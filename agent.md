@@ -1,0 +1,194 @@
+# ParadoxCode Agent Guide
+
+本文件是参与 ParadoxCode 的代理和开发者的工作约定。目标是让每次改动都能沿着既定架构推进，并留下可验证、可维护、可追溯的结果。
+
+## 1. 先理解项目
+
+开始任何实现前，按以下顺序阅读：
+
+1. `docs/README.md`：当前决策、文档索引和文档状态；
+2. `docs/architecture.md`：数据流、crate 依赖、并发、身份和错误恢复；
+3. `docs/mvp.md`：MVP 成功定义、非目标、阶段和退出条件；
+4. 与当前任务直接相关的 RFC；
+5. `docs/reference-study.md`：CWTools、EU4 Config、Jomini 的调研结论和版权边界；
+6. `plan.md`：当前执行顺序、阶段状态和风险。
+
+不要把 `reference/` 当作生产代码或可直接复制的测试 corpus。它只用于研究。
+
+## 2. 代理的默认职责
+
+你不是只负责“把代码写出来”，而是负责在现有设计边界内完成一个可验证的垂直切片：
+
+- 先确认任务属于哪个 Phase、哪个 crate 和哪个 RFC；
+- 先检查现状和已有未提交改动，再决定编辑范围；
+- 以最小增量实现，避免提前引入没有性能证据的框架；
+- 同步添加能证明行为的测试或 fixture；
+- 如果实现改变了架构约束、公开 API、规则 schema、CLI 或配置，更新相关文档；
+- 最后运行与改动相称的验证，并明确报告未运行的检查和剩余风险。
+
+没有实现代码时，先建立最小骨架和验证路径，不要直接堆叠完整语言服务功能。
+
+## 3. 权威性和设计变更
+
+设计冲突时按以下优先级处理：
+
+1. 用户当前明确要求；
+2. 已接受的 RFC 和 `docs/architecture.md`；
+3. `plan.md` 的阶段约束；
+4. 尚未接受的提案、调研笔记和实现便利性。
+
+如果必须改变已接受的边界：
+
+- 先写清问题、备选方案、影响和迁移成本；
+- 修改对应 RFC 的状态、决策和验收条件；
+- 再修改实现计划和代码；
+- 在交付说明中指出这是设计变更，而不是普通重构。
+
+不要为了让测试通过而悄悄放宽规则、吞掉未知输入、绕过 source root resolution 或把业务逻辑塞进 LSP 层。
+
+## 4. 架构边界
+
+必须维持以下依赖方向：
+
+```text
+pdx-text
+  -> pdx-syntax -> pdx-hir -> pdx-workspace -> pdx-analysis -> pdx-lsp
+  -> pdx-format                                      -> pdx-cli
+pdx-eu4 -> pdx-cwt
+pdx-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
+```
+
+各层职责：
+
+| 层 | 允许负责的事情 | 不应负责的事情 |
+| --- | --- | --- |
+| `pdx-text` | offset、line index、UTF-8/UTF-16、URI/path 基础 | EU4 规则、workspace 状态 |
+| `pdx-syntax` | 硬编码 EU4 loss-aware CST、增量 parse、syntax error | 规则数据库、磁盘扫描、LSP 类型 |
+| `pdx-eu4` | EU4 SQLite schema、canonical view、`rule_hash`、只读 runtime API | CWT parser、LSP、动态 Mod symbol |
+| `pdx-cwt` | 一次性 CWT discovery/import/report | runtime 依赖、持续同步、CWT fallback |
+| `pdx-hir` | 基于 typed CST 和 Eu4Rules 的 lowering、scope | 编辑器 API、磁盘 I/O |
+| `pdx-workspace` | VFS、overlay、source roots、parse/HIR cache、index shards、snapshot | LSP protocol types |
+| `pdx-analysis` | 面向 snapshot 的 diagnostics/completion/hover/navigation/rename 查询 | 直接读磁盘、editor client |
+| `pdx-format` | 安全 formatter 和 edit 生成 | 语义修复、破坏性重写 |
+| `pdx-lsp` | 生命周期、capability、协议转换、取消、publish diagnostics | EU4 名称表、业务查询、规则解释 |
+| `editors/zed` | language metadata、queries、server 获取/启动、配置传递 | symbol 提取、scope 推导、EU4 规则实现 |
+
+`AnalysisHost` 是可变状态的拥有者；请求读取不可变 `AnalysisSnapshot`，查询期间不持有 host 锁。后台结果提交前必须校验文档版本或 snapshot 身份。
+
+## 5. 实现不变量
+
+### 数据和身份
+
+- source 优先级固定为：未保存 overlay > 当前 Mod > 有序依赖 Mod > Vanilla；
+- `SourceRootId`、`SourceFileId`、`DocumentId`、`SymbolId` 使用稳定身份；
+- 不用绝对路径字符串作为跨请求 symbol 身份；
+- 不用 CST node pointer 作为跨请求身份；
+- 每个文件独立生成和替换 index shard；
+- 被覆盖 definition 可以保留用于解释，但不能成为活动跳转目标；
+- Vanilla cache 只在首次配置或用户显式刷新时建立/更新，不因 rule hash 或文件变化自动刷新。
+
+### 错误恢复
+
+- syntax error 不阻止局部 CST 产生；
+- lowering 遇到未知节点生成 `UnknownConstruct`，不 panic；
+- 未知 scope 保留为 `Unknown`，避免级联错误；
+- importer 遇到未建模 CWT construct 必须失败，或在报告中明确记录并由人工批准为 non-semantic；
+- formatter 遇到不安全 `ERROR` node 返回无编辑和明确原因。
+
+### 规则数据库
+
+- `eu4.pdxrules` 是 runtime 的唯一权威规则源；
+- runtime 不读取、下载或重新导入 CWT；
+- `rule_hash` hash 的是规范化逻辑内容，不是 SQLite 文件 bytes；
+- hash 不受 rowid、插入顺序、页布局、index、VACUUM、时间戳和 import log 影响；
+- 动态 scripted effect、trigger、building 等成员来自 `WorkspaceIndex`，不得硬编码进核心 crate 或 extension；
+- 导入必须保留 source order、重复 key 和 alternative identity，不能先转换成普通 map。
+
+## 6. 推荐工作流
+
+### 开始前
+
+1. `rg --files` 查找相关实现、fixture、脚本和文档；
+2. 查看 `git status`；如果工作区不是有效 Git checkout，不要自行初始化或清理仓库状态；
+3. 阅读当前任务关联的 RFC 和现有测试；
+4. 写出本次改动的最小范围、预期不变量和验证命令；
+5. 若发现已有改动，保留其内容，只编辑任务所需的区域。
+
+### 实现中
+
+- 每次改动保持可编译或尽量保持局部可验证；
+- 公开 API、diagnostic code、symbol kind、schema rule id 使用稳定命名；
+- 用户输入路径、文件内容和配置错误必须显式返回，禁止用 `unwrap`/`expect` 逃逸；
+- `unsafe` 默认禁止；若依赖确实需要，封装在最小边界并写出 safety contract；
+- 后台任务要可取消，或有明确的资源和时间上限；
+- 不为其他游戏保留抽象；EU4 语法、路径和规则可以直接硬编码在对应核心模块中；
+- EU4 名称表和规则属于 Rust 核心，不放进 Zed extension。
+
+### 完成前
+
+- 添加或更新 unit、golden、integration、corpus、property/fuzz 测试中的适用层级；
+- 对 parser/formatter 使用原创 fixture，避免复制 Vanilla 或参考仓库 corpus；
+- 对规则/importer 运行 schema、foreign key、stable ID 和 canonical hash 校验；
+- 对 LSP 改动运行真实 JSON-RPC transport 测试；
+- 对 Zed 改动运行 manifest/build 或可行的 smoke test；
+- 更新 `plan.md` 阶段状态，或在交付报告中说明为什么暂不更新；
+- 汇报验证结果、未运行的检查和剩余风险。
+
+## 7. 测试策略
+
+按改动层级选择测试，不要只测试最内部的函数：
+
+- `pdx-text`：offset、line endings、UTF-16、URI/path；
+- `pdx-syntax`：typed CST、错误提取、增量编辑、错误恢复；
+- `pdx-eu4`：schema、只读加载、foreign key、hash 稳定性和 runtime invariants；
+- `pdx-cwt`：source discovery、construct inventory、directive/documentation 关联、事务回滚、报告；
+- `pdx-hir`：scope transition、unknown context、typed lowering；
+- `pdx-workspace`：root order、overlay、覆盖解析、shard replacement、snapshot；
+- `pdx-analysis`：diagnostics、completion、definition、references、hover、rename；
+- `pdx-format`：trivia safety、token preservation、idempotence；
+- `pdx-lsp`：真实 JSON-RPC、capability fallback、版本乱序、取消、stale diagnostics；
+- Zed：manifest、Wasm/build、文件识别和 server 启动 smoke test。
+
+MVP fuzz 至少覆盖 PdxScript/localisation parse、incremental edit 等价性、typed CST walk、HIR lowering、formatter、line index、CWT import 和 EU4 CSV parser。发现的 crash 修复后必须进入 regression corpus。
+
+## 8. 版权、安全和数据边界
+
+- 不提交或再分发 Vanilla EU4 文件、用户本地 Vanilla cache 或原生 CWT source tree；
+- `reference/` 只用于研究，不进入正常构建和 runtime；
+- 规则 artifact 只包含已确认可再分发的数据和必要 provenance；
+- provenance 记录上游项目、固定 commit、输入 hash、许可证和 importer/schema 版本；
+- Mod/CWT 配置永不作为任意代码执行；
+- 扫描限制文件大小、嵌套深度、路径逃逸和资源消耗；
+- importer 输入路径必须显式、可复现、稳定排序，并拒绝重复 logical identity；
+- atomic publish 前先完成完整 validation，禁止留下半写数据库。
+
+## 9. 交付报告格式
+
+完成任务时，报告应简要包含：
+
+1. 结果：实现了什么，涉及哪些文件；
+2. 设计：是否遵循现有 RFC，是否有设计变更；
+3. 验证：运行了哪些命令，结果如何；
+4. 未完成：哪些检查未运行，原因是什么；
+5. 风险：已知限制、后续建议和是否影响下一 Phase。
+
+如果任务被阻塞，先完成所有不依赖外部输入的检查，并说明阻塞点、已尝试的替代路径和需要的最小决策。不要用静默降级掩盖缺失规则、缺失依赖或不确定的解析结果。
+
+## 10. 常用文档入口
+
+- [实施计划](plan.md)
+- [设计文档索引](docs/README.md)
+- [总体架构](docs/architecture.md)
+- [EU4 MVP](docs/mvp.md)
+- [系统边界与 crate 依赖](docs/rfc/0001-system-boundaries.md)
+- [语法、CST 与增量解析](docs/rfc/0002-syntax-cst.md)
+- [Workspace/VFS](docs/rfc/0003-workspace-vfs.md)
+- [Eu4Rules](docs/rfc/0004-eu4-rules-schema.md)
+- [HIR 与 Scope](docs/rfc/0005-hir-scope.md)
+- [Symbol/Reference Index](docs/rfc/0006-symbol-index.md)
+- [诊断与补全](docs/rfc/0007-diagnostics-completion.md)
+- [安全格式化](docs/rfc/0008-formatter.md)
+- [LSP Runtime](docs/rfc/0009-lsp-runtime.md)
+- [Zed 集成](docs/rfc/0010-zed-integration.md)
+- [测试与质量门禁](docs/rfc/0011-testing-quality.md)
+- [CWT 一次性导入](docs/rfc/0012-cwt-rule-compiler.md)

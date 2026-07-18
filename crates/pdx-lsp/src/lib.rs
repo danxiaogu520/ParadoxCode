@@ -1,0 +1,1283 @@
+//! Minimal JSON-RPC/LSP runtime for the EU4 language server.
+//!
+//! The crate owns transport framing, protocol state, document versioning, URI and position
+//! conversion, and result freshness checks. Parser and language-feature logic remains in the
+//! editor-neutral workspace and analysis crates.
+
+use std::collections::{BTreeMap, HashSet};
+use std::fmt;
+use std::io::{self, BufRead, BufReader, Read, Write};
+use std::path::{Path, PathBuf};
+
+use pdx_analysis::{
+    CompletionKind, Hover, Location, RenameError, complete, definition, diagnostics,
+    document_symbols, hover, prepare_rename, references, rename, workspace_symbols,
+};
+use pdx_eu4::{Eu4Rules, RulesError};
+use pdx_text::{LineIndex, Position, TextRange};
+use pdx_workspace::{
+    AnalysisHost, AnalysisSnapshot, DocumentError, DocumentId, DocumentSource, SourceRoot,
+    SourceRootId, SourceRootKind, TextChange, WorkspaceChange,
+};
+use serde_json::{Value, json};
+
+const JSON_RPC_VERSION: &str = "2.0";
+const INVALID_REQUEST: i64 = -32600;
+const METHOD_NOT_FOUND: i64 = -32601;
+const INVALID_PARAMS: i64 = -32602;
+const SERVER_NOT_INITIALIZED: i64 = -32002;
+const REQUEST_CANCELLED: i64 = -32800;
+
+/// Lifecycle state of the server process.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum ServerState {
+    /// The process accepts only `initialize`, `exit`, and cancellation notifications.
+    Uninitialized,
+    /// The server has completed `initialize` and accepts document events.
+    Initialized,
+    /// `shutdown` completed; only `exit` is accepted.
+    ShuttingDown,
+    /// The `exit` notification was received.
+    Exited,
+}
+
+/// Explicit options passed by an editor or CLI.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct InitializeOptions {
+    /// Optional packaged EU4 rules path. The server validates and loads it read-only before serving.
+    pub rules_path: Option<PathBuf>,
+}
+
+/// Errors raised by the server transport or process lifecycle.
+#[derive(Debug)]
+pub enum LspError {
+    /// The underlying transport failed.
+    Io(io::Error),
+    /// A JSON message could not be decoded or encoded.
+    Json(serde_json::Error),
+    /// The message framing or process lifecycle was invalid.
+    Protocol(String),
+    /// The explicitly requested EU4 rules artifact failed validation.
+    Rules(RulesError),
+    /// The client exited without first sending `shutdown`.
+    ExitWithoutShutdown,
+}
+
+impl fmt::Display for LspError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Io(error) => write!(formatter, "LSP transport I/O error: {error}"),
+            Self::Json(error) => write!(formatter, "invalid LSP JSON message: {error}"),
+            Self::Protocol(message) => write!(formatter, "LSP protocol error: {message}"),
+            Self::Rules(error) => write!(formatter, "LSP rules error: {error}"),
+            Self::ExitWithoutShutdown => formatter.write_str("LSP exit received before shutdown"),
+        }
+    }
+}
+
+impl std::error::Error for LspError {}
+
+impl From<io::Error> for LspError {
+    fn from(error: io::Error) -> Self {
+        Self::Io(error)
+    }
+}
+
+impl From<serde_json::Error> for LspError {
+    fn from(error: serde_json::Error) -> Self {
+        Self::Json(error)
+    }
+}
+
+impl From<RulesError> for LspError {
+    fn from(error: RulesError) -> Self {
+        Self::Rules(error)
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum RequestId {
+    Number(i64),
+    String(String),
+}
+
+impl RequestId {
+    fn parse(value: &Value) -> Result<Self, RpcError> {
+        if let Some(number) = value.as_i64() {
+            return Ok(Self::Number(number));
+        }
+        if let Some(string) = value.as_str() {
+            return Ok(Self::String(string.to_owned()));
+        }
+        Err(RpcError::new(INVALID_REQUEST, "request id must be a string or integer"))
+    }
+}
+
+#[derive(Clone, Debug)]
+struct RpcError {
+    code: i64,
+    message: String,
+}
+
+impl RpcError {
+    fn new(code: i64, message: &'static str) -> Self {
+        Self { code, message: message.to_owned() }
+    }
+
+    fn response(&self, id: Value) -> Value {
+        json!({
+            "jsonrpc": JSON_RPC_VERSION,
+            "id": id,
+            "error": {"code": self.code, "message": self.message},
+        })
+    }
+}
+
+/// An LSP server with a single event-loop-owned workspace host.
+#[derive(Debug)]
+pub struct LspServer {
+    state: ServerState,
+    options: InitializeOptions,
+    host: AnalysisHost,
+    cancelled: HashSet<RequestId>,
+    diagnostics: BTreeMap<DocumentId, Value>,
+    clean_exit: bool,
+}
+
+impl LspServer {
+    /// Creates a server in the pre-initialize state.
+    #[must_use]
+    pub fn new(options: InitializeOptions) -> Self {
+        let rules = options
+            .rules_path
+            .as_deref()
+            .and_then(|path| Eu4Rules::load(path).ok())
+            .unwrap_or_else(Eu4Rules::empty);
+        Self {
+            state: ServerState::Uninitialized,
+            options,
+            host: AnalysisHost::new(rules),
+            cancelled: HashSet::new(),
+            diagnostics: BTreeMap::new(),
+            clean_exit: false,
+        }
+    }
+
+    /// Creates a server and fails when an explicitly supplied rules artifact is invalid.
+    pub fn try_new(options: InitializeOptions) -> Result<Self, LspError> {
+        let rules = match options.rules_path.as_deref() {
+            Some(path) => Eu4Rules::load(path)?,
+            None => Eu4Rules::empty(),
+        };
+        Ok(Self {
+            state: ServerState::Uninitialized,
+            options,
+            host: AnalysisHost::new(rules),
+            cancelled: HashSet::new(),
+            diagnostics: BTreeMap::new(),
+            clean_exit: false,
+        })
+    }
+
+    /// Returns the current lifecycle state.
+    #[must_use]
+    pub const fn state(&self) -> ServerState {
+        self.state
+    }
+
+    /// Returns the options captured at construction time.
+    #[must_use]
+    pub const fn options(&self) -> &InitializeOptions {
+        &self.options
+    }
+
+    /// Captures the immutable workspace view used by editor-neutral queries.
+    #[must_use]
+    pub fn snapshot(&self) -> AnalysisSnapshot {
+        self.host.snapshot()
+    }
+
+    /// Commits diagnostics only if they still match the current open-document version.
+    ///
+    /// Phase 2 has no syntax analyzer yet, but this freshness gate is the boundary used by later
+    /// background diagnostics workers. A stale result is discarded without changing the store.
+    pub fn commit_diagnostics(&mut self, uri: &str, version: i64, diagnostics: Value) -> bool {
+        let id = DocumentId::new(uri);
+        let snapshot = self.host.snapshot();
+        let current = snapshot.document(&id);
+        if current.is_some_and(|document| {
+            document.source() == DocumentSource::Overlay && document.version() == Some(version)
+        }) {
+            self.diagnostics.insert(id, diagnostics);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Returns the last accepted diagnostics batch for a document.
+    #[must_use]
+    pub fn diagnostics(&self, uri: &str) -> Option<&Value> {
+        self.diagnostics.get(&DocumentId::new(uri))
+    }
+
+    /// Runs the framed stdio transport used by `pdx-ls`.
+    pub fn run_stdio(options: InitializeOptions) -> Result<(), LspError> {
+        let stdin = io::stdin();
+        let stdout = io::stdout();
+        let mut server = Self::try_new(options)?;
+        server.run_transport(stdin.lock(), stdout.lock())
+    }
+
+    /// Runs the same framed transport over arbitrary streams.
+    ///
+    /// This is public so integration tests can drive the actual JSON-RPC framing without a
+    /// process or socket. The event loop remains sequential, which guarantees document versions
+    /// are applied in arrival order and never holds a host lock during a query snapshot.
+    pub fn run_transport<R: Read, W: Write>(
+        &mut self,
+        input: R,
+        mut output: W,
+    ) -> Result<(), LspError> {
+        let mut input = BufReader::new(input);
+        loop {
+            let Some(message) = read_message(&mut input)? else {
+                return if self.state == ServerState::Exited && self.clean_exit {
+                    Ok(())
+                } else {
+                    Err(LspError::Protocol("transport ended before a clean exit".to_owned()))
+                };
+            };
+            let responses = self.handle_message(message)?;
+            for response in responses {
+                write_message(&mut output, &response)?;
+            }
+            if self.state == ServerState::Exited {
+                return if self.clean_exit { Ok(()) } else { Err(LspError::ExitWithoutShutdown) };
+            }
+        }
+    }
+
+    fn handle_message(&mut self, message: Value) -> Result<Vec<Value>, LspError> {
+        let Some(object) = message.as_object() else {
+            return Ok(vec![
+                RpcError::new(INVALID_REQUEST, "request must be a JSON object")
+                    .response(Value::Null),
+            ]);
+        };
+        if object.get("jsonrpc").and_then(Value::as_str) != Some(JSON_RPC_VERSION) {
+            return Ok(vec![
+                RpcError::new(INVALID_REQUEST, "jsonrpc must be \"2.0\"")
+                    .response(object.get("id").cloned().unwrap_or(Value::Null)),
+            ]);
+        }
+        let Some(method) = object.get("method").and_then(Value::as_str) else {
+            // Responses from a client are not part of Phase 2's server input stream.
+            if object.contains_key("result") || object.contains_key("error") {
+                return Ok(Vec::new());
+            }
+            return Ok(vec![
+                RpcError::new(INVALID_REQUEST, "request method is missing")
+                    .response(object.get("id").cloned().unwrap_or(Value::Null)),
+            ]);
+        };
+        let id_value = object.get("id").cloned();
+        let request_id = match id_value.as_ref() {
+            Some(Value::Null) => None,
+            Some(value) => match RequestId::parse(value) {
+                Ok(request_id) => Some(request_id),
+                Err(error) => return Ok(vec![error.response(Value::Null)]),
+            },
+            None => None,
+        };
+
+        if method == "$/cancelRequest" {
+            self.handle_cancel(object.get("params"));
+            return Ok(Vec::new());
+        }
+
+        let result = self.dispatch_method(method, object.get("params"), request_id.as_ref());
+        match (id_value, result) {
+            (Some(id), Ok(value)) => {
+                Ok(vec![json!({"jsonrpc": JSON_RPC_VERSION, "id": id, "result": value})])
+            }
+            (Some(id), Err(error)) => Ok(vec![error.response(id)]),
+            (None, Ok(value)) if value != Value::Null => Ok(vec![value]),
+            (None, _) => Ok(Vec::new()),
+        }
+    }
+
+    fn dispatch_method(
+        &mut self,
+        method: &str,
+        params: Option<&Value>,
+        request_id: Option<&RequestId>,
+    ) -> Result<Value, RpcError> {
+        if method == "exit" {
+            self.clean_exit = self.state == ServerState::ShuttingDown;
+            self.state = ServerState::Exited;
+            return Ok(Value::Null);
+        }
+        if method == "initialize" {
+            if self.state != ServerState::Uninitialized {
+                return Err(RpcError::new(INVALID_REQUEST, "server is already initialized"));
+            }
+            return self.handle_initialize(params);
+        }
+        if let Some(request_id) = request_id {
+            if self.cancelled.remove(request_id) {
+                return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
+            }
+        }
+        if self.state == ServerState::Uninitialized {
+            return Err(RpcError::new(SERVER_NOT_INITIALIZED, "server is not initialized"));
+        }
+        if self.state == ServerState::ShuttingDown {
+            return Err(RpcError::new(SERVER_NOT_INITIALIZED, "server is shutting down"));
+        }
+
+        match method {
+            "initialized" => Ok(Value::Null),
+            "shutdown" => {
+                self.state = ServerState::ShuttingDown;
+                Ok(Value::Null)
+            }
+            "textDocument/didOpen" => {
+                let uri = self.handle_did_open(params)?;
+                Ok(self.publish_diagnostics(&uri))
+            }
+            "textDocument/didChange" => {
+                let uri = self.handle_did_change(params)?;
+                Ok(self.publish_diagnostics(&uri))
+            }
+            "textDocument/didClose" => self.handle_did_close(params),
+            "textDocument/didSave" => {
+                let uri = params
+                    .and_then(Value::as_object)
+                    .and_then(|object| object.get("textDocument"))
+                    .and_then(Value::as_object)
+                    .and_then(|object| object.get("uri"))
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        RpcError::new(INVALID_PARAMS, "didSave requires textDocument")
+                    })?;
+                Ok(self.publish_diagnostics(uri))
+            }
+            "textDocument/completion" => self.handle_completion(params),
+            "textDocument/hover" => self.handle_hover(params),
+            "textDocument/definition" => self.handle_definition(params),
+            "textDocument/references" => self.handle_references(params),
+            "textDocument/prepareRename" => self.handle_prepare_rename(params),
+            "textDocument/rename" => self.handle_rename(params),
+            "textDocument/documentSymbol" => self.handle_document_symbols(params),
+            "workspace/symbol" => self.handle_workspace_symbols(params),
+            _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
+        }
+    }
+
+    fn handle_cancel(&mut self, params: Option<&Value>) {
+        let Some(id) = params
+            .and_then(Value::as_object)
+            .and_then(|object| object.get("id"))
+            .and_then(|value| RequestId::parse(value).ok())
+        else {
+            return;
+        };
+        self.cancelled.insert(id);
+    }
+
+    fn handle_initialize(&mut self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let object = params
+            .and_then(Value::as_object)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "initialize params must be an object"))?;
+        let root = if let Some(root_uri) = object.get("rootUri") {
+            parse_optional_file_uri(root_uri)?
+        } else {
+            object
+                .get("workspaceFolders")
+                .and_then(Value::as_array)
+                .and_then(|folders| folders.first())
+                .and_then(Value::as_object)
+                .and_then(|folder| folder.get("uri"))
+                .map(parse_file_uri)
+                .transpose()?
+        };
+        self.host.apply_change(WorkspaceChange::SetWorkspaceRoot(root.clone()));
+        if let Some(root) = root.filter(|path| path.is_dir()) {
+            self.host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root,
+            )]));
+            if self.options.rules_path.is_some() {
+                self.host.refresh_source_roots().map_err(|error| RpcError {
+                    code: INVALID_PARAMS,
+                    message: error.to_string(),
+                })?;
+            }
+        }
+        self.state = ServerState::Initialized;
+        Ok(json!({
+            "capabilities": {
+                "textDocumentSync": {"openClose": true, "change": 2},
+                "completionProvider": {"triggerCharacters": ["=", " ", ":"]},
+                "hoverProvider": true,
+                "definitionProvider": true,
+                "referencesProvider": true,
+                "renameProvider": {"prepareProvider": true},
+                "documentSymbolProvider": true,
+                "workspaceSymbolProvider": true
+            },
+            "serverInfo": {"name": "pdx-ls", "version": "0.1.0"}
+        }))
+    }
+
+    fn handle_did_open(&mut self, params: Option<&Value>) -> Result<String, RpcError> {
+        let text_document = params
+            .and_then(Value::as_object)
+            .and_then(|object| object.get("textDocument"))
+            .and_then(Value::as_object)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "didOpen requires textDocument"))?;
+        let uri = required_string(text_document, "uri")?;
+        let version = required_i64(text_document, "version")?;
+        let text = required_string(text_document, "text")?.to_owned();
+        let path = uri_to_path(uri).ok();
+        self.host
+            .open_document(DocumentId::new(uri), version, text, path)
+            .map_err(document_error)?;
+        Ok(uri.to_owned())
+    }
+
+    fn handle_did_change(&mut self, params: Option<&Value>) -> Result<String, RpcError> {
+        let object = params
+            .and_then(Value::as_object)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "didChange params must be an object"))?;
+        let text_document = object
+            .get("textDocument")
+            .and_then(Value::as_object)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "didChange requires textDocument"))?;
+        let uri = required_string(text_document, "uri")?;
+        let id = DocumentId::new(uri);
+        let version = required_i64(text_document, "version")?;
+        let snapshot = self.host.snapshot();
+        let current = snapshot
+            .document(&id)
+            .filter(|document| document.source() == DocumentSource::Overlay)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "didChange document is not open"))?;
+        let mut text = current.text().to_owned();
+        let mut line_index = current.line_index().clone();
+        let mut changes = Vec::new();
+        let content_changes = object
+            .get("contentChanges")
+            .and_then(Value::as_array)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "didChange requires contentChanges"))?;
+        for content_change in content_changes {
+            let change = content_change
+                .as_object()
+                .ok_or_else(|| RpcError::new(INVALID_PARAMS, "content change must be an object"))?;
+            let replacement = required_string(change, "text")?.to_owned();
+            let range = change
+                .get("range")
+                .map(|value| lsp_range_to_text_range(value, &line_index, &text))
+                .transpose()?;
+            apply_text_change(&mut text, range, &replacement)?;
+            changes.push(TextChange { range, text: replacement });
+            line_index = LineIndex::new(&text);
+        }
+        self.host.apply_document_changes(&id, version, &changes).map_err(document_error)?;
+        Ok(uri.to_owned())
+    }
+
+    fn handle_did_close(&mut self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let text_document = params
+            .and_then(Value::as_object)
+            .and_then(|object| object.get("textDocument"))
+            .and_then(Value::as_object)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "didClose requires textDocument"))?;
+        let uri = required_string(text_document, "uri")?;
+        let id = DocumentId::new(uri);
+        self.host.close_document(&id).map_err(document_error)?;
+        self.diagnostics.remove(&id);
+        Ok(json!({
+            "jsonrpc": JSON_RPC_VERSION,
+            "method": "textDocument/publishDiagnostics",
+            "params": {"uri": uri, "diagnostics": []}
+        }))
+    }
+
+    fn publish_diagnostics(&mut self, uri: &str) -> Value {
+        let id = DocumentId::new(uri);
+        let snapshot = self.host.snapshot();
+        let values = snapshot.document(&id).map_or_else(Vec::new, |document| {
+            diagnostics(&snapshot, &id)
+                .into_iter()
+                .map(|diagnostic| {
+                    json!({
+                        "range": range_to_json(document.line_index(), document.text(), diagnostic.range),
+                        "severity": diagnostic.severity,
+                        "code": diagnostic.code.as_str(),
+                        "source": "pdx-analysis",
+                        "message": diagnostic.message,
+                    })
+                })
+                .collect::<Vec<_>>()
+        });
+        let value = json!({
+            "jsonrpc": JSON_RPC_VERSION,
+            "method": "textDocument/publishDiagnostics",
+            "params": {"uri": uri, "diagnostics": values},
+        });
+        if let Some(params) = value.get("params").and_then(|params| params.get("diagnostics")) {
+            self.diagnostics.insert(id, params.clone());
+        }
+        value
+    }
+
+    fn handle_completion(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let (id, position) = self.document_position(params)?;
+        let result = complete(&self.host.snapshot(), &id, position);
+        let snapshot = self.host.snapshot();
+        let document = snapshot
+            .document(&id)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
+        let items = result
+            .items
+            .into_iter()
+            .map(|item| {
+                let insert_format = u8::from(item.insert_text.contains("$0"));
+                json!({
+                    "label": item.label,
+                    "kind": completion_kind(item.kind),
+                    "detail": item.detail,
+                    "documentation": item.documentation,
+                    "deprecated": item.deprecated,
+                    "sortText": format!("{:03}", item.sort_score),
+                    "insertText": item.insert_text,
+                    "insertTextFormat": if insert_format == 1 { 2 } else { 1 },
+                    "textEdit": {
+                        "range": range_to_json(document.line_index(), document.text(), item.replacement_range),
+                        "newText": item.insert_text,
+                    },
+                })
+            })
+            .collect::<Vec<_>>();
+        Ok(json!({"isIncomplete": false, "items": items}))
+    }
+
+    fn handle_hover(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let (id, position) = self.document_position(params)?;
+        let snapshot = self.host.snapshot();
+        let Some(value) = hover(&snapshot, &id, position) else { return Ok(Value::Null) };
+        let document = snapshot
+            .document(&id)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
+        Ok(hover_to_json(&value, document.line_index(), document.text()))
+    }
+
+    fn handle_definition(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let (id, position) = self.document_position(params)?;
+        let snapshot = self.host.snapshot();
+        let result = definition(&snapshot, &id, position)
+            .into_iter()
+            .filter_map(|location| location_to_json(&snapshot, &location))
+            .collect::<Vec<_>>();
+        Ok(Value::Array(result))
+    }
+
+    fn handle_references(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let (id, position) = self.document_position(params)?;
+        let include_declaration = params
+            .and_then(Value::as_object)
+            .and_then(|object| object.get("context"))
+            .and_then(Value::as_object)
+            .and_then(|context| context.get("includeDeclaration"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let snapshot = self.host.snapshot();
+        let result = references(&snapshot, &id, position, include_declaration)
+            .into_iter()
+            .filter_map(|location| location_to_json(&snapshot, &location))
+            .collect::<Vec<_>>();
+        Ok(Value::Array(result))
+    }
+
+    fn handle_prepare_rename(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let (id, position) = self.document_position(params)?;
+        let snapshot = self.host.snapshot();
+        let result = prepare_rename(&snapshot, &id, position).map_err(rename_error)?;
+        let document = snapshot
+            .document(&id)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
+        Ok(json!({
+            "range": range_to_json(document.line_index(), document.text(), result.range),
+            "placeholder": result.placeholder,
+        }))
+    }
+
+    fn handle_rename(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let new_name = params
+            .and_then(Value::as_object)
+            .and_then(|object| object.get("newName"))
+            .and_then(Value::as_str)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "rename requires newName"))?;
+        let (id, position) = self.document_position(params)?;
+        let snapshot = self.host.snapshot();
+        let plan = rename(&snapshot, &id, position, new_name).map_err(rename_error)?;
+        let mut changes = BTreeMap::<String, Vec<Value>>::new();
+        for edit in plan.edits {
+            let location = location_to_json(&snapshot, &edit.location).ok_or_else(|| {
+                RpcError::new(INVALID_PARAMS, "rename target has no client-visible URI")
+            })?;
+            let uri = location
+                .get("uri")
+                .and_then(Value::as_str)
+                .ok_or_else(|| RpcError::new(INVALID_PARAMS, "rename target has no URI"))?
+                .to_owned();
+            let range = location
+                .get("range")
+                .cloned()
+                .ok_or_else(|| RpcError::new(INVALID_PARAMS, "rename target has no range"))?;
+            changes.entry(uri).or_default().push(json!({
+                "range": range,
+                "newText": edit.new_text,
+            }));
+        }
+        Ok(json!({"changes": changes}))
+    }
+
+    fn handle_document_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let id = self.document_id(params)?;
+        let snapshot = self.host.snapshot();
+        let result = document_symbols(&snapshot, &id)
+            .into_iter()
+            .map(|symbol| {
+                json!({
+                    "name": symbol.name,
+                    "kind": symbol_kind(&symbol.kind),
+                    "range": location_range_to_json(&snapshot, &symbol.location),
+                    "selectionRange": range_to_json_for_location(&snapshot, &symbol.location, symbol.selection_range),
+                })
+            })
+            .collect::<Vec<_>>();
+        Ok(Value::Array(result))
+    }
+
+    fn handle_workspace_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let query = params
+            .and_then(Value::as_object)
+            .and_then(|object| object.get("query"))
+            .and_then(Value::as_str)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "workspace/symbol requires query"))?;
+        let snapshot = self.host.snapshot();
+        let result = workspace_symbols(&snapshot, query)
+            .into_iter()
+            .filter_map(|symbol| {
+                let location = location_to_json(&snapshot, &symbol.location)?;
+                Some(json!({
+                    "name": symbol.name,
+                    "kind": symbol_kind(&symbol.kind),
+                    "location": location,
+                }))
+            })
+            .collect::<Vec<_>>();
+        Ok(Value::Array(result))
+    }
+
+    fn document_id(&self, params: Option<&Value>) -> Result<DocumentId, RpcError> {
+        let uri = params
+            .and_then(Value::as_object)
+            .and_then(|object| object.get("textDocument"))
+            .and_then(Value::as_object)
+            .and_then(|object| object.get("uri"))
+            .and_then(Value::as_str)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "textDocument uri is required"))?;
+        Ok(DocumentId::new(uri))
+    }
+
+    fn document_position(&self, params: Option<&Value>) -> Result<(DocumentId, u32), RpcError> {
+        let id = self.document_id(params)?;
+        let position = params
+            .and_then(Value::as_object)
+            .and_then(|object| object.get("position"))
+            .map(|value| position_from_json(Some(value)))
+            .transpose()?
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "position is required"))?;
+        let snapshot = self.host.snapshot();
+        let document = snapshot
+            .document(&id)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
+        document
+            .line_index()
+            .offset(document.text(), position)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "position is not valid UTF-16"))
+            .map(|offset| (id, offset))
+    }
+}
+
+fn completion_kind(kind: CompletionKind) -> u8 {
+    match kind {
+        CompletionKind::Key => 10,
+        CompletionKind::Value => 12,
+        CompletionKind::Symbol => 3,
+        CompletionKind::Localisation => 14,
+    }
+}
+
+fn symbol_kind(kind: &str) -> u8 {
+    match kind {
+        "localisation" => 15,
+        "event" => 12,
+        "scripted_effect" | "scripted_trigger" => 3,
+        _ => 13,
+    }
+}
+
+fn hover_to_json(value: &Hover, index: &LineIndex, text: &str) -> Value {
+    let mut result = json!({
+        "contents": {"kind": "markdown", "value": value.contents},
+    });
+    if let Some(range) = value.range {
+        result["range"] = range_to_json(index, text, range);
+    }
+    result
+}
+
+fn range_to_json(index: &LineIndex, text: &str, range: TextRange) -> Value {
+    let start = index.position(text, range.start()).unwrap_or_default();
+    let end = index.position(text, range.end()).unwrap_or(start);
+    json!({
+        "start": {"line": start.line, "character": start.character},
+        "end": {"line": end.line, "character": end.character},
+    })
+}
+
+fn location_range_to_json(snapshot: &AnalysisSnapshot, location: &Location) -> Value {
+    if let Some(document) = location.document.as_ref()
+        && let Some(document) = snapshot.document(document)
+    {
+        return range_to_json(document.line_index(), document.text(), location.range);
+    }
+    if let Some(file) = location.file.and_then(|file| snapshot.source_text(file)) {
+        let index = LineIndex::new(file);
+        return range_to_json(&index, file, location.range);
+    }
+    json!({"start":{"line":0,"character":0},"end":{"line":0,"character":0}})
+}
+
+fn range_to_json_for_location(
+    snapshot: &AnalysisSnapshot,
+    location: &Location,
+    range: TextRange,
+) -> Value {
+    if let Some(document) = location.document.as_ref()
+        && let Some(document) = snapshot.document(document)
+    {
+        return range_to_json(document.line_index(), document.text(), range);
+    }
+    if let Some(file) = location.file.and_then(|file| snapshot.source_text(file)) {
+        let index = LineIndex::new(file);
+        return range_to_json(&index, file, range);
+    }
+    json!({"start":{"line":0,"character":0},"end":{"line":0,"character":0}})
+}
+
+fn location_to_json(snapshot: &AnalysisSnapshot, location: &Location) -> Option<Value> {
+    let uri = if let Some(document) = location.document.as_ref() {
+        document.as_str().to_owned()
+    } else if let Some(file) = location.file.and_then(|file| snapshot.source_files().get(&file)) {
+        path_to_uri(&file.physical_path)
+    } else if let (Some(root), Some(path)) = (snapshot.workspace_root(), location.path.as_ref()) {
+        path_to_uri(&root.join(path.as_str()))
+    } else {
+        return None;
+    };
+    Some(json!({"uri": uri, "range": location_range_to_json(snapshot, location)}))
+}
+
+fn document_error(error: DocumentError) -> RpcError {
+    RpcError { code: INVALID_PARAMS, message: error.to_string() }
+}
+
+fn rename_error(error: RenameError) -> RpcError {
+    RpcError { code: INVALID_PARAMS, message: format!("rename unavailable: {error}") }
+}
+
+fn required_string<'a>(
+    object: &'a serde_json::Map<String, Value>,
+    key: &'static str,
+) -> Result<&'a str, RpcError> {
+    object.get(key).and_then(Value::as_str).ok_or_else(|| RpcError::new(INVALID_PARAMS, key))
+}
+
+fn required_i64(
+    object: &serde_json::Map<String, Value>,
+    key: &'static str,
+) -> Result<i64, RpcError> {
+    object.get(key).and_then(Value::as_i64).ok_or_else(|| RpcError::new(INVALID_PARAMS, key))
+}
+
+fn parse_optional_file_uri(value: &Value) -> Result<Option<PathBuf>, RpcError> {
+    if value.is_null() { Ok(None) } else { parse_file_uri(value).map(Some) }
+}
+
+fn parse_file_uri(value: &Value) -> Result<PathBuf, RpcError> {
+    let uri = value
+        .as_str()
+        .ok_or_else(|| RpcError::new(INVALID_PARAMS, "URI must be a string or null"))?;
+    uri_to_path(uri).map_err(|_| RpcError::new(INVALID_PARAMS, "only file:// URIs are supported"))
+}
+
+fn lsp_range_to_text_range(
+    value: &Value,
+    index: &LineIndex,
+    text: &str,
+) -> Result<TextRange, RpcError> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| RpcError::new(INVALID_PARAMS, "range must be an object"))?;
+    let start = position_from_json(object.get("start"))?;
+    let end = position_from_json(object.get("end"))?;
+    let start = index.offset(text, start).ok_or_else(|| {
+        RpcError::new(INVALID_PARAMS, "range start is not a valid UTF-16 position")
+    })?;
+    let end = index
+        .offset(text, end)
+        .ok_or_else(|| RpcError::new(INVALID_PARAMS, "range end is not a valid UTF-16 position"))?;
+    TextRange::new(start, end)
+        .ok_or_else(|| RpcError::new(INVALID_PARAMS, "range end precedes start"))
+}
+
+fn position_from_json(value: Option<&Value>) -> Result<Position, RpcError> {
+    let object = value
+        .and_then(Value::as_object)
+        .ok_or_else(|| RpcError::new(INVALID_PARAMS, "position must be an object"))?;
+    let line = object
+        .get("line")
+        .and_then(Value::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+        .ok_or_else(|| RpcError::new(INVALID_PARAMS, "position line must be a u32"))?;
+    let character = object
+        .get("character")
+        .and_then(Value::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+        .ok_or_else(|| RpcError::new(INVALID_PARAMS, "position character must be a u32"))?;
+    Ok(Position::new(line, character))
+}
+
+fn apply_text_change(
+    text: &mut String,
+    range: Option<TextRange>,
+    replacement: &str,
+) -> Result<(), RpcError> {
+    if let Some(range) = range {
+        let start = usize::try_from(range.start())
+            .map_err(|_| RpcError::new(INVALID_PARAMS, "range is too large"))?;
+        let end = usize::try_from(range.end())
+            .map_err(|_| RpcError::new(INVALID_PARAMS, "range is too large"))?;
+        if text.get(start..end).is_none() {
+            return Err(RpcError::new(INVALID_PARAMS, "range is outside the document"));
+        }
+        text.replace_range(start..end, replacement);
+    } else {
+        text.clear();
+        text.push_str(replacement);
+    }
+    Ok(())
+}
+
+/// Converts a `file://` URI to a filesystem path.
+pub fn uri_to_path(uri: &str) -> Result<PathBuf, UriError> {
+    let rest = uri
+        .strip_prefix("file://")
+        .or_else(|| uri.strip_prefix("FILE://"))
+        .ok_or(UriError::UnsupportedScheme)?;
+    let rest = rest.split(['?', '#']).next().unwrap_or(rest);
+    let (authority, encoded_path) = if rest.starts_with('/') {
+        (None, rest.to_owned())
+    } else if let Some((authority, path)) = rest.split_once('/') {
+        (Some(authority), format!("/{path}"))
+    } else {
+        (Some(rest), "/".to_owned())
+    };
+    if authority.is_some_and(|value| !value.is_empty() && !value.eq_ignore_ascii_case("localhost"))
+    {
+        return Err(UriError::UnsupportedAuthority);
+    }
+    let decoded = percent_decode(&encoded_path)?;
+    #[cfg(windows)]
+    let decoded = decoded.strip_prefix('/').unwrap_or(&decoded).to_owned();
+    Ok(PathBuf::from(decoded))
+}
+
+/// Converts an absolute filesystem path to a percent-encoded `file://` URI.
+#[must_use]
+pub fn path_to_uri(path: &Path) -> String {
+    let raw = path.to_string_lossy();
+    let mut uri = String::from("file://");
+    if !raw.starts_with('/') {
+        uri.push('/');
+    }
+    for byte in raw.as_bytes() {
+        if *byte == b'/' || *byte == b':' || is_uri_unreserved(*byte) {
+            uri.push(char::from(*byte));
+        } else {
+            uri.push('%');
+            uri.push(hex_digit(byte >> 4));
+            uri.push(hex_digit(byte & 0x0f));
+        }
+    }
+    uri
+}
+
+/// URI conversion failure.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum UriError {
+    /// The URI is not a supported `file://` URI.
+    UnsupportedScheme,
+    /// A non-local authority was supplied.
+    UnsupportedAuthority,
+    /// A percent escape or UTF-8 sequence is invalid.
+    InvalidEncoding,
+}
+
+impl fmt::Display for UriError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::UnsupportedScheme => "unsupported URI scheme",
+            Self::UnsupportedAuthority => "unsupported URI authority",
+            Self::InvalidEncoding => "invalid URI percent encoding",
+        })
+    }
+}
+
+impl std::error::Error for UriError {}
+
+fn percent_decode(value: &str) -> Result<String, UriError> {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            if index + 2 >= bytes.len() {
+                return Err(UriError::InvalidEncoding);
+            }
+            let high = hex_value(bytes[index + 1]).ok_or(UriError::InvalidEncoding)?;
+            let low = hex_value(bytes[index + 2]).ok_or(UriError::InvalidEncoding)?;
+            decoded.push((high << 4) | low);
+            index += 3;
+        } else {
+            decoded.push(bytes[index]);
+            index += 1;
+        }
+    }
+    String::from_utf8(decoded).map_err(|_| UriError::InvalidEncoding)
+}
+
+fn is_uri_unreserved(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~')
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn hex_digit(value: u8) -> char {
+    match value {
+        0..=9 => char::from(b'0' + value),
+        _ => char::from(b'A' + value - 10),
+    }
+}
+
+fn read_message<R: BufRead>(reader: &mut R) -> Result<Option<Value>, LspError> {
+    let mut content_length = None;
+    let mut saw_header = false;
+    loop {
+        let mut line = String::new();
+        let bytes = reader.read_line(&mut line)?;
+        if bytes == 0 {
+            if saw_header {
+                return Err(LspError::Protocol("unexpected EOF in LSP headers".to_owned()));
+            }
+            return Ok(None);
+        }
+        saw_header = true;
+        if line == "\r\n" || line == "\n" {
+            break;
+        }
+        if let Some((name, value)) = line.split_once(':')
+            && name.eq_ignore_ascii_case("Content-Length")
+        {
+            content_length = Some(
+                value
+                    .trim()
+                    .parse::<usize>()
+                    .map_err(|_| LspError::Protocol("invalid Content-Length".to_owned()))?,
+            );
+        }
+    }
+    let content_length =
+        content_length.ok_or_else(|| LspError::Protocol("missing Content-Length".to_owned()))?;
+    let mut body = vec![0; content_length];
+    reader.read_exact(&mut body)?;
+    serde_json::from_slice(&body).map_err(|error| {
+        if error.is_data() || error.is_syntax() {
+            LspError::Json(error)
+        } else {
+            LspError::Protocol(format!("invalid JSON-RPC body: {error}"))
+        }
+    })
+}
+
+fn write_message<W: Write>(writer: &mut W, message: &Value) -> Result<(), LspError> {
+    let body = serde_json::to_vec(message)?;
+    write!(writer, "Content-Length: {}\r\n\r\n", body.len())?;
+    writer.write_all(&body)?;
+    writer.flush()?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::io::Cursor;
+    use std::path::PathBuf;
+
+    use super::{InitializeOptions, LspServer, ServerState, path_to_uri, uri_to_path};
+    use pdx_text::TextRange;
+    use pdx_workspace::TextChange;
+    use serde_json::{Value, json};
+
+    fn frame(value: Value) -> Vec<u8> {
+        let body = serde_json::to_vec(&value).expect("test JSON should serialize");
+        let mut framed = format!("Content-Length: {}\r\n\r\n", body.len()).into_bytes();
+        framed.extend(body);
+        framed
+    }
+
+    fn frames(values: impl IntoIterator<Item = Value>) -> Vec<u8> {
+        values.into_iter().flat_map(frame).collect()
+    }
+
+    fn decode_frames(bytes: &[u8]) -> Vec<Value> {
+        let mut cursor = Cursor::new(bytes);
+        let mut decoded = Vec::new();
+        while let Some(value) = super::read_message(&mut cursor).expect("test frame is valid") {
+            decoded.push(value);
+        }
+        decoded
+    }
+
+    #[test]
+    fn uri_round_trip_preserves_unicode_and_spaces() {
+        let path = std::env::temp_dir().join("Paradox Code").join("汉.txt");
+        let uri = path_to_uri(&path);
+        assert!(uri.contains("%20"));
+        assert_eq!(uri_to_path(&uri).expect("URI should decode"), path);
+    }
+
+    #[test]
+    fn memory_transport_runs_real_json_rpc_lifecycle_and_sync() {
+        let path = std::env::temp_dir().join(format!("pdx-lsp-{}.txt", std::process::id()));
+        fs::write(&path, "disk").expect("write disk fixture");
+        let uri = path_to_uri(&path);
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"rootUri":uri}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({
+                "jsonrpc":"2.0",
+                "method":"textDocument/didOpen",
+                "params":{"textDocument":{"uri":uri,"languageId":"pdx-script","version":1,"text":"a\r\n汉😀e\u{301}\r\n"}}
+            }),
+            json!({
+                "jsonrpc":"2.0",
+                "method":"textDocument/didChange",
+                "params":{"textDocument":{"uri":uri,"version":2},"contentChanges":[{"range":{"start":{"line":1,"character":1},"end":{"line":1,"character":3}},"text":"猫"}]}
+            }),
+            json!({
+                "jsonrpc":"2.0",
+                "method":"textDocument/didChange",
+                "params":{"textDocument":{"uri":uri,"version":1},"contentChanges":[{"text":"stale"}]}
+            }),
+            json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":99}}),
+            json!({"jsonrpc":"2.0","id":99,"method":"textDocument/hover","params":{}}),
+            json!({
+                "jsonrpc":"2.0",
+                "method":"textDocument/didChange",
+                "params":{"textDocument":{"uri":uri,"version":3},"contentChanges":[{"text":"current"}]}
+            }),
+            json!({"jsonrpc":"2.0","method":"textDocument/didClose","params":{"textDocument":{"uri":uri}}}),
+            json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = LspServer::new(InitializeOptions::default());
+        server.run_transport(Cursor::new(input), &mut output).expect("transport should finish");
+
+        let responses = decode_frames(&output);
+        let before_initialize =
+            responses.iter().find(|value| value["id"] == 1).expect("pre-init response");
+        assert_eq!(before_initialize["error"]["code"], -32002);
+        let initialize =
+            responses.iter().find(|value| value["id"] == 2).expect("initialize response");
+        assert_eq!(initialize["result"]["capabilities"]["textDocumentSync"]["change"], 2);
+        assert_eq!(initialize["result"]["capabilities"]["renameProvider"]["prepareProvider"], true);
+        let cancelled =
+            responses.iter().find(|value| value["id"] == 99).expect("cancelled response");
+        assert_eq!(cancelled["error"]["code"], -32800);
+        let shutdown = responses.iter().find(|value| value["id"] == 4).expect("shutdown response");
+        assert_eq!(shutdown["result"], Value::Null);
+        assert!(responses.iter().any(|value| value["method"] == "textDocument/publishDiagnostics"));
+        let snapshot = server.snapshot();
+        let document = snapshot
+            .document(&pdx_workspace::DocumentId::new(uri.clone()))
+            .expect("close restores disk candidate");
+        assert_eq!(document.text(), "disk");
+        assert_eq!(document.version(), None);
+        assert_eq!(server.state(), ServerState::Exited);
+        fs::remove_file(path).expect("remove disk fixture");
+    }
+
+    #[test]
+    fn memory_transport_delegates_phase5_requests_to_analysis() {
+        let uri = "file:///tmp/phase5-events.txt";
+        let text = "country_event = { id = test.1 }\nevent = test.1\nscope = nowhere\n";
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp"}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":text}}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":2,"character":8}}}),
+            json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8}}}),
+            json!({"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8}}}),
+            json!({"jsonrpc":"2.0","id":5,"method":"textDocument/references","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8},"context":{"includeDeclaration":true}}}),
+            json!({"jsonrpc":"2.0","id":6,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":uri}}}),
+            json!({"jsonrpc":"2.0","id":7,"method":"workspace/symbol","params":{"query":"test"}}),
+            json!({"jsonrpc":"2.0","id":9,"method":"textDocument/prepareRename","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8}}}),
+            json!({"jsonrpc":"2.0","id":10,"method":"textDocument/rename","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8},"newName":"renamed.1"}}),
+            json!({"jsonrpc":"2.0","id":8,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = LspServer::new(InitializeOptions::default());
+        server.run_transport(Cursor::new(input), &mut output).expect("transport should finish");
+        let responses = decode_frames(&output);
+        let completion =
+            responses.iter().find(|value| value["id"] == 2).expect("completion response");
+        assert!(completion["result"]["items"].as_array().is_some_and(|items| !items.is_empty()));
+        assert!(
+            responses
+                .iter()
+                .find(|value| value["id"] == 3)
+                .is_some_and(|value| value["result"]["contents"].is_object())
+        );
+        assert_eq!(
+            responses.iter().find(|value| value["id"] == 4).expect("definition")["result"]
+                .as_array()
+                .map(Vec::len),
+            Some(1)
+        );
+        assert_eq!(
+            responses.iter().find(|value| value["id"] == 5).expect("references")["result"]
+                .as_array()
+                .map(Vec::len),
+            Some(2)
+        );
+        assert_eq!(
+            responses.iter().find(|value| value["id"] == 6).expect("document symbols")["result"]
+                .as_array()
+                .map(Vec::len),
+            Some(1)
+        );
+        assert_eq!(
+            responses.iter().find(|value| value["id"] == 7).expect("workspace symbols")["result"]
+                .as_array()
+                .map(Vec::len),
+            Some(1)
+        );
+        let prepare = responses.iter().find(|value| value["id"] == 9).expect("prepare rename");
+        assert_eq!(prepare["result"]["placeholder"], "test.1");
+        let rename = responses.iter().find(|value| value["id"] == 10).expect("rename");
+        assert_eq!(rename["result"]["changes"][uri].as_array().map(Vec::len), Some(2));
+        assert!(
+            rename["result"]["changes"][uri]
+                .as_array()
+                .is_some_and(|edits| { edits.iter().all(|edit| edit["newText"] == "renamed.1") })
+        );
+        let diagnostics = responses
+            .iter()
+            .find(|value| value["method"] == "textDocument/publishDiagnostics")
+            .expect("diagnostic notification");
+        assert!(
+            diagnostics["params"]["diagnostics"].as_array().is_some_and(|items| {
+                items.iter().any(|item| item["code"] == "pdx-unknown-scope")
+            })
+        );
+    }
+
+    #[test]
+    fn memory_transport_rename_covers_current_mod_disk_references() {
+        let nonce = std::process::id();
+        let root = std::env::temp_dir().join(format!("pdx-lsp-rename-{nonce}"));
+        let target_path = root.join("common/events/target.txt");
+        let references_path = root.join("common/events/references.txt");
+        fs::create_dir_all(target_path.parent().expect("target parent")).expect("directories");
+        fs::write(&target_path, "country_event = { id = cross.1 }\n").expect("target");
+        fs::write(&references_path, "event = cross.1\n").expect("reference");
+        let target_uri = path_to_uri(&target_path);
+        let references_uri = path_to_uri(&references_path);
+        let rules_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&root)}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":target_uri,"version":1,"text":"country_event = { id = cross.1 }\n"}}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":target_uri},"position":{"line":0,"character":25},"newName":"renamed.1"}}),
+            json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = LspServer::try_new(InitializeOptions { rules_path: Some(rules_path) })
+            .expect("bundled rules should load");
+        server.run_transport(Cursor::new(input), &mut output).expect("transport should finish");
+        let responses = decode_frames(&output);
+        let rename = responses.iter().find(|value| value["id"] == 2).expect("rename response");
+        assert!(rename["error"].is_null(), "rename response={rename}");
+        let changes = rename["result"]["changes"].as_object().expect("workspace changes");
+        assert_eq!(changes.get(&target_uri).and_then(Value::as_array).map(Vec::len), Some(1));
+        assert_eq!(changes.get(&references_uri).and_then(Value::as_array).map(Vec::len), Some(1));
+        assert!(changes.values().all(|edits| {
+            edits
+                .as_array()
+                .is_some_and(|edits| edits.iter().all(|edit| edit["newText"] == "renamed.1"))
+        }));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn stale_diagnostics_do_not_replace_newer_results() {
+        let mut server = LspServer::new(InitializeOptions::default());
+        let uri = "file:///tmp/diagnostics.txt";
+        let id = pdx_workspace::DocumentId::new(uri);
+        server
+            .host
+            .open_document(id.clone(), 1, "key = value".to_owned(), None)
+            .expect("open should succeed");
+        assert!(server.commit_diagnostics(uri, 1, json!([{"message":"old"}])));
+        server
+            .host
+            .apply_document_changes(
+                &id,
+                2,
+                &[TextChange::ranged(TextRange::new(0, 3).expect("range"), "new")],
+            )
+            .expect("change should succeed");
+        assert!(!server.commit_diagnostics(uri, 1, json!([{"message":"stale"}])));
+        assert_eq!(server.diagnostics(uri).expect("old result remains")[0]["message"], "old");
+        assert!(server.commit_diagnostics(uri, 2, json!([{"message":"new"}])));
+        assert_eq!(server.diagnostics(uri).expect("new result accepted")[0]["message"], "new");
+    }
+}

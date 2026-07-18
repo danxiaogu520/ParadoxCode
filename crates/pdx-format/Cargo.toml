@@ -1,0 +1,15 @@
+[package]
+name = "pdx-format"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Safe editor-neutral formatter boundary for ParadoxCode."
+
+[dependencies]
+pdx-syntax = { path = "../pdx-syntax" }
+pdx-text = { path = "../pdx-text" }
+
+[lints]
+workspace = true
+

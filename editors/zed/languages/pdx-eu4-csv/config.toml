@@ -1,0 +1,5 @@
+name = "EU4 CSV"
+grammar = "pdx-eu4-csv"
+path_suffixes = [".csv"]
+tab_size = 2
+hard_tabs = false

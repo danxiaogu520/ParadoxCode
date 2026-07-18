@@ -1,0 +1,22 @@
+[package]
+name = "pdx-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "CLI entry points for ParadoxCode."
+
+[dependencies]
+pdx-lsp = { path = "../pdx-lsp" }
+
+[[bin]]
+name = "pdx"
+path = "src/bin/pdx.rs"
+
+[[bin]]
+name = "pdx-ls"
+path = "src/bin/pdx-ls.rs"
+
+[lints]
+workspace = true
+

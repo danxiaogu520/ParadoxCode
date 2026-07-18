@@ -1,0 +1,11 @@
+[package]
+name = "pdx-text"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Editor-neutral text, range, position, and path primitives for ParadoxCode."
+
+[lints]
+workspace = true
+

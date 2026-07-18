@@ -1,0 +1,16 @@
+[package]
+name = "pdx-workspace"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "VFS, source-root, and immutable snapshot boundary for ParadoxCode."
+
+[dependencies]
+pdx-hir = { path = "../pdx-hir" }
+pdx-eu4 = { path = "../pdx-eu4" }
+pdx-syntax = { path = "../pdx-syntax" }
+pdx-text = { path = "../pdx-text" }
+
+[lints]
+workspace = true

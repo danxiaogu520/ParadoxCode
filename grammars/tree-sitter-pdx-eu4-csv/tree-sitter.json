@@ -1,0 +1,24 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "pdx_eu4_csv",
+      "camelcase": "PdxEu4Csv",
+      "title": "EU4 CSV",
+      "scope": "source.pdx_eu4_csv",
+      "file-types": ["csv"],
+      "injection-regex": "^pdx[-_ ]?eu4[-_ ]?csv$",
+      "class-name": "TreeSitterPdxEu4Csv"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Editor-only Tree-sitter grammar for EU4 CSV"
+  },
+  "bindings": {
+    "c": true,
+    "node": true,
+    "rust": true
+  }
+}

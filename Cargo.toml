@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/pdx-text",
+    "crates/pdx-syntax",
+    "crates/pdx-eu4",
+    "crates/pdx-cwt",
+    "crates/pdx-hir",
+    "crates/pdx-workspace",
+    "crates/pdx-analysis",
+    "crates/pdx-format",
+    "crates/pdx-lsp",
+    "crates/pdx-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.85"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = "warn"

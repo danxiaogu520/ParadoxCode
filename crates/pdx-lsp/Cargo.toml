@@ -1,0 +1,18 @@
+[package]
+name = "pdx-lsp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Language-server lifecycle and protocol boundary for ParadoxCode."
+
+[dependencies]
+pdx-eu4 = { path = "../pdx-eu4" }
+pdx-analysis = { path = "../pdx-analysis" }
+pdx-format = { path = "../pdx-format" }
+pdx-text = { path = "../pdx-text" }
+pdx-workspace = { path = "../pdx-workspace" }
+serde_json = "1.0"
+
+[lints]
+workspace = true

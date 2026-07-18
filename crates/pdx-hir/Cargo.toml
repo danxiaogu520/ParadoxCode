@@ -1,0 +1,15 @@
+[package]
+name = "pdx-hir"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Rule-aware HIR boundary for ParadoxCode."
+
+[dependencies]
+pdx-eu4 = { path = "../pdx-eu4" }
+pdx-syntax = { path = "../pdx-syntax" }
+pdx-text = { path = "../pdx-text" }
+
+[lints]
+workspace = true

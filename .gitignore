@@ -1,0 +1,12 @@
+**/target/
+/.cargo/
+*.pdb
+*.wasm
+**/node_modules/
+__pycache__/
+
+# Local rule and Vanilla index artifacts are never source-controlled.
+rules/*.pdxrules
+!rules/eu4.pdxrules
+rules/vanilla-cache/
+editors/zed/bundled-rules/*.pdxrules

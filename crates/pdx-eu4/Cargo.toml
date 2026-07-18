@@ -1,0 +1,15 @@
+[package]
+name = "pdx-eu4"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "EU4-specific rules and runtime metadata for ParadoxCode."
+
+[dependencies]
+pdx-text = { path = "../pdx-text" }
+rusqlite = { version = "0.32", features = ["bundled"] }
+sha2 = "0.10"
+
+[lints]
+workspace = true

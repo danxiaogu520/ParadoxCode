@@ -1,0 +1,239 @@
+==================
+Properties and scalar values
+==================
+country = FRA
+capital ?= 144
+name = "A quoted value"
+operator_lt < 10
+operator_lte <= 10
+operator_gt > 10
+operator_gte >= 10
+operator_ne != 10
+operator_eq == 10
+operator_conditional ?= yes
+---
+
+(source_file
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (bare_value
+        (bare_scalar))))
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (bare_value
+        (bare_scalar))))
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (quoted_string)))
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (bare_value
+        (bare_scalar))))
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (bare_value
+        (bare_scalar))))
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (bare_value
+        (bare_scalar))))
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (bare_value
+        (bare_scalar))))
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (bare_value
+        (bare_scalar))))
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (bare_value
+        (bare_scalar))))
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (bare_value
+        (bare_scalar)))))
+
+==================
+Nested and mixed blocks
+==================
+country = {
+  primary_culture = french
+  1444.11.11
+  rgb { 12 34 56 }
+  duplicate = one
+  duplicate = two
+  nested = { key = value bare }
+}
+---
+
+(source_file
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (block
+        (property
+          (key
+            (bare_scalar))
+          (operator)
+          (value
+            (bare_value
+              (bare_scalar))))
+        (bare_value
+          (bare_scalar))
+        (header_block
+          (bare_value
+            (bare_scalar))
+          (block
+            (bare_value
+              (bare_scalar))
+            (bare_value
+              (bare_scalar))
+            (bare_value
+              (bare_scalar))))
+        (property
+          (key
+            (bare_scalar))
+          (operator)
+          (value
+            (bare_value
+              (bare_scalar))))
+        (property
+          (key
+            (bare_scalar))
+          (operator)
+          (value
+            (bare_value
+              (bare_scalar))))
+        (property
+          (key
+            (bare_scalar))
+          (operator)
+          (value
+            (block
+              (property
+                (key
+                  (bare_scalar))
+                (operator)
+                (value
+                  (bare_value
+                    (bare_scalar))))
+              (bare_value
+                (bare_scalar)))))))))
+
+==================
+Comments, escapes, and special scalars
+==================
+# leading comment
+title = "escaped \"quote\" and $PARAM$"
+value = @root:scope|leaf
+variable = $THIS$
+path = common/events/example.txt
+---
+
+(source_file
+  (comment)
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (quoted_string
+        (escape_sequence)
+        (escape_sequence))))
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (bare_value
+        (bare_scalar))))
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (bare_value
+        (bare_scalar))))
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (bare_value
+        (bare_scalar)))))
+
+==================
+Conditional parameter blocks
+==================
+effect = {
+  [[name] value = yes ]
+  [[!other_name] nested = { enabled = yes } ]
+}
+---
+
+(source_file
+  (property
+    (key
+      (bare_scalar))
+    (operator)
+    (value
+      (block
+        (parameter_block
+          (parameter_condition
+            (bare_scalar))
+          (property
+            (key
+              (bare_scalar))
+            (operator)
+            (value
+              (bare_value
+                (bare_scalar)))))
+        (parameter_block
+          (parameter_condition
+            (bare_scalar))
+          (property
+            (key
+              (bare_scalar))
+            (operator)
+            (value
+              (block
+                (property
+                  (key
+                    (bare_scalar))
+                  (operator)
+                  (value
+                    (bare_value
+                      (bare_scalar))))))))))))

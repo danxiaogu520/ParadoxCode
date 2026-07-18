@@ -1,0 +1,17 @@
+[package]
+name = "pdx-analysis"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Editor-neutral analysis query facade for ParadoxCode."
+
+[dependencies]
+pdx-hir = { path = "../pdx-hir" }
+pdx-eu4 = { path = "../pdx-eu4" }
+pdx-syntax = { path = "../pdx-syntax" }
+pdx-text = { path = "../pdx-text" }
+pdx-workspace = { path = "../pdx-workspace" }
+
+[lints]
+workspace = true

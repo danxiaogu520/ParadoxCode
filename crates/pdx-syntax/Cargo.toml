@@ -1,0 +1,16 @@
+[package]
+name = "pdx-syntax"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Format-agnostic syntax facade for ParadoxCode."
+
+[dependencies]
+pdx-text = { path = "../pdx-text" }
+
+[lints.rust]
+unsafe_code = "allow"
+
+[lints.clippy]
+all = "warn"

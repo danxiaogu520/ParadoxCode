@@ -1,0 +1,18 @@
+[package]
+name = "pdx-zed"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Zed language extension package for ParadoxCode."
+
+# This is an editor package, not a member of the core analysis workspace.
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+zed_extension_api = "0.7.0"
+
+[lints.rust]
+unsafe_code = "forbid"

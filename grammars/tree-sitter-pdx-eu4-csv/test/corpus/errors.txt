@@ -1,0 +1,22 @@
+==================
+Incomplete quoted cell recovers
+==================
+id,name
+1,"unfinished
+---
+
+(source_file
+  (record
+    (cell
+      (unquoted_cell))
+    (delimiter)
+    (cell
+      (unquoted_cell)))
+  (newline)
+  (record
+    (cell
+      (unquoted_cell))
+    (delimiter)
+    (cell
+      (quoted_cell
+        (MISSING """)))))
