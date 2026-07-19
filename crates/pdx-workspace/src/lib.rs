@@ -174,6 +174,15 @@ impl WorkspaceIndex {
         Self::default()
     }
 
+    /// Builds an index from a complete set of file shards and derives lookup maps once.
+    #[must_use]
+    pub fn from_shards(shards: impl IntoIterator<Item = FileIndexShard>) -> Self {
+        let mut index = Self::empty();
+        index.shards.extend(shards.into_iter().map(|shard| (shard.file_id, shard)));
+        index.rebuild_maps();
+        index
+    }
+
     /// Returns all retained definitions for a kind/name, including shadowed ones.
     #[must_use]
     pub fn definitions(&self, kind: &str, name: &str) -> &[Definition] {
@@ -470,6 +479,8 @@ pub enum WorkspaceError {
     Io(std::io::Error),
     /// A root-relative path escaped its logical root.
     InvalidLogicalPath(PathBuf),
+    /// Two distinct physical files produced the same stable source identity.
+    FileIdCollision { first: PathBuf, second: PathBuf },
 }
 
 impl fmt::Display for WorkspaceError {
@@ -479,6 +490,12 @@ impl fmt::Display for WorkspaceError {
             Self::InvalidLogicalPath(path) => {
                 write!(formatter, "invalid workspace logical path: {}", path.display())
             }
+            Self::FileIdCollision { first, second } => write!(
+                formatter,
+                "source file identity collision between {} and {}",
+                first.display(),
+                second.display()
+            ),
         }
     }
 }
@@ -516,12 +533,12 @@ fn collect_disk_files(
     Ok(())
 }
 
-fn stable_file_id(root: SourceRootId, logical: &LogicalPath, salt: u64) -> u64 {
+fn stable_file_id(root: SourceRootId, logical: &LogicalPath) -> u64 {
     let mut value = 0xcbf29ce484222325_u64 ^ u64::from(root.get());
     for byte in logical.as_str().bytes() {
         value = (value ^ u64::from(byte)).wrapping_mul(0x100000001b3);
     }
-    value ^ salt.wrapping_mul(0x9e3779b97f4a7c15)
+    value
 }
 
 fn root_priority(root: &SourceRoot) -> u64 {
@@ -739,7 +756,7 @@ fn collect_cwt_type_definition(
         .name_field
         .as_deref()
         .and_then(|field| find_property(node, field, parsed))
-        .or_else(|| Some(key))
+        .or(Some(key))
     else {
         return;
     };
@@ -1211,12 +1228,12 @@ fn find_property(node: &CstNode, wanted: &str, parsed: &ParsedFile) -> Option<St
 pub struct AnalysisHost {
     revision: u64,
     rules: Arc<Eu4Rules>,
-    roots: Vec<SourceRoot>,
+    roots: Arc<[SourceRoot]>,
     workspace_root: Option<PathBuf>,
-    documents: BTreeMap<DocumentId, DocumentSnapshot>,
-    source_files: BTreeMap<SourceFileId, SourceFile>,
-    disk_text: BTreeMap<SourceFileId, String>,
-    index: WorkspaceIndex,
+    documents: Arc<BTreeMap<DocumentId, DocumentSnapshot>>,
+    source_files: Arc<BTreeMap<SourceFileId, SourceFile>>,
+    disk_text: Arc<BTreeMap<SourceFileId, String>>,
+    index: Arc<WorkspaceIndex>,
 }
 
 impl AnalysisHost {
@@ -1232,19 +1249,19 @@ impl AnalysisHost {
         Self {
             revision: 0,
             rules: Arc::new(rules),
-            roots: Vec::new(),
+            roots: Arc::from([]),
             workspace_root: None,
-            documents: BTreeMap::new(),
-            source_files: BTreeMap::new(),
-            disk_text: BTreeMap::new(),
-            index: WorkspaceIndex::empty(),
+            documents: Arc::new(BTreeMap::new()),
+            source_files: Arc::new(BTreeMap::new()),
+            disk_text: Arc::new(BTreeMap::new()),
+            index: Arc::new(WorkspaceIndex::empty()),
         }
     }
 
     /// Applies one event-loop change and advances the snapshot revision.
     pub fn apply_change(&mut self, change: WorkspaceChange) {
         match change {
-            WorkspaceChange::SetSourceRoots(roots) => self.roots = roots,
+            WorkspaceChange::SetSourceRoots(roots) => self.roots = Arc::from(roots),
             WorkspaceChange::SetWorkspaceRoot(root) => self.workspace_root = root,
         }
         self.revision = self.revision.saturating_add(1);
@@ -1252,18 +1269,22 @@ impl AnalysisHost {
 
     /// Scans all configured roots in stable order and atomically refreshes source files and shards.
     pub fn refresh_source_roots(&mut self) -> Result<(), WorkspaceError> {
-        let mut files = BTreeMap::new();
+        let mut files: BTreeMap<SourceFileId, SourceFile> = BTreeMap::new();
         let mut texts = BTreeMap::new();
-        let mut next_index = 0_u64;
-        for root in &self.roots {
+        for root in self.roots.iter() {
             let mut paths = Vec::new();
             collect_disk_files(&root.path, &root.path, &mut paths)?;
             paths.sort_by(|left, right| left.0.cmp(&right.0));
             for (logical, physical) in paths {
-                let id = SourceFileId::new(stable_file_id(root.id, &logical, next_index));
-                next_index = next_index.saturating_add(1);
+                let id = SourceFileId::new(stable_file_id(root.id, &logical));
                 let Some(category) = self.rules.classify(&logical) else { continue };
                 let text = fs::read_to_string(&physical).map_err(WorkspaceError::Io)?;
+                if let Some(existing) = files.get(&id) {
+                    return Err(WorkspaceError::FileIdCollision {
+                        first: existing.physical_path.clone(),
+                        second: physical,
+                    });
+                }
                 let source_file = SourceFile {
                     id,
                     root_id: root.id,
@@ -1276,13 +1297,10 @@ impl AnalysisHost {
                 texts.insert(id, text);
             }
         }
-        let mut index = WorkspaceIndex::empty();
-        for (id, file) in &files {
-            if let Some(text) = texts.get(id) {
-                let shard = build_shard(file, text, self.rules.as_ref());
-                index.replace_shard(shard);
-            }
-        }
+        let shards = files.iter().filter_map(|(id, file)| {
+            texts.get(id).map(|text| build_shard(file, text, self.rules.as_ref()))
+        });
+        let mut index = WorkspaceIndex::from_shards(shards);
         let priorities = files
             .values()
             .filter_map(|file| {
@@ -1293,16 +1311,16 @@ impl AnalysisHost {
             })
             .collect::<BTreeMap<_, _>>();
         index.resolve_priorities(&priorities, self.rules.as_ref());
-        self.source_files = files;
-        self.disk_text = texts;
-        self.index = index;
+        self.source_files = Arc::new(files);
+        self.disk_text = Arc::new(texts);
+        self.index = Arc::new(index);
         self.revision = self.revision.saturating_add(1);
         Ok(())
     }
 
     /// Returns a mutable workspace index for targeted shard replacement.
     pub fn replace_index_shard(&mut self, shard: FileIndexShard) {
-        self.index.replace_shard(shard);
+        Arc::make_mut(&mut self.index).replace_shard(shard);
         self.revision = self.revision.saturating_add(1);
     }
 
@@ -1322,7 +1340,7 @@ impl AnalysisHost {
             return Err(DocumentError::AlreadyOpen(id));
         }
         let line_index = LineIndex::new(&text);
-        self.documents.insert(
+        Arc::make_mut(&mut self.documents).insert(
             id.clone(),
             DocumentSnapshot {
                 id,
@@ -1379,7 +1397,7 @@ impl AnalysisHost {
         }
 
         let path = current.path.clone();
-        self.documents.insert(
+        Arc::make_mut(&mut self.documents).insert(
             id.clone(),
             DocumentSnapshot {
                 id: id.clone(),
@@ -1403,10 +1421,10 @@ impl AnalysisHost {
             return Err(DocumentError::NotOpen(id.clone()));
         }
         let path = current.path.clone();
-        self.documents.remove(id);
+        Arc::make_mut(&mut self.documents).remove(id);
         if let Some(path) = path {
             if let Ok(text) = fs::read_to_string(&path) {
-                self.documents.insert(
+                Arc::make_mut(&mut self.documents).insert(
                     id.clone(),
                     DocumentSnapshot {
                         id: id.clone(),
@@ -1429,12 +1447,12 @@ impl AnalysisHost {
         AnalysisSnapshot {
             revision: self.revision,
             rules: Arc::clone(&self.rules),
-            roots: Arc::from(self.roots.clone()),
+            roots: Arc::clone(&self.roots),
             workspace_root: self.workspace_root.clone(),
-            documents: Arc::new(self.documents.clone()),
-            source_files: Arc::new(self.source_files.clone()),
-            disk_text: Arc::new(self.disk_text.clone()),
-            index: Arc::new(self.index.clone()),
+            documents: Arc::clone(&self.documents),
+            source_files: Arc::clone(&self.source_files),
+            disk_text: Arc::clone(&self.disk_text),
+            index: Arc::clone(&self.index),
         }
     }
 }
@@ -1572,13 +1590,133 @@ impl AnalysisSnapshot {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::sync::Arc;
 
     use super::{
-        AnalysisHost, DocumentId, DocumentSource, SourceRoot, SourceRootId, SourceRootKind,
-        TextChange,
+        AnalysisHost, Definition, DocumentId, DocumentSource, FileIndexShard, SourceFileId,
+        SourceRoot, SourceRootId, SourceRootKind, TextChange, WorkspaceIndex,
     };
     use pdx_eu4::Eu4Rules;
     use pdx_text::{LogicalPath, TextRange};
+
+    #[test]
+    fn bulk_index_build_retains_every_shard_and_definition() {
+        let first_file = SourceFileId::new(1);
+        let second_file = SourceFileId::new(2);
+        let range = TextRange::new(0, 3).expect("range");
+        let shards = [
+            FileIndexShard {
+                file_id: first_file,
+                definitions: vec![Definition {
+                    kind: "event".to_owned(),
+                    name: "shared.1".to_owned(),
+                    file_id: first_file,
+                    range,
+                    active: true,
+                }],
+                references: Vec::new(),
+                syntax_error_count: 0,
+            },
+            FileIndexShard {
+                file_id: second_file,
+                definitions: vec![Definition {
+                    kind: "event".to_owned(),
+                    name: "shared.1".to_owned(),
+                    file_id: second_file,
+                    range,
+                    active: true,
+                }],
+                references: Vec::new(),
+                syntax_error_count: 0,
+            },
+        ];
+
+        let index = WorkspaceIndex::from_shards(shards);
+
+        assert!(index.shard(first_file).is_some());
+        assert!(index.shard(second_file).is_some());
+        assert_eq!(index.definitions("event", "SHARED.1").len(), 2);
+    }
+
+    #[test]
+    fn source_file_ids_do_not_shift_when_an_earlier_path_is_added() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-workspace-stable-ids-{nonce}"));
+        let events = root.join("events");
+        fs::create_dir_all(&events).expect("event directory");
+        fs::write(events.join("b.txt"), "country_event = { id = stable.b }\n").expect("b event");
+        fs::write(events.join("c.txt"), "country_event = { id = stable.c }\n").expect("c event");
+
+        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        host.refresh_source_roots().expect("initial scan");
+        let before = host.snapshot();
+        let b_before = before
+            .source_files()
+            .values()
+            .find(|file| file.logical_path.as_str() == "events/b.txt")
+            .expect("b source file")
+            .id;
+        let c_before = before
+            .source_files()
+            .values()
+            .find(|file| file.logical_path.as_str() == "events/c.txt")
+            .expect("c source file")
+            .id;
+
+        fs::write(events.join("a.txt"), "country_event = { id = stable.a }\n").expect("a event");
+        host.refresh_source_roots().expect("second scan");
+        let after = host.snapshot();
+        let b_after = after
+            .source_files()
+            .values()
+            .find(|file| file.logical_path.as_str() == "events/b.txt")
+            .expect("b source file after insertion")
+            .id;
+        let c_after = after
+            .source_files()
+            .values()
+            .find(|file| file.logical_path.as_str() == "events/c.txt")
+            .expect("c source file after insertion")
+            .id;
+
+        assert_eq!(b_before, b_after);
+        assert_eq!(c_before, c_after);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn snapshots_share_immutable_state_and_preserve_old_revisions() {
+        let mut host = AnalysisHost::new(Eu4Rules::empty());
+        let first = host.snapshot();
+        let second = host.snapshot();
+
+        assert!(Arc::ptr_eq(&first.rules, &second.rules));
+        assert!(Arc::ptr_eq(&first.roots, &second.roots));
+        assert!(Arc::ptr_eq(&first.documents, &second.documents));
+        assert!(Arc::ptr_eq(&first.source_files, &second.source_files));
+        assert!(Arc::ptr_eq(&first.disk_text, &second.disk_text));
+        assert!(Arc::ptr_eq(&first.index, &second.index));
+
+        let id = DocumentId::new("file:///tmp/snapshot.txt");
+        host.open_document(id.clone(), 1, "one".to_owned(), None).expect("open should succeed");
+        let third = host.snapshot();
+
+        assert!(first.document(&id).is_none());
+        assert_eq!(third.document(&id).expect("new snapshot sees document").text(), "one");
+        assert!(!Arc::ptr_eq(&first.documents, &third.documents));
+        assert!(Arc::ptr_eq(&first.roots, &third.roots));
+        assert!(Arc::ptr_eq(&first.source_files, &third.source_files));
+        assert!(Arc::ptr_eq(&first.disk_text, &third.disk_text));
+        assert!(Arc::ptr_eq(&first.index, &third.index));
+    }
 
     #[test]
     fn stale_document_versions_are_rejected_atomically() {
