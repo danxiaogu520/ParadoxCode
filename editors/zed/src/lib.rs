@@ -32,6 +32,7 @@ impl zed::Extension for ParadoxCodeExtension {
                 "pdx-ls was not found; install it or configure lsp.pdx-ls.binary.path".to_owned()
             })?;
         let args = configured_args
+            .filter(|arguments| !arguments.is_empty())
             .unwrap_or_else(|| vec!["--rules".to_owned(), "bundled-rules/eu4.pdxrules".to_owned()]);
         Ok(zed::Command::new(binary).args(args))
     }
