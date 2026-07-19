@@ -1,12 +1,14 @@
 # ParadoxCode 总体架构
 
+> 2026-07-20 状态说明：本文描述迁移目标。当前实现已具备 EU4 功能原型，但 HIR、per-file cache、廉价 snapshot、后台取消和发布闭环尚未达到本文约束；迁移计划见 [RFC 0013](rfc/0013-generic-engine-eu4-first.md)。
+
 ## 目标
 
-ParadoxCode 只为 EU4 Mod 脚本提供接近现代语言的编辑体验。首个客户端是 Zed，核心分析独立于编辑器。VS Code 如未来接入，也只复用这一套 EU4 分析实现。
+ParadoxCode 提供通用 PDX Mod 语言引擎。EU4 是当前唯一有完整交付承诺的游戏 profile；首个客户端是 Zed，核心分析独立于编辑器。未来编辑器和低优先级游戏 profile 复用同一套 workspace、index、analysis 和 LSP runtime。
 
 MVP 不以少数目录为边界。凡是权威 EU4 规则数据库能够分类的文件类别，都进入与其格式相称的分析范围。PdxScript、localisation 与受支持 CSV 使用独立 parser；媒体、字体、音频、贴图等资源只作为 filepath reference 目标被索引。存档和二进制数据不做内容解析。
 
-EU4 已停止更新，ParadoxCode 从头到尾只服务其最新/最终版本。规则数据库可以继续由项目维护者修订，但这些修订只产生新的 `rule_hash`，不构成新的 EU4 版本。
+当前 EU4 profile 服务项目选定的 EU4 规则基线。规则数据库可以继续由项目维护者修订，每次逻辑修订产生新的 `rule_hash`。通用引擎不假定所有游戏都只有一个版本；版本策略属于各游戏 profile 和规则 artifact metadata。
 
 ## 数据流
 
@@ -20,7 +22,7 @@ Editor buffer / current mod / dependency mods / Vanilla cache
        Rust format-specific loss-aware CST
                   |
                   v
-     EU4 path- and rule-aware HIR lowering <---- Immutable Eu4Rules
+   profile path- and rule-aware HIR lowering <---- Immutable RuleSet + GameProfile
                   |
                   v
        Per-file semantic index shard
@@ -79,9 +81,9 @@ Zed extension 只负责：
 
 ### 规则层
 
-`pdx-cwt v0.1` 只负责一次性读取 CWTools 建模的 EU4 `.cwt` 配置并导入自有 SQLite 规则数据库。导入完成后，`.cwt` 不再是项目的权威规则源，也不进入正常构建、发布或运行时。未来版本可以为这个数据库增加查询、增删改、历史和 diff，但不属于 MVP。
+`pdx-cwt v0.1` 只负责一次性读取 CWTools 建模的 EU4 `.cwt` 配置并导入自有 SQLite 规则数据库。导入完成后，`.cwt` 不再是项目的权威规则源，也不进入正常构建、发布或运行时。未来其他游戏可以拥有自己的 importer/profile，但不属于 EU4 v0.1。
 
-`pdx-eu4` 定义 EU4 专用 SQLite schema、规范化逻辑视图、`rule_hash` 算法、只读加载与运行时查询 API。发布构建把独立的 `eu4.pdxrules` 文件打包进编辑器扩展；规则不嵌入 `pdx-ls`，也不独立下载或分发。运行时只读加载并冻结为内存 `Eu4Rules`。
+迁移目标中，`pdx-rules` 定义通用 SQLite artifact schema、规范化逻辑视图、`rule_hash` 算法、只读加载与运行时查询 API；`pdx-game-eu4` 提供 EU4 profile。当前 `pdx-eu4` 暂时混合这两类职责，必须分阶段拆分。运行时只读加载并冻结 `RuleSet`，再校验其 `game_id` 与 profile 一致。
 
 数据库保存 `TypeKey("scripted_effect")`、`AliasRef("effect")` 等 EU4 静态 matcher；实际 scripted effect、building 等成员来自 `WorkspaceIndex`。EU4 command、scope 和目录规则直接属于核心 EU4 实现，不设计其他游戏的替换层。
 
@@ -90,11 +92,12 @@ Zed extension 只负责：
 ```text
 pdx-text
 pdx-syntax    -> pdx-text
-pdx-eu4       -> pdx-text
-pdx-cwt       -> pdx-text + pdx-eu4
-pdx-hir       -> pdx-text + pdx-syntax + pdx-eu4
-pdx-workspace -> pdx-text + pdx-syntax + pdx-eu4 + pdx-hir
-pdx-analysis  -> pdx-workspace + pdx-hir + pdx-eu4
+pdx-rules     -> pdx-text
+pdx-game-eu4  -> pdx-rules + pdx-text + pdx-syntax
+pdx-cwt       -> pdx-text + pdx-rules + pdx-game-eu4
+pdx-hir       -> pdx-text + pdx-syntax + pdx-rules
+pdx-workspace -> pdx-text + pdx-syntax + pdx-rules + pdx-hir
+pdx-analysis  -> pdx-workspace + pdx-hir + pdx-rules
 pdx-format    -> pdx-text + pdx-syntax
 pdx-lsp       -> pdx-analysis + pdx-format
 pdx-cli       -> pdx-lsp + selected runtime crates
@@ -103,8 +106,9 @@ pdx-cli       -> pdx-lsp + selected runtime crates
 实际约束：
 
 - `pdx-text` 不依赖其他 workspace crate。
-- `pdx-syntax` 直接实现 EU4 语法，但不依赖规则数据库、workspace 或 LSP。
-- `pdx-eu4` 定义 SQLite schema、hash 与只读 runtime view，不依赖 CWT parser 或 LSP。
+- `pdx-syntax` 实现可复用 PDX 文本前端，但不依赖游戏规则数据库、workspace 或 LSP。
+- `pdx-rules` 定义 SQLite schema、hash 与只读 runtime view，不依赖具体游戏名称表、CWT parser 或 LSP。
+- `pdx-game-eu4` 保存 EU4 profile 和无法由通用规则数据表达的 EU4 特殊语义。
 - `pdx-cwt` 依赖 `pdx-text` 与 `pdx-eu4`，MVP 只提供 CWT 到 SQLite 数据库的一次性导入工具；它不是 runtime dependency。
 - `pdx-hir` 通过稳定的 typed CST API 和 `Eu4Rules` lowering。
 - `pdx-workspace` 不依赖 LSP 类型。
@@ -124,8 +128,9 @@ ParsedFile                  source text + tree + line index
 HirFile                     contextual semantic nodes
 FileIndexShard              definitions + references + facts
 WorkspaceIndex              merged immutable index
-Eu4Rules                loaded immutable EU4 rules
-Eu4RuleHash             canonical logical rule content hash
+RuleSet                 loaded immutable rules for one game profile
+RuleHash                canonical logical rule content hash
+GameProfile             game identity and profile-specific semantics
 VanillaIndexCache           local persistent Vanilla shard cache; manual refresh only
 ```
 
@@ -138,6 +143,8 @@ VanillaIndexCache           local persistent Vanilla shard cache; manual refresh
 - completion/hover 优先于后台全量诊断。
 
 MVP 不立即引入通用增量计算框架。先使用清晰的按文件 cache key 和 shard replacement；只有性能数据证明需要时再评估 query framework。
+
+当前 alpha 的同步 transport、深拷贝 snapshot 和 query-time workspace 重解析不满足以上并发模型，属于发布前必须消除的实现缺口，而不是允许长期保留的简化。
 
 ## 稳定身份
 

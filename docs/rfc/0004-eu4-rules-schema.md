@@ -3,13 +3,13 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
-> 2026-07-16 amendment：本 RFC 描述的是项目唯一的 EU4 规则数据库，不描述可切换的其他目标接口。迁移说明见 [EU4-only 架构决策](../decision-eu4-only.md)。
+> 2026-07-20 amendment：EU4 是当前唯一交付规则包，但通用 artifact/runtime 类型将按 [RFC 0013](0013-generic-engine-eu4-first.md) 迁入 `pdx-rules`，EU4 特有内容进入 EU4 profile。本 RFC 继续定义 `eu4.pdxrules` 的具体语义与发布要求。
 
 ## 目标
 
 EU4 的文件分类、types、aliases、enums、commands、scopes、symbols、documentation、reference semantics 与覆盖策略全部存入项目自有的 `eu4.pdxrules`。核心分析只消费 EU4 schema；不提供游戏选择器、通用游戏适配接口或其他游戏适配。EU4 语法本身由 `pdx-syntax` 直接实现。
 
-ParadoxCode 从头到尾只服务 EU4 最新/最终版本。规则数据库可以由项目维护者继续修订；每次逻辑修订产生新的 `rule_hash`，但不产生或选择一个新的 EU4 版本。
+EU4 profile 当前只服务项目选定的 EU4 规则基线。规则数据库可以由项目维护者继续修订；每次逻辑修订产生新的 `rule_hash`。未来其他游戏或版本的策略不由本 RFC 定义。
 
 ## 目录
 

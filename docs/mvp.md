@@ -1,5 +1,7 @@
 # EU4 MVP 实施计划
 
+> 2026-07-20 重新审计：当前代码是 EU4 alpha 功能原型，不是已发布的 v0.1。Phase 2–3 的基础实现可继续作为基线；Phase 4–6A 的功能代码存在，但增量数据流、持久化 Vanilla cache、依赖配置、formatter LSP 接入、后台取消、自动安装和跨平台发布退出条件尚未全部满足。后续先完成 RFC 0013 和发布前架构修复，再进入 Phase 6B。
+
 ## MVP 成功定义
 
 用户在 Zed 中打开一个 EU4 Mod workspace 后，可以获得：
@@ -20,7 +22,7 @@ Event、Scripted Effect、Scripted Trigger 和 Localisation Key 仍是必须通�
 
 ## 非目标
 
-- 任何其他游戏适配、多游戏抽象或通用规则包接口
+- 当前版本实现其他游戏 profile、动态插件 ABI 或多游戏 workspace
 - VS Code extension
 - Semantic Tokens
 - Code Action / Quick Fix
@@ -121,7 +123,7 @@ Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 
 ## Phase 4：CWT 导入、EU4 权威规则数据库与 Workspace Index
 
-状态：`completed`（2026-07-18）。
+状态：`implemented, acceptance reopened`（2026-07-20 重新审计）；规则导入、SQLite runtime、root/overlay 和基础 shard 已实现，但 LSP 未接入 dependency/Vanilla 配置，Vanilla cache 未持久化，单文件更新链路尚未真正替换 HIR/index shard。
 
 交付：
 
@@ -150,7 +152,7 @@ Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 
 ## Phase 5：语言功能
 
-状态：`completed`（2026-07-18）；`pdx-analysis` 提供 editor-neutral diagnostics、completion、hover、navigation 和 symbol queries，`pdx-lsp` 仅负责 JSON-RPC/LSP 转换。
+状态：`implemented, acceptance reopened`（2026-07-20 重新审计）；主要查询已实现并有回归，但 query-time workspace 重解析和深拷贝 snapshot 尚未满足性能与增量边界。
 
 交付：
 
@@ -171,7 +173,7 @@ Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 
 ## Phase 6A：Rename 与 v0.1
 
-状态：`completed`（2026-07-18）；analysis 层提供 prepare rename 和安全 WorkspaceEdit，LSP 声明并实现 rename capability，发布与 Zed smoke 检查通过。
+状态：`implemented, not released`（2026-07-20 重新审计）；rename 内部链路和开发机 smoke 已通过，但自动获取 server、rules artifact 打包、formatter capability、跨平台 release 和干净 clone 安装尚未闭环。
 
 交付：
 
@@ -187,11 +189,11 @@ Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 - ambiguous reference 拒绝 rename。
 - rename 后重新分析无新增 unresolved reference。
 
-完成 Phase 6A 后发布 `v0.1.0`。
+完成重新打开的 Phase 4–6A 验收条件后发布 `v0.1.0`。
 
 ## Phase 6B 与 Phase 7
 
-`v0.2` 再实现 Semantic Tokens、Code Action 与 Quick Fix。之后进入 Phase 7，为 VS Code 编写薄客户端。
+`v0.2` 再实现 Semantic Tokens、Code Action 与 Quick Fix。之后再评估其他编辑器客户端。任何新功能都排在增量架构和可安装 EU4 v0.1 之后。
 
 ## 建议质量预算
 

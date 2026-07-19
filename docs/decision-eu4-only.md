@@ -2,6 +2,10 @@
 
 日期：2026-07-16
 
+状态：Superseded（2026-07-20）
+
+本决策已被 [RFC 0013：通用 PDX 语言引擎与 EU4-first 产品策略](rfc/0013-generic-engine-eu4-first.md) 取代。本文仅保留为历史记录，不再约束当前实现。
+
 ## 决策
 
 ParadoxCode 只支持 Europa Universalis IV（EU4）。项目不实现其他游戏适配，不保留可切换的 `game`/游戏规则抽象，也不为未来游戏预留替换式 parser 或规则接口。

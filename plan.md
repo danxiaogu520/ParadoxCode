@@ -3,7 +3,7 @@
 > 本文件是 ParadoxCode 从设计基线走向可工作的 EU4 语言工具链的执行计划。
 > 具体设计以 `docs/` 下的 RFC 为准；如果实现需要改变已接受的边界，先更新对应 RFC，再更新本计划。
 
-> 2026-07-16 scope amendment：项目目标固定为 EU4-only；不提供其他游戏适配、`game` 选择器或可切换游戏规则层。详见 `docs/decision-eu4-only.md`。
+> 2026-07-20 scope amendment：项目调整为通用 `pdx-lsp` 引擎、EU4-first。EU4 仍是当前唯一交付目标，其他游戏优先级低且没有版本承诺；通用边界和迁移原则见 `docs/rfc/0013-generic-engine-eu4-first.md`。
 
 ## 1. 项目目标
 
@@ -22,13 +22,13 @@ ParadoxCode 为 Europa Universalis IV（EU4）Mod 提供面向 Zed 的语言工�
 
 ## 2. 当前基线
 
-当前工作区已经完成 Phase 0–6A（工程骨架、语法/Zed 资产、LSP runtime、typed CST/formatter、规则数据库/workspace index、语言功能和安全 rename）；后续 Phase 6B/7 按本计划推进：
+当前工作区已经实现 Phase 0–6A 的主要 EU4 功能原型，但 2026-07-20 重新审计确认它仍是 alpha：架构文档描述的 HIR/cache/snapshot/取消模型和普通用户发布链路尚未完全落地。后续先完成发布前修复阶段，再进入 Phase 6B：
 
 - `docs/architecture.md`：总体架构、数据流、crate 依赖和并发模型；
 - `docs/mvp.md`：MVP 成功定义、Phase 0–7 计划和质量预算；
 - `docs/rfc/0001`–`docs/rfc/0012`：系统边界、语法、VFS、规则数据库、HIR、索引、语言功能、格式化、LSP、Zed、测试和 CWT 导入约束；
 - `reference/`：只读的 CWTools、EU4 Config、Jomini 调研 checkout，不是构建依赖；
-- Phase 0–6A 已建立 Rust workspace、EU4 parser、CSV/localisation facade、Zed syntax assets、JSON-RPC/LSP runtime、规则数据库、workspace overlay/index、规则驱动语言功能和安全 rename；随后完成了 EU4-only CWTools 语义对齐基线和纯 Rust runtime 收尾。
+- Phase 0–6A 已建立 Rust workspace、EU4 parser、CSV/localisation facade、Zed syntax assets、JSON-RPC/LSP runtime、规则数据库、workspace overlay/index、规则驱动语言功能和安全 rename；这些能力是迁移基线，不代表 v0.1 已完成发布。
 
 因此第一步不是实现语言功能，而是建立能够持续验证这些设计的最小工程骨架。
 
@@ -46,7 +46,7 @@ ParadoxCode 为 Europa Universalis IV（EU4）Mod 提供面向 Zed 的语言工�
 
 ### 不在 MVP
 
-- 任何其他游戏适配、多游戏抽象或通用规则包接口；
+- 当前版本实现其他游戏 profile、动态插件 ABI 或多游戏 workspace；
 - VS Code extension；
 - Semantic Tokens、Code Action、Quick Fix、Inlay Hint、Code Lens、Document Link；
 - 存档、二进制和媒体内容的语义解析；
@@ -173,8 +173,7 @@ PdxScript 至少覆盖 property、裸 value、嵌套/混合 block、八种 opera
 
 ### Phase 4：CWT 导入、规则数据库和 Workspace Index
 
-状态：`completed`（2026-07-18；SQLite runtime、原创 CWT importer、root/overlay resolver、file
-shards 和主要语义回归已通过验证）
+状态：`implemented, acceptance reopened`（2026-07-20）；SQLite runtime、原创 CWT importer、root/overlay resolver、file shards 和主要语义回归已实现，但 dependency/Vanilla LSP 配置、持久化 cache 和真实单文件更新链路仍需完成。
 
 这是 MVP 中最大的一阶段，应拆成“规则 schema/runtime”和“importer”两个可独立审查的序列。
 
@@ -211,7 +210,7 @@ Workspace/index：
 
 ### Phase 5：语言功能
 
-状态：`completed`（2026-07-18；analysis queries、semantic diagnostics、completion/navigation 和真实 LSP integration 已通过验证）
+状态：`implemented, acceptance reopened`（2026-07-20）；查询功能和 LSP integration 已实现，但 query-time 全 workspace 重解析、深拷贝 snapshot 和同步 diagnostics 不满足已接受的性能/取消边界。
 
 工作项：
 
@@ -229,7 +228,7 @@ Workspace/index：
 
 ### Phase 6A：Rename 与 v0.1 发布
 
-状态：`completed`（2026-07-18；prepare rename、safe WorkspaceEdit、只读来源保护、发布构建和 Zed smoke 已通过验证）
+状态：`implemented, not released`（2026-07-20）；prepare rename、safe WorkspaceEdit 和只读来源保护已实现，自动安装、规则包获取、formatter LSP、跨平台 release 与干净 clone smoke 尚未完成。
 
 工作项：
 
@@ -244,7 +243,26 @@ Workspace/index：
 
 依赖：Phase 5。
 
-完成后发布 `v0.1.0`。
+重新满足所有退出条件后发布 `v0.1.0`。
+
+### Phase R：通用引擎边界与发布前架构修复
+
+状态：`in progress`（2026-07-20）
+
+按可独立验证的小切片执行：
+
+1. 接受 RFC 0013，拆分通用规则 runtime 与 EU4 profile，迁移期间保留兼容 re-export；
+2. 实现真实 per-file HIR/FileState，overlay 变化只更新一个文件；
+3. 将 snapshot 改为共享不可变状态，查询创建 snapshot 时不深拷贝 workspace 文本和索引；
+4. 删除 analysis query-time 全 workspace 重解析，查询只读取当前 HIR 与 WorkspaceIndex；
+5. 增加 index bulk build 和真正的单 shard 增量 replacement；
+6. 修复稳定 SourceFileId、symlink 顺序、文件大小/深度/数量限制和错误隔离；
+7. 将 LSP transport 迁移到类型化协议层，增加 worker、debounce、版本门和在途取消；
+8. 接入 formatting、dependency roots、Vanilla cache 持久化和文件变化更新；
+9. 建立大型 synthetic workspace benchmark 与“编辑一个文件只 parse/lower 一次”计数测试；
+10. 完成 Zed 自动获取、多平台 release、checksum 和干净 clone 端到端安装测试。
+
+Phase R 完成前不开始 Semantic Tokens、Quick Fix、其他游戏 profile 或新的编辑器客户端。
 
 ### Phase 6B：v0.2 与后续
 

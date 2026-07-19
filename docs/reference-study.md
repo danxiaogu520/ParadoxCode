@@ -14,7 +14,7 @@
 
 `reference/cwtools` 是 CWTools 引擎源码和测试材料，不是完整 EU4 规则源。EU4 规则语料来自独立上游 [`cwtools/cwtools-eu4-config`](https://github.com/cwtools/cwtools-eu4-config)。本次浅克隆固定在 `master` 的 `a85622d368bbb7afca938ed70fdd5eda44aec769`（2026-04-15），上游声明为 MIT License。这一提交是一次性 bootstrap 导入和调研 baseline，不是项目的浮动构建依赖。
 
-ParadoxCode 只服务 EU4 的最新/最终版本，不建立历史版本矩阵，也不把规则快照与游戏版本绑定。导入 provenance 记录上游 commit、输入 hash 和许可证即可；后续人工维护只改变 `rule_hash`。
+本次研究和 EU4 profile 只服务项目选定的 EU4 规则基线，不建立历史版本矩阵。导入 provenance 记录上游 commit、输入 hash 和许可证；后续人工维护改变 `rule_hash`。其他游戏 profile 的版本策略不由本研究决定。
 
 ## EU4 CWT 真实语料结论
 

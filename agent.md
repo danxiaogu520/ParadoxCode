@@ -2,6 +2,29 @@
 
 本文件是参与 ParadoxCode 的代理和开发者的工作约定。目标是让每次改动都能沿着既定架构推进，并留下可验证、可维护、可追溯的结果。
 
+## 0. 持久项目授权与产品方向
+
+项目所有者已授权代理持续负责 ParadoxCode 的技术执行，包括规划、架构判断、实现、重构、测试、性能验证和文档维护。除破坏性操作、外部发布、凭据/付费操作以及会实质改变产品方向的决定外，代理应自行作出合理技术判断并继续推进，不需要逐项等待确认。
+
+默认协作规则：
+
+- 保护用户已有和未提交的修改，不擅自清理、覆盖或回退；
+- 采用小步、可审查、可回滚的改动，不进行无法验证的一次性大重写；
+- 行为保持型重构与新功能分开交付；
+- 自动化验证未通过时不得把阶段标记为完成；
+- 遇到普通实现细节自行决策，遇到破坏性操作、外部发布或重大产品分歧再请求用户决定；
+- 每个阶段记录结果、设计变化、验证、剩余风险和下一步；
+- 文档状态必须反映真实端到端能力，不以已有骨架或单元测试代替产品闭环。
+
+产品方向固定为“通用 `pdx-lsp` 引擎，EU4-first”：
+
+- 当前版本只要求把 EU4 支持做完整、可靠和可发布；
+- workspace、snapshot、索引、分析查询、LSP runtime、CLI 和发布设施应保持游戏无关；
+- EU4 的路径、scope、command、symbol 和特殊语义应集中在 EU4 profile/模块中；
+- 暂不承诺其他游戏的交付时间，也不为尚不存在的第二个实现设计复杂插件 ABI 或大量推测性 trait；
+- 优先用规则数据和 profile 表达游戏差异，只有在第二个真实游戏证明数据不足时再提炼行为接口；
+- 新增其他游戏时，应能复用核心引擎，而不需要重写 workspace、索引、LSP 和并发模型。
+
 ## 1. 先理解项目
 
 开始任何实现前，按以下顺序阅读：
@@ -54,19 +77,23 @@
 pdx-text
   -> pdx-syntax -> pdx-hir -> pdx-workspace -> pdx-analysis -> pdx-lsp
   -> pdx-format                                      -> pdx-cli
-pdx-eu4 -> pdx-cwt
-pdx-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
+pdx-rules -> pdx-cwt
+pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 ```
+
+上图是迁移目标。当前仓库仍使用 `pdx-eu4` 承担通用规则 runtime 与 EU4 profile 的混合职责；迁移期间应保持构建可用，先移动通用规则类型，再隔离 EU4 特有语义，避免一次性重命名和重写。
 
 各层职责：
 
 | 层 | 允许负责的事情 | 不应负责的事情 |
 | --- | --- | --- |
 | `pdx-text` | offset、line index、UTF-8/UTF-16、URI/path 基础 | EU4 规则、workspace 状态 |
-| `pdx-syntax` | 硬编码 EU4 loss-aware CST、增量 parse、syntax error | 规则数据库、磁盘扫描、LSP 类型 |
-| `pdx-eu4` | EU4 SQLite schema、canonical view、`rule_hash`、只读 runtime API | CWT parser、LSP、动态 Mod symbol |
+| `pdx-syntax` | PDX Script、localisation、CSV 的 loss-aware CST、增量 parse、syntax error | 游戏规则数据库、磁盘扫描、LSP 类型 |
+| `pdx-rules`（迁移目标） | 通用规则 schema、canonical view、`rule_hash`、只读 runtime API | 具体游戏名称表、CWT parser、LSP、动态 Mod symbol |
+| `pdx-game-eu4`（迁移目标） | EU4 profile、路径、scope、command、symbol 和特殊语义 | LSP、workspace 可变状态、编辑器 API |
+| `pdx-eu4`（过渡） | 迁移前的规则 runtime 与 EU4 数据；每次改动应减少职责混合 | 新增与 EU4 无关的长期公共能力 |
 | `pdx-cwt` | 一次性 CWT discovery/import/report | runtime 依赖、持续同步、CWT fallback |
-| `pdx-hir` | 基于 typed CST 和 Eu4Rules 的 lowering、scope | 编辑器 API、磁盘 I/O |
+| `pdx-hir` | 基于 typed CST、RuleSet 和游戏 profile 的 lowering、scope | 编辑器 API、磁盘 I/O |
 | `pdx-workspace` | VFS、overlay、source roots、parse/HIR cache、index shards、snapshot | LSP protocol types |
 | `pdx-analysis` | 面向 snapshot 的 diagnostics/completion/hover/navigation/rename 查询 | 直接读磁盘、editor client |
 | `pdx-format` | 安全 formatter 和 edit 生成 | 语义修复、破坏性重写 |
@@ -121,8 +148,8 @@ pdx-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 - 用户输入路径、文件内容和配置错误必须显式返回，禁止用 `unwrap`/`expect` 逃逸；
 - `unsafe` 默认禁止；若依赖确实需要，封装在最小边界并写出 safety contract；
 - 后台任务要可取消，或有明确的资源和时间上限；
-- 不为其他游戏保留抽象；EU4 语法、路径和规则可以直接硬编码在对应核心模块中；
-- EU4 名称表和规则属于 Rust 核心，不放进 Zed extension。
+- 不为低优先级游戏实现推测性功能或复杂插件系统；只保留已经被核心引擎与 EU4 profile 边界证明有用的扩展点；
+- EU4 名称表和特殊规则属于 EU4 profile/规则包，不放进通用 LSP 层或 Zed extension。
 
 ### 完成前
 
@@ -140,7 +167,7 @@ pdx-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 
 - `pdx-text`：offset、line endings、UTF-16、URI/path；
 - `pdx-syntax`：typed CST、错误提取、增量编辑、错误恢复；
-- `pdx-eu4`：schema、只读加载、foreign key、hash 稳定性和 runtime invariants；
+- `pdx-rules`/过渡期 `pdx-eu4`：schema、只读加载、foreign key、hash 稳定性和 runtime invariants；
 - `pdx-cwt`：source discovery、construct inventory、directive/documentation 关联、事务回滚、报告；
 - `pdx-hir`：scope transition、unknown context、typed lowering；
 - `pdx-workspace`：root order、overlay、覆盖解析、shard replacement、snapshot；
@@ -192,3 +219,4 @@ MVP fuzz 至少覆盖 PdxScript/localisation parse、incremental edit 等价性�
 - [Zed 集成](docs/rfc/0010-zed-integration.md)
 - [测试与质量门禁](docs/rfc/0011-testing-quality.md)
 - [CWT 一次性导入](docs/rfc/0012-cwt-rule-compiler.md)
+- [通用 PDX 引擎与 EU4-first](docs/rfc/0013-generic-engine-eu4-first.md)

@@ -3,7 +3,7 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
-> 2026-07-16 amendment：项目边界已收窄为 EU4-only；`pdx-syntax`、`pdx-eu4` 和配置接口不再设计为多游戏可替换层。迁移说明见 [EU4-only 架构决策](../decision-eu4-only.md)。
+> 2026-07-20 amendment：EU4-only 约束已被 [RFC 0013](0013-generic-engine-eu4-first.md) 取代。当前产品仍只交付 EU4，但 workspace、index、analysis、LSP 和规则 runtime 将迁移为通用引擎，EU4 专有行为进入游戏 profile。
 
 ## 问题
 
@@ -78,5 +78,5 @@ reference/               只读参考仓库，不参与构建
 ## 拒绝的方案
 
 - 单一 `pdx-core` 巨型 crate：早期方便，后期无法阻止协议和游戏逻辑耦合。
-- 为单一 EU4 目标保留可切换的多游戏 LSP 抽象：增加边界和维护成本而无产品收益。
+- 在只有 EU4 一个真实实现时设计复杂插件 ABI 或大量行为 trait：缺乏第二个样本，容易形成错误抽象。
 - 在 Zed extension 内做语义分析：无法复用、难测试且受扩展运行环境限制。

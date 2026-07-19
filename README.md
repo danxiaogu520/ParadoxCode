@@ -1,12 +1,18 @@
 # ParadoxCode
 
-ParadoxCode is an EU4-only language-tooling workspace. It does not provide adapters for other
-games or a game-selection layer. The current repository milestone is the completed CWTools-aligned
-EU4 rules runtime: a pure-Rust syntax/parser core, Zed-only Tree-sitter grammar assets, a
+ParadoxCode is a general PDX language-tooling engine developed EU4-first. EU4 is the only game
+currently scheduled for complete support; other game profiles are intentionally low priority.
+The repository is currently an alpha with a working CWTools-aligned EU4 feature prototype: a pure-Rust syntax/parser core, Zed-only Tree-sitter grammar assets, a
 conservative formatter, a Zed development extension, a stdio JSON-RPC/LSP server, an EU4-only CWT
 importer, a validated SQLite rules artifact, a source-root/overlay workspace index, and
 editor-neutral language analysis with diagnostics, completion, hover, navigation, and safe
 semantic rename.
+
+The alpha is not yet a complete end-user release. Incremental HIR/index updates, cheap immutable
+snapshots, cancellable background diagnostics, full Vanilla/dependency configuration, formatter
+LSP wiring, automatic server installation, and cross-platform release packaging remain active
+work. See [RFC 0013](docs/rfc/0013-generic-engine-eu4-first.md) for the accepted engine/profile
+boundary.
 
 The runtime parser does not compile or link Tree-sitter C. The `grammars/tree-sitter-*` directories
 remain solely for Zed's editor-side highlighting and corpus checks. The committed rule artifact is
