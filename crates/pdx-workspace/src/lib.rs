@@ -544,11 +544,11 @@ fn build_shard(file: &SourceFile, source: &str, rules: &Eu4Rules) -> FileIndexSh
     match &category.parser {
         ParserKind::PdxScript => {
             let parsed = parse_eu4(Eu4FileFormat::PdxScript, source);
-            shard_from_parsed(file, &parsed, category.id.as_str())
+            shard_from_parsed(file, &parsed, category.id.as_str(), rules)
         }
         ParserKind::Localisation => {
             let parsed = parse_eu4(Eu4FileFormat::Localisation, source);
-            shard_from_parsed(file, &parsed, category.id.as_str())
+            shard_from_parsed(file, &parsed, category.id.as_str(), rules)
         }
         ParserKind::Csv(dialect) => {
             let dialect = match dialect {
@@ -598,7 +598,12 @@ fn build_shard(file: &SourceFile, source: &str, rules: &Eu4Rules) -> FileIndexSh
     }
 }
 
-fn shard_from_parsed(file: &SourceFile, parsed: &ParsedFile, category_id: &str) -> FileIndexShard {
+fn shard_from_parsed(
+    file: &SourceFile,
+    parsed: &ParsedFile,
+    category_id: &str,
+    rules: &Eu4Rules,
+) -> FileIndexShard {
     let mut definitions = Vec::new();
     let mut references = Vec::new();
     collect_semantics(
@@ -613,12 +618,206 @@ fn shard_from_parsed(file: &SourceFile, parsed: &ParsedFile, category_id: &str) 
     );
     collect_scripted_effect_params(file, parsed, &mut definitions);
     collect_eu4_dynamic_members(file, parsed.root(), parsed, &mut definitions, None);
+    collect_cwt_type_members(file, parsed, rules, &mut definitions);
     FileIndexShard {
         file_id: file.id,
         definitions,
         references,
         syntax_error_count: parsed.errors().len(),
     }
+}
+
+/// Collects workspace members declared by CWT `type[...]` definitions.
+///
+/// CWTools builds these members from the parsed workspace, rather than treating a type's name as
+/// a literal root key. For example, `type[mission]` with `skip_root_key = any` exposes every child
+/// of every root clause in `missions/*.txt` as a `<mission>` member. Keeping this in the workspace
+/// shard makes CWT key/value matching, completion, and hover see the same dynamic names.
+fn collect_cwt_type_members(
+    file: &SourceFile,
+    parsed: &ParsedFile,
+    rules: &Eu4Rules,
+    definitions: &mut Vec<Definition>,
+) {
+    for descriptor in rules.model().cwt.type_descriptors.values() {
+        if !cwt_type_path_matches(descriptor, &file.logical_path) {
+            continue;
+        }
+
+        if descriptor.type_per_file {
+            let Some(file_name) = file.logical_path.as_str().rsplit('/').next() else {
+                continue;
+            };
+            let name = file_name.rsplit_once('.').map_or(file_name, |(stem, _)| stem);
+            if !name.is_empty() {
+                definitions.push(Definition {
+                    kind: descriptor.name.clone(),
+                    name: name.to_owned(),
+                    file_id: file.id,
+                    range: parsed.root().range(),
+                    active: true,
+                });
+            }
+            continue;
+        }
+
+        if descriptor.skip_root_paths.is_empty() {
+            for child in parsed.root().children() {
+                if child.kind() == CstKind::Property {
+                    collect_cwt_type_definition(file, parsed, descriptor, child, definitions);
+                }
+            }
+        } else {
+            for root in parsed.root().children() {
+                if root.kind() != CstKind::Property {
+                    continue;
+                }
+                for skip_path in &descriptor.skip_root_paths {
+                    collect_cwt_skip_root_path(
+                        file,
+                        parsed,
+                        descriptor,
+                        root,
+                        skip_path,
+                        definitions,
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn collect_cwt_skip_root_path(
+    file: &SourceFile,
+    parsed: &ParsedFile,
+    descriptor: &pdx_eu4::CwtTypeDescriptor,
+    node: &CstNode,
+    path: &[String],
+    definitions: &mut Vec<Definition>,
+) {
+    let Some(head) = path.first() else {
+        collect_cwt_block_children(file, parsed, descriptor, node, definitions);
+        return;
+    };
+    let node_key = cwt_property_key(node, parsed).unwrap_or_default();
+    if !head.eq_ignore_ascii_case("any") && !head.eq_ignore_ascii_case(&node_key) {
+        return;
+    }
+    if path.len() == 1 {
+        collect_cwt_block_children(file, parsed, descriptor, node, definitions);
+        return;
+    }
+    for child in cwt_block_properties(node) {
+        collect_cwt_skip_root_path(file, parsed, descriptor, child, &path[1..], definitions);
+    }
+}
+
+fn collect_cwt_block_children(
+    file: &SourceFile,
+    parsed: &ParsedFile,
+    descriptor: &pdx_eu4::CwtTypeDescriptor,
+    node: &CstNode,
+    definitions: &mut Vec<Definition>,
+) {
+    for child in cwt_block_properties(node) {
+        collect_cwt_type_definition(file, parsed, descriptor, child, definitions);
+    }
+}
+
+fn collect_cwt_type_definition(
+    file: &SourceFile,
+    parsed: &ParsedFile,
+    descriptor: &pdx_eu4::CwtTypeDescriptor,
+    node: &CstNode,
+    definitions: &mut Vec<Definition>,
+) {
+    let Some(key) = cwt_property_key(node, parsed) else { return };
+    if !cwt_type_key_matches(descriptor, &key) {
+        return;
+    }
+    let Some(name) = descriptor
+        .name_field
+        .as_deref()
+        .and_then(|field| find_property(node, field, parsed))
+        .or_else(|| Some(key))
+    else {
+        return;
+    };
+    if name.is_empty() {
+        return;
+    }
+    definitions.push(Definition {
+        kind: descriptor.name.clone(),
+        name,
+        file_id: file.id,
+        range: node.range(),
+        active: true,
+    });
+}
+
+fn cwt_type_key_matches(descriptor: &pdx_eu4::CwtTypeDescriptor, key: &str) -> bool {
+    descriptor.type_key_filter.as_ref().is_none_or(|(values, negate)| {
+        (values.iter().any(|value| value.eq_ignore_ascii_case(key))) != *negate
+    })
+}
+
+fn cwt_block_properties(node: &CstNode) -> impl Iterator<Item = &CstNode> {
+    node.children().iter().flat_map(|child| {
+        if child.kind() != CstKind::Value {
+            return Vec::new();
+        }
+        child
+            .children()
+            .iter()
+            .filter(|block| block.kind() == CstKind::Block)
+            .flat_map(|block| {
+                block.children().iter().filter(|child| child.kind() == CstKind::Property)
+            })
+            .collect::<Vec<_>>()
+    })
+}
+
+fn cwt_property_key(node: &CstNode, parsed: &ParsedFile) -> Option<String> {
+    node.children()
+        .iter()
+        .find(|child| child.kind() == CstKind::Key)
+        .and_then(|child| parsed.text(child.range()))
+        .map(|key| key.trim().to_owned())
+        .filter(|key| !key.is_empty())
+}
+
+fn cwt_type_path_matches(
+    descriptor: &pdx_eu4::CwtTypeDescriptor,
+    logical_path: &LogicalPath,
+) -> bool {
+    let path = logical_path.as_str().replace('\\', "/").to_ascii_lowercase();
+    let (directory, file_name) = path.rsplit_once('/').unwrap_or(("", path.as_str()));
+    if let Some(prefix) = descriptor.path.as_deref() {
+        let prefix =
+            prefix.trim_matches('/').strip_prefix("game/").unwrap_or(prefix.trim_matches('/'));
+        let prefix = prefix.to_ascii_lowercase();
+        let matches = if descriptor.path_strict {
+            directory == prefix
+        } else {
+            directory == prefix || directory.starts_with(&format!("{prefix}/"))
+        };
+        if !matches {
+            return false;
+        }
+    }
+    if let Some(expected_file) = descriptor.path_file.as_deref()
+        && !file_name.eq_ignore_ascii_case(expected_file)
+    {
+        return false;
+    }
+    if let Some(expected_extension) = descriptor.path_extension.as_deref() {
+        let expected_extension = expected_extension.trim_start_matches('.');
+        let actual_extension = file_name.rsplit_once('.').map_or("", |(_, extension)| extension);
+        if !actual_extension.eq_ignore_ascii_case(expected_extension) {
+            return false;
+        }
+    }
+    true
 }
 
 fn collect_eu4_dynamic_members(

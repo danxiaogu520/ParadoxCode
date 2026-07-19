@@ -15,9 +15,9 @@
 - 后续规则修订直接作用于数据库，并产生新的 `rule_hash`。
 - LSP runtime 永远不依赖 `pdx-cwt`。
 
-当前 EU4 parity baseline 使用 73 个固定输入，artifact schema 为 10，importer 为
+当前 EU4 parity baseline 使用 73 个固定输入，artifact schema 为 11，importer 为
 `phase12-cwt-starts-with-1`，canonical `rule_hash` 为
-`1818e5fe1fd4b0f4c5ba0759c33351779a7ca4669de7d02bc0f9634dc2aaff35`。该 baseline 已覆盖
+`42fbe0d1fd6bf8609258380bc5367ff757cb50968bfdfaff73c2ca515ea5dc67`。该 baseline 已覆盖
 CWTools 的 duplicate/alternative、leaf-value/value-clause、cardinality、scope transition、
 dynamic value、type path/skip-root 和 subtype `starts_with` 语义。
 

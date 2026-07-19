@@ -1,7 +1,7 @@
 {
-  "schema_version": 10,
+  "schema_version": 11,
   "importer_version": "phase12-cwt-starts-with-1",
-  "rule_hash": "1818e5fe1fd4b0f4c5ba0759c33351779a7ca4669de7d02bc0f9634dc2aaff35",
+  "rule_hash": "42fbe0d1fd6bf8609258380bc5367ff757cb50968bfdfaff73c2ca515ea5dc67",
   "files": [
     {
       "path": "abilities.cwt",

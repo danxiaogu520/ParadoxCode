@@ -870,7 +870,7 @@ fn compile_semantic_nodes(
                 let type_context = format!("type:{type_name}");
                 if let CwtValue::Block(children) = &node.value {
                     collect_type_root_keys(model, &type_name, children);
-                    collect_type_descriptor(model, &type_name, children);
+                    collect_type_descriptor(model, &type_name, &node.directives, children);
                     compile_semantic_nodes(
                         model,
                         source_file,
@@ -905,10 +905,18 @@ fn compile_semantic_nodes(
     }
 }
 
-fn collect_type_descriptor(model: &mut RulesModel, type_name: &str, nodes: &[CwtNode]) {
+fn collect_type_descriptor(
+    model: &mut RulesModel,
+    type_name: &str,
+    directives: &[String],
+    nodes: &[CwtNode],
+) {
     let descriptor = model.cwt.type_descriptors.entry(type_name.to_owned()).or_insert_with(|| {
         CwtTypeDescriptor { name: type_name.to_owned(), ..CwtTypeDescriptor::default() }
     });
+    if let Some(filter) = directives.iter().find_map(|directive| parse_type_key_filter(directive)) {
+        descriptor.type_key_filter = Some(filter);
+    }
     for node in nodes {
         let base = node.key.split('[').next().unwrap_or(&node.key).to_ascii_lowercase();
         let scalar = match &node.value {
@@ -950,6 +958,23 @@ fn collect_type_descriptor(model: &mut RulesModel, type_name: &str, nodes: &[Cwt
             }
         }
     }
+}
+
+fn parse_type_key_filter(directive: &str) -> Option<(Vec<String>, bool)> {
+    let mut words = directive.split_whitespace();
+    let name = words.next()?;
+    if !name.eq_ignore_ascii_case("type_key_filter") {
+        return None;
+    }
+    let operator = words.next()?;
+    let negate = match operator {
+        "=" => false,
+        "<>" => true,
+        _ => return None,
+    };
+    let values = words.collect::<Vec<_>>().join(" ");
+    let values = parse_scope_words(&values);
+    (!values.is_empty()).then_some((values, negate))
 }
 
 fn cwt_directive_value(directive: &str, name: &str) -> Option<String> {
@@ -1691,9 +1716,13 @@ mod tests {
         assert_eq!(report.directive_counts.get("cardinality"), Some(&3506));
         assert_eq!(
             report.rule_hash,
-            "1818e5fe1fd4b0f4c5ba0759c33351779a7ca4669de7d02bc0f9634dc2aaff35"
+            "42fbe0d1fd6bf8609258380bc5367ff757cb50968bfdfaff73c2ca515ea5dc67"
         );
         let rules = pdx_eu4::Eu4Rules::load(&output).expect("load pinned corpus");
+        assert_eq!(
+            rules.model().cwt.type_descriptors["mission"].type_key_filter,
+            Some((vec!["potential".to_owned(), "potential_on_load".to_owned()], true))
+        );
         assert!(rules.model().cwt.rules.iter().any(|rule| rule.alternative_id.is_some()));
         assert!(rules.model().cwt.rules.iter().any(|rule| rule.shape == CwtRuleShape::ValueClause));
         assert!(rules.model().cwt.rules.iter().any(|rule| rule.shape == CwtRuleShape::LeafValue));

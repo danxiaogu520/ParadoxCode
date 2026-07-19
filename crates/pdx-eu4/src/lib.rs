@@ -13,7 +13,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use sha2::{Digest, Sha256};
 
 /// The first runtime schema version reserved for the generated rule database.
-pub const CURRENT_SCHEMA_VERSION: u32 = 10;
+pub const CURRENT_SCHEMA_VERSION: u32 = 11;
 
 /// A stable digest of canonical EU4 rule content.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
@@ -409,6 +409,11 @@ pub struct CwtTypeDescriptor {
     pub name_from_file: bool,
     /// Optional CWT `starts_with` discriminator.
     pub starts_with: Option<String>,
+    /// Optional filter for keys that instantiate this type, paired with its negation flag.
+    ///
+    /// CWTools evaluates this as `contains(key) != negate`, so `<>` filters are represented by
+    /// `negate = true`.
+    pub type_key_filter: Option<(Vec<String>, bool)>,
 }
 
 impl CwtRuleShape {
@@ -952,6 +957,19 @@ fn canonical_hash(model: &RulesModel) -> Eu4RuleHash {
         put_opt_str(&mut bytes, descriptor.name_field.as_deref());
         bytes.push(u8::from(descriptor.name_from_file));
         put_opt_str(&mut bytes, descriptor.starts_with.as_deref());
+        match &descriptor.type_key_filter {
+            Some((values, negate)) => {
+                bytes.push(1);
+                bytes.push(u8::from(*negate));
+                let mut values = values.clone();
+                values.sort();
+                put_len(&mut bytes, values.len());
+                for value in values {
+                    put_str(&mut bytes, &value);
+                }
+            }
+            None => bytes.push(0),
+        }
     }
     let digest = Sha256::digest(bytes);
     let mut result = [0_u8; 32];
@@ -1118,16 +1136,18 @@ fn schema(connection: &Connection) -> Result<(), RulesError> {
             skip_root_keys TEXT NOT NULL DEFAULT '',
             name_field TEXT,
             name_from_file INTEGER NOT NULL DEFAULT 0,
-            starts_with TEXT
+            starts_with TEXT,
+            type_key_filter TEXT NOT NULL DEFAULT '',
+            type_key_filter_negate INTEGER NOT NULL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS import_provenance (
             source_path TEXT PRIMARY KEY NOT NULL, source_sha256 TEXT NOT NULL, importer_version TEXT NOT NULL
         );")?;
-    ensure_cwt_scope_columns(connection)?;
+    ensure_cwt_columns(connection)?;
     Ok(())
 }
 
-fn ensure_cwt_scope_columns(connection: &Connection) -> Result<(), RulesError> {
+fn ensure_cwt_columns(connection: &Connection) -> Result<(), RulesError> {
     for (name, definition) in [
         ("child_context", "TEXT"),
         ("alternative_id", "TEXT"),
@@ -1149,6 +1169,22 @@ fn ensure_cwt_scope_columns(connection: &Connection) -> Result<(), RulesError> {
         if present == 0 {
             connection
                 .execute(&format!("ALTER TABLE cwt_rules ADD COLUMN {name} {definition}"), [])?;
+        }
+    }
+    for (name, definition) in [
+        ("type_key_filter", "TEXT NOT NULL DEFAULT ''"),
+        ("type_key_filter_negate", "INTEGER NOT NULL DEFAULT 0"),
+    ] {
+        let present: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('cwt_type_descriptors') WHERE name = ?1",
+            params![name],
+            |row| row.get(0),
+        )?;
+        if present == 0 {
+            connection.execute(
+                &format!("ALTER TABLE cwt_type_descriptors ADD COLUMN {name} {definition}"),
+                [],
+            )?;
         }
     }
     Ok(())
@@ -1236,7 +1272,7 @@ fn write_connection(connection: &mut Connection, rules: &Eu4Rules) -> Result<(),
     }
     for (type_name, descriptor) in &rules.model.cwt.type_descriptors {
         transaction.execute(
-            "INSERT INTO cwt_type_descriptors(type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT INTO cwt_type_descriptors(type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 type_name,
                 descriptor.path,
@@ -1253,6 +1289,13 @@ fn write_connection(connection: &mut Connection, rules: &Eu4Rules) -> Result<(),
                 descriptor.name_field,
                 i64::from(descriptor.name_from_file),
                 descriptor.starts_with,
+                descriptor
+                    .type_key_filter
+                    .as_ref()
+                    .map_or_else(String::new, |(values, _)| values.join("\u{1f}")),
+                i64::from(
+                    descriptor.type_key_filter.as_ref().is_some_and(|(_, negate)| *negate),
+                ),
             ],
         )?;
     }
@@ -1488,11 +1531,13 @@ fn read_cwt_model(connection: &Connection) -> Result<CwtSemanticModel, RulesErro
     }
     let mut type_descriptors = BTreeMap::new();
     let mut statement = connection.prepare(
-        "SELECT type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with FROM cwt_type_descriptors ORDER BY type_name",
+        "SELECT type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate FROM cwt_type_descriptors ORDER BY type_name",
     )?;
     let rows = statement.query_map([], |row| {
         let type_name: String = row.get(0)?;
         let skip_root_paths: String = row.get(6)?;
+        let type_key_filter: String = row.get(10)?;
+        let type_key_filter_negate: bool = row.get::<_, i64>(11)? != 0;
         Ok(CwtTypeDescriptor {
             name: type_name.clone(),
             path: row.get(1)?,
@@ -1511,6 +1556,14 @@ fn read_cwt_model(connection: &Connection) -> Result<CwtSemanticModel, RulesErro
             name_field: row.get(7)?,
             name_from_file: row.get::<_, i64>(8)? != 0,
             starts_with: row.get(9)?,
+            type_key_filter: if type_key_filter.is_empty() {
+                None
+            } else {
+                Some((
+                    type_key_filter.split('\u{1f}').map(str::to_owned).collect(),
+                    type_key_filter_negate,
+                ))
+            },
         })
     })?;
     for row in rows {

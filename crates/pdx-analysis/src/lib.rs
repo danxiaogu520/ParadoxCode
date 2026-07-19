@@ -1391,7 +1391,7 @@ fn analyze_input(snapshot: &AnalysisSnapshot, input: &ParsedInput) -> FileAnalys
                 && same_name(&definition.name, &property.key)
         });
         if !property.top_level
-            && !cwt_validates_path(snapshot, &property.path)
+            && !cwt_validates_path(snapshot, &property.path, input.path.as_ref())
             && !known.contains(&property.key.to_ascii_lowercase())
             && !is_dynamic_command
             && looks_unknown_key(&property.key)
@@ -1608,6 +1608,9 @@ fn cwt_root_context(
                         })
                     })
                 }))
+                && rules
+                    .iter()
+                    .any(|rule| rule.context.eq_ignore_ascii_case(&format!("root:{type_name}")))
                 && descriptor
                     .is_none_or(|descriptor| cwt_type_path_matches(descriptor, logical_path))
         })
@@ -1635,9 +1638,34 @@ fn cwt_root_context(
                                         || root.eq_ignore_ascii_case(key)
                                 })
                             }))
+                        && rules.iter().any(|rule| {
+                            rule.context.eq_ignore_ascii_case(&format!("root:{type_name}"))
+                        })
                         && cwt_type_path_matches(descriptor, logical_path)
                 })
                 .map(|(type_name, _)| format!("type:{type_name}"))
+                .or_else(|| {
+                    // CWTools applies a normal (type_per_file = no) type to every root clause
+                    // in its matching path. The root key therefore need not literally equal the
+                    // type name; for example, `EDG_Bavarian_Missions = { ... }` uses the
+                    // `mission_series` rules. The normalized artifact keeps the type descriptor
+                    // and the corresponding `root:<type>` rules separately, so recover that
+                    // path-based selection here after the more specific selectors above.
+                    snapshot
+                        .rules()
+                        .model()
+                        .cwt
+                        .type_descriptors
+                        .iter()
+                        .find(|(type_name, descriptor)| {
+                            !snapshot.rules().model().cwt.type_root_keys.contains_key(*type_name)
+                                && cwt_type_path_matches(descriptor, logical_path)
+                                && snapshot.rules().model().cwt.rules.iter().any(|rule| {
+                                    rule.context.eq_ignore_ascii_case(&format!("root:{type_name}"))
+                                })
+                        })
+                        .map(|(type_name, _)| format!("type:{type_name}"))
+                })
         })
 }
 
@@ -1680,9 +1708,13 @@ fn cwt_type_path_matches(
     true
 }
 
-fn cwt_validates_path(snapshot: &AnalysisSnapshot, path: &[String]) -> bool {
+fn cwt_validates_path(
+    snapshot: &AnalysisSnapshot,
+    path: &[String],
+    logical_path: Option<&LogicalPath>,
+) -> bool {
     let Some(root) = path.first() else { return false };
-    cwt_root_context(snapshot, root, None).is_some()
+    cwt_root_context(snapshot, root, logical_path).is_some()
 }
 
 fn script_properties(input: &ParsedInput, parent: &CstNode) -> Vec<ScriptProperty> {
@@ -3359,6 +3391,54 @@ mod tests {
                 .iter()
                 .any(|item| item.code == DiagnosticCode::UnknownKey)
         );
+    }
+
+    #[test]
+    fn eu4_normal_type_selector_applies_mission_rules_to_custom_root_names() {
+        use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use std::fs;
+
+        let root = std::env::temp_dir().join(format!(
+            "pdx-analysis-cwt-missions-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        fs::create_dir_all(root.join("missions")).expect("missions directory");
+        let rules_path =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
+        let rules = Eu4Rules::load(&rules_path).expect("load committed CWT artifact");
+        let mut host = AnalysisHost::new(rules);
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        let path = root.join("missions/EDG_Bavarian_Missions.txt");
+        let source = "EDG_Bavarian_Missions = { slot = 1 generic = no ai = yes has_country_shield = yes potential = { } EDG_bav_claim = { required_missions = { potential } } }\n";
+        fs::write(&path, source).expect("write mission document");
+        host.refresh_source_roots().expect("index mission document");
+        let id = DocumentId::new("file:///tmp/EDG_Bavarian_Missions.txt");
+        host.open_document(id.clone(), 1, source.to_owned(), Some(path))
+            .expect("open mission document");
+        let results = diagnostics(&host.snapshot(), &id);
+        assert!(
+            !results.iter().any(|item| {
+                item.code == DiagnosticCode::UnknownKey
+                    && ["slot", "generic", "ai", "has_country_shield", "EDG_bav_claim"]
+                        .iter()
+                        .any(|key| item.message.contains(&format!("`{key}`")))
+            }),
+            "mission fields were not selected by the path-based type: {results:?}"
+        );
+        assert!(
+            results.iter().any(|item| {
+                item.code == DiagnosticCode::InvalidValue && item.message.contains("potential")
+            }),
+            "negative type_key_filter was not applied to <mission>: {results:?}"
+        );
+        fs::remove_dir_all(root).expect("cleanup");
     }
 
     #[test]

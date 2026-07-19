@@ -23,5 +23,5 @@ cargo run -p pdx-cwt -- import \
 ```
 
 The current canonical `rule_hash` is
-`1818e5fe1fd4b0f4c5ba0759c33351779a7ca4669de7d02bc0f9634dc2aaff35`; the importer report is the
+`42fbe0d1fd6bf8609258380bc5367ff757cb50968bfdfaff73c2ca515ea5dc67`; the importer report is the
 semantic inventory and provenance record for the committed database.
