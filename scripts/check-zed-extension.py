@@ -18,19 +18,19 @@ EXTENSION = ROOT / "editors" / "zed"
 GRAMMAR_ROOT = ROOT / "grammars"
 LANGUAGES = {
     "pdx-script": (
-        "pdx-script",
+        "pdx_script",
         "tree-sitter-pdx-script",
         "test/corpus/pdx-script.txt",
         ("highlights.scm", "brackets.scm", "indents.scm", "outline.scm"),
     ),
     "pdx-eu4-localisation": (
-        "pdx-eu4-localisation",
+        "pdx_eu4_localisation",
         "tree-sitter-pdx-eu4-localisation",
         "test/corpus/localisation.txt",
         ("highlights.scm", "outline.scm"),
     ),
     "pdx-eu4-csv": (
-        "pdx-eu4-csv",
+        "pdx_eu4_csv",
         "tree-sitter-pdx-eu4-csv",
         "test/corpus/csv.txt",
         ("highlights.scm", "brackets.scm", "indents.scm", "outline.scm"),
@@ -65,7 +65,7 @@ def main() -> int:
         require(manifest["schema_version"] == 1, "unsupported Zed extension schema")
         grammars = manifest.get("grammars", {})
         require(
-            set(grammars) == {"pdx-script", "pdx-eu4-localisation", "pdx-eu4-csv"},
+            set(grammars) == {"pdx_script", "pdx_eu4_localisation", "pdx_eu4_csv"},
             "manifest grammar set is incomplete",
         )
 

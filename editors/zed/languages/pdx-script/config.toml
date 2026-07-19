@@ -1,5 +1,5 @@
 name = "PdxScript"
-grammar = "pdx-script"
+grammar = "pdx_script"
 path_suffixes = [".gui", ".gfx"]
 line_comments = ["# "]
 tab_size = 2

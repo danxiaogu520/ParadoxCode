@@ -1,5 +1,5 @@
 name = "EU4 Localisation"
-grammar = "pdx-eu4-localisation"
+grammar = "pdx_eu4_localisation"
 path_suffixes = [".yml"]
 line_comments = ["# "]
 tab_size = 2

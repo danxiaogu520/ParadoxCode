@@ -9,9 +9,9 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "editors" / "zed" / "extension.toml"
 GRAMMARS = (
-    "pdx-script",
-    "pdx-eu4-localisation",
-    "pdx-eu4-csv",
+    ("pdx_script", "pdx-script"),
+    ("pdx_eu4_localisation", "pdx-eu4-localisation"),
+    ("pdx_eu4_csv", "pdx-eu4-csv"),
 )
 
 
@@ -32,8 +32,8 @@ def git_revision() -> str:
 def main() -> None:
     text = MANIFEST.read_text(encoding="utf-8")
     revision = git_revision()
-    for grammar in GRAMMARS:
-        table = f"[grammars.{grammar}]"
+    for grammar_id, grammar_dir_name in GRAMMARS:
+        table = f"[grammars.{grammar_id}]"
         start = text.index(table)
         next_table = text.find("\n[", start + len(table))
         end = len(text) if next_table == -1 else next_table
@@ -54,7 +54,7 @@ def main() -> None:
         )
         block = re.sub(
             r'^path = ".*"$',
-            f'path = "grammars/tree-sitter-{grammar}"',
+            f'path = "grammars/tree-sitter-{grammar_dir_name}"',
             block,
             count=1,
             flags=re.MULTILINE,

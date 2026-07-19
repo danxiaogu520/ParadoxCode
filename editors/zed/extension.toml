@@ -7,19 +7,19 @@ description = "EU4 language tooling backed by pdx-ls."
 
 # Development manifest: local file URLs keep the grammar source in this monorepo. The release
 # manifest must replace these URLs with read-only mirrors and pinned revisions.
-[grammars.pdx-script]
+[grammars.pdx_script]
 repository = "file:///home/administrator/ParadoxCode"
-rev = "HEAD"
+rev = "b13f71ba292eb745fa08e57d95a51e87e9de34ff"
 path = "grammars/tree-sitter-pdx-script"
 
-[grammars.pdx-eu4-localisation]
+[grammars.pdx_eu4_localisation]
 repository = "file:///home/administrator/ParadoxCode"
-rev = "HEAD"
+rev = "b13f71ba292eb745fa08e57d95a51e87e9de34ff"
 path = "grammars/tree-sitter-pdx-eu4-localisation"
 
-[grammars.pdx-eu4-csv]
+[grammars.pdx_eu4_csv]
 repository = "file:///home/administrator/ParadoxCode"
-rev = "HEAD"
+rev = "b13f71ba292eb745fa08e57d95a51e87e9de34ff"
 path = "grammars/tree-sitter-pdx-eu4-csv"
 
 [language_servers.pdx-ls]
