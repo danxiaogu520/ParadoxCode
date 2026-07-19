@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Point the local Zed manifest at this checkout's grammar directories."""
+"""Pin the Zed dev manifest to this checkout's reachable Git remote."""
 
 from pathlib import Path
 import re
@@ -29,8 +29,23 @@ def git_revision() -> str:
     return result.stdout.strip()
 
 
+def git_repository() -> str:
+    result = subprocess.run(
+        ["git", "-C", str(ROOT), "remote", "get-url", "origin"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        raise SystemExit(
+            "The Zed development manifest needs an origin remote so Zed can fetch grammar sources."
+        )
+    return result.stdout.strip()
+
+
 def main() -> None:
     text = MANIFEST.read_text(encoding="utf-8")
+    repository = git_repository()
     revision = git_revision()
     for grammar_id, grammar_dir_name in GRAMMARS:
         table = f"[grammars.{grammar_id}]"
@@ -40,7 +55,7 @@ def main() -> None:
         block = text[start:end]
         block = re.sub(
             r'^repository = ".*"$',
-            f'repository = "file://{ROOT.resolve().as_posix()}"',
+            f'repository = "{repository}"',
             block,
             count=1,
             flags=re.MULTILINE,

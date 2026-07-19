@@ -6,10 +6,10 @@ semantics remain in the Rust core.
 
 The extension directory is deliberately outside the core Cargo workspace. The three grammar
 directories under `../../grammars/` are the source of truth; the development manifest points at
-the monorepo with a local `file://` URL, `rev = "HEAD"`, and a grammar-specific `path`. Run
-`python3 scripts/prepare-zed-dev-manifest.py` from the repository root before installing a
-checkout whose absolute path differs from this one. A published manifest must replace those
-URLs with the read-only mirrors and pinned revisions described in the Phase 0 spike.
+the repository's reachable Git remote with a pinned revision and a grammar-specific `path`. Run
+`python3 scripts/prepare-zed-dev-manifest.py` from the repository root after changing the
+grammar revision or remote. A published manifest must replace those URLs with the read-only
+mirrors and pinned revisions described in the Phase 0 spike.
 
 Because `.txt` is shared by many languages, PdxScript does not globally claim that suffix. Apply
 [`recommended-settings.json`](recommended-settings.json) to an EU4 Mod workspace to associate

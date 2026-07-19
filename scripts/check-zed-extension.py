@@ -77,15 +77,15 @@ def main() -> int:
             repository = grammars[grammar_id]["repository"]
             parsed_url = urlparse(repository)
             require(
-                parsed_url.scheme == "file",
-                f"{grammar_id}: Phase 1 manifest must use a local file:// repository",
+                parsed_url.scheme in {"file", "https"},
+                f"{grammar_id}: manifest must use a file:// or https:// repository",
             )
             require(grammars[grammar_id].get("rev"), f"{grammar_id}: grammar revision is missing")
             require(
                 grammars[grammar_id].get("path") == f"grammars/{grammar_dir_name}",
                 f"{grammar_id}: repository path must point at the monorepo grammar directory",
             )
-            grammar_path = Path(parsed_url.path) / grammars[grammar_id]["path"]
+            grammar_path = GRAMMAR_ROOT / grammar_dir_name
             require(grammar_path.name == grammar_dir_name, f"{grammar_id}: repository path mismatch")
             require((grammar_path / "grammar.js").is_file(), f"{grammar_id}: grammar.js missing")
             require((grammar_path / "src" / "parser.c").is_file(), f"{grammar_id}: generated parser missing")

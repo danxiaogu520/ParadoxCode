@@ -5,21 +5,21 @@ schema_version = 1
 authors = ["ParadoxCode maintainers"]
 description = "EU4 language tooling backed by pdx-ls."
 
-# Development manifest: local file URLs keep the grammar source in this monorepo. The release
-# manifest must replace these URLs with read-only mirrors and pinned revisions.
+# Development manifest: use the repository remote so Zed can clone the grammars from Windows
+# and other worktrees. The release manifest must replace these URLs with read-only mirrors.
 [grammars.pdx_script]
-repository = "file:///home/administrator/ParadoxCode"
-rev = "b13f71ba292eb745fa08e57d95a51e87e9de34ff"
+repository = "https://github.com/danxiaogu520/ParadoxCode.git"
+rev = "d7b51c2b126b762c6021b42f229bb2867e8968f8"
 path = "grammars/tree-sitter-pdx-script"
 
 [grammars.pdx_eu4_localisation]
-repository = "file:///home/administrator/ParadoxCode"
-rev = "b13f71ba292eb745fa08e57d95a51e87e9de34ff"
+repository = "https://github.com/danxiaogu520/ParadoxCode.git"
+rev = "d7b51c2b126b762c6021b42f229bb2867e8968f8"
 path = "grammars/tree-sitter-pdx-eu4-localisation"
 
 [grammars.pdx_eu4_csv]
-repository = "file:///home/administrator/ParadoxCode"
-rev = "b13f71ba292eb745fa08e57d95a51e87e9de34ff"
+repository = "https://github.com/danxiaogu520/ParadoxCode.git"
+rev = "d7b51c2b126b762c6021b42f229bb2867e8968f8"
 path = "grammars/tree-sitter-pdx-eu4-csv"
 
 [language_servers.pdx-ls]
