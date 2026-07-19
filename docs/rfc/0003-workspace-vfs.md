@@ -51,6 +51,14 @@ Vanilla < Dependency Mods（配置顺序）< Current Mod < Open Document Overlay
 
 不得通过 filesystem canonicalize 作为逻辑身份，因为符号链接、未存在的新文件和 Windows 大小写会导致不稳定结果。
 
+## 扫描安全与错误隔离
+
+工作区发现必须有明确的资源边界，当前默认值为：source root 以下最多递归 64 层、所有 roots 合计最多检查 100,000 个普通文件、单个会被规则分类的源文件最多读取 16 MiB。详细问题报告最多保留 256 条，更多问题只累计数量，防止错误本身耗尽内存。
+
+目录内的符号链接一律不跟随，避免逻辑 root 之外的路径逃逸和目录环。显式配置的 source root 自身可以是用户选择的路径，但 root 内部仍按上述规则扫描。
+
+根目录不可读、文件总数越界和稳定 ID 冲突属于 workspace-level error，失败刷新不得替换上一个有效 snapshot。单个嵌套目录或文件不可读、文件过大、文件不是 UTF-8 等属于可恢复问题：跳过该项、保留有界 `WorkspaceScanReport`，其余文件继续进入索引。读取分类后的文件时仍使用有界 reader，避免文件在 metadata 检查后增长造成无界分配。
+
 ## 文件分类
 
 文件 matcher 完全来自 Eu4Rules，包括 bootstrap CWT 中 `type[...]` 的 `path`、`path_strict`、`path_file`、`path_extension`、`type_per_file` 等规范化约束。Event、scripted effect、scripted trigger 和 localisation 是强制回归类别，但不是分类白名单。

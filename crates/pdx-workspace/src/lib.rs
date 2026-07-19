@@ -6,6 +6,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
+use std::io::Read;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -99,6 +100,77 @@ pub struct SourceFile {
     pub category_id: Option<String>,
     /// File resolution policy selected by the rules catalog.
     pub resolution: FileResolutionPolicy,
+}
+
+/// Resource boundaries applied while discovering source files.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct WorkspaceScanLimits {
+    /// Maximum number of nested directories below a configured source root.
+    pub max_depth: usize,
+    /// Maximum number of regular files examined across all source roots.
+    pub max_files: usize,
+    /// Maximum size of one source file in bytes.
+    pub max_file_size: u64,
+    /// Maximum number of detailed issues retained in a scan report.
+    pub max_reported_issues: usize,
+}
+
+impl Default for WorkspaceScanLimits {
+    fn default() -> Self {
+        Self {
+            max_depth: 64,
+            max_files: 100_000,
+            max_file_size: 16 * 1024 * 1024,
+            max_reported_issues: 256,
+        }
+    }
+}
+
+/// Classification of a recoverable source-root scan problem.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WorkspaceScanIssueKind {
+    /// A directory entry was a symbolic link and was not followed.
+    SymlinkSkipped,
+    /// A subtree exceeded the configured nesting limit.
+    DepthLimitExceeded,
+    /// A nested directory could not be read.
+    DirectoryUnreadable,
+    /// One directory entry could not be inspected.
+    DirectoryEntryUnreadable,
+    /// Metadata for a regular file could not be read.
+    MetadataUnreadable,
+    /// A file exceeded the configured per-file size limit.
+    FileTooLarge,
+    /// A file disappeared or otherwise could not be read after discovery.
+    FileUnreadable,
+    /// Source bytes were not valid UTF-8.
+    InvalidUtf8,
+}
+
+/// One recoverable problem encountered during source-root discovery.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WorkspaceScanIssue {
+    /// Stable machine-readable issue category.
+    pub kind: WorkspaceScanIssueKind,
+    /// Best available physical path for the affected entry.
+    pub path: PathBuf,
+    /// Human-readable detail suitable for logs or future diagnostics.
+    pub detail: String,
+}
+
+/// Summary of the most recent successful bounded workspace scan.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct WorkspaceScanReport {
+    /// Regular files examined before rules classification.
+    pub discovered_files: usize,
+    /// Classified, readable UTF-8 files added to the workspace.
+    pub indexed_files: usize,
+    /// Entries or subtrees skipped for a recoverable reason.
+    pub skipped_entries: usize,
+    /// Retained issue details, bounded by [`WorkspaceScanLimits::max_reported_issues`].
+    pub issues: Vec<WorkspaceScanIssue>,
+    /// Additional issues omitted after the report detail limit was reached.
+    pub omitted_issues: usize,
 }
 
 /// A candidate retained by overlay resolution, including shadowed definitions.
@@ -481,6 +553,8 @@ pub enum WorkspaceError {
     InvalidLogicalPath(PathBuf),
     /// Two distinct physical files produced the same stable source identity.
     FileIdCollision { first: PathBuf, second: PathBuf },
+    /// Source discovery exceeded its total regular-file budget.
+    FileLimitExceeded { limit: usize },
 }
 
 impl fmt::Display for WorkspaceError {
@@ -496,31 +570,117 @@ impl fmt::Display for WorkspaceError {
                 first.display(),
                 second.display()
             ),
+            Self::FileLimitExceeded { limit } => {
+                write!(formatter, "workspace contains more than the allowed {limit} files")
+            }
         }
     }
 }
 
 impl std::error::Error for WorkspaceError {}
 
+fn record_scan_issue(
+    report: &mut WorkspaceScanReport,
+    limits: WorkspaceScanLimits,
+    kind: WorkspaceScanIssueKind,
+    path: PathBuf,
+    detail: String,
+) {
+    report.skipped_entries = report.skipped_entries.saturating_add(1);
+    if report.issues.len() < limits.max_reported_issues {
+        report.issues.push(WorkspaceScanIssue { kind, path, detail });
+    } else {
+        report.omitted_issues = report.omitted_issues.saturating_add(1);
+    }
+}
+
 fn collect_disk_files(
     root: &std::path::Path,
     current: &std::path::Path,
+    depth: usize,
+    limits: WorkspaceScanLimits,
+    report: &mut WorkspaceScanReport,
     output: &mut Vec<(LogicalPath, PathBuf)>,
 ) -> Result<(), WorkspaceError> {
-    let mut entries = fs::read_dir(current)
-        .map_err(WorkspaceError::Io)?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(WorkspaceError::Io)?;
+    let entries = match fs::read_dir(current) {
+        Ok(entries) => entries,
+        Err(error) if depth == 0 => return Err(WorkspaceError::Io(error)),
+        Err(error) => {
+            record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::DirectoryUnreadable,
+                current.to_owned(),
+                error.to_string(),
+            );
+            return Ok(());
+        }
+    };
+    let mut entries = entries
+        .filter_map(|entry| match entry {
+            Ok(entry) => Some(entry),
+            Err(error) => {
+                record_scan_issue(
+                    report,
+                    limits,
+                    WorkspaceScanIssueKind::DirectoryEntryUnreadable,
+                    current.to_owned(),
+                    error.to_string(),
+                );
+                None
+            }
+        })
+        .collect::<Vec<_>>();
     entries.sort_by_key(|entry| entry.file_name());
     for entry in entries {
         let path = entry.path();
-        if path.is_dir() {
-            collect_disk_files(root, &path, output)?;
+        let file_type = match entry.file_type() {
+            Ok(file_type) => file_type,
+            Err(error) => {
+                record_scan_issue(
+                    report,
+                    limits,
+                    WorkspaceScanIssueKind::DirectoryEntryUnreadable,
+                    path,
+                    error.to_string(),
+                );
+                continue;
+            }
+        };
+        if file_type.is_symlink() {
+            record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::SymlinkSkipped,
+                path,
+                "symbolic links are not followed during workspace discovery".to_owned(),
+            );
             continue;
         }
-        if path.is_symlink() {
+        if file_type.is_dir() {
+            if depth >= limits.max_depth {
+                record_scan_issue(
+                    report,
+                    limits,
+                    WorkspaceScanIssueKind::DepthLimitExceeded,
+                    path,
+                    format!(
+                        "directory nesting exceeds the configured limit of {}",
+                        limits.max_depth
+                    ),
+                );
+                continue;
+            }
+            collect_disk_files(root, &path, depth + 1, limits, report, output)?;
             continue;
         }
+        if !file_type.is_file() {
+            continue;
+        }
+        if report.discovered_files >= limits.max_files {
+            return Err(WorkspaceError::FileLimitExceeded { limit: limits.max_files });
+        }
+        report.discovered_files = report.discovered_files.saturating_add(1);
         let relative = path
             .strip_prefix(root)
             .map_err(|_| WorkspaceError::InvalidLogicalPath(path.clone()))?
@@ -531,6 +691,87 @@ fn collect_disk_files(
         output.push((logical, path));
     }
     Ok(())
+}
+
+fn read_source_file(
+    path: &std::path::Path,
+    limits: WorkspaceScanLimits,
+    report: &mut WorkspaceScanReport,
+) -> Option<String> {
+    let metadata = match fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) => {
+            record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::MetadataUnreadable,
+                path.to_owned(),
+                error.to_string(),
+            );
+            return None;
+        }
+    };
+    if metadata.len() > limits.max_file_size {
+        record_scan_issue(
+            report,
+            limits,
+            WorkspaceScanIssueKind::FileTooLarge,
+            path.to_owned(),
+            format!(
+                "file size {} exceeds the configured limit of {} bytes",
+                metadata.len(),
+                limits.max_file_size
+            ),
+        );
+        return None;
+    }
+    let file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) => {
+            record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::FileUnreadable,
+                path.to_owned(),
+                error.to_string(),
+            );
+            return None;
+        }
+    };
+    let mut bytes = Vec::new();
+    if let Err(error) = file.take(limits.max_file_size.saturating_add(1)).read_to_end(&mut bytes) {
+        record_scan_issue(
+            report,
+            limits,
+            WorkspaceScanIssueKind::FileUnreadable,
+            path.to_owned(),
+            error.to_string(),
+        );
+        return None;
+    }
+    if u64::try_from(bytes.len()).map_or(true, |size| size > limits.max_file_size) {
+        record_scan_issue(
+            report,
+            limits,
+            WorkspaceScanIssueKind::FileTooLarge,
+            path.to_owned(),
+            format!("file grew beyond the configured limit of {} bytes", limits.max_file_size),
+        );
+        return None;
+    }
+    match String::from_utf8(bytes) {
+        Ok(text) => Some(text),
+        Err(error) => {
+            record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::InvalidUtf8,
+                path.to_owned(),
+                error.to_string(),
+            );
+            None
+        }
+    }
 }
 
 fn stable_file_id(root: SourceRootId, logical: &LogicalPath) -> u64 {
@@ -1234,6 +1475,7 @@ pub struct AnalysisHost {
     source_files: Arc<BTreeMap<SourceFileId, SourceFile>>,
     disk_text: Arc<BTreeMap<SourceFileId, String>>,
     index: Arc<WorkspaceIndex>,
+    scan_report: Arc<WorkspaceScanReport>,
 }
 
 impl AnalysisHost {
@@ -1255,6 +1497,7 @@ impl AnalysisHost {
             source_files: Arc::new(BTreeMap::new()),
             disk_text: Arc::new(BTreeMap::new()),
             index: Arc::new(WorkspaceIndex::empty()),
+            scan_report: Arc::new(WorkspaceScanReport::default()),
         }
     }
 
@@ -1268,17 +1511,26 @@ impl AnalysisHost {
     }
 
     /// Scans all configured roots in stable order and atomically refreshes source files and shards.
-    pub fn refresh_source_roots(&mut self) -> Result<(), WorkspaceError> {
+    pub fn refresh_source_roots(&mut self) -> Result<WorkspaceScanReport, WorkspaceError> {
+        self.refresh_source_roots_with_limits(WorkspaceScanLimits::default())
+    }
+
+    /// Scans all configured roots with explicit resource limits.
+    pub fn refresh_source_roots_with_limits(
+        &mut self,
+        limits: WorkspaceScanLimits,
+    ) -> Result<WorkspaceScanReport, WorkspaceError> {
         let mut files: BTreeMap<SourceFileId, SourceFile> = BTreeMap::new();
         let mut texts = BTreeMap::new();
+        let mut report = WorkspaceScanReport::default();
         for root in self.roots.iter() {
             let mut paths = Vec::new();
-            collect_disk_files(&root.path, &root.path, &mut paths)?;
+            collect_disk_files(&root.path, &root.path, 0, limits, &mut report, &mut paths)?;
             paths.sort_by(|left, right| left.0.cmp(&right.0));
             for (logical, physical) in paths {
                 let id = SourceFileId::new(stable_file_id(root.id, &logical));
                 let Some(category) = self.rules.classify(&logical) else { continue };
-                let text = fs::read_to_string(&physical).map_err(WorkspaceError::Io)?;
+                let Some(text) = read_source_file(&physical, limits, &mut report) else { continue };
                 if let Some(existing) = files.get(&id) {
                     return Err(WorkspaceError::FileIdCollision {
                         first: existing.physical_path.clone(),
@@ -1295,6 +1547,7 @@ impl AnalysisHost {
                 };
                 files.insert(id, source_file);
                 texts.insert(id, text);
+                report.indexed_files = report.indexed_files.saturating_add(1);
             }
         }
         let shards = files.iter().filter_map(|(id, file)| {
@@ -1314,8 +1567,9 @@ impl AnalysisHost {
         self.source_files = Arc::new(files);
         self.disk_text = Arc::new(texts);
         self.index = Arc::new(index);
+        self.scan_report = Arc::new(report.clone());
         self.revision = self.revision.saturating_add(1);
-        Ok(())
+        Ok(report)
     }
 
     /// Returns a mutable workspace index for targeted shard replacement.
@@ -1453,6 +1707,7 @@ impl AnalysisHost {
             source_files: Arc::clone(&self.source_files),
             disk_text: Arc::clone(&self.disk_text),
             index: Arc::clone(&self.index),
+            scan_report: Arc::clone(&self.scan_report),
         }
     }
 }
@@ -1468,6 +1723,7 @@ pub struct AnalysisSnapshot {
     source_files: Arc<BTreeMap<SourceFileId, SourceFile>>,
     disk_text: Arc<BTreeMap<SourceFileId, String>>,
     index: Arc<WorkspaceIndex>,
+    scan_report: Arc<WorkspaceScanReport>,
 }
 
 impl AnalysisSnapshot {
@@ -1517,6 +1773,12 @@ impl AnalysisSnapshot {
     #[must_use]
     pub fn index(&self) -> &WorkspaceIndex {
         &self.index
+    }
+
+    /// Returns the bounded report from the latest successful source-root scan.
+    #[must_use]
+    pub fn scan_report(&self) -> &WorkspaceScanReport {
+        &self.scan_report
     }
 
     /// Resolves one logical path, retaining lower-priority candidates as shadowed entries.
@@ -1595,6 +1857,7 @@ mod tests {
     use super::{
         AnalysisHost, Definition, DocumentId, DocumentSource, FileIndexShard, SourceFileId,
         SourceRoot, SourceRootId, SourceRootKind, TextChange, WorkspaceIndex,
+        WorkspaceScanIssueKind, WorkspaceScanLimits,
     };
     use pdx_eu4::Eu4Rules;
     use pdx_text::{LogicalPath, TextRange};
@@ -1704,6 +1967,7 @@ mod tests {
         assert!(Arc::ptr_eq(&first.source_files, &second.source_files));
         assert!(Arc::ptr_eq(&first.disk_text, &second.disk_text));
         assert!(Arc::ptr_eq(&first.index, &second.index));
+        assert!(Arc::ptr_eq(&first.scan_report, &second.scan_report));
 
         let id = DocumentId::new("file:///tmp/snapshot.txt");
         host.open_document(id.clone(), 1, "one".to_owned(), None).expect("open should succeed");
@@ -1716,6 +1980,152 @@ mod tests {
         assert!(Arc::ptr_eq(&first.source_files, &third.source_files));
         assert!(Arc::ptr_eq(&first.disk_text, &third.disk_text));
         assert!(Arc::ptr_eq(&first.index, &third.index));
+        assert!(Arc::ptr_eq(&first.scan_report, &third.scan_report));
+    }
+
+    #[test]
+    fn recoverable_file_failures_do_not_abort_the_workspace_scan() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-workspace-isolation-{nonce}"));
+        let events = root.join("events");
+        fs::create_dir_all(&events).expect("event directory");
+        fs::write(events.join("good.txt"), "country_event = { id = safe.1 }\n")
+            .expect("valid event");
+        fs::write(events.join("invalid.txt"), [0xff, 0xfe]).expect("invalid UTF-8 event");
+        fs::write(events.join("large.txt"), vec![b'x'; 65]).expect("oversized event");
+
+        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        let report = host
+            .refresh_source_roots_with_limits(WorkspaceScanLimits {
+                max_file_size: 64,
+                ..WorkspaceScanLimits::default()
+            })
+            .expect("recoverable file failures should not abort scanning");
+
+        assert_eq!(report.discovered_files, 3);
+        assert_eq!(report.indexed_files, 1);
+        assert_eq!(report.skipped_entries, 2);
+        assert!(
+            report.issues.iter().any(|issue| issue.kind == WorkspaceScanIssueKind::InvalidUtf8)
+        );
+        assert!(
+            report.issues.iter().any(|issue| issue.kind == WorkspaceScanIssueKind::FileTooLarge)
+        );
+        assert_eq!(host.snapshot().scan_report(), &report);
+        assert_eq!(host.snapshot().source_files().len(), 1);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn depth_limit_skips_nested_subtrees_with_a_reported_issue() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-workspace-depth-{nonce}"));
+        let events = root.join("events");
+        fs::create_dir_all(&events).expect("event directory");
+        fs::write(events.join("deep.txt"), "country_event = { id = deep.1 }\n")
+            .expect("deep event");
+
+        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        let report = host
+            .refresh_source_roots_with_limits(WorkspaceScanLimits {
+                max_depth: 0,
+                ..WorkspaceScanLimits::default()
+            })
+            .expect("depth-limited scan");
+
+        assert_eq!(report.indexed_files, 0);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.kind == WorkspaceScanIssueKind::DepthLimitExceeded)
+        );
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn file_limit_failure_preserves_the_previous_snapshot() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-workspace-file-limit-{nonce}"));
+        let events = root.join("events");
+        fs::create_dir_all(&events).expect("event directory");
+        fs::write(events.join("a.txt"), "country_event = { id = limit.a }\n").expect("a event");
+
+        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        host.refresh_source_roots().expect("initial scan");
+        let before = host.snapshot();
+        fs::write(events.join("b.txt"), "country_event = { id = limit.b }\n").expect("b event");
+
+        let error = host
+            .refresh_source_roots_with_limits(WorkspaceScanLimits {
+                max_files: 1,
+                ..WorkspaceScanLimits::default()
+            })
+            .expect_err("the total file limit must be enforced");
+        assert!(matches!(error, super::WorkspaceError::FileLimitExceeded { limit: 1 }));
+        let after = host.snapshot();
+        assert_eq!(after.revision(), before.revision());
+        assert_eq!(after.source_files(), before.source_files());
+        assert_eq!(after.scan_report(), before.scan_report());
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn directory_symlinks_are_reported_and_never_followed() {
+        use std::os::unix::fs::symlink;
+
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-workspace-symlink-root-{nonce}"));
+        let outside = std::env::temp_dir().join(format!("pdx-workspace-symlink-outside-{nonce}"));
+        fs::create_dir_all(&root).expect("source root");
+        fs::create_dir_all(&outside).expect("outside directory");
+        fs::write(outside.join("leak.txt"), "country_event = { id = leak.1 }\n")
+            .expect("outside event");
+        symlink(&outside, root.join("events")).expect("directory symlink");
+
+        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        let report = host.refresh_source_roots().expect("symlink-safe scan");
+
+        assert_eq!(report.discovered_files, 0);
+        assert_eq!(report.indexed_files, 0);
+        assert!(
+            report.issues.iter().any(|issue| issue.kind == WorkspaceScanIssueKind::SymlinkSkipped)
+        );
+        fs::remove_dir_all(root).expect("cleanup root");
+        fs::remove_dir_all(outside).expect("cleanup outside directory");
     }
 
     #[test]
