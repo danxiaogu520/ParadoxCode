@@ -3,7 +3,7 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
-> 实现进度（2026-07-20）：stdio reader 与 workspace event loop 已分离；编辑先 stage 最新文本/版本，parse/lower 在 snapshot worker 准备，并通过版本、文本、路径三重提交门拒绝旧结果；依赖语义的请求按消息顺序等待最新 parse。semantic diagnostics 使用 200ms debounce 与版本门，普通语言请求也在 snapshot worker 执行；`$/cancelRequest` 会标记在途 `RequestId` 并抑制旧结果。analysis 内部协作式 cancellation checkpoint 和 workspace scan 取消仍待实现。
+> 实现进度（2026-07-20）：stdio reader 与 workspace event loop 已分离；编辑先 stage 最新文本/版本，parse/lower 在 snapshot worker 准备，并通过版本、文本、路径三重提交门拒绝旧结果；依赖语义的请求按消息顺序等待最新 parse。semantic diagnostics 使用 200ms debounce 与版本门，普通语言请求也在 snapshot worker 执行；`$/cancelRequest` 会标记在途 `RequestId` 并抑制旧结果。标准 initialize/sync/cancel/language-request params 与 initialize result/capabilities 已迁入 `lsp-types`，语言功能 response DTO 仍在迁移；analysis 内部协作式 cancellation checkpoint 和 workspace scan 取消仍待实现。
 
 ## 边界
 

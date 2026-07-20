@@ -259,7 +259,7 @@ Workspace/index：
 4. 删除 analysis query-time 全 workspace 重解析，查询只读取当前 HIR 与 WorkspaceIndex（已完成）；
 5. 增加 index bulk build 和真正的单 shard 增量 replacement（已完成）；
 6. 修复稳定 SourceFileId、symlink 顺序、文件大小/深度/数量限制和错误隔离（已完成）；
-7. 将 LSP transport 迁移到类型化协议层，增加 worker、debounce、版本门和在途取消（stdio reader 分离、prepared-document parse worker/三重提交门、semantic diagnostics 200ms debounce、snapshot request worker 与在途结果取消已完成；类型化协议、analysis 内部 cancellation checkpoint 和 workspace scan 取消待完成）；
+7. 将 LSP transport 迁移到类型化协议层，增加 worker、debounce、版本门和在途取消（stdio reader 分离、prepared-document parse worker/三重提交门、semantic diagnostics 200ms debounce、snapshot request worker 与在途结果取消已完成；`lsp-types` 已接管 initialize/sync/cancel/language-request params 和 initialize result/capabilities，语言功能 response DTO、analysis 内部 cancellation checkpoint 和 workspace scan 取消待完成）；
 8. 接入 formatting、dependency roots、Vanilla cache 持久化和文件变化更新；
 9. 建立大型 synthetic workspace benchmark 与“编辑一个文件只 parse/lower 一次”计数测试；
 10. 完成 Zed 自动获取、多平台 release、checksum 和干净 clone 端到端安装测试。

@@ -13,6 +13,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
+use lsp_types::{
+    CancelParams, CompletionOptions, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentSymbolParams,
+    HoverProviderCapability, InitializeParams, InitializeResult, NumberOrString, OneOf,
+    Range as LspRange, ReferenceParams, RenameOptions, RenameParams, ServerCapabilities,
+    ServerInfo, TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, WorkDoneProgressOptions, WorkspaceSymbolParams,
+};
 use pdx_analysis::{
     CompletionKind, Hover, Location, RenameError, complete, definition, diagnostics,
     document_symbols, hover, prepare_rename, references, rename, workspace_symbols,
@@ -23,6 +31,7 @@ use pdx_workspace::{
     AnalysisHost, AnalysisSnapshot, DocumentError, DocumentId, DocumentSource, PreparedDocument,
     SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
 };
+use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 
 const JSON_RPC_VERSION: &str = "2.0";
@@ -843,15 +852,8 @@ impl LspServer {
             }
             "textDocument/didClose" => self.handle_did_close(params),
             "textDocument/didSave" => {
-                let uri = params
-                    .and_then(Value::as_object)
-                    .and_then(|object| object.get("textDocument"))
-                    .and_then(Value::as_object)
-                    .and_then(|object| object.get("uri"))
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| {
-                        RpcError::new(INVALID_PARAMS, "didSave requires textDocument")
-                    })?;
+                let params = typed_params::<DidSaveTextDocumentParams>(params, "didSave")?;
+                let uri = params.text_document.uri.as_str();
                 self.schedule_parse(uri);
                 self.schedule_diagnostics(uri, Duration::ZERO);
                 Ok(Value::Null)
@@ -864,32 +866,23 @@ impl LspServer {
     }
 
     fn handle_cancel(&mut self, params: Option<&Value>) {
-        let Some(id) = params
-            .and_then(Value::as_object)
-            .and_then(|object| object.get("id"))
-            .and_then(|value| RequestId::parse(value).ok())
-        else {
-            return;
-        };
-        self.cancelled.insert(id);
+        if let Ok(params) = typed_params::<CancelParams>(params, "cancel request") {
+            self.cancelled.insert(request_id_from_lsp(params.id));
+        }
     }
 
     fn handle_initialize(&mut self, params: Option<&Value>) -> Result<Value, RpcError> {
-        let object = params
-            .and_then(Value::as_object)
-            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "initialize params must be an object"))?;
-        let root = if let Some(root_uri) = object.get("rootUri") {
-            parse_optional_file_uri(root_uri)?
-        } else {
-            object
-                .get("workspaceFolders")
-                .and_then(Value::as_array)
-                .and_then(|folders| folders.first())
-                .and_then(Value::as_object)
-                .and_then(|folder| folder.get("uri"))
-                .map(parse_file_uri)
-                .transpose()?
-        };
+        let params = typed_params::<InitializeParams>(params, "initialize")?;
+        #[allow(deprecated)]
+        let root_uri = params.root_uri;
+        let root = root_uri.as_ref().map(|uri| parse_file_uri_str(uri.as_str())).transpose()?;
+        let workspace_root = params
+            .workspace_folders
+            .as_ref()
+            .and_then(|folders| folders.first())
+            .map(|folder| parse_file_uri_str(folder.uri.as_str()))
+            .transpose()?;
+        let root = root.or(workspace_root);
         self.host.apply_change(WorkspaceChange::SetWorkspaceRoot(root.clone()));
         if let Some(root) = root.filter(|path| path.is_dir()) {
             self.host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -905,48 +898,58 @@ impl LspServer {
             }
         }
         self.state = ServerState::Initialized;
-        Ok(json!({
-            "capabilities": {
-                "textDocumentSync": {"openClose": true, "change": 2},
-                "completionProvider": {"triggerCharacters": ["=", " ", ":"]},
-                "hoverProvider": true,
-                "definitionProvider": true,
-                "referencesProvider": true,
-                "renameProvider": {"prepareProvider": true},
-                "documentSymbolProvider": true,
-                "workspaceSymbolProvider": true
+        serde_json::to_value(InitializeResult {
+            capabilities: ServerCapabilities {
+                text_document_sync: Some(TextDocumentSyncCapability::Options(
+                    TextDocumentSyncOptions {
+                        open_close: Some(true),
+                        change: Some(TextDocumentSyncKind::INCREMENTAL),
+                        ..TextDocumentSyncOptions::default()
+                    },
+                )),
+                completion_provider: Some(CompletionOptions {
+                    trigger_characters: Some(vec!["=".to_owned(), " ".to_owned(), ":".to_owned()]),
+                    ..CompletionOptions::default()
+                }),
+                hover_provider: Some(HoverProviderCapability::Simple(true)),
+                definition_provider: Some(OneOf::Left(true)),
+                references_provider: Some(OneOf::Left(true)),
+                rename_provider: Some(OneOf::Right(RenameOptions {
+                    prepare_provider: Some(true),
+                    work_done_progress_options: WorkDoneProgressOptions::default(),
+                })),
+                document_symbol_provider: Some(OneOf::Left(true)),
+                workspace_symbol_provider: Some(OneOf::Left(true)),
+                ..ServerCapabilities::default()
             },
-            "serverInfo": {"name": "pdx-ls", "version": "0.1.0"}
-        }))
+            server_info: Some(ServerInfo {
+                name: "pdx-ls".to_owned(),
+                version: Some(env!("CARGO_PKG_VERSION").to_owned()),
+            }),
+        })
+        .map_err(|error| RpcError {
+            code: INTERNAL_ERROR,
+            message: format!("failed to serialize initialize result: {error}"),
+        })
     }
 
     fn handle_did_open(&mut self, params: Option<&Value>) -> Result<String, RpcError> {
-        let text_document = params
-            .and_then(Value::as_object)
-            .and_then(|object| object.get("textDocument"))
-            .and_then(Value::as_object)
-            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "didOpen requires textDocument"))?;
-        let uri = required_string(text_document, "uri")?;
-        let version = required_i64(text_document, "version")?;
-        let text = required_string(text_document, "text")?.to_owned();
-        let path = uri_to_path(uri).ok();
+        let params = typed_params::<DidOpenTextDocumentParams>(params, "didOpen")?;
+        let uri = params.text_document.uri.as_str().to_owned();
+        let version = i64::from(params.text_document.version);
+        let text = params.text_document.text;
+        let path = uri_to_path(&uri).ok();
         self.host
-            .stage_open_document(DocumentId::new(uri), version, text, path)
+            .stage_open_document(DocumentId::new(uri.clone()), version, text, path)
             .map_err(document_error)?;
-        Ok(uri.to_owned())
+        Ok(uri)
     }
 
     fn handle_did_change(&mut self, params: Option<&Value>) -> Result<String, RpcError> {
-        let object = params
-            .and_then(Value::as_object)
-            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "didChange params must be an object"))?;
-        let text_document = object
-            .get("textDocument")
-            .and_then(Value::as_object)
-            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "didChange requires textDocument"))?;
-        let uri = required_string(text_document, "uri")?;
-        let id = DocumentId::new(uri);
-        let version = required_i64(text_document, "version")?;
+        let params = typed_params::<DidChangeTextDocumentParams>(params, "didChange")?;
+        let uri = params.text_document.uri.as_str().to_owned();
+        let id = DocumentId::new(uri.clone());
+        let version = i64::from(params.text_document.version);
         let snapshot = self.host.snapshot();
         let current = snapshot
             .document(&id)
@@ -954,34 +957,23 @@ impl LspServer {
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "didChange document is not open"))?;
         let mut text = current.text().to_owned();
         let mut line_index = current.line_index().clone();
-        let content_changes = object
-            .get("contentChanges")
-            .and_then(Value::as_array)
-            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "didChange requires contentChanges"))?;
-        for content_change in content_changes {
-            let change = content_change
-                .as_object()
-                .ok_or_else(|| RpcError::new(INVALID_PARAMS, "content change must be an object"))?;
-            let replacement = required_string(change, "text")?.to_owned();
+        for change in params.content_changes {
             let range = change
-                .get("range")
-                .map(|value| lsp_range_to_text_range(value, &line_index, &text))
+                .range
+                .as_ref()
+                .map(|range| lsp_range_to_text_range(range, &line_index, &text))
                 .transpose()?;
-            apply_text_change(&mut text, range, &replacement)?;
+            apply_text_change(&mut text, range, &change.text)?;
             line_index = LineIndex::new(&text);
         }
         self.host.stage_document_text(&id, version, text).map_err(document_error)?;
-        Ok(uri.to_owned())
+        Ok(uri)
     }
 
     fn handle_did_close(&mut self, params: Option<&Value>) -> Result<Value, RpcError> {
-        let text_document = params
-            .and_then(Value::as_object)
-            .and_then(|object| object.get("textDocument"))
-            .and_then(Value::as_object)
-            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "didClose requires textDocument"))?;
-        let uri = required_string(text_document, "uri")?;
-        let id = DocumentId::new(uri);
+        let params = typed_params::<DidCloseTextDocumentParams>(params, "didClose")?;
+        let uri = params.text_document.uri.as_str().to_owned();
+        let id = DocumentId::new(uri.clone());
         self.host.close_document(&id).map_err(document_error)?;
         self.pending_parses.remove(&id);
         self.pending_diagnostics.remove(&id);
@@ -1069,14 +1061,9 @@ impl SnapshotRequestContext {
     }
 
     fn references(&self, params: Option<&Value>) -> Result<Value, RpcError> {
-        let (id, position) = self.document_position(params)?;
-        let include_declaration = params
-            .and_then(Value::as_object)
-            .and_then(|object| object.get("context"))
-            .and_then(Value::as_object)
-            .and_then(|context| context.get("includeDeclaration"))
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
+        let params = typed_params::<ReferenceParams>(params, "references")?;
+        let (id, position) = self.offset_for(&params.text_document_position)?;
+        let include_declaration = params.context.include_declaration;
         let result = references(&self.snapshot, &id, position, include_declaration)
             .into_iter()
             .filter_map(|location| location_to_json(&self.snapshot, &location))
@@ -1098,13 +1085,9 @@ impl SnapshotRequestContext {
     }
 
     fn rename(&self, params: Option<&Value>) -> Result<Value, RpcError> {
-        let new_name = params
-            .and_then(Value::as_object)
-            .and_then(|object| object.get("newName"))
-            .and_then(Value::as_str)
-            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "rename requires newName"))?;
-        let (id, position) = self.document_position(params)?;
-        let plan = rename(&self.snapshot, &id, position, new_name).map_err(rename_error)?;
+        let params = typed_params::<RenameParams>(params, "rename")?;
+        let (id, position) = self.offset_for(&params.text_document_position)?;
+        let plan = rename(&self.snapshot, &id, position, &params.new_name).map_err(rename_error)?;
         let mut changes = BTreeMap::<String, Vec<Value>>::new();
         for edit in plan.edits {
             let location = location_to_json(&self.snapshot, &edit.location).ok_or_else(|| {
@@ -1128,7 +1111,8 @@ impl SnapshotRequestContext {
     }
 
     fn document_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
-        let id = self.document_id(params)?;
+        let params = typed_params::<DocumentSymbolParams>(params, "document symbols")?;
+        let id = DocumentId::new(params.text_document.uri.as_str());
         let result = document_symbols(&self.snapshot, &id)
             .into_iter()
             .map(|symbol| {
@@ -1144,12 +1128,8 @@ impl SnapshotRequestContext {
     }
 
     fn workspace_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
-        let query = params
-            .and_then(Value::as_object)
-            .and_then(|object| object.get("query"))
-            .and_then(Value::as_str)
-            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "workspace/symbol requires query"))?;
-        let result = workspace_symbols(&self.snapshot, query)
+        let params = typed_params::<WorkspaceSymbolParams>(params, "workspace symbols")?;
+        let result = workspace_symbols(&self.snapshot, &params.query)
             .into_iter()
             .filter_map(|symbol| {
                 let location = location_to_json(&self.snapshot, &symbol.location)?;
@@ -1163,25 +1143,17 @@ impl SnapshotRequestContext {
         Ok(Value::Array(result))
     }
 
-    fn document_id(&self, params: Option<&Value>) -> Result<DocumentId, RpcError> {
-        let uri = params
-            .and_then(Value::as_object)
-            .and_then(|object| object.get("textDocument"))
-            .and_then(Value::as_object)
-            .and_then(|object| object.get("uri"))
-            .and_then(Value::as_str)
-            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "textDocument uri is required"))?;
-        Ok(DocumentId::new(uri))
+    fn document_position(&self, params: Option<&Value>) -> Result<(DocumentId, u32), RpcError> {
+        let params = typed_params::<TextDocumentPositionParams>(params, "document position")?;
+        self.offset_for(&params)
     }
 
-    fn document_position(&self, params: Option<&Value>) -> Result<(DocumentId, u32), RpcError> {
-        let id = self.document_id(params)?;
-        let position = params
-            .and_then(Value::as_object)
-            .and_then(|object| object.get("position"))
-            .map(|value| position_from_json(Some(value)))
-            .transpose()?
-            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "position is required"))?;
+    fn offset_for(
+        &self,
+        params: &TextDocumentPositionParams,
+    ) -> Result<(DocumentId, u32), RpcError> {
+        let id = DocumentId::new(params.text_document.uri.as_str());
+        let position = Position::new(params.position.line, params.position.character);
         let document = self
             .snapshot
             .document(&id)
@@ -1224,14 +1196,10 @@ fn cancel_request_from_notification(
     if object.get("method").and_then(Value::as_str) != Some("$/cancelRequest") {
         return;
     }
-    let Some(request_id) = object
-        .get("params")
-        .and_then(Value::as_object)
-        .and_then(|params| params.get("id"))
-        .and_then(|id| RequestId::parse(id).ok())
-    else {
+    let Ok(params) = typed_params::<CancelParams>(object.get("params"), "cancel request") else {
         return;
     };
+    let request_id = request_id_from_lsp(params.id);
     if let Some(request) = in_flight.get(&request_id) {
         request.cancelled.store(true, Ordering::Release);
     }
@@ -1355,41 +1323,34 @@ fn rename_error(error: RenameError) -> RpcError {
     RpcError { code: INVALID_PARAMS, message: format!("rename unavailable: {error}") }
 }
 
-fn required_string<'a>(
-    object: &'a serde_json::Map<String, Value>,
-    key: &'static str,
-) -> Result<&'a str, RpcError> {
-    object.get(key).and_then(Value::as_str).ok_or_else(|| RpcError::new(INVALID_PARAMS, key))
+fn typed_params<T: DeserializeOwned>(
+    params: Option<&Value>,
+    context: &'static str,
+) -> Result<T, RpcError> {
+    serde_json::from_value(params.cloned().unwrap_or(Value::Null)).map_err(|error| RpcError {
+        code: INVALID_PARAMS,
+        message: format!("invalid {context} params: {error}"),
+    })
 }
 
-fn required_i64(
-    object: &serde_json::Map<String, Value>,
-    key: &'static str,
-) -> Result<i64, RpcError> {
-    object.get(key).and_then(Value::as_i64).ok_or_else(|| RpcError::new(INVALID_PARAMS, key))
+fn request_id_from_lsp(id: NumberOrString) -> RequestId {
+    match id {
+        NumberOrString::Number(value) => RequestId::Number(i64::from(value)),
+        NumberOrString::String(value) => RequestId::String(value),
+    }
 }
 
-fn parse_optional_file_uri(value: &Value) -> Result<Option<PathBuf>, RpcError> {
-    if value.is_null() { Ok(None) } else { parse_file_uri(value).map(Some) }
-}
-
-fn parse_file_uri(value: &Value) -> Result<PathBuf, RpcError> {
-    let uri = value
-        .as_str()
-        .ok_or_else(|| RpcError::new(INVALID_PARAMS, "URI must be a string or null"))?;
+fn parse_file_uri_str(uri: &str) -> Result<PathBuf, RpcError> {
     uri_to_path(uri).map_err(|_| RpcError::new(INVALID_PARAMS, "only file:// URIs are supported"))
 }
 
 fn lsp_range_to_text_range(
-    value: &Value,
+    range: &LspRange,
     index: &LineIndex,
     text: &str,
 ) -> Result<TextRange, RpcError> {
-    let object = value
-        .as_object()
-        .ok_or_else(|| RpcError::new(INVALID_PARAMS, "range must be an object"))?;
-    let start = position_from_json(object.get("start"))?;
-    let end = position_from_json(object.get("end"))?;
+    let start = Position::new(range.start.line, range.start.character);
+    let end = Position::new(range.end.line, range.end.character);
     let start = index.offset(text, start).ok_or_else(|| {
         RpcError::new(INVALID_PARAMS, "range start is not a valid UTF-16 position")
     })?;
@@ -1398,23 +1359,6 @@ fn lsp_range_to_text_range(
         .ok_or_else(|| RpcError::new(INVALID_PARAMS, "range end is not a valid UTF-16 position"))?;
     TextRange::new(start, end)
         .ok_or_else(|| RpcError::new(INVALID_PARAMS, "range end precedes start"))
-}
-
-fn position_from_json(value: Option<&Value>) -> Result<Position, RpcError> {
-    let object = value
-        .and_then(Value::as_object)
-        .ok_or_else(|| RpcError::new(INVALID_PARAMS, "position must be an object"))?;
-    let line = object
-        .get("line")
-        .and_then(Value::as_u64)
-        .and_then(|value| u32::try_from(value).ok())
-        .ok_or_else(|| RpcError::new(INVALID_PARAMS, "position line must be a u32"))?;
-    let character = object
-        .get("character")
-        .and_then(Value::as_u64)
-        .and_then(|value| u32::try_from(value).ok())
-        .ok_or_else(|| RpcError::new(INVALID_PARAMS, "position character must be a u32"))?;
-    Ok(Position::new(line, character))
 }
 
 fn apply_text_change(
@@ -1604,8 +1548,8 @@ mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
 
     use super::{
-        DocumentId, InFlightRequest, InitializeOptions, LspError, LspServer, RequestId,
-        ServerState, cancel_request_from_notification, path_to_uri, uri_to_path,
+        DocumentId, INVALID_PARAMS, InFlightRequest, InitializeOptions, LspError, LspServer,
+        RequestId, ServerState, cancel_request_from_notification, path_to_uri, uri_to_path,
     };
     use pdx_rules::{RuleSet, RulesError, RulesModel};
     use pdx_text::TextRange;
@@ -1678,7 +1622,7 @@ mod tests {
         let uri = path_to_uri(&path);
         let input = frames([
             json!({"jsonrpc":"2.0","id":1,"method":"shutdown","params":{}}),
-            json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"rootUri":uri}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"rootUri":uri,"capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             json!({
                 "jsonrpc":"2.0",
@@ -1736,13 +1680,49 @@ mod tests {
     }
 
     #[test]
+    fn typed_protocol_rejects_malformed_params_without_corrupting_lifecycle() {
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp"}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{}}),
+            json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = eu4_server(InitializeOptions::default()).expect("server");
+
+        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+
+        let responses = decode_frames(&output);
+        let malformed_initialize =
+            responses.iter().find(|value| value["id"] == 1).expect("invalid initialize");
+        assert_eq!(malformed_initialize["error"]["code"], INVALID_PARAMS);
+        assert!(
+            malformed_initialize["error"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("invalid initialize params"))
+        );
+        assert!(
+            responses
+                .iter()
+                .find(|value| value["id"] == 2)
+                .is_some_and(|value| value["result"]["capabilities"].is_object())
+        );
+        let malformed_hover =
+            responses.iter().find(|value| value["id"] == 3).expect("invalid hover");
+        assert_eq!(malformed_hover["error"]["code"], INVALID_PARAMS);
+        assert_eq!(server.state(), ServerState::Exited);
+    }
+
+    #[test]
     fn memory_transport_delegates_phase5_requests_to_analysis() {
         let uri = "file:///tmp/phase5-events.txt";
         let text = "country_event = { id = test.1 }\nevent = test.1\nscope = nowhere\n";
         let input = frames([
-            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp"}}),
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":text}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"pdx-script","version":1,"text":text}}}),
             json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":2,"character":8}}}),
             json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8}}}),
             json!({"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8}}}),
@@ -1825,9 +1805,9 @@ mod tests {
         let references_uri = path_to_uri(&references_path);
         let rules_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let input = frames([
-            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&root)}}),
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&root),"capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":target_uri,"version":1,"text":"country_event = { id = cross.1 }\n"}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":target_uri,"languageId":"pdx-script","version":1,"text":"country_event = { id = cross.1 }\n"}}}),
             json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":target_uri},"position":{"line":0,"character":25},"newName":"renamed.1"}}),
             json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
             json!({"jsonrpc":"2.0","method":"exit"}),
@@ -1879,9 +1859,9 @@ mod tests {
     fn rapid_changes_debounce_and_publish_only_the_latest_diagnostics() {
         let uri = "file:///tmp/debounced-diagnostics.txt";
         let input = frames([
-            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp"}}),
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":"scope = nowhere\n"}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"pdx-script","version":1,"text":"scope = nowhere\n"}}}),
             json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":uri,"version":2},"contentChanges":[{"text":"scope = country\n"}]}}),
             json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
             json!({"jsonrpc":"2.0","method":"exit"}),

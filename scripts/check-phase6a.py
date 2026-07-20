@@ -89,12 +89,24 @@ def check_server_smoke() -> None:
         path.write_text("country_event = { id = smoke.1 }\n", encoding="utf-8")
         uri = file_uri(path)
         messages = [
-            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"rootUri": file_uri(root)}},
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {"rootUri": file_uri(root), "capabilities": {}},
+            },
             {"jsonrpc": "2.0", "method": "initialized", "params": {}},
             {
                 "jsonrpc": "2.0",
                 "method": "textDocument/didOpen",
-                "params": {"textDocument": {"uri": uri, "version": 1, "text": path.read_text(encoding="utf-8")}},
+                "params": {
+                    "textDocument": {
+                        "uri": uri,
+                        "languageId": "pdx-script",
+                        "version": 1,
+                        "text": path.read_text(encoding="utf-8"),
+                    }
+                },
             },
             {
                 "jsonrpc": "2.0",
