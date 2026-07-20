@@ -17,7 +17,9 @@ Rust workspace 初始包含：
 |---|---|
 | `pdx-text` | range、position、line index、URI/path 基础类型 |
 | `pdx-syntax` | 硬编码 EU4 Rust parser、source text、typed CST、syntax errors |
-| `pdx-eu4` | EU4 SQLite schema、canonical hash、只读 runtime model 与查询 API |
+| `pdx-rules` | 通用 SQLite schema、canonical hash、只读 runtime model 与查询 API |
+| `pdx-game-eu4` | EU4 profile、bootstrap catalog 与专属语义 |
+| `pdx-eu4` | 迁移期兼容 re-export facade |
 | `pdx-cwt` | MVP 一次性 CWT importer；未来的规则数据库 CRUD 管理工具 |
 | `pdx-hir` | 路径和规则感知的语义 lowering |
 | `pdx-workspace` | VFS、source roots、cache、snapshot、index |
@@ -30,11 +32,11 @@ Rust workspace 初始包含：
 
 ## 依赖约束
 
-1. 运行时依赖沿 `text -> syntax/eu4 -> hir -> workspace -> analysis -> lsp` 方向。
-2. `pdx-cwt` 依赖 `pdx-text` 和 `pdx-eu4`，但任何 analysis runtime crate 都不反向依赖 `pdx-cwt`。
+1. 运行时依赖沿 `text/rules -> syntax/hir -> workspace -> analysis -> lsp` 方向。
+2. `pdx-cwt` 依赖 `pdx-text`、`pdx-rules` 和 `pdx-game-eu4`，但任何 analysis runtime crate 都不反向依赖 `pdx-cwt`。
 3. `pdx-format` 只依赖 text/syntax 和格式配置，不依赖 workspace index。
 4. 只有 `pdx-lsp` 可以在公开 API 中使用 LSP protocol types。
-5. EU4 规则数据库是独立 SQLite artifact；`pdx-eu4` 可以包含 EU4 专用类型和规则适配，但不把规则复制进 `pdx-ls` binary。
+5. EU4 规则数据库是独立 SQLite artifact；通用加载位于 `pdx-rules`，EU4 规则适配位于 `pdx-game-eu4`，不把规则复制进 `pdx-ls` binary。
 6. Zed extension 不链接 analysis crate；它携带 `eu4.pdxrules` 并显式传给 server。
 7. 核心 API 不接受绝对游戏目录作为隐式全局；workspace configuration 显式传入。
 8. 所有 Cargo package/独立模块使用 `pdx-` 前缀；Rust identifier 必须使用下划线时采用 `pdx_*`。binary 固定为 `pdx`、`pdx-ls` 与维护者工具 `pdx-cwt`。
@@ -72,7 +74,7 @@ reference/               只读参考仓库，不参与构建
 
 - CLI 可以在没有 LSP 的情况下复用分析。
 - Zed 和未来其他编辑器客户端不会产生两套 EU4 语义逻辑。
-- 一次性 CWT importer 和 Eu4Rules schema 可独立测试。
+- 一次性 CWT importer、通用 `RuleSet` schema 和 EU4 profile 可独立测试。
 - crate 数量略多，但每个边界均对应不同的变化原因。
 
 ## 拒绝的方案

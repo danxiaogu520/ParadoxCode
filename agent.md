@@ -81,7 +81,7 @@ pdx-rules -> pdx-cwt
 pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 ```
 
-上图是迁移目标。当前仓库仍使用 `pdx-eu4` 承担通用规则 runtime 与 EU4 profile 的混合职责；迁移期间应保持构建可用，先移动通用规则类型，再隔离 EU4 特有语义，避免一次性重命名和重写。
+通用规则 runtime 已迁入 `pdx-rules`，EU4 bootstrap/profile 已迁入 `pdx-game-eu4`；`pdx-eu4` 只保留迁移期兼容 re-export。后续继续隔离 analysis/HIR 中的 EU4 特有语义，避免一次性重写。
 
 各层职责：
 
@@ -89,9 +89,9 @@ pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 | --- | --- | --- |
 | `pdx-text` | offset、line index、UTF-8/UTF-16、URI/path 基础 | EU4 规则、workspace 状态 |
 | `pdx-syntax` | PDX Script、localisation、CSV 的 loss-aware CST、增量 parse、syntax error | 游戏规则数据库、磁盘扫描、LSP 类型 |
-| `pdx-rules`（迁移目标） | 通用规则 schema、canonical view、`rule_hash`、只读 runtime API | 具体游戏名称表、CWT parser、LSP、动态 Mod symbol |
-| `pdx-game-eu4`（迁移目标） | EU4 profile、路径、scope、command、symbol 和特殊语义 | LSP、workspace 可变状态、编辑器 API |
-| `pdx-eu4`（过渡） | 迁移前的规则 runtime 与 EU4 数据；每次改动应减少职责混合 | 新增与 EU4 无关的长期公共能力 |
+| `pdx-rules` | 通用规则 schema、canonical view、`rule_hash`、只读 runtime API | 具体游戏名称表、CWT parser、LSP、动态 Mod symbol |
+| `pdx-game-eu4` | EU4 profile、路径、scope、command、symbol 和特殊语义 | LSP、workspace 可变状态、编辑器 API |
+| `pdx-eu4`（过渡） | 兼容 re-export；待迁移完成后删除 | 新增长期公共能力 |
 | `pdx-cwt` | 一次性 CWT discovery/import/report | runtime 依赖、持续同步、CWT fallback |
 | `pdx-hir` | 基于 typed CST、RuleSet 和游戏 profile 的 lowering、scope | 编辑器 API、磁盘 I/O |
 | `pdx-workspace` | VFS、overlay、source roots、parse/HIR cache、index shards、snapshot | LSP protocol types |

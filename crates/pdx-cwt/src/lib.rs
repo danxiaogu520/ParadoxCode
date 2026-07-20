@@ -2,7 +2,7 @@
 //!
 //! CWT is deliberately parsed here rather than in the editor runtime. The importer preserves
 //! source order, duplicate keys, directives, and documentation while lowering to scalar
-//! normalized rule rows owned by pdx-eu4.
+//! normalized rule rows owned by `pdx-rules` and seeded by the EU4 profile.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -10,10 +10,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use pdx_eu4::{
-    CwtKeyMatcher, CwtRuleShape, CwtSemanticRule, CwtTypeDescriptor, CwtValueMatcher, Eu4Rules,
-    FileCategory, FileMatcher, FileResolutionPolicy, ParserKind, RuleRecord, RulesError,
-    RulesModel, SymbolDescriptor, SymbolResolutionPolicy,
+use pdx_rules::{
+    CwtKeyMatcher, CwtRuleShape, CwtSemanticRule, CwtTypeDescriptor, CwtValueMatcher, FileCategory,
+    FileMatcher, FileResolutionPolicy, ParserKind, RuleRecord, RuleSet, RulesError, RulesModel,
+    SymbolDescriptor, SymbolResolutionPolicy,
 };
 use pdx_text::LogicalPath;
 use rusqlite::{Connection, params};
@@ -446,7 +446,7 @@ pub fn import_with_options(options: &ImportOptions) -> Result<ImportReport, Impo
         )));
     }
     let sources = discover_sources(&options.source)?;
-    let mut model = RulesModel::bootstrap();
+    let mut model = pdx_game_eu4::bootstrap_model();
     let mut source_files = Vec::new();
     let mut warnings = Vec::new();
     let mut parsed_sources = Vec::new();
@@ -478,7 +478,7 @@ pub fn import_with_options(options: &ImportOptions) -> Result<ImportReport, Impo
         warnings.push(format!("unhandled CWT directive spelling: {directive}"));
     }
     add_path_categories(&mut model);
-    let rules = Eu4Rules::from_model(model);
+    let rules = RuleSet::from_model(model);
     atomic_write_rules(&rules, &options.output, &source_files)?;
     let report = ImportReport {
         input_count: source_files.len(),
@@ -1548,7 +1548,7 @@ fn digest_hex(bytes: &[u8]) -> String {
 }
 
 fn atomic_write_rules(
-    rules: &Eu4Rules,
+    rules: &RuleSet,
     output: &Path,
     source_files: &[ImportFileReport],
 ) -> Result<(), ImportError> {
@@ -1596,7 +1596,7 @@ fn temp_path(path: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::{CwtValue, ImportOptions, cardinality_bounds, import_with_options, parse_cwt};
-    use pdx_eu4::CwtRuleShape;
+    use pdx_rules::CwtRuleShape;
 
     #[test]
     fn parser_preserves_bracketed_keys_directives_docs_and_duplicates() {
@@ -1653,7 +1653,7 @@ mod tests {
             report: None,
         })
         .expect("import");
-        let rules = pdx_eu4::Eu4Rules::load(&output).expect("load");
+        let rules = pdx_rules::RuleSet::load(&output).expect("load");
         let rule = rules
             .model()
             .cwt
@@ -1690,7 +1690,7 @@ mod tests {
         assert!(!report.rule_hash.is_empty());
         assert_eq!(report.construct_counts.get("types"), Some(&1));
         assert!(report.unhandled_directives.is_empty());
-        assert!(pdx_eu4::Eu4Rules::load(&output).is_ok());
+        assert!(pdx_rules::RuleSet::load(&output).is_ok());
         std::fs::remove_dir_all(root).expect("cleanup");
     }
 
@@ -1718,7 +1718,7 @@ mod tests {
             report.rule_hash,
             "42fbe0d1fd6bf8609258380bc5367ff757cb50968bfdfaff73c2ca515ea5dc67"
         );
-        let rules = pdx_eu4::Eu4Rules::load(&output).expect("load pinned corpus");
+        let rules = pdx_rules::RuleSet::load(&output).expect("load pinned corpus");
         assert_eq!(
             rules.model().cwt.type_descriptors["mission"].type_key_filter,
             Some((vec!["potential".to_owned(), "potential_on_load".to_owned()], true))

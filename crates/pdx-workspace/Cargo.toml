@@ -8,9 +8,12 @@ description = "VFS, source-root, and immutable snapshot boundary for ParadoxCode
 
 [dependencies]
 pdx-hir = { path = "../pdx-hir" }
-pdx-eu4 = { path = "../pdx-eu4" }
+pdx-rules = { path = "../pdx-rules" }
 pdx-syntax = { path = "../pdx-syntax" }
 pdx-text = { path = "../pdx-text" }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+pdx-game-eu4 = { path = "../pdx-game-eu4" }

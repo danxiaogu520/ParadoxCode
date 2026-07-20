@@ -63,7 +63,9 @@ ParadoxCode 为 Europa Universalis IV（EU4）Mod 提供面向 Zed 的语言工�
 crates/
   pdx-text/
   pdx-syntax/
-  pdx-eu4/
+  pdx-rules/
+  pdx-game-eu4/
+  pdx-eu4/             # temporary compatibility facade
   pdx-cwt/
   pdx-hir/
   pdx-workspace/
@@ -86,11 +88,11 @@ reference/
 pdx-text
   -> pdx-syntax -> pdx-hir -> pdx-workspace -> pdx-analysis -> pdx-lsp
   -> pdx-format                                      -> pdx-cli
-pdx-eu4 -> pdx-cwt
-pdx-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
+pdx-rules -> pdx-hir / pdx-workspace / pdx-analysis / pdx-lsp
+pdx-rules + pdx-game-eu4 -> pdx-cwt
 ```
 
-关键对象包括 `AnalysisHost`、`AnalysisSnapshot`、`SourceRoot`、`SourceFile`、`OpenDocumentOverlay`、`ParsedFile`、`HirFile`、`FileIndexShard`、`WorkspaceIndex`、`Eu4Rules` 和 `VanillaIndexCache`。跨请求身份使用稳定 ID，不使用绝对路径字符串或 CST node pointer。
+关键对象包括 `AnalysisHost`、`AnalysisSnapshot`、`SourceRoot`、`SourceFile`、`OpenDocumentOverlay`、`ParsedFile`、`HirFile`、`FileIndexShard`、`WorkspaceIndex`、`RuleSet`、`Eu4Profile` 和 `VanillaIndexCache`。跨请求身份使用稳定 ID，不使用绝对路径字符串或 CST node pointer。
 
 ## 5. 分阶段路线
 
@@ -251,7 +253,7 @@ Workspace/index：
 
 按可独立验证的小切片执行：
 
-1. 接受 RFC 0013，拆分通用规则 runtime 与 EU4 profile，迁移期间保留兼容 re-export；
+1. 接受 RFC 0013，拆分通用规则 runtime 与 EU4 profile，迁移期间保留兼容 re-export（`pdx-rules`、`pdx-game-eu4` 与 `pdx-eu4` facade 已建立；EU4 特殊 analysis/HIR 逻辑仍待迁移）；
 2. 实现真实 per-file HIR/FileState，overlay 变化只更新一个文件（FileState、磁盘复用和 overlay 按版本 parse/lower cache 已完成；真实语义 HIR 待完成）；
 3. 将 snapshot 改为共享不可变状态，查询创建 snapshot 时不深拷贝 workspace 文本和索引（已完成）；
 4. 删除 analysis query-time 全 workspace 重解析，查询只读取当前 HIR 与 WorkspaceIndex（已完成）；

@@ -4,12 +4,11 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "EU4-specific rules and runtime metadata for ParadoxCode."
+description = "Compatibility facade for the EU4 profile during crate migration."
 
 [dependencies]
-pdx-text = { path = "../pdx-text" }
-rusqlite = { version = "0.32", features = ["bundled"] }
-sha2 = "0.10"
+pdx-game-eu4 = { path = "../pdx-game-eu4" }
+pdx-rules = { path = "../pdx-rules" }
 
 [lints]
 workspace = true

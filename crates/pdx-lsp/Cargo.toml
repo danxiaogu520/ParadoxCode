@@ -7,7 +7,7 @@ rust-version.workspace = true
 description = "Language-server lifecycle and protocol boundary for ParadoxCode."
 
 [dependencies]
-pdx-eu4 = { path = "../pdx-eu4" }
+pdx-rules = { path = "../pdx-rules" }
 pdx-analysis = { path = "../pdx-analysis" }
 pdx-format = { path = "../pdx-format" }
 pdx-text = { path = "../pdx-text" }

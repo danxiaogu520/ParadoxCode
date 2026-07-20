@@ -13,7 +13,7 @@ use pdx_analysis::{
     CompletionKind, Hover, Location, RenameError, complete, definition, diagnostics,
     document_symbols, hover, prepare_rename, references, rename, workspace_symbols,
 };
-use pdx_eu4::{Eu4Rules, RulesError};
+use pdx_rules::{RuleSet, RulesError};
 use pdx_text::{LineIndex, Position, TextRange};
 use pdx_workspace::{
     AnalysisHost, AnalysisSnapshot, DocumentError, DocumentId, DocumentSource, SourceRoot,
@@ -151,8 +151,8 @@ impl LspServer {
         let rules = options
             .rules_path
             .as_deref()
-            .and_then(|path| Eu4Rules::load(path).ok())
-            .unwrap_or_else(Eu4Rules::empty);
+            .and_then(|path| RuleSet::load(path).ok())
+            .unwrap_or_else(RuleSet::empty);
         Self {
             state: ServerState::Uninitialized,
             options,
@@ -166,8 +166,8 @@ impl LspServer {
     /// Creates a server and fails when an explicitly supplied rules artifact is invalid.
     pub fn try_new(options: InitializeOptions) -> Result<Self, LspError> {
         let rules = match options.rules_path.as_deref() {
-            Some(path) => Eu4Rules::load(path)?,
-            None => Eu4Rules::empty(),
+            Some(path) => RuleSet::load(path)?,
+            None => RuleSet::empty(),
         };
         Ok(Self {
             state: ServerState::Uninitialized,

@@ -7,8 +7,8 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Arc;
 
-use pdx_eu4::{CwtKeyMatcher, CwtRuleShape, CwtValueMatcher, SymbolResolutionPolicy};
 use pdx_hir::Scope;
+use pdx_rules::{CwtKeyMatcher, CwtRuleShape, CwtValueMatcher, SymbolResolutionPolicy};
 use pdx_syntax::{CstKind, CstNode, CsvParsedFile, Eu4FileFormat, ParsedFile, SyntaxError};
 use pdx_text::{LogicalPath, TextRange, TextSize};
 use pdx_workspace::{
@@ -514,7 +514,7 @@ fn cwt_rules_for_container<'a>(
     context: &str,
     parent_path: &[String],
     _scope: &Eu4ScopeContext,
-) -> Vec<&'a pdx_eu4::CwtSemanticRule> {
+) -> Vec<&'a pdx_rules::CwtSemanticRule> {
     snapshot
         .rules()
         .model()
@@ -837,7 +837,7 @@ fn add_numeric_completion(
     }
 }
 
-fn cwt_rule_detail(rule: &pdx_eu4::CwtSemanticRule) -> String {
+fn cwt_rule_detail(rule: &pdx_rules::CwtSemanticRule) -> String {
     let shape = match rule.shape {
         CwtRuleShape::Node => "block",
         CwtRuleShape::Leaf => "scalar",
@@ -969,7 +969,7 @@ fn cwt_rule_documentation_at(
     rules.into_iter().find_map(cwt_rule_documentation_for_rule)
 }
 
-fn cwt_rule_documentation_for_rule(rule: &pdx_eu4::CwtSemanticRule) -> Option<String> {
+fn cwt_rule_documentation_for_rule(rule: &pdx_rules::CwtSemanticRule) -> Option<String> {
     let mut lines = rule.documentation.clone();
     if rule.required {
         lines.push("required".to_owned());
@@ -1608,7 +1608,7 @@ fn cwt_root_context(
 }
 
 fn cwt_type_path_matches(
-    descriptor: &pdx_eu4::CwtTypeDescriptor,
+    descriptor: &pdx_rules::CwtTypeDescriptor,
     logical_path: Option<&LogicalPath>,
 ) -> bool {
     let Some(logical_path) = logical_path else { return true };
@@ -1913,13 +1913,13 @@ fn validate_cwt_container(
     }
 }
 
-fn cwt_rule_is_selected(rule: &pdx_eu4::CwtSemanticRule, selected: Option<&str>) -> bool {
+fn cwt_rule_is_selected(rule: &pdx_rules::CwtSemanticRule, selected: Option<&str>) -> bool {
     rule.alternative_id.as_deref().is_none_or(|alternative| selected == Some(alternative))
 }
 
 fn cwt_selected_alternative(
     snapshot: &AnalysisSnapshot,
-    rules: &[&pdx_eu4::CwtSemanticRule],
+    rules: &[&pdx_rules::CwtSemanticRule],
     properties: &[ScriptProperty],
     bare_values: &[(String, TextRange)],
     scope: &Eu4ScopeContext,
@@ -1977,7 +1977,7 @@ fn cwt_selected_alternative(
 
 fn cwt_leaf_value_matches(
     snapshot: &AnalysisSnapshot,
-    rule: &pdx_eu4::CwtSemanticRule,
+    rule: &pdx_rules::CwtSemanticRule,
     value: &str,
     scope: &Eu4ScopeContext,
 ) -> bool {
@@ -2045,13 +2045,13 @@ fn cwt_parent_path_matches(
 }
 
 fn cwt_rule_severity<'a>(
-    rules: impl IntoIterator<Item = &'a pdx_eu4::CwtSemanticRule>,
+    rules: impl IntoIterator<Item = &'a pdx_rules::CwtSemanticRule>,
     fallback: DiagnosticCode,
 ) -> u8 {
     rules.into_iter().filter_map(|rule| rule.severity).min().unwrap_or_else(|| fallback.severity())
 }
 
-fn cwt_min_cardinality_severity(rule: &pdx_eu4::CwtSemanticRule) -> u8 {
+fn cwt_min_cardinality_severity(rule: &pdx_rules::CwtSemanticRule) -> u8 {
     if !rule.strict_min {
         2
     } else {
@@ -2059,12 +2059,12 @@ fn cwt_min_cardinality_severity(rule: &pdx_eu4::CwtSemanticRule) -> u8 {
     }
 }
 
-fn cwt_scope_allows(rule: &pdx_eu4::CwtSemanticRule, scope: &Eu4ScopeContext) -> bool {
+fn cwt_scope_allows(rule: &pdx_rules::CwtSemanticRule, scope: &Eu4ScopeContext) -> bool {
     rule.allowed_scopes.is_empty()
         || rule.allowed_scopes.iter().any(|expected| scope_compatible(&scope.current, expected))
 }
 
-fn cwt_child_scope(parent: &Eu4ScopeContext, rule: &pdx_eu4::CwtSemanticRule) -> Eu4ScopeContext {
+fn cwt_child_scope(parent: &Eu4ScopeContext, rule: &pdx_rules::CwtSemanticRule) -> Eu4ScopeContext {
     let mut child = parent.clone();
     if let Some(push_scope) = &rule.push_scope
         && !push_scope.eq_ignore_ascii_case("any")
@@ -2109,7 +2109,7 @@ fn cwt_key_matches(snapshot: &AnalysisSnapshot, matcher: &CwtKeyMatcher, key: &s
 
 fn cwt_property_matches(
     snapshot: &AnalysisSnapshot,
-    rule: &pdx_eu4::CwtSemanticRule,
+    rule: &pdx_rules::CwtSemanticRule,
     property: &ScriptProperty,
     scope_context: &Eu4ScopeContext,
 ) -> bool {
@@ -3083,14 +3083,12 @@ mod tests {
         CompletionKind, DiagnosticCode, RenameError, complete, definition, diagnostics,
         document_symbols, hover, prepare_rename, references, rename, workspace_symbols,
     };
-    use pdx_eu4::{
-        CwtKeyMatcher, CwtRuleShape, CwtSemanticRule, CwtValueMatcher, Eu4Rules, RulesModel,
-    };
+    use pdx_rules::{CwtKeyMatcher, CwtRuleShape, CwtSemanticRule, CwtValueMatcher, RuleSet};
     use pdx_text::TextRange;
     use pdx_workspace::{AnalysisHost, DocumentId};
 
     fn snapshot(text: &str) -> (AnalysisHost, DocumentId) {
-        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
         let id = DocumentId::new("file:///tmp/common/events/test.txt");
         host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
         (host, id)
@@ -3110,7 +3108,7 @@ mod tests {
         min_occurs: Option<u32>,
         max_occurs: Option<u32>,
     ) -> (AnalysisHost, DocumentId) {
-        let mut model = RulesModel::bootstrap();
+        let mut model = pdx_game_eu4::bootstrap_model();
         model.cwt.rules.push(CwtSemanticRule {
             id: "fixture:trigger:foo".to_owned(),
             context: "trigger".to_owned(),
@@ -3133,7 +3131,7 @@ mod tests {
             source_file: "fixture.cwt".to_owned(),
             line: 1,
         });
-        let mut host = AnalysisHost::new(Eu4Rules::from_model(model));
+        let mut host = AnalysisHost::new(RuleSet::from_model(model));
         let id = DocumentId::new("file:///tmp/common/events/test.txt");
         host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
         (host, id)
@@ -3220,7 +3218,7 @@ mod tests {
 
     #[test]
     fn cwt_value_clause_validates_bare_values_and_cardinality() {
-        let mut model = RulesModel::bootstrap();
+        let mut model = pdx_game_eu4::bootstrap_model();
         model.cwt.rules.push(CwtSemanticRule {
             id: "fixture:terrain:color".to_owned(),
             context: "terrain".to_owned(),
@@ -3265,7 +3263,7 @@ mod tests {
             source_file: "fixture.cwt".to_owned(),
             line: 2,
         });
-        let mut host = AnalysisHost::new(Eu4Rules::from_model(model));
+        let mut host = AnalysisHost::new(RuleSet::from_model(model));
         let id = DocumentId::new("file:///tmp/common/terrain/test.txt");
         host.open_document(id.clone(), 1, "terrain = { color = { 1 2 300 } }\n".to_owned(), None)
             .expect("open");
@@ -3289,7 +3287,7 @@ mod tests {
     fn committed_cwt_artifact_drives_runtime_value_diagnostics() {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = Eu4Rules::load(&rules_path).expect("load committed CWT artifact");
+        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
         assert!(!rules.model().cwt.rules.is_empty());
         assert!(rules.model().cwt.rules.iter().any(|rule| rule.severity == Some(2)));
         assert!(rules.model().cwt.rules.iter().any(|rule| rule.min_occurs == Some(1)));
@@ -3311,7 +3309,7 @@ mod tests {
     fn cwt_type_selector_applies_event_rules_to_country_event() {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = Eu4Rules::load(&rules_path).expect("load committed CWT artifact");
+        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
         let mut host = AnalysisHost::new(rules);
         let id = DocumentId::new("file:///tmp/events/test.txt");
         host.open_document(
@@ -3343,7 +3341,7 @@ mod tests {
         fs::create_dir_all(root.join("missions")).expect("missions directory");
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = Eu4Rules::load(&rules_path).expect("load committed CWT artifact");
+        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
         let mut host = AnalysisHost::new(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
@@ -3380,7 +3378,7 @@ mod tests {
     fn eu4_starts_with_type_selector_applies_on_action_rules() {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = Eu4Rules::load(&rules_path).expect("load committed CWT artifact");
+        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
         let mut host = AnalysisHost::new(rules);
         let id = DocumentId::new("file:///tmp/common/on_actions/test.txt");
         host.open_document(
@@ -3401,7 +3399,7 @@ mod tests {
     fn eu4_scope_links_switch_effect_context_and_scope() {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = Eu4Rules::load(&rules_path).expect("load committed CWT artifact");
+        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
         let mut host = AnalysisHost::new(rules);
         let id = DocumentId::new("file:///tmp/events/scope.txt");
         host.open_document(
@@ -3423,7 +3421,7 @@ mod tests {
     fn eu4_alias_alternatives_do_not_cross_report_cardinality() {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = Eu4Rules::load(&rules_path).expect("load committed CWT artifact");
+        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
         let mut host = AnalysisHost::new(rules);
         let id = DocumentId::new("file:///tmp/events/alternatives.txt");
         host.open_document(
@@ -3444,7 +3442,7 @@ mod tests {
     fn eu4_common_links_allow_owner_to_push_province_scope_to_country() {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = Eu4Rules::load(&rules_path).expect("load committed CWT artifact");
+        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
         let mut host = AnalysisHost::new(rules);
         let id = DocumentId::new("file:///tmp/events/owner.txt");
         host.open_document(
@@ -3471,7 +3469,7 @@ mod tests {
             .expect("culture definition");
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = Eu4Rules::load(&rules_path).expect("load committed CWT artifact");
+        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
         let mut host = AnalysisHost::new(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -3505,7 +3503,7 @@ mod tests {
         fs::write(root.join("map/definition.csv"), "1;0;0;0;0;0\n").expect("province definition");
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = Eu4Rules::load(&rules_path).expect("load committed CWT artifact");
+        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
         let mut host = AnalysisHost::new(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -3546,7 +3544,7 @@ mod tests {
         .expect("country tag definition");
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = Eu4Rules::load(&rules_path).expect("load committed CWT artifact");
+        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
         let mut host = AnalysisHost::new(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -3587,7 +3585,7 @@ mod tests {
         .expect("flag definition");
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = Eu4Rules::load(&rules_path).expect("load committed CWT artifact");
+        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
         let mut host = AnalysisHost::new(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -3629,7 +3627,7 @@ mod tests {
         .expect("scripted effect definition");
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = Eu4Rules::load(&rules_path).expect("load committed CWT artifact");
+        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
         let mut host = AnalysisHost::new(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -3670,7 +3668,7 @@ mod tests {
         .expect("legacy reform definition");
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = Eu4Rules::load(&rules_path).expect("load committed CWT artifact");
+        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
         let mut host = AnalysisHost::new(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -3698,7 +3696,7 @@ mod tests {
 
     #[test]
     fn localisation_values_offer_indexed_localisation_symbols() {
-        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
         let id = DocumentId::new("file:///tmp/localisation/test.yml");
         host.open_document(
             id.clone(),
@@ -3797,7 +3795,7 @@ mod tests {
         let path = dependency.join("events.txt");
         fs::write(&path, "country_event = { id = read_only.1 }\n").expect("dependency event");
 
-        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
             kind: SourceRootKind::Dependency,

@@ -1,15 +1,13 @@
 [package]
-name = "pdx-hir"
+name = "pdx-game-eu4"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Rule-aware HIR boundary for ParadoxCode."
+description = "EU4 game profile and bootstrap rules for ParadoxCode."
 
 [dependencies]
 pdx-rules = { path = "../pdx-rules" }
-pdx-syntax = { path = "../pdx-syntax" }
-pdx-text = { path = "../pdx-text" }
 
 [lints]
 workspace = true

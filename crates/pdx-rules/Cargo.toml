@@ -1,15 +1,15 @@
 [package]
-name = "pdx-hir"
+name = "pdx-rules"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Rule-aware HIR boundary for ParadoxCode."
+description = "Game-independent rules schema and runtime metadata for ParadoxCode."
 
 [dependencies]
-pdx-rules = { path = "../pdx-rules" }
-pdx-syntax = { path = "../pdx-syntax" }
 pdx-text = { path = "../pdx-text" }
+rusqlite = { version = "0.32", features = ["bundled"] }
+sha2 = "0.10"
 
 [lints]
 workspace = true

@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use pdx_eu4::Eu4Rules;
+use pdx_rules::RuleSet;
 use pdx_syntax::ParsedFile;
 
 /// A conservative semantic scope value.
@@ -39,12 +39,12 @@ impl HirFile {
 
 /// Lowers a parsed EU4 file into the Phase 0 HIR shell.
 #[must_use]
-pub fn lower(syntax: ParsedFile, _rules: &Eu4Rules) -> HirFile {
+pub fn lower(syntax: ParsedFile, _rules: &RuleSet) -> HirFile {
     lower_shared(Arc::new(syntax), _rules)
 }
 
 /// Lowers a shared parsed file without copying its CST.
 #[must_use]
-pub fn lower_shared(syntax: Arc<ParsedFile>, _rules: &Eu4Rules) -> HirFile {
+pub fn lower_shared(syntax: Arc<ParsedFile>, _rules: &RuleSet) -> HirFile {
     HirFile { syntax, scope: Scope::Unknown }
 }

@@ -159,8 +159,9 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 name = "pdx-analysis"
 version = "0.1.0"
 dependencies = [
- "pdx-eu4",
+ "pdx-game-eu4",
  "pdx-hir",
+ "pdx-rules",
  "pdx-syntax",
  "pdx-text",
  "pdx-workspace",
@@ -177,7 +178,8 @@ dependencies = [
 name = "pdx-cwt"
 version = "0.1.0"
 dependencies = [
- "pdx-eu4",
+ "pdx-game-eu4",
+ "pdx-rules",
  "pdx-text",
  "rusqlite",
  "serde",
@@ -189,9 +191,8 @@ dependencies = [
 name = "pdx-eu4"
 version = "0.1.0"
 dependencies = [
- "pdx-text",
- "rusqlite",
- "sha2",
+ "pdx-game-eu4",
+ "pdx-rules",
 ]
 
 [[package]]
@@ -203,10 +204,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pdx-game-eu4"
+version = "0.1.0"
+dependencies = [
+ "pdx-rules",
+]
+
+[[package]]
 name = "pdx-hir"
 version = "0.1.0"
 dependencies = [
- "pdx-eu4",
+ "pdx-rules",
  "pdx-syntax",
  "pdx-text",
 ]
@@ -216,11 +224,20 @@ name = "pdx-lsp"
 version = "0.1.0"
 dependencies = [
  "pdx-analysis",
- "pdx-eu4",
  "pdx-format",
+ "pdx-rules",
  "pdx-text",
  "pdx-workspace",
  "serde_json",
+]
+
+[[package]]
+name = "pdx-rules"
+version = "0.1.0"
+dependencies = [
+ "pdx-text",
+ "rusqlite",
+ "sha2",
 ]
 
 [[package]]
@@ -238,8 +255,9 @@ version = "0.1.0"
 name = "pdx-workspace"
 version = "0.1.0"
 dependencies = [
- "pdx-eu4",
+ "pdx-game-eu4",
  "pdx-hir",
+ "pdx-rules",
  "pdx-syntax",
  "pdx-text",
 ]

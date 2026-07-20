@@ -1,6 +1,6 @@
 # ParadoxCode 总体架构
 
-> 2026-07-20 状态说明：本文描述迁移目标。当前实现已具备 EU4 功能原型，但 HIR、per-file cache、廉价 snapshot、后台取消和发布闭环尚未达到本文约束；迁移计划见 [RFC 0013](rfc/0013-generic-engine-eu4-first.md)。
+> 2026-07-20 状态说明：通用 `pdx-rules`、EU4 profile、per-file cache 与廉价 snapshot 已落地；真实语义 HIR、后台取消和发布闭环仍未达到本文约束。迁移计划见 [RFC 0013](rfc/0013-generic-engine-eu4-first.md)。
 
 ## 目标
 
@@ -83,7 +83,7 @@ Zed extension 只负责：
 
 `pdx-cwt v0.1` 只负责一次性读取 CWTools 建模的 EU4 `.cwt` 配置并导入自有 SQLite 规则数据库。导入完成后，`.cwt` 不再是项目的权威规则源，也不进入正常构建、发布或运行时。未来其他游戏可以拥有自己的 importer/profile，但不属于 EU4 v0.1。
 
-迁移目标中，`pdx-rules` 定义通用 SQLite artifact schema、规范化逻辑视图、`rule_hash` 算法、只读加载与运行时查询 API；`pdx-game-eu4` 提供 EU4 profile。当前 `pdx-eu4` 暂时混合这两类职责，必须分阶段拆分。运行时只读加载并冻结 `RuleSet`，再校验其 `game_id` 与 profile 一致。
+`pdx-rules` 定义通用 SQLite artifact schema、规范化逻辑视图、`rule_hash` 算法、只读加载与运行时查询 API；`pdx-game-eu4` 提供 EU4 profile 与 bootstrap catalog。`pdx-eu4` 现在只保留临时 re-export facade，待调用方和文档迁移完成后删除。运行时只读加载并冻结 `RuleSet`；artifact `game_id` 校验仍是下一 schema 切片。
 
 数据库保存 `TypeKey("scripted_effect")`、`AliasRef("effect")` 等 EU4 静态 matcher；实际 scripted effect、building 等成员来自 `WorkspaceIndex`。EU4 command、scope 和目录规则直接属于核心 EU4 实现，不设计其他游戏的替换层。
 
@@ -109,8 +109,8 @@ pdx-cli       -> pdx-lsp + selected runtime crates
 - `pdx-syntax` 实现可复用 PDX 文本前端，但不依赖游戏规则数据库、workspace 或 LSP。
 - `pdx-rules` 定义 SQLite schema、hash 与只读 runtime view，不依赖具体游戏名称表、CWT parser 或 LSP。
 - `pdx-game-eu4` 保存 EU4 profile 和无法由通用规则数据表达的 EU4 特殊语义。
-- `pdx-cwt` 依赖 `pdx-text` 与 `pdx-eu4`，MVP 只提供 CWT 到 SQLite 数据库的一次性导入工具；它不是 runtime dependency。
-- `pdx-hir` 通过稳定的 typed CST API 和 `Eu4Rules` lowering。
+- `pdx-cwt` 依赖 `pdx-text`、`pdx-rules` 与 `pdx-game-eu4`，MVP 只提供 CWT 到 SQLite 数据库的一次性导入工具；它不是 runtime dependency。
+- `pdx-hir` 通过稳定的 typed CST API 和 `RuleSet` lowering；显式 profile 输入仍待补齐。
 - `pdx-workspace` 不依赖 LSP 类型。
 - `pdx-analysis` 不依赖任何 editor API。
 - `pdx-lsp` 是唯一允许依赖 LSP protocol types 的核心 crate。

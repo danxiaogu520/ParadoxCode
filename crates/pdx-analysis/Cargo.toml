@@ -8,10 +8,13 @@ description = "Editor-neutral analysis query facade for ParadoxCode."
 
 [dependencies]
 pdx-hir = { path = "../pdx-hir" }
-pdx-eu4 = { path = "../pdx-eu4" }
+pdx-rules = { path = "../pdx-rules" }
 pdx-syntax = { path = "../pdx-syntax" }
 pdx-text = { path = "../pdx-text" }
 pdx-workspace = { path = "../pdx-workspace" }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+pdx-game-eu4 = { path = "../pdx-game-eu4" }

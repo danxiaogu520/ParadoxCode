@@ -61,6 +61,8 @@ pdx-lsp
 
 ## 迁移策略
 
+> 实现进度（2026-07-20）：步骤 2–3 的 crate 拆分已完成。`pdx-rules` 持有通用 runtime，`pdx-game-eu4` 持有 EU4 bootstrap/profile，`pdx-eu4` 只剩兼容 re-export。步骤 4–6 尚未完成。
+
 当前 `pdx-eu4` 同时包含通用规则 runtime 与 EU4 数据。迁移必须分步进行：
 
 1. 先为现有行为建立回归测试和性能计数器；

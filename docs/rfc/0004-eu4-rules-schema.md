@@ -43,7 +43,7 @@ one-time EU4 CWT bootstrap corpus
                  +---- canonical logical view ----> rule_hash
                  |
                  v
-       read-only runtime Eu4Rules
+       read-only runtime RuleSet + Eu4Profile
 ```
 
 导入成功以后，SQLite 数据库是唯一权威。CWTools 行为兼容和 CWT source revision 不再是后续维护的约束。维护者未来通过 `pdx-cwt` CRUD 直接修订数据库；MVP 只实现 import。
@@ -147,7 +147,7 @@ SymbolDescriptor
 
 ## Runtime 不可变性
 
-`pdx-eu4` 以 read-only 模式打开 SQLite，校验 EU4 schema、foreign keys、逻辑不变量与 `rule_hash`，然后构建只读 arena/index 并通过 `Arc<Eu4Rules>` 共享。
+`pdx-rules` 以 read-only 模式打开 SQLite，校验 schema、foreign keys、逻辑不变量与 `rule_hash`，然后构建只读 runtime view 并通过 `Arc<RuleSet>` 共享；`pdx-game-eu4` 负责确认这是 EU4 profile 可消费的 artifact。
 
 Runtime API 不暴露 `insert`、`update` 或 `delete`。加载失败时 server 降级为 syntax-only，并发布 workspace-level 配置错误；不能部分加载或从网络寻找替代规则。
 

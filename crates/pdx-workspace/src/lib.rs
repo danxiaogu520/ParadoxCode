@@ -10,8 +10,8 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use pdx_eu4::{Eu4Rules, FileResolutionPolicy, ParserKind, SymbolResolutionPolicy};
 use pdx_hir::{HirFile, lower_shared};
+use pdx_rules::{FileResolutionPolicy, ParserKind, RuleSet, SymbolResolutionPolicy};
 use pdx_syntax::{CstKind, CstNode, Eu4FileFormat, ParsedFile, parse_eu4, parse_eu4_csv_file};
 use pdx_text::{LineIndex, LogicalPath, TextRange};
 
@@ -375,7 +375,7 @@ impl WorkspaceIndex {
         self.sort_definition_buckets(&affected);
     }
 
-    fn resolve_priorities(&mut self, priorities: &BTreeMap<SourceFileId, u64>, rules: &Eu4Rules) {
+    fn resolve_priorities(&mut self, priorities: &BTreeMap<SourceFileId, u64>, rules: &RuleSet) {
         let keys = self.definitions.keys().cloned().collect::<Vec<_>>();
         self.resolve_definition_buckets(&keys, priorities, rules);
     }
@@ -384,7 +384,7 @@ impl WorkspaceIndex {
         &mut self,
         shard: FileIndexShard,
         priorities: &BTreeMap<SourceFileId, u64>,
-        rules: &Eu4Rules,
+        rules: &RuleSet,
     ) {
         let affected = self.replace_shard_entries(shard);
         self.resolve_definition_buckets(&affected, priorities, rules);
@@ -431,7 +431,7 @@ impl WorkspaceIndex {
         &mut self,
         keys: &[(String, String)],
         priorities: &BTreeMap<SourceFileId, u64>,
-        rules: &Eu4Rules,
+        rules: &RuleSet,
     ) {
         for key in keys {
             let Some(values) = self.definitions.get_mut(key) else { continue };
@@ -970,7 +970,7 @@ fn source_priorities(
 fn parse_source(
     parser: &ParserKind,
     source: &str,
-    rules: &Eu4Rules,
+    rules: &RuleSet,
 ) -> (Option<ParsedSource>, Option<Arc<HirFile>>) {
     match parser {
         ParserKind::PdxScript => {
@@ -985,9 +985,9 @@ fn parse_source(
         }
         ParserKind::Csv(dialect) => {
             let dialect = match dialect {
-                pdx_eu4::CsvDialect::Comma => pdx_syntax::csv::CsvDialect::Comma,
-                pdx_eu4::CsvDialect::Tab => pdx_syntax::csv::CsvDialect::Tab,
-                pdx_eu4::CsvDialect::Semicolon => pdx_syntax::csv::CsvDialect::Semicolon,
+                pdx_rules::CsvDialect::Comma => pdx_syntax::csv::CsvDialect::Comma,
+                pdx_rules::CsvDialect::Tab => pdx_syntax::csv::CsvDialect::Tab,
+                pdx_rules::CsvDialect::Semicolon => pdx_syntax::csv::CsvDialect::Semicolon,
             };
             (Some(ParsedSource::Csv(Arc::new(parse_eu4_csv_file(source, dialect)))), None)
         }
@@ -999,7 +999,7 @@ fn build_file_state(
     file: &SourceFile,
     source: String,
     revision: u64,
-    rules: &Eu4Rules,
+    rules: &RuleSet,
 ) -> FileState {
     let Some(category) = rules.classify(&file.logical_path) else {
         return FileState {
@@ -1067,7 +1067,7 @@ fn shard_from_parsed(
     file: &SourceFile,
     parsed: &ParsedFile,
     category_id: &str,
-    rules: &Eu4Rules,
+    rules: &RuleSet,
 ) -> FileIndexShard {
     let mut definitions = Vec::new();
     let mut references = Vec::new();
@@ -1101,7 +1101,7 @@ fn shard_from_parsed(
 fn collect_cwt_type_members(
     file: &SourceFile,
     parsed: &ParsedFile,
-    rules: &Eu4Rules,
+    rules: &RuleSet,
     definitions: &mut Vec<Definition>,
 ) {
     for descriptor in rules.model().cwt.type_descriptors.values() {
@@ -1155,7 +1155,7 @@ fn collect_cwt_type_members(
 fn collect_cwt_skip_root_path(
     file: &SourceFile,
     parsed: &ParsedFile,
-    descriptor: &pdx_eu4::CwtTypeDescriptor,
+    descriptor: &pdx_rules::CwtTypeDescriptor,
     node: &CstNode,
     path: &[String],
     definitions: &mut Vec<Definition>,
@@ -1180,7 +1180,7 @@ fn collect_cwt_skip_root_path(
 fn collect_cwt_block_children(
     file: &SourceFile,
     parsed: &ParsedFile,
-    descriptor: &pdx_eu4::CwtTypeDescriptor,
+    descriptor: &pdx_rules::CwtTypeDescriptor,
     node: &CstNode,
     definitions: &mut Vec<Definition>,
 ) {
@@ -1192,7 +1192,7 @@ fn collect_cwt_block_children(
 fn collect_cwt_type_definition(
     file: &SourceFile,
     parsed: &ParsedFile,
-    descriptor: &pdx_eu4::CwtTypeDescriptor,
+    descriptor: &pdx_rules::CwtTypeDescriptor,
     node: &CstNode,
     definitions: &mut Vec<Definition>,
 ) {
@@ -1220,7 +1220,7 @@ fn collect_cwt_type_definition(
     });
 }
 
-fn cwt_type_key_matches(descriptor: &pdx_eu4::CwtTypeDescriptor, key: &str) -> bool {
+fn cwt_type_key_matches(descriptor: &pdx_rules::CwtTypeDescriptor, key: &str) -> bool {
     descriptor.type_key_filter.as_ref().is_none_or(|(values, negate)| {
         (values.iter().any(|value| value.eq_ignore_ascii_case(key))) != *negate
     })
@@ -1252,7 +1252,7 @@ fn cwt_property_key(node: &CstNode, parsed: &ParsedFile) -> Option<String> {
 }
 
 fn cwt_type_path_matches(
-    descriptor: &pdx_eu4::CwtTypeDescriptor,
+    descriptor: &pdx_rules::CwtTypeDescriptor,
     logical_path: &LogicalPath,
 ) -> bool {
     let path = logical_path.as_str().replace('\\', "/").to_ascii_lowercase();
@@ -1720,7 +1720,7 @@ fn find_property(node: &CstNode, wanted: &str, parsed: &ParsedFile) -> Option<St
 #[derive(Clone, Debug)]
 pub struct AnalysisHost {
     revision: u64,
-    rules: Arc<Eu4Rules>,
+    rules: Arc<RuleSet>,
     roots: Arc<[SourceRoot]>,
     workspace_root: Option<PathBuf>,
     documents: Arc<BTreeMap<DocumentId, DocumentSnapshot>>,
@@ -1734,12 +1734,12 @@ impl AnalysisHost {
     /// Creates an empty host with the bootstrap EU4 rule identity.
     #[must_use]
     pub fn empty() -> Self {
-        Self::new(Eu4Rules::empty())
+        Self::new(RuleSet::empty())
     }
 
     /// Creates an empty host around an immutable rule database.
     #[must_use]
-    pub fn new(rules: Eu4Rules) -> Self {
+    pub fn new(rules: RuleSet) -> Self {
         Self {
             revision: 0,
             rules: Arc::new(rules),
@@ -1782,7 +1782,7 @@ impl AnalysisHost {
             })?;
         Some(match extension.as_str() {
             "yml" | "yaml" => ParserKind::Localisation,
-            "csv" => ParserKind::Csv(pdx_eu4::CsvDialect::Semicolon),
+            "csv" => ParserKind::Csv(pdx_rules::CsvDialect::Semicolon),
             "txt" | "gui" | "gfx" | "asset" | "sfx" => ParserKind::PdxScript,
             _ => return None,
         })
@@ -2027,7 +2027,7 @@ impl AnalysisHost {
 #[derive(Clone, Debug)]
 pub struct AnalysisSnapshot {
     revision: u64,
-    rules: Arc<Eu4Rules>,
+    rules: Arc<RuleSet>,
     roots: Arc<[SourceRoot]>,
     workspace_root: Option<PathBuf>,
     documents: Arc<BTreeMap<DocumentId, DocumentSnapshot>>,
@@ -2046,7 +2046,7 @@ impl AnalysisSnapshot {
 
     /// Returns the immutable EU4 rules used for this snapshot.
     #[must_use]
-    pub fn rules(&self) -> &Eu4Rules {
+    pub fn rules(&self) -> &RuleSet {
         &self.rules
     }
 
@@ -2177,7 +2177,7 @@ mod tests {
         Reference, SourceFileId, SourceRoot, SourceRootId, SourceRootKind, TextChange,
         WorkspaceIndex, WorkspaceScanIssueKind, WorkspaceScanLimits,
     };
-    use pdx_eu4::Eu4Rules;
+    use pdx_rules::RuleSet;
     use pdx_text::{LogicalPath, TextRange};
 
     #[test]
@@ -2298,7 +2298,7 @@ mod tests {
                 syntax_error_count: 0,
             },
         ]);
-        let rules = Eu4Rules::bootstrap();
+        let rules = pdx_game_eu4::bootstrap_rules();
         let tied = BTreeMap::from([(first_file, 10), (second_file, 10)]);
         index.resolve_priorities(&tied, &rules);
         assert_eq!(
@@ -2344,7 +2344,7 @@ mod tests {
         fs::write(events.join("b.txt"), "country_event = { id = stable.b }\n").expect("b event");
         fs::write(events.join("c.txt"), "country_event = { id = stable.c }\n").expect("c event");
 
-        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -2398,7 +2398,7 @@ mod tests {
         fs::write(events.join("a.txt"), "country_event = { id = state.a }\n").expect("a event");
         fs::write(events.join("b.txt"), "country_event = { id = state.b }\n").expect("b event");
 
-        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -2462,7 +2462,7 @@ mod tests {
 
     #[test]
     fn snapshots_share_immutable_state_and_preserve_old_revisions() {
-        let mut host = AnalysisHost::new(Eu4Rules::empty());
+        let mut host = AnalysisHost::new(RuleSet::empty());
         let first = host.snapshot();
         let second = host.snapshot();
 
@@ -2502,7 +2502,7 @@ mod tests {
         fs::write(events.join("invalid.txt"), [0xff, 0xfe]).expect("invalid UTF-8 event");
         fs::write(events.join("large.txt"), vec![b'x'; 65]).expect("oversized event");
 
-        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -2541,7 +2541,7 @@ mod tests {
         fs::write(events.join("deep.txt"), "country_event = { id = deep.1 }\n")
             .expect("deep event");
 
-        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -2575,7 +2575,7 @@ mod tests {
         fs::create_dir_all(&events).expect("event directory");
         fs::write(events.join("a.txt"), "country_event = { id = limit.a }\n").expect("a event");
 
-        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -2616,7 +2616,7 @@ mod tests {
             .expect("outside event");
         symlink(&outside, root.join("events")).expect("directory symlink");
 
-        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -2635,7 +2635,7 @@ mod tests {
 
     #[test]
     fn stale_document_versions_are_rejected_atomically() {
-        let mut host = AnalysisHost::new(Eu4Rules::empty());
+        let mut host = AnalysisHost::new(RuleSet::empty());
         let id = DocumentId::new("file:///tmp/example.txt");
         host.open_document(id.clone(), 1, "a😀z".to_owned(), None).expect("open should succeed");
         let first = host.snapshot();
@@ -2669,7 +2669,7 @@ mod tests {
     fn close_restores_the_backing_disk_candidate() {
         let path = std::env::temp_dir().join(format!("pdx-workspace-{}.txt", std::process::id()));
         fs::write(&path, "disk").expect("write fixture");
-        let mut host = AnalysisHost::new(Eu4Rules::empty());
+        let mut host = AnalysisHost::new(RuleSet::empty());
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -2729,7 +2729,7 @@ mod tests {
         )
         .expect("localisation");
 
-        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
             SourceRoot {
                 id: SourceRootId::new(1),
