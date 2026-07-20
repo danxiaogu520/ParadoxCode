@@ -141,12 +141,12 @@ VanillaIndexCache           local persistent Vanilla shard cache; manual refresh
 - LSP event loop 顺序应用文档版本和配置变化。
 - parse 与单文件 HIR 更新可在 worker 中执行，但结果提交时必须校验文档版本。
 - 查询获取 snapshot 后不持有 host 锁。
-- semantic diagnostics 使用约 200ms debounce，在 immutable snapshot worker 上运行，提交时校验文档版本；新编辑会使旧任务失效。workspace scan 与普通请求的协作式在途取消仍待完成。
+- semantic diagnostics 使用约 200ms debounce，在 immutable snapshot worker 上运行，提交时校验文档版本；新编辑会使旧任务失效。普通语言请求同样捕获单一 snapshot 后进入 worker，`$/cancelRequest` 可标记在途请求并抑制其结果；analysis 深循环内的细粒度 cancellation checkpoint 与 workspace scan 取消仍待完成。
 - completion/hover 优先于后台全量诊断。
 
 MVP 不立即引入通用增量计算框架。先使用清晰的按文件 cache key 和 shard replacement；只有性能数据证明需要时再评估 query framework。
 
-当前 alpha 已消除深拷贝 snapshot、query-time workspace 重解析和同步 semantic diagnostics；parse/lower 仍在事件循环应用编辑时同步执行，普通请求尚无真正的在途取消。这些剩余缺口属于发布前必须消除的问题，而不是允许长期保留的简化。
+当前 alpha 已消除深拷贝 snapshot、query-time workspace 重解析、同步 semantic diagnostics 和 event-loop 上的语言查询；parse/lower 仍在事件循环应用编辑时同步执行，请求取消也只能在 analysis 调用前后检查。这些剩余缺口属于发布前必须消除的问题，而不是允许长期保留的简化。
 
 ## 稳定身份
 

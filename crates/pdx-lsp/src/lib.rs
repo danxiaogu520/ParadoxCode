@@ -4,7 +4,7 @@
 //! conversion, and result freshness checks. Parser and language-feature logic remains in the
 //! editor-neutral workspace and analysis crates.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -26,6 +26,7 @@ use pdx_workspace::{
 use serde_json::{Value, json};
 
 const JSON_RPC_VERSION: &str = "2.0";
+const INTERNAL_ERROR: i64 = -32603;
 const INVALID_REQUEST: i64 = -32600;
 const METHOD_NOT_FOUND: i64 = -32601;
 const INVALID_PARAMS: i64 = -32602;
@@ -145,9 +146,22 @@ struct DiagnosticsResult {
     values: Option<Value>,
 }
 
+#[derive(Debug)]
+struct InFlightRequest {
+    cancelled: Arc<AtomicBool>,
+}
+
+#[derive(Debug)]
+struct SnapshotRequestResult {
+    request_id: RequestId,
+    id: Value,
+    result: Result<Value, RpcError>,
+}
+
 enum TransportEvent {
     Input(Result<Option<Value>, LspError>),
     Diagnostics(DiagnosticsResult),
+    Request(SnapshotRequestResult),
 }
 
 impl RpcError {
@@ -335,6 +349,7 @@ impl LspServer {
                 LspError::Protocol("LSP transport reader failed to start".to_owned())
             })?;
             let mut in_flight = BTreeMap::<DocumentId, InFlightDiagnostics>::new();
+            let mut in_flight_requests = HashMap::<RequestId, InFlightRequest>::new();
 
             loop {
                 self.cancel_stale_diagnostics(&in_flight);
@@ -367,13 +382,25 @@ impl LspServer {
                                 ))
                             };
                         };
-                        let responses = self.handle_message(message)?;
-                        for response in responses {
-                            write_message(&mut output, &response)?;
+                        let spawned = self.spawn_snapshot_request(
+                            scope,
+                            &event_sender,
+                            &mut in_flight_requests,
+                            &message,
+                        );
+                        if !spawned {
+                            let responses = self.handle_message(message.clone())?;
+                            for response in responses {
+                                write_message(&mut output, &response)?;
+                            }
+                            cancel_request_from_notification(&message, &in_flight_requests);
                         }
                         self.cancel_stale_diagnostics(&in_flight);
                         if self.state == ServerState::Exited {
                             for task in in_flight.values() {
+                                task.cancelled.store(true, Ordering::Release);
+                            }
+                            for task in in_flight_requests.values() {
                                 task.cancelled.store(true, Ordering::Release);
                             }
                             return if self.clean_exit {
@@ -402,10 +429,25 @@ impl LspServer {
                             )?;
                         }
                     }
+                    TransportEvent::Request(result) => {
+                        in_flight_requests.remove(&result.request_id);
+                        self.cancelled.remove(&result.request_id);
+                        let response = match result.result {
+                            Ok(value) => json!({
+                                "jsonrpc": JSON_RPC_VERSION,
+                                "id": result.id,
+                                "result": value,
+                            }),
+                            Err(error) => error.response(result.id),
+                        };
+                        write_message(&mut output, &response)?;
+                    }
                 }
 
                 let draining_shutdown = self.state == ServerState::ShuttingDown
-                    && (!self.pending_diagnostics.is_empty() || !in_flight.is_empty());
+                    && (!self.pending_diagnostics.is_empty()
+                        || !in_flight.is_empty()
+                        || !in_flight_requests.is_empty());
                 if !reader_active && !draining_shutdown {
                     read_sender.send(()).map_err(|_| {
                         LspError::Protocol("LSP transport reader stopped unexpectedly".to_owned())
@@ -414,6 +456,62 @@ impl LspServer {
                 }
             }
         })
+    }
+
+    fn spawn_snapshot_request<'scope, 'environment>(
+        &self,
+        scope: &'scope std::thread::Scope<'scope, 'environment>,
+        event_sender: &mpsc::Sender<TransportEvent>,
+        in_flight: &mut HashMap<RequestId, InFlightRequest>,
+        message: &Value,
+    ) -> bool {
+        if self.state != ServerState::Initialized {
+            return false;
+        }
+        let Some(object) = message.as_object() else { return false };
+        if object.get("jsonrpc").and_then(Value::as_str) != Some(JSON_RPC_VERSION) {
+            return false;
+        }
+        let Some(method) = object.get("method").and_then(Value::as_str) else { return false };
+        if !is_snapshot_request(method) {
+            return false;
+        }
+        let Some(id) = object.get("id").filter(|id| !id.is_null()) else { return false };
+        let Ok(request_id) = RequestId::parse(id) else { return false };
+        if in_flight.contains_key(&request_id) {
+            return false;
+        }
+
+        let context = SnapshotRequestContext::new(self.host.snapshot());
+        let method = method.to_owned();
+        let params = object.get("params").cloned();
+        let id = id.clone();
+        let sender = event_sender.clone();
+        let cancelled = Arc::new(AtomicBool::new(self.cancelled.contains(&request_id)));
+        in_flight.insert(request_id.clone(), InFlightRequest { cancelled: Arc::clone(&cancelled) });
+        scope.spawn(move || {
+            let result = if cancelled.load(Ordering::Acquire) {
+                Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"))
+            } else {
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    context.dispatch(&method, params.as_ref())
+                }))
+                .unwrap_or_else(|_| {
+                    Err(RpcError::new(INTERNAL_ERROR, "request worker failed unexpectedly"))
+                });
+                if cancelled.load(Ordering::Acquire) {
+                    Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"))
+                } else {
+                    result
+                }
+            };
+            let _ = sender.send(TransportEvent::Request(SnapshotRequestResult {
+                request_id,
+                id,
+                result,
+            }));
+        });
+        true
     }
 
     fn schedule_diagnostics(&mut self, uri: &str, delay: Duration) {
@@ -609,14 +707,9 @@ impl LspServer {
                 self.schedule_diagnostics(uri, Duration::ZERO);
                 Ok(Value::Null)
             }
-            "textDocument/completion" => self.handle_completion(params),
-            "textDocument/hover" => self.handle_hover(params),
-            "textDocument/definition" => self.handle_definition(params),
-            "textDocument/references" => self.handle_references(params),
-            "textDocument/prepareRename" => self.handle_prepare_rename(params),
-            "textDocument/rename" => self.handle_rename(params),
-            "textDocument/documentSymbol" => self.handle_document_symbols(params),
-            "workspace/symbol" => self.handle_workspace_symbols(params),
+            method if is_snapshot_request(method) => {
+                SnapshotRequestContext::new(self.host.snapshot()).dispatch(method, params)
+            }
             _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
         }
     }
@@ -751,12 +844,37 @@ impl LspServer {
             "params": {"uri": uri, "diagnostics": []}
         }))
     }
+}
 
-    fn handle_completion(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+#[derive(Clone, Debug)]
+struct SnapshotRequestContext {
+    snapshot: AnalysisSnapshot,
+}
+
+impl SnapshotRequestContext {
+    fn new(snapshot: AnalysisSnapshot) -> Self {
+        Self { snapshot }
+    }
+
+    fn dispatch(&self, method: &str, params: Option<&Value>) -> Result<Value, RpcError> {
+        match method {
+            "textDocument/completion" => self.completion(params),
+            "textDocument/hover" => self.hover(params),
+            "textDocument/definition" => self.definition(params),
+            "textDocument/references" => self.references(params),
+            "textDocument/prepareRename" => self.prepare_rename(params),
+            "textDocument/rename" => self.rename(params),
+            "textDocument/documentSymbol" => self.document_symbols(params),
+            "workspace/symbol" => self.workspace_symbols(params),
+            _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
+        }
+    }
+
+    fn completion(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let (id, position) = self.document_position(params)?;
-        let result = complete(&self.host.snapshot(), &id, position);
-        let snapshot = self.host.snapshot();
-        let document = snapshot
+        let result = complete(&self.snapshot, &id, position);
+        let document = self
+            .snapshot
             .document(&id)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
         let items = result
@@ -783,27 +901,26 @@ impl LspServer {
         Ok(json!({"isIncomplete": false, "items": items}))
     }
 
-    fn handle_hover(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+    fn hover(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let (id, position) = self.document_position(params)?;
-        let snapshot = self.host.snapshot();
-        let Some(value) = hover(&snapshot, &id, position) else { return Ok(Value::Null) };
-        let document = snapshot
+        let Some(value) = hover(&self.snapshot, &id, position) else { return Ok(Value::Null) };
+        let document = self
+            .snapshot
             .document(&id)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
         Ok(hover_to_json(&value, document.line_index(), document.text()))
     }
 
-    fn handle_definition(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+    fn definition(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let (id, position) = self.document_position(params)?;
-        let snapshot = self.host.snapshot();
-        let result = definition(&snapshot, &id, position)
+        let result = definition(&self.snapshot, &id, position)
             .into_iter()
-            .filter_map(|location| location_to_json(&snapshot, &location))
+            .filter_map(|location| location_to_json(&self.snapshot, &location))
             .collect::<Vec<_>>();
         Ok(Value::Array(result))
     }
 
-    fn handle_references(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+    fn references(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let (id, position) = self.document_position(params)?;
         let include_declaration = params
             .and_then(Value::as_object)
@@ -812,19 +929,18 @@ impl LspServer {
             .and_then(|context| context.get("includeDeclaration"))
             .and_then(Value::as_bool)
             .unwrap_or(false);
-        let snapshot = self.host.snapshot();
-        let result = references(&snapshot, &id, position, include_declaration)
+        let result = references(&self.snapshot, &id, position, include_declaration)
             .into_iter()
-            .filter_map(|location| location_to_json(&snapshot, &location))
+            .filter_map(|location| location_to_json(&self.snapshot, &location))
             .collect::<Vec<_>>();
         Ok(Value::Array(result))
     }
 
-    fn handle_prepare_rename(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+    fn prepare_rename(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let (id, position) = self.document_position(params)?;
-        let snapshot = self.host.snapshot();
-        let result = prepare_rename(&snapshot, &id, position).map_err(rename_error)?;
-        let document = snapshot
+        let result = prepare_rename(&self.snapshot, &id, position).map_err(rename_error)?;
+        let document = self
+            .snapshot
             .document(&id)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
         Ok(json!({
@@ -833,18 +949,17 @@ impl LspServer {
         }))
     }
 
-    fn handle_rename(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+    fn rename(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let new_name = params
             .and_then(Value::as_object)
             .and_then(|object| object.get("newName"))
             .and_then(Value::as_str)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "rename requires newName"))?;
         let (id, position) = self.document_position(params)?;
-        let snapshot = self.host.snapshot();
-        let plan = rename(&snapshot, &id, position, new_name).map_err(rename_error)?;
+        let plan = rename(&self.snapshot, &id, position, new_name).map_err(rename_error)?;
         let mut changes = BTreeMap::<String, Vec<Value>>::new();
         for edit in plan.edits {
-            let location = location_to_json(&snapshot, &edit.location).ok_or_else(|| {
+            let location = location_to_json(&self.snapshot, &edit.location).ok_or_else(|| {
                 RpcError::new(INVALID_PARAMS, "rename target has no client-visible URI")
             })?;
             let uri = location
@@ -864,34 +979,32 @@ impl LspServer {
         Ok(json!({"changes": changes}))
     }
 
-    fn handle_document_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+    fn document_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let id = self.document_id(params)?;
-        let snapshot = self.host.snapshot();
-        let result = document_symbols(&snapshot, &id)
+        let result = document_symbols(&self.snapshot, &id)
             .into_iter()
             .map(|symbol| {
                 json!({
                     "name": symbol.name,
                     "kind": symbol_kind(&symbol.kind),
-                    "range": location_range_to_json(&snapshot, &symbol.location),
-                    "selectionRange": range_to_json_for_location(&snapshot, &symbol.location, symbol.selection_range),
+                    "range": location_range_to_json(&self.snapshot, &symbol.location),
+                    "selectionRange": range_to_json_for_location(&self.snapshot, &symbol.location, symbol.selection_range),
                 })
             })
             .collect::<Vec<_>>();
         Ok(Value::Array(result))
     }
 
-    fn handle_workspace_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+    fn workspace_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let query = params
             .and_then(Value::as_object)
             .and_then(|object| object.get("query"))
             .and_then(Value::as_str)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "workspace/symbol requires query"))?;
-        let snapshot = self.host.snapshot();
-        let result = workspace_symbols(&snapshot, query)
+        let result = workspace_symbols(&self.snapshot, query)
             .into_iter()
             .filter_map(|symbol| {
-                let location = location_to_json(&snapshot, &symbol.location)?;
+                let location = location_to_json(&self.snapshot, &symbol.location)?;
                 Some(json!({
                     "name": symbol.name,
                     "kind": symbol_kind(&symbol.kind),
@@ -921,8 +1034,8 @@ impl LspServer {
             .map(|value| position_from_json(Some(value)))
             .transpose()?
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "position is required"))?;
-        let snapshot = self.host.snapshot();
-        let document = snapshot
+        let document = self
+            .snapshot
             .document(&id)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
         document
@@ -930,6 +1043,41 @@ impl LspServer {
             .offset(document.text(), position)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "position is not valid UTF-16"))
             .map(|offset| (id, offset))
+    }
+}
+
+fn is_snapshot_request(method: &str) -> bool {
+    matches!(
+        method,
+        "textDocument/completion"
+            | "textDocument/hover"
+            | "textDocument/definition"
+            | "textDocument/references"
+            | "textDocument/prepareRename"
+            | "textDocument/rename"
+            | "textDocument/documentSymbol"
+            | "workspace/symbol"
+    )
+}
+
+fn cancel_request_from_notification(
+    message: &Value,
+    in_flight: &HashMap<RequestId, InFlightRequest>,
+) {
+    let Some(object) = message.as_object() else { return };
+    if object.get("method").and_then(Value::as_str) != Some("$/cancelRequest") {
+        return;
+    }
+    let Some(request_id) = object
+        .get("params")
+        .and_then(Value::as_object)
+        .and_then(|params| params.get("id"))
+        .and_then(|id| RequestId::parse(id).ok())
+    else {
+        return;
+    };
+    if let Some(request) = in_flight.get(&request_id) {
+        request.cancelled.store(true, Ordering::Release);
     }
 }
 
@@ -1292,11 +1440,17 @@ fn write_message<W: Write>(writer: &mut W, message: &Value) -> Result<(), LspErr
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::fs;
     use std::io::Cursor;
     use std::path::PathBuf;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
-    use super::{InitializeOptions, LspError, LspServer, ServerState, path_to_uri, uri_to_path};
+    use super::{
+        InFlightRequest, InitializeOptions, LspError, LspServer, RequestId, ServerState,
+        cancel_request_from_notification, path_to_uri, uri_to_path,
+    };
     use pdx_rules::{RuleSet, RulesError, RulesModel};
     use pdx_text::TextRange;
     use pdx_workspace::TextChange;
@@ -1595,5 +1749,27 @@ mod tests {
                 .as_array()
                 .is_some_and(|items| items.iter().all(|item| item["code"] != "pdx-unknown-scope"))
         );
+    }
+
+    #[test]
+    fn cancel_notification_marks_the_matching_in_flight_request() {
+        let request_id = RequestId::String("active-query".to_owned());
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let in_flight = HashMap::from([(
+            request_id.clone(),
+            InFlightRequest { cancelled: Arc::clone(&cancelled) },
+        )]);
+
+        cancel_request_from_notification(
+            &json!({
+                "jsonrpc": "2.0",
+                "method": "$/cancelRequest",
+                "params": {"id": "active-query"},
+            }),
+            &in_flight,
+        );
+
+        assert!(cancelled.load(Ordering::Acquire));
+        assert!(in_flight.contains_key(&request_id));
     }
 }
