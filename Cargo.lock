@@ -215,6 +215,7 @@ dependencies = [
 name = "pdx-hir"
 version = "0.1.0"
 dependencies = [
+ "pdx-game-eu4",
  "pdx-rules",
  "pdx-syntax",
  "pdx-text",

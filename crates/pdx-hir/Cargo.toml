@@ -13,3 +13,6 @@ pdx-text = { path = "../pdx-text" }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+pdx-game-eu4 = { path = "../pdx-game-eu4" }

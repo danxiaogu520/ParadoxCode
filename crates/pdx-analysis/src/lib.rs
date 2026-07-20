@@ -7,10 +7,9 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Arc;
 
-use pdx_hir::{HirFile, HirProperty, Scope};
+use pdx_hir::{HirFile, HirReferenceOrigin, Scope};
 use pdx_rules::{
-    CwtKeyMatcher, CwtRuleShape, CwtValueMatcher, GameProfile, ProfileDefinitionRule,
-    SymbolResolutionPolicy,
+    CwtKeyMatcher, CwtRuleShape, CwtValueMatcher, GameProfile, SymbolResolutionPolicy,
 };
 use pdx_syntax::{CstKind, CstNode, CsvParsedFile, Eu4FileFormat, ParsedFile, SyntaxError};
 use pdx_text::{LogicalPath, TextRange, TextSize};
@@ -2256,38 +2255,26 @@ fn diagnostic_from_syntax(error: &SyntaxError) -> Diagnostic {
 fn semantic_data(input: &ParsedInput) -> SemanticFile {
     let mut data = SemanticFile { definitions: Vec::new(), references: Vec::new() };
     let Some(hir) = input.hir.as_deref() else { return data };
-    for entry in hir.localisation_entries() {
+    for definition in hir.definitions() {
         data.definitions.push(make_definition(
             input,
-            "localisation",
-            entry.name.clone(),
-            entry.range,
-            entry.name_range,
+            &definition.kind,
+            definition.name.clone(),
+            definition.range,
+            definition.selection_range,
         ));
     }
-    for property in hir.properties() {
-        if property.top_level
-            && let Some(rule) = definition_rule(input, property)
-        {
-            let (name, selection_range) = definition_name(hir, property, rule);
-            data.definitions.push(make_definition(
-                input,
-                &rule.kind,
-                name,
-                property.range,
-                selection_range,
-            ));
-        }
-        if let Some((kind, name, range)) = reference_from_property(&input.profile, property) {
-            data.references.push(ReferenceInternal {
-                kind,
-                name,
-                range,
-                document: input.document.clone(),
-                file: input.file,
-                path: input.path.clone(),
-            });
-        }
+    for reference in
+        hir.references().iter().filter(|reference| reference.origin == HirReferenceOrigin::Profile)
+    {
+        data.references.push(ReferenceInternal {
+            kind: reference.kind.clone(),
+            name: reference.name.clone(),
+            range: reference.range,
+            document: input.document.clone(),
+            file: input.file,
+            path: input.path.clone(),
+        });
     }
     data
 }
@@ -2312,65 +2299,6 @@ fn make_definition(
         document: input.document.clone(),
         file: input.file,
     }
-}
-
-fn definition_rule<'profile>(
-    input: &'profile ParsedInput,
-    property: &HirProperty,
-) -> Option<&'profile ProfileDefinitionRule> {
-    let path = input.path.as_ref().map_or("", LogicalPath::as_str);
-    input
-        .profile
-        .definition(path, &property.key)
-        .filter(|rule| !rule.requires_value || property.value_range.is_some())
-}
-
-fn definition_name(
-    hir: &HirFile,
-    property: &HirProperty,
-    rule: &ProfileDefinitionRule,
-) -> (String, TextRange) {
-    if let Some(field) = rule.name_field.as_deref()
-        && let Some((name, range)) = find_nested_property(hir, property, field)
-    {
-        return (name, range);
-    }
-    (property.key.clone(), property.key_range)
-}
-
-fn find_nested_property(
-    hir: &HirFile,
-    parent: &HirProperty,
-    wanted: &str,
-) -> Option<(String, TextRange)> {
-    hir.properties()
-        .iter()
-        .filter(|property| property.path.len() > parent.path.len())
-        .filter(|property| property.path.starts_with(&parent.path))
-        .filter(|property| {
-            property.range.start() >= parent.range.start()
-                && property.range.end() <= parent.range.end()
-        })
-        .find(|property| property.key.eq_ignore_ascii_case(wanted))
-        .and_then(|property| {
-            property.scalar.as_ref().map(|scalar| (scalar.value.clone(), scalar.range))
-        })
-}
-
-fn reference_from_property(
-    profile: &GameProfile,
-    property: &HirProperty,
-) -> Option<(String, String, TextRange)> {
-    let kind = profile.reference_kind(&property.key)?;
-    let scalar = property.scalar.as_ref()?;
-    if scalar.value.is_empty()
-        || scalar.value == "yes"
-        || scalar.value == "no"
-        || scalar.value.parse::<f64>().is_ok()
-    {
-        return None;
-    }
-    Some((kind.to_owned(), scalar.value.clone(), scalar.range))
 }
 
 fn property_key(input: &ParsedInput, node: &CstNode) -> Option<(String, TextRange)> {

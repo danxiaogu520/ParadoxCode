@@ -10,7 +10,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use pdx_hir::{HirFile, HirProperty, lower_shared};
+use pdx_hir::{HirFile, lower_shared, lower_shared_with_profile};
 use pdx_rules::{FileResolutionPolicy, GameProfile, ParserKind, RuleSet, SymbolResolutionPolicy};
 use pdx_syntax::{CstKind, CstNode, Eu4FileFormat, ParsedFile, parse_eu4, parse_eu4_csv_file};
 use pdx_text::{LineIndex, LogicalPath, TextRange};
@@ -982,17 +982,25 @@ fn source_priorities(
 fn parse_source(
     parser: &ParserKind,
     source: &str,
+    logical_path: Option<&LogicalPath>,
     rules: &RuleSet,
+    profile: &GameProfile,
 ) -> (Option<ParsedSource>, Option<Arc<HirFile>>) {
     match parser {
         ParserKind::PdxScript => {
             let parsed = Arc::new(parse_eu4(Eu4FileFormat::PdxScript, source));
-            let hir = Arc::new(lower_shared(Arc::clone(&parsed), rules));
+            let hir = Arc::new(logical_path.map_or_else(
+                || lower_shared(Arc::clone(&parsed), rules),
+                |path| lower_shared_with_profile(Arc::clone(&parsed), path, rules, profile),
+            ));
             (Some(ParsedSource::Text(parsed)), Some(hir))
         }
         ParserKind::Localisation => {
             let parsed = Arc::new(parse_eu4(Eu4FileFormat::Localisation, source));
-            let hir = Arc::new(lower_shared(Arc::clone(&parsed), rules));
+            let hir = Arc::new(logical_path.map_or_else(
+                || lower_shared(Arc::clone(&parsed), rules),
+                |path| lower_shared_with_profile(Arc::clone(&parsed), path, rules, profile),
+            ));
             (Some(ParsedSource::Text(parsed)), Some(hir))
         }
         ParserKind::Csv(dialect) => {
@@ -1028,10 +1036,11 @@ fn build_file_state(
             }),
         };
     };
-    let (parsed, hir) = parse_source(&category.parser, &source, rules);
+    let (parsed, hir) =
+        parse_source(&category.parser, &source, Some(&file.logical_path), rules, profile);
     let shard = match (parsed.as_ref(), hir.as_deref()) {
         (Some(ParsedSource::Text(parsed)), Some(hir)) => {
-            shard_from_parsed(file, parsed, hir, category.id.as_str(), rules, profile)
+            shard_from_parsed(file, parsed, hir, rules, profile)
         }
         (Some(ParsedSource::Text(parsed)), None) => FileIndexShard {
             file_id: file.id,
@@ -1062,15 +1071,13 @@ fn shard_from_parsed(
     file: &SourceFile,
     parsed: &ParsedFile,
     hir: &HirFile,
-    category_id: &str,
     rules: &RuleSet,
     profile: &GameProfile,
 ) -> FileIndexShard {
     let mut definitions = Vec::new();
     let mut references = Vec::new();
-    collect_hir_semantics(file, hir, category_id, profile, &mut definitions, &mut references);
+    collect_hir_semantics(file, hir, &mut definitions, &mut references);
     collect_profile_token_definitions(file, parsed, profile, &mut definitions);
-    collect_profile_value_definitions(file, hir, profile, &mut definitions);
     collect_cwt_type_members(file, parsed, rules, &mut definitions);
     FileIndexShard {
         file_id: file.id,
@@ -1304,30 +1311,6 @@ fn cwt_type_path_matches(
     true
 }
 
-fn collect_profile_value_definitions(
-    file: &SourceFile,
-    hir: &HirFile,
-    profile: &GameProfile,
-    definitions: &mut Vec<Definition>,
-) {
-    for property in hir.properties() {
-        let parent_key = property.path.iter().rev().nth(1).map(String::as_str);
-        let kind = profile.value_definition_kind(&property.key, parent_key);
-        if let Some(kind) = kind
-            && let Some(scalar) = property.scalar.as_ref()
-            && !scalar.value.is_empty()
-        {
-            definitions.push(Definition {
-                kind: kind.to_owned(),
-                name: scalar.value.clone(),
-                file_id: file.id,
-                range: scalar.range,
-                active: true,
-            });
-        }
-    }
-}
-
 fn collect_profile_token_definitions(
     file: &SourceFile,
     parsed: &ParsedFile,
@@ -1386,124 +1369,26 @@ fn collect_profile_token_definitions(
 fn collect_hir_semantics(
     file: &SourceFile,
     hir: &HirFile,
-    category_id: &str,
-    profile: &GameProfile,
     definitions: &mut Vec<Definition>,
     references: &mut Vec<Reference>,
 ) {
-    for entry in hir.localisation_entries() {
+    for definition in hir.definitions() {
         definitions.push(Definition {
-            kind: "localisation".to_owned(),
-            name: entry.name.clone(),
+            kind: definition.kind.clone(),
+            name: definition.name.clone(),
             file_id: file.id,
-            range: entry.range,
+            range: definition.range,
             active: true,
         });
     }
-    let logical_path = file.logical_path.as_str().to_ascii_lowercase();
-    for property in hir.properties() {
-        if property.top_level {
-            let interpretation = profile
-                .definition(&logical_path, &property.key)
-                .filter(|rule| !rule.requires_value || property.value_range.is_some())
-                .map(|rule| (rule.kind.clone(), rule.name_field.as_deref()));
-            if let Some((kind, name_field)) = interpretation {
-                let name = name_field
-                    .and_then(|field| nested_hir_property(hir, property, field))
-                    .and_then(|property| property.scalar.as_ref())
-                    .map_or_else(|| property.key.clone(), |scalar| scalar.value.clone());
-                definitions.push(Definition {
-                    kind,
-                    name,
-                    file_id: file.id,
-                    range: property.range,
-                    active: true,
-                });
-            }
-            for rule in profile
-                .conditional_definitions
-                .iter()
-                .filter(|rule| rule.path.matches(&logical_path))
-            {
-                if nested_hir_property(hir, property, &rule.required_field)
-                    .and_then(|property| property.scalar.as_ref())
-                    .is_some_and(|scalar| scalar.value.eq_ignore_ascii_case(&rule.required_value))
-                    && nested_hir_property(hir, property, &rule.absent_field).is_none()
-                {
-                    definitions.push(Definition {
-                        kind: rule.kind.clone(),
-                        name: property.key.clone(),
-                        file_id: file.id,
-                        range: property.range,
-                        active: true,
-                    });
-                }
-            }
-            for rule in profile
-                .container_definitions
-                .iter()
-                .filter(|rule| rule.path.matches(&logical_path) && rule.key.matches(&property.key))
-            {
-                for country in hir.properties().iter().filter(|candidate| {
-                    candidate.path.len() == property.path.len().saturating_add(1)
-                        && candidate.path.starts_with(&property.path)
-                        && range_within(candidate.range, property.range)
-                }) {
-                    definitions.push(Definition {
-                        kind: rule.kind.clone(),
-                        name: country.key.clone(),
-                        file_id: file.id,
-                        range: country.range,
-                        active: true,
-                    });
-                }
-            }
-        }
-        if let Some((kind, name, range)) = semantic_reference(profile, property) {
-            references.push(Reference { kind, name, file_id: file.id, range });
-        }
-    }
-    for value in hir.bare_values() {
+    for reference in hir.references() {
         references.push(Reference {
-            kind: category_id.to_owned(),
-            name: value.value.clone(),
+            kind: reference.kind.clone(),
+            name: reference.name.clone(),
             file_id: file.id,
-            range: value.range,
+            range: reference.range,
         });
     }
-}
-
-fn semantic_reference(
-    profile: &GameProfile,
-    property: &HirProperty,
-) -> Option<(String, String, TextRange)> {
-    let kind = profile.reference_kind(&property.key)?;
-    let scalar = property.scalar.as_ref()?;
-    if scalar.value.is_empty()
-        || scalar.value == "yes"
-        || scalar.value == "no"
-        || scalar.value.parse::<f64>().is_ok()
-    {
-        return None;
-    }
-    Some((kind.to_owned(), scalar.value.clone(), scalar.range))
-}
-
-fn nested_hir_property<'hir>(
-    hir: &'hir HirFile,
-    parent: &HirProperty,
-    wanted: &str,
-) -> Option<&'hir HirProperty> {
-    hir.properties()
-        .iter()
-        .filter(|property| property.path.len() > parent.path.len())
-        .filter(|property| property.path.starts_with(&parent.path))
-        .filter(|property| range_within(property.range, parent.range))
-        .find(|property| property.key.eq_ignore_ascii_case(wanted))
-}
-
-fn range_within(inner: TextRange, outer: TextRange) -> bool {
-    inner.start() >= outer.start() && inner.end() <= outer.end()
 }
 
 fn find_property(node: &CstNode, wanted: &str, parsed: &ParsedFile) -> Option<String> {
@@ -1582,7 +1467,11 @@ impl AnalysisHost {
         }
     }
 
-    fn parser_for_document(&self, id: &DocumentId, path: Option<&Path>) -> Option<ParserKind> {
+    fn parser_for_document(
+        &self,
+        id: &DocumentId,
+        path: Option<&Path>,
+    ) -> Option<(ParserKind, Option<LogicalPath>)> {
         let logical = path
             .and_then(|path| {
                 self.roots
@@ -1598,7 +1487,7 @@ impl AnalysisHost {
                     .and_then(|name| LogicalPath::parse(name).ok())
             });
         if let Some(category) = logical.as_ref().and_then(|path| self.rules.classify(path)) {
-            return Some(category.parser.clone());
+            return Some((category.parser.clone(), logical));
         }
         let extension = path
             .and_then(Path::extension)
@@ -1609,12 +1498,13 @@ impl AnalysisHost {
                     path.as_str().rsplit_once('.').map(|(_, ext)| ext.to_ascii_lowercase())
                 })
             })?;
-        Some(match extension.as_str() {
+        let parser = match extension.as_str() {
             "yml" | "yaml" => ParserKind::Localisation,
             "csv" => ParserKind::Csv(pdx_rules::CsvDialect::Semicolon),
             "txt" | "gui" | "gfx" | "asset" | "sfx" => ParserKind::PdxScript,
             _ => return None,
-        })
+        };
+        Some((parser, logical))
     }
 
     fn document_snapshot(
@@ -1626,9 +1516,18 @@ impl AnalysisHost {
         path: Option<PathBuf>,
     ) -> DocumentSnapshot {
         let line_index = LineIndex::new(&text);
-        let (parsed, hir) = self
-            .parser_for_document(&id, path.as_deref())
-            .map_or((None, None), |parser| parse_source(&parser, &text, self.rules.as_ref()));
+        let (parsed, hir) = self.parser_for_document(&id, path.as_deref()).map_or(
+            (None, None),
+            |(parser, logical_path)| {
+                parse_source(
+                    &parser,
+                    &text,
+                    logical_path.as_ref(),
+                    self.rules.as_ref(),
+                    self.profile.as_ref(),
+                )
+            },
+        );
         DocumentSnapshot {
             id,
             version,
