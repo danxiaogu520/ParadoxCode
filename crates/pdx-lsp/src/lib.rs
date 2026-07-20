@@ -1,4 +1,4 @@
-//! Minimal JSON-RPC/LSP runtime for the EU4 language server.
+//! Minimal JSON-RPC/LSP runtime for the generic PDX language server.
 //!
 //! The crate owns transport framing, protocol state, document versioning, URI and position
 //! conversion, and result freshness checks. Parser and language-feature logic remains in the
@@ -8,6 +8,10 @@ use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{self, RecvTimeoutError};
+use std::time::{Duration, Instant};
 
 use pdx_analysis::{
     CompletionKind, Hover, Location, RenameError, complete, definition, diagnostics,
@@ -27,6 +31,7 @@ const METHOD_NOT_FOUND: i64 = -32601;
 const INVALID_PARAMS: i64 = -32602;
 const SERVER_NOT_INITIALIZED: i64 = -32002;
 const REQUEST_CANCELLED: i64 = -32800;
+const DIAGNOSTIC_DEBOUNCE: Duration = Duration::from_millis(200);
 
 /// Lifecycle state of the server process.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -119,6 +124,32 @@ struct RpcError {
     message: String,
 }
 
+#[derive(Debug)]
+struct PendingDiagnostics {
+    uri: String,
+    version: i64,
+    due: Instant,
+}
+
+#[derive(Debug)]
+struct InFlightDiagnostics {
+    version: i64,
+    cancelled: Arc<AtomicBool>,
+}
+
+#[derive(Debug)]
+struct DiagnosticsResult {
+    id: DocumentId,
+    uri: String,
+    version: i64,
+    values: Option<Value>,
+}
+
+enum TransportEvent {
+    Input(Result<Option<Value>, LspError>),
+    Diagnostics(DiagnosticsResult),
+}
+
 impl RpcError {
     fn new(code: i64, message: &'static str) -> Self {
         Self { code, message: message.to_owned() }
@@ -141,6 +172,7 @@ pub struct LspServer {
     host: AnalysisHost,
     cancelled: HashSet<RequestId>,
     diagnostics: BTreeMap<DocumentId, Value>,
+    pending_diagnostics: BTreeMap<DocumentId, PendingDiagnostics>,
     clean_exit: bool,
 }
 
@@ -194,6 +226,7 @@ impl LspServer {
             host: AnalysisHost::with_profile(rules, profile),
             cancelled: HashSet::new(),
             diagnostics: BTreeMap::new(),
+            pending_diagnostics: BTreeMap::new(),
             clean_exit: false,
         })
     }
@@ -245,7 +278,7 @@ impl LspServer {
         let stdin = io::stdin();
         let stdout = io::stdout();
         let mut server = Self::try_new(options)?;
-        server.run_transport(stdin.lock(), stdout.lock())
+        server.run_transport(stdin, stdout.lock())
     }
 
     /// Runs identity-only stdio while enforcing the selected game identity.
@@ -258,7 +291,7 @@ impl LspServer {
         let stdin = io::stdin();
         let stdout = io::stdout();
         let mut server = Self::try_new_for_game(options, expected_game_id)?;
-        server.run_transport(stdin.lock(), stdout.lock())
+        server.run_transport(stdin, stdout.lock())
     }
 
     /// Runs stdio with explicit game-profile interpretation and identity validation.
@@ -269,35 +302,202 @@ impl LspServer {
         let stdin = io::stdin();
         let stdout = io::stdout();
         let mut server = Self::try_new_with_profile(options, profile)?;
-        server.run_transport(stdin.lock(), stdout.lock())
+        server.run_transport(stdin, stdout.lock())
     }
 
     /// Runs the same framed transport over arbitrary streams.
     ///
     /// This is public so integration tests can drive the actual JSON-RPC framing without a
-    /// process or socket. The event loop remains sequential, which guarantees document versions
-    /// are applied in arrival order and never holds a host lock during a query snapshot.
-    pub fn run_transport<R: Read, W: Write>(
+    /// process or socket. A dedicated reader keeps input available while diagnostics run on
+    /// immutable snapshots; the event-loop thread remains the sole workspace-state owner.
+    pub fn run_transport<R: Read + Send, W: Write>(
         &mut self,
         input: R,
         mut output: W,
     ) -> Result<(), LspError> {
-        let mut input = BufReader::new(input);
-        loop {
-            let Some(message) = read_message(&mut input)? else {
-                return if self.state == ServerState::Exited && self.clean_exit {
-                    Ok(())
-                } else {
-                    Err(LspError::Protocol("transport ended before a clean exit".to_owned()))
+        std::thread::scope(|scope| {
+            let (event_sender, event_receiver) = mpsc::channel::<TransportEvent>();
+            let (read_sender, read_receiver) = mpsc::channel::<()>();
+            let reader_sender = event_sender.clone();
+            scope.spawn(move || {
+                let mut input = BufReader::new(input);
+                while read_receiver.recv().is_ok() {
+                    let result = read_message(&mut input);
+                    let terminal = !matches!(result, Ok(Some(_)));
+                    if reader_sender.send(TransportEvent::Input(result)).is_err() || terminal {
+                        break;
+                    }
+                }
+            });
+
+            let mut reader_active = true;
+            read_sender.send(()).map_err(|_| {
+                LspError::Protocol("LSP transport reader failed to start".to_owned())
+            })?;
+            let mut in_flight = BTreeMap::<DocumentId, InFlightDiagnostics>::new();
+
+            loop {
+                self.cancel_stale_diagnostics(&in_flight);
+                self.spawn_due_diagnostics(scope, &event_sender, &mut in_flight, false);
+                let timeout = self.next_diagnostic_wait(&in_flight);
+                let event = match timeout {
+                    Some(timeout) => match event_receiver.recv_timeout(timeout) {
+                        Ok(event) => event,
+                        Err(RecvTimeoutError::Timeout) => continue,
+                        Err(RecvTimeoutError::Disconnected) => {
+                            return Err(LspError::Protocol(
+                                "LSP transport workers stopped unexpectedly".to_owned(),
+                            ));
+                        }
+                    },
+                    None => event_receiver.recv().map_err(|_| {
+                        LspError::Protocol("LSP transport workers stopped unexpectedly".to_owned())
+                    })?,
                 };
-            };
-            let responses = self.handle_message(message)?;
-            for response in responses {
-                write_message(&mut output, &response)?;
+
+                match event {
+                    TransportEvent::Input(result) => {
+                        reader_active = false;
+                        let Some(message) = result? else {
+                            return if self.state == ServerState::Exited && self.clean_exit {
+                                Ok(())
+                            } else {
+                                Err(LspError::Protocol(
+                                    "transport ended before a clean exit".to_owned(),
+                                ))
+                            };
+                        };
+                        let responses = self.handle_message(message)?;
+                        for response in responses {
+                            write_message(&mut output, &response)?;
+                        }
+                        self.cancel_stale_diagnostics(&in_flight);
+                        if self.state == ServerState::Exited {
+                            for task in in_flight.values() {
+                                task.cancelled.store(true, Ordering::Release);
+                            }
+                            return if self.clean_exit {
+                                Ok(())
+                            } else {
+                                Err(LspError::ExitWithoutShutdown)
+                            };
+                        }
+                        if self.state == ServerState::ShuttingDown {
+                            self.spawn_due_diagnostics(scope, &event_sender, &mut in_flight, true);
+                        }
+                    }
+                    TransportEvent::Diagnostics(result) => {
+                        if in_flight
+                            .get(&result.id)
+                            .is_some_and(|task| task.version == result.version)
+                        {
+                            in_flight.remove(&result.id);
+                        }
+                        if let Some(values) = result.values
+                            && self.commit_diagnostics(&result.uri, result.version, values.clone())
+                        {
+                            write_message(
+                                &mut output,
+                                &diagnostics_notification(&result.uri, values),
+                            )?;
+                        }
+                    }
+                }
+
+                let draining_shutdown = self.state == ServerState::ShuttingDown
+                    && (!self.pending_diagnostics.is_empty() || !in_flight.is_empty());
+                if !reader_active && !draining_shutdown {
+                    read_sender.send(()).map_err(|_| {
+                        LspError::Protocol("LSP transport reader stopped unexpectedly".to_owned())
+                    })?;
+                    reader_active = true;
+                }
             }
-            if self.state == ServerState::Exited {
-                return if self.clean_exit { Ok(()) } else { Err(LspError::ExitWithoutShutdown) };
+        })
+    }
+
+    fn schedule_diagnostics(&mut self, uri: &str, delay: Duration) {
+        let id = DocumentId::new(uri);
+        let version = self
+            .host
+            .snapshot()
+            .document(&id)
+            .filter(|document| document.source() == DocumentSource::Overlay)
+            .and_then(|document| document.version());
+        if let Some(version) = version {
+            self.pending_diagnostics.insert(
+                id,
+                PendingDiagnostics { uri: uri.to_owned(), version, due: Instant::now() + delay },
+            );
+        }
+    }
+
+    fn cancel_stale_diagnostics(&self, in_flight: &BTreeMap<DocumentId, InFlightDiagnostics>) {
+        let snapshot = self.host.snapshot();
+        for (id, task) in in_flight {
+            let current_version = snapshot.document(id).and_then(|document| document.version());
+            let superseded = self
+                .pending_diagnostics
+                .get(id)
+                .is_some_and(|pending| pending.version != task.version);
+            if current_version != Some(task.version) || superseded {
+                task.cancelled.store(true, Ordering::Release);
             }
+        }
+    }
+
+    fn next_diagnostic_wait(
+        &self,
+        in_flight: &BTreeMap<DocumentId, InFlightDiagnostics>,
+    ) -> Option<Duration> {
+        let now = Instant::now();
+        self.pending_diagnostics
+            .iter()
+            .filter(|(id, _)| !in_flight.contains_key(*id))
+            .map(|(_, pending)| pending.due.saturating_duration_since(now))
+            .min()
+    }
+
+    fn spawn_due_diagnostics<'scope, 'environment>(
+        &mut self,
+        scope: &'scope std::thread::Scope<'scope, 'environment>,
+        event_sender: &mpsc::Sender<TransportEvent>,
+        in_flight: &mut BTreeMap<DocumentId, InFlightDiagnostics>,
+        force: bool,
+    ) {
+        let now = Instant::now();
+        let ready = self
+            .pending_diagnostics
+            .iter()
+            .filter(|(id, pending)| !in_flight.contains_key(*id) && (force || pending.due <= now))
+            .map(|(id, _)| id.clone())
+            .collect::<Vec<_>>();
+        for id in ready {
+            let Some(pending) = self.pending_diagnostics.remove(&id) else { continue };
+            let snapshot = self.host.snapshot();
+            let sender = event_sender.clone();
+            let cancelled = Arc::new(AtomicBool::new(false));
+            in_flight.insert(
+                id.clone(),
+                InFlightDiagnostics { version: pending.version, cancelled: Arc::clone(&cancelled) },
+            );
+            scope.spawn(move || {
+                let values = if cancelled.load(Ordering::Acquire) {
+                    None
+                } else {
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        diagnostic_values(&snapshot, &id)
+                    }))
+                    .ok()
+                    .filter(|_| !cancelled.load(Ordering::Acquire))
+                };
+                let _ = sender.send(TransportEvent::Diagnostics(DiagnosticsResult {
+                    id,
+                    uri: pending.uri,
+                    version: pending.version,
+                    values,
+                }));
+            });
         }
     }
 
@@ -387,11 +587,13 @@ impl LspServer {
             }
             "textDocument/didOpen" => {
                 let uri = self.handle_did_open(params)?;
-                Ok(self.publish_diagnostics(&uri))
+                self.schedule_diagnostics(&uri, DIAGNOSTIC_DEBOUNCE);
+                Ok(Value::Null)
             }
             "textDocument/didChange" => {
                 let uri = self.handle_did_change(params)?;
-                Ok(self.publish_diagnostics(&uri))
+                self.schedule_diagnostics(&uri, DIAGNOSTIC_DEBOUNCE);
+                Ok(Value::Null)
             }
             "textDocument/didClose" => self.handle_did_close(params),
             "textDocument/didSave" => {
@@ -404,7 +606,8 @@ impl LspServer {
                     .ok_or_else(|| {
                         RpcError::new(INVALID_PARAMS, "didSave requires textDocument")
                     })?;
-                Ok(self.publish_diagnostics(uri))
+                self.schedule_diagnostics(uri, Duration::ZERO);
+                Ok(Value::Null)
             }
             "textDocument/completion" => self.handle_completion(params),
             "textDocument/hover" => self.handle_hover(params),
@@ -540,40 +743,13 @@ impl LspServer {
         let uri = required_string(text_document, "uri")?;
         let id = DocumentId::new(uri);
         self.host.close_document(&id).map_err(document_error)?;
+        self.pending_diagnostics.remove(&id);
         self.diagnostics.remove(&id);
         Ok(json!({
             "jsonrpc": JSON_RPC_VERSION,
             "method": "textDocument/publishDiagnostics",
             "params": {"uri": uri, "diagnostics": []}
         }))
-    }
-
-    fn publish_diagnostics(&mut self, uri: &str) -> Value {
-        let id = DocumentId::new(uri);
-        let snapshot = self.host.snapshot();
-        let values = snapshot.document(&id).map_or_else(Vec::new, |document| {
-            diagnostics(&snapshot, &id)
-                .into_iter()
-                .map(|diagnostic| {
-                    json!({
-                        "range": range_to_json(document.line_index(), document.text(), diagnostic.range),
-                        "severity": diagnostic.severity,
-                        "code": diagnostic.code.as_str(),
-                        "source": "pdx-analysis",
-                        "message": diagnostic.message,
-                    })
-                })
-                .collect::<Vec<_>>()
-        });
-        let value = json!({
-            "jsonrpc": JSON_RPC_VERSION,
-            "method": "textDocument/publishDiagnostics",
-            "params": {"uri": uri, "diagnostics": values},
-        });
-        if let Some(params) = value.get("params").and_then(|params| params.get("diagnostics")) {
-            self.diagnostics.insert(id, params.clone());
-        }
-        value
     }
 
     fn handle_completion(&self, params: Option<&Value>) -> Result<Value, RpcError> {
@@ -755,6 +931,36 @@ impl LspServer {
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "position is not valid UTF-16"))
             .map(|offset| (id, offset))
     }
+}
+
+fn diagnostic_values(snapshot: &AnalysisSnapshot, id: &DocumentId) -> Value {
+    let values = snapshot.document(id).map_or_else(Vec::new, |document| {
+        diagnostics(snapshot, id)
+            .into_iter()
+            .map(|diagnostic| {
+                json!({
+                    "range": range_to_json(
+                        document.line_index(),
+                        document.text(),
+                        diagnostic.range,
+                    ),
+                    "severity": diagnostic.severity,
+                    "code": diagnostic.code.as_str(),
+                    "source": "pdx-analysis",
+                    "message": diagnostic.message,
+                })
+            })
+            .collect::<Vec<_>>()
+    });
+    Value::Array(values)
+}
+
+fn diagnostics_notification(uri: &str, values: Value) -> Value {
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "method": "textDocument/publishDiagnostics",
+        "params": {"uri": uri, "diagnostics": values},
+    })
 }
 
 fn completion_kind(kind: CompletionKind) -> u8 {
@@ -1357,5 +1563,37 @@ mod tests {
         assert_eq!(server.diagnostics(uri).expect("old result remains")[0]["message"], "old");
         assert!(server.commit_diagnostics(uri, 2, json!([{"message":"new"}])));
         assert_eq!(server.diagnostics(uri).expect("new result accepted")[0]["message"], "new");
+    }
+
+    #[test]
+    fn rapid_changes_debounce_and_publish_only_the_latest_diagnostics() {
+        let uri = "file:///tmp/debounced-diagnostics.txt";
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp"}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":"scope = nowhere\n"}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":uri,"version":2},"contentChanges":[{"text":"scope = country\n"}]}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = eu4_server(InitializeOptions::default()).expect("server");
+
+        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+
+        let responses = decode_frames(&output);
+        let published = responses
+            .iter()
+            .filter(|value| {
+                value["method"] == "textDocument/publishDiagnostics"
+                    && value["params"]["uri"] == uri
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(published.len(), 1);
+        assert!(
+            published[0]["params"]["diagnostics"]
+                .as_array()
+                .is_some_and(|items| items.iter().all(|item| item["code"] != "pdx-unknown-scope"))
+        );
     }
 }

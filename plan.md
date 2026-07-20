@@ -212,7 +212,7 @@ Workspace/index：
 
 ### Phase 5：语言功能
 
-状态：`implemented, acceptance reopened`（2026-07-20）；查询功能和 LSP integration 已实现，但 query-time 全 workspace 重解析、深拷贝 snapshot 和同步 diagnostics 不满足已接受的性能/取消边界。
+状态：`implemented, acceptance reopened`（2026-07-20）；查询功能和 LSP integration 已实现，query-time 全 workspace 重解析、深拷贝 snapshot 和同步 diagnostics 已消除；parse/lower 事件循环阻塞与普通请求在途取消仍不满足已接受边界。
 
 工作项：
 
@@ -259,7 +259,7 @@ Workspace/index：
 4. 删除 analysis query-time 全 workspace 重解析，查询只读取当前 HIR 与 WorkspaceIndex（已完成）；
 5. 增加 index bulk build 和真正的单 shard 增量 replacement（已完成）；
 6. 修复稳定 SourceFileId、symlink 顺序、文件大小/深度/数量限制和错误隔离（已完成）；
-7. 将 LSP transport 迁移到类型化协议层，增加 worker、debounce、版本门和在途取消；
+7. 将 LSP transport 迁移到类型化协议层，增加 worker、debounce、版本门和在途取消（stdio reader 分离、semantic diagnostics 200ms debounce、snapshot worker、版本门和旧任务失效已完成；类型化协议、parse worker 与普通请求在途取消待完成）；
 8. 接入 formatting、dependency roots、Vanilla cache 持久化和文件变化更新；
 9. 建立大型 synthetic workspace benchmark 与“编辑一个文件只 parse/lower 一次”计数测试；
 10. 完成 Zed 自动获取、多平台 release、checksum 和干净 clone 端到端安装测试。

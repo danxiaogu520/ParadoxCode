@@ -3,6 +3,8 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
+> 实现进度（2026-07-20）：stdio reader 与 workspace event loop 已分离；semantic diagnostics 使用 200ms debounce、immutable snapshot worker、文档版本提交门和旧任务失效标记。普通语言请求仍在 event-loop thread 上同步执行，`$/cancelRequest` 只能阻止尚未开始的请求；真正的在途请求取消与 workspace scan 取消仍待实现。
+
 ## 边界
 
 `pdx-lsp` 是协议 adapter，不拥有 parser、规则或 feature 算法。它负责：
