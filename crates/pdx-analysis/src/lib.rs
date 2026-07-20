@@ -6,6 +6,9 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Arc;
+#[cfg(test)]
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use pdx_hir::{HirFile, HirReferenceOrigin, Scope};
 use pdx_rules::{
@@ -16,6 +19,79 @@ use pdx_text::{LogicalPath, TextRange, TextSize};
 use pdx_workspace::{
     AnalysisSnapshot, Definition, DocumentId, DocumentSource, ParsedSource, SourceFileId,
 };
+
+/// Shared cooperative-cancellation state for editor-neutral analysis queries.
+///
+/// Clones observe the same flag. Query implementations check it while traversing workspace and
+/// CWT data so protocol adapters can stop obsolete work without introducing protocol types here.
+#[derive(Clone, Debug)]
+pub struct CancellationToken {
+    cancelled: Arc<AtomicBool>,
+    #[cfg(test)]
+    remaining_checkpoints: Arc<AtomicUsize>,
+}
+
+impl Default for CancellationToken {
+    fn default() -> Self {
+        Self {
+            cancelled: Arc::new(AtomicBool::new(false)),
+            #[cfg(test)]
+            remaining_checkpoints: Arc::new(AtomicUsize::new(usize::MAX)),
+        }
+    }
+}
+
+impl CancellationToken {
+    /// Creates an uncancelled token.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Marks this token and every clone as cancelled.
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Release);
+    }
+
+    /// Reports whether cancellation has been requested.
+    #[must_use]
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Acquire)
+    }
+
+    fn checkpoint(&self) -> Result<(), Cancelled> {
+        #[cfg(test)]
+        if self
+            .remaining_checkpoints
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
+                if remaining != usize::MAX && remaining > 0 { Some(remaining - 1) } else { None }
+            })
+            .is_err_and(|remaining| remaining == 0)
+        {
+            self.cancel();
+        }
+        if self.is_cancelled() { Err(Cancelled) } else { Ok(()) }
+    }
+
+    #[cfg(test)]
+    fn cancel_after(checkpoints: usize) -> Self {
+        Self {
+            cancelled: Arc::new(AtomicBool::new(false)),
+            remaining_checkpoints: Arc::new(AtomicUsize::new(checkpoints)),
+        }
+    }
+}
+
+/// Marker returned when a cooperative analysis query stops early.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Cancelled;
+
+fn uncancelled<T>(result: Result<T, Cancelled>) -> T {
+    match result {
+        Ok(value) => value,
+        Err(Cancelled) => unreachable!("a fresh cancellation token cannot be cancelled"),
+    }
+}
 
 /// Stable categories emitted by semantic analysis.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -209,6 +285,21 @@ pub enum RenameError {
     Conflict,
 }
 
+/// Failure from a cancellable rename query.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RenameFailure {
+    /// The caller cancelled the query before it completed.
+    Cancelled,
+    /// Semantic safety checks rejected the requested rename.
+    Rejected(RenameError),
+}
+
+impl From<RenameError> for RenameFailure {
+    fn from(error: RenameError) -> Self {
+        Self::Rejected(error)
+    }
+}
+
 impl std::fmt::Display for RenameError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
@@ -310,7 +401,19 @@ pub fn analyze_source_file(
 /// Returns diagnostics for one document, or an empty vector for unsupported/nonexistent files.
 #[must_use]
 pub fn diagnostics(snapshot: &AnalysisSnapshot, document: &DocumentId) -> Vec<Diagnostic> {
-    analyze_document(snapshot, document).map_or_else(Vec::new, |analysis| analysis.diagnostics)
+    uncancelled(diagnostics_with_cancellation(snapshot, document, &CancellationToken::new()))
+}
+
+/// Returns diagnostics while cooperatively stopping when `cancellation` is marked.
+pub fn diagnostics_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    document: &DocumentId,
+    cancellation: &CancellationToken,
+) -> Result<Vec<Diagnostic>, Cancelled> {
+    cancellation.checkpoint()?;
+    let Some(input) = input_for_document(snapshot, document) else { return Ok(Vec::new()) };
+    analyze_input_with_cancellation(snapshot, &input, cancellation)
+        .map(|analysis| analysis.diagnostics)
 }
 
 /// Computes key, value, localisation, and symbol completion.
@@ -320,16 +423,28 @@ pub fn complete(
     document: &DocumentId,
     position: TextSize,
 ) -> CompletionResult {
+    uncancelled(complete_with_cancellation(snapshot, document, position, &CancellationToken::new()))
+}
+
+/// Computes completion with cooperative cancellation checkpoints.
+pub fn complete_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    document: &DocumentId,
+    position: TextSize,
+    cancellation: &CancellationToken,
+) -> Result<CompletionResult, Cancelled> {
+    cancellation.checkpoint()?;
     let Some(input) = input_for_document(snapshot, document) else {
-        return CompletionResult { revision: snapshot.revision(), items: Vec::new() };
+        return Ok(CompletionResult { revision: snapshot.revision(), items: Vec::new() });
     };
     let replacement_range = word_range(&input.source, position);
     let prefix = input.source_text(replacement_range).unwrap_or_default().to_owned();
     let value_context = completion_value_context(&input, position);
-    let all = all_semantics(snapshot);
+    let all = all_semantics(snapshot, cancellation)?;
     let mut items = Vec::new();
     let cwt_context = cwt_completion_context(snapshot, &input, position);
     if let Some(context) = cwt_context.as_ref() {
+        cancellation.checkpoint()?;
         if value_context {
             if let Some(property) = context.property.as_ref() {
                 add_cwt_value_items(
@@ -348,6 +463,7 @@ pub fn complete(
     if items.is_empty() && value_context {
         add_scalar_items(&mut items, replacement_range, &prefix);
         for definition in &all.definitions {
+            cancellation.checkpoint()?;
             let kind = if definition.kind == "localisation" {
                 CompletionKind::Localisation
             } else {
@@ -371,6 +487,7 @@ pub fn complete(
         }
     } else if items.is_empty() {
         for key in known_keys(snapshot) {
+            cancellation.checkpoint()?;
             push_completion(
                 &mut items,
                 CompletionItem {
@@ -387,6 +504,7 @@ pub fn complete(
             );
         }
         for definition in &all.definitions {
+            cancellation.checkpoint()?;
             if matches!(definition.kind.as_str(), "scripted_effect" | "scripted_trigger") {
                 push_completion(
                     &mut items,
@@ -411,6 +529,7 @@ pub fn complete(
         add_scalar_items(&mut items, replacement_range, "");
         if !value_context {
             for key in known_keys(snapshot).into_iter().take(32) {
+                cancellation.checkpoint()?;
                 items.push(CompletionItem {
                     label: key.clone(),
                     kind: CompletionKind::Key,
@@ -426,7 +545,8 @@ pub fn complete(
     }
     items.sort_by_key(|item| (item.sort_score, item.label.to_ascii_lowercase()));
     items.dedup_by(|left, right| left.label == right.label && left.kind == right.kind);
-    CompletionResult { revision: snapshot.revision(), items }
+    cancellation.checkpoint()?;
+    Ok(CompletionResult { revision: snapshot.revision(), items })
 }
 
 #[derive(Clone, Debug)]
@@ -896,29 +1016,49 @@ pub fn hover(
     document: &DocumentId,
     position: TextSize,
 ) -> Option<Hover> {
-    let input = input_for_document(snapshot, document)?;
+    uncancelled(hover_with_cancellation(snapshot, document, position, &CancellationToken::new()))
+}
+
+/// Computes hover information with cooperative cancellation checkpoints.
+pub fn hover_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    document: &DocumentId,
+    position: TextSize,
+    cancellation: &CancellationToken,
+) -> Result<Option<Hover>, Cancelled> {
+    cancellation.checkpoint()?;
+    let Some(input) = input_for_document(snapshot, document) else { return Ok(None) };
     let range = word_range(&input.source, position);
-    let word = input.source_text(range)?.trim_matches('"').to_owned();
+    let Some(word) = input.source_text(range).map(|word| word.trim_matches('"').to_owned()) else {
+        return Ok(None);
+    };
     if word.is_empty() {
-        return None;
+        return Ok(None);
     }
-    let all = all_semantics(snapshot);
+    let all = all_semantics(snapshot, cancellation)?;
     if let Some(reference) = all.references.iter().find(|reference| {
         reference.document.as_ref() == Some(document) && contains(reference.range, position)
     }) {
-        return Some(hover_for_symbol(snapshot, &all, &reference.kind, &reference.name, range));
+        return Ok(Some(hover_for_symbol(snapshot, &all, &reference.kind, &reference.name, range)));
     }
     if let Some(definition) = all.definitions.iter().find(|definition| {
         definition.document.as_ref() == Some(document)
             && contains(definition.symbol.selection_range, position)
     }) {
-        return Some(hover_for_symbol(snapshot, &all, &definition.kind, &definition.name, range));
+        return Ok(Some(hover_for_symbol(
+            snapshot,
+            &all,
+            &definition.kind,
+            &definition.name,
+            range,
+        )));
     }
+    cancellation.checkpoint()?;
     if let Some(details) = cwt_rule_documentation_at(snapshot, &input, position) {
-        return Some(Hover {
+        return Ok(Some(Hover {
             contents: format!("PDX property `{word}`\n\n{details}"),
             range: Some(range),
-        });
+        }));
     }
     let known = known_keys(snapshot);
     if known.contains(&word) {
@@ -926,9 +1066,9 @@ pub fn hover(
             || format!("PDX property `{word}`"),
             |details| format!("PDX property `{word}`\n\n{details}"),
         );
-        return Some(Hover { contents, range: Some(range) });
+        return Ok(Some(Hover { contents, range: Some(range) }));
     }
-    Some(Hover { contents: format!("PDX value `{word}`"), range: Some(range) })
+    Ok(Some(Hover { contents: format!("PDX value `{word}`"), range: Some(range) }))
 }
 
 fn cwt_rule_documentation(snapshot: &AnalysisSnapshot, key: &str) -> Option<String> {
@@ -999,17 +1139,33 @@ pub fn definition(
     document: &DocumentId,
     position: TextSize,
 ) -> Vec<Location> {
+    uncancelled(definition_with_cancellation(
+        snapshot,
+        document,
+        position,
+        &CancellationToken::new(),
+    ))
+}
+
+/// Resolves a definition with cooperative cancellation checkpoints.
+pub fn definition_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    document: &DocumentId,
+    position: TextSize,
+    cancellation: &CancellationToken,
+) -> Result<Vec<Location>, Cancelled> {
+    cancellation.checkpoint()?;
     if input_for_document(snapshot, document).is_none() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
-    let all = all_semantics(snapshot);
+    let all = all_semantics(snapshot, cancellation)?;
     let Some((kind, name)) = symbol_at(&all, document, position) else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
-    match resolve_symbol(snapshot, &all, &kind, &name) {
+    Ok(match resolve_symbol(snapshot, &all, &kind, &name) {
         Resolution::Unique(definition) => vec![definition.location],
         Resolution::Ambiguous | Resolution::Missing => Vec::new(),
-    }
+    })
 }
 
 /// Returns resolved references for the symbol at a position.
@@ -1020,22 +1176,41 @@ pub fn references(
     position: TextSize,
     include_declaration: bool,
 ) -> Vec<Location> {
+    uncancelled(references_with_cancellation(
+        snapshot,
+        document,
+        position,
+        include_declaration,
+        &CancellationToken::new(),
+    ))
+}
+
+/// Resolves references with cooperative cancellation checkpoints.
+pub fn references_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    document: &DocumentId,
+    position: TextSize,
+    include_declaration: bool,
+    cancellation: &CancellationToken,
+) -> Result<Vec<Location>, Cancelled> {
+    cancellation.checkpoint()?;
     let Some(input) = input_for_document(snapshot, document) else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
     let _ = input;
-    let all = all_semantics(snapshot);
+    let all = all_semantics(snapshot, cancellation)?;
     let Some((kind, name)) = symbol_at(&all, document, position) else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
     let Resolution::Unique(target) = resolve_symbol(snapshot, &all, &kind, &name) else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
     let mut result = Vec::new();
     if include_declaration {
         result.push(target.location.clone());
     }
     for reference in &all.references {
+        cancellation.checkpoint()?;
         if reference.kind != kind || !same_name(&reference.name, &name) {
             continue;
         }
@@ -1053,7 +1228,8 @@ pub fn references(
         )
     });
     result.dedup();
-    result
+    cancellation.checkpoint()?;
+    Ok(result)
 }
 
 /// Returns the identifier range when the cursor is on a uniquely resolved, writable symbol.
@@ -1062,7 +1238,25 @@ pub fn prepare_rename(
     document: &DocumentId,
     position: TextSize,
 ) -> Result<PrepareRenameResult, RenameError> {
-    let target = rename_target(snapshot, document, position)?;
+    match prepare_rename_with_cancellation(snapshot, document, position, &CancellationToken::new())
+    {
+        Ok(result) => Ok(result),
+        Err(RenameFailure::Rejected(error)) => Err(error),
+        Err(RenameFailure::Cancelled) => {
+            unreachable!("a fresh cancellation token cannot be cancelled")
+        }
+    }
+}
+
+/// Prepares a rename while allowing the caller to cancel semantic resolution.
+pub fn prepare_rename_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    document: &DocumentId,
+    position: TextSize,
+    cancellation: &CancellationToken,
+) -> Result<PrepareRenameResult, RenameFailure> {
+    cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
+    let target = rename_target(snapshot, document, position, cancellation)?;
     let input = input_for_document(snapshot, document).ok_or(RenameError::NoSymbol)?;
     let placeholder =
         input.source_text(target.cursor_range).ok_or(RenameError::NoSymbol)?.to_owned();
@@ -1076,12 +1270,37 @@ pub fn rename(
     position: TextSize,
     new_name: &str,
 ) -> Result<WorkspaceEditPlan, RenameError> {
-    if !valid_rename_name(new_name) {
-        return Err(RenameError::InvalidName);
+    match rename_with_cancellation(
+        snapshot,
+        document,
+        position,
+        new_name,
+        &CancellationToken::new(),
+    ) {
+        Ok(result) => Ok(result),
+        Err(RenameFailure::Rejected(error)) => Err(error),
+        Err(RenameFailure::Cancelled) => {
+            unreachable!("a fresh cancellation token cannot be cancelled")
+        }
     }
-    let target = rename_target(snapshot, document, position)?;
-    let all = all_semantics(snapshot);
-    check_rename_conflict(snapshot, &all, &target, new_name)?;
+}
+
+/// Builds a rename plan with cooperative cancellation checkpoints.
+pub fn rename_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    document: &DocumentId,
+    position: TextSize,
+    new_name: &str,
+    cancellation: &CancellationToken,
+) -> Result<WorkspaceEditPlan, RenameFailure> {
+    cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
+    if !valid_rename_name(new_name) {
+        return Err(RenameError::InvalidName.into());
+    }
+    let target = rename_target(snapshot, document, position, cancellation)?;
+    let all =
+        all_semantics(snapshot, cancellation).map_err(|Cancelled| RenameFailure::Cancelled)?;
+    check_rename_conflict(snapshot, &all, &target, new_name, cancellation)?;
 
     let mut edits = vec![WorkspaceTextEdit {
         location: Location {
@@ -1092,6 +1311,7 @@ pub fn rename(
     }];
     let overlay_files = overlay_file_ids(snapshot);
     for reference in &all.references {
+        cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
         if reference.kind != target.kind || !same_name(&reference.name, &target.name) {
             continue;
         }
@@ -1125,26 +1345,52 @@ pub fn rename(
     });
     edits
         .dedup_by(|left, right| left.location == right.location && left.new_text == right.new_text);
+    cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
     Ok(WorkspaceEditPlan { revision: snapshot.revision(), edits })
 }
 
 /// Returns symbols declared by one document.
 #[must_use]
 pub fn document_symbols(snapshot: &AnalysisSnapshot, document: &DocumentId) -> Vec<Symbol> {
+    uncancelled(document_symbols_with_cancellation(snapshot, document, &CancellationToken::new()))
+}
+
+/// Returns document symbols with cooperative cancellation checkpoints.
+pub fn document_symbols_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    document: &DocumentId,
+    cancellation: &CancellationToken,
+) -> Result<Vec<Symbol>, Cancelled> {
+    cancellation.checkpoint()?;
     let Some(input) = input_for_document(snapshot, document) else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
     let data = semantic_data(&input);
-    data.definitions.into_iter().map(|definition| definition.symbol).collect()
+    let mut result = Vec::with_capacity(data.definitions.len());
+    for definition in data.definitions {
+        cancellation.checkpoint()?;
+        result.push(definition.symbol);
+    }
+    Ok(result)
 }
 
 /// Returns active workspace symbols using deterministic prefix/fuzzy ranking.
 #[must_use]
 pub fn workspace_symbols(snapshot: &AnalysisSnapshot, query: &str) -> Vec<WorkspaceSymbol> {
-    let all = all_semantics(snapshot);
+    uncancelled(workspace_symbols_with_cancellation(snapshot, query, &CancellationToken::new()))
+}
+
+/// Returns workspace symbols with cooperative cancellation checkpoints.
+pub fn workspace_symbols_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    query: &str,
+    cancellation: &CancellationToken,
+) -> Result<Vec<WorkspaceSymbol>, Cancelled> {
+    let all = all_semantics(snapshot, cancellation)?;
     let query = query.trim().to_ascii_lowercase();
     let mut result = Vec::new();
     for definition in &all.definitions {
+        cancellation.checkpoint()?;
         let name = definition.name.to_ascii_lowercase();
         let score = if query.is_empty() {
             Some(20)
@@ -1170,7 +1416,8 @@ pub fn workspace_symbols(snapshot: &AnalysisSnapshot, query: &str) -> Vec<Worksp
     result.sort_by_key(|(score, symbol)| {
         (*score, symbol.name.to_ascii_lowercase(), symbol.kind.clone())
     });
-    result.into_iter().map(|(_, symbol)| symbol).collect()
+    cancellation.checkpoint()?;
+    Ok(result.into_iter().map(|(_, symbol)| symbol).collect())
 }
 
 #[derive(Clone, Debug)]
@@ -1337,13 +1584,24 @@ fn logical_path(snapshot: &AnalysisSnapshot, path: &Path) -> Option<LogicalPath>
 }
 
 fn analyze_input(snapshot: &AnalysisSnapshot, input: &ParsedInput) -> FileAnalysis {
+    uncancelled(analyze_input_with_cancellation(snapshot, input, &CancellationToken::new()))
+}
+
+fn analyze_input_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    cancellation: &CancellationToken,
+) -> Result<FileAnalysis, Cancelled> {
+    cancellation.checkpoint()?;
     let semantic = semantic_data(input);
-    let all = all_semantics(snapshot);
+    cancellation.checkpoint()?;
+    let all = all_semantics(snapshot, cancellation)?;
     let mut diagnostics = syntax_diagnostics(input);
-    diagnostics.extend(cwt_rule_diagnostics(snapshot, input));
+    diagnostics.extend(cwt_rule_diagnostics(snapshot, input, cancellation)?);
     let known = known_keys(snapshot);
     let mut unknown_scope_reported = false;
     for property in properties(input) {
+        cancellation.checkpoint()?;
         let is_dynamic_command = all.definitions.iter().any(|definition| {
             matches!(definition.kind.as_str(), "scripted_effect" | "scripted_trigger")
                 && same_name(&definition.name, &property.key)
@@ -1376,6 +1634,7 @@ fn analyze_input(snapshot: &AnalysisSnapshot, input: &ParsedInput) -> FileAnalys
         }
     }
     for reference in &semantic.references {
+        cancellation.checkpoint()?;
         match resolve_symbol(snapshot, &all, &reference.kind, &reference.name) {
             Resolution::Missing => diagnostics.push(Diagnostic {
                 code: DiagnosticCode::UnknownSymbol,
@@ -1401,7 +1660,8 @@ fn analyze_input(snapshot: &AnalysisSnapshot, input: &ParsedInput) -> FileAnalys
             && left.range == right.range
             && left.message == right.message
     });
-    FileAnalysis {
+    cancellation.checkpoint()?;
+    Ok(FileAnalysis {
         revision: snapshot.revision(),
         document: input.document.clone(),
         file: input.file,
@@ -1417,7 +1677,7 @@ fn analyze_input(snapshot: &AnalysisSnapshot, input: &ParsedInput) -> FileAnalys
                 ReferenceInfo { kind: reference.kind, name: reference.name, location }
             })
             .collect(),
-    }
+    })
 }
 
 #[derive(Clone, Debug)]
@@ -1453,14 +1713,21 @@ impl ScopeContext {
     }
 }
 
-fn cwt_rule_diagnostics(snapshot: &AnalysisSnapshot, input: &ParsedInput) -> Vec<Diagnostic> {
+fn cwt_rule_diagnostics(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    cancellation: &CancellationToken,
+) -> Result<Vec<Diagnostic>, Cancelled> {
+    cancellation.checkpoint()?;
     if input.format != Eu4FileFormat::PdxScript || snapshot.rules().model().cwt.rules.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
-    let ParsedContent::Text(parsed) = &input.parsed else { return Vec::new() };
+    let ParsedContent::Text(parsed) = &input.parsed else { return Ok(Vec::new()) };
     let roots = script_properties(input, parsed.root());
+    cancellation.checkpoint()?;
     let mut diagnostics = Vec::new();
     for property in roots {
+        cancellation.checkpoint()?;
         let Some(context) = cwt_root_context(snapshot, &property.key, input.path.as_ref()) else {
             continue;
         };
@@ -1487,7 +1754,8 @@ fn cwt_rule_diagnostics(snapshot: &AnalysisSnapshot, input: &ParsedInput) -> Vec
                     &child.bare_values,
                     &child_scope,
                     &mut diagnostics,
-                );
+                    cancellation,
+                )?;
             }
             continue;
         }
@@ -1499,9 +1767,10 @@ fn cwt_rule_diagnostics(snapshot: &AnalysisSnapshot, input: &ParsedInput) -> Vec
             &property.bare_values,
             &scope,
             &mut diagnostics,
-        );
+            cancellation,
+        )?;
     }
-    diagnostics
+    Ok(diagnostics)
 }
 
 fn cwt_initial_scope(snapshot: &AnalysisSnapshot, context: &str, root_key: &str) -> ScopeContext {
@@ -1716,6 +1985,7 @@ fn script_properties(input: &ParsedInput, parent: &CstNode) -> Vec<ScriptPropert
         .collect()
 }
 
+#[allow(clippy::too_many_arguments)] // Recursive validation carries explicit semantic state.
 fn validate_cwt_container(
     snapshot: &AnalysisSnapshot,
     context: &str,
@@ -1724,7 +1994,9 @@ fn validate_cwt_container(
     bare_values: &[(String, TextRange)],
     scope: &ScopeContext,
     diagnostics: &mut Vec<Diagnostic>,
-) {
+    cancellation: &CancellationToken,
+) -> Result<(), Cancelled> {
+    cancellation.checkpoint()?;
     let rules = snapshot
         .rules()
         .model()
@@ -1740,12 +2012,13 @@ fn validate_cwt_container(
         })
         .collect::<Vec<_>>();
     if rules.is_empty() {
-        return;
+        return Ok(());
     }
     let selected_alternative =
         cwt_selected_alternative(snapshot, &rules, properties, bare_values, scope);
     let mut counts = std::collections::BTreeMap::<String, u32>::new();
     for property in properties {
+        cancellation.checkpoint()?;
         let key = property.key.to_ascii_lowercase();
         let count = counts.entry(key).or_default();
         *count = count.saturating_add(1);
@@ -1842,9 +2115,11 @@ fn validate_cwt_container(
             &property.bare_values,
             &next_scope,
             diagnostics,
-        );
+            cancellation,
+        )?;
     }
     for (value, value_range) in bare_values {
+        cancellation.checkpoint()?;
         let matching = rules
             .iter()
             .filter(|rule| {
@@ -1865,6 +2140,7 @@ fn validate_cwt_container(
     let empty_range =
         properties.first().map_or_else(|| TextRange::empty(0), |property| property.key_range);
     for rule in rules.iter().filter(|rule| cwt_scope_allows(rule, scope)) {
+        cancellation.checkpoint()?;
         if !cwt_rule_is_selected(rule, selected_alternative.as_deref()) {
             continue;
         }
@@ -1922,6 +2198,7 @@ fn validate_cwt_container(
             });
         }
     }
+    Ok(())
 }
 
 fn cwt_rule_is_selected(rule: &pdx_rules::CwtSemanticRule, selected: Option<&str>) -> bool {
@@ -2338,12 +2615,17 @@ fn properties(input: &ParsedInput) -> Vec<PropertyInfo> {
     })
 }
 
-fn all_semantics(snapshot: &AnalysisSnapshot) -> SemanticWorkspace {
+fn all_semantics(
+    snapshot: &AnalysisSnapshot,
+    cancellation: &CancellationToken,
+) -> Result<SemanticWorkspace, Cancelled> {
     let mut all = SemanticWorkspace::default();
     for definition in snapshot.index().definitions_iter() {
+        cancellation.checkpoint()?;
         all.definitions.push(index_definition_info(snapshot, definition));
     }
     for reference in snapshot.index().references_iter() {
+        cancellation.checkpoint()?;
         let path =
             snapshot.source_files().get(&reference.file_id).map(|file| file.logical_path.clone());
         all.references.push(ReferenceInternal {
@@ -2356,6 +2638,7 @@ fn all_semantics(snapshot: &AnalysisSnapshot) -> SemanticWorkspace {
         });
     }
     for document in snapshot.documents().values() {
+        cancellation.checkpoint()?;
         if document.source() != DocumentSource::Overlay {
             continue;
         }
@@ -2365,7 +2648,7 @@ fn all_semantics(snapshot: &AnalysisSnapshot) -> SemanticWorkspace {
             all.references.extend(semantic.references);
         }
     }
-    all
+    Ok(all)
 }
 
 fn resolve_symbol(
@@ -2656,19 +2939,22 @@ fn rename_target(
     snapshot: &AnalysisSnapshot,
     document: &DocumentId,
     position: TextSize,
-) -> Result<RenameTarget, RenameError> {
+    cancellation: &CancellationToken,
+) -> Result<RenameTarget, RenameFailure> {
+    cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
     let input = input_for_document(snapshot, document).ok_or(RenameError::NoSymbol)?;
-    let all = all_semantics(snapshot);
+    let all =
+        all_semantics(snapshot, cancellation).map_err(|Cancelled| RenameFailure::Cancelled)?;
     let Some((kind, name)) = symbol_at(&all, document, position) else {
-        return Err(RenameError::NoSymbol);
+        return Err(RenameError::NoSymbol.into());
     };
     let definition = match resolve_symbol(snapshot, &all, &kind, &name) {
         Resolution::Unique(definition) => definition,
-        Resolution::Ambiguous => return Err(RenameError::Ambiguous),
-        Resolution::Missing => return Err(RenameError::Unresolved),
+        Resolution::Ambiguous => return Err(RenameError::Ambiguous.into()),
+        Resolution::Missing => return Err(RenameError::Unresolved.into()),
     };
     if !writable_location(snapshot, &definition.location) {
-        return Err(RenameError::ReadOnly);
+        return Err(RenameError::ReadOnly.into());
     }
     Ok(RenameTarget { kind, name, cursor_range: word_range(&input.source, position), definition })
 }
@@ -2678,7 +2964,8 @@ fn check_rename_conflict(
     all: &SemanticWorkspace,
     target: &RenameTarget,
     new_name: &str,
-) -> Result<(), RenameError> {
+    cancellation: &CancellationToken,
+) -> Result<(), RenameFailure> {
     let policy = snapshot
         .rules()
         .model()
@@ -2687,6 +2974,7 @@ fn check_rename_conflict(
         .find(|descriptor| descriptor.kind_id.eq_ignore_ascii_case(&target.kind))
         .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| descriptor.resolution);
     for definition in &all.definitions {
+        cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
         if definition.kind != target.kind || !same_name(&definition.name, new_name) {
             continue;
         }
@@ -2699,7 +2987,7 @@ fn check_rename_conflict(
             SymbolResolutionPolicy::ReplaceBySymbol => priority >= target.definition.priority,
         };
         if conflict {
-            return Err(RenameError::Conflict);
+            return Err(RenameError::Conflict.into());
         }
     }
     Ok(())
@@ -2778,9 +3066,11 @@ fn fuzzy_match(value: &str, query: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        CompletionKind, DiagnosticCode, RenameError, complete, definition, diagnostics,
-        document_symbols, hover, input_for_document, prepare_rename, references, rename,
-        workspace_symbols,
+        CancellationToken, Cancelled, CompletionKind, DiagnosticCode, RenameError, RenameFailure,
+        complete, complete_with_cancellation, definition, diagnostics,
+        diagnostics_with_cancellation, document_symbols, hover, input_for_document, prepare_rename,
+        references, rename, rename_with_cancellation, workspace_symbols,
+        workspace_symbols_with_cancellation,
     };
     use pdx_rules::{CwtKeyMatcher, CwtRuleShape, CwtSemanticRule, CwtValueMatcher, RuleSet};
     use pdx_text::TextRange;
@@ -2838,6 +3128,38 @@ mod tests {
         let id = DocumentId::new("file:///tmp/common/events/test.txt");
         host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
         (host, id)
+    }
+
+    #[test]
+    fn cancellable_queries_stop_at_internal_checkpoints() {
+        let (host, id) = snapshot(
+            "country_event = { id = cancel.1 immediate = { country_event = { id = cancel.1 } } }\n",
+        );
+        let snapshot = host.snapshot();
+
+        let completion_cancellation = CancellationToken::cancel_after(1);
+        assert_eq!(
+            complete_with_cancellation(&snapshot, &id, 25, &completion_cancellation),
+            Err(Cancelled)
+        );
+        assert!(completion_cancellation.is_cancelled());
+
+        let diagnostics_cancellation = CancellationToken::cancel_after(3);
+        assert_eq!(
+            diagnostics_with_cancellation(&snapshot, &id, &diagnostics_cancellation),
+            Err(Cancelled)
+        );
+
+        let workspace_cancellation = CancellationToken::new();
+        workspace_cancellation.cancel();
+        assert_eq!(
+            workspace_symbols_with_cancellation(&snapshot, "cancel", &workspace_cancellation),
+            Err(Cancelled)
+        );
+        assert_eq!(
+            rename_with_cancellation(&snapshot, &id, 25, "renamed.1", &workspace_cancellation,),
+            Err(RenameFailure::Cancelled)
+        );
     }
 
     #[test]

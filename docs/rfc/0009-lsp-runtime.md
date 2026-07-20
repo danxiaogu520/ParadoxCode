@@ -3,7 +3,7 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
-> 实现进度（2026-07-20）：stdio reader 与 workspace event loop 已分离；编辑先 stage 最新文本/版本，parse/lower 在 snapshot worker 准备，并通过版本、文本、路径三重提交门拒绝旧结果；依赖语义的请求按消息顺序等待最新 parse。semantic diagnostics 使用 200ms debounce 与版本门，普通语言请求也在 snapshot worker 执行；`$/cancelRequest` 会标记在途 `RequestId` 并抑制旧结果。当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 与语言功能 response 已迁入 `lsp-types`，JSON-RPC framing 继续保持轻量自有实现；analysis 内部协作式 cancellation checkpoint 和 workspace scan 取消仍待实现。
+> 实现进度（2026-07-20）：stdio reader 与 workspace event loop 已分离；编辑先 stage 最新文本/版本，parse/lower 在 snapshot worker 准备，并通过版本、文本、路径三重提交门拒绝旧结果；依赖语义的请求按消息顺序等待最新 parse。semantic diagnostics 使用 200ms debounce 与版本门，普通语言请求也在 snapshot worker 执行；`$/cancelRequest` 与过期 diagnostics 使用共享的 editor-neutral token，在 workspace semantic 合并、CWT 递归和主要结果遍历中协作式中止。当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 与语言功能 response 已迁入 `lsp-types`，JSON-RPC framing 继续保持轻量自有实现；workspace scan 取消仍待实现。
 
 ## 边界
 

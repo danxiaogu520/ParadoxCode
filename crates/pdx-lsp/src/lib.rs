@@ -27,8 +27,10 @@ use lsp_types::{
     WorkspaceEdit, WorkspaceSymbolParams,
 };
 use pdx_analysis::{
-    CompletionKind, Location, RenameError, complete, definition, diagnostics, document_symbols,
-    hover, prepare_rename, references, rename, workspace_symbols,
+    CancellationToken, Cancelled, CompletionKind, Location, RenameError, RenameFailure,
+    complete_with_cancellation, definition_with_cancellation, diagnostics_with_cancellation,
+    document_symbols_with_cancellation, hover_with_cancellation, prepare_rename_with_cancellation,
+    references_with_cancellation, rename_with_cancellation, workspace_symbols_with_cancellation,
 };
 use pdx_rules::{GameProfile, RuleSet, RulesError};
 use pdx_text::{LineIndex, Position, TextRange};
@@ -168,7 +170,7 @@ struct ParseResult {
 #[derive(Debug)]
 struct InFlightDiagnostics {
     version: i64,
-    cancelled: Arc<AtomicBool>,
+    cancellation: CancellationToken,
 }
 
 #[derive(Debug)]
@@ -181,7 +183,7 @@ struct DiagnosticsResult {
 
 #[derive(Debug)]
 struct InFlightRequest {
-    cancelled: Arc<AtomicBool>,
+    cancellation: CancellationToken,
 }
 
 #[derive(Debug)]
@@ -465,10 +467,10 @@ impl LspServer {
                                 task.cancelled.store(true, Ordering::Release);
                             }
                             for task in in_flight.values() {
-                                task.cancelled.store(true, Ordering::Release);
+                                task.cancellation.cancel();
                             }
                             for task in in_flight_requests.values() {
-                                task.cancelled.store(true, Ordering::Release);
+                                task.cancellation.cancel();
                             }
                             return if self.clean_exit {
                                 Ok(())
@@ -568,15 +570,19 @@ impl LspServer {
             return false;
         }
 
-        let context = SnapshotRequestContext::new(self.host.snapshot());
+        let cancellation = CancellationToken::new();
+        if self.cancelled.contains(&request_id) {
+            cancellation.cancel();
+        }
+        let context = SnapshotRequestContext::new(self.host.snapshot(), cancellation.clone());
         let method = method.to_owned();
         let params = object.get("params").cloned();
         let id = id.clone();
         let sender = event_sender.clone();
-        let cancelled = Arc::new(AtomicBool::new(self.cancelled.contains(&request_id)));
-        in_flight.insert(request_id.clone(), InFlightRequest { cancelled: Arc::clone(&cancelled) });
+        in_flight
+            .insert(request_id.clone(), InFlightRequest { cancellation: cancellation.clone() });
         scope.spawn(move || {
-            let result = if cancelled.load(Ordering::Acquire) {
+            let result = if cancellation.is_cancelled() {
                 Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"))
             } else {
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -585,7 +591,7 @@ impl LspServer {
                 .unwrap_or_else(|_| {
                     Err(RpcError::new(INTERNAL_ERROR, "request worker failed unexpectedly"))
                 });
-                if cancelled.load(Ordering::Acquire) {
+                if cancellation.is_cancelled() {
                     Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"))
                 } else {
                     result
@@ -702,7 +708,7 @@ impl LspServer {
                 .get(id)
                 .is_some_and(|pending| pending.version != task.version);
             if current_version != Some(task.version) || superseded {
-                task.cancelled.store(true, Ordering::Release);
+                task.cancellation.cancel();
             }
         }
     }
@@ -737,21 +743,24 @@ impl LspServer {
             let Some(pending) = self.pending_diagnostics.remove(&id) else { continue };
             let snapshot = self.host.snapshot();
             let sender = event_sender.clone();
-            let cancelled = Arc::new(AtomicBool::new(false));
+            let cancellation = CancellationToken::new();
             in_flight.insert(
                 id.clone(),
-                InFlightDiagnostics { version: pending.version, cancelled: Arc::clone(&cancelled) },
+                InFlightDiagnostics {
+                    version: pending.version,
+                    cancellation: cancellation.clone(),
+                },
             );
             scope.spawn(move || {
-                let values = if cancelled.load(Ordering::Acquire) {
+                let values = if cancellation.is_cancelled() {
                     None
                 } else {
                     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        diagnostic_values(&snapshot, &id)
+                        diagnostic_values(&snapshot, &id, &cancellation)
                     }))
                     .ok()
                     .flatten()
-                    .filter(|_| !cancelled.load(Ordering::Acquire))
+                    .filter(|_| !cancellation.is_cancelled())
                 };
                 let _ = sender.send(TransportEvent::Diagnostics(DiagnosticsResult {
                     id,
@@ -866,7 +875,8 @@ impl LspServer {
                 Ok(Value::Null)
             }
             method if is_snapshot_request(method) => {
-                SnapshotRequestContext::new(self.host.snapshot()).dispatch(method, params)
+                SnapshotRequestContext::new(self.host.snapshot(), CancellationToken::new())
+                    .dispatch(method, params)
             }
             _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
         }
@@ -996,11 +1006,12 @@ impl LspServer {
 #[derive(Clone, Debug)]
 struct SnapshotRequestContext {
     snapshot: AnalysisSnapshot,
+    cancellation: CancellationToken,
 }
 
 impl SnapshotRequestContext {
-    fn new(snapshot: AnalysisSnapshot) -> Self {
-        Self { snapshot }
+    fn new(snapshot: AnalysisSnapshot, cancellation: CancellationToken) -> Self {
+        Self { snapshot, cancellation }
     }
 
     fn dispatch(&self, method: &str, params: Option<&Value>) -> Result<Value, RpcError> {
@@ -1019,11 +1030,13 @@ impl SnapshotRequestContext {
 
     fn completion(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let (id, position) = self.document_position(params)?;
-        let result = complete(&self.snapshot, &id, position);
+        let result = complete_with_cancellation(&self.snapshot, &id, position, &self.cancellation)
+            .map_err(cancelled_error)?;
         let document = self
             .snapshot
             .document(&id)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
+        self.ensure_active()?;
         let items = result
             .items
             .into_iter()
@@ -1054,6 +1067,7 @@ impl SnapshotRequestContext {
                 }
             })
             .collect::<Vec<_>>();
+        self.ensure_active()?;
         typed_value(
             CompletionResponse::List(CompletionList { is_incomplete: false, items }),
             "completion response",
@@ -1062,11 +1076,17 @@ impl SnapshotRequestContext {
 
     fn hover(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let (id, position) = self.document_position(params)?;
-        let Some(value) = hover(&self.snapshot, &id, position) else { return Ok(Value::Null) };
+        let Some(value) =
+            hover_with_cancellation(&self.snapshot, &id, position, &self.cancellation)
+                .map_err(cancelled_error)?
+        else {
+            return Ok(Value::Null);
+        };
         let document = self
             .snapshot
             .document(&id)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
+        self.ensure_active()?;
         typed_value(
             LspHover {
                 contents: HoverContents::Markup(MarkupContent {
@@ -1083,10 +1103,13 @@ impl SnapshotRequestContext {
 
     fn definition(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let (id, position) = self.document_position(params)?;
-        let result = definition(&self.snapshot, &id, position)
-            .into_iter()
-            .filter_map(|location| location_to_lsp(&self.snapshot, &location))
-            .collect::<Vec<_>>();
+        let result =
+            definition_with_cancellation(&self.snapshot, &id, position, &self.cancellation)
+                .map_err(cancelled_error)?
+                .into_iter()
+                .filter_map(|location| location_to_lsp(&self.snapshot, &location))
+                .collect::<Vec<_>>();
+        self.ensure_active()?;
         typed_value(result, "definition response")
     }
 
@@ -1094,20 +1117,31 @@ impl SnapshotRequestContext {
         let params = typed_params::<ReferenceParams>(params, "references")?;
         let (id, position) = self.offset_for(&params.text_document_position)?;
         let include_declaration = params.context.include_declaration;
-        let result = references(&self.snapshot, &id, position, include_declaration)
-            .into_iter()
-            .filter_map(|location| location_to_lsp(&self.snapshot, &location))
-            .collect::<Vec<_>>();
+        let result = references_with_cancellation(
+            &self.snapshot,
+            &id,
+            position,
+            include_declaration,
+            &self.cancellation,
+        )
+        .map_err(cancelled_error)?
+        .into_iter()
+        .filter_map(|location| location_to_lsp(&self.snapshot, &location))
+        .collect::<Vec<_>>();
+        self.ensure_active()?;
         typed_value(result, "references response")
     }
 
     fn prepare_rename(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let (id, position) = self.document_position(params)?;
-        let result = prepare_rename(&self.snapshot, &id, position).map_err(rename_error)?;
+        let result =
+            prepare_rename_with_cancellation(&self.snapshot, &id, position, &self.cancellation)
+                .map_err(rename_failure)?;
         let document = self
             .snapshot
             .document(&id)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
+        self.ensure_active()?;
         typed_value(
             PrepareRenameResponse::RangeWithPlaceholder {
                 range: range_to_lsp(document.line_index(), document.text(), result.range),
@@ -1121,9 +1155,17 @@ impl SnapshotRequestContext {
     fn rename(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<RenameParams>(params, "rename")?;
         let (id, position) = self.offset_for(&params.text_document_position)?;
-        let plan = rename(&self.snapshot, &id, position, &params.new_name).map_err(rename_error)?;
+        let plan = rename_with_cancellation(
+            &self.snapshot,
+            &id,
+            position,
+            &params.new_name,
+            &self.cancellation,
+        )
+        .map_err(rename_failure)?;
         let mut changes = HashMap::<Uri, Vec<TextEdit>>::new();
         for edit in plan.edits {
+            self.ensure_active()?;
             let location = location_to_lsp(&self.snapshot, &edit.location).ok_or_else(|| {
                 RpcError::new(INVALID_PARAMS, "rename target has no client-visible URI")
             })?;
@@ -1139,7 +1181,8 @@ impl SnapshotRequestContext {
     fn document_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<DocumentSymbolParams>(params, "document symbols")?;
         let id = DocumentId::new(params.text_document.uri.as_str());
-        let result = document_symbols(&self.snapshot, &id)
+        let result = document_symbols_with_cancellation(&self.snapshot, &id, &self.cancellation)
+            .map_err(cancelled_error)?
             .into_iter()
             .map(|symbol| LspDocumentSymbol {
                 name: symbol.name,
@@ -1156,26 +1199,34 @@ impl SnapshotRequestContext {
                 children: None,
             })
             .collect::<Vec<_>>();
+        self.ensure_active()?;
         typed_value(result, "document symbols response")
     }
 
     #[allow(deprecated)]
     fn workspace_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<WorkspaceSymbolParams>(params, "workspace symbols")?;
-        let result = workspace_symbols(&self.snapshot, &params.query)
-            .into_iter()
-            .filter_map(|symbol| {
-                Some(SymbolInformation {
-                    name: symbol.name,
-                    kind: symbol_kind(&symbol.kind),
-                    tags: None,
-                    deprecated: None,
-                    location: location_to_lsp(&self.snapshot, &symbol.location)?,
-                    container_name: None,
+        let result =
+            workspace_symbols_with_cancellation(&self.snapshot, &params.query, &self.cancellation)
+                .map_err(cancelled_error)?
+                .into_iter()
+                .filter_map(|symbol| {
+                    Some(SymbolInformation {
+                        name: symbol.name,
+                        kind: symbol_kind(&symbol.kind),
+                        tags: None,
+                        deprecated: None,
+                        location: location_to_lsp(&self.snapshot, &symbol.location)?,
+                        container_name: None,
+                    })
                 })
-            })
-            .collect::<Vec<_>>();
+                .collect::<Vec<_>>();
+        self.ensure_active()?;
         typed_value(result, "workspace symbols response")
+    }
+
+    fn ensure_active(&self) -> Result<(), RpcError> {
+        if self.cancellation.is_cancelled() { Err(cancelled_error(Cancelled)) } else { Ok(()) }
     }
 
     fn document_position(&self, params: Option<&Value>) -> Result<(DocumentId, u32), RpcError> {
@@ -1236,13 +1287,19 @@ fn cancel_request_from_notification(
     };
     let request_id = request_id_from_lsp(params.id);
     if let Some(request) = in_flight.get(&request_id) {
-        request.cancelled.store(true, Ordering::Release);
+        request.cancellation.cancel();
     }
 }
 
-fn diagnostic_values(snapshot: &AnalysisSnapshot, id: &DocumentId) -> Option<Value> {
+fn diagnostic_values(
+    snapshot: &AnalysisSnapshot,
+    id: &DocumentId,
+    cancellation: &CancellationToken,
+) -> Option<Value> {
     let values = snapshot.document(id).map_or_else(Vec::new, |document| {
-        diagnostics(snapshot, id)
+        diagnostics_with_cancellation(snapshot, id, cancellation)
+            .ok()
+            .unwrap_or_default()
             .into_iter()
             .map(|diagnostic| {
                 LspDiagnostic::new(
@@ -1350,6 +1407,17 @@ fn document_error(error: DocumentError) -> RpcError {
 
 fn rename_error(error: RenameError) -> RpcError {
     RpcError { code: INVALID_PARAMS, message: format!("rename unavailable: {error}") }
+}
+
+fn cancelled_error(_: Cancelled) -> RpcError {
+    RpcError::new(REQUEST_CANCELLED, "request was cancelled")
+}
+
+fn rename_failure(error: RenameFailure) -> RpcError {
+    match error {
+        RenameFailure::Cancelled => cancelled_error(Cancelled),
+        RenameFailure::Rejected(error) => rename_error(error),
+    }
 }
 
 fn typed_params<T: DeserializeOwned>(
@@ -1580,12 +1648,11 @@ mod tests {
     use std::fs;
     use std::io::Cursor;
     use std::path::PathBuf;
-    use std::sync::Arc;
-    use std::sync::atomic::{AtomicBool, Ordering};
 
     use super::{
-        DocumentId, INVALID_PARAMS, InFlightRequest, InitializeOptions, LspError, LspServer,
-        RequestId, ServerState, cancel_request_from_notification, path_to_uri, uri_to_path,
+        CancellationToken, DocumentId, INVALID_PARAMS, InFlightRequest, InitializeOptions,
+        LspError, LspServer, RequestId, ServerState, cancel_request_from_notification, path_to_uri,
+        uri_to_path,
     };
     use lsp_types::{
         CompletionResponse, Diagnostic, DocumentSymbol, Hover, Location, PrepareRenameResponse,
@@ -1958,10 +2025,10 @@ mod tests {
     #[test]
     fn cancel_notification_marks_the_matching_in_flight_request() {
         let request_id = RequestId::String("active-query".to_owned());
-        let cancelled = Arc::new(AtomicBool::new(false));
+        let cancellation = CancellationToken::new();
         let in_flight = HashMap::from([(
             request_id.clone(),
-            InFlightRequest { cancelled: Arc::clone(&cancelled) },
+            InFlightRequest { cancellation: cancellation.clone() },
         )]);
 
         cancel_request_from_notification(
@@ -1973,7 +2040,7 @@ mod tests {
             &in_flight,
         );
 
-        assert!(cancelled.load(Ordering::Acquire));
+        assert!(cancellation.is_cancelled());
         assert!(in_flight.contains_key(&request_id));
     }
 }
