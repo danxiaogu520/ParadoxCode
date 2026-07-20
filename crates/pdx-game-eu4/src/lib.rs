@@ -2,8 +2,9 @@
 
 use pdx_rules::{
     CsvDialect, FileCategory, FileMatcher, FileResolutionPolicy, GameProfile, ParserKind,
-    ProfileDefinitionRule, ProfileMatchMode, ProfileReferenceRule, ProfileTextMatcher, RuleSet,
-    RulesModel, SymbolDescriptor, SymbolResolutionPolicy,
+    ProfileConditionalDefinitionRule, ProfileContainerDefinitionRule, ProfileDefinitionRule,
+    ProfileMatchMode, ProfileReferenceRule, ProfileTextMatcher, ProfileValueDefinitionRule,
+    RuleSet, RulesModel, SymbolDescriptor, SymbolResolutionPolicy,
 };
 
 /// Stable identity stored by EU4 rule artifacts and selected by the server.
@@ -51,64 +52,136 @@ pub fn profile() -> GameProfile {
         key: matcher(mode, key),
         kind: kind.to_owned(),
     };
+    let mut definitions = vec![
+        definition(
+            ProfileMatchMode::Contains,
+            "scripted_effect",
+            ProfileMatchMode::Any,
+            "",
+            "scripted_effect",
+            None,
+            false,
+        ),
+        definition(
+            ProfileMatchMode::Contains,
+            "scripted_trigger",
+            ProfileMatchMode::Any,
+            "",
+            "scripted_trigger",
+            None,
+            false,
+        ),
+        definition(
+            ProfileMatchMode::Contains,
+            "events/",
+            ProfileMatchMode::Any,
+            "",
+            "event",
+            Some("id"),
+            false,
+        ),
+        definition(
+            ProfileMatchMode::Any,
+            "",
+            ProfileMatchMode::Suffix,
+            "_event",
+            "event",
+            Some("id"),
+            false,
+        ),
+        definition(
+            ProfileMatchMode::Any,
+            "",
+            ProfileMatchMode::Exact,
+            "country_event",
+            "event",
+            Some("id"),
+            true,
+        ),
+        definition(
+            ProfileMatchMode::Any,
+            "",
+            ProfileMatchMode::Exact,
+            "province_event",
+            "event",
+            Some("id"),
+            true,
+        ),
+    ];
+    for (directory, kind) in [
+        ("common/cultures", "culture"),
+        ("common/religions", "religion"),
+        ("common/tradenodes", "trade_node"),
+        ("common/colonial_regions", "colonial_region"),
+        ("common/estates", "estate"),
+        ("common/ideas", "idea_group"),
+        ("common/governments", "government"),
+        ("common/government_reforms", "government_reform"),
+        ("common/subject_types", "subject_type"),
+        ("common/technologies", "technology"),
+        ("common/buildings", "building"),
+        ("common/units", "unit_type"),
+        ("common/mercenary_companies", "mercenary_company"),
+        ("common/trade_companies", "trade_company"),
+        ("common/advisortypes", "advisor_type"),
+        ("common/leader_personalities", "leader_personality"),
+        ("common/ruler_personalities", "ruler_personality"),
+        ("common/event_modifiers", "event_modifier"),
+        ("common/static_modifiers", "static_modifier"),
+        ("common/timed_modifiers", "timed_modifier"),
+        ("common/triggered_modifiers", "triggered_modifier"),
+        ("common/subject_type_upgrades", "subject_type_upgrade"),
+        ("common/peace_treaties", "peace_treaty"),
+        ("common/casus_belli", "casus_belli"),
+        ("common/cb_types", "casus_belli"),
+        ("common/wargoal_types", "wargoal_type"),
+        ("common/institutions", "institution"),
+        ("common/great_projects", "great_project"),
+        ("common/estate_privileges", "estate_privilege"),
+        ("common/estate_agendas", "estate_agenda"),
+        ("common/diplomatic_actions", "diplomatic_action"),
+        ("common/new_diplomatic_actions", "diplomatic_action"),
+        ("common/disasters", "disaster"),
+        ("common/rebel_types", "rebel_type"),
+        ("common/insults", "insult"),
+        ("common/opinion_modifiers", "opinion_modifier"),
+        ("common/tradegoods", "tradegood"),
+    ] {
+        definitions.push(definition(
+            ProfileMatchMode::Directory,
+            directory,
+            ProfileMatchMode::Any,
+            "",
+            kind,
+            None,
+            false,
+        ));
+    }
+    let value_definition =
+        |key: &str, parent_key: Option<&str>, kind: &str| ProfileValueDefinitionRule {
+            key: ProfileTextMatcher::insensitive(ProfileMatchMode::Exact, key.to_owned()),
+            parent_key: parent_key.map(|key| {
+                ProfileTextMatcher::insensitive(ProfileMatchMode::Exact, key.to_owned())
+            }),
+            kind: kind.to_owned(),
+        };
+    let mut value_definitions = vec![
+        value_definition("set_country_flag", None, "country_flag"),
+        value_definition("set_global_flag", None, "global_flag"),
+        value_definition("set_province_flag", None, "province_flag"),
+        value_definition("set_ruler_flag", None, "ruler_flag"),
+        value_definition("set_heir_flag", None, "heir_flag"),
+        value_definition("set_consort_flag", None, "consort_flag"),
+        value_definition("save_event_target_as", None, "event_target"),
+        value_definition("save_global_event_target_as", None, "global_event_target"),
+        value_definition("set_saved_name", None, "saved_name"),
+    ];
+    for parent in ["set_variable", "change_variable", "new_variable", "new_variables"] {
+        value_definitions.push(value_definition("which", Some(parent), "variable"));
+    }
     GameProfile {
         game_id: GAME_ID.to_owned(),
-        definitions: vec![
-            definition(
-                ProfileMatchMode::Contains,
-                "scripted_effect",
-                ProfileMatchMode::Any,
-                "",
-                "scripted_effect",
-                None,
-                false,
-            ),
-            definition(
-                ProfileMatchMode::Contains,
-                "scripted_trigger",
-                ProfileMatchMode::Any,
-                "",
-                "scripted_trigger",
-                None,
-                false,
-            ),
-            definition(
-                ProfileMatchMode::Contains,
-                "events/",
-                ProfileMatchMode::Any,
-                "",
-                "event",
-                Some("id"),
-                false,
-            ),
-            definition(
-                ProfileMatchMode::Any,
-                "",
-                ProfileMatchMode::Suffix,
-                "_event",
-                "event",
-                Some("id"),
-                false,
-            ),
-            definition(
-                ProfileMatchMode::Any,
-                "",
-                ProfileMatchMode::Exact,
-                "country_event",
-                "event",
-                Some("id"),
-                true,
-            ),
-            definition(
-                ProfileMatchMode::Any,
-                "",
-                ProfileMatchMode::Exact,
-                "province_event",
-                "event",
-                Some("id"),
-                true,
-            ),
-        ],
+        definitions,
         references: vec![
             reference(ProfileMatchMode::Exact, "event", "event"),
             reference(ProfileMatchMode::Exact, "events", "event"),
@@ -129,6 +202,19 @@ pub fn profile() -> GameProfile {
             reference(ProfileMatchMode::Exact, "title", "localisation"),
             reference(ProfileMatchMode::Exact, "tooltip", "localisation"),
         ],
+        value_definitions,
+        container_definitions: vec![ProfileContainerDefinitionRule {
+            path: matcher(ProfileMatchMode::Contains, "common/country_tags"),
+            key: matcher(ProfileMatchMode::Exact, "countries"),
+            kind: "country_tag".to_owned(),
+        }],
+        conditional_definitions: vec![ProfileConditionalDefinitionRule {
+            path: matcher(ProfileMatchMode::Contains, "common/government_reforms/"),
+            kind: "hardcoded_legacy_government".to_owned(),
+            required_field: "legacy_government".to_owned(),
+            required_value: "yes".to_owned(),
+            absent_field: "legacy_equivalent".to_owned(),
+        }],
     }
 }
 
@@ -261,5 +347,12 @@ mod tests {
             Some("event")
         );
         assert_eq!(profile.reference_kind("title"), Some("localisation"));
+        assert_eq!(
+            profile
+                .definition("common/cultures/example.txt", "germanic")
+                .map(|rule| rule.kind.as_str()),
+            Some("culture")
+        );
+        assert_eq!(profile.value_definition_kind("which", Some("set_variable")), Some("variable"));
     }
 }

@@ -274,6 +274,8 @@ pub enum ProfileMatchMode {
     Suffix,
     /// Requires the candidate to contain the pattern.
     Contains,
+    /// Requires a logical path's immediate parent directory to match the pattern.
+    Directory,
 }
 
 /// A deterministic text selector used by built-in game-profile data.
@@ -313,6 +315,10 @@ impl ProfileTextMatcher {
                 ProfileMatchMode::Prefix => candidate.starts_with(&self.pattern),
                 ProfileMatchMode::Suffix => candidate.ends_with(&self.pattern),
                 ProfileMatchMode::Contains => candidate.contains(&self.pattern),
+                ProfileMatchMode::Directory => {
+                    candidate.rsplit_once('/').map_or("", |(directory, _)| directory)
+                        == self.pattern
+                }
             };
         }
         match self.mode {
@@ -331,6 +337,10 @@ impl ProfileTextMatcher {
                         .windows(self.pattern.len())
                         .any(|window| window.eq_ignore_ascii_case(self.pattern.as_bytes()))
             }
+            ProfileMatchMode::Directory => candidate
+                .rsplit_once('/')
+                .map_or("", |(directory, _)| directory)
+                .eq_ignore_ascii_case(&self.pattern),
         }
     }
 }
@@ -359,6 +369,43 @@ pub struct ProfileReferenceRule {
     pub kind: String,
 }
 
+/// One scalar value that declares a workspace symbol.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProfileValueDefinitionRule {
+    /// Property-key selector.
+    pub key: ProfileTextMatcher,
+    /// Optional immediate parent-key selector.
+    pub parent_key: Option<ProfileTextMatcher>,
+    /// Stable declared symbol kind.
+    pub kind: String,
+}
+
+/// One block whose direct child keys declare workspace symbols.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProfileContainerDefinitionRule {
+    /// Logical-path selector.
+    pub path: ProfileTextMatcher,
+    /// Top-level container-key selector.
+    pub key: ProfileTextMatcher,
+    /// Stable child symbol kind.
+    pub kind: String,
+}
+
+/// One definition emitted when nested scalar conditions are satisfied.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProfileConditionalDefinitionRule {
+    /// Logical-path selector.
+    pub path: ProfileTextMatcher,
+    /// Stable emitted symbol kind.
+    pub kind: String,
+    /// Nested scalar field that must exist.
+    pub required_field: String,
+    /// Required scalar spelling.
+    pub required_value: String,
+    /// Nested field that must be absent.
+    pub absent_field: String,
+}
+
 /// Data-only game-specific interpretation selected by the composition root.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct GameProfile {
@@ -368,13 +415,26 @@ pub struct GameProfile {
     pub definitions: Vec<ProfileDefinitionRule>,
     /// Ordered scalar-reference rules; the first match wins.
     pub references: Vec<ProfileReferenceRule>,
+    /// Ordered scalar value-definition rules; the first match wins.
+    pub value_definitions: Vec<ProfileValueDefinitionRule>,
+    /// Blocks whose direct child keys declare symbols.
+    pub container_definitions: Vec<ProfileContainerDefinitionRule>,
+    /// Additional definitions gated by nested fields.
+    pub conditional_definitions: Vec<ProfileConditionalDefinitionRule>,
 }
 
 impl GameProfile {
     /// Creates an identity-only profile with no game-specific interpretation.
     #[must_use]
     pub fn empty(game_id: impl Into<String>) -> Self {
-        Self { game_id: game_id.into(), definitions: Vec::new(), references: Vec::new() }
+        Self {
+            game_id: game_id.into(),
+            definitions: Vec::new(),
+            references: Vec::new(),
+            value_definitions: Vec::new(),
+            container_definitions: Vec::new(),
+            conditional_definitions: Vec::new(),
+        }
     }
 
     /// Returns the first matching top-level definition rule.
@@ -389,6 +449,20 @@ impl GameProfile {
     #[must_use]
     pub fn reference_kind(&self, key: &str) -> Option<&str> {
         self.references.iter().find(|rule| rule.key.matches(key)).map(|rule| rule.kind.as_str())
+    }
+
+    /// Returns the declared kind for one scalar value property.
+    #[must_use]
+    pub fn value_definition_kind(&self, key: &str, parent_key: Option<&str>) -> Option<&str> {
+        self.value_definitions
+            .iter()
+            .find(|rule| {
+                rule.key.matches(key)
+                    && rule.parent_key.as_ref().is_none_or(|matcher| {
+                        parent_key.is_some_and(|parent| matcher.matches(parent))
+                    })
+            })
+            .map(|rule| rule.kind.as_str())
     }
 }
 
@@ -1695,11 +1769,15 @@ mod tests {
     fn profile_text_matchers_are_case_insensitive_and_bounded() {
         let suffix = ProfileTextMatcher::insensitive(ProfileMatchMode::Suffix, "_event");
         let contains = ProfileTextMatcher::insensitive(ProfileMatchMode::Contains, "events/");
+        let directory =
+            ProfileTextMatcher::insensitive(ProfileMatchMode::Directory, "common/cultures");
 
         assert!(suffix.matches("COUNTRY_EVENT"));
         assert!(!suffix.matches("event_target"));
         assert!(contains.matches("COMMON/EVENTS/example.txt"));
         assert!(!contains.matches("common/event_modifiers/example.txt"));
+        assert!(directory.matches("COMMON/CULTURES/example.txt"));
+        assert!(!directory.matches("common/cultures/nested/example.txt"));
         assert!(ProfileTextMatcher::any().matches("anything"));
     }
 

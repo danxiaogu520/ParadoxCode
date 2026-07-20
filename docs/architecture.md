@@ -85,7 +85,7 @@ Zed extension 只负责：
 
 `pdx-rules` 定义通用 SQLite artifact schema、规范化逻辑视图、`rule_hash` 算法、只读加载与运行时查询 API，以及不含游戏名称的 data-only `GameProfile` 描述；`pdx-game-eu4` 填充 EU4 profile 与 bootstrap catalog。`pdx-eu4` 现在只保留临时 re-export facade，待调用方和文档迁移完成后删除。运行时只读加载并冻结 `RuleSet`，schema 12 将 `game_id` 纳入 metadata 与 canonical hash；EU4 组合入口在启动服务前校验 profile 身份，并把 profile 显式传入 LSP/host/snapshot。
 
-当前 event、scripted effect/trigger 与 localisation 的 definition/reference 解释已经由 EU4 profile 数据同时驱动 workspace shard 和 analysis。country tag、legacy government、动态目录 symbol、flag/variable 与 scope/command fallback 仍在分批迁移；通用层不得按 `game_id` 字符串隐式启用这些行为。
+当前 event、scripted effect/trigger、localisation、动态目录 symbol、flag/variable、country tag 与 legacy government 的 definition/reference 解释已经由 EU4 profile 数据驱动 workspace shard/analysis。`definition.csv` province、scripted parameter 和 scope/command fallback 仍在分批迁移；通用层不得按 `game_id` 字符串隐式启用这些行为。
 
 数据库保存 `TypeKey("scripted_effect")`、`AliasRef("effect")` 等 EU4 静态 matcher；实际 scripted effect、building 等成员来自 `WorkspaceIndex`。EU4 command、scope 和目录规则属于 EU4 profile 实现，不设计其他游戏的推测性替换层。
 

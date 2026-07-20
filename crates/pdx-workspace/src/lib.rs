@@ -1094,7 +1094,7 @@ fn shard_from_parsed(
     let mut references = Vec::new();
     collect_hir_semantics(file, hir, category_id, profile, &mut definitions, &mut references);
     collect_scripted_effect_params(file, parsed, &mut definitions);
-    collect_eu4_dynamic_members(file, hir, &mut definitions);
+    collect_profile_value_definitions(file, hir, profile, &mut definitions);
     collect_cwt_type_members(file, parsed, rules, &mut definitions);
     FileIndexShard {
         file_id: file.id,
@@ -1297,15 +1297,15 @@ fn cwt_type_path_matches(
     true
 }
 
-fn collect_eu4_dynamic_members(
+fn collect_profile_value_definitions(
     file: &SourceFile,
     hir: &HirFile,
+    profile: &GameProfile,
     definitions: &mut Vec<Definition>,
 ) {
     for property in hir.properties() {
-        let key = property.key.to_ascii_lowercase();
         let parent_key = property.path.iter().rev().nth(1).map(String::as_str);
-        let kind = dynamic_member_kind(&key, parent_key);
+        let kind = profile.value_definition_kind(&property.key, parent_key);
         if let Some(kind) = kind
             && let Some(scalar) = property.scalar.as_ref()
             && !scalar.value.is_empty()
@@ -1319,32 +1319,6 @@ fn collect_eu4_dynamic_members(
             });
         }
     }
-}
-
-fn dynamic_member_kind(key: &str, parent_key: Option<&str>) -> Option<&'static str> {
-    Some(match key {
-        "set_country_flag" => "country_flag",
-        "set_global_flag" => "global_flag",
-        "set_province_flag" => "province_flag",
-        "set_ruler_flag" => "ruler_flag",
-        "set_heir_flag" => "heir_flag",
-        "set_consort_flag" => "consort_flag",
-        "save_event_target_as" => "event_target",
-        "save_global_event_target_as" => "global_event_target",
-        "set_saved_name" => "saved_name",
-        "which"
-            if matches!(
-                parent_key,
-                Some("set_variable")
-                    | Some("change_variable")
-                    | Some("new_variable")
-                    | Some("new_variables")
-            ) =>
-        {
-            "variable"
-        }
-        _ => return None,
-    })
 }
 
 fn collect_scripted_effect_params(
@@ -1422,8 +1396,7 @@ fn collect_hir_semantics(
             let interpretation = profile
                 .definition(&logical_path, &property.key)
                 .filter(|rule| !rule.requires_value || property.value_range.is_some())
-                .map(|rule| (rule.kind.clone(), rule.name_field.as_deref()))
-                .or_else(|| definition_kind(&logical_path).map(|kind| (kind, None)));
+                .map(|rule| (rule.kind.clone(), rule.name_field.as_deref()));
             if let Some((kind, name_field)) = interpretation {
                 let name = name_field
                     .and_then(|field| nested_hir_property(hir, property, field))
@@ -1436,14 +1409,19 @@ fn collect_hir_semantics(
                     range: property.range,
                     active: true,
                 });
-                if logical_path.contains("common/government_reforms/")
-                    && nested_hir_property(hir, property, "legacy_government")
-                        .and_then(|property| property.scalar.as_ref())
-                        .is_some_and(|scalar| scalar.value.eq_ignore_ascii_case("yes"))
-                    && nested_hir_property(hir, property, "legacy_equivalent").is_none()
+            }
+            for rule in profile
+                .conditional_definitions
+                .iter()
+                .filter(|rule| rule.path.matches(&logical_path))
+            {
+                if nested_hir_property(hir, property, &rule.required_field)
+                    .and_then(|property| property.scalar.as_ref())
+                    .is_some_and(|scalar| scalar.value.eq_ignore_ascii_case(&rule.required_value))
+                    && nested_hir_property(hir, property, &rule.absent_field).is_none()
                 {
                     definitions.push(Definition {
-                        kind: "hardcoded_legacy_government".to_owned(),
+                        kind: rule.kind.clone(),
                         name: property.key.clone(),
                         file_id: file.id,
                         range: property.range,
@@ -1451,8 +1429,10 @@ fn collect_hir_semantics(
                     });
                 }
             }
-            if logical_path.contains("common/country_tags")
-                && property.key.eq_ignore_ascii_case("countries")
+            for rule in profile
+                .container_definitions
+                .iter()
+                .filter(|rule| rule.path.matches(&logical_path) && rule.key.matches(&property.key))
             {
                 for country in hir.properties().iter().filter(|candidate| {
                     candidate.path.len() == property.path.len().saturating_add(1)
@@ -1460,7 +1440,7 @@ fn collect_hir_semantics(
                         && range_within(candidate.range, property.range)
                 }) {
                     definitions.push(Definition {
-                        kind: "country_tag".to_owned(),
+                        kind: rule.kind.clone(),
                         name: country.key.clone(),
                         file_id: file.id,
                         range: country.range,
@@ -1497,59 +1477,6 @@ fn semantic_reference(
         return None;
     }
     Some((kind.to_owned(), scalar.value.clone(), scalar.range))
-}
-
-fn definition_kind(path: &str) -> Option<String> {
-    if let Some(kind) = eu4_dynamic_definition_kind(path) {
-        return Some(kind.to_owned());
-    }
-    None
-}
-
-fn eu4_dynamic_definition_kind(path: &str) -> Option<&'static str> {
-    let path = path.trim_end_matches('/');
-    if path.contains("common/country_tags") {
-        return None;
-    }
-    let directory = path.rsplit_once('/').map_or(path, |(directory, _)| directory);
-    Some(match directory {
-        "common/cultures" => "culture",
-        "common/religions" => "religion",
-        "common/tradenodes" => "trade_node",
-        "common/colonial_regions" => "colonial_region",
-        "common/estates" => "estate",
-        "common/ideas" => "idea_group",
-        "common/governments" => "government",
-        "common/government_reforms" => "government_reform",
-        "common/subject_types" => "subject_type",
-        "common/technologies" => "technology",
-        "common/buildings" => "building",
-        "common/units" => "unit_type",
-        "common/mercenary_companies" => "mercenary_company",
-        "common/trade_companies" => "trade_company",
-        "common/advisortypes" => "advisor_type",
-        "common/leader_personalities" => "leader_personality",
-        "common/ruler_personalities" => "ruler_personality",
-        "common/event_modifiers" => "event_modifier",
-        "common/static_modifiers" => "static_modifier",
-        "common/timed_modifiers" => "timed_modifier",
-        "common/triggered_modifiers" => "triggered_modifier",
-        "common/subject_type_upgrades" => "subject_type_upgrade",
-        "common/peace_treaties" => "peace_treaty",
-        "common/casus_belli" | "common/cb_types" => "casus_belli",
-        "common/wargoal_types" => "wargoal_type",
-        "common/institutions" => "institution",
-        "common/great_projects" => "great_project",
-        "common/estate_privileges" => "estate_privilege",
-        "common/estate_agendas" => "estate_agenda",
-        "common/diplomatic_actions" | "common/new_diplomatic_actions" => "diplomatic_action",
-        "common/disasters" => "disaster",
-        "common/rebel_types" => "rebel_type",
-        "common/insults" => "insult",
-        "common/opinion_modifiers" => "opinion_modifier",
-        "common/tradegoods" => "tradegood",
-        _ => return None,
-    })
 }
 
 fn nested_hir_property<'hir>(
@@ -2133,6 +2060,35 @@ mod tests {
         assert!(index.shard(first_file).is_some());
         assert!(index.shard(second_file).is_some());
         assert_eq!(index.definitions("event", "SHARED.1").len(), 2);
+    }
+
+    #[test]
+    fn identity_only_host_does_not_leak_eu4_dynamic_symbols() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-workspace-generic-profile-{nonce}"));
+        let cultures = root.join("common/cultures");
+        fs::create_dir_all(&cultures).expect("culture directory");
+        fs::write(
+            cultures.join("cultures.txt"),
+            "germanic = { set_country_flag = generic_flag }\n",
+        )
+        .expect("culture fixture");
+
+        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        host.refresh_source_roots().expect("scan roots");
+        let snapshot = host.snapshot();
+
+        assert!(snapshot.index().definitions("culture", "germanic").is_empty());
+        assert!(snapshot.index().definitions("country_flag", "generic_flag").is_empty());
+        fs::remove_dir_all(root).expect("cleanup");
     }
 
     #[test]
