@@ -11,6 +11,8 @@ pdx-hir = { path = "../pdx-hir" }
 pdx-rules = { path = "../pdx-rules" }
 pdx-syntax = { path = "../pdx-syntax" }
 pdx-text = { path = "../pdx-text" }
+rusqlite = { version = "0.32", features = ["bundled"] }
+sha2 = "0.10"
 
 [lints]
 workspace = true

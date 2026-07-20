@@ -20,6 +20,13 @@ use pdx_rules::{FileResolutionPolicy, GameProfile, ParserKind, RuleSet, SymbolRe
 use pdx_syntax::{CstKind, CstNode, Eu4FileFormat, ParsedFile, parse_eu4, parse_eu4_csv_file};
 use pdx_text::{LineIndex, LogicalPath, TextRange};
 
+mod vanilla_cache;
+
+pub use vanilla_cache::{
+    CURRENT_VANILLA_CACHE_SCHEMA_VERSION, VanillaCacheError, VanillaIndexCache,
+    VanillaIndexCacheMetadata,
+};
+
 #[cfg(test)]
 thread_local! {
     static PIPELINE_COUNTS: Cell<(usize, usize)> = const { Cell::new((0, 0)) };
@@ -492,7 +499,6 @@ impl WorkspaceIndex {
         self.sort_definition_buckets(&affected);
     }
 
-    #[cfg(test)]
     fn resolve_priorities(&mut self, priorities: &BTreeMap<SourceFileId, u64>, rules: &RuleSet) {
         match self.resolve_priorities_cancellable(priorities, rules, &WorkspaceScanToken::new()) {
             Ok(()) => {}
@@ -631,50 +637,6 @@ impl WorkspaceIndex {
 
 fn definition_key(definition: &Definition) -> (String, String) {
     (definition.kind.clone(), definition.name.to_ascii_lowercase())
-}
-
-/// Vanilla cache metadata. Loading is explicit; a host never refreshes it implicitly.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct VanillaIndexCacheMetadata {
-    /// Cache format version.
-    pub schema_version: u32,
-    /// Rules hash used to create the cache.
-    pub rule_hash: String,
-    /// Source identity supplied by the caller.
-    pub source_identity: String,
-}
-
-/// Explicitly managed Vanilla index cache seam.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct VanillaIndexCache {
-    metadata: Option<VanillaIndexCacheMetadata>,
-    index: WorkspaceIndex,
-}
-
-impl VanillaIndexCache {
-    /// Creates an unconfigured cache. It never scans or refreshes by itself.
-    #[must_use]
-    pub fn empty() -> Self {
-        Self::default()
-    }
-
-    /// Returns cache metadata when a caller has explicitly installed a snapshot.
-    #[must_use]
-    pub fn metadata(&self) -> Option<&VanillaIndexCacheMetadata> {
-        self.metadata.as_ref()
-    }
-
-    /// Returns the cached immutable index.
-    #[must_use]
-    pub fn index(&self) -> &WorkspaceIndex {
-        &self.index
-    }
-
-    /// Installs a newly rebuilt cache. This is the only refresh operation.
-    pub fn refresh(&mut self, metadata: VanillaIndexCacheMetadata, index: WorkspaceIndex) {
-        self.metadata = Some(metadata);
-        self.index = index;
-    }
 }
 
 /// Stable identity for an editor document during one server lifetime.
@@ -1704,6 +1666,7 @@ pub struct AnalysisHost {
     file_states: Arc<BTreeMap<SourceFileId, Arc<FileState>>>,
     index: Arc<WorkspaceIndex>,
     scan_report: Arc<WorkspaceScanReport>,
+    vanilla_cache: Option<Arc<VanillaIndexCache>>,
 }
 
 impl AnalysisHost {
@@ -1734,6 +1697,7 @@ impl AnalysisHost {
             file_states: Arc::new(BTreeMap::new()),
             index: Arc::new(WorkspaceIndex::empty()),
             scan_report: Arc::new(WorkspaceScanReport::default()),
+            vanilla_cache: None,
         }
     }
 
@@ -1756,10 +1720,77 @@ impl AnalysisHost {
     /// Applies one event-loop change and advances the snapshot revision.
     pub fn apply_change(&mut self, change: WorkspaceChange) {
         match change {
-            WorkspaceChange::SetSourceRoots(roots) => self.roots = Arc::from(roots),
+            WorkspaceChange::SetSourceRoots(roots) => {
+                self.roots = Arc::from(roots);
+                self.vanilla_cache = None;
+            }
             WorkspaceChange::SetWorkspaceRoot(root) => self.workspace_root = root,
         }
         self.revision = self.revision.saturating_add(1);
+    }
+
+    /// Installs a validated persistent Vanilla cache without scanning its original directory.
+    ///
+    /// The cache's rule hash is intentionally not required to match. It remains observable in
+    /// metadata so the user can decide whether to run an explicit refresh.
+    pub fn install_vanilla_cache(
+        &mut self,
+        cache: VanillaIndexCache,
+    ) -> Result<(), VanillaCacheError> {
+        if cache.metadata().game_id != self.rules.game_id()
+            || cache.metadata().game_id != self.profile.game_id
+        {
+            return Err(VanillaCacheError::GameMismatch {
+                expected: self.profile.game_id.clone(),
+                actual: cache.metadata().game_id.clone(),
+            });
+        }
+        let vanilla = cache.source_root();
+        for root in self.roots.iter() {
+            if root.id == vanilla.id {
+                return Err(VanillaCacheError::InvalidData(format!(
+                    "reserved Vanilla root id {} is already configured",
+                    vanilla.id.get()
+                )));
+            }
+            if root.kind == SourceRootKind::Vanilla {
+                return Err(VanillaCacheError::InvalidData(
+                    "a Vanilla source root is already configured".to_owned(),
+                ));
+            }
+            if vanilla.path.starts_with(&root.path) || root.path.starts_with(&vanilla.path) {
+                return Err(VanillaCacheError::RootConflict {
+                    vanilla: vanilla.path.clone(),
+                    configured: root.path.clone(),
+                });
+            }
+        }
+
+        let mut files = cache.source_files().clone();
+        for (id, file) in self.source_files.iter() {
+            if let Some(cached) = files.insert(*id, file.clone()) {
+                return Err(VanillaCacheError::InvalidData(format!(
+                    "file id collision between {} and {}",
+                    cached.physical_path.display(),
+                    file.physical_path.display()
+                )));
+            }
+        }
+        let mut shards = cache.index().shards.values().cloned().collect::<Vec<_>>();
+        shards.extend(self.index.shards.values().cloned());
+        let mut roots = Vec::with_capacity(self.roots.len().saturating_add(1));
+        roots.push(vanilla.clone());
+        roots.extend(self.roots.iter().cloned());
+        let mut index = WorkspaceIndex::from_shards(shards);
+        let priorities = source_priorities(&roots, &files);
+        index.resolve_priorities(&priorities, self.rules.as_ref());
+
+        self.roots = Arc::from(roots);
+        self.source_files = Arc::new(files);
+        self.index = Arc::new(index);
+        self.vanilla_cache = Some(Arc::new(cache));
+        self.revision = self.revision.saturating_add(1);
+        Ok(())
     }
 
     /// Scans all configured roots in stable order and atomically refreshes source files and shards.
@@ -1798,6 +1829,9 @@ impl AnalysisHost {
         let mut report = WorkspaceScanReport::default();
         for root in self.roots.iter() {
             cancellation.checkpoint()?;
+            if self.vanilla_cache.as_ref().is_some_and(|cache| cache.source_root().id == root.id) {
+                continue;
+            }
             let mut paths = Vec::new();
             collect_disk_files(
                 &root.path,
@@ -1862,7 +1896,19 @@ impl AnalysisHost {
             file_states.insert(*id, state);
         }
         cancellation.checkpoint()?;
-        let shards = file_states.values().map(|state| state.shard().clone());
+        let mut shards =
+            file_states.values().map(|state| state.shard().clone()).collect::<Vec<_>>();
+        if let Some(cache) = self.vanilla_cache.as_ref() {
+            for (id, cached) in cache.source_files() {
+                if let Some(existing) = files.insert(*id, cached.clone()) {
+                    return Err(WorkspaceError::FileIdCollision {
+                        first: existing.physical_path,
+                        second: cached.physical_path.clone(),
+                    });
+                }
+            }
+            shards.extend(cache.index().shards.values().cloned());
+        }
         let mut index = WorkspaceIndex::from_shards_cancellable(shards, cancellation)?;
         let priorities = source_priorities(&self.roots, &files);
         index.resolve_priorities_cancellable(&priorities, self.rules.as_ref(), cancellation)?;
@@ -2258,8 +2304,9 @@ mod tests {
     use super::{
         AnalysisHost, Definition, DocumentId, DocumentSource, FileIndexShard, ParsedSource,
         Reference, SourceFileId, SourceRoot, SourceRootId, SourceRootKind, TextChange,
-        WorkspaceError, WorkspaceIndex, WorkspaceScanIssueKind, WorkspaceScanLimits,
-        WorkspaceScanToken, pipeline_counts, reset_pipeline_counts,
+        VanillaCacheError, VanillaIndexCache, WorkspaceError, WorkspaceIndex,
+        WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanToken, pipeline_counts,
+        reset_pipeline_counts,
     };
     use pdx_rules::RuleSet;
     use pdx_text::{LogicalPath, TextRange};
@@ -3047,6 +3094,95 @@ mod tests {
         let resolved = overlay_snapshot.resolve(&logical);
         assert!(resolved.first().and_then(|candidate| candidate.document_id.as_ref()).is_some());
         assert!(resolved.first().is_some_and(|candidate| candidate.active));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-workspace-vanilla-cache-{nonce}"));
+        let vanilla = root.join("vanilla");
+        let current = root.join("current");
+        fs::create_dir_all(vanilla.join("common/events")).expect("Vanilla fixture directory");
+        fs::create_dir_all(current.join("common/events")).expect("current fixture directory");
+        fs::write(
+            vanilla.join("common/events/definitions.txt"),
+            "country_event = { id = shared.1 }\ncountry_event = { id = vanilla.1 }\n",
+        )
+        .expect("Vanilla definitions");
+        fs::write(
+            current.join("common/events/definitions.txt"),
+            "country_event = { id = shared.1 }\n",
+        )
+        .expect("current definition");
+
+        let mut vanilla_host = eu4_host();
+        vanilla_host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+        )]));
+        vanilla_host.refresh_source_roots().expect("scan Vanilla once");
+        let cache =
+            VanillaIndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
+        let cache_path = root.join("cache/vanilla.pdxindex");
+        cache.save(&cache_path).expect("save cache");
+        let loaded = VanillaIndexCache::load(&cache_path).expect("load cache");
+        assert_eq!(loaded.metadata(), cache.metadata());
+        assert_eq!(loaded.source_files(), cache.source_files());
+        assert_eq!(loaded.index(), cache.index());
+
+        let foreign_path = root.join("foreign.sqlite");
+        let foreign = rusqlite::Connection::open(&foreign_path).expect("foreign database");
+        foreign.execute("CREATE TABLE marker(value TEXT)", []).expect("foreign schema");
+        drop(foreign);
+        assert!(matches!(cache.save(&foreign_path), Err(VanillaCacheError::NotVanillaCache)));
+        let foreign = rusqlite::Connection::open(&foreign_path).expect("reopen foreign database");
+        assert_eq!(
+            foreign
+                .query_row("SELECT count(*) FROM marker", [], |row| row.get::<_, i64>(0))
+                .expect("foreign table remains"),
+            0
+        );
+        drop(foreign);
+
+        fs::rename(&vanilla, root.join("vanilla-moved")).expect("make original source unavailable");
+        let mut host = eu4_host();
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(u32::MAX),
+            SourceRootKind::CurrentMod,
+            fs::canonicalize(&current).expect("canonical current root"),
+        )]));
+        host.refresh_source_roots().expect("scan current root");
+        host.install_vanilla_cache(loaded).expect("install cache without Vanilla source access");
+        host.refresh_source_roots().expect("refresh must skip unavailable Vanilla root");
+
+        let snapshot = host.snapshot();
+        assert_eq!(snapshot.source_roots()[0].kind, SourceRootKind::Vanilla);
+        let shared = snapshot
+            .index()
+            .active_definition("event", "shared.1")
+            .expect("current definition wins");
+        assert_eq!(
+            snapshot.source_files().get(&shared.file_id).expect("shared file").root_id,
+            SourceRootId::new(u32::MAX)
+        );
+        let vanilla_definition = snapshot
+            .index()
+            .active_definition("event", "vanilla.1")
+            .expect("cached Vanilla-only definition remains available");
+        assert_eq!(
+            snapshot
+                .source_files()
+                .get(&vanilla_definition.file_id)
+                .expect("Vanilla file metadata")
+                .root_id,
+            SourceRootId::new(0)
+        );
+        assert!(snapshot.file_state(vanilla_definition.file_id).is_none());
         fs::remove_dir_all(root).expect("cleanup");
     }
 }

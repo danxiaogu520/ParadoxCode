@@ -316,6 +316,8 @@ dependencies = [
  "pdx-rules",
  "pdx-syntax",
  "pdx-text",
+ "rusqlite",
+ "sha2",
 ]
 
 [[package]]
