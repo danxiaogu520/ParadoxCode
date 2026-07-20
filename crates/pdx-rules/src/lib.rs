@@ -261,6 +261,137 @@ pub struct SymbolDescriptor {
     pub case_sensitive: bool,
 }
 
+/// Matching mode for small, data-only game-profile selectors.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProfileMatchMode {
+    /// Accepts every candidate.
+    Any,
+    /// Requires the whole candidate to match.
+    Exact,
+    /// Requires the candidate to start with the pattern.
+    Prefix,
+    /// Requires the candidate to end with the pattern.
+    Suffix,
+    /// Requires the candidate to contain the pattern.
+    Contains,
+}
+
+/// A deterministic text selector used by built-in game-profile data.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProfileTextMatcher {
+    /// Match operation.
+    pub mode: ProfileMatchMode,
+    /// Pattern used by every mode except [`ProfileMatchMode::Any`].
+    pub pattern: String,
+    /// Whether ASCII case is significant.
+    pub case_sensitive: bool,
+}
+
+impl ProfileTextMatcher {
+    /// Creates a case-insensitive selector.
+    #[must_use]
+    pub fn insensitive(mode: ProfileMatchMode, pattern: impl Into<String>) -> Self {
+        Self { mode, pattern: pattern.into(), case_sensitive: false }
+    }
+
+    /// Creates a selector that accepts every candidate.
+    #[must_use]
+    pub fn any() -> Self {
+        Self::insensitive(ProfileMatchMode::Any, "")
+    }
+
+    /// Tests one candidate without allocating for case-insensitive matching.
+    #[must_use]
+    pub fn matches(&self, candidate: &str) -> bool {
+        if self.mode == ProfileMatchMode::Any {
+            return true;
+        }
+        if self.case_sensitive {
+            return match self.mode {
+                ProfileMatchMode::Any => true,
+                ProfileMatchMode::Exact => candidate == self.pattern,
+                ProfileMatchMode::Prefix => candidate.starts_with(&self.pattern),
+                ProfileMatchMode::Suffix => candidate.ends_with(&self.pattern),
+                ProfileMatchMode::Contains => candidate.contains(&self.pattern),
+            };
+        }
+        match self.mode {
+            ProfileMatchMode::Any => true,
+            ProfileMatchMode::Exact => candidate.eq_ignore_ascii_case(&self.pattern),
+            ProfileMatchMode::Prefix => candidate
+                .get(..self.pattern.len())
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case(&self.pattern)),
+            ProfileMatchMode::Suffix => candidate
+                .get(candidate.len().saturating_sub(self.pattern.len())..)
+                .is_some_and(|suffix| suffix.eq_ignore_ascii_case(&self.pattern)),
+            ProfileMatchMode::Contains => {
+                self.pattern.is_empty()
+                    || candidate
+                        .as_bytes()
+                        .windows(self.pattern.len())
+                        .any(|window| window.eq_ignore_ascii_case(self.pattern.as_bytes()))
+            }
+        }
+    }
+}
+
+/// One top-level symbol-definition interpretation supplied by a game profile.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProfileDefinitionRule {
+    /// Logical-path selector.
+    pub path: ProfileTextMatcher,
+    /// Top-level property-key selector.
+    pub key: ProfileTextMatcher,
+    /// Stable symbol kind.
+    pub kind: String,
+    /// Optional nested scalar field that supplies the definition name.
+    pub name_field: Option<String>,
+    /// Whether parser recovery must have produced a value wrapper.
+    pub requires_value: bool,
+}
+
+/// One scalar-reference interpretation supplied by a game profile.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProfileReferenceRule {
+    /// Property-key selector.
+    pub key: ProfileTextMatcher,
+    /// Stable target symbol kind.
+    pub kind: String,
+}
+
+/// Data-only game-specific interpretation selected by the composition root.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct GameProfile {
+    /// Stable identity shared with the selected rules artifact.
+    pub game_id: String,
+    /// Ordered top-level definition rules; the first match wins.
+    pub definitions: Vec<ProfileDefinitionRule>,
+    /// Ordered scalar-reference rules; the first match wins.
+    pub references: Vec<ProfileReferenceRule>,
+}
+
+impl GameProfile {
+    /// Creates an identity-only profile with no game-specific interpretation.
+    #[must_use]
+    pub fn empty(game_id: impl Into<String>) -> Self {
+        Self { game_id: game_id.into(), definitions: Vec::new(), references: Vec::new() }
+    }
+
+    /// Returns the first matching top-level definition rule.
+    #[must_use]
+    pub fn definition(&self, logical_path: &str, key: &str) -> Option<&ProfileDefinitionRule> {
+        self.definitions
+            .iter()
+            .find(|rule| rule.path.matches(logical_path) && rule.key.matches(key))
+    }
+
+    /// Returns the target kind for a scalar property reference.
+    #[must_use]
+    pub fn reference_kind(&self, key: &str) -> Option<&str> {
+        self.references.iter().find(|rule| rule.key.matches(key)).map(|rule| rule.kind.as_str())
+    }
+}
+
 /// A normalized rule row. Values are intentionally scalar and deterministic; runtime crates do
 /// not need to understand the CWT source representation.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1546,7 +1677,10 @@ fn decode_cwt_value(
 
 #[cfg(test)]
 mod tests {
-    use super::{CURRENT_SCHEMA_VERSION, RuleRecord, RuleSet, RulesModel};
+    use super::{
+        CURRENT_SCHEMA_VERSION, ProfileMatchMode, ProfileTextMatcher, RuleRecord, RuleSet,
+        RulesModel,
+    };
     use std::collections::BTreeMap;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -1555,6 +1689,18 @@ mod tests {
         let rules = RuleSet::empty();
         assert_eq!(rules.schema_version(), CURRENT_SCHEMA_VERSION);
         assert_eq!(rules.rule_hash().as_bytes(), [0; 32]);
+    }
+
+    #[test]
+    fn profile_text_matchers_are_case_insensitive_and_bounded() {
+        let suffix = ProfileTextMatcher::insensitive(ProfileMatchMode::Suffix, "_event");
+        let contains = ProfileTextMatcher::insensitive(ProfileMatchMode::Contains, "events/");
+
+        assert!(suffix.matches("COUNTRY_EVENT"));
+        assert!(!suffix.matches("event_target"));
+        assert!(contains.matches("COMMON/EVENTS/example.txt"));
+        assert!(!contains.matches("common/event_modifiers/example.txt"));
+        assert!(ProfileTextMatcher::any().matches("anything"));
     }
 
     #[test]

@@ -226,6 +226,7 @@ version = "0.1.0"
 dependencies = [
  "pdx-analysis",
  "pdx-format",
+ "pdx-game-eu4",
  "pdx-rules",
  "pdx-text",
  "pdx-workspace",

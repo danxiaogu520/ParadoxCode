@@ -8,7 +8,10 @@ use std::path::Path;
 use std::sync::Arc;
 
 use pdx_hir::{HirFile, HirProperty, Scope};
-use pdx_rules::{CwtKeyMatcher, CwtRuleShape, CwtValueMatcher, SymbolResolutionPolicy};
+use pdx_rules::{
+    CwtKeyMatcher, CwtRuleShape, CwtValueMatcher, GameProfile, ProfileDefinitionRule,
+    SymbolResolutionPolicy,
+};
 use pdx_syntax::{CstKind, CstNode, CsvParsedFile, Eu4FileFormat, ParsedFile, SyntaxError};
 use pdx_text::{LogicalPath, TextRange, TextSize};
 use pdx_workspace::{
@@ -1177,6 +1180,7 @@ struct ParsedInput {
     source: Arc<str>,
     parsed: ParsedContent,
     hir: Option<Arc<HirFile>>,
+    profile: Arc<GameProfile>,
 }
 
 #[derive(Clone, Debug)]
@@ -1286,7 +1290,17 @@ fn input_for_document(snapshot: &AnalysisSnapshot, id: &DocumentId) -> Option<Pa
         ParsedSource::Csv(parsed) => ParsedContent::Csv(Arc::clone(parsed)),
     };
     let hir = document.hir_handle();
-    Some(ParsedInput { document: Some(id.clone()), file, path, format, source, parsed, hir })
+    let profile = snapshot.game_profile_handle();
+    Some(ParsedInput {
+        document: Some(id.clone()),
+        file,
+        path,
+        format,
+        source,
+        parsed,
+        hir,
+        profile,
+    })
 }
 
 fn input_for_source_file(snapshot: &AnalysisSnapshot, id: SourceFileId) -> Option<ParsedInput> {
@@ -1304,6 +1318,7 @@ fn input_for_source_file(snapshot: &AnalysisSnapshot, id: SourceFileId) -> Optio
         source: state.source_handle(),
         parsed,
         hir: state.hir_handle(),
+        profile: snapshot.game_profile_handle(),
     })
 }
 
@@ -2296,18 +2311,18 @@ fn semantic_data(input: &ParsedInput) -> SemanticFile {
     }
     for property in hir.properties() {
         if property.top_level
-            && let Some(kind) = definition_kind(input.path.as_ref(), property)
+            && let Some(rule) = definition_rule(input, property)
         {
-            let (name, selection_range) = definition_name(hir, property);
+            let (name, selection_range) = definition_name(hir, property, rule);
             data.definitions.push(make_definition(
                 input,
-                &kind,
+                &rule.kind,
                 name,
                 property.range,
                 selection_range,
             ));
         }
-        if let Some((kind, name, range)) = reference_from_property(property) {
+        if let Some((kind, name, range)) = reference_from_property(&input.profile, property) {
             data.references.push(ReferenceInternal {
                 kind,
                 name,
@@ -2343,28 +2358,24 @@ fn make_definition(
     }
 }
 
-fn definition_kind(path: Option<&LogicalPath>, property: &HirProperty) -> Option<String> {
-    let path = path.map_or_else(String::new, |path| path.as_str().to_ascii_lowercase());
-    if path.contains("scripted_effect") {
-        return Some("scripted_effect".to_owned());
-    }
-    if path.contains("scripted_trigger") {
-        return Some("scripted_trigger".to_owned());
-    }
-    if path.contains("events/") || property.key.to_ascii_lowercase().ends_with("_event") {
-        return Some("event".to_owned());
-    }
-    if matches!(property.key.as_str(), "country_event" | "province_event")
-        && property.value_range.is_some()
-    {
-        return Some("event".to_owned());
-    }
-    None
+fn definition_rule<'profile>(
+    input: &'profile ParsedInput,
+    property: &HirProperty,
+) -> Option<&'profile ProfileDefinitionRule> {
+    let path = input.path.as_ref().map_or("", LogicalPath::as_str);
+    input
+        .profile
+        .definition(path, &property.key)
+        .filter(|rule| !rule.requires_value || property.value_range.is_some())
 }
 
-fn definition_name(hir: &HirFile, property: &HirProperty) -> (String, TextRange) {
-    if matches!(property.key.as_str(), "country_event" | "province_event")
-        && let Some((name, range)) = find_nested_property(hir, property, "id")
+fn definition_name(
+    hir: &HirFile,
+    property: &HirProperty,
+    rule: &ProfileDefinitionRule,
+) -> (String, TextRange) {
+    if let Some(field) = rule.name_field.as_deref()
+        && let Some((name, range)) = find_nested_property(hir, property, field)
     {
         return (name, range);
     }
@@ -2390,30 +2401,11 @@ fn find_nested_property(
         })
 }
 
-fn reference_from_property(property: &HirProperty) -> Option<(String, String, TextRange)> {
-    let lower = property.key.to_ascii_lowercase();
-    let kind = if matches!(lower.as_str(), "event" | "events" | "event_id" | "trigger_event")
-        || lower.ends_with("_event")
-    {
-        Some("event")
-    } else if lower.contains("scripted_effect")
-        || lower == "call_effect"
-        || lower.ends_with("_effect")
-    {
-        Some("scripted_effect")
-    } else if lower.contains("scripted_trigger")
-        || lower == "call_trigger"
-        || lower.ends_with("_trigger")
-    {
-        Some("scripted_trigger")
-    } else if matches!(
-        lower.as_str(),
-        "localisation" | "localization" | "loc_key" | "name" | "desc" | "title" | "tooltip"
-    ) {
-        Some("localisation")
-    } else {
-        None
-    }?;
+fn reference_from_property(
+    profile: &GameProfile,
+    property: &HirProperty,
+) -> Option<(String, String, TextRange)> {
+    let kind = profile.reference_kind(&property.key)?;
     let scalar = property.scalar.as_ref()?;
     if scalar.value.is_empty()
         || scalar.value == "yes"
@@ -3027,8 +3019,12 @@ mod tests {
     use pdx_text::TextRange;
     use pdx_workspace::{AnalysisHost, DocumentId};
 
+    fn eu4_host(rules: RuleSet) -> AnalysisHost {
+        AnalysisHost::with_profile(rules, pdx_game_eu4::profile())
+    }
+
     fn snapshot(text: &str) -> (AnalysisHost, DocumentId) {
-        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
+        let mut host = eu4_host(pdx_game_eu4::bootstrap_rules());
         let id = DocumentId::new("file:///tmp/common/events/test.txt");
         host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
         (host, id)
@@ -3071,7 +3067,7 @@ mod tests {
             source_file: "fixture.cwt".to_owned(),
             line: 1,
         });
-        let mut host = AnalysisHost::new(RuleSet::from_model(model));
+        let mut host = eu4_host(RuleSet::from_model(model));
         let id = DocumentId::new("file:///tmp/common/events/test.txt");
         host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
         (host, id)
@@ -3095,6 +3091,16 @@ mod tests {
         let input_hir = input.hir.as_ref().expect("shared analysis HIR");
 
         assert!(std::sync::Arc::ptr_eq(&document_hir, input_hir));
+    }
+
+    #[test]
+    fn identity_only_host_does_not_guess_eu4_semantics_from_game_id() {
+        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
+        let id = DocumentId::new("file:///tmp/common/events/generic.txt");
+        host.open_document(id.clone(), 1, "country_event = { id = generic.1 }\n".to_owned(), None)
+            .expect("open");
+
+        assert!(document_symbols(&host.snapshot(), &id).is_empty());
     }
 
     #[test]
@@ -3214,7 +3220,7 @@ mod tests {
             source_file: "fixture.cwt".to_owned(),
             line: 2,
         });
-        let mut host = AnalysisHost::new(RuleSet::from_model(model));
+        let mut host = eu4_host(RuleSet::from_model(model));
         let id = DocumentId::new("file:///tmp/common/terrain/test.txt");
         host.open_document(id.clone(), 1, "terrain = { color = { 1 2 300 } }\n".to_owned(), None)
             .expect("open");
@@ -3242,7 +3248,7 @@ mod tests {
         assert!(!rules.model().cwt.rules.is_empty());
         assert!(rules.model().cwt.rules.iter().any(|rule| rule.severity == Some(2)));
         assert!(rules.model().cwt.rules.iter().any(|rule| rule.min_occurs == Some(1)));
-        let mut host = AnalysisHost::new(rules);
+        let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/common/events/test.txt");
         host.open_document(
             id.clone(),
@@ -3261,7 +3267,7 @@ mod tests {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
-        let mut host = AnalysisHost::new(rules);
+        let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/events/test.txt");
         host.open_document(
             id.clone(),
@@ -3293,7 +3299,7 @@ mod tests {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
-        let mut host = AnalysisHost::new(rules);
+        let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -3330,7 +3336,7 @@ mod tests {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
-        let mut host = AnalysisHost::new(rules);
+        let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/common/on_actions/test.txt");
         host.open_document(
             id.clone(),
@@ -3351,7 +3357,7 @@ mod tests {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
-        let mut host = AnalysisHost::new(rules);
+        let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/events/scope.txt");
         host.open_document(
             id.clone(),
@@ -3373,7 +3379,7 @@ mod tests {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
-        let mut host = AnalysisHost::new(rules);
+        let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/events/alternatives.txt");
         host.open_document(
             id.clone(),
@@ -3394,7 +3400,7 @@ mod tests {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
-        let mut host = AnalysisHost::new(rules);
+        let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/events/owner.txt");
         host.open_document(
             id.clone(),
@@ -3421,7 +3427,7 @@ mod tests {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
-        let mut host = AnalysisHost::new(rules);
+        let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
             kind: SourceRootKind::CurrentMod,
@@ -3455,7 +3461,7 @@ mod tests {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
-        let mut host = AnalysisHost::new(rules);
+        let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
             kind: SourceRootKind::CurrentMod,
@@ -3496,7 +3502,7 @@ mod tests {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
-        let mut host = AnalysisHost::new(rules);
+        let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
             kind: SourceRootKind::CurrentMod,
@@ -3537,7 +3543,7 @@ mod tests {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
-        let mut host = AnalysisHost::new(rules);
+        let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
             kind: SourceRootKind::CurrentMod,
@@ -3579,7 +3585,7 @@ mod tests {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
-        let mut host = AnalysisHost::new(rules);
+        let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
             kind: SourceRootKind::CurrentMod,
@@ -3620,7 +3626,7 @@ mod tests {
         let rules_path =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
-        let mut host = AnalysisHost::new(rules);
+        let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
             kind: SourceRootKind::CurrentMod,
@@ -3647,7 +3653,7 @@ mod tests {
 
     #[test]
     fn localisation_values_offer_indexed_localisation_symbols() {
-        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
+        let mut host = eu4_host(pdx_game_eu4::bootstrap_rules());
         let id = DocumentId::new("file:///tmp/localisation/test.yml");
         host.open_document(
             id.clone(),
@@ -3746,7 +3752,7 @@ mod tests {
         let path = dependency.join("events.txt");
         fs::write(&path, "country_event = { id = read_only.1 }\n").expect("dependency event");
 
-        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
+        let mut host = eu4_host(pdx_game_eu4::bootstrap_rules());
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
             kind: SourceRootKind::Dependency,

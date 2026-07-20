@@ -16,3 +16,6 @@ serde_json = "1.0"
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+pdx-game-eu4 = { path = "../pdx-game-eu4" }

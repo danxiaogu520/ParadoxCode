@@ -1,6 +1,6 @@
 //! Temporary compatibility facade for callers migrating to `pdx-rules` and `pdx-game-eu4`.
 
-pub use pdx_game_eu4::{Eu4Profile, GAME_ID, bootstrap_model, bootstrap_rules};
+pub use pdx_game_eu4::{Eu4Profile, GAME_ID, bootstrap_model, bootstrap_rules, profile};
 pub use pdx_rules::*;
 
 /// Transitional name for [`RuleSet`]. New runtime code should use the generic name.

@@ -13,7 +13,7 @@ use pdx_analysis::{
     CompletionKind, Hover, Location, RenameError, complete, definition, diagnostics,
     document_symbols, hover, prepare_rename, references, rename, workspace_symbols,
 };
-use pdx_rules::{RuleSet, RulesError};
+use pdx_rules::{GameProfile, RuleSet, RulesError};
 use pdx_text::{LineIndex, Position, TextRange};
 use pdx_workspace::{
     AnalysisHost, AnalysisSnapshot, DocumentError, DocumentId, DocumentSource, SourceRoot,
@@ -147,20 +147,36 @@ pub struct LspServer {
 impl LspServer {
     /// Creates a server and fails when an explicitly supplied rules artifact is invalid.
     pub fn try_new(options: InitializeOptions) -> Result<Self, LspError> {
-        Self::try_new_with_expected_game(options, None)
+        Self::try_new_with_expected_game(options, None, GameProfile::default())
     }
 
-    /// Creates a server and rejects a rules artifact for a different game profile.
+    /// Creates an identity-only server and rejects a rules artifact for a different game.
+    ///
+    /// Call [`Self::try_new_with_profile`] when game-specific interpretation is required.
     pub fn try_new_for_game(
         options: InitializeOptions,
         expected_game_id: &str,
     ) -> Result<Self, LspError> {
-        Self::try_new_with_expected_game(options, Some(expected_game_id))
+        Self::try_new_with_expected_game(
+            options,
+            Some(expected_game_id),
+            GameProfile::empty(expected_game_id),
+        )
+    }
+
+    /// Creates a server with explicit data-only game semantics.
+    pub fn try_new_with_profile(
+        options: InitializeOptions,
+        profile: GameProfile,
+    ) -> Result<Self, LspError> {
+        let expected_game_id = (!profile.game_id.is_empty()).then(|| profile.game_id.clone());
+        Self::try_new_with_expected_game(options, expected_game_id.as_deref(), profile)
     }
 
     fn try_new_with_expected_game(
         options: InitializeOptions,
         expected_game_id: Option<&str>,
+        profile: GameProfile,
     ) -> Result<Self, LspError> {
         let rules = match options.rules_path.as_deref() {
             Some(path) => {
@@ -175,7 +191,7 @@ impl LspServer {
         Ok(Self {
             state: ServerState::Uninitialized,
             options,
-            host: AnalysisHost::new(rules),
+            host: AnalysisHost::with_profile(rules, profile),
             cancelled: HashSet::new(),
             diagnostics: BTreeMap::new(),
             clean_exit: false,
@@ -232,7 +248,9 @@ impl LspServer {
         server.run_transport(stdin.lock(), stdout.lock())
     }
 
-    /// Runs stdio while enforcing the selected game profile identity.
+    /// Runs identity-only stdio while enforcing the selected game identity.
+    ///
+    /// Call [`Self::run_stdio_with_profile`] for a game-aware language server.
     pub fn run_stdio_for_game(
         options: InitializeOptions,
         expected_game_id: &str,
@@ -240,6 +258,17 @@ impl LspServer {
         let stdin = io::stdin();
         let stdout = io::stdout();
         let mut server = Self::try_new_for_game(options, expected_game_id)?;
+        server.run_transport(stdin.lock(), stdout.lock())
+    }
+
+    /// Runs stdio with explicit game-profile interpretation and identity validation.
+    pub fn run_stdio_with_profile(
+        options: InitializeOptions,
+        profile: GameProfile,
+    ) -> Result<(), LspError> {
+        let stdin = io::stdin();
+        let stdout = io::stdout();
+        let mut server = Self::try_new_with_profile(options, profile)?;
         server.run_transport(stdin.lock(), stdout.lock())
     }
 
@@ -1067,6 +1096,10 @@ mod tests {
     use pdx_workspace::TextChange;
     use serde_json::{Value, json};
 
+    fn eu4_server(options: InitializeOptions) -> Result<LspServer, LspError> {
+        LspServer::try_new_with_profile(options, pdx_game_eu4::profile())
+    }
+
     fn frame(value: Value) -> Vec<u8> {
         let body = serde_json::to_vec(&value).expect("test JSON should serialize");
         let mut framed = format!("Content-Length: {}\r\n\r\n", body.len()).into_bytes();
@@ -1158,8 +1191,8 @@ mod tests {
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let mut output = Vec::new();
-        let mut server = LspServer::try_new(InitializeOptions::default())
-            .expect("syntax-only server should initialize");
+        let mut server =
+            eu4_server(InitializeOptions::default()).expect("syntax-only server should initialize");
         server.run_transport(Cursor::new(input), &mut output).expect("transport should finish");
 
         let responses = decode_frames(&output);
@@ -1206,8 +1239,8 @@ mod tests {
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let mut output = Vec::new();
-        let mut server = LspServer::try_new(InitializeOptions::default())
-            .expect("syntax-only server should initialize");
+        let mut server =
+            eu4_server(InitializeOptions::default()).expect("syntax-only server should initialize");
         server.run_transport(Cursor::new(input), &mut output).expect("transport should finish");
         let responses = decode_frames(&output);
         let completion =
@@ -1284,7 +1317,7 @@ mod tests {
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let mut output = Vec::new();
-        let mut server = LspServer::try_new(InitializeOptions { rules_path: Some(rules_path) })
+        let mut server = eu4_server(InitializeOptions { rules_path: Some(rules_path) })
             .expect("bundled rules should load");
         server.run_transport(Cursor::new(input), &mut output).expect("transport should finish");
         let responses = decode_frames(&output);
@@ -1303,8 +1336,8 @@ mod tests {
 
     #[test]
     fn stale_diagnostics_do_not_replace_newer_results() {
-        let mut server = LspServer::try_new(InitializeOptions::default())
-            .expect("syntax-only server should initialize");
+        let mut server =
+            eu4_server(InitializeOptions::default()).expect("syntax-only server should initialize");
         let uri = "file:///tmp/diagnostics.txt";
         let id = pdx_workspace::DocumentId::new(uri);
         server

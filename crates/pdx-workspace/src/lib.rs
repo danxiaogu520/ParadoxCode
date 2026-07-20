@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use pdx_hir::{HirFile, HirProperty, lower_shared};
-use pdx_rules::{FileResolutionPolicy, ParserKind, RuleSet, SymbolResolutionPolicy};
+use pdx_rules::{FileResolutionPolicy, GameProfile, ParserKind, RuleSet, SymbolResolutionPolicy};
 use pdx_syntax::{CstKind, CstNode, Eu4FileFormat, ParsedFile, parse_eu4, parse_eu4_csv_file};
 use pdx_text::{LineIndex, LogicalPath, TextRange};
 
@@ -1012,6 +1012,7 @@ fn build_file_state(
     source: String,
     revision: u64,
     rules: &RuleSet,
+    profile: &GameProfile,
 ) -> FileState {
     let Some(category) = rules.classify(&file.logical_path) else {
         return FileState {
@@ -1030,7 +1031,7 @@ fn build_file_state(
     let (parsed, hir) = parse_source(&category.parser, &source, rules);
     let shard = match (parsed.as_ref(), hir.as_deref()) {
         (Some(ParsedSource::Text(parsed)), Some(hir)) => {
-            shard_from_parsed(file, parsed, hir, category.id.as_str(), rules)
+            shard_from_parsed(file, parsed, hir, category.id.as_str(), rules, profile)
         }
         (Some(ParsedSource::Text(parsed)), None) => FileIndexShard {
             file_id: file.id,
@@ -1087,10 +1088,11 @@ fn shard_from_parsed(
     hir: &HirFile,
     category_id: &str,
     rules: &RuleSet,
+    profile: &GameProfile,
 ) -> FileIndexShard {
     let mut definitions = Vec::new();
     let mut references = Vec::new();
-    collect_hir_semantics(file, hir, category_id, &mut definitions, &mut references);
+    collect_hir_semantics(file, hir, category_id, profile, &mut definitions, &mut references);
     collect_scripted_effect_params(file, parsed, &mut definitions);
     collect_eu4_dynamic_members(file, hir, &mut definitions);
     collect_cwt_type_members(file, parsed, rules, &mut definitions);
@@ -1401,6 +1403,7 @@ fn collect_hir_semantics(
     file: &SourceFile,
     hir: &HirFile,
     category_id: &str,
+    profile: &GameProfile,
     definitions: &mut Vec<Definition>,
     references: &mut Vec<Reference>,
 ) {
@@ -1416,8 +1419,16 @@ fn collect_hir_semantics(
     let logical_path = file.logical_path.as_str().to_ascii_lowercase();
     for property in hir.properties() {
         if property.top_level {
-            if let Some(kind) = definition_kind(&logical_path, property) {
-                let name = event_name(hir, property).unwrap_or_else(|| property.key.clone());
+            let interpretation = profile
+                .definition(&logical_path, &property.key)
+                .filter(|rule| !rule.requires_value || property.value_range.is_some())
+                .map(|rule| (rule.kind.clone(), rule.name_field.as_deref()))
+                .or_else(|| definition_kind(&logical_path).map(|kind| (kind, None)));
+            if let Some((kind, name_field)) = interpretation {
+                let name = name_field
+                    .and_then(|field| nested_hir_property(hir, property, field))
+                    .and_then(|property| property.scalar.as_ref())
+                    .map_or_else(|| property.key.clone(), |scalar| scalar.value.clone());
                 definitions.push(Definition {
                     kind,
                     name,
@@ -1458,7 +1469,7 @@ fn collect_hir_semantics(
                 }
             }
         }
-        if let Some((kind, name, range)) = semantic_reference(property) {
+        if let Some((kind, name, range)) = semantic_reference(profile, property) {
             references.push(Reference { kind, name, file_id: file.id, range });
         }
     }
@@ -1472,30 +1483,11 @@ fn collect_hir_semantics(
     }
 }
 
-fn semantic_reference(property: &HirProperty) -> Option<(String, String, TextRange)> {
-    let lower = property.key.to_ascii_lowercase();
-    let kind = if matches!(lower.as_str(), "event" | "events" | "event_id" | "trigger_event")
-        || lower.ends_with("_event")
-    {
-        Some("event")
-    } else if lower.contains("scripted_effect")
-        || lower == "call_effect"
-        || lower.ends_with("_effect")
-    {
-        Some("scripted_effect")
-    } else if lower.contains("scripted_trigger")
-        || lower == "call_trigger"
-        || lower.ends_with("_trigger")
-    {
-        Some("scripted_trigger")
-    } else if matches!(
-        lower.as_str(),
-        "localisation" | "localization" | "loc_key" | "name" | "desc" | "title" | "tooltip"
-    ) {
-        Some("localisation")
-    } else {
-        None
-    }?;
+fn semantic_reference(
+    profile: &GameProfile,
+    property: &HirProperty,
+) -> Option<(String, String, TextRange)> {
+    let kind = profile.reference_kind(&property.key)?;
     let scalar = property.scalar.as_ref()?;
     if scalar.value.is_empty()
         || scalar.value == "yes"
@@ -1507,21 +1499,7 @@ fn semantic_reference(property: &HirProperty) -> Option<(String, String, TextRan
     Some((kind.to_owned(), scalar.value.clone(), scalar.range))
 }
 
-fn definition_kind(path: &str, property: &HirProperty) -> Option<String> {
-    if path.contains("scripted_effect") {
-        return Some("scripted_effect".to_owned());
-    }
-    if path.contains("scripted_trigger") {
-        return Some("scripted_trigger".to_owned());
-    }
-    if path.contains("events/") || property.key.ends_with("_event") {
-        return Some("event".to_owned());
-    }
-    if property.value_range.is_some()
-        && matches!(property.key.as_str(), "country_event" | "province_event")
-    {
-        return Some("event".to_owned());
-    }
+fn definition_kind(path: &str) -> Option<String> {
     if let Some(kind) = eu4_dynamic_definition_kind(path) {
         return Some(kind.to_owned());
     }
@@ -1572,12 +1550,6 @@ fn eu4_dynamic_definition_kind(path: &str) -> Option<&'static str> {
         "common/tradegoods" => "tradegood",
         _ => return None,
     })
-}
-
-fn event_name(hir: &HirFile, property: &HirProperty) -> Option<String> {
-    nested_hir_property(hir, property, "id")
-        .and_then(|property| property.scalar.as_ref())
-        .map(|scalar| scalar.value.clone())
 }
 
 fn nested_hir_property<'hir>(
@@ -1632,6 +1604,7 @@ fn find_property(node: &CstNode, wanted: &str, parsed: &ParsedFile) -> Option<St
 pub struct AnalysisHost {
     revision: u64,
     rules: Arc<RuleSet>,
+    profile: Arc<GameProfile>,
     roots: Arc<[SourceRoot]>,
     workspace_root: Option<PathBuf>,
     documents: Arc<BTreeMap<DocumentId, DocumentSnapshot>>,
@@ -1651,9 +1624,17 @@ impl AnalysisHost {
     /// Creates an empty host around an immutable rule database.
     #[must_use]
     pub fn new(rules: RuleSet) -> Self {
+        let profile = GameProfile::empty(rules.game_id());
+        Self::with_profile(rules, profile)
+    }
+
+    /// Creates an empty host with explicit game-specific profile data.
+    #[must_use]
+    pub fn with_profile(rules: RuleSet, profile: GameProfile) -> Self {
         Self {
             revision: 0,
             rules: Arc::new(rules),
+            profile: Arc::new(profile),
             roots: Arc::from([]),
             workspace_root: None,
             documents: Arc::new(BTreeMap::new()),
@@ -1784,7 +1765,13 @@ impl AnalysisHost {
                 previous => {
                     let file_revision =
                         previous.map_or(0, |state| state.revision().saturating_add(1));
-                    Arc::new(build_file_state(file, text, file_revision, self.rules.as_ref()))
+                    Arc::new(build_file_state(
+                        file,
+                        text,
+                        file_revision,
+                        self.rules.as_ref(),
+                        self.profile.as_ref(),
+                    ))
                 }
             };
             file_states.insert(*id, state);
@@ -1923,6 +1910,7 @@ impl AnalysisHost {
         AnalysisSnapshot {
             revision: self.revision,
             rules: Arc::clone(&self.rules),
+            profile: Arc::clone(&self.profile),
             roots: Arc::clone(&self.roots),
             workspace_root: self.workspace_root.clone(),
             documents: Arc::clone(&self.documents),
@@ -1939,6 +1927,7 @@ impl AnalysisHost {
 pub struct AnalysisSnapshot {
     revision: u64,
     rules: Arc<RuleSet>,
+    profile: Arc<GameProfile>,
     roots: Arc<[SourceRoot]>,
     workspace_root: Option<PathBuf>,
     documents: Arc<BTreeMap<DocumentId, DocumentSnapshot>>,
@@ -1959,6 +1948,18 @@ impl AnalysisSnapshot {
     #[must_use]
     pub fn rules(&self) -> &RuleSet {
         &self.rules
+    }
+
+    /// Returns the immutable game-specific interpretation selected for this snapshot.
+    #[must_use]
+    pub fn game_profile(&self) -> &GameProfile {
+        &self.profile
+    }
+
+    /// Clones the shared game-profile handle without copying profile data.
+    #[must_use]
+    pub fn game_profile_handle(&self) -> Arc<GameProfile> {
+        Arc::clone(&self.profile)
     }
 
     /// Returns source roots in configured order.
@@ -2090,6 +2091,10 @@ mod tests {
     };
     use pdx_rules::RuleSet;
     use pdx_text::{LogicalPath, TextRange};
+
+    fn eu4_host() -> AnalysisHost {
+        AnalysisHost::with_profile(pdx_game_eu4::bootstrap_rules(), pdx_game_eu4::profile())
+    }
 
     #[test]
     fn bulk_index_build_retains_every_shard_and_definition() {
@@ -2255,7 +2260,7 @@ mod tests {
         fs::write(events.join("b.txt"), "country_event = { id = stable.b }\n").expect("b event");
         fs::write(events.join("c.txt"), "country_event = { id = stable.c }\n").expect("c event");
 
-        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
+        let mut host = eu4_host();
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -2309,7 +2314,7 @@ mod tests {
         fs::write(events.join("a.txt"), "country_event = { id = state.a }\n").expect("a event");
         fs::write(events.join("b.txt"), "country_event = { id = state.b }\n").expect("b event");
 
-        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
+        let mut host = eu4_host();
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -2378,6 +2383,7 @@ mod tests {
         let second = host.snapshot();
 
         assert!(Arc::ptr_eq(&first.rules, &second.rules));
+        assert!(Arc::ptr_eq(&first.profile, &second.profile));
         assert!(Arc::ptr_eq(&first.roots, &second.roots));
         assert!(Arc::ptr_eq(&first.documents, &second.documents));
         assert!(Arc::ptr_eq(&first.source_files, &second.source_files));
@@ -2393,6 +2399,7 @@ mod tests {
         assert_eq!(third.document(&id).expect("new snapshot sees document").text(), "one");
         assert!(!Arc::ptr_eq(&first.documents, &third.documents));
         assert!(Arc::ptr_eq(&first.roots, &third.roots));
+        assert!(Arc::ptr_eq(&first.profile, &third.profile));
         assert!(Arc::ptr_eq(&first.source_files, &third.source_files));
         assert!(Arc::ptr_eq(&first.file_states, &third.file_states));
         assert!(Arc::ptr_eq(&first.index, &third.index));
@@ -2413,7 +2420,7 @@ mod tests {
         fs::write(events.join("invalid.txt"), [0xff, 0xfe]).expect("invalid UTF-8 event");
         fs::write(events.join("large.txt"), vec![b'x'; 65]).expect("oversized event");
 
-        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
+        let mut host = eu4_host();
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -2452,7 +2459,7 @@ mod tests {
         fs::write(events.join("deep.txt"), "country_event = { id = deep.1 }\n")
             .expect("deep event");
 
-        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
+        let mut host = eu4_host();
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -2486,7 +2493,7 @@ mod tests {
         fs::create_dir_all(&events).expect("event directory");
         fs::write(events.join("a.txt"), "country_event = { id = limit.a }\n").expect("a event");
 
-        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
+        let mut host = eu4_host();
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -2527,7 +2534,7 @@ mod tests {
             .expect("outside event");
         symlink(&outside, root.join("events")).expect("directory symlink");
 
-        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
+        let mut host = eu4_host();
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -2640,7 +2647,7 @@ mod tests {
         )
         .expect("localisation");
 
-        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
+        let mut host = eu4_host();
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
             SourceRoot {
                 id: SourceRootId::new(1),
