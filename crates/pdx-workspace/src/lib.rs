@@ -95,7 +95,7 @@ pub struct SourceFile {
     pub root_id: SourceRootId,
     /// Physical disk path.
     pub physical_path: PathBuf,
-    /// EU4 logical path relative to the root.
+    /// PDX logical path relative to the root.
     pub logical_path: LogicalPath,
     /// Rules catalog category, when one matched.
     pub category_id: Option<String>,
@@ -1040,31 +1040,7 @@ fn build_file_state(
             syntax_error_count: parsed.errors().len(),
         },
         (Some(ParsedSource::Csv(parsed)), _) => {
-            let definitions =
-                if file.logical_path.as_str().eq_ignore_ascii_case("map/definition.csv") {
-                    parsed
-                        .parse()
-                        .records
-                        .iter()
-                        .flat_map(|record| record.cells.first())
-                        .filter_map(|cell| {
-                            let name = parsed.source()[usize::try_from(cell.value_range.start())
-                                .ok()?
-                                ..usize::try_from(cell.value_range.end()).ok()?]
-                                .trim()
-                                .to_owned();
-                            name.parse::<u32>().ok().map(|_| Definition {
-                                kind: "province_id".to_owned(),
-                                name,
-                                file_id: file.id,
-                                range: cell.value_range,
-                                active: true,
-                            })
-                        })
-                        .collect()
-                } else {
-                    Vec::new()
-                };
+            let definitions = collect_profile_csv_definitions(file, parsed, profile);
             FileIndexShard {
                 file_id: file.id,
                 definitions,
@@ -1093,7 +1069,7 @@ fn shard_from_parsed(
     let mut definitions = Vec::new();
     let mut references = Vec::new();
     collect_hir_semantics(file, hir, category_id, profile, &mut definitions, &mut references);
-    collect_scripted_effect_params(file, parsed, &mut definitions);
+    collect_profile_token_definitions(file, parsed, profile, &mut definitions);
     collect_profile_value_definitions(file, hir, profile, &mut definitions);
     collect_cwt_type_members(file, parsed, rules, &mut definitions);
     FileIndexShard {
@@ -1102,6 +1078,37 @@ fn shard_from_parsed(
         references,
         syntax_error_count: parsed.errors().len(),
     }
+}
+
+fn collect_profile_csv_definitions(
+    file: &SourceFile,
+    parsed: &pdx_syntax::CsvParsedFile,
+    profile: &GameProfile,
+) -> Vec<Definition> {
+    profile
+        .csv_definitions
+        .iter()
+        .filter(|rule| rule.path.matches(file.logical_path.as_str()))
+        .flat_map(|rule| {
+            parsed.parse().records.iter().filter_map(move |record| {
+                let cell = record.cells.get(rule.column)?;
+                let name = parsed.source()[usize::try_from(cell.value_range.start()).ok()?
+                    ..usize::try_from(cell.value_range.end()).ok()?]
+                    .trim()
+                    .to_owned();
+                if rule.unsigned_integer_only && name.parse::<u32>().is_err() {
+                    return None;
+                }
+                Some(Definition {
+                    kind: rule.kind.clone(),
+                    name,
+                    file_id: file.id,
+                    range: cell.value_range,
+                    active: true,
+                })
+            })
+        })
+        .collect()
 }
 
 /// Collects workspace members declared by CWT `type[...]` definitions.
@@ -1321,53 +1328,56 @@ fn collect_profile_value_definitions(
     }
 }
 
-fn collect_scripted_effect_params(
+fn collect_profile_token_definitions(
     file: &SourceFile,
     parsed: &ParsedFile,
+    profile: &GameProfile,
     definitions: &mut Vec<Definition>,
 ) {
-    let path = file.logical_path.as_str().to_ascii_lowercase();
-    if !(path.starts_with("common/scripted_effects/")
-        || path.starts_with("common/scripted_triggers/"))
+    for rule in profile
+        .token_definitions
+        .iter()
+        .filter(|rule| rule.path.matches(file.logical_path.as_str()))
     {
-        return;
-    }
-    for token in parsed.tokens().iter().filter(|token| token.kind() == pdx_syntax::TokenKind::Bare)
-    {
-        let Some(raw) = parsed.text(token.range()) else { continue };
-        let mut opening = None;
-        for (offset, character) in raw.char_indices() {
-            if character != '$' {
-                continue;
-            }
-            if let Some(start) = opening.take() {
-                if start + 1 < offset {
-                    let name = raw[start + 1..offset].to_owned();
-                    let token_start = usize::try_from(token.range().start()).unwrap_or(0);
-                    let start =
-                        u32::try_from(token_start.saturating_add(start)).unwrap_or(u32::MAX);
-                    let end = u32::try_from(
-                        token_start.saturating_add(offset.saturating_add(character.len_utf8())),
-                    )
-                    .unwrap_or(u32::MAX);
-                    let range = TextRange::new(start, end).unwrap_or(token.range());
-                    definitions.push(Definition {
-                        kind: "scripted_effect_param".to_owned(),
-                        name: name.clone(),
-                        file_id: file.id,
-                        range,
-                        active: true,
-                    });
-                    definitions.push(Definition {
-                        kind: "scripted_effect_param_dollar".to_owned(),
-                        name: format!("${name}$"),
-                        file_id: file.id,
-                        range,
-                        active: true,
-                    });
+        for token in
+            parsed.tokens().iter().filter(|token| token.kind() == pdx_syntax::TokenKind::Bare)
+        {
+            let Some(raw) = parsed.text(token.range()) else { continue };
+            let mut opening: Option<usize> = None;
+            for (offset, character) in raw.char_indices() {
+                if character != rule.delimiter {
+                    continue;
                 }
-            } else {
-                opening = Some(offset);
+                if let Some(start) = opening.take() {
+                    if start + rule.delimiter.len_utf8() < offset {
+                        let name_start = start.saturating_add(rule.delimiter.len_utf8());
+                        let name = raw[name_start..offset].to_owned();
+                        let token_start = usize::try_from(token.range().start()).unwrap_or(0);
+                        let start =
+                            u32::try_from(token_start.saturating_add(start)).unwrap_or(u32::MAX);
+                        let end = u32::try_from(
+                            token_start.saturating_add(offset.saturating_add(character.len_utf8())),
+                        )
+                        .unwrap_or(u32::MAX);
+                        let range = TextRange::new(start, end).unwrap_or(token.range());
+                        definitions.push(Definition {
+                            kind: rule.inner_kind.clone(),
+                            name: name.clone(),
+                            file_id: file.id,
+                            range,
+                            active: true,
+                        });
+                        definitions.push(Definition {
+                            kind: rule.wrapped_kind.clone(),
+                            name: format!("{}{name}{}", rule.delimiter, rule.delimiter),
+                            file_id: file.id,
+                            range,
+                            active: true,
+                        });
+                    }
+                } else {
+                    opening = Some(offset);
+                }
             }
         }
     }
@@ -1542,7 +1552,7 @@ pub struct AnalysisHost {
 }
 
 impl AnalysisHost {
-    /// Creates an empty host with the bootstrap EU4 rule identity.
+    /// Creates an empty host with no game-specific rule identity.
     #[must_use]
     pub fn empty() -> Self {
         Self::new(RuleSet::empty())
@@ -1871,7 +1881,7 @@ impl AnalysisSnapshot {
         self.revision
     }
 
-    /// Returns the immutable EU4 rules used for this snapshot.
+    /// Returns the immutable game rules used for this snapshot.
     #[must_use]
     pub fn rules(&self) -> &RuleSet {
         &self.rules
@@ -2070,12 +2080,19 @@ mod tests {
             .as_nanos();
         let root = std::env::temp_dir().join(format!("pdx-workspace-generic-profile-{nonce}"));
         let cultures = root.join("common/cultures");
-        fs::create_dir_all(&cultures).expect("culture directory");
+        let scripted_effects = root.join("common/scripted_effects");
+        let map = root.join("map");
+        for directory in [&cultures, &scripted_effects, &map] {
+            fs::create_dir_all(directory).expect("fixture directory");
+        }
         fs::write(
             cultures.join("cultures.txt"),
             "germanic = { set_country_flag = generic_flag }\n",
         )
         .expect("culture fixture");
+        fs::write(scripted_effects.join("effects.txt"), "example = { value = $AMOUNT$ }\n")
+            .expect("scripted effect fixture");
+        fs::write(map.join("definition.csv"), "1;1;2;3;generic;x\n").expect("province fixture");
 
         let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -2088,6 +2105,8 @@ mod tests {
 
         assert!(snapshot.index().definitions("culture", "germanic").is_empty());
         assert!(snapshot.index().definitions("country_flag", "generic_flag").is_empty());
+        assert!(snapshot.index().definitions("scripted_effect_param", "AMOUNT").is_empty());
+        assert!(snapshot.index().definitions("province_id", "1").is_empty());
         fs::remove_dir_all(root).expect("cleanup");
     }
 

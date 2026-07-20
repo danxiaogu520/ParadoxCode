@@ -2,9 +2,10 @@
 
 use pdx_rules::{
     CsvDialect, FileCategory, FileMatcher, FileResolutionPolicy, GameProfile, ParserKind,
-    ProfileConditionalDefinitionRule, ProfileContainerDefinitionRule, ProfileDefinitionRule,
-    ProfileMatchMode, ProfileReferenceRule, ProfileTextMatcher, ProfileValueDefinitionRule,
-    RuleSet, RulesModel, SymbolDescriptor, SymbolResolutionPolicy,
+    ProfileConditionalDefinitionRule, ProfileContainerDefinitionRule, ProfileCsvDefinitionRule,
+    ProfileDefinitionRule, ProfileMatchMode, ProfileReferenceRule, ProfileTextMatcher,
+    ProfileTokenDefinitionRule, ProfileValueDefinitionRule, RuleSet, RulesModel, SymbolDescriptor,
+    SymbolResolutionPolicy,
 };
 
 /// Stable identity stored by EU4 rule artifacts and selected by the server.
@@ -215,6 +216,26 @@ pub fn profile() -> GameProfile {
             required_value: "yes".to_owned(),
             absent_field: "legacy_equivalent".to_owned(),
         }],
+        csv_definitions: vec![ProfileCsvDefinitionRule {
+            path: matcher(ProfileMatchMode::Exact, "map/definition.csv"),
+            column: 0,
+            kind: "province_id".to_owned(),
+            unsigned_integer_only: true,
+        }],
+        token_definitions: vec![
+            ProfileTokenDefinitionRule {
+                path: matcher(ProfileMatchMode::Prefix, "common/scripted_effects/"),
+                delimiter: '$',
+                inner_kind: "scripted_effect_param".to_owned(),
+                wrapped_kind: "scripted_effect_param_dollar".to_owned(),
+            },
+            ProfileTokenDefinitionRule {
+                path: matcher(ProfileMatchMode::Prefix, "common/scripted_triggers/"),
+                delimiter: '$',
+                inner_kind: "scripted_effect_param".to_owned(),
+                wrapped_kind: "scripted_effect_param_dollar".to_owned(),
+            },
+        ],
     }
 }
 
@@ -354,5 +375,15 @@ mod tests {
             Some("culture")
         );
         assert_eq!(profile.value_definition_kind("which", Some("set_variable")), Some("variable"));
+        assert!(
+            profile
+                .csv_definitions
+                .iter()
+                .any(|rule| rule.kind == "province_id" && rule.path.matches("map/definition.csv"))
+        );
+        assert!(profile.token_definitions.iter().any(|rule| {
+            rule.inner_kind == "scripted_effect_param"
+                && rule.path.matches("common/scripted_effects/example.txt")
+        }));
     }
 }

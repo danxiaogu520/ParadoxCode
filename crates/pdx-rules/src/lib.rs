@@ -406,6 +406,32 @@ pub struct ProfileConditionalDefinitionRule {
     pub absent_field: String,
 }
 
+/// One CSV column whose cells declare workspace symbols.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProfileCsvDefinitionRule {
+    /// Logical-path selector.
+    pub path: ProfileTextMatcher,
+    /// Zero-based CSV column.
+    pub column: usize,
+    /// Stable declared symbol kind.
+    pub kind: String,
+    /// Whether non-unsigned-integer cells are ignored.
+    pub unsigned_integer_only: bool,
+}
+
+/// One delimited identifier embedded in parser tokens.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProfileTokenDefinitionRule {
+    /// Logical-path selector.
+    pub path: ProfileTextMatcher,
+    /// Opening and closing delimiter.
+    pub delimiter: char,
+    /// Kind emitted for the inner spelling.
+    pub inner_kind: String,
+    /// Kind emitted for the delimiter-wrapped spelling.
+    pub wrapped_kind: String,
+}
+
 /// Data-only game-specific interpretation selected by the composition root.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct GameProfile {
@@ -421,6 +447,10 @@ pub struct GameProfile {
     pub container_definitions: Vec<ProfileContainerDefinitionRule>,
     /// Additional definitions gated by nested fields.
     pub conditional_definitions: Vec<ProfileConditionalDefinitionRule>,
+    /// CSV columns that declare symbols.
+    pub csv_definitions: Vec<ProfileCsvDefinitionRule>,
+    /// Delimited identifiers embedded in parser tokens.
+    pub token_definitions: Vec<ProfileTokenDefinitionRule>,
 }
 
 impl GameProfile {
@@ -434,6 +464,8 @@ impl GameProfile {
             value_definitions: Vec::new(),
             container_definitions: Vec::new(),
             conditional_definitions: Vec::new(),
+            csv_definitions: Vec::new(),
+            token_definitions: Vec::new(),
         }
     }
 
