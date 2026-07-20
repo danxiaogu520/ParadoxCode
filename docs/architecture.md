@@ -1,6 +1,6 @@
 # ParadoxCode 总体架构
 
-> 2026-07-20 状态说明：通用 `pdx-rules`、EU4 profile、per-file cache、廉价 snapshot、共享结构与 profile-aware definition/reference HIR facts，以及带协作式 analysis 取消的 LSP parse/query/diagnostic worker 已落地；scope/CWT typed lowering、workspace scan 取消和发布闭环仍未达到本文约束。迁移计划见 [RFC 0013](rfc/0013-generic-engine-eu4-first.md)。
+> 2026-07-20 状态说明：通用 `pdx-rules`、EU4 profile、per-file cache、廉价 snapshot、共享结构与 profile-aware definition/reference HIR facts，以及带协作式 analysis 取消的 LSP parse/query/diagnostic worker 已落地；workspace scan 已具备原子可取消 API，但 LSP 初始化扫描仍待迁入 worker；scope/CWT typed lowering和发布闭环仍未达到本文约束。迁移计划见 [RFC 0013](rfc/0013-generic-engine-eu4-first.md)。
 
 ## 目标
 

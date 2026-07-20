@@ -11,6 +11,9 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+#[cfg(test)]
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use pdx_hir::{HirFile, lower_shared, lower_shared_with_profile};
 use pdx_rules::{FileResolutionPolicy, GameProfile, ParserKind, RuleSet, SymbolResolutionPolicy};
@@ -147,6 +150,65 @@ pub struct WorkspaceScanLimits {
     pub max_file_size: u64,
     /// Maximum number of detailed issues retained in a scan report.
     pub max_reported_issues: usize,
+}
+
+/// Shared cooperative-cancellation state for source-root discovery and indexing.
+#[derive(Clone, Debug)]
+pub struct WorkspaceScanToken {
+    cancelled: Arc<AtomicBool>,
+    #[cfg(test)]
+    remaining_checkpoints: Arc<AtomicUsize>,
+}
+
+impl Default for WorkspaceScanToken {
+    fn default() -> Self {
+        Self {
+            cancelled: Arc::new(AtomicBool::new(false)),
+            #[cfg(test)]
+            remaining_checkpoints: Arc::new(AtomicUsize::new(usize::MAX)),
+        }
+    }
+}
+
+impl WorkspaceScanToken {
+    /// Creates an uncancelled scan token.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Cancels discovery, file materialization, and index work using this token.
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Release);
+    }
+
+    /// Reports whether cancellation has been requested.
+    #[must_use]
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Acquire)
+    }
+
+    fn checkpoint(&self) -> Result<(), WorkspaceError> {
+        #[cfg(test)]
+        if self
+            .remaining_checkpoints
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
+                if remaining != usize::MAX && remaining > 0 { Some(remaining - 1) } else { None }
+            })
+            .is_err_and(|remaining| remaining == 0)
+        {
+            self.cancel();
+        }
+        if self.is_cancelled() { Err(WorkspaceError::Cancelled) } else { Ok(()) }
+    }
+
+    #[cfg(test)]
+    fn cancel_after(checkpoints: usize) -> Self {
+        Self {
+            cancelled: Arc::new(AtomicBool::new(false)),
+            remaining_checkpoints: Arc::new(AtomicUsize::new(checkpoints)),
+        }
+    }
 }
 
 impl Default for WorkspaceScanLimits {
@@ -357,10 +419,26 @@ impl WorkspaceIndex {
     /// Builds an index from a complete set of file shards and derives lookup maps once.
     #[must_use]
     pub fn from_shards(shards: impl IntoIterator<Item = FileIndexShard>) -> Self {
+        match Self::from_shards_cancellable(shards, &WorkspaceScanToken::new()) {
+            Ok(index) => index,
+            Err(WorkspaceError::Cancelled) => {
+                unreachable!("a fresh workspace scan token cannot be cancelled")
+            }
+            Err(_) => unreachable!("index construction has no other fallible operation"),
+        }
+    }
+
+    fn from_shards_cancellable(
+        shards: impl IntoIterator<Item = FileIndexShard>,
+        cancellation: &WorkspaceScanToken,
+    ) -> Result<Self, WorkspaceError> {
         let mut index = Self::empty();
-        index.shards.extend(shards.into_iter().map(|shard| (shard.file_id, shard)));
-        index.rebuild_maps();
-        index
+        for shard in shards {
+            cancellation.checkpoint()?;
+            index.shards.insert(shard.file_id, shard);
+        }
+        index.rebuild_maps_cancellable(cancellation)?;
+        Ok(index)
     }
 
     /// Returns all retained definitions for a kind/name, including shadowed ones.
@@ -414,9 +492,29 @@ impl WorkspaceIndex {
         self.sort_definition_buckets(&affected);
     }
 
+    #[cfg(test)]
     fn resolve_priorities(&mut self, priorities: &BTreeMap<SourceFileId, u64>, rules: &RuleSet) {
+        match self.resolve_priorities_cancellable(priorities, rules, &WorkspaceScanToken::new()) {
+            Ok(()) => {}
+            Err(WorkspaceError::Cancelled) => {
+                unreachable!("a fresh workspace scan token cannot be cancelled")
+            }
+            Err(_) => unreachable!("priority resolution has no other fallible operation"),
+        }
+    }
+
+    fn resolve_priorities_cancellable(
+        &mut self,
+        priorities: &BTreeMap<SourceFileId, u64>,
+        rules: &RuleSet,
+        cancellation: &WorkspaceScanToken,
+    ) -> Result<(), WorkspaceError> {
         let keys = self.definitions.keys().cloned().collect::<Vec<_>>();
-        self.resolve_definition_buckets(&keys, priorities, rules);
+        for key in &keys {
+            cancellation.checkpoint()?;
+            self.resolve_definition_buckets(std::slice::from_ref(key), priorities, rules);
+        }
+        Ok(())
     }
 
     fn replace_shard_resolved(
@@ -506,11 +604,16 @@ impl WorkspaceIndex {
         }
     }
 
-    fn rebuild_maps(&mut self) {
+    fn rebuild_maps_cancellable(
+        &mut self,
+        cancellation: &WorkspaceScanToken,
+    ) -> Result<(), WorkspaceError> {
         self.definitions.clear();
         self.references.clear();
         for shard in self.shards.values() {
+            cancellation.checkpoint()?;
             for definition in &shard.definitions {
+                cancellation.checkpoint()?;
                 self.definitions
                     .entry((definition.kind.clone(), definition.name.to_ascii_lowercase()))
                     .or_default()
@@ -519,8 +622,10 @@ impl WorkspaceIndex {
             self.references.insert(shard.file_id, shard.references.clone());
         }
         for values in self.definitions.values_mut() {
+            cancellation.checkpoint()?;
             values.sort_by_key(|definition| (!definition.active, definition.file_id));
         }
+        Ok(())
     }
 }
 
@@ -774,6 +879,8 @@ impl std::error::Error for DocumentError {}
 /// Errors raised while materializing source roots and index shards.
 #[derive(Debug)]
 pub enum WorkspaceError {
+    /// The caller cancelled source discovery or index materialization.
+    Cancelled,
     /// Filesystem discovery or read failure.
     Io(std::io::Error),
     /// A root-relative path escaped its logical root.
@@ -787,6 +894,7 @@ pub enum WorkspaceError {
 impl fmt::Display for WorkspaceError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Cancelled => formatter.write_str("workspace scan was cancelled"),
             Self::Io(error) => write!(formatter, "workspace I/O error: {error}"),
             Self::InvalidLogicalPath(path) => {
                 write!(formatter, "invalid workspace logical path: {}", path.display())
@@ -828,7 +936,9 @@ fn collect_disk_files(
     limits: WorkspaceScanLimits,
     report: &mut WorkspaceScanReport,
     output: &mut Vec<(LogicalPath, PathBuf)>,
+    cancellation: &WorkspaceScanToken,
 ) -> Result<(), WorkspaceError> {
+    cancellation.checkpoint()?;
     let entries = match fs::read_dir(current) {
         Ok(entries) => entries,
         Err(error) if depth == 0 => return Err(WorkspaceError::Io(error)),
@@ -860,6 +970,7 @@ fn collect_disk_files(
         .collect::<Vec<_>>();
     entries.sort_by_key(|entry| entry.file_name());
     for entry in entries {
+        cancellation.checkpoint()?;
         let path = entry.path();
         let file_type = match entry.file_type() {
             Ok(file_type) => file_type,
@@ -898,7 +1009,7 @@ fn collect_disk_files(
                 );
                 continue;
             }
-            collect_disk_files(root, &path, depth + 1, limits, report, output)?;
+            collect_disk_files(root, &path, depth + 1, limits, report, output, cancellation)?;
             continue;
         }
         if !file_type.is_file() {
@@ -925,6 +1036,16 @@ fn read_source_file(
     limits: WorkspaceScanLimits,
     report: &mut WorkspaceScanReport,
 ) -> Option<String> {
+    read_source_file_cancellable(path, limits, report, &WorkspaceScanToken::new()).ok().flatten()
+}
+
+fn read_source_file_cancellable(
+    path: &std::path::Path,
+    limits: WorkspaceScanLimits,
+    report: &mut WorkspaceScanReport,
+    cancellation: &WorkspaceScanToken,
+) -> Result<Option<String>, WorkspaceError> {
+    cancellation.checkpoint()?;
     let metadata = match fs::metadata(path) {
         Ok(metadata) => metadata,
         Err(error) => {
@@ -935,7 +1056,7 @@ fn read_source_file(
                 path.to_owned(),
                 error.to_string(),
             );
-            return None;
+            return Ok(None);
         }
     };
     if metadata.len() > limits.max_file_size {
@@ -950,7 +1071,7 @@ fn read_source_file(
                 limits.max_file_size
             ),
         );
-        return None;
+        return Ok(None);
     }
     let file = match fs::File::open(path) {
         Ok(file) => file,
@@ -962,7 +1083,7 @@ fn read_source_file(
                 path.to_owned(),
                 error.to_string(),
             );
-            return None;
+            return Ok(None);
         }
     };
     let mut bytes = Vec::new();
@@ -974,8 +1095,9 @@ fn read_source_file(
             path.to_owned(),
             error.to_string(),
         );
-        return None;
+        return Ok(None);
     }
+    cancellation.checkpoint()?;
     if u64::try_from(bytes.len()).map_or(true, |size| size > limits.max_file_size) {
         record_scan_issue(
             report,
@@ -984,10 +1106,10 @@ fn read_source_file(
             path.to_owned(),
             format!("file grew beyond the configured limit of {} bytes", limits.max_file_size),
         );
-        return None;
+        return Ok(None);
     }
     match String::from_utf8(bytes) {
-        Ok(text) => Some(text),
+        Ok(text) => Ok(Some(text)),
         Err(error) => {
             record_scan_issue(
                 report,
@@ -996,7 +1118,7 @@ fn read_source_file(
                 path.to_owned(),
                 error.to_string(),
             );
-            None
+            Ok(None)
         }
     }
 }
@@ -1645,22 +1767,57 @@ impl AnalysisHost {
         self.refresh_source_roots_with_limits(WorkspaceScanLimits::default())
     }
 
+    /// Scans configured roots while cooperatively observing `cancellation`.
+    pub fn refresh_source_roots_cancellable(
+        &mut self,
+        cancellation: &WorkspaceScanToken,
+    ) -> Result<WorkspaceScanReport, WorkspaceError> {
+        self.refresh_source_roots_with_limits_and_cancellation(
+            WorkspaceScanLimits::default(),
+            cancellation,
+        )
+    }
+
     /// Scans all configured roots with explicit resource limits.
     pub fn refresh_source_roots_with_limits(
         &mut self,
         limits: WorkspaceScanLimits,
     ) -> Result<WorkspaceScanReport, WorkspaceError> {
+        self.refresh_source_roots_with_limits_and_cancellation(limits, &WorkspaceScanToken::new())
+    }
+
+    /// Scans configured roots with explicit resource limits and cooperative cancellation.
+    pub fn refresh_source_roots_with_limits_and_cancellation(
+        &mut self,
+        limits: WorkspaceScanLimits,
+        cancellation: &WorkspaceScanToken,
+    ) -> Result<WorkspaceScanReport, WorkspaceError> {
+        cancellation.checkpoint()?;
         let mut files: BTreeMap<SourceFileId, SourceFile> = BTreeMap::new();
         let mut texts = BTreeMap::new();
         let mut report = WorkspaceScanReport::default();
         for root in self.roots.iter() {
+            cancellation.checkpoint()?;
             let mut paths = Vec::new();
-            collect_disk_files(&root.path, &root.path, 0, limits, &mut report, &mut paths)?;
+            collect_disk_files(
+                &root.path,
+                &root.path,
+                0,
+                limits,
+                &mut report,
+                &mut paths,
+                cancellation,
+            )?;
             paths.sort_by(|left, right| left.0.cmp(&right.0));
             for (logical, physical) in paths {
+                cancellation.checkpoint()?;
                 let id = SourceFileId::new(stable_file_id(root.id, &logical));
                 let Some(category) = self.rules.classify(&logical) else { continue };
-                let Some(text) = read_source_file(&physical, limits, &mut report) else { continue };
+                let Some(text) =
+                    read_source_file_cancellable(&physical, limits, &mut report, cancellation)?
+                else {
+                    continue;
+                };
                 if let Some(existing) = files.get(&id) {
                     return Err(WorkspaceError::FileIdCollision {
                         first: existing.physical_path.clone(),
@@ -1682,6 +1839,7 @@ impl AnalysisHost {
         }
         let mut file_states = BTreeMap::new();
         for (id, file) in &files {
+            cancellation.checkpoint()?;
             let Some(text) = texts.remove(id) else { continue };
             let state = match self.file_states.get(id) {
                 Some(previous)
@@ -1703,10 +1861,12 @@ impl AnalysisHost {
             };
             file_states.insert(*id, state);
         }
+        cancellation.checkpoint()?;
         let shards = file_states.values().map(|state| state.shard().clone());
-        let mut index = WorkspaceIndex::from_shards(shards);
+        let mut index = WorkspaceIndex::from_shards_cancellable(shards, cancellation)?;
         let priorities = source_priorities(&self.roots, &files);
-        index.resolve_priorities(&priorities, self.rules.as_ref());
+        index.resolve_priorities_cancellable(&priorities, self.rules.as_ref(), cancellation)?;
+        cancellation.checkpoint()?;
         self.source_files = Arc::new(files);
         self.file_states = Arc::new(file_states);
         self.index = Arc::new(index);
@@ -2098,8 +2258,8 @@ mod tests {
     use super::{
         AnalysisHost, Definition, DocumentId, DocumentSource, FileIndexShard, ParsedSource,
         Reference, SourceFileId, SourceRoot, SourceRootId, SourceRootKind, TextChange,
-        WorkspaceIndex, WorkspaceScanIssueKind, WorkspaceScanLimits, pipeline_counts,
-        reset_pipeline_counts,
+        WorkspaceError, WorkspaceIndex, WorkspaceScanIssueKind, WorkspaceScanLimits,
+        WorkspaceScanToken, pipeline_counts, reset_pipeline_counts,
     };
     use pdx_rules::RuleSet;
     use pdx_text::{LogicalPath, TextRange};
@@ -2625,6 +2785,51 @@ mod tests {
         assert_eq!(after.revision(), before.revision());
         assert_eq!(after.source_files(), before.source_files());
         assert_eq!(after.scan_report(), before.scan_report());
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn cancelled_scan_preserves_the_previous_snapshot_atomically() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-workspace-cancel-scan-{nonce}"));
+        let events = root.join("events");
+        fs::create_dir_all(&events).expect("event directory");
+        fs::write(events.join("baseline.txt"), "country_event = { id = baseline.1 }\n")
+            .expect("baseline event");
+
+        let mut host = eu4_host();
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        host.refresh_source_roots().expect("initial scan");
+        let before = host.snapshot();
+        for index in 0..32 {
+            fs::write(
+                events.join(format!("new-{index:02}.txt")),
+                format!("country_event = {{ id = cancelled.{index} }}\n"),
+            )
+            .expect("new event");
+        }
+
+        let cancellation = WorkspaceScanToken::cancel_after(5);
+        let error = host
+            .refresh_source_roots_cancellable(&cancellation)
+            .expect_err("scan should stop at an internal checkpoint");
+        assert!(matches!(error, WorkspaceError::Cancelled));
+        assert!(cancellation.is_cancelled());
+
+        let after = host.snapshot();
+        assert_eq!(after.revision(), before.revision());
+        assert!(Arc::ptr_eq(&after.source_files, &before.source_files));
+        assert!(Arc::ptr_eq(&after.file_states, &before.file_states));
+        assert!(Arc::ptr_eq(&after.index, &before.index));
+        assert!(Arc::ptr_eq(&after.scan_report, &before.scan_report));
+        assert!(after.index().definitions("event", "cancelled.0").is_empty());
         fs::remove_dir_all(root).expect("cleanup");
     }
 

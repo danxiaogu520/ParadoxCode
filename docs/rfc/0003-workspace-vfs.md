@@ -59,6 +59,8 @@ Vanilla < Dependency Mods（配置顺序）< Current Mod < Open Document Overlay
 
 根目录不可读、文件总数越界和稳定 ID 冲突属于 workspace-level error，失败刷新不得替换上一个有效 snapshot。单个嵌套目录或文件不可读、文件过大、文件不是 UTF-8 等属于可恢复问题：跳过该项、保留有界 `WorkspaceScanReport`，其余文件继续进入索引。读取分类后的文件时仍使用有界 reader，避免文件在 metadata 检查后增长造成无界分配。
 
+目录发现、受限读取、逐文件 parse/lower、bulk index 和 priority resolution 共用 `WorkspaceScanToken` 检查点。取消与 workspace-level error 一样在提交前退出，必须保留旧 revision、source files、`FileState`、index 和 scan report；LSP 初始化扫描迁入 worker 后直接使用该接口。
+
 ## 文件分类
 
 文件 matcher 完全来自 Eu4Rules，包括 bootstrap CWT 中 `type[...]` 的 `path`、`path_strict`、`path_file`、`path_extension`、`type_per_file` 等规范化约束。Event、scripted effect、scripted trigger 和 localisation 是强制回归类别，但不是分类白名单。

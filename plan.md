@@ -259,7 +259,7 @@ Workspace/index：
 4. 删除 analysis query-time 全 workspace 重解析，查询只读取当前 HIR 与 WorkspaceIndex（已完成）；
 5. 增加 index bulk build 和真正的单 shard 增量 replacement（已完成）；
 6. 修复稳定 SourceFileId、symlink 顺序、文件大小/深度/数量限制和错误隔离（已完成）；
-7. 将 LSP transport 迁移到类型化协议层，增加 worker、debounce、版本门和在途取消（stdio reader 分离、prepared-document parse worker/三重提交门、semantic diagnostics 200ms debounce、snapshot request worker、共享 cancellation token 与 analysis 内部 checkpoint 已完成；`lsp-types` 已接管当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 和语言功能 response，轻量 JSON-RPC framing 有意保留；workspace scan 取消待完成）；
+7. 将 LSP transport 迁移到类型化协议层，增加 worker、debounce、版本门和在途取消（stdio reader 分离、prepared-document parse worker/三重提交门、semantic diagnostics 200ms debounce、snapshot request worker、共享 cancellation token 与 analysis 内部 checkpoint 已完成；workspace scan 已具备目录/读取/parse/lower/index 检查点及取消原子性回归，LSP 初始化扫描迁入可取消 worker 待完成；`lsp-types` 已接管当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 和语言功能 response，轻量 JSON-RPC framing 有意保留）；
 8. 接入 formatting、dependency roots、Vanilla cache 持久化和文件变化更新；
 9. 建立大型 synthetic workspace benchmark 与“编辑一个文件只 parse/lower 一次”计数测试（已完成：默认 2,000 个原创 EU4 event 文件，覆盖 cold/unchanged/单磁盘变化/单 overlay 编辑；线程局部测试计数器证明 overlay 编辑 parse/lower 各一次且不重建磁盘 `FileState`）；
 10. 完成 Zed 自动获取、多平台 release、checksum 和干净 clone 端到端安装测试。
