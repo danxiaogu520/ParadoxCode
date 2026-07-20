@@ -8,16 +8,17 @@ importer, a validated SQLite rules artifact, a source-root/overlay workspace ind
 editor-neutral language analysis with diagnostics, completion, hover, navigation, and safe
 semantic rename.
 
-The alpha is not yet a complete end-user release. Incremental HIR/index updates, cheap immutable
-snapshots, cancellable background diagnostics, full Vanilla/dependency configuration, formatter
-LSP wiring, automatic server installation, and cross-platform release packaging remain active
-work. See [RFC 0013](docs/rfc/0013-generic-engine-eu4-first.md) for the accepted engine/profile
-boundary.
+The alpha is not yet a complete end-user release. Per-file HIR/index updates, cheap immutable
+snapshots, cancellable background work, formatter LSP wiring, and ordered read-only dependency
+configuration are implemented. Persistent Vanilla caching, watched-file updates, automatic server
+installation, and cross-platform release packaging remain active work. See
+[workspace configuration](docs/configuration.md) for current Mod/dependency setup and
+[RFC 0013](docs/rfc/0013-generic-engine-eu4-first.md) for the accepted engine/profile boundary.
 
 The runtime parser does not compile or link Tree-sitter C. The `grammars/tree-sitter-*` directories
 remain solely for Zed's editor-side highlighting and corpus checks. The committed rule artifact is
-schema 10, with canonical rule hash
-`1818e5fe1fd4b0f4c5ba0759c33351779a7ca4669de7d02bc0f9634dc2aaff35`.
+schema 12, with canonical rule hash
+`446f21f2c08d8d802c8769df34259f880bb63467726592d3f95ee1cea7b71484`.
 
 ## Build and verify Phase 6A
 

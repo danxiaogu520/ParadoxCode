@@ -3,7 +3,7 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
-> 实现进度（2026-07-20）：stdio reader 与 workspace event loop 已分离；initialize 的 source-root scan 在候选 host worker 中运行，目录/读取/parse/lower/index 全链路可取消且仅在成功后提交；编辑先 stage 最新文本/版本，parse/lower 在 snapshot worker 准备，并通过版本、文本、路径三重提交门拒绝旧结果；依赖语义的请求按消息顺序等待最新 parse。semantic diagnostics 使用 200ms debounce 与版本门，普通语言请求也在 snapshot worker 执行；`$/cancelRequest` 与过期 diagnostics 使用共享的 editor-neutral token，在 workspace semantic 合并、CWT 递归和主要结果遍历中协作式中止。当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 与语言功能 response 已迁入 `lsp-types`，JSON-RPC framing 继续保持轻量自有实现。
+> 实现进度（2026-07-20）：stdio reader 与 workspace event loop 已分离；initialize 的 source-root scan 在候选 host worker 中运行，目录/读取/parse/lower/index 全链路可取消且仅在成功后提交；编辑先 stage 最新文本/版本，parse/lower 在 snapshot worker 准备，并通过版本、文本、路径三重提交门拒绝旧结果；依赖语义的请求按消息顺序等待最新 parse。semantic diagnostics 使用 200ms debounce 与版本门，普通语言请求也在 snapshot worker 执行；`$/cancelRequest` 与过期 diagnostics 使用共享的 editor-neutral token，在 workspace semantic 合并、CWT 递归和主要结果遍历中协作式中止。当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 与语言功能 response 已迁入 `lsp-types`，JSON-RPC framing 继续保持轻量自有实现。类型化 `initializationOptions`、项目 TOML、Current Mod 与有序只读 Dependency roots 已接入；持久化 Vanilla cache 和 watched-file 定向更新待完成。
 
 ## 边界
 
@@ -50,15 +50,15 @@ Exited
 ```json
 {
   "projectConfig": ".pdx/project.toml",
-  "modDirectory": "workspace/current mod absolute path",
+  "modDirectory": "mod",
   "dependencies": [
-    { "id": "dependency-id", "path": "resolved absolute path" }
+    { "id": "dependency-id", "path": "dependencies/dependency-id" }
   ],
-  "vanillaIndexCache": "absolute local cache path"
+  "vanillaIndexCache": ".pdx/cache/vanilla.pdxindex"
 }
 ```
 
-`dependencies` 按从低到高优先级解释。项目固定为 EU4，不接受 game id、game version 或 DLC source roots。规则路径由 process argument 提供，不在项目配置中 pin `rule_hash`。
+`projectConfig` 和其余路径的相对路径均以 client 打开的 workspace root 为基准；inline 字段逐字段覆盖 TOML。`dependencies` 按从低到高优先级解释，ID 大小写不敏感地唯一并产生稳定 root identity；目录必须存在且 root 之间不得相同或嵌套。Current Mod 可写，Dependency 只读。项目固定为 EU4，不接受 game id、game version 或 DLC source roots。规则路径由 process argument 提供，不在项目配置中 pin `rule_hash`。当前 alpha 在持久化加载实现前明确拒绝 `vanillaIndexCache`，不会静默忽略。
 
 客户端未提供配置时，server 仍提供 syntax features，并发布 workspace configuration warning；不得猜测 Steam 安装路径后静默扫描。Vanilla cache 缺失时不自动扫描游戏目录。
 

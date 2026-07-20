@@ -6,6 +6,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::fmt;
+use std::fs;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -40,8 +41,8 @@ use pdx_workspace::{
     PreparedDocument, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange, WorkspaceError,
     WorkspaceScanToken,
 };
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 const JSON_RPC_VERSION: &str = "2.0";
@@ -52,6 +53,7 @@ const INVALID_PARAMS: i64 = -32602;
 const SERVER_NOT_INITIALIZED: i64 = -32002;
 const REQUEST_CANCELLED: i64 = -32800;
 const DIAGNOSTIC_DEBOUNCE: Duration = Duration::from_millis(200);
+const PROJECT_CONFIG_MAX_BYTES: u64 = 1024 * 1024;
 
 /// Lifecycle state of the server process.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -73,6 +75,32 @@ pub enum ServerState {
 pub struct InitializeOptions {
     /// Optional packaged EU4 rules path. The server validates and loads it read-only before serving.
     pub rules_path: Option<PathBuf>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(default, deny_unknown_fields, rename_all = "camelCase")]
+struct WorkspaceInitializationOptions {
+    project_config: Option<PathBuf>,
+    mod_directory: Option<PathBuf>,
+    dependencies: Option<Vec<DependencyConfiguration>>,
+    vanilla_index_cache: Option<PathBuf>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct DependencyConfiguration {
+    id: String,
+    path: PathBuf,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(default, deny_unknown_fields)]
+struct ProjectConfiguration {
+    #[serde(alias = "modDirectory")]
+    mod_directory: Option<PathBuf>,
+    dependencies: Option<Vec<DependencyConfiguration>>,
+    #[serde(alias = "vanillaIndexCache")]
+    vanilla_index_cache: Option<PathBuf>,
 }
 
 /// Errors raised by the server transport or process lifecycle.
@@ -219,8 +247,8 @@ enum TransportEvent {
 }
 
 impl RpcError {
-    fn new(code: i64, message: &'static str) -> Self {
-        Self { code, message: message.to_owned() }
+    fn new(code: i64, message: impl Into<String>) -> Self {
+        Self { code, message: message.into() }
     }
 
     fn response(&self, id: Value) -> Value {
@@ -1084,6 +1112,7 @@ fn prepare_initialize_candidate(
     if cancellation.is_cancelled() {
         return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
     }
+    let initialization_options = params.initialization_options.clone();
     #[allow(deprecated)]
     let root_uri = params.root_uri;
     let root = root_uri.as_ref().map(|uri| parse_file_uri_str(uri.as_str())).transpose()?;
@@ -1093,17 +1122,13 @@ fn prepare_initialize_candidate(
         .and_then(|folders| folders.first())
         .map(|folder| parse_file_uri_str(folder.uri.as_str()))
         .transpose()?;
-    let root = root.or(workspace_root);
-    host.apply_change(WorkspaceChange::SetWorkspaceRoot(root.clone()));
-    if let Some(root) = root.filter(|path| path.is_dir()) {
-        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
-            root,
-        )]));
-        if scan_workspace {
-            host.refresh_source_roots_cancellable(cancellation).map_err(workspace_scan_error)?;
-        }
+    let client_root = root.or(workspace_root);
+    let (workspace_root, roots) =
+        resolve_source_roots(client_root.as_deref(), initialization_options, cancellation)?;
+    host.apply_change(WorkspaceChange::SetWorkspaceRoot(workspace_root));
+    host.apply_change(WorkspaceChange::SetSourceRoots(roots.clone()));
+    if scan_workspace && !roots.is_empty() {
+        host.refresh_source_roots_cancellable(cancellation).map_err(workspace_scan_error)?;
     }
     if cancellation.is_cancelled() {
         return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
@@ -1143,6 +1168,189 @@ fn prepare_initialize_candidate(
         message: format!("failed to serialize initialize result: {error}"),
     })?;
     Ok((host, result))
+}
+
+fn resolve_source_roots(
+    client_root: Option<&Path>,
+    initialization_options: Option<Value>,
+    cancellation: &WorkspaceScanToken,
+) -> Result<(Option<PathBuf>, Vec<SourceRoot>), RpcError> {
+    let inline = initialization_options.map_or_else(
+        || Ok(WorkspaceInitializationOptions::default()),
+        |value| {
+            serde_json::from_value::<WorkspaceInitializationOptions>(value).map_err(|error| {
+                RpcError::new(INVALID_PARAMS, format!("invalid initializationOptions: {error}"))
+            })
+        },
+    )?;
+    let base = client_root.map(Path::to_path_buf);
+    let mut project = if let Some(path) = inline.project_config.as_deref() {
+        let path = resolve_path(path, base.as_deref(), "projectConfig")?;
+        if !path.is_file() {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!("projectConfig is not a file: {}", path.display()),
+            ));
+        }
+        if cancellation.is_cancelled() {
+            return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
+        }
+        let file = fs::File::open(&path).map_err(|error| {
+            RpcError::new(
+                INVALID_PARAMS,
+                format!("cannot open projectConfig {}: {error}", path.display()),
+            )
+        })?;
+        let mut text = String::new();
+        file.take(PROJECT_CONFIG_MAX_BYTES + 1).read_to_string(&mut text).map_err(|error| {
+            RpcError::new(
+                INVALID_PARAMS,
+                format!("cannot read projectConfig {}: {error}", path.display()),
+            )
+        })?;
+        if text.len() as u64 > PROJECT_CONFIG_MAX_BYTES {
+            return Err(RpcError::new(INVALID_PARAMS, "projectConfig exceeds 1 MiB"));
+        }
+        toml::from_str::<ProjectConfiguration>(&text).map_err(|error| {
+            RpcError::new(INVALID_PARAMS, format!("invalid projectConfig TOML: {error}"))
+        })?
+    } else {
+        ProjectConfiguration::default()
+    };
+    if inline.mod_directory.is_some() {
+        project.mod_directory = inline.mod_directory;
+    }
+    if inline.dependencies.is_some() {
+        project.dependencies = inline.dependencies;
+    }
+    if inline.vanilla_index_cache.is_some() {
+        project.vanilla_index_cache = inline.vanilla_index_cache;
+    }
+    if project.vanilla_index_cache.is_some() {
+        return Err(RpcError::new(
+            INVALID_PARAMS,
+            "vanillaIndexCache is not supported until persistent cache loading is enabled",
+        ));
+    }
+
+    let current_mod = match project.mod_directory.as_deref() {
+        Some(path) => Some(resolve_directory(path, base.as_deref(), "modDirectory")?),
+        None => {
+            client_root.filter(|path| path.is_dir()).map(fs::canonicalize).transpose().map_err(
+                |error| {
+                    RpcError::new(INVALID_PARAMS, format!("cannot resolve workspace root: {error}"))
+                },
+            )?
+        }
+    };
+    let mut configured = Vec::<(String, PathBuf)>::new();
+    let mut root_ids = BTreeMap::<u32, String>::new();
+    for dependency in project.dependencies.unwrap_or_default() {
+        if dependency.id.trim().is_empty() {
+            return Err(RpcError::new(INVALID_PARAMS, "dependency id must not be empty"));
+        }
+        if dependency.id != dependency.id.trim() {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!("dependency id must not have surrounding whitespace: {}", dependency.id),
+            ));
+        }
+        if configured.iter().any(|(id, _)| id.eq_ignore_ascii_case(&dependency.id)) {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!("duplicate dependency id: {}", dependency.id),
+            ));
+        }
+        let path = resolve_directory(&dependency.path, base.as_deref(), "dependency path")?;
+        let root_id = stable_dependency_root_id(&dependency.id);
+        if let Some(previous) = root_ids.insert(root_id, dependency.id.clone()) {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!("dependency root id collision between {previous} and {}", dependency.id),
+            ));
+        }
+        configured.push((dependency.id, path));
+    }
+
+    let mut paths = configured.iter().map(|(_, path)| path).collect::<Vec<_>>();
+    if let Some(current_mod) = current_mod.as_ref() {
+        paths.push(current_mod);
+    }
+    for (index, left) in paths.iter().enumerate() {
+        for right in paths.iter().skip(index + 1) {
+            if left.starts_with(right) || right.starts_with(left) {
+                return Err(RpcError::new(
+                    INVALID_PARAMS,
+                    format!(
+                        "source roots must not overlap: {} and {}",
+                        left.display(),
+                        right.display()
+                    ),
+                ));
+            }
+        }
+    }
+
+    let mut roots = Vec::with_capacity(configured.len() + usize::from(current_mod.is_some()));
+    for (order, (id, path)) in configured.into_iter().enumerate() {
+        let mut root = SourceRoot::new(
+            SourceRootId::new(stable_dependency_root_id(&id)),
+            SourceRootKind::Dependency,
+            path,
+        );
+        root.order = u32::try_from(order).map_err(|_| {
+            RpcError::new(INVALID_PARAMS, "too many dependency roots to assign stable order")
+        })?;
+        roots.push(root);
+    }
+    if let Some(path) = current_mod.clone() {
+        roots.push(SourceRoot::new(SourceRootId::new(u32::MAX), SourceRootKind::CurrentMod, path));
+    }
+    Ok((current_mod.or(base), roots))
+}
+
+fn resolve_directory(
+    path: &Path,
+    base: Option<&Path>,
+    field: &'static str,
+) -> Result<PathBuf, RpcError> {
+    let path = resolve_path(path, base, field)?;
+    if !path.is_dir() {
+        return Err(RpcError::new(
+            INVALID_PARAMS,
+            format!("{field} is not a directory: {}", path.display()),
+        ));
+    }
+    Ok(path)
+}
+
+fn resolve_path(
+    path: &Path,
+    base: Option<&Path>,
+    field: &'static str,
+) -> Result<PathBuf, RpcError> {
+    let candidate = if path.is_absolute() {
+        path.to_owned()
+    } else {
+        let base = base.ok_or_else(|| {
+            RpcError::new(INVALID_PARAMS, format!("relative {field} requires a workspace root"))
+        })?;
+        base.join(path)
+    };
+    fs::canonicalize(&candidate).map_err(|error| {
+        RpcError::new(
+            INVALID_PARAMS,
+            format!("cannot resolve {field} {}: {error}", candidate.display()),
+        )
+    })
+}
+
+fn stable_dependency_root_id(id: &str) -> u32 {
+    let mut value = 0x811c9dc5_u32;
+    for byte in id.bytes().map(|byte| byte.to_ascii_lowercase()) {
+        value = (value ^ u32::from(byte)).wrapping_mul(0x0100_0193);
+    }
+    if matches!(value, 0 | u32::MAX) { value ^ 0x8000_0000 } else { value }
 }
 
 #[derive(Clone, Debug)]
@@ -2194,6 +2402,136 @@ mod tests {
                 .as_array()
                 .is_some_and(|edits| edits.iter().all(|edit| edit["newText"] == "renamed.1"))
         }));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn project_config_loads_ordered_dependencies_and_keeps_them_read_only() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-lsp-project-config-{nonce}"));
+        let config_dir = root.join(".pdx");
+        let current = root.join("mod");
+        let low = root.join("dependencies/low");
+        let high = root.join("dependencies/high");
+        fs::create_dir_all(&config_dir).expect("config directory");
+        for directory in [&current, &low, &high] {
+            fs::create_dir_all(directory.join("common/events")).expect("fixture directory");
+        }
+        let (_, inline_roots) = super::resolve_source_roots(
+            Some(&root),
+            Some(json!({
+                "modDirectory": "mod",
+                "dependencies": [
+                    {"id": "low", "path": "dependencies/low"},
+                    {"id": "high", "path": "dependencies/high"}
+                ]
+            })),
+            &pdx_workspace::WorkspaceScanToken::new(),
+        )
+        .expect("inline initializationOptions");
+        assert_eq!(inline_roots.len(), 3);
+        let overlap = super::resolve_source_roots(
+            Some(&root),
+            Some(json!({
+                "modDirectory": "mod",
+                "dependencies": [{"id": "nested", "path": "mod/common"}]
+            })),
+            &pdx_workspace::WorkspaceScanToken::new(),
+        )
+        .expect_err("nested source roots must be rejected");
+        assert_eq!(overlap.code, INVALID_PARAMS);
+        assert!(overlap.message.contains("must not overlap"));
+        fs::write(
+            config_dir.join("project.toml"),
+            r#"mod_directory = "mod"
+
+[[dependencies]]
+id = "low"
+path = "dependencies/low"
+
+[[dependencies]]
+id = "high"
+path = "dependencies/high"
+"#,
+        )
+        .expect("project config");
+        fs::write(
+            low.join("common/events/definitions.txt"),
+            concat!(
+                "country_event = { id = shared.1 }\n",
+                "country_event = { id = dependency-shared.1 }\n",
+                "country_event = { id = dependency.1 }\n"
+            ),
+        )
+        .expect("low dependency");
+        fs::write(
+            high.join("common/events/definitions.txt"),
+            "country_event = { id = shared.1 }\ncountry_event = { id = dependency-shared.1 }\n",
+        )
+        .expect("high dependency");
+        fs::write(
+            current.join("common/events/definitions.txt"),
+            "country_event = { id = shared.1 }\n",
+        )
+        .expect("current mod");
+        let reference_path = current.join("common/events/reference.txt");
+        fs::write(&reference_path, "event = dependency.1\n").expect("current reference");
+
+        let rules_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
+        let reference_uri = path_to_uri(&reference_path);
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&root),"capabilities":{},"initializationOptions":{"projectConfig":".pdx/project.toml"}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"pdx-script","version":1,"text":"event = dependency.1\n"}}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":reference_uri},"position":{"line":0,"character":10},"newName":"renamed.1"}}),
+            json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server =
+            eu4_server(InitializeOptions { rules_path: Some(rules_path) }).expect("bundled rules");
+        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        let responses = decode_frames(&output);
+
+        let snapshot = server.snapshot();
+        let roots = snapshot.source_roots();
+        assert_eq!(roots.len(), 3);
+        assert_eq!(roots[0].kind, pdx_workspace::SourceRootKind::Dependency);
+        assert_eq!(roots[0].order, 0);
+        assert_eq!(roots[1].kind, pdx_workspace::SourceRootKind::Dependency);
+        assert_eq!(roots[1].order, 1);
+        assert_eq!(roots[2].kind, pdx_workspace::SourceRootKind::CurrentMod);
+        assert!(roots[2].writable);
+        let active = snapshot
+            .index()
+            .active_definition("event", "shared.1")
+            .expect("current definition should win");
+        assert!(
+            snapshot
+                .source_files()
+                .get(&active.file_id)
+                .is_some_and(|file| file.physical_path.starts_with(&current))
+        );
+        let active_dependency = snapshot
+            .index()
+            .active_definition("event", "dependency-shared.1")
+            .expect("higher ordered dependency should win");
+        assert!(
+            snapshot
+                .source_files()
+                .get(&active_dependency.file_id)
+                .is_some_and(|file| file.physical_path.starts_with(&high))
+        );
+        let rename = responses.iter().find(|value| value["id"] == 2).expect("rename response");
+        assert_eq!(rename["error"]["code"], INVALID_PARAMS);
+        assert!(
+            rename["error"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("read-only"))
+        );
         fs::remove_dir_all(root).expect("cleanup");
     }
 

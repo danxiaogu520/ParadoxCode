@@ -175,7 +175,7 @@ PdxScript 至少覆盖 property、裸 value、嵌套/混合 block、八种 opera
 
 ### Phase 4：CWT 导入、规则数据库和 Workspace Index
 
-状态：`implemented, acceptance reopened`（2026-07-20）；SQLite runtime、原创 CWT importer、root/overlay resolver、file shards 和主要语义回归已实现，但 dependency/Vanilla LSP 配置、持久化 cache 和真实单文件更新链路仍需完成。
+状态：`implemented, acceptance reopened`（2026-07-20）；SQLite runtime、原创 CWT importer、root/overlay resolver、file shards、dependency LSP/TOML 配置和主要语义回归已实现，但 Vanilla 持久化 cache 和 watched-file 定向更新仍需完成。
 
 这是 MVP 中最大的一阶段，应拆成“规则 schema/runtime”和“importer”两个可独立审查的序列。
 
@@ -260,7 +260,7 @@ Workspace/index：
 5. 增加 index bulk build 和真正的单 shard 增量 replacement（已完成）；
 6. 修复稳定 SourceFileId、symlink 顺序、文件大小/深度/数量限制和错误隔离（已完成）；
 7. 将 LSP transport 迁移到类型化协议层，增加 worker、debounce、版本门和在途取消（已完成：stdio reader 分离，initialize 候选 host scan worker，prepared-document parse worker/三重提交门，semantic diagnostics 200ms debounce，snapshot request worker，共享 cancellation token 与 analysis 内部 checkpoint；workspace scan 覆盖目录/读取/parse/lower/index 检查点并有取消原子性回归；`lsp-types` 接管当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 和语言功能 response，轻量 JSON-RPC framing 有意保留）；
-8. 接入 formatting、dependency roots、Vanilla cache 持久化和文件变化更新（formatting 已完成：typed request/edits、capability、snapshot worker、UTF-16 与 unsafe-syntax integration 回归；其余三项待完成）；
+8. 接入 formatting、dependency roots、Vanilla cache 持久化和文件变化更新（formatting 已完成：typed request/edits、capability、snapshot worker、UTF-16 与 unsafe-syntax integration 回归；dependency roots 已完成：类型化 initialization options、TOML、稳定 ID、有序优先级、重叠校验和只读 rename 回归；Vanilla cache 与 watched-file 定向更新待完成）；
 9. 建立大型 synthetic workspace benchmark 与“编辑一个文件只 parse/lower 一次”计数测试（已完成：默认 2,000 个原创 EU4 event 文件，覆盖 cold/unchanged/单磁盘变化/单 overlay 编辑；线程局部测试计数器证明 overlay 编辑 parse/lower 各一次且不重建磁盘 `FileState`）；
 10. 完成 Zed 自动获取、多平台 release、checksum 和干净 clone 端到端安装测试。
 

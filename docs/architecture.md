@@ -1,6 +1,6 @@
 # ParadoxCode 总体架构
 
-> 2026-07-20 状态说明：通用 `pdx-rules`、EU4 profile、per-file cache、廉价 snapshot、共享结构与 profile-aware definition/reference HIR facts，以及带协作式取消的 LSP initialize/parse/query/diagnostic worker 已落地；scope/CWT typed lowering和发布闭环仍未达到本文约束。迁移计划见 [RFC 0013](rfc/0013-generic-engine-eu4-first.md)。
+> 2026-07-20 状态说明：通用 `pdx-rules`、EU4 profile、per-file cache、廉价 snapshot、共享结构与 profile-aware definition/reference HIR facts、带协作式取消的 LSP initialize/parse/query/diagnostic worker，以及 Current Mod/Dependency 项目配置已落地；scope/CWT typed lowering、持久化 Vanilla cache、watched-file 定向更新和发布闭环仍未达到本文约束。迁移计划见 [RFC 0013](rfc/0013-generic-engine-eu4-first.md)。
 
 ## 目标
 
@@ -78,6 +78,8 @@ Zed extension 只负责：
 ### 工作区层
 
 `pdx-workspace` 维护 VFS、open document overlay、source roots、parse/HIR cache 和 index shards。可变状态只存在于 `AnalysisHost`；请求使用不可变 snapshot。
+
+LSP initialize 将 client 打开的 root 与类型化 `initializationOptions` 解析成 source roots；可选 `.pdx/project.toml` 描述 Current Mod 和从低到高排列的 Dependency Mods，inline 字段可覆盖 TOML。相对路径以打开的 worktree 为基准，目录会 canonicalize 并拒绝重叠。配置入口和示例见 [Workspace configuration](configuration.md)。这属于 adapter 配置解析；优先级、只读属性和索引仍由 editor-neutral workspace 模型执行。
 
 ### 规则层
 

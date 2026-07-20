@@ -23,5 +23,24 @@ settings. The extension registers one `pdx-ls` server for all three languages an
 `--rules bundled-rules/eu4.pdxrules` by default. A configured binary argument list can override
 that path for development or platform-specific packaging.
 
-The server uses the opened worktree as the current Mod root. Rename produces a WorkspaceEdit only
-for that root and open overlays; Vanilla and dependency definitions are rejected as read-only.
+With no project configuration, the server uses the opened worktree as the current Mod root. For a
+workspace containing a separate Mod directory and ordered dependency Mods, configure
+`lsp.pdx-ls.initialization_options.projectConfig` in `.zed/settings.json`:
+
+```json
+{
+  "lsp": {
+    "pdx-ls": {
+      "initialization_options": {
+        "projectConfig": ".pdx/project.toml"
+      }
+    }
+  }
+}
+```
+
+See [workspace configuration](../../docs/configuration.md) for the project TOML schema, relative
+path rules, inline configuration, and precedence. Initialization options require a language-server
+restart after changes. Rename produces a WorkspaceEdit only for the current Mod and its open
+overlays; dependency definitions are rejected as read-only. Persistent Vanilla cache loading is
+not enabled yet.
