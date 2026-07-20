@@ -1,6 +1,6 @@
 # EU4 MVP 实施计划
 
-> 2026-07-20 重新审计：当前代码是 EU4 alpha 功能原型，不是已发布的 v0.1。Phase 2–3 的基础实现可继续作为基线；Phase 4–6A 的功能代码存在，但持久化 Vanilla cache、依赖配置、formatter LSP 接入、workspace scan 取消、自动安装和跨平台发布退出条件尚未全部满足。后续先完成 RFC 0013 和发布前架构修复，再进入 Phase 6B。
+> 2026-07-20 重新审计：当前代码是 EU4 alpha 功能原型，不是已发布的 v0.1。Phase 2–3 的基础实现可继续作为基线；Phase 4–6A 的功能代码存在，但持久化 Vanilla cache、依赖配置、formatter LSP 接入、自动安装和跨平台发布退出条件尚未全部满足。后续先完成 RFC 0013 和发布前架构修复，再进入 Phase 6B。
 
 ## MVP 成功定义
 

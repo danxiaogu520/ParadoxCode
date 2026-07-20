@@ -1,6 +1,6 @@
 # ParadoxCode 总体架构
 
-> 2026-07-20 状态说明：通用 `pdx-rules`、EU4 profile、per-file cache、廉价 snapshot、共享结构与 profile-aware definition/reference HIR facts，以及带协作式 analysis 取消的 LSP parse/query/diagnostic worker 已落地；workspace scan 已具备原子可取消 API，但 LSP 初始化扫描仍待迁入 worker；scope/CWT typed lowering和发布闭环仍未达到本文约束。迁移计划见 [RFC 0013](rfc/0013-generic-engine-eu4-first.md)。
+> 2026-07-20 状态说明：通用 `pdx-rules`、EU4 profile、per-file cache、廉价 snapshot、共享结构与 profile-aware definition/reference HIR facts，以及带协作式取消的 LSP initialize/parse/query/diagnostic worker 已落地；scope/CWT typed lowering和发布闭环仍未达到本文约束。迁移计划见 [RFC 0013](rfc/0013-generic-engine-eu4-first.md)。
 
 ## 目标
 
@@ -141,12 +141,12 @@ VanillaIndexCache           local persistent Vanilla shard cache; manual refresh
 - LSP event loop 顺序应用文档版本和配置变化。
 - 编辑先在 event loop 提交最新文本、版本和 `LineIndex`，parse/单文件 HIR 在 immutable snapshot worker 中准备；结果只有在版本、文本和路径仍完全一致时才能提交。依赖语义的后续请求会有序等待最新 parse，不读取旧文本。
 - 查询获取 snapshot 后不持有 host 锁。
-- semantic diagnostics 使用约 200ms debounce，在 immutable snapshot worker 上运行，提交时校验文档版本；新编辑会使旧任务失效。普通语言请求同样捕获单一 snapshot 后进入 worker。`$/cancelRequest` 和过期 diagnostics 通过共享的 editor-neutral `CancellationToken` 在 workspace semantic 合并、CWT 递归及主要结果遍历中协作式中止；workspace scan 取消仍待完成。
+- initialize 的 source-root scan 在候选 `AnalysisHost` worker 中运行，目录发现、受限读取、parse/lower、bulk index 和 priority resolution 均可取消，只有完整成功后才由 event loop 原子提交。semantic diagnostics 使用约 200ms debounce，在 immutable snapshot worker 上运行，提交时校验文档版本；新编辑会使旧任务失效。普通语言请求同样捕获单一 snapshot 后进入 worker。`$/cancelRequest` 和过期 diagnostics 通过共享的 editor-neutral `CancellationToken` 在 workspace semantic 合并、CWT 递归及主要结果遍历中协作式中止。
 - completion/hover 优先于后台全量诊断。
 
 MVP 不立即引入通用增量计算框架。先使用清晰的按文件 cache key 和 shard replacement；只有性能数据证明需要时再评估 query framework。
 
-当前 alpha 已消除深拷贝 snapshot、query-time workspace 重解析，以及 event-loop 上的 parse/lower、semantic diagnostics 和语言查询；analysis 查询已支持内部协作式取消，workspace scan 尚未接入取消。这个剩余缺口属于发布前必须消除的问题，而不是允许长期保留的简化。
+当前 alpha 已消除深拷贝 snapshot、query-time workspace 重解析，以及 event-loop 上的 workspace scan、parse/lower、semantic diagnostics 和语言查询；initialize scan 与 analysis 查询均支持内部协作式取消。后续并发工作应集中在文件变化的定向更新，而不是重新引入 event-loop 阻塞。
 
 ## 稳定身份
 

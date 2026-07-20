@@ -36,7 +36,7 @@ use pdx_rules::{GameProfile, RuleSet, RulesError};
 use pdx_text::{LineIndex, Position, TextRange};
 use pdx_workspace::{
     AnalysisHost, AnalysisSnapshot, DocumentError, DocumentId, DocumentSource, PreparedDocument,
-    SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
+    SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange, WorkspaceError, WorkspaceScanToken,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -56,6 +56,8 @@ const DIAGNOSTIC_DEBOUNCE: Duration = Duration::from_millis(200);
 pub enum ServerState {
     /// The process accepts only `initialize`, `exit`, and cancellation notifications.
     Uninitialized,
+    /// An initialize worker is materializing the first workspace snapshot.
+    Initializing,
     /// The server has completed `initialize` and accepts document events.
     Initialized,
     /// `shutdown` completed; only `exit` is accepted.
@@ -187,6 +189,19 @@ struct InFlightRequest {
 }
 
 #[derive(Debug)]
+struct InFlightInitialize {
+    request_id: RequestId,
+    cancellation: WorkspaceScanToken,
+}
+
+#[derive(Debug)]
+struct InitializeTaskResult {
+    request_id: RequestId,
+    id: Value,
+    result: Result<(AnalysisHost, Value), RpcError>,
+}
+
+#[derive(Debug)]
 struct SnapshotRequestResult {
     request_id: RequestId,
     id: Value,
@@ -195,6 +210,7 @@ struct SnapshotRequestResult {
 
 enum TransportEvent {
     Input(Result<Option<Value>, LspError>),
+    Initialize(InitializeTaskResult),
     Parse(ParseResult),
     Diagnostics(DiagnosticsResult),
     Request(SnapshotRequestResult),
@@ -389,6 +405,7 @@ impl LspServer {
             let mut in_flight_parses = BTreeMap::<DocumentId, InFlightParse>::new();
             let mut in_flight = BTreeMap::<DocumentId, InFlightDiagnostics>::new();
             let mut in_flight_requests = HashMap::<RequestId, InFlightRequest>::new();
+            let mut in_flight_initialize = None::<InFlightInitialize>;
             let mut deferred_messages = VecDeque::<Value>::new();
 
             loop {
@@ -402,7 +419,9 @@ impl LspServer {
                     self.state == ServerState::ShuttingDown,
                 );
                 let parse_busy = !self.pending_parses.is_empty() || !in_flight_parses.is_empty();
-                let deferred_ready = !parse_busy && !deferred_messages.is_empty();
+                let initialize_busy = in_flight_initialize.is_some();
+                let deferred_ready =
+                    !parse_busy && !initialize_busy && !deferred_messages.is_empty();
                 let (event, from_reader) = if deferred_ready {
                     let message = deferred_messages.pop_front().expect("checked non-empty");
                     (TransportEvent::Input(Ok(Some(message))), false)
@@ -443,10 +462,19 @@ impl LspServer {
                         };
                         let parse_busy =
                             !self.pending_parses.is_empty() || !in_flight_parses.is_empty();
-                        if from_reader && parse_busy && is_snapshot_request_message(&message) {
+                        let initialize_busy = in_flight_initialize.is_some();
+                        if from_reader
+                            && ((parse_busy && is_snapshot_request_message(&message))
+                                || (initialize_busy && !is_initialize_control_message(&message)))
+                        {
                             deferred_messages.push_back(message);
                         } else {
-                            let spawned = self.spawn_snapshot_request(
+                            let spawned = self.spawn_initialize_request(
+                                scope,
+                                &event_sender,
+                                &mut in_flight_initialize,
+                                &message,
+                            ) || self.spawn_snapshot_request(
                                 scope,
                                 &event_sender,
                                 &mut in_flight_requests,
@@ -458,6 +486,10 @@ impl LspServer {
                                     write_message(&mut output, &response)?;
                                 }
                                 cancel_request_from_notification(&message, &in_flight_requests);
+                                cancel_initialize_from_notification(
+                                    &message,
+                                    in_flight_initialize.as_ref(),
+                                );
                             }
                         }
                         self.cancel_stale_parses(&in_flight_parses);
@@ -472,6 +504,9 @@ impl LspServer {
                             for task in in_flight_requests.values() {
                                 task.cancellation.cancel();
                             }
+                            if let Some(task) = in_flight_initialize.as_ref() {
+                                task.cancellation.cancel();
+                            }
                             return if self.clean_exit {
                                 Ok(())
                             } else {
@@ -481,6 +516,37 @@ impl LspServer {
                         if self.state == ServerState::ShuttingDown {
                             self.spawn_due_diagnostics(scope, &event_sender, &mut in_flight, true);
                         }
+                    }
+                    TransportEvent::Initialize(result) => {
+                        let current = in_flight_initialize
+                            .as_ref()
+                            .is_some_and(|task| task.request_id == result.request_id);
+                        if !current {
+                            continue;
+                        }
+                        let task = in_flight_initialize.take().expect("checked initialize task");
+                        self.cancelled.remove(&result.request_id);
+                        let response = match result.result {
+                            Ok((host, value)) if !task.cancellation.is_cancelled() => {
+                                self.host = host;
+                                self.state = ServerState::Initialized;
+                                json!({
+                                    "jsonrpc": JSON_RPC_VERSION,
+                                    "id": result.id,
+                                    "result": value,
+                                })
+                            }
+                            Ok(_) => {
+                                self.state = ServerState::Uninitialized;
+                                RpcError::new(REQUEST_CANCELLED, "request was cancelled")
+                                    .response(result.id)
+                            }
+                            Err(error) => {
+                                self.state = ServerState::Uninitialized;
+                                error.response(result.id)
+                            }
+                        };
+                        write_message(&mut output, &response)?;
                     }
                     TransportEvent::Parse(result) => {
                         if in_flight_parses
@@ -535,7 +601,8 @@ impl LspServer {
                         || !in_flight_parses.is_empty()
                         || !self.pending_diagnostics.is_empty()
                         || !in_flight.is_empty()
-                        || !in_flight_requests.is_empty());
+                        || !in_flight_requests.is_empty()
+                        || in_flight_initialize.is_some());
                 if !reader_active && !draining_shutdown && deferred_messages.is_empty() {
                     read_sender.send(()).map_err(|_| {
                         LspError::Protocol("LSP transport reader stopped unexpectedly".to_owned())
@@ -598,6 +665,58 @@ impl LspServer {
                 }
             };
             let _ = sender.send(TransportEvent::Request(SnapshotRequestResult {
+                request_id,
+                id,
+                result,
+            }));
+        });
+        true
+    }
+
+    fn spawn_initialize_request<'scope, 'environment>(
+        &mut self,
+        scope: &'scope std::thread::Scope<'scope, 'environment>,
+        event_sender: &mpsc::Sender<TransportEvent>,
+        in_flight: &mut Option<InFlightInitialize>,
+        message: &Value,
+    ) -> bool {
+        if self.state != ServerState::Uninitialized || in_flight.is_some() {
+            return false;
+        }
+        let Some(object) = message.as_object() else { return false };
+        if object.get("jsonrpc").and_then(Value::as_str) != Some(JSON_RPC_VERSION)
+            || object.get("method").and_then(Value::as_str) != Some("initialize")
+        {
+            return false;
+        }
+        let Some(id) = object.get("id").filter(|id| !id.is_null()) else { return false };
+        let Ok(request_id) = RequestId::parse(id) else { return false };
+        let Ok(params) = typed_params::<InitializeParams>(object.get("params"), "initialize")
+        else {
+            return false;
+        };
+
+        let cancellation = WorkspaceScanToken::new();
+        if self.cancelled.contains(&request_id) {
+            cancellation.cancel();
+        }
+        let candidate = self.host.clone();
+        let scan_workspace = self.options.rules_path.is_some();
+        let sender = event_sender.clone();
+        let id = id.clone();
+        self.state = ServerState::Initializing;
+        *in_flight = Some(InFlightInitialize {
+            request_id: request_id.clone(),
+            cancellation: cancellation.clone(),
+        });
+        scope.spawn(move || {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                prepare_initialize_candidate(candidate, params, scan_workspace, &cancellation)
+            }))
+            .unwrap_or_else(|_| {
+                Err(RpcError::new(INTERNAL_ERROR, "initialize worker failed unexpectedly"))
+            });
+            let _ = sender.send(TransportEvent::Initialize(InitializeTaskResult {
                 request_id,
                 id,
                 result,
@@ -843,7 +962,7 @@ impl LspServer {
                 return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
             }
         }
-        if self.state == ServerState::Uninitialized {
+        if matches!(self.state, ServerState::Uninitialized | ServerState::Initializing) {
             return Err(RpcError::new(SERVER_NOT_INITIALIZED, "server is not initialized"));
         }
         if self.state == ServerState::ShuttingDown {
@@ -890,64 +1009,15 @@ impl LspServer {
 
     fn handle_initialize(&mut self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<InitializeParams>(params, "initialize")?;
-        #[allow(deprecated)]
-        let root_uri = params.root_uri;
-        let root = root_uri.as_ref().map(|uri| parse_file_uri_str(uri.as_str())).transpose()?;
-        let workspace_root = params
-            .workspace_folders
-            .as_ref()
-            .and_then(|folders| folders.first())
-            .map(|folder| parse_file_uri_str(folder.uri.as_str()))
-            .transpose()?;
-        let root = root.or(workspace_root);
-        self.host.apply_change(WorkspaceChange::SetWorkspaceRoot(root.clone()));
-        if let Some(root) = root.filter(|path| path.is_dir()) {
-            self.host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-                SourceRootId::new(1),
-                SourceRootKind::CurrentMod,
-                root,
-            )]));
-            if self.options.rules_path.is_some() {
-                self.host.refresh_source_roots().map_err(|error| RpcError {
-                    code: INVALID_PARAMS,
-                    message: error.to_string(),
-                })?;
-            }
-        }
+        let (host, result) = prepare_initialize_candidate(
+            self.host.clone(),
+            params,
+            self.options.rules_path.is_some(),
+            &WorkspaceScanToken::new(),
+        )?;
+        self.host = host;
         self.state = ServerState::Initialized;
-        serde_json::to_value(InitializeResult {
-            capabilities: ServerCapabilities {
-                text_document_sync: Some(TextDocumentSyncCapability::Options(
-                    TextDocumentSyncOptions {
-                        open_close: Some(true),
-                        change: Some(TextDocumentSyncKind::INCREMENTAL),
-                        ..TextDocumentSyncOptions::default()
-                    },
-                )),
-                completion_provider: Some(CompletionOptions {
-                    trigger_characters: Some(vec!["=".to_owned(), " ".to_owned(), ":".to_owned()]),
-                    ..CompletionOptions::default()
-                }),
-                hover_provider: Some(HoverProviderCapability::Simple(true)),
-                definition_provider: Some(OneOf::Left(true)),
-                references_provider: Some(OneOf::Left(true)),
-                rename_provider: Some(OneOf::Right(RenameOptions {
-                    prepare_provider: Some(true),
-                    work_done_progress_options: WorkDoneProgressOptions::default(),
-                })),
-                document_symbol_provider: Some(OneOf::Left(true)),
-                workspace_symbol_provider: Some(OneOf::Left(true)),
-                ..ServerCapabilities::default()
-            },
-            server_info: Some(ServerInfo {
-                name: "pdx-ls".to_owned(),
-                version: Some(env!("CARGO_PKG_VERSION").to_owned()),
-            }),
-        })
-        .map_err(|error| RpcError {
-            code: INTERNAL_ERROR,
-            message: format!("failed to serialize initialize result: {error}"),
-        })
+        Ok(result)
     }
 
     fn handle_did_open(&mut self, params: Option<&Value>) -> Result<String, RpcError> {
@@ -1001,6 +1071,75 @@ impl LspServer {
             "params": {"uri": uri, "diagnostics": []}
         }))
     }
+}
+
+fn prepare_initialize_candidate(
+    mut host: AnalysisHost,
+    params: InitializeParams,
+    scan_workspace: bool,
+    cancellation: &WorkspaceScanToken,
+) -> Result<(AnalysisHost, Value), RpcError> {
+    if cancellation.is_cancelled() {
+        return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
+    }
+    #[allow(deprecated)]
+    let root_uri = params.root_uri;
+    let root = root_uri.as_ref().map(|uri| parse_file_uri_str(uri.as_str())).transpose()?;
+    let workspace_root = params
+        .workspace_folders
+        .as_ref()
+        .and_then(|folders| folders.first())
+        .map(|folder| parse_file_uri_str(folder.uri.as_str()))
+        .transpose()?;
+    let root = root.or(workspace_root);
+    host.apply_change(WorkspaceChange::SetWorkspaceRoot(root.clone()));
+    if let Some(root) = root.filter(|path| path.is_dir()) {
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root,
+        )]));
+        if scan_workspace {
+            host.refresh_source_roots_cancellable(cancellation).map_err(workspace_scan_error)?;
+        }
+    }
+    if cancellation.is_cancelled() {
+        return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
+    }
+    let result = serde_json::to_value(InitializeResult {
+        capabilities: ServerCapabilities {
+            text_document_sync: Some(TextDocumentSyncCapability::Options(
+                TextDocumentSyncOptions {
+                    open_close: Some(true),
+                    change: Some(TextDocumentSyncKind::INCREMENTAL),
+                    ..TextDocumentSyncOptions::default()
+                },
+            )),
+            completion_provider: Some(CompletionOptions {
+                trigger_characters: Some(vec!["=".to_owned(), " ".to_owned(), ":".to_owned()]),
+                ..CompletionOptions::default()
+            }),
+            hover_provider: Some(HoverProviderCapability::Simple(true)),
+            definition_provider: Some(OneOf::Left(true)),
+            references_provider: Some(OneOf::Left(true)),
+            rename_provider: Some(OneOf::Right(RenameOptions {
+                prepare_provider: Some(true),
+                work_done_progress_options: WorkDoneProgressOptions::default(),
+            })),
+            document_symbol_provider: Some(OneOf::Left(true)),
+            workspace_symbol_provider: Some(OneOf::Left(true)),
+            ..ServerCapabilities::default()
+        },
+        server_info: Some(ServerInfo {
+            name: "pdx-ls".to_owned(),
+            version: Some(env!("CARGO_PKG_VERSION").to_owned()),
+        }),
+    })
+    .map_err(|error| RpcError {
+        code: INTERNAL_ERROR,
+        message: format!("failed to serialize initialize result: {error}"),
+    })?;
+    Ok((host, result))
 }
 
 #[derive(Clone, Debug)]
@@ -1274,6 +1413,14 @@ fn is_snapshot_request_message(message: &Value) -> bool {
         .is_some_and(is_snapshot_request)
 }
 
+fn is_initialize_control_message(message: &Value) -> bool {
+    message
+        .as_object()
+        .and_then(|object| object.get("method"))
+        .and_then(Value::as_str)
+        .is_some_and(|method| matches!(method, "$/cancelRequest" | "exit"))
+}
+
 fn cancel_request_from_notification(
     message: &Value,
     in_flight: &HashMap<RequestId, InFlightRequest>,
@@ -1288,6 +1435,20 @@ fn cancel_request_from_notification(
     let request_id = request_id_from_lsp(params.id);
     if let Some(request) = in_flight.get(&request_id) {
         request.cancellation.cancel();
+    }
+}
+
+fn cancel_initialize_from_notification(message: &Value, in_flight: Option<&InFlightInitialize>) {
+    let Some(in_flight) = in_flight else { return };
+    let Some(object) = message.as_object() else { return };
+    if object.get("method").and_then(Value::as_str) != Some("$/cancelRequest") {
+        return;
+    }
+    let Ok(params) = typed_params::<CancelParams>(object.get("params"), "cancel request") else {
+        return;
+    };
+    if request_id_from_lsp(params.id) == in_flight.request_id {
+        in_flight.cancellation.cancel();
     }
 }
 
@@ -1403,6 +1564,12 @@ fn location_to_lsp(snapshot: &AnalysisSnapshot, location: &Location) -> Option<L
 
 fn document_error(error: DocumentError) -> RpcError {
     RpcError { code: INVALID_PARAMS, message: error.to_string() }
+}
+
+fn workspace_scan_error(error: WorkspaceError) -> RpcError {
+    let code =
+        if matches!(error, WorkspaceError::Cancelled) { REQUEST_CANCELLED } else { INVALID_PARAMS };
+    RpcError { code, message: error.to_string() }
 }
 
 fn rename_error(error: RenameError) -> RpcError {
@@ -1650,8 +1817,9 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{
-        CancellationToken, DocumentId, INVALID_PARAMS, InFlightRequest, InitializeOptions,
-        LspError, LspServer, RequestId, ServerState, cancel_request_from_notification, path_to_uri,
+        CancellationToken, DocumentId, INVALID_PARAMS, InFlightInitialize, InFlightRequest,
+        InitializeOptions, LspError, LspServer, RequestId, ServerState,
+        cancel_initialize_from_notification, cancel_request_from_notification, path_to_uri,
         uri_to_path,
     };
     use lsp_types::{
@@ -2042,5 +2210,50 @@ mod tests {
 
         assert!(cancellation.is_cancelled());
         assert!(in_flight.contains_key(&request_id));
+    }
+
+    #[test]
+    fn initialize_cancellation_is_forwarded_and_a_retry_can_succeed() {
+        let request_id = RequestId::Number(1);
+        let scan_cancellation = pdx_workspace::WorkspaceScanToken::new();
+        let in_flight = InFlightInitialize {
+            request_id: request_id.clone(),
+            cancellation: scan_cancellation.clone(),
+        };
+        cancel_initialize_from_notification(
+            &json!({
+                "jsonrpc": "2.0",
+                "method": "$/cancelRequest",
+                "params": {"id": 1},
+            }),
+            Some(&in_flight),
+        );
+        assert!(scan_cancellation.is_cancelled());
+
+        let input = frames([
+            json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":1}}),
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp/cancelled","capabilities":{}}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"rootUri":"file:///tmp/retry","capabilities":{}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = eu4_server(InitializeOptions::default()).expect("server");
+        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        let responses = decode_frames(&output);
+
+        assert_eq!(
+            responses.iter().find(|value| value["id"] == 1).expect("cancelled initialize")["error"]
+                ["code"],
+            super::REQUEST_CANCELLED
+        );
+        assert!(
+            responses
+                .iter()
+                .find(|value| value["id"] == 2)
+                .is_some_and(|value| value["result"]["capabilities"].is_object())
+        );
+        assert_eq!(server.state(), ServerState::Exited);
     }
 }
