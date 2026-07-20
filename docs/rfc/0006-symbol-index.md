@@ -61,6 +61,8 @@ WorkspaceIndex 建立：
 
 同一个文件更新时先构建新 shard，成功后一次性替换。查询不得观察到半更新状态。
 
+实现不得用“清空并重建整个 lookup map”伪装成 shard replacement。替换或删除一个 shard 时，只移除该 `SourceFileId` 在旧 definition/reference buckets 中的贡献、插入新贡献，并重新解析受影响的 `(kind, normalized_name)` buckets。未受影响的 buckets 不参与排序和 resolution。最高优先级并列时保留多个 active candidates，使查询返回 ambiguous；不得按容器或遍历顺序任取一个 winner。
+
 ## 名称规范化
 
 每个 symbol descriptor 可声明 case policy。index key 存 normalized name，同时保留原始文本。不能统一对全部 symbol 做 Unicode lowercase；EU4 规则的显式策略由 fixture 验证。

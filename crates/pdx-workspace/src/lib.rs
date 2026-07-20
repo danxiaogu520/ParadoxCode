@@ -335,7 +335,9 @@ impl WorkspaceIndex {
     /// Returns the active definition for a kind/name, if one exists.
     #[must_use]
     pub fn active_definition(&self, kind: &str, name: &str) -> Option<&Definition> {
-        self.definitions(kind, name).iter().find(|definition| definition.active)
+        let mut active = self.definitions(kind, name).iter().filter(|definition| definition.active);
+        let definition = active.next()?;
+        active.next().is_none().then_some(definition)
     }
 
     /// Iterates over all retained definitions in deterministic kind/name order.
@@ -362,45 +364,106 @@ impl WorkspaceIndex {
         self.references.values().flat_map(|references| references.iter())
     }
 
-    /// Replaces one shard as a single map operation.
+    /// Replaces one shard and updates only lookup buckets touched by that file.
     pub fn replace_shard(&mut self, shard: FileIndexShard) {
-        self.shards.insert(shard.file_id, shard);
-        self.rebuild_maps();
+        self.replace_shard_entries(shard);
     }
 
-    /// Removes a file shard.
+    /// Removes a file shard and updates only lookup buckets touched by that file.
     pub fn remove_shard(&mut self, file_id: SourceFileId) {
-        self.shards.remove(&file_id);
-        self.rebuild_maps();
+        let affected = self.remove_shard_entries(file_id);
+        self.sort_definition_buckets(&affected);
     }
 
     fn resolve_priorities(&mut self, priorities: &BTreeMap<SourceFileId, u64>, rules: &Eu4Rules) {
-        for values in self.definitions.values_mut() {
+        let keys = self.definitions.keys().cloned().collect::<Vec<_>>();
+        self.resolve_definition_buckets(&keys, priorities, rules);
+    }
+
+    fn replace_shard_resolved(
+        &mut self,
+        shard: FileIndexShard,
+        priorities: &BTreeMap<SourceFileId, u64>,
+        rules: &Eu4Rules,
+    ) {
+        let affected = self.replace_shard_entries(shard);
+        self.resolve_definition_buckets(&affected, priorities, rules);
+    }
+
+    fn replace_shard_entries(&mut self, shard: FileIndexShard) -> Vec<(String, String)> {
+        let file_id = shard.file_id;
+        let mut affected = self.remove_shard_entries(file_id);
+        for definition in &shard.definitions {
+            let key = definition_key(definition);
+            self.definitions.entry(key.clone()).or_default().push(definition.clone());
+            affected.push(key);
+        }
+        self.references.insert(file_id, shard.references.clone());
+        self.shards.insert(file_id, shard);
+        affected.sort();
+        affected.dedup();
+        self.sort_definition_buckets(&affected);
+        affected
+    }
+
+    fn remove_shard_entries(&mut self, file_id: SourceFileId) -> Vec<(String, String)> {
+        let Some(previous) = self.shards.remove(&file_id) else {
+            self.references.remove(&file_id);
+            return Vec::new();
+        };
+        self.references.remove(&file_id);
+        let mut affected = previous.definitions.iter().map(definition_key).collect::<Vec<_>>();
+        affected.sort();
+        affected.dedup();
+        for key in &affected {
+            let remove_bucket = self.definitions.get_mut(key).is_some_and(|definitions| {
+                definitions.retain(|definition| definition.file_id != file_id);
+                definitions.is_empty()
+            });
+            if remove_bucket {
+                self.definitions.remove(key);
+            }
+        }
+        affected
+    }
+
+    fn resolve_definition_buckets(
+        &mut self,
+        keys: &[(String, String)],
+        priorities: &BTreeMap<SourceFileId, u64>,
+        rules: &Eu4Rules,
+    ) {
+        for key in keys {
+            let Some(values) = self.definitions.get_mut(key) else { continue };
             let policy = rules
                 .model()
                 .symbol_descriptors
                 .iter()
-                .find(|descriptor| {
-                    descriptor.kind_id
-                        == values.first().map_or("", |definition| definition.kind.as_str())
-                })
+                .find(|descriptor| descriptor.kind_id.eq_ignore_ascii_case(&key.0))
                 .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| {
                     descriptor.resolution
                 });
-            let winner = values
+            let highest = values
                 .iter()
-                .enumerate()
-                .max_by_key(|(_, definition)| {
-                    priorities.get(&definition.file_id).copied().unwrap_or(0)
-                })
-                .map(|(index, _)| index);
-            for (index, definition) in values.iter_mut().enumerate() {
+                .map(|definition| priorities.get(&definition.file_id).copied().unwrap_or(0))
+                .max();
+            for definition in values.iter_mut() {
                 definition.active = match policy {
                     SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique => true,
-                    SymbolResolutionPolicy::ReplaceBySymbol => Some(index) == winner,
+                    SymbolResolutionPolicy::ReplaceBySymbol => {
+                        Some(priorities.get(&definition.file_id).copied().unwrap_or(0)) == highest
+                    }
                 };
             }
             values.sort_by_key(|definition| (!definition.active, definition.file_id));
+        }
+    }
+
+    fn sort_definition_buckets(&mut self, keys: &[(String, String)]) {
+        for key in keys {
+            if let Some(values) = self.definitions.get_mut(key) {
+                values.sort_by_key(|definition| (!definition.active, definition.file_id));
+            }
         }
     }
 
@@ -420,6 +483,10 @@ impl WorkspaceIndex {
             values.sort_by_key(|definition| (!definition.active, definition.file_id));
         }
     }
+}
+
+fn definition_key(definition: &Definition) -> (String, String) {
+    (definition.kind.clone(), definition.name.to_ascii_lowercase())
 }
 
 /// Vanilla cache metadata. Loading is explicit; a host never refreshes it implicitly.
@@ -883,6 +950,21 @@ fn root_priority(root: &SourceRoot) -> u64 {
         SourceRootKind::Dependency => 1_000 + u64::from(root.order),
         SourceRootKind::CurrentMod => 10_000 + u64::from(root.order),
     }
+}
+
+fn source_priorities(
+    roots: &[SourceRoot],
+    files: &BTreeMap<SourceFileId, SourceFile>,
+) -> BTreeMap<SourceFileId, u64> {
+    files
+        .values()
+        .filter_map(|file| {
+            roots
+                .iter()
+                .find(|root| root.id == file.root_id)
+                .map(|root| (file.id, root_priority(root)))
+        })
+        .collect()
 }
 
 fn parse_source(
@@ -1798,15 +1880,7 @@ impl AnalysisHost {
         }
         let shards = file_states.values().map(|state| state.shard().clone());
         let mut index = WorkspaceIndex::from_shards(shards);
-        let priorities = files
-            .values()
-            .filter_map(|file| {
-                self.roots
-                    .iter()
-                    .find(|root| root.id == file.root_id)
-                    .map(|root| (file.id, root_priority(root)))
-            })
-            .collect::<BTreeMap<_, _>>();
+        let priorities = source_priorities(&self.roots, &files);
         index.resolve_priorities(&priorities, self.rules.as_ref());
         self.source_files = Arc::new(files);
         self.file_states = Arc::new(file_states);
@@ -1819,7 +1893,12 @@ impl AnalysisHost {
     /// Returns a mutable workspace index for targeted shard replacement.
     pub fn replace_index_shard(&mut self, shard: FileIndexShard) {
         let file_id = shard.file_id;
-        Arc::make_mut(&mut self.index).replace_shard(shard.clone());
+        let priorities = source_priorities(&self.roots, &self.source_files);
+        Arc::make_mut(&mut self.index).replace_shard_resolved(
+            shard.clone(),
+            &priorities,
+            self.rules.as_ref(),
+        );
         if let Some(previous) = self.file_states.get(&file_id) {
             let mut replacement = previous.as_ref().clone();
             replacement.shard = Arc::new(shard);
@@ -2089,13 +2168,14 @@ impl AnalysisSnapshot {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use std::fs;
     use std::sync::Arc;
 
     use super::{
         AnalysisHost, Definition, DocumentId, DocumentSource, FileIndexShard, ParsedSource,
-        SourceFileId, SourceRoot, SourceRootId, SourceRootKind, TextChange, WorkspaceIndex,
-        WorkspaceScanIssueKind, WorkspaceScanLimits,
+        Reference, SourceFileId, SourceRoot, SourceRootId, SourceRootKind, TextChange,
+        WorkspaceIndex, WorkspaceScanIssueKind, WorkspaceScanLimits,
     };
     use pdx_eu4::Eu4Rules;
     use pdx_text::{LogicalPath, TextRange};
@@ -2137,6 +2217,119 @@ mod tests {
         assert!(index.shard(first_file).is_some());
         assert!(index.shard(second_file).is_some());
         assert_eq!(index.definitions("event", "SHARED.1").len(), 2);
+    }
+
+    #[test]
+    fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
+        let first_file = SourceFileId::new(1);
+        let second_file = SourceFileId::new(2);
+        let range = TextRange::new(0, 3).expect("range");
+        let definition = |file_id, name: &str| Definition {
+            kind: "event".to_owned(),
+            name: name.to_owned(),
+            file_id,
+            range,
+            active: true,
+        };
+        let reference = |file_id, name: &str| Reference {
+            kind: "event".to_owned(),
+            name: name.to_owned(),
+            file_id,
+            range,
+        };
+        let mut index = WorkspaceIndex::from_shards([
+            FileIndexShard {
+                file_id: first_file,
+                definitions: vec![definition(first_file, "old.1")],
+                references: vec![reference(first_file, "old.1")],
+                syntax_error_count: 0,
+            },
+            FileIndexShard {
+                file_id: second_file,
+                definitions: vec![definition(second_file, "untouched.1")],
+                references: vec![reference(second_file, "untouched.1")],
+                syntax_error_count: 0,
+            },
+        ]);
+
+        index.replace_shard(FileIndexShard {
+            file_id: first_file,
+            definitions: vec![definition(first_file, "new.1")],
+            references: vec![reference(first_file, "new.1")],
+            syntax_error_count: 1,
+        });
+
+        assert!(index.definitions("event", "old.1").is_empty());
+        assert_eq!(index.definitions("event", "new.1").len(), 1);
+        assert_eq!(index.definitions("event", "untouched.1").len(), 1);
+        assert_eq!(index.references(first_file)[0].name, "new.1");
+        assert_eq!(index.references(second_file)[0].name, "untouched.1");
+        assert_eq!(index.shard(first_file).expect("replacement shard").syntax_error_count, 1);
+
+        index.remove_shard(first_file);
+        assert!(index.definitions("event", "new.1").is_empty());
+        assert!(index.references(first_file).is_empty());
+        assert_eq!(index.definitions("event", "untouched.1").len(), 1);
+    }
+
+    #[test]
+    fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
+        let first_file = SourceFileId::new(1);
+        let second_file = SourceFileId::new(2);
+        let range = TextRange::new(0, 3).expect("range");
+        let definition = |file_id| Definition {
+            kind: "event".to_owned(),
+            name: "shared.1".to_owned(),
+            file_id,
+            range,
+            active: true,
+        };
+        let mut index = WorkspaceIndex::from_shards([
+            FileIndexShard {
+                file_id: first_file,
+                definitions: vec![definition(first_file)],
+                references: Vec::new(),
+                syntax_error_count: 0,
+            },
+            FileIndexShard {
+                file_id: second_file,
+                definitions: vec![definition(second_file)],
+                references: Vec::new(),
+                syntax_error_count: 0,
+            },
+        ]);
+        let rules = Eu4Rules::bootstrap();
+        let tied = BTreeMap::from([(first_file, 10), (second_file, 10)]);
+        index.resolve_priorities(&tied, &rules);
+        assert_eq!(
+            index.definitions("event", "shared.1").iter().filter(|item| item.active).count(),
+            2
+        );
+        assert!(index.active_definition("event", "shared.1").is_none());
+
+        let ordered = BTreeMap::from([(first_file, 10), (second_file, 20)]);
+        index.resolve_priorities(&ordered, &rules);
+        assert_eq!(
+            index
+                .active_definition("event", "shared.1")
+                .expect("higher priority definition")
+                .file_id,
+            second_file
+        );
+        index.replace_shard_resolved(
+            FileIndexShard {
+                file_id: second_file,
+                definitions: Vec::new(),
+                references: Vec::new(),
+                syntax_error_count: 0,
+            },
+            &ordered,
+            &rules,
+        );
+        assert_eq!(
+            index.active_definition("event", "shared.1").expect("remaining definition").file_id,
+            first_file
+        );
     }
 
     #[test]
