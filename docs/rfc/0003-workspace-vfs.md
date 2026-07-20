@@ -143,6 +143,8 @@ HirFileCache
 FileIndexShard
 ```
 
+Phase R 的实现载体是不可变 `FileState`，它把共享源文本、`ParsedSource`、共享 `HirFile` 和 `FileIndexShard` 绑定到同一个 per-file revision。全量目录刷新仍会检查磁盘，但文本和文件元数据未变化时直接复用旧 `FileState`；打开文档则按 LSP document version 构建并保留同样的 parse/HIR cache。analysis query 不得自行调用 parser，磁盘跨文件语义只读取 `WorkspaceIndex`。
+
 更新算法：
 
 1. 应用 disk 或 overlay text change。

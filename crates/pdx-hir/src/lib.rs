@@ -2,6 +2,8 @@
 //!
 //! Phase 0 establishes the scope and file identities without implementing EU4 semantics.
 
+use std::sync::Arc;
+
 use pdx_eu4::Eu4Rules;
 use pdx_syntax::ParsedFile;
 
@@ -17,14 +19,14 @@ pub enum Scope {
 /// A lowered file handle.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HirFile {
-    syntax: ParsedFile,
+    syntax: Arc<ParsedFile>,
     scope: Scope,
 }
 
 impl HirFile {
     /// Returns the source syntax handle.
     #[must_use]
-    pub const fn syntax(&self) -> &ParsedFile {
+    pub fn syntax(&self) -> &ParsedFile {
         &self.syntax
     }
 
@@ -38,5 +40,11 @@ impl HirFile {
 /// Lowers a parsed EU4 file into the Phase 0 HIR shell.
 #[must_use]
 pub fn lower(syntax: ParsedFile, _rules: &Eu4Rules) -> HirFile {
+    lower_shared(Arc::new(syntax), _rules)
+}
+
+/// Lowers a shared parsed file without copying its CST.
+#[must_use]
+pub fn lower_shared(syntax: Arc<ParsedFile>, _rules: &Eu4Rules) -> HirFile {
     HirFile { syntax, scope: Scope::Unknown }
 }

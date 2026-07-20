@@ -5,18 +5,15 @@
 
 use std::collections::BTreeSet;
 use std::path::Path;
+use std::sync::Arc;
 
-use pdx_eu4::{
-    CsvDialect as RuleCsvDialect, CwtKeyMatcher, CwtRuleShape, CwtValueMatcher, ParserKind,
-    SymbolResolutionPolicy,
-};
+use pdx_eu4::{CwtKeyMatcher, CwtRuleShape, CwtValueMatcher, SymbolResolutionPolicy};
 use pdx_hir::Scope;
-use pdx_syntax::{
-    CstKind, CstNode, CsvParsedFile, Eu4FileFormat, ParsedFile, SyntaxError, csv::CsvDialect,
-    parse_eu4, parse_eu4_csv_file,
-};
+use pdx_syntax::{CstKind, CstNode, CsvParsedFile, Eu4FileFormat, ParsedFile, SyntaxError};
 use pdx_text::{LogicalPath, TextRange, TextSize};
-use pdx_workspace::{AnalysisSnapshot, Definition, DocumentId, DocumentSource, SourceFileId};
+use pdx_workspace::{
+    AnalysisSnapshot, Definition, DocumentId, DocumentSource, ParsedSource, SourceFileId,
+};
 
 /// Stable categories emitted by semantic analysis.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -1177,14 +1174,14 @@ struct ParsedInput {
     file: Option<SourceFileId>,
     path: Option<LogicalPath>,
     format: Eu4FileFormat,
-    source: String,
+    source: Arc<str>,
     parsed: ParsedContent,
 }
 
 #[derive(Clone, Debug)]
 enum ParsedContent {
-    Text(ParsedFile),
-    Csv(CsvParsedFile),
+    Text(Arc<ParsedFile>),
+    Csv(Arc<CsvParsedFile>),
 }
 
 impl ParsedInput {
@@ -1280,89 +1277,30 @@ fn input_for_document(snapshot: &AnalysisSnapshot, id: &DocumentId) -> Option<Pa
         .path()
         .and_then(|path| snapshot.source_files().values().find(|file| file.physical_path == path))
         .map(|file| file.id);
-    let format = parser_for(snapshot, path.as_ref(), document.path());
-    let source = document.text().to_owned();
-    parse_input(Some(id.clone()), file, path, format?, source)
+    let source = document.text_handle();
+    let parsed = document.parsed()?;
+    let format = parsed.format();
+    let parsed = match parsed {
+        ParsedSource::Text(parsed) => ParsedContent::Text(Arc::clone(parsed)),
+        ParsedSource::Csv(parsed) => ParsedContent::Csv(Arc::clone(parsed)),
+    };
+    Some(ParsedInput { document: Some(id.clone()), file, path, format, source, parsed })
 }
 
 fn input_for_source_file(snapshot: &AnalysisSnapshot, id: SourceFileId) -> Option<ParsedInput> {
     let file = snapshot.source_files().get(&id)?;
-    let source = snapshot.source_text(id)?.to_owned();
-    let parser = snapshot
-        .rules()
-        .classify(&file.logical_path)
-        .map(|category| category.parser.clone())
-        .or_else(|| parser_for(snapshot, Some(&file.logical_path), Some(&file.physical_path)))?;
-    parse_input(None, Some(id), Some(file.logical_path.clone()), parser, source)
-}
-
-fn parse_input(
-    document: Option<DocumentId>,
-    file: Option<SourceFileId>,
-    path: Option<LogicalPath>,
-    parser: ParserKind,
-    source: String,
-) -> Option<ParsedInput> {
-    match parser {
-        ParserKind::PdxScript => Some(ParsedInput {
-            document,
-            file,
-            path,
-            format: Eu4FileFormat::PdxScript,
-            parsed: ParsedContent::Text(parse_eu4(Eu4FileFormat::PdxScript, &source)),
-            source,
-        }),
-        ParserKind::Localisation => Some(ParsedInput {
-            document,
-            file,
-            path,
-            format: Eu4FileFormat::Localisation,
-            parsed: ParsedContent::Text(parse_eu4(Eu4FileFormat::Localisation, &source)),
-            source,
-        }),
-        ParserKind::Csv(dialect) => {
-            let dialect = match dialect {
-                RuleCsvDialect::Comma => CsvDialect::Comma,
-                RuleCsvDialect::Tab => CsvDialect::Tab,
-                RuleCsvDialect::Semicolon => CsvDialect::Semicolon,
-            };
-            Some(ParsedInput {
-                document,
-                file,
-                path,
-                format: Eu4FileFormat::Csv,
-                parsed: ParsedContent::Csv(parse_eu4_csv_file(&source, dialect)),
-                source,
-            })
-        }
-        ParserKind::Asset | ParserKind::SyntaxOnly => None,
-    }
-}
-
-fn parser_for(
-    snapshot: &AnalysisSnapshot,
-    path: Option<&LogicalPath>,
-    physical: Option<&Path>,
-) -> Option<ParserKind> {
-    if let Some(path) = path {
-        if let Some(category) = snapshot.rules().classify(path) {
-            return Some(category.parser.clone());
-        }
-    }
-    let extension = physical
-        .and_then(Path::extension)
-        .and_then(|extension| extension.to_str())
-        .map(str::to_ascii_lowercase)
-        .or_else(|| {
-            path.and_then(|path| {
-                path.as_str().rsplit_once('.').map(|(_, ext)| ext.to_ascii_lowercase())
-            })
-        })?;
-    Some(match extension.as_str() {
-        "yml" | "yaml" => ParserKind::Localisation,
-        "csv" => ParserKind::Csv(RuleCsvDialect::Semicolon),
-        "txt" | "gui" | "gfx" | "asset" | "sfx" => ParserKind::PdxScript,
-        _ => return None,
+    let state = snapshot.file_state(id)?;
+    let parsed = match state.parsed()? {
+        ParsedSource::Text(parsed) => ParsedContent::Text(Arc::clone(parsed)),
+        ParsedSource::Csv(parsed) => ParsedContent::Csv(Arc::clone(parsed)),
+    };
+    Some(ParsedInput {
+        document: None,
+        file: Some(id),
+        path: Some(file.logical_path.clone()),
+        format: state.parsed()?.format(),
+        source: state.source_handle(),
+        parsed,
     })
 }
 
@@ -2587,12 +2525,20 @@ fn collect_properties(
 
 fn all_semantics(snapshot: &AnalysisSnapshot) -> SemanticWorkspace {
     let mut all = SemanticWorkspace::default();
-    for file in snapshot.source_files().values() {
-        if let Some(input) = input_for_source_file(snapshot, file.id) {
-            let semantic = semantic_data(&input);
-            all.definitions.extend(semantic.definitions);
-            all.references.extend(semantic.references);
-        }
+    for definition in snapshot.index().definitions_iter() {
+        all.definitions.push(index_definition_info(snapshot, definition));
+    }
+    for reference in snapshot.index().references_iter() {
+        let path =
+            snapshot.source_files().get(&reference.file_id).map(|file| file.logical_path.clone());
+        all.references.push(ReferenceInternal {
+            kind: reference.kind.clone(),
+            name: reference.name.clone(),
+            range: reference.range,
+            document: None,
+            file: Some(reference.file_id),
+            path,
+        });
     }
     for document in snapshot.documents().values() {
         if document.source() != DocumentSource::Overlay {
@@ -2603,17 +2549,6 @@ fn all_semantics(snapshot: &AnalysisSnapshot) -> SemanticWorkspace {
             all.definitions.extend(semantic.definitions);
             all.references.extend(semantic.references);
         }
-    }
-    for definition in snapshot.index().definitions_iter() {
-        if all.definitions.iter().any(|existing| {
-            existing.kind == definition.kind
-                && same_name(&existing.name, &definition.name)
-                && existing.file == Some(definition.file_id)
-                && existing.symbol.range == definition.range
-        }) {
-            continue;
-        }
-        all.definitions.push(index_definition_info(snapshot, definition));
     }
     all
 }

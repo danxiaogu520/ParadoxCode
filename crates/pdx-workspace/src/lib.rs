@@ -7,10 +7,11 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use pdx_eu4::{Eu4Rules, FileResolutionPolicy, ParserKind, SymbolResolutionPolicy};
+use pdx_hir::{HirFile, lower_shared};
 use pdx_syntax::{CstKind, CstNode, Eu4FileFormat, ParsedFile, parse_eu4, parse_eu4_csv_file};
 use pdx_text::{LineIndex, LogicalPath, TextRange};
 
@@ -231,6 +232,74 @@ pub struct FileIndexShard {
     pub syntax_error_count: usize,
 }
 
+/// Parsed frontend retained by one immutable file state.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ParsedSource {
+    /// PDX Script or localisation CST.
+    Text(Arc<ParsedFile>),
+    /// Structured CSV parse.
+    Csv(Arc<pdx_syntax::CsvParsedFile>),
+}
+
+impl ParsedSource {
+    /// Returns the common frontend format.
+    #[must_use]
+    pub fn format(&self) -> Eu4FileFormat {
+        match self {
+            Self::Text(parsed) => parsed.format(),
+            Self::Csv(_) => Eu4FileFormat::Csv,
+        }
+    }
+}
+
+/// Immutable parse/lower/index result for one disk file revision.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FileState {
+    revision: u64,
+    source: Arc<str>,
+    parsed: Option<ParsedSource>,
+    hir: Option<Arc<HirFile>>,
+    shard: Arc<FileIndexShard>,
+}
+
+impl FileState {
+    /// Returns the per-file revision. It changes only when this file state is rebuilt.
+    #[must_use]
+    pub const fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    /// Returns the source text retained by this state.
+    #[must_use]
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    /// Clones the shared source handle without copying its text.
+    #[must_use]
+    pub fn source_handle(&self) -> Arc<str> {
+        Arc::clone(&self.source)
+    }
+
+    /// Returns the cached parsed frontend, when this category has one.
+    #[must_use]
+    pub fn parsed(&self) -> Option<&ParsedSource> {
+        self.parsed.as_ref()
+    }
+
+    /// Returns the cached HIR, when this frontend supports lowering.
+    #[must_use]
+    pub fn hir(&self) -> Option<&HirFile> {
+        self.hir.as_deref()
+    }
+
+    /// Returns the index shard produced atomically with this parse/HIR state.
+    #[must_use]
+    pub fn shard(&self) -> &FileIndexShard {
+        &self.shard
+    }
+}
+
 /// Workspace-wide symbol index made from immutable file shards.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct WorkspaceIndex {
@@ -285,6 +354,12 @@ impl WorkspaceIndex {
     #[must_use]
     pub fn references(&self, file_id: SourceFileId) -> &[Reference] {
         self.references.get(&file_id).map_or(&[], Vec::as_slice)
+    }
+
+    /// Iterates over references from every retained file shard.
+    #[must_use = "iterate the retained references"]
+    pub fn references_iter(&self) -> impl Iterator<Item = &Reference> {
+        self.references.values().flat_map(|references| references.iter())
     }
 
     /// Replaces one shard as a single map operation.
@@ -426,10 +501,12 @@ pub enum DocumentSource {
 pub struct DocumentSnapshot {
     id: DocumentId,
     version: Option<i64>,
-    text: String,
+    text: Arc<str>,
     line_index: LineIndex,
     source: DocumentSource,
     path: Option<PathBuf>,
+    parsed: Option<ParsedSource>,
+    hir: Option<Arc<HirFile>>,
 }
 
 impl DocumentSnapshot {
@@ -451,6 +528,12 @@ impl DocumentSnapshot {
         &self.text
     }
 
+    /// Clones the shared text handle without copying its contents.
+    #[must_use]
+    pub fn text_handle(&self) -> Arc<str> {
+        Arc::clone(&self.text)
+    }
+
     /// Returns the UTF-8/UTF-16 line index for this text.
     #[must_use]
     pub const fn line_index(&self) -> &LineIndex {
@@ -467,6 +550,18 @@ impl DocumentSnapshot {
     #[must_use]
     pub fn path(&self) -> Option<&std::path::Path> {
         self.path.as_deref()
+    }
+
+    /// Returns the parsed frontend built for this exact document version.
+    #[must_use]
+    pub fn parsed(&self) -> Option<&ParsedSource> {
+        self.parsed.as_ref()
+    }
+
+    /// Returns the HIR built for this exact document version.
+    #[must_use]
+    pub fn hir(&self) -> Option<&HirFile> {
+        self.hir.as_deref()
     }
 }
 
@@ -790,23 +885,21 @@ fn root_priority(root: &SourceRoot) -> u64 {
     }
 }
 
-fn build_shard(file: &SourceFile, source: &str, rules: &Eu4Rules) -> FileIndexShard {
-    let Some(category) = rules.classify(&file.logical_path) else {
-        return FileIndexShard {
-            file_id: file.id,
-            definitions: Vec::new(),
-            references: Vec::new(),
-            syntax_error_count: 0,
-        };
-    };
-    match &category.parser {
+fn parse_source(
+    parser: &ParserKind,
+    source: &str,
+    rules: &Eu4Rules,
+) -> (Option<ParsedSource>, Option<Arc<HirFile>>) {
+    match parser {
         ParserKind::PdxScript => {
-            let parsed = parse_eu4(Eu4FileFormat::PdxScript, source);
-            shard_from_parsed(file, &parsed, category.id.as_str(), rules)
+            let parsed = Arc::new(parse_eu4(Eu4FileFormat::PdxScript, source));
+            let hir = Arc::new(lower_shared(Arc::clone(&parsed), rules));
+            (Some(ParsedSource::Text(parsed)), Some(hir))
         }
         ParserKind::Localisation => {
-            let parsed = parse_eu4(Eu4FileFormat::Localisation, source);
-            shard_from_parsed(file, &parsed, category.id.as_str(), rules)
+            let parsed = Arc::new(parse_eu4(Eu4FileFormat::Localisation, source));
+            let hir = Arc::new(lower_shared(Arc::clone(&parsed), rules));
+            (Some(ParsedSource::Text(parsed)), Some(hir))
         }
         ParserKind::Csv(dialect) => {
             let dialect = match dialect {
@@ -814,7 +907,38 @@ fn build_shard(file: &SourceFile, source: &str, rules: &Eu4Rules) -> FileIndexSh
                 pdx_eu4::CsvDialect::Tab => pdx_syntax::csv::CsvDialect::Tab,
                 pdx_eu4::CsvDialect::Semicolon => pdx_syntax::csv::CsvDialect::Semicolon,
             };
-            let parsed = parse_eu4_csv_file(source, dialect);
+            (Some(ParsedSource::Csv(Arc::new(parse_eu4_csv_file(source, dialect)))), None)
+        }
+        ParserKind::Asset | ParserKind::SyntaxOnly => (None, None),
+    }
+}
+
+fn build_file_state(
+    file: &SourceFile,
+    source: String,
+    revision: u64,
+    rules: &Eu4Rules,
+) -> FileState {
+    let Some(category) = rules.classify(&file.logical_path) else {
+        return FileState {
+            revision,
+            source: Arc::from(source),
+            parsed: None,
+            hir: None,
+            shard: Arc::new(FileIndexShard {
+                file_id: file.id,
+                definitions: Vec::new(),
+                references: Vec::new(),
+                syntax_error_count: 0,
+            }),
+        };
+    };
+    let (parsed, hir) = parse_source(&category.parser, &source, rules);
+    let shard = match parsed.as_ref() {
+        Some(ParsedSource::Text(parsed)) => {
+            shard_from_parsed(file, parsed, category.id.as_str(), rules)
+        }
+        Some(ParsedSource::Csv(parsed)) => {
             let definitions =
                 if file.logical_path.as_str().eq_ignore_ascii_case("map/definition.csv") {
                     parsed
@@ -847,13 +971,14 @@ fn build_shard(file: &SourceFile, source: &str, rules: &Eu4Rules) -> FileIndexSh
                 syntax_error_count: parsed.errors().len(),
             }
         }
-        ParserKind::Asset | ParserKind::SyntaxOnly => FileIndexShard {
+        None => FileIndexShard {
             file_id: file.id,
             definitions: Vec::new(),
             references: Vec::new(),
             syntax_error_count: 0,
         },
-    }
+    };
+    FileState { revision, source: Arc::from(source), parsed, hir, shard: Arc::new(shard) }
 }
 
 fn shard_from_parsed(
@@ -1323,6 +1448,9 @@ fn collect_semantics(
                         }
                     }
                 }
+                if let Some((kind, name, range)) = semantic_reference(node, &key, parsed) {
+                    references.push(Reference { kind, name, file_id: file.id, range });
+                }
             }
         }
         CstKind::BareValue if !inside_key => {
@@ -1351,6 +1479,48 @@ fn collect_semantics(
             references,
         );
     }
+}
+
+fn semantic_reference(
+    node: &CstNode,
+    key: &str,
+    parsed: &ParsedFile,
+) -> Option<(String, String, TextRange)> {
+    let lower = key.to_ascii_lowercase();
+    let kind = if matches!(lower.as_str(), "event" | "events" | "event_id" | "trigger_event")
+        || lower.ends_with("_event")
+    {
+        Some("event")
+    } else if lower.contains("scripted_effect")
+        || lower == "call_effect"
+        || lower.ends_with("_effect")
+    {
+        Some("scripted_effect")
+    } else if lower.contains("scripted_trigger")
+        || lower == "call_trigger"
+        || lower.ends_with("_trigger")
+    {
+        Some("scripted_trigger")
+    } else if matches!(
+        lower.as_str(),
+        "localisation" | "localization" | "loc_key" | "name" | "desc" | "title" | "tooltip"
+    ) {
+        Some("localisation")
+    } else {
+        None
+    }?;
+    let value = node.children().iter().find(|child| child.kind() == CstKind::Value)?;
+    let scalar = value
+        .children()
+        .iter()
+        .find(|child| matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString))?;
+    let raw = parsed.text(scalar.range())?.trim();
+    let name =
+        raw.strip_prefix('"').and_then(|value| value.strip_suffix('"')).unwrap_or(raw).to_owned();
+    if name.is_empty() || name == "yes" || name == "no" || name.parse::<f64>().is_ok() {
+        return None;
+    }
+    Some((kind.to_owned(), name, scalar.range()))
 }
 
 fn definition_kind(path: &str, key: &str, node: &CstNode, parsed: &ParsedFile) -> Option<String> {
@@ -1473,7 +1643,7 @@ pub struct AnalysisHost {
     workspace_root: Option<PathBuf>,
     documents: Arc<BTreeMap<DocumentId, DocumentSnapshot>>,
     source_files: Arc<BTreeMap<SourceFileId, SourceFile>>,
-    disk_text: Arc<BTreeMap<SourceFileId, String>>,
+    file_states: Arc<BTreeMap<SourceFileId, Arc<FileState>>>,
     index: Arc<WorkspaceIndex>,
     scan_report: Arc<WorkspaceScanReport>,
 }
@@ -1495,9 +1665,68 @@ impl AnalysisHost {
             workspace_root: None,
             documents: Arc::new(BTreeMap::new()),
             source_files: Arc::new(BTreeMap::new()),
-            disk_text: Arc::new(BTreeMap::new()),
+            file_states: Arc::new(BTreeMap::new()),
             index: Arc::new(WorkspaceIndex::empty()),
             scan_report: Arc::new(WorkspaceScanReport::default()),
+        }
+    }
+
+    fn parser_for_document(&self, id: &DocumentId, path: Option<&Path>) -> Option<ParserKind> {
+        let logical = path
+            .and_then(|path| {
+                self.roots
+                    .iter()
+                    .filter_map(|root| path.strip_prefix(&root.path).ok())
+                    .filter_map(|relative| LogicalPath::parse(&relative.to_string_lossy()).ok())
+                    .min_by_key(|path| path.as_str().len())
+            })
+            .or_else(|| {
+                id.as_str()
+                    .split(['/', '\\'])
+                    .next_back()
+                    .and_then(|name| LogicalPath::parse(name).ok())
+            });
+        if let Some(category) = logical.as_ref().and_then(|path| self.rules.classify(path)) {
+            return Some(category.parser.clone());
+        }
+        let extension = path
+            .and_then(Path::extension)
+            .and_then(|extension| extension.to_str())
+            .map(str::to_ascii_lowercase)
+            .or_else(|| {
+                logical.as_ref().and_then(|path| {
+                    path.as_str().rsplit_once('.').map(|(_, ext)| ext.to_ascii_lowercase())
+                })
+            })?;
+        Some(match extension.as_str() {
+            "yml" | "yaml" => ParserKind::Localisation,
+            "csv" => ParserKind::Csv(pdx_eu4::CsvDialect::Semicolon),
+            "txt" | "gui" | "gfx" | "asset" | "sfx" => ParserKind::PdxScript,
+            _ => return None,
+        })
+    }
+
+    fn document_snapshot(
+        &self,
+        id: DocumentId,
+        version: Option<i64>,
+        text: String,
+        source: DocumentSource,
+        path: Option<PathBuf>,
+    ) -> DocumentSnapshot {
+        let line_index = LineIndex::new(&text);
+        let (parsed, hir) = self
+            .parser_for_document(&id, path.as_deref())
+            .map_or((None, None), |parser| parse_source(&parser, &text, self.rules.as_ref()));
+        DocumentSnapshot {
+            id,
+            version,
+            text: Arc::from(text),
+            line_index,
+            source,
+            path,
+            parsed,
+            hir,
         }
     }
 
@@ -1550,9 +1779,24 @@ impl AnalysisHost {
                 report.indexed_files = report.indexed_files.saturating_add(1);
             }
         }
-        let shards = files.iter().filter_map(|(id, file)| {
-            texts.get(id).map(|text| build_shard(file, text, self.rules.as_ref()))
-        });
+        let mut file_states = BTreeMap::new();
+        for (id, file) in &files {
+            let Some(text) = texts.remove(id) else { continue };
+            let state = match self.file_states.get(id) {
+                Some(previous)
+                    if self.source_files.get(id) == Some(file) && previous.source() == text =>
+                {
+                    Arc::clone(previous)
+                }
+                previous => {
+                    let file_revision =
+                        previous.map_or(0, |state| state.revision().saturating_add(1));
+                    Arc::new(build_file_state(file, text, file_revision, self.rules.as_ref()))
+                }
+            };
+            file_states.insert(*id, state);
+        }
+        let shards = file_states.values().map(|state| state.shard().clone());
         let mut index = WorkspaceIndex::from_shards(shards);
         let priorities = files
             .values()
@@ -1565,7 +1809,7 @@ impl AnalysisHost {
             .collect::<BTreeMap<_, _>>();
         index.resolve_priorities(&priorities, self.rules.as_ref());
         self.source_files = Arc::new(files);
-        self.disk_text = Arc::new(texts);
+        self.file_states = Arc::new(file_states);
         self.index = Arc::new(index);
         self.scan_report = Arc::new(report.clone());
         self.revision = self.revision.saturating_add(1);
@@ -1574,7 +1818,13 @@ impl AnalysisHost {
 
     /// Returns a mutable workspace index for targeted shard replacement.
     pub fn replace_index_shard(&mut self, shard: FileIndexShard) {
-        Arc::make_mut(&mut self.index).replace_shard(shard);
+        let file_id = shard.file_id;
+        Arc::make_mut(&mut self.index).replace_shard(shard.clone());
+        if let Some(previous) = self.file_states.get(&file_id) {
+            let mut replacement = previous.as_ref().clone();
+            replacement.shard = Arc::new(shard);
+            Arc::make_mut(&mut self.file_states).insert(file_id, Arc::new(replacement));
+        }
         self.revision = self.revision.saturating_add(1);
     }
 
@@ -1593,18 +1843,9 @@ impl AnalysisHost {
         {
             return Err(DocumentError::AlreadyOpen(id));
         }
-        let line_index = LineIndex::new(&text);
-        Arc::make_mut(&mut self.documents).insert(
-            id.clone(),
-            DocumentSnapshot {
-                id,
-                version: Some(version),
-                text,
-                line_index,
-                source: DocumentSource::Overlay,
-                path,
-            },
-        );
+        let document =
+            self.document_snapshot(id.clone(), Some(version), text, DocumentSource::Overlay, path);
+        Arc::make_mut(&mut self.documents).insert(id.clone(), document);
         self.revision = self.revision.saturating_add(1);
         Ok(())
     }
@@ -1631,7 +1872,7 @@ impl AnalysisHost {
             });
         }
 
-        let mut text = current.text.clone();
+        let mut text = current.text().to_owned();
         for change in changes {
             if let Some(range) = change.range {
                 let start = usize::try_from(range.start()).ok();
@@ -1651,17 +1892,9 @@ impl AnalysisHost {
         }
 
         let path = current.path.clone();
-        Arc::make_mut(&mut self.documents).insert(
-            id.clone(),
-            DocumentSnapshot {
-                id: id.clone(),
-                version: Some(version),
-                line_index: LineIndex::new(&text),
-                text,
-                source: DocumentSource::Overlay,
-                path,
-            },
-        );
+        let document =
+            self.document_snapshot(id.clone(), Some(version), text, DocumentSource::Overlay, path);
+        Arc::make_mut(&mut self.documents).insert(id.clone(), document);
         self.revision = self.revision.saturating_add(1);
         Ok(())
     }
@@ -1677,18 +1910,17 @@ impl AnalysisHost {
         let path = current.path.clone();
         Arc::make_mut(&mut self.documents).remove(id);
         if let Some(path) = path {
-            if let Ok(text) = fs::read_to_string(&path) {
-                Arc::make_mut(&mut self.documents).insert(
+            let mut report = WorkspaceScanReport::default();
+            if let Some(text) = read_source_file(&path, WorkspaceScanLimits::default(), &mut report)
+            {
+                let document = self.document_snapshot(
                     id.clone(),
-                    DocumentSnapshot {
-                        id: id.clone(),
-                        version: None,
-                        line_index: LineIndex::new(&text),
-                        text,
-                        source: DocumentSource::Disk,
-                        path: Some(path),
-                    },
+                    None,
+                    text,
+                    DocumentSource::Disk,
+                    Some(path),
                 );
+                Arc::make_mut(&mut self.documents).insert(id.clone(), document);
             }
         }
         self.revision = self.revision.saturating_add(1);
@@ -1705,7 +1937,7 @@ impl AnalysisHost {
             workspace_root: self.workspace_root.clone(),
             documents: Arc::clone(&self.documents),
             source_files: Arc::clone(&self.source_files),
-            disk_text: Arc::clone(&self.disk_text),
+            file_states: Arc::clone(&self.file_states),
             index: Arc::clone(&self.index),
             scan_report: Arc::clone(&self.scan_report),
         }
@@ -1721,7 +1953,7 @@ pub struct AnalysisSnapshot {
     workspace_root: Option<PathBuf>,
     documents: Arc<BTreeMap<DocumentId, DocumentSnapshot>>,
     source_files: Arc<BTreeMap<SourceFileId, SourceFile>>,
-    disk_text: Arc<BTreeMap<SourceFileId, String>>,
+    file_states: Arc<BTreeMap<SourceFileId, Arc<FileState>>>,
     index: Arc<WorkspaceIndex>,
     scan_report: Arc<WorkspaceScanReport>,
 }
@@ -1767,6 +1999,12 @@ impl AnalysisSnapshot {
     #[must_use]
     pub fn source_files(&self) -> &BTreeMap<SourceFileId, SourceFile> {
         &self.source_files
+    }
+
+    /// Returns the immutable parse/HIR/index state for one scanned disk file.
+    #[must_use]
+    pub fn file_state(&self, file_id: SourceFileId) -> Option<&FileState> {
+        self.file_states.get(&file_id).map(Arc::as_ref)
     }
 
     /// Returns the immutable file/symbol index.
@@ -1845,7 +2083,7 @@ impl AnalysisSnapshot {
     /// Returns the current text for a disk file, if it was scanned.
     #[must_use]
     pub fn source_text(&self, file_id: SourceFileId) -> Option<&str> {
-        self.disk_text.get(&file_id).map(String::as_str)
+        self.file_state(file_id).map(FileState::source)
     }
 }
 
@@ -1855,8 +2093,8 @@ mod tests {
     use std::sync::Arc;
 
     use super::{
-        AnalysisHost, Definition, DocumentId, DocumentSource, FileIndexShard, SourceFileId,
-        SourceRoot, SourceRootId, SourceRootKind, TextChange, WorkspaceIndex,
+        AnalysisHost, Definition, DocumentId, DocumentSource, FileIndexShard, ParsedSource,
+        SourceFileId, SourceRoot, SourceRootId, SourceRootKind, TextChange, WorkspaceIndex,
         WorkspaceScanIssueKind, WorkspaceScanLimits,
     };
     use pdx_eu4::Eu4Rules;
@@ -1956,6 +2194,80 @@ mod tests {
     }
 
     #[test]
+    fn unchanged_file_states_are_reused_and_only_changed_files_advance() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-workspace-file-state-{nonce}"));
+        let events = root.join("events");
+        fs::create_dir_all(&events).expect("event directory");
+        fs::write(events.join("a.txt"), "country_event = { id = state.a }\n").expect("a event");
+        fs::write(events.join("b.txt"), "country_event = { id = state.b }\n").expect("b event");
+
+        let mut host = AnalysisHost::new(Eu4Rules::bootstrap());
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        host.refresh_source_roots().expect("initial scan");
+        let first = host.snapshot();
+        let a = first
+            .source_files()
+            .values()
+            .find(|file| file.logical_path.as_str() == "events/a.txt")
+            .expect("a file")
+            .id;
+        let b = first
+            .source_files()
+            .values()
+            .find(|file| file.logical_path.as_str() == "events/b.txt")
+            .expect("b file")
+            .id;
+        assert!(first.file_state(a).expect("a state").parsed().is_some());
+        assert!(first.file_state(a).expect("a state").hir().is_some());
+        let Some(ParsedSource::Text(parsed)) = first.file_state(a).expect("a state").parsed()
+        else {
+            panic!("event file should retain a text parse");
+        };
+        assert!(std::ptr::eq(
+            parsed.as_ref(),
+            first.file_state(a).expect("a state").hir().expect("a HIR").syntax()
+        ));
+
+        host.refresh_source_roots().expect("unchanged scan");
+        let second = host.snapshot();
+        assert!(Arc::ptr_eq(
+            first.file_states.get(&a).expect("first a state"),
+            second.file_states.get(&a).expect("second a state")
+        ));
+        assert!(Arc::ptr_eq(
+            first.file_states.get(&b).expect("first b state"),
+            second.file_states.get(&b).expect("second b state")
+        ));
+
+        fs::write(events.join("b.txt"), "country_event = { id = state.changed }\n")
+            .expect("changed b event");
+        host.refresh_source_roots().expect("changed scan");
+        let third = host.snapshot();
+        assert!(Arc::ptr_eq(
+            second.file_states.get(&a).expect("second a state"),
+            third.file_states.get(&a).expect("third a state")
+        ));
+        assert!(!Arc::ptr_eq(
+            second.file_states.get(&b).expect("second b state"),
+            third.file_states.get(&b).expect("third b state")
+        ));
+        assert_eq!(
+            third.file_state(b).expect("changed b state").revision(),
+            second.file_state(b).expect("old b state").revision().saturating_add(1)
+        );
+        assert_eq!(third.index().definitions("event", "state.changed").len(), 1);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
     fn snapshots_share_immutable_state_and_preserve_old_revisions() {
         let mut host = AnalysisHost::new(Eu4Rules::empty());
         let first = host.snapshot();
@@ -1965,7 +2277,7 @@ mod tests {
         assert!(Arc::ptr_eq(&first.roots, &second.roots));
         assert!(Arc::ptr_eq(&first.documents, &second.documents));
         assert!(Arc::ptr_eq(&first.source_files, &second.source_files));
-        assert!(Arc::ptr_eq(&first.disk_text, &second.disk_text));
+        assert!(Arc::ptr_eq(&first.file_states, &second.file_states));
         assert!(Arc::ptr_eq(&first.index, &second.index));
         assert!(Arc::ptr_eq(&first.scan_report, &second.scan_report));
 
@@ -1978,7 +2290,7 @@ mod tests {
         assert!(!Arc::ptr_eq(&first.documents, &third.documents));
         assert!(Arc::ptr_eq(&first.roots, &third.roots));
         assert!(Arc::ptr_eq(&first.source_files, &third.source_files));
-        assert!(Arc::ptr_eq(&first.disk_text, &third.disk_text));
+        assert!(Arc::ptr_eq(&first.file_states, &third.file_states));
         assert!(Arc::ptr_eq(&first.index, &third.index));
         assert!(Arc::ptr_eq(&first.scan_report, &third.scan_report));
     }
@@ -2133,6 +2445,15 @@ mod tests {
         let mut host = AnalysisHost::new(Eu4Rules::empty());
         let id = DocumentId::new("file:///tmp/example.txt");
         host.open_document(id.clone(), 1, "a😀z".to_owned(), None).expect("open should succeed");
+        let first = host.snapshot();
+        let first_document = first.document(&id).expect("first document");
+        let Some(ParsedSource::Text(first_parse)) = first_document.parsed() else {
+            panic!("txt overlay should retain a text parse");
+        };
+        assert!(std::ptr::eq(
+            first_parse.as_ref(),
+            first_document.hir().expect("overlay HIR").syntax()
+        ));
         let range = TextRange::new(1, 5).expect("emoji range");
         let error = host
             .apply_document_changes(&id, 1, &[TextChange::ranged(range, "x")])
@@ -2141,7 +2462,14 @@ mod tests {
         assert_eq!(host.snapshot().document(&id).expect("document exists").text(), "a😀z");
         host.apply_document_changes(&id, 2, &[TextChange::ranged(range, "x")])
             .expect("new version should succeed");
-        assert_eq!(host.snapshot().document(&id).expect("document exists").text(), "axz");
+        let second = host.snapshot();
+        let second_document = second.document(&id).expect("document exists");
+        assert_eq!(second_document.text(), "axz");
+        let Some(ParsedSource::Text(second_parse)) = second_document.parsed() else {
+            panic!("changed txt overlay should retain a text parse");
+        };
+        assert!(!Arc::ptr_eq(first_parse, second_parse));
+        assert_eq!(first.document(&id).expect("old snapshot remains valid").text(), "a😀z");
     }
 
     #[test]
