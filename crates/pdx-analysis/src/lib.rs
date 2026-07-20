@@ -35,7 +35,7 @@ pub enum DiagnosticCode {
     InvalidValue,
     /// A CWT cardinality constraint was violated.
     Cardinality,
-    /// A key or value is known to CWT but is used from the wrong EU4 scope.
+    /// A key or value is known to CWT but is used from the wrong game scope.
     WrongScope,
 }
 
@@ -204,7 +204,7 @@ pub enum RenameError {
     Ambiguous,
     /// The selected definition belongs to Vanilla, a dependency, or another read-only source.
     ReadOnly,
-    /// The requested replacement is not a single EU4 identifier token.
+    /// The requested replacement is not a single PDX identifier token.
     InvalidName,
     /// The replacement would create a same-priority or otherwise disallowed definition conflict.
     Conflict,
@@ -217,7 +217,7 @@ impl std::fmt::Display for RenameError {
             Self::Unresolved => "symbol has no unique definition",
             Self::Ambiguous => "symbol has multiple definitions",
             Self::ReadOnly => "symbol is defined in a read-only source",
-            Self::InvalidName => "new name is not a valid EU4 identifier",
+            Self::InvalidName => "new name is not a valid PDX identifier",
             Self::Conflict => "new name conflicts with another definition",
         })
     }
@@ -377,7 +377,7 @@ pub fn complete(
                 CompletionItem {
                     label: key.clone(),
                     kind: CompletionKind::Key,
-                    detail: "EU4 property".to_owned(),
+                    detail: "PDX property".to_owned(),
                     documentation: None,
                     replacement_range,
                     insert_text: key,
@@ -415,7 +415,7 @@ pub fn complete(
                 items.push(CompletionItem {
                     label: key.clone(),
                     kind: CompletionKind::Key,
-                    detail: "EU4 property".to_owned(),
+                    detail: "PDX property".to_owned(),
                     documentation: None,
                     replacement_range,
                     insert_text: key,
@@ -434,7 +434,7 @@ pub fn complete(
 struct CwtCompletionContext {
     context: String,
     parent_path: Vec<String>,
-    scope: Eu4ScopeContext,
+    scope: ScopeContext,
     property: Option<ScriptProperty>,
 }
 
@@ -472,7 +472,7 @@ fn cwt_completion_container(
     parent_path: Vec<String>,
     properties: Vec<ScriptProperty>,
     _bare_values: Vec<(String, TextRange)>,
-    scope: Eu4ScopeContext,
+    scope: ScopeContext,
     position: TextSize,
 ) -> CwtCompletionContext {
     for property in &properties {
@@ -516,7 +516,7 @@ fn cwt_rules_for_container<'a>(
     snapshot: &'a AnalysisSnapshot,
     context: &str,
     parent_path: &[String],
-    _scope: &Eu4ScopeContext,
+    _scope: &ScopeContext,
 ) -> Vec<&'a pdx_rules::CwtSemanticRule> {
     snapshot
         .rules()
@@ -744,8 +744,11 @@ fn add_cwt_value_items(
                 }
             }
             CwtValueMatcher::Scope(expected) => {
-                for label in ["root", "this", "from", "prev", "country", "province", "trade_node"] {
-                    if expected.as_deref().is_none_or(|scope| scope_compatible(label, scope)) {
+                for label in &snapshot.game_profile().scope_completions {
+                    if expected
+                        .as_deref()
+                        .is_none_or(|scope| snapshot.game_profile().scopes_compatible(label, scope))
+                    {
                         add_value_completion(
                             items,
                             label,
@@ -852,7 +855,7 @@ fn cwt_rule_detail(rule: &pdx_rules::CwtSemanticRule) -> String {
 
 fn workspace_member_names(snapshot: &AnalysisSnapshot, type_name: &str) -> Vec<String> {
     let base = type_name.split_once('.').map_or(type_name, |(kind, _)| kind);
-    let alias = eu4_member_kind_alias(base);
+    let alias = snapshot.game_profile().member_kind_alias(base);
     let mut names = snapshot
         .index()
         .definitions_iter()
@@ -914,19 +917,19 @@ pub fn hover(
     }
     if let Some(details) = cwt_rule_documentation_at(snapshot, &input, position) {
         return Some(Hover {
-            contents: format!("EU4 property `{word}`\n\n{details}"),
+            contents: format!("PDX property `{word}`\n\n{details}"),
             range: Some(range),
         });
     }
     let known = known_keys(snapshot);
     if known.contains(&word) {
         let contents = cwt_rule_documentation(snapshot, &word).map_or_else(
-            || format!("EU4 property `{word}`"),
-            |details| format!("EU4 property `{word}`\n\n{details}"),
+            || format!("PDX property `{word}`"),
+            |details| format!("PDX property `{word}`\n\n{details}"),
         );
         return Some(Hover { contents, range: Some(range) });
     }
-    Some(Hover { contents: format!("EU4 value `{word}`"), range: Some(range) })
+    Some(Hover { contents: format!("PDX value `{word}`"), range: Some(range) })
 }
 
 fn cwt_rule_documentation(snapshot: &AnalysisSnapshot, key: &str) -> Option<String> {
@@ -1356,12 +1359,12 @@ fn analyze_input(snapshot: &AnalysisSnapshot, input: &ParsedInput) -> FileAnalys
                 code: DiagnosticCode::UnknownKey,
                 severity: DiagnosticCode::UnknownKey.severity(),
                 range: property.key_range,
-                message: format!("unknown EU4 key `{}`", property.key),
+                message: format!("unknown PDX key `{}`", property.key),
             });
         }
         if property.key.eq_ignore_ascii_case("scope")
             && let Some((value, range)) = property.value.as_ref()
-            && !known_scope(value)
+            && !input.profile.is_scope(value)
             && !unknown_scope_reported
         {
             diagnostics.push(Diagnostic {
@@ -1431,16 +1434,18 @@ struct ScriptProperty {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct Eu4ScopeContext {
+struct ScopeContext {
+    profile: Arc<GameProfile>,
     root: String,
     current: String,
     from: Vec<String>,
     previous: Vec<String>,
 }
 
-impl Default for Eu4ScopeContext {
-    fn default() -> Self {
+impl ScopeContext {
+    fn new(profile: Arc<GameProfile>) -> Self {
         Self {
+            profile,
             root: "any".to_owned(),
             current: "any".to_owned(),
             from: Vec::new(),
@@ -1500,12 +1505,8 @@ fn cwt_rule_diagnostics(snapshot: &AnalysisSnapshot, input: &ParsedInput) -> Vec
     diagnostics
 }
 
-fn cwt_initial_scope(
-    snapshot: &AnalysisSnapshot,
-    context: &str,
-    root_key: &str,
-) -> Eu4ScopeContext {
-    let mut scope = Eu4ScopeContext::default();
+fn cwt_initial_scope(snapshot: &AnalysisSnapshot, context: &str, root_key: &str) -> ScopeContext {
+    let mut scope = ScopeContext::new(snapshot.game_profile_handle());
     if let Some(type_name) = context.strip_prefix("type:")
         && let Some(root_scope) = snapshot
             .rules()
@@ -1519,16 +1520,9 @@ fn cwt_initial_scope(
         scope.current.clone_from(root_scope);
         return scope;
     }
-    match root_key.to_ascii_lowercase().as_str() {
-        "country_event" => {
-            scope.root = "country".to_owned();
-            scope.current = "country".to_owned();
-        }
-        "province_event" => {
-            scope.root = "province".to_owned();
-            scope.current = "province".to_owned();
-        }
-        _ => {}
+    if let Some(root_scope) = snapshot.game_profile().root_scope(root_key) {
+        scope.root = root_scope.to_owned();
+        scope.current = root_scope.to_owned();
     }
     scope
 }
@@ -1729,7 +1723,7 @@ fn validate_cwt_container(
     parent_path: &[String],
     properties: &[ScriptProperty],
     bare_values: &[(String, TextRange)],
-    scope: &Eu4ScopeContext,
+    scope: &ScopeContext,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let rules = snapshot
@@ -1786,7 +1780,7 @@ fn validate_cwt_container(
                     ),
                     range: property.key_range,
                     message: format!(
-                        "`{}` is not available in EU4 scope `{}`",
+                        "`{}` is not available in game scope `{}`",
                         property.key, scope.current
                     ),
                 });
@@ -1940,7 +1934,7 @@ fn cwt_selected_alternative(
     rules: &[&pdx_rules::CwtSemanticRule],
     properties: &[ScriptProperty],
     bare_values: &[(String, TextRange)],
-    scope: &Eu4ScopeContext,
+    scope: &ScopeContext,
 ) -> Option<String> {
     let mut alternatives = Vec::<String>::new();
     for rule in rules {
@@ -1997,7 +1991,7 @@ fn cwt_leaf_value_matches(
     snapshot: &AnalysisSnapshot,
     rule: &pdx_rules::CwtSemanticRule,
     value: &str,
-    scope: &Eu4ScopeContext,
+    scope: &ScopeContext,
 ) -> bool {
     match &rule.value {
         CwtValueMatcher::Dynamic(kind) => cwt_dynamic_value_matches(snapshot, kind, value, scope),
@@ -2077,12 +2071,15 @@ fn cwt_min_cardinality_severity(rule: &pdx_rules::CwtSemanticRule) -> u8 {
     }
 }
 
-fn cwt_scope_allows(rule: &pdx_rules::CwtSemanticRule, scope: &Eu4ScopeContext) -> bool {
+fn cwt_scope_allows(rule: &pdx_rules::CwtSemanticRule, scope: &ScopeContext) -> bool {
     rule.allowed_scopes.is_empty()
-        || rule.allowed_scopes.iter().any(|expected| scope_compatible(&scope.current, expected))
+        || rule
+            .allowed_scopes
+            .iter()
+            .any(|expected| scope.profile.scopes_compatible(&scope.current, expected))
 }
 
-fn cwt_child_scope(parent: &Eu4ScopeContext, rule: &pdx_rules::CwtSemanticRule) -> Eu4ScopeContext {
+fn cwt_child_scope(parent: &ScopeContext, rule: &pdx_rules::CwtSemanticRule) -> ScopeContext {
     let mut child = parent.clone();
     if let Some(push_scope) = &rule.push_scope
         && !push_scope.eq_ignore_ascii_case("any")
@@ -2129,7 +2126,7 @@ fn cwt_property_matches(
     snapshot: &AnalysisSnapshot,
     rule: &pdx_rules::CwtSemanticRule,
     property: &ScriptProperty,
-    scope_context: &Eu4ScopeContext,
+    scope_context: &ScopeContext,
 ) -> bool {
     let shape_matches = match rule.shape {
         CwtRuleShape::Node => property.block_range.is_some(),
@@ -2169,7 +2166,7 @@ fn cwt_dynamic_value_matches(
     snapshot: &AnalysisSnapshot,
     kind: &str,
     value: &str,
-    scope_context: &Eu4ScopeContext,
+    scope_context: &ScopeContext,
 ) -> bool {
     let kind = kind.to_ascii_lowercase();
     if kind == "scope_field" {
@@ -2196,7 +2193,8 @@ fn cwt_dynamic_value_matches(
 
 fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
     let base = type_name.split_once('.').map_or(type_name, |(kind, _)| kind);
-    let candidates = [type_name, base, eu4_member_kind_alias(base).unwrap_or(base)];
+    let candidates =
+        [type_name, base, snapshot.game_profile().member_kind_alias(base).unwrap_or(base)];
     snapshot.index().definitions_iter().any(|definition| {
         candidates.iter().any(|candidate| definition.kind.eq_ignore_ascii_case(candidate))
             && definition.name.eq_ignore_ascii_case(member)
@@ -2212,50 +2210,15 @@ fn enum_member(snapshot: &AnalysisSnapshot, enum_name: &str, member: &str) -> bo
         .get(enum_name)
         .is_some_and(|values| values.iter().any(|value| value.eq_ignore_ascii_case(member)));
     static_member
-        || eu4_member_kind_alias(enum_name)
+        || snapshot.game_profile().enum_extra_member(enum_name, member)
+        || snapshot
+            .game_profile()
+            .member_kind_alias(enum_name)
             .is_some_and(|kind| workspace_member(snapshot, kind, member))
         || workspace_member(snapshot, enum_name, member)
-        || (enum_name.eq_ignore_ascii_case("scripted_effect_params")
-            && (member.eq_ignore_ascii_case("scaled_skill")
-                || workspace_member(snapshot, "scripted_effect_param", member)))
-        || (enum_name.eq_ignore_ascii_case("scripted_effect_params_dollar")
-            && workspace_member(snapshot, "scripted_effect_param_dollar", member))
 }
 
-fn eu4_member_kind_alias(type_name: &str) -> Option<&'static str> {
-    Some(match type_name.to_ascii_lowercase().as_str() {
-        "country_tags" | "country_tag" => "country_tag",
-        "trade_nodes" | "tradenodes" | "trade_node" => "trade_node",
-        "colonial_regions" | "colonial_region" => "colonial_region",
-        "government_reforms" | "government_reform" => "government_reform",
-        "subject_types" | "subject_type" => "subject_type",
-        "mercenary_companies" | "mercenary_company" => "mercenary_company",
-        "trade_companies" | "trade_company" => "trade_company",
-        "event_modifiers" | "event_modifier" => "event_modifier",
-        "static_modifiers" | "static_modifier" => "static_modifier",
-        "timed_modifiers" | "timed_modifier" => "timed_modifier",
-        "triggered_modifiers" | "triggered_modifier" => "triggered_modifier",
-        "peace_treaties" | "peace_treaty" => "peace_treaty",
-        "wargoal_types" | "wargoal_type" => "wargoal_type",
-        "advisortypes" | "advisor_type" => "advisor_type",
-        "leader_personalities" | "leader_personality" => "leader_personality",
-        "ruler_personalities" | "ruler_personality" => "ruler_personality",
-        "idea_groups" | "idea_group" => "idea_group",
-        "buildings" | "building" => "building",
-        "technologies" | "technology" => "technology",
-        "religions" | "religion" => "religion",
-        "cultures" | "culture" => "culture",
-        "scripted_effect_params" => "scripted_effect_param",
-        "scripted_effect_params_dollar" => "scripted_effect_param_dollar",
-        "hardcoded_legacygovernments" | "hardcoded_legacy_only_governments" => {
-            "hardcoded_legacy_government"
-        }
-        "modifiers" | "modifier" => "static_modifier",
-        _ => return None,
-    })
-}
-
-fn scope_member(scope: Option<&str>, member: &str, context: &Eu4ScopeContext) -> bool {
+fn scope_member(scope: Option<&str>, member: &str, context: &ScopeContext) -> bool {
     let lowered = member.to_ascii_lowercase().replace('_', "");
     let resolved = if lowered == "root" {
         Some(context.root.as_str())
@@ -2270,15 +2233,8 @@ fn scope_member(scope: Option<&str>, member: &str, context: &Eu4ScopeContext) ->
         Some(member)
     };
     let Some(resolved) = resolved else { return false };
-    known_scope(resolved) && scope.is_none_or(|expected| scope_compatible(resolved, expected))
-}
-
-fn scope_compatible(actual: &str, expected: &str) -> bool {
-    if expected.eq_ignore_ascii_case("any") || actual.eq_ignore_ascii_case("any") {
-        return true;
-    }
-    actual.eq_ignore_ascii_case(expected)
-        || (actual.eq_ignore_ascii_case("trade_node") && expected.eq_ignore_ascii_case("province"))
+    context.profile.is_scope(resolved)
+        && scope.is_none_or(|expected| context.profile.scopes_compatible(resolved, expected))
 }
 
 fn syntax_diagnostics(input: &ParsedInput) -> Vec<Diagnostic> {
@@ -2660,98 +2616,18 @@ fn hover_for_symbol(
 }
 
 fn known_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
-    const BUILTINS: &[&str] = &[
-        "id",
-        "name",
-        "desc",
-        "title",
-        "picture",
-        "type",
-        "trigger",
-        "immediate",
-        "option",
-        "options",
-        "ai_chance",
-        "effect",
-        "hidden",
-        "is_triggered_only",
-        "country_event",
-        "province_event",
-        "event",
-        "always",
-        "limit",
-        "else",
-        "if",
-        "custom_tooltip",
-        "tooltip",
-        "text",
-        "scope",
-        "from",
-        "root",
-        "prev",
-        "owner",
-        "controller",
-        "capital",
-        "location",
-        "value",
-        "factor",
-        "modifier",
-        "add",
-        "remove",
-        "set",
-        "yes",
-        "no",
-        "true",
-        "false",
-        "random",
-        "weight",
-        "mean_time_to_happen",
-        "days",
-        "months",
-        "years",
-        "chance",
-        "is_valid",
-        "allow",
-        "target",
-        "file",
-        "path",
-        "color",
-        "culture",
-        "religion",
-        "province",
-        "country",
-        "tag",
-        "flag",
-        "has_country_flag",
-        "set_country_flag",
-        "clr_country_flag",
-        "has_global_flag",
-        "set_global_flag",
-        "clr_global_flag",
-        "add_manpower",
-        "add_prestige",
-        "add_stability",
-        "add_treasury",
-        "change_variable",
-        "check_variable",
-        "set_variable",
-        "save_event_target_as",
-        "fire_event",
-        "call_scripted_effect",
-        "call_scripted_trigger",
-        "scripted_effect",
-        "scripted_trigger",
-        "localisation",
-        "localization",
-        "loc_key",
-    ];
-    let mut keys = BUILTINS.iter().map(|key| (*key).to_owned()).collect::<BTreeSet<_>>();
+    let mut keys = snapshot
+        .game_profile()
+        .fallback_keys
+        .iter()
+        .map(|key| key.to_ascii_lowercase())
+        .collect::<BTreeSet<_>>();
     for record in &snapshot.rules().model().records {
         keys.extend(record.fields.keys().map(|key| key.to_ascii_lowercase()));
     }
     // The imported descriptor catalog is the authoritative extension point for semantic keys.
-    // Keep the small bootstrap list above so syntax-only/degraded servers remain useful, then
-    // admit every descriptor name supplied by a validated EU4 rules artifact.
+    // Keep profile fallbacks useful in degraded mode, then admit every descriptor name supplied
+    // by a validated rules artifact.
     keys.extend(
         snapshot
             .rules()
@@ -2765,43 +2641,6 @@ fn known_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
 
 fn looks_unknown_key(key: &str) -> bool {
     !key.trim().is_empty()
-}
-
-fn known_scope(value: &str) -> bool {
-    matches!(
-        value.to_ascii_lowercase().as_str(),
-        "any"
-            | "root"
-            | "from"
-            | "prev"
-            | "previous"
-            | "prev_prev"
-            | "this"
-            | "owner"
-            | "controller"
-            | "capital"
-            | "capital_scope"
-            | "location"
-            | "province"
-            | "country"
-            | "trade_node"
-            | "unit"
-            | "monarch"
-            | "heir"
-            | "consort"
-            | "mercenary_company"
-            | "rebel_faction"
-            | "religion"
-            | "culture"
-            | "advisor"
-            | "leader"
-            | "trade_company"
-            | "global"
-            | "none"
-            | "overlord"
-            | "event_target"
-            | "global_event_target"
-    )
 }
 
 fn completion_value_context(input: &ParsedInput, position: TextSize) -> bool {
@@ -2825,7 +2664,7 @@ fn add_scalar_items(items: &mut Vec<CompletionItem>, range: TextRange, prefix: &
             CompletionItem {
                 label: label.to_owned(),
                 kind: CompletionKind::Value,
-                detail: "EU4 scalar".to_owned(),
+                detail: "PDX scalar".to_owned(),
                 documentation: None,
                 replacement_range: range,
                 insert_text: label.to_owned(),
@@ -3097,10 +2936,32 @@ mod tests {
     fn identity_only_host_does_not_guess_eu4_semantics_from_game_id() {
         let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
         let id = DocumentId::new("file:///tmp/common/events/generic.txt");
-        host.open_document(id.clone(), 1, "country_event = { id = generic.1 }\n".to_owned(), None)
-            .expect("open");
+        host.open_document(
+            id.clone(),
+            1,
+            "country_event = { id = generic.1 scope = country }\n".to_owned(),
+            None,
+        )
+        .expect("open");
 
-        assert!(document_symbols(&host.snapshot(), &id).is_empty());
+        let snapshot = host.snapshot();
+        assert!(document_symbols(&snapshot, &id).is_empty());
+        assert!(
+            diagnostics(&snapshot, &id)
+                .iter()
+                .any(|item| item.code == DiagnosticCode::UnknownScope)
+        );
+    }
+
+    #[test]
+    fn eu4_profile_supplies_known_scope_spellings() {
+        let (host, id) = snapshot("country_event = { scope = country }\n");
+
+        assert!(
+            diagnostics(&host.snapshot(), &id)
+                .iter()
+                .all(|item| item.code != DiagnosticCode::UnknownScope)
+        );
     }
 
     #[test]
@@ -3237,7 +3098,7 @@ mod tests {
         let result = complete(&snapshot, &id, value);
         assert!(result.items.iter().any(|item| item.label == "yes"));
         let hover = hover(&snapshot, &id, 18).expect("CWT hover");
-        assert!(hover.contents.contains("foo") || hover.contents.contains("EU4"));
+        assert!(hover.contents.contains("foo") || hover.contents.contains("PDX"));
     }
 
     #[test]

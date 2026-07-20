@@ -432,6 +432,24 @@ pub struct ProfileTokenDefinitionRule {
     pub wrapped_kind: String,
 }
 
+/// One root property that selects an initial semantic scope.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProfileRootScopeRule {
+    /// Root property-key selector.
+    pub key: ProfileTextMatcher,
+    /// Initial root/current scope.
+    pub scope: String,
+}
+
+/// One asymmetric scope compatibility accepted by a game profile.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProfileScopeCompatibility {
+    /// Actual current scope.
+    pub actual: String,
+    /// Rule-expected scope accepted for the actual scope.
+    pub expected: String,
+}
+
 /// Data-only game-specific interpretation selected by the composition root.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct GameProfile {
@@ -451,6 +469,20 @@ pub struct GameProfile {
     pub csv_definitions: Vec<ProfileCsvDefinitionRule>,
     /// Delimited identifiers embedded in parser tokens.
     pub token_definitions: Vec<ProfileTokenDefinitionRule>,
+    /// Known concrete scopes and scope expressions.
+    pub scope_names: Vec<String>,
+    /// Scope spellings offered by completion.
+    pub scope_completions: Vec<String>,
+    /// Root-key fallbacks used when CWT type metadata has no initial scope.
+    pub root_scopes: Vec<ProfileRootScopeRule>,
+    /// Additional asymmetric scope compatibility pairs.
+    pub scope_compatibilities: Vec<ProfileScopeCompatibility>,
+    /// CWT type/enum spellings mapped to workspace symbol kinds.
+    pub member_kind_aliases: BTreeMap<String, String>,
+    /// Profile fallback keys used when no imported semantic rule selects a property.
+    pub fallback_keys: Vec<String>,
+    /// Additional static enum members supplied by the profile.
+    pub enum_extra_members: BTreeMap<String, Vec<String>>,
 }
 
 impl GameProfile {
@@ -466,6 +498,13 @@ impl GameProfile {
             conditional_definitions: Vec::new(),
             csv_definitions: Vec::new(),
             token_definitions: Vec::new(),
+            scope_names: Vec::new(),
+            scope_completions: Vec::new(),
+            root_scopes: Vec::new(),
+            scope_compatibilities: Vec::new(),
+            member_kind_aliases: BTreeMap::new(),
+            fallback_keys: Vec::new(),
+            enum_extra_members: BTreeMap::new(),
         }
     }
 
@@ -495,6 +534,48 @@ impl GameProfile {
                     })
             })
             .map(|rule| rule.kind.as_str())
+    }
+
+    /// Returns the profile fallback scope for one root key.
+    #[must_use]
+    pub fn root_scope(&self, key: &str) -> Option<&str> {
+        self.root_scopes.iter().find(|rule| rule.key.matches(key)).map(|rule| rule.scope.as_str())
+    }
+
+    /// Returns whether a scope spelling is known to this profile.
+    #[must_use]
+    pub fn is_scope(&self, value: &str) -> bool {
+        self.scope_names.iter().any(|scope| scope.eq_ignore_ascii_case(value))
+    }
+
+    /// Tests profile scope compatibility, including the generic `any` scope.
+    #[must_use]
+    pub fn scopes_compatible(&self, actual: &str, expected: &str) -> bool {
+        actual.eq_ignore_ascii_case("any")
+            || expected.eq_ignore_ascii_case("any")
+            || actual.eq_ignore_ascii_case(expected)
+            || self.scope_compatibilities.iter().any(|pair| {
+                pair.actual.eq_ignore_ascii_case(actual)
+                    && pair.expected.eq_ignore_ascii_case(expected)
+            })
+    }
+
+    /// Returns the workspace symbol kind aliased by one CWT member name.
+    #[must_use]
+    pub fn member_kind_alias(&self, name: &str) -> Option<&str> {
+        self.member_kind_aliases
+            .iter()
+            .find(|(alias, _)| alias.eq_ignore_ascii_case(name))
+            .map(|(_, kind)| kind.as_str())
+    }
+
+    /// Returns whether a profile-specific extra enum member is known.
+    #[must_use]
+    pub fn enum_extra_member(&self, enum_name: &str, member: &str) -> bool {
+        self.enum_extra_members.iter().any(|(name, members)| {
+            name.eq_ignore_ascii_case(enum_name)
+                && members.iter().any(|value| value.eq_ignore_ascii_case(member))
+        })
     }
 }
 

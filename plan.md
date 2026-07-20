@@ -253,7 +253,7 @@ Workspace/index：
 
 按可独立验证的小切片执行：
 
-1. 接受 RFC 0013，拆分通用规则 runtime 与 EU4 profile，迁移期间保留兼容 re-export（`pdx-rules`、`pdx-game-eu4`、schema 12 `game_id` 校验与 `pdx-eu4` facade 已建立；data-only profile 已显式贯穿 CLI/LSP/host/snapshot，workspace symbol/reference 路径含 province CSV 与 scripted parameter 已迁移，analysis scope/command 特例仍待迁移）；
+1. 接受 RFC 0013，拆分通用规则 runtime 与 EU4 profile，迁移期间保留兼容 re-export（`pdx-rules`、`pdx-game-eu4`、schema 12 `game_id` 校验与 `pdx-eu4` facade 已建立；data-only profile 已显式贯穿 CLI/LSP/host/snapshot，workspace symbol/reference 与 analysis scope/key/member fallback 已迁移；`pdx-eu4` facade 删除和 syntax 历史 API 重命名待后续独立切片）；
 2. 实现真实 per-file HIR/FileState，overlay 变化只更新一个文件（FileState、磁盘复用、overlay 按版本 parse/lower cache，以及供 workspace shard/analysis 共享的 property/localisation/scalar HIR facts 已完成；rule/profile-aware typed facts 与 scope lowering 待完成）；
 3. 将 snapshot 改为共享不可变状态，查询创建 snapshot 时不深拷贝 workspace 文本和索引（已完成）；
 4. 删除 analysis query-time 全 workspace 重解析，查询只读取当前 HIR 与 WorkspaceIndex（已完成）；

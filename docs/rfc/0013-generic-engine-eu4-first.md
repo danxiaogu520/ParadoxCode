@@ -61,7 +61,7 @@ pdx-lsp
 
 ## 迁移策略
 
-> 实现进度（2026-07-20）：步骤 2–3 的 crate 拆分已完成。`pdx-rules` 持有通用 runtime 和 data-only `GameProfile` 类型，`pdx-game-eu4` 持有 EU4 profile 数据与 bootstrap catalog，`pdx-eu4` 只剩兼容 re-export。schema 12 已将 `game_id` 纳入 artifact metadata/hash；CLI → LSP → host → snapshot 显式传递并校验所选 profile。步骤 4 的 workspace symbol/reference 路径已迁移（包括 province CSV 与 scripted parameter），analysis scope/command 特例仍待迁移；步骤 5 的结构 HIR 已共享，但 profile-aware typed lowering 尚未完成。
+> 实现进度（2026-07-20）：步骤 2–4 已完成。`pdx-rules` 持有通用 runtime 和 data-only `GameProfile` 类型，`pdx-game-eu4` 持有 EU4 profile 数据与 bootstrap catalog，`pdx-eu4` 只剩兼容 re-export。schema 12 已将 `game_id` 纳入 artifact metadata/hash；CLI → LSP → host → snapshot 显式传递并校验所选 profile。workspace symbol/reference 与 analysis scope/key/member fallback 已迁移，通用 runtime 不再含 EU4 名称白名单；步骤 5 的结构 HIR 已共享，但 profile-aware typed lowering 尚未完成。
 
 当前 `pdx-eu4` 同时包含通用规则 runtime 与 EU4 数据。迁移必须分步进行：
 
