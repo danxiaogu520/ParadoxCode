@@ -3,6 +3,8 @@
 //! `AnalysisHost` is the mutable owner. Queries later consume `AnalysisSnapshot` values and
 //! must not depend on editor protocol types.
 
+#[cfg(test)]
+use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
@@ -14,6 +16,37 @@ use pdx_hir::{HirFile, lower_shared, lower_shared_with_profile};
 use pdx_rules::{FileResolutionPolicy, GameProfile, ParserKind, RuleSet, SymbolResolutionPolicy};
 use pdx_syntax::{CstKind, CstNode, Eu4FileFormat, ParsedFile, parse_eu4, parse_eu4_csv_file};
 use pdx_text::{LineIndex, LogicalPath, TextRange};
+
+#[cfg(test)]
+thread_local! {
+    static PIPELINE_COUNTS: Cell<(usize, usize)> = const { Cell::new((0, 0)) };
+}
+
+#[cfg(test)]
+fn record_pipeline_parse() {
+    PIPELINE_COUNTS.with(|counts| {
+        let (parses, lowers) = counts.get();
+        counts.set((parses.saturating_add(1), lowers));
+    });
+}
+
+#[cfg(test)]
+fn record_pipeline_lower() {
+    PIPELINE_COUNTS.with(|counts| {
+        let (parses, lowers) = counts.get();
+        counts.set((parses, lowers.saturating_add(1)));
+    });
+}
+
+#[cfg(test)]
+fn reset_pipeline_counts() {
+    PIPELINE_COUNTS.set((0, 0));
+}
+
+#[cfg(test)]
+fn pipeline_counts() -> (usize, usize) {
+    PIPELINE_COUNTS.get()
+}
 
 /// Stable identity for a source root during one host lifetime.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -1008,7 +1041,11 @@ fn parse_source(
 ) -> (Option<ParsedSource>, Option<Arc<HirFile>>) {
     match parser {
         ParserKind::PdxScript => {
+            #[cfg(test)]
+            record_pipeline_parse();
             let parsed = Arc::new(parse_eu4(Eu4FileFormat::PdxScript, source));
+            #[cfg(test)]
+            record_pipeline_lower();
             let hir = Arc::new(logical_path.map_or_else(
                 || lower_shared(Arc::clone(&parsed), rules),
                 |path| lower_shared_with_profile(Arc::clone(&parsed), path, rules, profile),
@@ -1016,7 +1053,11 @@ fn parse_source(
             (Some(ParsedSource::Text(parsed)), Some(hir))
         }
         ParserKind::Localisation => {
+            #[cfg(test)]
+            record_pipeline_parse();
             let parsed = Arc::new(parse_eu4(Eu4FileFormat::Localisation, source));
+            #[cfg(test)]
+            record_pipeline_lower();
             let hir = Arc::new(logical_path.map_or_else(
                 || lower_shared(Arc::clone(&parsed), rules),
                 |path| lower_shared_with_profile(Arc::clone(&parsed), path, rules, profile),
@@ -1024,6 +1065,8 @@ fn parse_source(
             (Some(ParsedSource::Text(parsed)), Some(hir))
         }
         ParserKind::Csv(dialect) => {
+            #[cfg(test)]
+            record_pipeline_parse();
             let dialect = match dialect {
                 pdx_rules::CsvDialect::Comma => pdx_syntax::csv::CsvDialect::Comma,
                 pdx_rules::CsvDialect::Tab => pdx_syntax::csv::CsvDialect::Tab,
@@ -2055,7 +2098,8 @@ mod tests {
     use super::{
         AnalysisHost, Definition, DocumentId, DocumentSource, FileIndexShard, ParsedSource,
         Reference, SourceFileId, SourceRoot, SourceRootId, SourceRootKind, TextChange,
-        WorkspaceIndex, WorkspaceScanIssueKind, WorkspaceScanLimits,
+        WorkspaceIndex, WorkspaceScanIssueKind, WorkspaceScanLimits, pipeline_counts,
+        reset_pipeline_counts,
     };
     use pdx_rules::RuleSet;
     use pdx_text::{LogicalPath, TextRange};
@@ -2379,6 +2423,67 @@ mod tests {
             second.file_state(b).expect("old b state").revision().saturating_add(1)
         );
         assert_eq!(third.index().definitions("event", "state.changed").len(), 1);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn one_overlay_edit_parses_and_lowers_exactly_once_in_a_populated_workspace() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-workspace-pipeline-count-{nonce}"));
+        let events = root.join("events");
+        fs::create_dir_all(&events).expect("event directory");
+        for index in 0..64 {
+            fs::write(
+                events.join(format!("event-{index:02}.txt")),
+                format!("country_event = {{ id = synthetic.{index} }}\n"),
+            )
+            .expect("event fixture");
+        }
+
+        let mut host = eu4_host();
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        host.refresh_source_roots().expect("initial scan");
+
+        let path = events.join("event-00.txt");
+        let id = DocumentId::new("file:///synthetic/events/event-00.txt");
+        host.stage_open_document(
+            id.clone(),
+            1,
+            "country_event = { id = synthetic.0 }\n".to_owned(),
+            Some(path),
+        )
+        .expect("stage initial overlay");
+        let initial = host.snapshot().prepare_document(&id).expect("prepare initial overlay");
+        assert!(host.commit_prepared_document(initial));
+        let before_edit = host.snapshot();
+
+        reset_pipeline_counts();
+        host.stage_document_text(&id, 2, "country_event = { id = synthetic.changed }\n".to_owned())
+            .expect("stage edit");
+        assert_eq!(pipeline_counts(), (0, 0), "staging must not run semantic work");
+
+        let prepared = host.snapshot().prepare_document(&id).expect("prepare edited overlay");
+        assert_eq!(pipeline_counts(), (1, 1));
+        assert!(host.commit_prepared_document(prepared));
+        assert_eq!(pipeline_counts(), (1, 1), "commit must not repeat worker work");
+
+        let after_edit = host.snapshot();
+        for file_id in before_edit.source_files().keys() {
+            assert!(Arc::ptr_eq(
+                before_edit.file_states.get(file_id).expect("old disk state"),
+                after_edit.file_states.get(file_id).expect("current disk state"),
+            ));
+        }
+        assert!(after_edit.document(&id).expect("edited overlay").hir().is_some_and(|hir| {
+            hir.definitions().iter().any(|definition| definition.name == "synthetic.changed")
+        }));
         fs::remove_dir_all(root).expect("cleanup");
     }
 

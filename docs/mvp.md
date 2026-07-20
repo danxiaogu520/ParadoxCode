@@ -152,7 +152,7 @@ Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 
 ## Phase 5：语言功能
 
-状态：`implemented, acceptance reopened`（2026-07-20 重新审计）；主要查询已实现并有回归，但 query-time workspace 重解析和深拷贝 snapshot 尚未满足性能与增量边界。
+状态：`completed`（2026-07-20 重新验收）；主要查询均有回归，query-time 全工作区重解析已删除，snapshot 共享不可变状态，单 overlay 编辑的计数测试证明只 parse/lower 各一次且不重建磁盘 `FileState`。
 
 交付：
 
@@ -205,4 +205,4 @@ Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 - semantic diagnostics：编辑后 200 ms debounce，可取消
 - 单文件更新：不得触发无关文件重新 parse
 
-性能门槛应在真实可再分发 fixture 建立后再校准。
+workspace synthetic fixture 与初始同机基线已经建立；completion/hover 等端到端延迟阈值仍应在更广泛的可再分发 fixture 和支持平台上继续校准。

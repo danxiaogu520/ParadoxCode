@@ -17,3 +17,7 @@ workspace = true
 
 [dev-dependencies]
 pdx-game-eu4 = { path = "../pdx-game-eu4" }
+
+[[bench]]
+name = "synthetic_workspace"
+harness = false
