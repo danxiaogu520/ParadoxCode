@@ -4,7 +4,7 @@
 //! conversion, and result freshness checks. Parser and language-feature logic remains in the
 //! editor-neutral workspace and analysis crates.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -20,8 +20,8 @@ use pdx_analysis::{
 use pdx_rules::{GameProfile, RuleSet, RulesError};
 use pdx_text::{LineIndex, Position, TextRange};
 use pdx_workspace::{
-    AnalysisHost, AnalysisSnapshot, DocumentError, DocumentId, DocumentSource, SourceRoot,
-    SourceRootId, SourceRootKind, TextChange, WorkspaceChange,
+    AnalysisHost, AnalysisSnapshot, DocumentError, DocumentId, DocumentSource, PreparedDocument,
+    SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
 };
 use serde_json::{Value, json};
 
@@ -133,6 +133,24 @@ struct PendingDiagnostics {
 }
 
 #[derive(Debug)]
+struct PendingParse {
+    version: i64,
+}
+
+#[derive(Debug)]
+struct InFlightParse {
+    version: i64,
+    cancelled: Arc<AtomicBool>,
+}
+
+#[derive(Debug)]
+struct ParseResult {
+    id: DocumentId,
+    version: i64,
+    prepared: Option<PreparedDocument>,
+}
+
+#[derive(Debug)]
 struct InFlightDiagnostics {
     version: i64,
     cancelled: Arc<AtomicBool>,
@@ -160,6 +178,7 @@ struct SnapshotRequestResult {
 
 enum TransportEvent {
     Input(Result<Option<Value>, LspError>),
+    Parse(ParseResult),
     Diagnostics(DiagnosticsResult),
     Request(SnapshotRequestResult),
 }
@@ -186,6 +205,7 @@ pub struct LspServer {
     host: AnalysisHost,
     cancelled: HashSet<RequestId>,
     diagnostics: BTreeMap<DocumentId, Value>,
+    pending_parses: BTreeMap<DocumentId, PendingParse>,
     pending_diagnostics: BTreeMap<DocumentId, PendingDiagnostics>,
     clean_exit: bool,
 }
@@ -240,6 +260,7 @@ impl LspServer {
             host: AnalysisHost::with_profile(rules, profile),
             cancelled: HashSet::new(),
             diagnostics: BTreeMap::new(),
+            pending_parses: BTreeMap::new(),
             pending_diagnostics: BTreeMap::new(),
             clean_exit: false,
         })
@@ -348,31 +369,52 @@ impl LspServer {
             read_sender.send(()).map_err(|_| {
                 LspError::Protocol("LSP transport reader failed to start".to_owned())
             })?;
+            let mut in_flight_parses = BTreeMap::<DocumentId, InFlightParse>::new();
             let mut in_flight = BTreeMap::<DocumentId, InFlightDiagnostics>::new();
             let mut in_flight_requests = HashMap::<RequestId, InFlightRequest>::new();
+            let mut deferred_messages = VecDeque::<Value>::new();
 
             loop {
+                self.cancel_stale_parses(&in_flight_parses);
+                self.spawn_pending_parses(scope, &event_sender, &mut in_flight_parses);
                 self.cancel_stale_diagnostics(&in_flight);
-                self.spawn_due_diagnostics(scope, &event_sender, &mut in_flight, false);
-                let timeout = self.next_diagnostic_wait(&in_flight);
-                let event = match timeout {
-                    Some(timeout) => match event_receiver.recv_timeout(timeout) {
-                        Ok(event) => event,
-                        Err(RecvTimeoutError::Timeout) => continue,
-                        Err(RecvTimeoutError::Disconnected) => {
-                            return Err(LspError::Protocol(
+                self.spawn_due_diagnostics(
+                    scope,
+                    &event_sender,
+                    &mut in_flight,
+                    self.state == ServerState::ShuttingDown,
+                );
+                let parse_busy = !self.pending_parses.is_empty() || !in_flight_parses.is_empty();
+                let deferred_ready = !parse_busy && !deferred_messages.is_empty();
+                let (event, from_reader) = if deferred_ready {
+                    let message = deferred_messages.pop_front().expect("checked non-empty");
+                    (TransportEvent::Input(Ok(Some(message))), false)
+                } else {
+                    let timeout = self.next_diagnostic_wait(&in_flight);
+                    let event = match timeout {
+                        Some(timeout) => match event_receiver.recv_timeout(timeout) {
+                            Ok(event) => event,
+                            Err(RecvTimeoutError::Timeout) => continue,
+                            Err(RecvTimeoutError::Disconnected) => {
+                                return Err(LspError::Protocol(
+                                    "LSP transport workers stopped unexpectedly".to_owned(),
+                                ));
+                            }
+                        },
+                        None => event_receiver.recv().map_err(|_| {
+                            LspError::Protocol(
                                 "LSP transport workers stopped unexpectedly".to_owned(),
-                            ));
-                        }
-                    },
-                    None => event_receiver.recv().map_err(|_| {
-                        LspError::Protocol("LSP transport workers stopped unexpectedly".to_owned())
-                    })?,
+                            )
+                        })?,
+                    };
+                    (event, true)
                 };
 
                 match event {
                     TransportEvent::Input(result) => {
-                        reader_active = false;
+                        if from_reader {
+                            reader_active = false;
+                        }
                         let Some(message) = result? else {
                             return if self.state == ServerState::Exited && self.clean_exit {
                                 Ok(())
@@ -382,21 +424,31 @@ impl LspServer {
                                 ))
                             };
                         };
-                        let spawned = self.spawn_snapshot_request(
-                            scope,
-                            &event_sender,
-                            &mut in_flight_requests,
-                            &message,
-                        );
-                        if !spawned {
-                            let responses = self.handle_message(message.clone())?;
-                            for response in responses {
-                                write_message(&mut output, &response)?;
+                        let parse_busy =
+                            !self.pending_parses.is_empty() || !in_flight_parses.is_empty();
+                        if from_reader && parse_busy && is_snapshot_request_message(&message) {
+                            deferred_messages.push_back(message);
+                        } else {
+                            let spawned = self.spawn_snapshot_request(
+                                scope,
+                                &event_sender,
+                                &mut in_flight_requests,
+                                &message,
+                            );
+                            if !spawned {
+                                let responses = self.handle_message(message.clone())?;
+                                for response in responses {
+                                    write_message(&mut output, &response)?;
+                                }
+                                cancel_request_from_notification(&message, &in_flight_requests);
                             }
-                            cancel_request_from_notification(&message, &in_flight_requests);
                         }
+                        self.cancel_stale_parses(&in_flight_parses);
                         self.cancel_stale_diagnostics(&in_flight);
                         if self.state == ServerState::Exited {
+                            for task in in_flight_parses.values() {
+                                task.cancelled.store(true, Ordering::Release);
+                            }
                             for task in in_flight.values() {
                                 task.cancelled.store(true, Ordering::Release);
                             }
@@ -411,6 +463,23 @@ impl LspServer {
                         }
                         if self.state == ServerState::ShuttingDown {
                             self.spawn_due_diagnostics(scope, &event_sender, &mut in_flight, true);
+                        }
+                    }
+                    TransportEvent::Parse(result) => {
+                        if in_flight_parses
+                            .get(&result.id)
+                            .is_some_and(|task| task.version == result.version)
+                        {
+                            in_flight_parses.remove(&result.id);
+                        }
+                        if let Some(prepared) = result.prepared
+                            && self.host.commit_prepared_document(prepared)
+                        {
+                            self.schedule_diagnostics_for_document(
+                                result.id,
+                                result.version,
+                                DIAGNOSTIC_DEBOUNCE,
+                            );
                         }
                     }
                     TransportEvent::Diagnostics(result) => {
@@ -445,10 +514,12 @@ impl LspServer {
                 }
 
                 let draining_shutdown = self.state == ServerState::ShuttingDown
-                    && (!self.pending_diagnostics.is_empty()
+                    && (!self.pending_parses.is_empty()
+                        || !in_flight_parses.is_empty()
+                        || !self.pending_diagnostics.is_empty()
                         || !in_flight.is_empty()
                         || !in_flight_requests.is_empty());
-                if !reader_active && !draining_shutdown {
+                if !reader_active && !draining_shutdown && deferred_messages.is_empty() {
                     read_sender.send(()).map_err(|_| {
                         LspError::Protocol("LSP transport reader stopped unexpectedly".to_owned())
                     })?;
@@ -514,6 +585,72 @@ impl LspServer {
         true
     }
 
+    fn schedule_parse(&mut self, uri: &str) {
+        let id = DocumentId::new(uri);
+        let version = self
+            .host
+            .snapshot()
+            .document(&id)
+            .filter(|document| document.source() == DocumentSource::Overlay)
+            .and_then(|document| document.version());
+        if let Some(version) = version {
+            self.pending_parses.insert(id, PendingParse { version });
+        }
+    }
+
+    fn cancel_stale_parses(&self, in_flight: &BTreeMap<DocumentId, InFlightParse>) {
+        let snapshot = self.host.snapshot();
+        for (id, task) in in_flight {
+            let current_version = snapshot.document(id).and_then(|document| document.version());
+            let superseded =
+                self.pending_parses.get(id).is_some_and(|pending| pending.version != task.version);
+            if current_version != Some(task.version) || superseded {
+                task.cancelled.store(true, Ordering::Release);
+            }
+        }
+    }
+
+    fn spawn_pending_parses<'scope, 'environment>(
+        &mut self,
+        scope: &'scope std::thread::Scope<'scope, 'environment>,
+        event_sender: &mpsc::Sender<TransportEvent>,
+        in_flight: &mut BTreeMap<DocumentId, InFlightParse>,
+    ) {
+        let ready = self
+            .pending_parses
+            .keys()
+            .filter(|id| !in_flight.contains_key(*id))
+            .cloned()
+            .collect::<Vec<_>>();
+        for id in ready {
+            let Some(pending) = self.pending_parses.remove(&id) else { continue };
+            let snapshot = self.host.snapshot();
+            let sender = event_sender.clone();
+            let cancelled = Arc::new(AtomicBool::new(false));
+            in_flight.insert(
+                id.clone(),
+                InFlightParse { version: pending.version, cancelled: Arc::clone(&cancelled) },
+            );
+            scope.spawn(move || {
+                let prepared = if cancelled.load(Ordering::Acquire) {
+                    None
+                } else {
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        snapshot.prepare_document(&id)
+                    }))
+                    .ok()
+                    .flatten()
+                    .filter(|_| !cancelled.load(Ordering::Acquire))
+                };
+                let _ = sender.send(TransportEvent::Parse(ParseResult {
+                    id,
+                    version: pending.version,
+                    prepared,
+                }));
+            });
+        }
+    }
+
     fn schedule_diagnostics(&mut self, uri: &str, delay: Duration) {
         let id = DocumentId::new(uri);
         let version = self
@@ -528,6 +665,17 @@ impl LspServer {
                 PendingDiagnostics { uri: uri.to_owned(), version, due: Instant::now() + delay },
             );
         }
+    }
+
+    fn schedule_diagnostics_for_document(&mut self, id: DocumentId, version: i64, delay: Duration) {
+        self.pending_diagnostics.insert(
+            id.clone(),
+            PendingDiagnostics {
+                uri: id.as_str().to_owned(),
+                version,
+                due: Instant::now() + delay,
+            },
+        );
     }
 
     fn cancel_stale_diagnostics(&self, in_flight: &BTreeMap<DocumentId, InFlightDiagnostics>) {
@@ -685,12 +833,12 @@ impl LspServer {
             }
             "textDocument/didOpen" => {
                 let uri = self.handle_did_open(params)?;
-                self.schedule_diagnostics(&uri, DIAGNOSTIC_DEBOUNCE);
+                self.schedule_parse(&uri);
                 Ok(Value::Null)
             }
             "textDocument/didChange" => {
                 let uri = self.handle_did_change(params)?;
-                self.schedule_diagnostics(&uri, DIAGNOSTIC_DEBOUNCE);
+                self.schedule_parse(&uri);
                 Ok(Value::Null)
             }
             "textDocument/didClose" => self.handle_did_close(params),
@@ -704,6 +852,7 @@ impl LspServer {
                     .ok_or_else(|| {
                         RpcError::new(INVALID_PARAMS, "didSave requires textDocument")
                     })?;
+                self.schedule_parse(uri);
                 self.schedule_diagnostics(uri, Duration::ZERO);
                 Ok(Value::Null)
             }
@@ -782,7 +931,7 @@ impl LspServer {
         let text = required_string(text_document, "text")?.to_owned();
         let path = uri_to_path(uri).ok();
         self.host
-            .open_document(DocumentId::new(uri), version, text, path)
+            .stage_open_document(DocumentId::new(uri), version, text, path)
             .map_err(document_error)?;
         Ok(uri.to_owned())
     }
@@ -805,7 +954,6 @@ impl LspServer {
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "didChange document is not open"))?;
         let mut text = current.text().to_owned();
         let mut line_index = current.line_index().clone();
-        let mut changes = Vec::new();
         let content_changes = object
             .get("contentChanges")
             .and_then(Value::as_array)
@@ -820,10 +968,9 @@ impl LspServer {
                 .map(|value| lsp_range_to_text_range(value, &line_index, &text))
                 .transpose()?;
             apply_text_change(&mut text, range, &replacement)?;
-            changes.push(TextChange { range, text: replacement });
             line_index = LineIndex::new(&text);
         }
-        self.host.apply_document_changes(&id, version, &changes).map_err(document_error)?;
+        self.host.stage_document_text(&id, version, text).map_err(document_error)?;
         Ok(uri.to_owned())
     }
 
@@ -836,6 +983,7 @@ impl LspServer {
         let uri = required_string(text_document, "uri")?;
         let id = DocumentId::new(uri);
         self.host.close_document(&id).map_err(document_error)?;
+        self.pending_parses.remove(&id);
         self.pending_diagnostics.remove(&id);
         self.diagnostics.remove(&id);
         Ok(json!({
@@ -1058,6 +1206,14 @@ fn is_snapshot_request(method: &str) -> bool {
             | "textDocument/documentSymbol"
             | "workspace/symbol"
     )
+}
+
+fn is_snapshot_request_message(message: &Value) -> bool {
+    message
+        .as_object()
+        .and_then(|object| object.get("method"))
+        .and_then(Value::as_str)
+        .is_some_and(is_snapshot_request)
 }
 
 fn cancel_request_from_notification(
@@ -1448,8 +1604,8 @@ mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
 
     use super::{
-        InFlightRequest, InitializeOptions, LspError, LspServer, RequestId, ServerState,
-        cancel_request_from_notification, path_to_uri, uri_to_path,
+        DocumentId, InFlightRequest, InitializeOptions, LspError, LspServer, RequestId,
+        ServerState, cancel_request_from_notification, path_to_uri, uri_to_path,
     };
     use pdx_rules::{RuleSet, RulesError, RulesModel};
     use pdx_text::TextRange;
@@ -1749,6 +1905,12 @@ mod tests {
                 .as_array()
                 .is_some_and(|items| items.iter().all(|item| item["code"] != "pdx-unknown-scope"))
         );
+        let snapshot = server.snapshot();
+        let document = snapshot.document(&DocumentId::new(uri)).expect("latest overlay");
+        assert_eq!(document.version(), Some(2));
+        assert_eq!(document.text(), "scope = country\n");
+        assert!(document.parsed().is_some());
+        assert!(document.hir().is_some());
     }
 
     #[test]

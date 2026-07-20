@@ -582,6 +582,26 @@ pub struct DocumentSnapshot {
     hir: Option<Arc<HirFile>>,
 }
 
+/// A fully parsed overlay candidate prepared outside the mutable host.
+#[derive(Clone, Debug)]
+pub struct PreparedDocument {
+    document: DocumentSnapshot,
+}
+
+impl PreparedDocument {
+    /// Returns the document identity carried by this candidate.
+    #[must_use]
+    pub const fn id(&self) -> &DocumentId {
+        &self.document.id
+    }
+
+    /// Returns the overlay version carried by this candidate.
+    #[must_use]
+    pub const fn version(&self) -> Option<i64> {
+        self.document.version
+    }
+}
+
 impl DocumentSnapshot {
     /// Returns the document identity.
     #[must_use]
@@ -1013,6 +1033,91 @@ fn parse_source(
         }
         ParserKind::Asset | ParserKind::SyntaxOnly => (None, None),
     }
+}
+
+fn parser_for_document(
+    rules: &RuleSet,
+    roots: &[SourceRoot],
+    id: &DocumentId,
+    path: Option<&Path>,
+) -> Option<(ParserKind, Option<LogicalPath>)> {
+    let logical = path
+        .and_then(|path| {
+            roots
+                .iter()
+                .filter_map(|root| path.strip_prefix(&root.path).ok())
+                .filter_map(|relative| LogicalPath::parse(&relative.to_string_lossy()).ok())
+                .min_by_key(|path| path.as_str().len())
+        })
+        .or_else(|| {
+            id.as_str()
+                .split(['/', '\\'])
+                .next_back()
+                .and_then(|name| LogicalPath::parse(name).ok())
+        });
+    if let Some(category) = logical.as_ref().and_then(|path| rules.classify(path)) {
+        return Some((category.parser.clone(), logical));
+    }
+    let extension = path
+        .and_then(Path::extension)
+        .and_then(|extension| extension.to_str())
+        .map(str::to_ascii_lowercase)
+        .or_else(|| {
+            logical.as_ref().and_then(|path| {
+                path.as_str().rsplit_once('.').map(|(_, ext)| ext.to_ascii_lowercase())
+            })
+        })?;
+    let parser = match extension.as_str() {
+        "yml" | "yaml" => ParserKind::Localisation,
+        "csv" => ParserKind::Csv(pdx_rules::CsvDialect::Semicolon),
+        "txt" | "gui" | "gfx" | "asset" | "sfx" => ParserKind::PdxScript,
+        _ => return None,
+    };
+    Some((parser, logical))
+}
+
+fn prepare_document_snapshot(
+    rules: &RuleSet,
+    profile: &GameProfile,
+    roots: &[SourceRoot],
+    mut document: DocumentSnapshot,
+) -> DocumentSnapshot {
+    let (parsed, hir) = parser_for_document(rules, roots, &document.id, document.path.as_deref())
+        .map_or((None, None), |(parser, logical_path)| {
+            parse_source(&parser, &document.text, logical_path.as_ref(), rules, profile)
+        });
+    document.parsed = parsed;
+    document.hir = hir;
+    document
+}
+
+fn unparsed_document(
+    id: DocumentId,
+    version: Option<i64>,
+    text: String,
+    source: DocumentSource,
+    path: Option<PathBuf>,
+) -> DocumentSnapshot {
+    let line_index = LineIndex::new(&text);
+    DocumentSnapshot {
+        id,
+        version,
+        text: Arc::from(text),
+        line_index,
+        source,
+        path,
+        parsed: None,
+        hir: None,
+    }
+}
+
+fn staged_overlay_document(
+    id: DocumentId,
+    version: i64,
+    text: String,
+    path: Option<PathBuf>,
+) -> DocumentSnapshot {
+    unparsed_document(id, Some(version), text, DocumentSource::Overlay, path)
 }
 
 fn build_file_state(
@@ -1467,46 +1572,6 @@ impl AnalysisHost {
         }
     }
 
-    fn parser_for_document(
-        &self,
-        id: &DocumentId,
-        path: Option<&Path>,
-    ) -> Option<(ParserKind, Option<LogicalPath>)> {
-        let logical = path
-            .and_then(|path| {
-                self.roots
-                    .iter()
-                    .filter_map(|root| path.strip_prefix(&root.path).ok())
-                    .filter_map(|relative| LogicalPath::parse(&relative.to_string_lossy()).ok())
-                    .min_by_key(|path| path.as_str().len())
-            })
-            .or_else(|| {
-                id.as_str()
-                    .split(['/', '\\'])
-                    .next_back()
-                    .and_then(|name| LogicalPath::parse(name).ok())
-            });
-        if let Some(category) = logical.as_ref().and_then(|path| self.rules.classify(path)) {
-            return Some((category.parser.clone(), logical));
-        }
-        let extension = path
-            .and_then(Path::extension)
-            .and_then(|extension| extension.to_str())
-            .map(str::to_ascii_lowercase)
-            .or_else(|| {
-                logical.as_ref().and_then(|path| {
-                    path.as_str().rsplit_once('.').map(|(_, ext)| ext.to_ascii_lowercase())
-                })
-            })?;
-        let parser = match extension.as_str() {
-            "yml" | "yaml" => ParserKind::Localisation,
-            "csv" => ParserKind::Csv(pdx_rules::CsvDialect::Semicolon),
-            "txt" | "gui" | "gfx" | "asset" | "sfx" => ParserKind::PdxScript,
-            _ => return None,
-        };
-        Some((parser, logical))
-    }
-
     fn document_snapshot(
         &self,
         id: DocumentId,
@@ -1515,29 +1580,12 @@ impl AnalysisHost {
         source: DocumentSource,
         path: Option<PathBuf>,
     ) -> DocumentSnapshot {
-        let line_index = LineIndex::new(&text);
-        let (parsed, hir) = self.parser_for_document(&id, path.as_deref()).map_or(
-            (None, None),
-            |(parser, logical_path)| {
-                parse_source(
-                    &parser,
-                    &text,
-                    logical_path.as_ref(),
-                    self.rules.as_ref(),
-                    self.profile.as_ref(),
-                )
-            },
-        );
-        DocumentSnapshot {
-            id,
-            version,
-            text: Arc::from(text),
-            line_index,
-            source,
-            path,
-            parsed,
-            hir,
-        }
+        prepare_document_snapshot(
+            self.rules.as_ref(),
+            self.profile.as_ref(),
+            &self.roots,
+            unparsed_document(id, version, text, source, path),
+        )
     }
 
     /// Applies one event-loop change and advances the snapshot revision.
@@ -1661,6 +1709,73 @@ impl AnalysisHost {
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
         self.revision = self.revision.saturating_add(1);
         Ok(())
+    }
+
+    /// Stages the latest overlay text without parsing it.
+    ///
+    /// A worker can call [`AnalysisSnapshot::prepare_document`] on the resulting snapshot and
+    /// return the candidate to [`Self::commit_prepared_document`].
+    pub fn stage_open_document(
+        &mut self,
+        id: DocumentId,
+        version: i64,
+        text: String,
+        path: Option<PathBuf>,
+    ) -> Result<(), DocumentError> {
+        if self
+            .documents
+            .get(&id)
+            .is_some_and(|document| document.source == DocumentSource::Overlay)
+        {
+            return Err(DocumentError::AlreadyOpen(id));
+        }
+        let document = staged_overlay_document(id.clone(), version, text, path);
+        Arc::make_mut(&mut self.documents).insert(id, document);
+        self.revision = self.revision.saturating_add(1);
+        Ok(())
+    }
+
+    /// Stages a complete newer overlay text without parsing it.
+    pub fn stage_document_text(
+        &mut self,
+        id: &DocumentId,
+        version: i64,
+        text: String,
+    ) -> Result<(), DocumentError> {
+        let Some(current) = self.documents.get(id) else {
+            return Err(DocumentError::NotOpen(id.clone()));
+        };
+        if current.source != DocumentSource::Overlay {
+            return Err(DocumentError::NotOpen(id.clone()));
+        }
+        let current_version = current.version.unwrap_or(version);
+        if version <= current_version {
+            return Err(DocumentError::StaleVersion {
+                document: id.clone(),
+                current: current_version,
+                received: version,
+            });
+        }
+        let document = staged_overlay_document(id.clone(), version, text, current.path.clone());
+        Arc::make_mut(&mut self.documents).insert(id.clone(), document);
+        self.revision = self.revision.saturating_add(1);
+        Ok(())
+    }
+
+    /// Commits a worker-prepared document only while its exact staged text/version is current.
+    pub fn commit_prepared_document(&mut self, prepared: PreparedDocument) -> bool {
+        let id = prepared.document.id.clone();
+        let Some(current) = self.documents.get(&id) else { return false };
+        let matches_current = current.source == DocumentSource::Overlay
+            && current.version == prepared.document.version
+            && current.text == prepared.document.text
+            && current.path == prepared.document.path;
+        if !matches_current {
+            return false;
+        }
+        Arc::make_mut(&mut self.documents).insert(id, prepared.document);
+        self.revision = self.revision.saturating_add(1);
+        true
     }
 
     /// Applies all changes from one `didChange` notification atomically.
@@ -1814,6 +1929,23 @@ impl AnalysisSnapshot {
     #[must_use]
     pub fn documents(&self) -> &BTreeMap<DocumentId, DocumentSnapshot> {
         &self.documents
+    }
+
+    /// Fully parses and lowers the exact staged overlay captured by this snapshot.
+    #[must_use]
+    pub fn prepare_document(&self, id: &DocumentId) -> Option<PreparedDocument> {
+        let document = self.documents.get(id)?;
+        if document.source != DocumentSource::Overlay {
+            return None;
+        }
+        Some(PreparedDocument {
+            document: prepare_document_snapshot(
+                self.rules.as_ref(),
+                self.profile.as_ref(),
+                &self.roots,
+                document.clone(),
+            ),
+        })
     }
 
     /// Returns one current document candidate.
@@ -2455,6 +2587,38 @@ mod tests {
         };
         assert!(!Arc::ptr_eq(first_parse, second_parse));
         assert_eq!(first.document(&id).expect("old snapshot remains valid").text(), "a😀z");
+    }
+
+    #[test]
+    fn prepared_document_commit_rejects_superseded_text_and_version() {
+        let mut host = eu4_host();
+        let id = DocumentId::new("file:///tmp/events/prepared.txt");
+        host.stage_open_document(
+            id.clone(),
+            1,
+            "country_event = { id = stale.1 }\n".to_owned(),
+            None,
+        )
+        .expect("stage open");
+        let staged = host.snapshot();
+        assert!(staged.document(&id).expect("staged document").parsed().is_none());
+        let stale = staged.prepare_document(&id).expect("prepare stale candidate");
+
+        host.stage_document_text(&id, 2, "country_event = { id = current.1 }\n".to_owned())
+            .expect("stage newer text");
+        assert!(!host.commit_prepared_document(stale));
+        let current = host.snapshot().prepare_document(&id).expect("prepare current candidate");
+        assert!(host.commit_prepared_document(current));
+
+        let committed = host.snapshot();
+        let document = committed.document(&id).expect("committed document");
+        assert_eq!(document.version(), Some(2));
+        assert!(document.parsed().is_some());
+        assert!(document.hir().is_some_and(|hir| {
+            hir.definitions()
+                .iter()
+                .any(|definition| definition.kind == "event" && definition.name == "current.1")
+        }));
     }
 
     #[test]
