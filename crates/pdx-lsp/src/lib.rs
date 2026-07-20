@@ -14,16 +14,21 @@ use std::sync::mpsc::{self, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
 use lsp_types::{
-    CancelParams, CompletionOptions, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentSymbolParams,
-    HoverProviderCapability, InitializeParams, InitializeResult, NumberOrString, OneOf,
-    Range as LspRange, ReferenceParams, RenameOptions, RenameParams, ServerCapabilities,
-    ServerInfo, TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, WorkDoneProgressOptions, WorkspaceSymbolParams,
+    CancelParams, CompletionItem, CompletionItemKind, CompletionList, CompletionOptions,
+    CompletionResponse, CompletionTextEdit, Diagnostic as LspDiagnostic, DiagnosticSeverity,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams, DocumentSymbol as LspDocumentSymbol, DocumentSymbolParams,
+    Documentation, Hover as LspHover, HoverContents, HoverProviderCapability, InitializeParams,
+    InitializeResult, InsertTextFormat, Location as LspLocation, MarkupContent, MarkupKind,
+    NumberOrString, OneOf, Position as LspPosition, PrepareRenameResponse, Range as LspRange,
+    ReferenceParams, RenameOptions, RenameParams, ServerCapabilities, ServerInfo,
+    SymbolInformation, SymbolKind, TextDocumentPositionParams, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextEdit, Uri, WorkDoneProgressOptions,
+    WorkspaceEdit, WorkspaceSymbolParams,
 };
 use pdx_analysis::{
-    CompletionKind, Hover, Location, RenameError, complete, definition, diagnostics,
-    document_symbols, hover, prepare_rename, references, rename, workspace_symbols,
+    CompletionKind, Location, RenameError, complete, definition, diagnostics, document_symbols,
+    hover, prepare_rename, references, rename, workspace_symbols,
 };
 use pdx_rules::{GameProfile, RuleSet, RulesError};
 use pdx_text::{LineIndex, Position, TextRange};
@@ -31,6 +36,7 @@ use pdx_workspace::{
     AnalysisHost, AnalysisSnapshot, DocumentError, DocumentId, DocumentSource, PreparedDocument,
     SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
 };
+use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 
@@ -744,6 +750,7 @@ impl LspServer {
                         diagnostic_values(&snapshot, &id)
                     }))
                     .ok()
+                    .flatten()
                     .filter(|_| !cancelled.load(Ordering::Acquire))
                 };
                 let _ = sender.send(TransportEvent::Diagnostics(DiagnosticsResult {
@@ -1021,24 +1028,36 @@ impl SnapshotRequestContext {
             .items
             .into_iter()
             .map(|item| {
-                let insert_format = u8::from(item.insert_text.contains("$0"));
-                json!({
-                    "label": item.label,
-                    "kind": completion_kind(item.kind),
-                    "detail": item.detail,
-                    "documentation": item.documentation,
-                    "deprecated": item.deprecated,
-                    "sortText": format!("{:03}", item.sort_score),
-                    "insertText": item.insert_text,
-                    "insertTextFormat": if insert_format == 1 { 2 } else { 1 },
-                    "textEdit": {
-                        "range": range_to_json(document.line_index(), document.text(), item.replacement_range),
-                        "newText": item.insert_text,
-                    },
-                })
+                let insert_text = item.insert_text;
+                CompletionItem {
+                    label: item.label,
+                    kind: Some(completion_kind(item.kind)),
+                    detail: Some(item.detail),
+                    documentation: item.documentation.map(Documentation::String),
+                    deprecated: Some(item.deprecated),
+                    sort_text: Some(format!("{:03}", item.sort_score)),
+                    insert_text: Some(insert_text.clone()),
+                    insert_text_format: Some(if insert_text.contains("$0") {
+                        InsertTextFormat::SNIPPET
+                    } else {
+                        InsertTextFormat::PLAIN_TEXT
+                    }),
+                    text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+                        range: range_to_lsp(
+                            document.line_index(),
+                            document.text(),
+                            item.replacement_range,
+                        ),
+                        new_text: insert_text,
+                    })),
+                    ..CompletionItem::default()
+                }
             })
             .collect::<Vec<_>>();
-        Ok(json!({"isIncomplete": false, "items": items}))
+        typed_value(
+            CompletionResponse::List(CompletionList { is_incomplete: false, items }),
+            "completion response",
+        )
     }
 
     fn hover(&self, params: Option<&Value>) -> Result<Value, RpcError> {
@@ -1048,16 +1067,27 @@ impl SnapshotRequestContext {
             .snapshot
             .document(&id)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
-        Ok(hover_to_json(&value, document.line_index(), document.text()))
+        typed_value(
+            LspHover {
+                contents: HoverContents::Markup(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: value.contents,
+                }),
+                range: value
+                    .range
+                    .map(|range| range_to_lsp(document.line_index(), document.text(), range)),
+            },
+            "hover response",
+        )
     }
 
     fn definition(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let (id, position) = self.document_position(params)?;
         let result = definition(&self.snapshot, &id, position)
             .into_iter()
-            .filter_map(|location| location_to_json(&self.snapshot, &location))
+            .filter_map(|location| location_to_lsp(&self.snapshot, &location))
             .collect::<Vec<_>>();
-        Ok(Value::Array(result))
+        typed_value(result, "definition response")
     }
 
     fn references(&self, params: Option<&Value>) -> Result<Value, RpcError> {
@@ -1066,9 +1096,9 @@ impl SnapshotRequestContext {
         let include_declaration = params.context.include_declaration;
         let result = references(&self.snapshot, &id, position, include_declaration)
             .into_iter()
-            .filter_map(|location| location_to_json(&self.snapshot, &location))
+            .filter_map(|location| location_to_lsp(&self.snapshot, &location))
             .collect::<Vec<_>>();
-        Ok(Value::Array(result))
+        typed_value(result, "references response")
     }
 
     fn prepare_rename(&self, params: Option<&Value>) -> Result<Value, RpcError> {
@@ -1078,69 +1108,74 @@ impl SnapshotRequestContext {
             .snapshot
             .document(&id)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
-        Ok(json!({
-            "range": range_to_json(document.line_index(), document.text(), result.range),
-            "placeholder": result.placeholder,
-        }))
+        typed_value(
+            PrepareRenameResponse::RangeWithPlaceholder {
+                range: range_to_lsp(document.line_index(), document.text(), result.range),
+                placeholder: result.placeholder,
+            },
+            "prepare rename response",
+        )
     }
 
+    #[allow(clippy::mutable_key_type)] // lsp_types::Uri contains an internal parse cache.
     fn rename(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<RenameParams>(params, "rename")?;
         let (id, position) = self.offset_for(&params.text_document_position)?;
         let plan = rename(&self.snapshot, &id, position, &params.new_name).map_err(rename_error)?;
-        let mut changes = BTreeMap::<String, Vec<Value>>::new();
+        let mut changes = HashMap::<Uri, Vec<TextEdit>>::new();
         for edit in plan.edits {
-            let location = location_to_json(&self.snapshot, &edit.location).ok_or_else(|| {
+            let location = location_to_lsp(&self.snapshot, &edit.location).ok_or_else(|| {
                 RpcError::new(INVALID_PARAMS, "rename target has no client-visible URI")
             })?;
-            let uri = location
-                .get("uri")
-                .and_then(Value::as_str)
-                .ok_or_else(|| RpcError::new(INVALID_PARAMS, "rename target has no URI"))?
-                .to_owned();
-            let range = location
-                .get("range")
-                .cloned()
-                .ok_or_else(|| RpcError::new(INVALID_PARAMS, "rename target has no range"))?;
-            changes.entry(uri).or_default().push(json!({
-                "range": range,
-                "newText": edit.new_text,
-            }));
+            changes
+                .entry(location.uri)
+                .or_default()
+                .push(TextEdit { range: location.range, new_text: edit.new_text });
         }
-        Ok(json!({"changes": changes}))
+        typed_value(WorkspaceEdit::new(changes), "rename response")
     }
 
+    #[allow(deprecated)]
     fn document_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<DocumentSymbolParams>(params, "document symbols")?;
         let id = DocumentId::new(params.text_document.uri.as_str());
         let result = document_symbols(&self.snapshot, &id)
             .into_iter()
-            .map(|symbol| {
-                json!({
-                    "name": symbol.name,
-                    "kind": symbol_kind(&symbol.kind),
-                    "range": location_range_to_json(&self.snapshot, &symbol.location),
-                    "selectionRange": range_to_json_for_location(&self.snapshot, &symbol.location, symbol.selection_range),
-                })
+            .map(|symbol| LspDocumentSymbol {
+                name: symbol.name,
+                detail: None,
+                kind: symbol_kind(&symbol.kind),
+                tags: None,
+                deprecated: None,
+                range: location_range_to_lsp(&self.snapshot, &symbol.location),
+                selection_range: range_to_lsp_for_location(
+                    &self.snapshot,
+                    &symbol.location,
+                    symbol.selection_range,
+                ),
+                children: None,
             })
             .collect::<Vec<_>>();
-        Ok(Value::Array(result))
+        typed_value(result, "document symbols response")
     }
 
+    #[allow(deprecated)]
     fn workspace_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<WorkspaceSymbolParams>(params, "workspace symbols")?;
         let result = workspace_symbols(&self.snapshot, &params.query)
             .into_iter()
             .filter_map(|symbol| {
-                let location = location_to_json(&self.snapshot, &symbol.location)?;
-                Some(json!({
-                    "name": symbol.name,
-                    "kind": symbol_kind(&symbol.kind),
-                    "location": location,
-                }))
+                Some(SymbolInformation {
+                    name: symbol.name,
+                    kind: symbol_kind(&symbol.kind),
+                    tags: None,
+                    deprecated: None,
+                    location: location_to_lsp(&self.snapshot, &symbol.location)?,
+                    container_name: None,
+                })
             })
             .collect::<Vec<_>>();
-        Ok(Value::Array(result))
+        typed_value(result, "workspace symbols response")
     }
 
     fn document_position(&self, params: Option<&Value>) -> Result<(DocumentId, u32), RpcError> {
@@ -1205,26 +1240,30 @@ fn cancel_request_from_notification(
     }
 }
 
-fn diagnostic_values(snapshot: &AnalysisSnapshot, id: &DocumentId) -> Value {
+fn diagnostic_values(snapshot: &AnalysisSnapshot, id: &DocumentId) -> Option<Value> {
     let values = snapshot.document(id).map_or_else(Vec::new, |document| {
         diagnostics(snapshot, id)
             .into_iter()
             .map(|diagnostic| {
-                json!({
-                    "range": range_to_json(
-                        document.line_index(),
-                        document.text(),
-                        diagnostic.range,
-                    ),
-                    "severity": diagnostic.severity,
-                    "code": diagnostic.code.as_str(),
-                    "source": "pdx-analysis",
-                    "message": diagnostic.message,
-                })
+                LspDiagnostic::new(
+                    range_to_lsp(document.line_index(), document.text(), diagnostic.range),
+                    match diagnostic.severity {
+                        1 => Some(DiagnosticSeverity::ERROR),
+                        2 => Some(DiagnosticSeverity::WARNING),
+                        3 => Some(DiagnosticSeverity::INFORMATION),
+                        4 => Some(DiagnosticSeverity::HINT),
+                        _ => None,
+                    },
+                    Some(NumberOrString::String(diagnostic.code.as_str().to_owned())),
+                    Some("pdx-analysis".to_owned()),
+                    diagnostic.message,
+                    None,
+                    None,
+                )
             })
             .collect::<Vec<_>>()
     });
-    Value::Array(values)
+    serde_json::to_value(values).ok()
 }
 
 fn diagnostics_notification(uri: &str, values: Value) -> Value {
@@ -1235,84 +1274,74 @@ fn diagnostics_notification(uri: &str, values: Value) -> Value {
     })
 }
 
-fn completion_kind(kind: CompletionKind) -> u8 {
+fn completion_kind(kind: CompletionKind) -> CompletionItemKind {
     match kind {
-        CompletionKind::Key => 10,
-        CompletionKind::Value => 12,
-        CompletionKind::Symbol => 3,
-        CompletionKind::Localisation => 14,
+        CompletionKind::Key => CompletionItemKind::PROPERTY,
+        CompletionKind::Value => CompletionItemKind::VALUE,
+        CompletionKind::Symbol => CompletionItemKind::FUNCTION,
+        CompletionKind::Localisation => CompletionItemKind::KEYWORD,
     }
 }
 
-fn symbol_kind(kind: &str) -> u8 {
+fn symbol_kind(kind: &str) -> SymbolKind {
     match kind {
-        "localisation" => 15,
-        "event" => 12,
-        "scripted_effect" | "scripted_trigger" => 3,
-        _ => 13,
+        "localisation" => SymbolKind::STRING,
+        "event" => SymbolKind::FUNCTION,
+        "scripted_effect" | "scripted_trigger" => SymbolKind::NAMESPACE,
+        _ => SymbolKind::VARIABLE,
     }
 }
 
-fn hover_to_json(value: &Hover, index: &LineIndex, text: &str) -> Value {
-    let mut result = json!({
-        "contents": {"kind": "markdown", "value": value.contents},
-    });
-    if let Some(range) = value.range {
-        result["range"] = range_to_json(index, text, range);
-    }
-    result
-}
-
-fn range_to_json(index: &LineIndex, text: &str, range: TextRange) -> Value {
+fn range_to_lsp(index: &LineIndex, text: &str, range: TextRange) -> LspRange {
     let start = index.position(text, range.start()).unwrap_or_default();
     let end = index.position(text, range.end()).unwrap_or(start);
-    json!({
-        "start": {"line": start.line, "character": start.character},
-        "end": {"line": end.line, "character": end.character},
-    })
+    LspRange::new(
+        LspPosition::new(start.line, start.character),
+        LspPosition::new(end.line, end.character),
+    )
 }
 
-fn location_range_to_json(snapshot: &AnalysisSnapshot, location: &Location) -> Value {
+fn location_range_to_lsp(snapshot: &AnalysisSnapshot, location: &Location) -> LspRange {
     if let Some(document) = location.document.as_ref()
         && let Some(document) = snapshot.document(document)
     {
-        return range_to_json(document.line_index(), document.text(), location.range);
+        return range_to_lsp(document.line_index(), document.text(), location.range);
     }
     if let Some(file) = location.file.and_then(|file| snapshot.source_text(file)) {
         let index = LineIndex::new(file);
-        return range_to_json(&index, file, location.range);
+        return range_to_lsp(&index, file, location.range);
     }
-    json!({"start":{"line":0,"character":0},"end":{"line":0,"character":0}})
+    LspRange::default()
 }
 
-fn range_to_json_for_location(
+fn range_to_lsp_for_location(
     snapshot: &AnalysisSnapshot,
     location: &Location,
     range: TextRange,
-) -> Value {
+) -> LspRange {
     if let Some(document) = location.document.as_ref()
         && let Some(document) = snapshot.document(document)
     {
-        return range_to_json(document.line_index(), document.text(), range);
+        return range_to_lsp(document.line_index(), document.text(), range);
     }
     if let Some(file) = location.file.and_then(|file| snapshot.source_text(file)) {
         let index = LineIndex::new(file);
-        return range_to_json(&index, file, range);
+        return range_to_lsp(&index, file, range);
     }
-    json!({"start":{"line":0,"character":0},"end":{"line":0,"character":0}})
+    LspRange::default()
 }
 
-fn location_to_json(snapshot: &AnalysisSnapshot, location: &Location) -> Option<Value> {
+fn location_to_lsp(snapshot: &AnalysisSnapshot, location: &Location) -> Option<LspLocation> {
     let uri = if let Some(document) = location.document.as_ref() {
-        document.as_str().to_owned()
+        document.as_str().parse::<Uri>().ok()?
     } else if let Some(file) = location.file.and_then(|file| snapshot.source_files().get(&file)) {
-        path_to_uri(&file.physical_path)
+        path_to_uri(&file.physical_path).parse::<Uri>().ok()?
     } else if let (Some(root), Some(path)) = (snapshot.workspace_root(), location.path.as_ref()) {
-        path_to_uri(&root.join(path.as_str()))
+        path_to_uri(&root.join(path.as_str())).parse::<Uri>().ok()?
     } else {
         return None;
     };
-    Some(json!({"uri": uri, "range": location_range_to_json(snapshot, location)}))
+    Some(LspLocation::new(uri, location_range_to_lsp(snapshot, location)))
 }
 
 fn document_error(error: DocumentError) -> RpcError {
@@ -1330,6 +1359,13 @@ fn typed_params<T: DeserializeOwned>(
     serde_json::from_value(params.cloned().unwrap_or(Value::Null)).map_err(|error| RpcError {
         code: INVALID_PARAMS,
         message: format!("invalid {context} params: {error}"),
+    })
+}
+
+fn typed_value<T: Serialize>(value: T, context: &'static str) -> Result<Value, RpcError> {
+    serde_json::to_value(value).map_err(|error| RpcError {
+        code: INTERNAL_ERROR,
+        message: format!("failed to serialize {context}: {error}"),
     })
 }
 
@@ -1551,9 +1587,14 @@ mod tests {
         DocumentId, INVALID_PARAMS, InFlightRequest, InitializeOptions, LspError, LspServer,
         RequestId, ServerState, cancel_request_from_notification, path_to_uri, uri_to_path,
     };
+    use lsp_types::{
+        CompletionResponse, Diagnostic, DocumentSymbol, Hover, Location, PrepareRenameResponse,
+        SymbolInformation, WorkspaceEdit,
+    };
     use pdx_rules::{RuleSet, RulesError, RulesModel};
     use pdx_text::TextRange;
     use pdx_workspace::TextChange;
+    use serde::de::DeserializeOwned;
     use serde_json::{Value, json};
 
     fn eu4_server(options: InitializeOptions) -> Result<LspServer, LspError> {
@@ -1578,6 +1619,15 @@ mod tests {
             decoded.push(value);
         }
         decoded
+    }
+
+    fn typed_result<T: DeserializeOwned>(responses: &[Value], id: i64) -> T {
+        let value = responses
+            .iter()
+            .find(|value| value["id"] == id)
+            .unwrap_or_else(|| panic!("missing response {id}"));
+        serde_json::from_value(value["result"].clone())
+            .unwrap_or_else(|error| panic!("response {id} is not valid LSP: {error}"))
     }
 
     #[test]
@@ -1790,6 +1840,18 @@ mod tests {
                 items.iter().any(|item| item["code"] == "pdx-unknown-scope")
             })
         );
+
+        let _: CompletionResponse = typed_result(&responses, 2);
+        let _: Hover = typed_result(&responses, 3);
+        let _: Vec<Location> = typed_result(&responses, 4);
+        let _: Vec<Location> = typed_result(&responses, 5);
+        let _: Vec<DocumentSymbol> = typed_result(&responses, 6);
+        let _: Vec<SymbolInformation> = typed_result(&responses, 7);
+        let _: PrepareRenameResponse = typed_result(&responses, 9);
+        let _: WorkspaceEdit = typed_result(&responses, 10);
+        let _: Vec<Diagnostic> =
+            serde_json::from_value(diagnostics["params"]["diagnostics"].clone())
+                .expect("diagnostic notification should use the standard LSP shape");
     }
 
     #[test]

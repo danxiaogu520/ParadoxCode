@@ -69,7 +69,7 @@ Zed extension 只负责：
 
 ### LSP 层
 
-`pdx-lsp` 只负责协议生命周期、capability negotiation、URI/position 转换、请求取消和 diagnostics 发布。标准输入参数与 initialize result/capabilities 使用 `lsp-types` DTO；轻量 framing、worker 调度和 editor-neutral analysis API 不绑定 async service framework。语言功能响应 DTO 正在分批迁移，所有功能算法仍只调用 `pdx-analysis`。
+`pdx-lsp` 只负责协议生命周期、capability negotiation、URI/position 转换、请求取消和 diagnostics 发布。当前声明能力覆盖的标准输入、initialize result/capabilities、diagnostics 与语言功能响应均使用 `lsp-types` DTO；轻量 JSON-RPC framing、worker 调度和 editor-neutral analysis API 不绑定 async service framework。所有功能算法仍只调用 `pdx-analysis`。
 
 ### 分析层
 
