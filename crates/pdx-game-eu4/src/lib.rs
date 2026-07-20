@@ -30,6 +30,7 @@ impl Eu4Profile {
 #[must_use]
 pub fn bootstrap_model() -> RulesModel {
     RulesModel {
+        game_id: GAME_ID.to_owned(),
         file_categories: vec![
             FileCategory {
                 id: "localisation".to_owned(),

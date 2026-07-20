@@ -20,7 +20,7 @@ use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const IMPORTER_VERSION: &str = "phase12-cwt-starts-with-1";
+const IMPORTER_VERSION: &str = "phase-rules-game-id-1";
 
 /// A scalar or nested CWT value.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -357,6 +357,8 @@ pub struct ImportFileReport {
 /// A successful import summary.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ImportReport {
+    /// Stable game profile identity carried by the generated artifact.
+    pub game_id: String,
     /// Explicit input files considered by the importer.
     pub input_count: usize,
     /// Destination selected by the caller.
@@ -380,6 +382,7 @@ pub struct ImportReport {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct ImportManifest {
     schema_version: u32,
+    game_id: String,
     importer_version: String,
     rule_hash: String,
     files: Vec<ImportFileReport>,
@@ -481,6 +484,7 @@ pub fn import_with_options(options: &ImportOptions) -> Result<ImportReport, Impo
     let rules = RuleSet::from_model(model);
     atomic_write_rules(&rules, &options.output, &source_files)?;
     let report = ImportReport {
+        game_id: rules.game_id().to_owned(),
         input_count: source_files.len(),
         output: options.output.clone(),
         rule_hash: rules.rule_hash().to_hex(),
@@ -493,6 +497,7 @@ pub fn import_with_options(options: &ImportOptions) -> Result<ImportReport, Impo
     };
     let manifest = ImportManifest {
         schema_version: rules.schema_version(),
+        game_id: rules.game_id().to_owned(),
         importer_version: IMPORTER_VERSION.to_owned(),
         rule_hash: rules.rule_hash().to_hex(),
         files: source_files,
@@ -1716,7 +1721,7 @@ mod tests {
         assert_eq!(report.directive_counts.get("cardinality"), Some(&3506));
         assert_eq!(
             report.rule_hash,
-            "42fbe0d1fd6bf8609258380bc5367ff757cb50968bfdfaff73c2ca515ea5dc67"
+            "446f21f2c08d8d802c8769df34259f880bb63467726592d3f95ee1cea7b71484"
         );
         let rules = pdx_rules::RuleSet::load(&output).expect("load pinned corpus");
         assert_eq!(

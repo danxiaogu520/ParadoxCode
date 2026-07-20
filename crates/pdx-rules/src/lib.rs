@@ -13,7 +13,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use sha2::{Digest, Sha256};
 
 /// The first runtime schema version reserved for the generated rule database.
-pub const CURRENT_SCHEMA_VERSION: u32 = 11;
+pub const CURRENT_SCHEMA_VERSION: u32 = 12;
 
 /// A stable digest of canonical rule content.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
@@ -500,6 +500,8 @@ pub struct CwtSemanticModel {
 /// Normalized logical contents of one game rule database.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct RulesModel {
+    /// Stable game profile identity, for example `eu4`.
+    pub game_id: String,
     /// File classification catalog.
     pub file_categories: Vec<FileCategory>,
     /// Symbol descriptors.
@@ -539,6 +541,8 @@ pub enum RulesError {
     InvalidSymbolPolicy(String),
     /// A required metadata key is absent.
     MissingMetadata(String),
+    /// The artifact belongs to a different game profile.
+    GameMismatch { expected: String, actual: String },
     /// An unknown persisted CWT rule shape was found.
     InvalidCwtShape(String),
 }
@@ -562,6 +566,9 @@ impl fmt::Display for RulesError {
                 write!(formatter, "invalid symbol resolution policy: {value}")
             }
             Self::MissingMetadata(key) => write!(formatter, "missing rules metadata: {key}"),
+            Self::GameMismatch { expected, actual } => {
+                write!(formatter, "rules game mismatch: expected {expected}, found {actual}")
+            }
             Self::InvalidCwtShape(value) => write!(formatter, "invalid CWT rule shape: {value}"),
         }
     }
@@ -591,6 +598,7 @@ impl RuleSet {
             schema_version: CURRENT_SCHEMA_VERSION,
             rule_hash: RuleHash::empty(),
             model: RulesModel {
+                game_id: String::new(),
                 file_categories: Vec::new(),
                 symbol_descriptors: Vec::new(),
                 records: Vec::new(),
@@ -642,6 +650,24 @@ impl RuleSet {
         self.model.classify(path)
     }
 
+    /// Returns the stable game profile identity carried by this artifact.
+    #[must_use]
+    pub fn game_id(&self) -> &str {
+        &self.model.game_id
+    }
+
+    /// Validates that this rule set can be consumed by the selected game profile.
+    pub fn ensure_game(&self, expected: &str) -> Result<(), RulesError> {
+        if self.game_id() == expected {
+            Ok(())
+        } else {
+            Err(RulesError::GameMismatch {
+                expected: expected.to_owned(),
+                actual: self.game_id().to_owned(),
+            })
+        }
+    }
+
     /// Writes a complete self-owned SQLite artifact.
     pub fn write_sqlite(&self, path: &Path) -> Result<(), RulesError> {
         let mut connection = Connection::open(path)?;
@@ -662,7 +688,10 @@ impl RuleSet {
         }
         let stored = metadata(&connection, "rule_hash")?
             .ok_or_else(|| RulesError::MissingMetadata("rule_hash".to_owned()))?;
-        let model = read_model(&connection)?;
+        let game_id = metadata(&connection, "game_id")?
+            .ok_or_else(|| RulesError::MissingMetadata("game_id".to_owned()))?;
+        let mut model = read_model(&connection)?;
+        model.game_id = game_id;
         let rules = Self { schema_version: version, rule_hash: canonical_hash(&model), model };
         let computed = rules.rule_hash.to_hex();
         if stored != computed {
@@ -686,9 +715,8 @@ impl RuleSet {
 
 fn canonical_hash(model: &RulesModel) -> RuleHash {
     let mut bytes = Vec::new();
-    // Kept stable while schema v11 artifacts are supported; changing this domain would invalidate
-    // existing EU4 rule files even when their normalized logical contents are identical.
-    bytes.extend_from_slice(b"paradoxcode/eu4-rules/v4\0");
+    bytes.extend_from_slice(b"paradoxcode/rules/v5\0");
+    put_str(&mut bytes, &model.game_id);
     let mut categories = model.file_categories.clone();
     categories.sort_by(|left, right| left.id.cmp(&right.id));
     put_len(&mut bytes, categories.len());
@@ -1088,8 +1116,8 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
     let transaction = connection.transaction()?;
     transaction.execute_batch("DELETE FROM metadata; DELETE FROM interned_names; DELETE FROM file_categories; DELETE FROM symbol_descriptors; DELETE FROM cwt_enum_values; DELETE FROM cwt_type_root_keys; DELETE FROM cwt_type_root_scopes; DELETE FROM cwt_type_descriptors; DELETE FROM cwt_rules; DELETE FROM rule_fields; DELETE FROM rule_records;")?;
     transaction.execute(
-        "INSERT INTO metadata(key, value) VALUES ('schema_version', ?1), ('rule_hash', ?2)",
-        params![rules.schema_version.to_string(), rules.rule_hash.to_hex()],
+        "INSERT INTO metadata(key, value) VALUES ('schema_version', ?1), ('rule_hash', ?2), ('game_id', ?3)",
+        params![rules.schema_version.to_string(), rules.rule_hash.to_hex(), rules.game_id()],
     )?;
     for category in &rules.model.file_categories {
         transaction.execute("INSERT INTO file_categories(id, parser, resolution, path_prefix, extensions, path_suffix, case_sensitive) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", params![category.id, category.parser.as_str(), category.resolution.as_str(), category.matcher.path_prefix, category.matcher.extensions.join("\u{1f}"), category.matcher.path_suffix, i64::from(category.matcher.case_sensitive)])?;
@@ -1314,7 +1342,13 @@ fn read_model(connection: &Connection) -> Result<RulesModel, RulesError> {
         records.push(RuleRecord { table, logical_id, source_order, fields });
     }
     let cwt = read_cwt_model(connection)?;
-    Ok(RulesModel { file_categories: categories, symbol_descriptors: descriptors, records, cwt })
+    Ok(RulesModel {
+        game_id: String::new(),
+        file_categories: categories,
+        symbol_descriptors: descriptors,
+        records,
+        cwt,
+    })
 }
 
 fn read_cwt_model(connection: &Connection) -> Result<CwtSemanticModel, RulesError> {
@@ -1525,7 +1559,7 @@ mod tests {
 
     #[test]
     fn canonical_hash_is_independent_of_record_insertion_order() {
-        let mut first = RulesModel::default();
+        let mut first = RulesModel { game_id: "test-game".to_owned(), ..RulesModel::default() };
         let records = [
             RuleRecord {
                 table: "types".to_owned(),
@@ -1541,7 +1575,7 @@ mod tests {
             },
         ];
         first.records.extend(records.clone());
-        let mut second = RulesModel::default();
+        let mut second = RulesModel { game_id: "test-game".to_owned(), ..RulesModel::default() };
         second.records.extend(records.into_iter().rev());
         assert_eq!(RuleSet::from_model(first).rule_hash(), RuleSet::from_model(second).rule_hash());
     }
@@ -1550,9 +1584,19 @@ mod tests {
     fn sqlite_round_trip_validates_logical_hash() {
         let nonce = SystemTime::now().duration_since(UNIX_EPOCH).expect("clock").as_nanos();
         let path = std::env::temp_dir().join(format!("paradoxcode-rules-{nonce}.pdxrules"));
-        let rules = RuleSet::from_model(RulesModel::default());
+        let rules = RuleSet::from_model(RulesModel {
+            game_id: "test-game".to_owned(),
+            ..RulesModel::default()
+        });
         rules.write_sqlite(&path).expect("write rules");
-        assert_eq!(RuleSet::load(&path).expect("load rules"), rules);
+        let loaded = RuleSet::load(&path).expect("load rules");
+        assert_eq!(loaded, rules);
+        assert_eq!(loaded.game_id(), "test-game");
+        assert!(loaded.ensure_game("test-game").is_ok());
+        assert!(matches!(
+            loaded.ensure_game("another-game"),
+            Err(super::RulesError::GameMismatch { .. })
+        ));
         std::fs::remove_file(path).expect("remove temporary rules");
     }
 }

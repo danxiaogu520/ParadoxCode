@@ -74,6 +74,8 @@ Eu4Rules
 
 SQLite 行号、rowid、页布局、索引布局、VACUUM 结果和写入时间都不是逻辑身份。表使用稳定 logical id 或显式 primary key；不能依赖隐式 rowid 作为跨版本 ID。
 
+schema 12 的 metadata 必须包含 `game_id = "eu4"`、`schema_version` 和 `rule_hash`。`game_id` 进入 canonical hash；缺失或与所选 `Eu4Profile` 不一致时，server 在启动阶段拒绝 artifact，不能降级后继续提供带错误语义的服务。
+
 ## KeyMatcher
 
 未知 key、补全和命令解析共享同一组 matcher：

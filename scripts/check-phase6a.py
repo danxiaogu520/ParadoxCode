@@ -64,9 +64,13 @@ def check_artifact() -> None:
         rule_hash = connection.execute(
             "SELECT value FROM metadata WHERE key = 'rule_hash'"
         ).fetchone()[0]
+        game_id = connection.execute(
+            "SELECT value FROM metadata WHERE key = 'game_id'"
+        ).fetchone()[0]
         foreign_keys = connection.execute("PRAGMA foreign_keys").fetchone()[0]
     require(str(schema_version) == str(manifest["schema_version"]), "rules schema mismatch")
     require(rule_hash == manifest["rule_hash"], "rules rule_hash mismatch")
+    require(game_id == manifest["game_id"] == "eu4", "rules game/profile mismatch")
     require(foreign_keys == 1, "rules artifact does not enable foreign keys")
 
     extension = (ROOT / "editors" / "zed" / "extension.toml").read_text(encoding="utf-8")

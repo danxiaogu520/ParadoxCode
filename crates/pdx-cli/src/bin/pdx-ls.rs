@@ -8,5 +8,8 @@ fn main() -> Result<(), pdx_lsp::LspError> {
         .windows(2)
         .find(|window| window[0] == "--rules")
         .map(|window| std::path::PathBuf::from(&window[1]));
-    pdx_lsp::LspServer::run_stdio(pdx_lsp::InitializeOptions { rules_path })
+    pdx_lsp::LspServer::run_stdio_for_game(
+        pdx_lsp::InitializeOptions { rules_path },
+        pdx_game_eu4::GAME_ID,
+    )
 }

@@ -145,28 +145,31 @@ pub struct LspServer {
 }
 
 impl LspServer {
-    /// Creates a server in the pre-initialize state.
-    #[must_use]
-    pub fn new(options: InitializeOptions) -> Self {
-        let rules = options
-            .rules_path
-            .as_deref()
-            .and_then(|path| RuleSet::load(path).ok())
-            .unwrap_or_else(RuleSet::empty);
-        Self {
-            state: ServerState::Uninitialized,
-            options,
-            host: AnalysisHost::new(rules),
-            cancelled: HashSet::new(),
-            diagnostics: BTreeMap::new(),
-            clean_exit: false,
-        }
-    }
-
     /// Creates a server and fails when an explicitly supplied rules artifact is invalid.
     pub fn try_new(options: InitializeOptions) -> Result<Self, LspError> {
+        Self::try_new_with_expected_game(options, None)
+    }
+
+    /// Creates a server and rejects a rules artifact for a different game profile.
+    pub fn try_new_for_game(
+        options: InitializeOptions,
+        expected_game_id: &str,
+    ) -> Result<Self, LspError> {
+        Self::try_new_with_expected_game(options, Some(expected_game_id))
+    }
+
+    fn try_new_with_expected_game(
+        options: InitializeOptions,
+        expected_game_id: Option<&str>,
+    ) -> Result<Self, LspError> {
         let rules = match options.rules_path.as_deref() {
-            Some(path) => RuleSet::load(path)?,
+            Some(path) => {
+                let rules = RuleSet::load(path)?;
+                if let Some(expected) = expected_game_id {
+                    rules.ensure_game(expected)?;
+                }
+                rules
+            }
             None => RuleSet::empty(),
         };
         Ok(Self {
@@ -226,6 +229,17 @@ impl LspServer {
         let stdin = io::stdin();
         let stdout = io::stdout();
         let mut server = Self::try_new(options)?;
+        server.run_transport(stdin.lock(), stdout.lock())
+    }
+
+    /// Runs stdio while enforcing the selected game profile identity.
+    pub fn run_stdio_for_game(
+        options: InitializeOptions,
+        expected_game_id: &str,
+    ) -> Result<(), LspError> {
+        let stdin = io::stdin();
+        let stdout = io::stdout();
+        let mut server = Self::try_new_for_game(options, expected_game_id)?;
         server.run_transport(stdin.lock(), stdout.lock())
     }
 
@@ -1047,7 +1061,8 @@ mod tests {
     use std::io::Cursor;
     use std::path::PathBuf;
 
-    use super::{InitializeOptions, LspServer, ServerState, path_to_uri, uri_to_path};
+    use super::{InitializeOptions, LspError, LspServer, ServerState, path_to_uri, uri_to_path};
+    use pdx_rules::{RuleSet, RulesError, RulesModel};
     use pdx_text::TextRange;
     use pdx_workspace::TextChange;
     use serde_json::{Value, json};
@@ -1078,6 +1093,33 @@ mod tests {
         let uri = path_to_uri(&path);
         assert!(uri.contains("%20"));
         assert_eq!(uri_to_path(&uri).expect("URI should decode"), path);
+    }
+
+    #[test]
+    fn selected_game_rejects_a_mismatched_rules_artifact() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("pdx-lsp-wrong-game-{nonce}.pdxrules"));
+        RuleSet::from_model(RulesModel {
+            game_id: "another-game".to_owned(),
+            ..RulesModel::default()
+        })
+        .write_sqlite(&path)
+        .expect("write mismatched rules");
+
+        let error = LspServer::try_new_for_game(
+            InitializeOptions { rules_path: Some(path.clone()) },
+            "eu4",
+        )
+        .expect_err("mismatched game must be rejected");
+        assert!(matches!(
+            error,
+            LspError::Rules(RulesError::GameMismatch { expected, actual })
+                if expected == "eu4" && actual == "another-game"
+        ));
+        fs::remove_file(path).expect("cleanup rules");
     }
 
     #[test]
@@ -1116,7 +1158,8 @@ mod tests {
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let mut output = Vec::new();
-        let mut server = LspServer::new(InitializeOptions::default());
+        let mut server = LspServer::try_new(InitializeOptions::default())
+            .expect("syntax-only server should initialize");
         server.run_transport(Cursor::new(input), &mut output).expect("transport should finish");
 
         let responses = decode_frames(&output);
@@ -1163,7 +1206,8 @@ mod tests {
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let mut output = Vec::new();
-        let mut server = LspServer::new(InitializeOptions::default());
+        let mut server = LspServer::try_new(InitializeOptions::default())
+            .expect("syntax-only server should initialize");
         server.run_transport(Cursor::new(input), &mut output).expect("transport should finish");
         let responses = decode_frames(&output);
         let completion =
@@ -1259,7 +1303,8 @@ mod tests {
 
     #[test]
     fn stale_diagnostics_do_not_replace_newer_results() {
-        let mut server = LspServer::new(InitializeOptions::default());
+        let mut server = LspServer::try_new(InitializeOptions::default())
+            .expect("syntax-only server should initialize");
         let uri = "file:///tmp/diagnostics.txt";
         let id = pdx_workspace::DocumentId::new(uri);
         server

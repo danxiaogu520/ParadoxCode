@@ -17,7 +17,7 @@
 
 当前 EU4 parity baseline 使用 73 个固定输入，artifact schema 为 11，importer 为
 `phase12-cwt-starts-with-1`，canonical `rule_hash` 为
-`42fbe0d1fd6bf8609258380bc5367ff757cb50968bfdfaff73c2ca515ea5dc67`。该 baseline 已覆盖
+`446f21f2c08d8d802c8769df34259f880bb63467726592d3f95ee1cea7b71484`（schema 12，包含 `game_id = "eu4"`）。该 baseline 已覆盖
 CWTools 的 duplicate/alternative、leaf-value/value-clause、cardinality、scope transition、
 dynamic value、type path/skip-root 和 subtype `starts_with` 语义。
 

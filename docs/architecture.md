@@ -83,7 +83,7 @@ Zed extension 只负责：
 
 `pdx-cwt v0.1` 只负责一次性读取 CWTools 建模的 EU4 `.cwt` 配置并导入自有 SQLite 规则数据库。导入完成后，`.cwt` 不再是项目的权威规则源，也不进入正常构建、发布或运行时。未来其他游戏可以拥有自己的 importer/profile，但不属于 EU4 v0.1。
 
-`pdx-rules` 定义通用 SQLite artifact schema、规范化逻辑视图、`rule_hash` 算法、只读加载与运行时查询 API；`pdx-game-eu4` 提供 EU4 profile 与 bootstrap catalog。`pdx-eu4` 现在只保留临时 re-export facade，待调用方和文档迁移完成后删除。运行时只读加载并冻结 `RuleSet`；artifact `game_id` 校验仍是下一 schema 切片。
+`pdx-rules` 定义通用 SQLite artifact schema、规范化逻辑视图、`rule_hash` 算法、只读加载与运行时查询 API；`pdx-game-eu4` 提供 EU4 profile 与 bootstrap catalog。`pdx-eu4` 现在只保留临时 re-export facade，待调用方和文档迁移完成后删除。运行时只读加载并冻结 `RuleSet`，schema 12 将 `game_id` 纳入 metadata 与 canonical hash；EU4 组合入口在启动服务前校验 profile 身份。
 
 数据库保存 `TypeKey("scripted_effect")`、`AliasRef("effect")` 等 EU4 静态 matcher；实际 scripted effect、building 等成员来自 `WorkspaceIndex`。EU4 command、scope 和目录规则直接属于核心 EU4 实现，不设计其他游戏的替换层。
 

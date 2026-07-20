@@ -61,7 +61,7 @@ pdx-lsp
 
 ## 迁移策略
 
-> 实现进度（2026-07-20）：步骤 2–3 的 crate 拆分已完成。`pdx-rules` 持有通用 runtime，`pdx-game-eu4` 持有 EU4 bootstrap/profile，`pdx-eu4` 只剩兼容 re-export。步骤 4–6 尚未完成。
+> 实现进度（2026-07-20）：步骤 2–3 的 crate 拆分已完成。`pdx-rules` 持有通用 runtime，`pdx-game-eu4` 持有 EU4 bootstrap/profile，`pdx-eu4` 只剩兼容 re-export。schema 12 已将 `game_id` 纳入 artifact metadata/hash 并在 EU4 server 入口校验；步骤 4–5 和最终删除兼容 facade 尚未完成。
 
 当前 `pdx-eu4` 同时包含通用规则 runtime 与 EU4 数据。迁移必须分步进行：
 

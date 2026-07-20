@@ -7,6 +7,7 @@ rust-version.workspace = true
 description = "CLI entry points for ParadoxCode."
 
 [dependencies]
+pdx-game-eu4 = { path = "../pdx-game-eu4" }
 pdx-lsp = { path = "../pdx-lsp" }
 
 [[bin]]
@@ -19,4 +20,3 @@ path = "src/bin/pdx-ls.rs"
 
 [lints]
 workspace = true
-

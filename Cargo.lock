@@ -171,6 +171,7 @@ dependencies = [
 name = "pdx-cli"
 version = "0.1.0"
 dependencies = [
+ "pdx-game-eu4",
  "pdx-lsp",
 ]
 
