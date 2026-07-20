@@ -3,6 +3,8 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
+> 实现进度（2026-07-20）：保守 PdxScript/localisation formatter、幂等与 trivia safety 回归、LSP `documentFormattingProvider`、typed params/edits 和 snapshot worker 路由已完成。客户端 `tabSize`/`insertSpaces` 会映射为 editor-neutral 选项；恢复语法、CSV 和不支持格式返回空 edits。range formatting 仍属于非目标。
+
 ## 目标
 
 提供保守、幂等、注释安全的全文格式化。格式化只改变布局，不改变 property 顺序、operator、引号或 scalar spelling。

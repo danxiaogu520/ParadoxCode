@@ -1,6 +1,6 @@
 # EU4 MVP 实施计划
 
-> 2026-07-20 重新审计：当前代码是 EU4 alpha 功能原型，不是已发布的 v0.1。Phase 2–3 的基础实现可继续作为基线；Phase 4–6A 的功能代码存在，但持久化 Vanilla cache、依赖配置、formatter LSP 接入、自动安装和跨平台发布退出条件尚未全部满足。后续先完成 RFC 0013 和发布前架构修复，再进入 Phase 6B。
+> 2026-07-20 重新审计：当前代码是 EU4 alpha 功能原型，不是已发布的 v0.1。Phase 2–3 的基础实现可继续作为基线；Phase 4–6A 的功能代码存在，但持久化 Vanilla cache、依赖配置、自动安装和跨平台发布退出条件尚未全部满足。后续先完成 RFC 0013 和发布前架构修复，再进入 Phase 6B。
 
 ## MVP 成功定义
 
@@ -173,7 +173,7 @@ Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 
 ## Phase 6A：Rename 与 v0.1
 
-状态：`implemented, not released`（2026-07-20 重新审计）；rename 内部链路和开发机 smoke 已通过，但自动获取 server、rules artifact 打包、formatter capability、跨平台 release 和干净 clone 安装尚未闭环。
+状态：`implemented, not released`（2026-07-20 重新审计）；rename 内部链路、formatter capability 和开发机 smoke 已通过，但自动获取 server、rules artifact 打包、跨平台 release 和干净 clone 安装尚未闭环。
 
 交付：
 

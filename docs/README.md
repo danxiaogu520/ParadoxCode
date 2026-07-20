@@ -2,7 +2,7 @@
 
 ParadoxCode 是通用 PDX Mod 语言工具引擎。当前唯一有交付承诺和完整规则覆盖目标的游戏是 Europa Universalis IV（EU4）；其他游戏未来可以通过 profile 接入，但优先级低，当前不纳入版本计划。
 
-当前仓库处于 alpha：EU4 主要语言功能已有可运行原型和自动化回归，但增量 HIR、廉价 snapshot、后台取消、完整 Vanilla/依赖配置、formatter LSP 接入和普通用户安装发布仍未闭环。
+当前仓库处于 alpha：EU4 主要语言功能、增量 per-file HIR、共享 snapshot、后台取消和 formatter LSP 已有自动化回归，但完整 Vanilla/依赖配置和普通用户安装发布仍未闭环。
 
 ## 当前决策
 

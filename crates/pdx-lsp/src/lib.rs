@@ -17,14 +17,14 @@ use lsp_types::{
     CancelParams, CompletionItem, CompletionItemKind, CompletionList, CompletionOptions,
     CompletionResponse, CompletionTextEdit, Diagnostic as LspDiagnostic, DiagnosticSeverity,
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, DocumentSymbol as LspDocumentSymbol, DocumentSymbolParams,
-    Documentation, Hover as LspHover, HoverContents, HoverProviderCapability, InitializeParams,
-    InitializeResult, InsertTextFormat, Location as LspLocation, MarkupContent, MarkupKind,
-    NumberOrString, OneOf, Position as LspPosition, PrepareRenameResponse, Range as LspRange,
-    ReferenceParams, RenameOptions, RenameParams, ServerCapabilities, ServerInfo,
-    SymbolInformation, SymbolKind, TextDocumentPositionParams, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TextEdit, Uri, WorkDoneProgressOptions,
-    WorkspaceEdit, WorkspaceSymbolParams,
+    DidSaveTextDocumentParams, DocumentFormattingParams, DocumentSymbol as LspDocumentSymbol,
+    DocumentSymbolParams, Documentation, Hover as LspHover, HoverContents, HoverProviderCapability,
+    InitializeParams, InitializeResult, InsertTextFormat, Location as LspLocation, MarkupContent,
+    MarkupKind, NumberOrString, OneOf, Position as LspPosition, PrepareRenameResponse,
+    Range as LspRange, ReferenceParams, RenameOptions, RenameParams, ServerCapabilities,
+    ServerInfo, SymbolInformation, SymbolKind, TextDocumentPositionParams,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, TextEdit, Uri,
+    WorkDoneProgressOptions, WorkspaceEdit, WorkspaceSymbolParams,
 };
 use pdx_analysis::{
     CancellationToken, Cancelled, CompletionKind, Location, RenameError, RenameFailure,
@@ -32,11 +32,13 @@ use pdx_analysis::{
     document_symbols_with_cancellation, hover_with_cancellation, prepare_rename_with_cancellation,
     references_with_cancellation, rename_with_cancellation, workspace_symbols_with_cancellation,
 };
+use pdx_format::{FormatOptions, IndentStyle, format_with_options};
 use pdx_rules::{GameProfile, RuleSet, RulesError};
 use pdx_text::{LineIndex, Position, TextRange};
 use pdx_workspace::{
-    AnalysisHost, AnalysisSnapshot, DocumentError, DocumentId, DocumentSource, PreparedDocument,
-    SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange, WorkspaceError, WorkspaceScanToken,
+    AnalysisHost, AnalysisSnapshot, DocumentError, DocumentId, DocumentSource, ParsedSource,
+    PreparedDocument, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange, WorkspaceError,
+    WorkspaceScanToken,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -1127,6 +1129,7 @@ fn prepare_initialize_candidate(
                 work_done_progress_options: WorkDoneProgressOptions::default(),
             })),
             document_symbol_provider: Some(OneOf::Left(true)),
+            document_formatting_provider: Some(OneOf::Left(true)),
             workspace_symbol_provider: Some(OneOf::Left(true)),
             ..ServerCapabilities::default()
         },
@@ -1162,6 +1165,7 @@ impl SnapshotRequestContext {
             "textDocument/prepareRename" => self.prepare_rename(params),
             "textDocument/rename" => self.rename(params),
             "textDocument/documentSymbol" => self.document_symbols(params),
+            "textDocument/formatting" => self.formatting(params),
             "workspace/symbol" => self.workspace_symbols(params),
             _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
         }
@@ -1342,6 +1346,42 @@ impl SnapshotRequestContext {
         typed_value(result, "document symbols response")
     }
 
+    fn formatting(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = typed_params::<DocumentFormattingParams>(params, "document formatting")?;
+        let id = DocumentId::new(params.text_document.uri.as_str());
+        let document = self
+            .snapshot
+            .document(&id)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
+        self.ensure_active()?;
+        let Some(ParsedSource::Text(parsed)) = document.parsed() else {
+            return typed_value(Vec::<TextEdit>::new(), "formatting response");
+        };
+        let indent_width = u8::try_from(params.options.tab_size).unwrap_or(u8::MAX).max(1);
+        let result = format_with_options(
+            parsed,
+            FormatOptions {
+                indent_style: if params.options.insert_spaces {
+                    IndentStyle::Spaces
+                } else {
+                    IndentStyle::Tabs
+                },
+                indent_width,
+                ..FormatOptions::default()
+            },
+        );
+        self.ensure_active()?;
+        let edits = result
+            .edits
+            .into_iter()
+            .map(|edit| TextEdit {
+                range: range_to_lsp(document.line_index(), document.text(), edit.range),
+                new_text: edit.replacement,
+            })
+            .collect::<Vec<_>>();
+        typed_value(edits, "formatting response")
+    }
+
     #[allow(deprecated)]
     fn workspace_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<WorkspaceSymbolParams>(params, "workspace symbols")?;
@@ -1401,6 +1441,7 @@ fn is_snapshot_request(method: &str) -> bool {
             | "textDocument/prepareRename"
             | "textDocument/rename"
             | "textDocument/documentSymbol"
+            | "textDocument/formatting"
             | "workspace/symbol"
     )
 }
@@ -1948,6 +1989,7 @@ mod tests {
             responses.iter().find(|value| value["id"] == 2).expect("initialize response");
         assert_eq!(initialize["result"]["capabilities"]["textDocumentSync"]["change"], 2);
         assert_eq!(initialize["result"]["capabilities"]["renameProvider"]["prepareProvider"], true);
+        assert_eq!(initialize["result"]["capabilities"]["documentFormattingProvider"], true);
         let cancelled =
             responses.iter().find(|value| value["id"] == 99).expect("cancelled response");
         assert_eq!(cancelled["error"]["code"], -32800);
@@ -2087,6 +2129,34 @@ mod tests {
         let _: Vec<Diagnostic> =
             serde_json::from_value(diagnostics["params"]["diagnostics"].clone())
                 .expect("diagnostic notification should use the standard LSP shape");
+    }
+
+    #[test]
+    fn memory_transport_formats_safe_text_and_refuses_recovered_syntax() {
+        let valid_uri = "file:///tmp/format-valid.txt";
+        let unsafe_uri = "file:///tmp/format-unsafe.txt";
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":valid_uri,"languageId":"pdx-script","version":1,"text":"name=\"汉😀\""}}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"textDocument/formatting","params":{"textDocument":{"uri":valid_uri},"options":{"tabSize":2,"insertSpaces":true}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":unsafe_uri,"languageId":"pdx-script","version":1,"text":"country_event = {"}}}),
+            json!({"jsonrpc":"2.0","id":3,"method":"textDocument/formatting","params":{"textDocument":{"uri":unsafe_uri},"options":{"tabSize":4,"insertSpaces":true}}}),
+            json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = eu4_server(InitializeOptions::default()).expect("server");
+        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        let responses = decode_frames(&output);
+
+        let edits = typed_result::<Vec<lsp_types::TextEdit>>(&responses, 2);
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].new_text, "name = \"汉😀\"");
+        assert_eq!(edits[0].range.start, lsp_types::Position::new(0, 0));
+        assert_eq!(edits[0].range.end, lsp_types::Position::new(0, 10));
+        let unsafe_edits = typed_result::<Vec<lsp_types::TextEdit>>(&responses, 3);
+        assert!(unsafe_edits.is_empty());
     }
 
     #[test]
