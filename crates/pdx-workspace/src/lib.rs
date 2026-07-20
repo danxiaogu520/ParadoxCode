@@ -10,7 +10,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use pdx_hir::{HirFile, lower_shared};
+use pdx_hir::{HirFile, HirProperty, lower_shared};
 use pdx_rules::{FileResolutionPolicy, ParserKind, RuleSet, SymbolResolutionPolicy};
 use pdx_syntax::{CstKind, CstNode, Eu4FileFormat, ParsedFile, parse_eu4, parse_eu4_csv_file};
 use pdx_text::{LineIndex, LogicalPath, TextRange};
@@ -291,6 +291,12 @@ impl FileState {
     #[must_use]
     pub fn hir(&self) -> Option<&HirFile> {
         self.hir.as_deref()
+    }
+
+    /// Clones the shared HIR handle without rebuilding or copying it.
+    #[must_use]
+    pub fn hir_handle(&self) -> Option<Arc<HirFile>> {
+        self.hir.as_ref().map(Arc::clone)
     }
 
     /// Returns the index shard produced atomically with this parse/HIR state.
@@ -629,6 +635,12 @@ impl DocumentSnapshot {
     #[must_use]
     pub fn hir(&self) -> Option<&HirFile> {
         self.hir.as_deref()
+    }
+
+    /// Clones the HIR handle for this exact document version.
+    #[must_use]
+    pub fn hir_handle(&self) -> Option<Arc<HirFile>> {
+        self.hir.as_ref().map(Arc::clone)
     }
 }
 
@@ -1016,11 +1028,17 @@ fn build_file_state(
         };
     };
     let (parsed, hir) = parse_source(&category.parser, &source, rules);
-    let shard = match parsed.as_ref() {
-        Some(ParsedSource::Text(parsed)) => {
-            shard_from_parsed(file, parsed, category.id.as_str(), rules)
+    let shard = match (parsed.as_ref(), hir.as_deref()) {
+        (Some(ParsedSource::Text(parsed)), Some(hir)) => {
+            shard_from_parsed(file, parsed, hir, category.id.as_str(), rules)
         }
-        Some(ParsedSource::Csv(parsed)) => {
+        (Some(ParsedSource::Text(parsed)), None) => FileIndexShard {
+            file_id: file.id,
+            definitions: Vec::new(),
+            references: Vec::new(),
+            syntax_error_count: parsed.errors().len(),
+        },
+        (Some(ParsedSource::Csv(parsed)), _) => {
             let definitions =
                 if file.logical_path.as_str().eq_ignore_ascii_case("map/definition.csv") {
                     parsed
@@ -1053,7 +1071,7 @@ fn build_file_state(
                 syntax_error_count: parsed.errors().len(),
             }
         }
-        None => FileIndexShard {
+        (None, _) => FileIndexShard {
             file_id: file.id,
             definitions: Vec::new(),
             references: Vec::new(),
@@ -1066,23 +1084,15 @@ fn build_file_state(
 fn shard_from_parsed(
     file: &SourceFile,
     parsed: &ParsedFile,
+    hir: &HirFile,
     category_id: &str,
     rules: &RuleSet,
 ) -> FileIndexShard {
     let mut definitions = Vec::new();
     let mut references = Vec::new();
-    collect_semantics(
-        file,
-        parsed,
-        parsed.root(),
-        category_id,
-        false,
-        true,
-        &mut definitions,
-        &mut references,
-    );
+    collect_hir_semantics(file, hir, category_id, &mut definitions, &mut references);
     collect_scripted_effect_params(file, parsed, &mut definitions);
-    collect_eu4_dynamic_members(file, parsed.root(), parsed, &mut definitions, None);
+    collect_eu4_dynamic_members(file, hir, &mut definitions);
     collect_cwt_type_members(file, parsed, rules, &mut definitions);
     FileIndexShard {
         file_id: file.id,
@@ -1287,40 +1297,25 @@ fn cwt_type_path_matches(
 
 fn collect_eu4_dynamic_members(
     file: &SourceFile,
-    node: &CstNode,
-    parsed: &ParsedFile,
+    hir: &HirFile,
     definitions: &mut Vec<Definition>,
-    parent_key: Option<&str>,
 ) {
-    if node.kind() == CstKind::Property {
-        let key = node
-            .children()
-            .iter()
-            .find(|child| child.kind() == CstKind::Key)
-            .and_then(|child| parsed.text(child.range()))
-            .map(str::trim)
-            .unwrap_or_default()
-            .to_ascii_lowercase();
+    for property in hir.properties() {
+        let key = property.key.to_ascii_lowercase();
+        let parent_key = property.path.iter().rev().nth(1).map(String::as_str);
         let kind = dynamic_member_kind(&key, parent_key);
         if let Some(kind) = kind
-            && let Some((name, range)) = direct_property_scalar(node, parsed)
-            && !name.is_empty()
+            && let Some(scalar) = property.scalar.as_ref()
+            && !scalar.value.is_empty()
         {
             definitions.push(Definition {
                 kind: kind.to_owned(),
-                name,
+                name: scalar.value.clone(),
                 file_id: file.id,
-                range,
+                range: scalar.range,
                 active: true,
             });
         }
-        for child in node.children() {
-            collect_eu4_dynamic_members(file, child, parsed, definitions, Some(&key));
-        }
-        return;
-    }
-    for child in node.children() {
-        collect_eu4_dynamic_members(file, child, parsed, definitions, parent_key);
     }
 }
 
@@ -1348,28 +1343,6 @@ fn dynamic_member_kind(key: &str, parent_key: Option<&str>) -> Option<&'static s
         }
         _ => return None,
     })
-}
-
-fn direct_property_scalar(node: &CstNode, parsed: &ParsedFile) -> Option<(String, TextRange)> {
-    for child in node.children() {
-        if matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString) {
-            return parsed
-                .text(child.range())
-                .map(|value| (value.trim_matches('"').trim().to_owned(), child.range()));
-        }
-        if child.kind() == CstKind::Value {
-            if let Some(value) = child
-                .children()
-                .iter()
-                .find(|value| matches!(value.kind(), CstKind::BareValue | CstKind::QuotedString))
-            {
-                return parsed
-                    .text(value.range())
-                    .map(|text| (text.trim_matches('"').trim().to_owned(), value.range()));
-            }
-        }
-    }
-    None
 }
 
 fn collect_scripted_effect_params(
@@ -1424,151 +1397,83 @@ fn collect_scripted_effect_params(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn collect_semantics(
+fn collect_hir_semantics(
     file: &SourceFile,
-    parsed: &ParsedFile,
-    node: &CstNode,
+    hir: &HirFile,
     category_id: &str,
-    inside_key: bool,
-    top_level: bool,
     definitions: &mut Vec<Definition>,
     references: &mut Vec<Reference>,
 ) {
-    match node.kind() {
-        CstKind::LocalisationEntry => {
-            if let Some(key) =
-                node.children().iter().find(|child| child.kind() == CstKind::LocalisationKey)
-            {
-                if let Some(name) = parsed.text(key.range()) {
+    for entry in hir.localisation_entries() {
+        definitions.push(Definition {
+            kind: "localisation".to_owned(),
+            name: entry.name.clone(),
+            file_id: file.id,
+            range: entry.range,
+            active: true,
+        });
+    }
+    let logical_path = file.logical_path.as_str().to_ascii_lowercase();
+    for property in hir.properties() {
+        if property.top_level {
+            if let Some(kind) = definition_kind(&logical_path, property) {
+                let name = event_name(hir, property).unwrap_or_else(|| property.key.clone());
+                definitions.push(Definition {
+                    kind,
+                    name,
+                    file_id: file.id,
+                    range: property.range,
+                    active: true,
+                });
+                if logical_path.contains("common/government_reforms/")
+                    && nested_hir_property(hir, property, "legacy_government")
+                        .and_then(|property| property.scalar.as_ref())
+                        .is_some_and(|scalar| scalar.value.eq_ignore_ascii_case("yes"))
+                    && nested_hir_property(hir, property, "legacy_equivalent").is_none()
+                {
                     definitions.push(Definition {
-                        kind: "localisation".to_owned(),
-                        name: name.trim().to_owned(),
+                        kind: "hardcoded_legacy_government".to_owned(),
+                        name: property.key.clone(),
                         file_id: file.id,
-                        range: node.range(),
+                        range: property.range,
+                        active: true,
+                    });
+                }
+            }
+            if logical_path.contains("common/country_tags")
+                && property.key.eq_ignore_ascii_case("countries")
+            {
+                for country in hir.properties().iter().filter(|candidate| {
+                    candidate.path.len() == property.path.len().saturating_add(1)
+                        && candidate.path.starts_with(&property.path)
+                        && range_within(candidate.range, property.range)
+                }) {
+                    definitions.push(Definition {
+                        kind: "country_tag".to_owned(),
+                        name: country.key.clone(),
+                        file_id: file.id,
+                        range: country.range,
                         active: true,
                     });
                 }
             }
         }
-        CstKind::Property => {
-            let key = node
-                .children()
-                .iter()
-                .find(|child| child.kind() == CstKind::Key)
-                .and_then(|child| parsed.text(child.range()))
-                .map(str::trim)
-                .map(str::to_owned);
-            if let Some(key) = key {
-                if top_level {
-                    if let Some(kind) =
-                        definition_kind(file.logical_path.as_str(), &key, node, parsed)
-                    {
-                        let name = event_name(node, parsed).unwrap_or_else(|| key.clone());
-                        definitions.push(Definition {
-                            kind,
-                            name,
-                            file_id: file.id,
-                            range: node.range(),
-                            active: true,
-                        });
-                        if file
-                            .logical_path
-                            .as_str()
-                            .to_ascii_lowercase()
-                            .contains("common/government_reforms/")
-                            && find_property(node, "legacy_government", parsed)
-                                .is_some_and(|value| value.eq_ignore_ascii_case("yes"))
-                            && find_property(node, "legacy_equivalent", parsed).is_none()
-                        {
-                            definitions.push(Definition {
-                                kind: "hardcoded_legacy_government".to_owned(),
-                                name: key.clone(),
-                                file_id: file.id,
-                                range: node.range(),
-                                active: true,
-                            });
-                        }
-                    }
-                    if file
-                        .logical_path
-                        .as_str()
-                        .to_ascii_lowercase()
-                        .contains("common/country_tags")
-                        && key.eq_ignore_ascii_case("countries")
-                    {
-                        for child in node.children() {
-                            if child.kind() != CstKind::Value {
-                                continue;
-                            }
-                            for block_child in child.children() {
-                                if block_child.kind() != CstKind::Block {
-                                    continue;
-                                }
-                                for country in block_child.children() {
-                                    if country.kind() != CstKind::Property {
-                                        continue;
-                                    }
-                                    let Some(country_key) = country
-                                        .children()
-                                        .iter()
-                                        .find(|child| child.kind() == CstKind::Key)
-                                        .and_then(|child| parsed.text(child.range()))
-                                        .map(str::trim)
-                                    else {
-                                        continue;
-                                    };
-                                    definitions.push(Definition {
-                                        kind: "country_tag".to_owned(),
-                                        name: country_key.to_owned(),
-                                        file_id: file.id,
-                                        range: country.range(),
-                                        active: true,
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-                if let Some((kind, name, range)) = semantic_reference(node, &key, parsed) {
-                    references.push(Reference { kind, name, file_id: file.id, range });
-                }
-            }
+        if let Some((kind, name, range)) = semantic_reference(property) {
+            references.push(Reference { kind, name, file_id: file.id, range });
         }
-        CstKind::BareValue if !inside_key => {
-            if let Some(name) =
-                parsed.text(node.range()).map(str::trim).filter(|value| !value.is_empty())
-            {
-                references.push(Reference {
-                    kind: category_id.to_owned(),
-                    name: name.to_owned(),
-                    file_id: file.id,
-                    range: node.range(),
-                });
-            }
-        }
-        _ => {}
     }
-    for child in node.children() {
-        collect_semantics(
-            file,
-            parsed,
-            child,
-            category_id,
-            inside_key || node.kind() == CstKind::Key,
-            top_level && node.kind() == CstKind::Document,
-            definitions,
-            references,
-        );
+    for value in hir.bare_values() {
+        references.push(Reference {
+            kind: category_id.to_owned(),
+            name: value.value.clone(),
+            file_id: file.id,
+            range: value.range,
+        });
     }
 }
 
-fn semantic_reference(
-    node: &CstNode,
-    key: &str,
-    parsed: &ParsedFile,
-) -> Option<(String, String, TextRange)> {
-    let lower = key.to_ascii_lowercase();
+fn semantic_reference(property: &HirProperty) -> Option<(String, String, TextRange)> {
+    let lower = property.key.to_ascii_lowercase();
     let kind = if matches!(lower.as_str(), "event" | "events" | "event_id" | "trigger_event")
         || lower.ends_with("_event")
     {
@@ -1591,40 +1496,35 @@ fn semantic_reference(
     } else {
         None
     }?;
-    let value = node.children().iter().find(|child| child.kind() == CstKind::Value)?;
-    let scalar = value
-        .children()
-        .iter()
-        .find(|child| matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString))?;
-    let raw = parsed.text(scalar.range())?.trim();
-    let name =
-        raw.strip_prefix('"').and_then(|value| value.strip_suffix('"')).unwrap_or(raw).to_owned();
-    if name.is_empty() || name == "yes" || name == "no" || name.parse::<f64>().is_ok() {
+    let scalar = property.scalar.as_ref()?;
+    if scalar.value.is_empty()
+        || scalar.value == "yes"
+        || scalar.value == "no"
+        || scalar.value.parse::<f64>().is_ok()
+    {
         return None;
     }
-    Some((kind.to_owned(), name, scalar.range()))
+    Some((kind.to_owned(), scalar.value.clone(), scalar.range))
 }
 
-fn definition_kind(path: &str, key: &str, node: &CstNode, parsed: &ParsedFile) -> Option<String> {
-    let path = path.to_ascii_lowercase();
+fn definition_kind(path: &str, property: &HirProperty) -> Option<String> {
     if path.contains("scripted_effect") {
         return Some("scripted_effect".to_owned());
     }
     if path.contains("scripted_trigger") {
         return Some("scripted_trigger".to_owned());
     }
-    if path.contains("events/") || key.ends_with("_event") {
+    if path.contains("events/") || property.key.ends_with("_event") {
         return Some("event".to_owned());
     }
-    if node.children().iter().any(|child| child.kind() == CstKind::Value)
-        && (key == "country_event" || key == "province_event")
+    if property.value_range.is_some()
+        && matches!(property.key.as_str(), "country_event" | "province_event")
     {
         return Some("event".to_owned());
     }
-    if let Some(kind) = eu4_dynamic_definition_kind(&path) {
+    if let Some(kind) = eu4_dynamic_definition_kind(path) {
         return Some(kind.to_owned());
     }
-    let _ = parsed;
     None
 }
 
@@ -1674,16 +1574,27 @@ fn eu4_dynamic_definition_kind(path: &str) -> Option<&'static str> {
     })
 }
 
-fn event_name(node: &CstNode, parsed: &ParsedFile) -> Option<String> {
-    for child in node.children() {
-        if child.kind() != CstKind::Value {
-            continue;
-        }
-        if let Some(id) = find_property(child, "id", parsed) {
-            return Some(id);
-        }
-    }
-    None
+fn event_name(hir: &HirFile, property: &HirProperty) -> Option<String> {
+    nested_hir_property(hir, property, "id")
+        .and_then(|property| property.scalar.as_ref())
+        .map(|scalar| scalar.value.clone())
+}
+
+fn nested_hir_property<'hir>(
+    hir: &'hir HirFile,
+    parent: &HirProperty,
+    wanted: &str,
+) -> Option<&'hir HirProperty> {
+    hir.properties()
+        .iter()
+        .filter(|property| property.path.len() > parent.path.len())
+        .filter(|property| property.path.starts_with(&parent.path))
+        .filter(|property| range_within(property.range, parent.range))
+        .find(|property| property.key.eq_ignore_ascii_case(wanted))
+}
+
+fn range_within(inner: TextRange, outer: TextRange) -> bool {
+    inner.start() >= outer.start() && inner.end() <= outer.end()
 }
 
 fn find_property(node: &CstNode, wanted: &str, parsed: &ParsedFile) -> Option<String> {

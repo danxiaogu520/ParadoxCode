@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Arc;
 
-use pdx_hir::Scope;
+use pdx_hir::{HirFile, HirProperty, Scope};
 use pdx_rules::{CwtKeyMatcher, CwtRuleShape, CwtValueMatcher, SymbolResolutionPolicy};
 use pdx_syntax::{CstKind, CstNode, CsvParsedFile, Eu4FileFormat, ParsedFile, SyntaxError};
 use pdx_text::{LogicalPath, TextRange, TextSize};
@@ -1176,6 +1176,7 @@ struct ParsedInput {
     format: Eu4FileFormat,
     source: Arc<str>,
     parsed: ParsedContent,
+    hir: Option<Arc<HirFile>>,
 }
 
 #[derive(Clone, Debug)]
@@ -1284,7 +1285,8 @@ fn input_for_document(snapshot: &AnalysisSnapshot, id: &DocumentId) -> Option<Pa
         ParsedSource::Text(parsed) => ParsedContent::Text(Arc::clone(parsed)),
         ParsedSource::Csv(parsed) => ParsedContent::Csv(Arc::clone(parsed)),
     };
-    Some(ParsedInput { document: Some(id.clone()), file, path, format, source, parsed })
+    let hir = document.hir_handle();
+    Some(ParsedInput { document: Some(id.clone()), file, path, format, source, parsed, hir })
 }
 
 fn input_for_source_file(snapshot: &AnalysisSnapshot, id: SourceFileId) -> Option<ParsedInput> {
@@ -1301,6 +1303,7 @@ fn input_for_source_file(snapshot: &AnalysisSnapshot, id: SourceFileId) -> Optio
         format: state.parsed()?.format(),
         source: state.source_handle(),
         parsed,
+        hir: state.hir_handle(),
     })
 }
 
@@ -2281,76 +2284,41 @@ fn diagnostic_from_syntax(error: &SyntaxError) -> Diagnostic {
 
 fn semantic_data(input: &ParsedInput) -> SemanticFile {
     let mut data = SemanticFile { definitions: Vec::new(), references: Vec::new() };
-    if let ParsedContent::Text(parsed) = &input.parsed {
-        let mut properties = Vec::new();
-        collect_text_semantics(input, parsed.root(), true, &mut data, &mut properties);
-    } else if let ParsedContent::Csv(_) = &input.parsed {
-        // CSV has syntax diagnostics and record ranges, but no generic symbol semantics.
+    let Some(hir) = input.hir.as_deref() else { return data };
+    for entry in hir.localisation_entries() {
+        data.definitions.push(make_definition(
+            input,
+            "localisation",
+            entry.name.clone(),
+            entry.range,
+            entry.name_range,
+        ));
+    }
+    for property in hir.properties() {
+        if property.top_level
+            && let Some(kind) = definition_kind(input.path.as_ref(), property)
+        {
+            let (name, selection_range) = definition_name(hir, property);
+            data.definitions.push(make_definition(
+                input,
+                &kind,
+                name,
+                property.range,
+                selection_range,
+            ));
+        }
+        if let Some((kind, name, range)) = reference_from_property(property) {
+            data.references.push(ReferenceInternal {
+                kind,
+                name,
+                range,
+                document: input.document.clone(),
+                file: input.file,
+                path: input.path.clone(),
+            });
+        }
     }
     data
-}
-
-fn collect_text_semantics(
-    input: &ParsedInput,
-    node: &CstNode,
-    top_level: bool,
-    data: &mut SemanticFile,
-    properties: &mut Vec<PropertyInfo>,
-) {
-    match node.kind() {
-        CstKind::LocalisationEntry => {
-            if let Some(key) =
-                node.children().iter().find(|child| child.kind() == CstKind::LocalisationKey)
-                && let Some(name) = text(input, key.range())
-            {
-                let name = name.trim().to_owned();
-                data.definitions.push(make_definition(
-                    input,
-                    "localisation",
-                    name,
-                    node.range(),
-                    key.range(),
-                ));
-            }
-        }
-        CstKind::Property => {
-            if let Some((key, key_range)) = property_key(input, node) {
-                let value = property_scalar(input, node);
-                properties.push(PropertyInfo {
-                    key: key.clone(),
-                    key_range,
-                    value: value.clone(),
-                    top_level,
-                    path: Vec::new(),
-                });
-                if top_level && let Some(kind) = definition_kind(input.path.as_ref(), &key, node) {
-                    let (name, selection_range) = definition_name(input, node, &key, key_range);
-                    data.definitions.push(make_definition(
-                        input,
-                        &kind,
-                        name,
-                        node.range(),
-                        selection_range,
-                    ));
-                }
-                if let Some((kind, name, range)) = reference_from_property(input, &key, node) {
-                    data.references.push(ReferenceInternal {
-                        kind,
-                        name,
-                        range,
-                        document: input.document.clone(),
-                        file: input.file,
-                        path: input.path.clone(),
-                    });
-                }
-            }
-        }
-        _ => {}
-    }
-    for child in node.children() {
-        let child_top_level = top_level && node.kind() == CstKind::Document;
-        collect_text_semantics(input, child, child_top_level, data, properties);
-    }
 }
 
 fn make_definition(
@@ -2375,7 +2343,7 @@ fn make_definition(
     }
 }
 
-fn definition_kind(path: Option<&LogicalPath>, key: &str, node: &CstNode) -> Option<String> {
+fn definition_kind(path: Option<&LogicalPath>, property: &HirProperty) -> Option<String> {
     let path = path.map_or_else(String::new, |path| path.as_str().to_ascii_lowercase());
     if path.contains("scripted_effect") {
         return Some("scripted_effect".to_owned());
@@ -2383,51 +2351,47 @@ fn definition_kind(path: Option<&LogicalPath>, key: &str, node: &CstNode) -> Opt
     if path.contains("scripted_trigger") {
         return Some("scripted_trigger".to_owned());
     }
-    if path.contains("events/") || key.to_ascii_lowercase().ends_with("_event") {
+    if path.contains("events/") || property.key.to_ascii_lowercase().ends_with("_event") {
         return Some("event".to_owned());
     }
-    if matches!(key, "country_event" | "province_event")
-        && node.children().iter().any(|child| child.kind() == CstKind::Value)
+    if matches!(property.key.as_str(), "country_event" | "province_event")
+        && property.value_range.is_some()
     {
         return Some("event".to_owned());
     }
     None
 }
 
-fn definition_name(
-    input: &ParsedInput,
-    node: &CstNode,
-    key: &str,
-    key_range: TextRange,
-) -> (String, TextRange) {
-    if matches!(key, "country_event" | "province_event")
-        && let Some((name, range)) = find_nested_property(input, node, "id")
+fn definition_name(hir: &HirFile, property: &HirProperty) -> (String, TextRange) {
+    if matches!(property.key.as_str(), "country_event" | "province_event")
+        && let Some((name, range)) = find_nested_property(hir, property, "id")
     {
         return (name, range);
     }
-    (key.to_owned(), key_range)
+    (property.key.clone(), property.key_range)
 }
 
 fn find_nested_property(
-    input: &ParsedInput,
-    node: &CstNode,
+    hir: &HirFile,
+    parent: &HirProperty,
     wanted: &str,
 ) -> Option<(String, TextRange)> {
-    if node.kind() == CstKind::Property
-        && let Some((key, _)) = property_key(input, node)
-        && key.eq_ignore_ascii_case(wanted)
-    {
-        return property_scalar(input, node);
-    }
-    node.children().iter().find_map(|child| find_nested_property(input, child, wanted))
+    hir.properties()
+        .iter()
+        .filter(|property| property.path.len() > parent.path.len())
+        .filter(|property| property.path.starts_with(&parent.path))
+        .filter(|property| {
+            property.range.start() >= parent.range.start()
+                && property.range.end() <= parent.range.end()
+        })
+        .find(|property| property.key.eq_ignore_ascii_case(wanted))
+        .and_then(|property| {
+            property.scalar.as_ref().map(|scalar| (scalar.value.clone(), scalar.range))
+        })
 }
 
-fn reference_from_property(
-    input: &ParsedInput,
-    key: &str,
-    node: &CstNode,
-) -> Option<(String, String, TextRange)> {
-    let lower = key.to_ascii_lowercase();
+fn reference_from_property(property: &HirProperty) -> Option<(String, String, TextRange)> {
+    let lower = property.key.to_ascii_lowercase();
     let kind = if matches!(lower.as_str(), "event" | "events" | "event_id" | "trigger_event")
         || lower.ends_with("_event")
     {
@@ -2450,11 +2414,15 @@ fn reference_from_property(
     } else {
         None
     }?;
-    let (value, range) = property_scalar(input, node)?;
-    if value.is_empty() || value == "yes" || value == "no" || value.parse::<f64>().is_ok() {
+    let scalar = property.scalar.as_ref()?;
+    if scalar.value.is_empty()
+        || scalar.value == "yes"
+        || scalar.value == "no"
+        || scalar.value.parse::<f64>().is_ok()
+    {
         return None;
     }
-    Some((kind.to_owned(), value, range))
+    Some((kind.to_owned(), scalar.value.clone(), scalar.range))
 }
 
 fn property_key(input: &ParsedInput, node: &CstNode) -> Option<(String, TextRange)> {
@@ -2480,47 +2448,18 @@ fn text(input: &ParsedInput, range: TextRange) -> Option<&str> {
 }
 
 fn properties(input: &ParsedInput) -> Vec<PropertyInfo> {
-    let ParsedContent::Text(parsed) = &input.parsed else { return Vec::new() };
-    let mut properties = Vec::new();
-    collect_properties(input, parsed.root(), true, &[], &mut properties);
-    properties
-}
-
-fn collect_properties(
-    input: &ParsedInput,
-    node: &CstNode,
-    top_level: bool,
-    parent_path: &[String],
-    output: &mut Vec<PropertyInfo>,
-) {
-    if node.kind() == CstKind::Property {
-        let Some((key, key_range)) = property_key(input, node) else { return };
-        let mut path = parent_path.to_vec();
-        path.push(key.clone());
-        output.push(PropertyInfo {
-            key,
-            key_range,
-            value: property_scalar(input, node),
-            top_level,
-            path: path.clone(),
-        });
-        if let Some(value) = node.children().iter().find(|child| child.kind() == CstKind::Value)
-            && let Some(block) =
-                value.children().iter().find(|child| child.kind() == CstKind::Block)
-        {
-            collect_properties(input, block, false, &path, output);
-        }
-        return;
-    }
-    for child in node.children() {
-        collect_properties(
-            input,
-            child,
-            top_level && node.kind() == CstKind::Document,
-            parent_path,
-            output,
-        );
-    }
+    input.hir.as_deref().map_or_else(Vec::new, |hir| {
+        hir.properties()
+            .iter()
+            .map(|property| PropertyInfo {
+                key: property.key.clone(),
+                key_range: property.key_range,
+                value: property.scalar.as_ref().map(|scalar| (scalar.value.clone(), scalar.range)),
+                top_level: property.top_level,
+                path: property.path.clone(),
+            })
+            .collect()
+    })
 }
 
 fn all_semantics(snapshot: &AnalysisSnapshot) -> SemanticWorkspace {
@@ -3081,7 +3020,8 @@ fn fuzzy_match(value: &str, query: &str) -> bool {
 mod tests {
     use super::{
         CompletionKind, DiagnosticCode, RenameError, complete, definition, diagnostics,
-        document_symbols, hover, prepare_rename, references, rename, workspace_symbols,
+        document_symbols, hover, input_for_document, prepare_rename, references, rename,
+        workspace_symbols,
     };
     use pdx_rules::{CwtKeyMatcher, CwtRuleShape, CwtSemanticRule, CwtValueMatcher, RuleSet};
     use pdx_text::TextRange;
@@ -3144,6 +3084,17 @@ mod tests {
         assert!(diagnostics(&snapshot, &id).iter().any(|item| item.code == DiagnosticCode::Syntax));
         let result = complete(&snapshot, &id, 35);
         assert!(!result.items.is_empty());
+    }
+
+    #[test]
+    fn query_input_reuses_the_document_hir_handle() {
+        let (host, id) = snapshot("country_event = { id = shared.1 }\n");
+        let snapshot = host.snapshot();
+        let document_hir = snapshot.document(&id).expect("document").hir_handle().expect("HIR");
+        let input = input_for_document(&snapshot, &id).expect("analysis input");
+        let input_hir = input.hir.as_ref().expect("shared analysis HIR");
+
+        assert!(std::sync::Arc::ptr_eq(&document_hir, input_hir));
     }
 
     #[test]

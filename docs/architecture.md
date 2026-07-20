@@ -1,6 +1,6 @@
 # ParadoxCode 总体架构
 
-> 2026-07-20 状态说明：通用 `pdx-rules`、EU4 profile、per-file cache 与廉价 snapshot 已落地；真实语义 HIR、后台取消和发布闭环仍未达到本文约束。迁移计划见 [RFC 0013](rfc/0013-generic-engine-eu4-first.md)。
+> 2026-07-20 状态说明：通用 `pdx-rules`、EU4 profile、per-file cache、廉价 snapshot 和共享结构 HIR facts 已落地；rule/profile-aware scope lowering、后台取消和发布闭环仍未达到本文约束。迁移计划见 [RFC 0013](rfc/0013-generic-engine-eu4-first.md)。
 
 ## 目标
 
@@ -110,7 +110,7 @@ pdx-cli       -> pdx-lsp + selected runtime crates
 - `pdx-rules` 定义 SQLite schema、hash 与只读 runtime view，不依赖具体游戏名称表、CWT parser 或 LSP。
 - `pdx-game-eu4` 保存 EU4 profile 和无法由通用规则数据表达的 EU4 特殊语义。
 - `pdx-cwt` 依赖 `pdx-text`、`pdx-rules` 与 `pdx-game-eu4`，MVP 只提供 CWT 到 SQLite 数据库的一次性导入工具；它不是 runtime dependency。
-- `pdx-hir` 通过稳定的 typed CST API 和 `RuleSet` lowering；显式 profile 输入仍待补齐。
+- `pdx-hir` 通过稳定的 typed CST API lowering；当前结构 facts 已被 workspace shard 与 analysis 查询共享，`RuleSet`/显式 profile 驱动的 typed semantic facts 和 scope lowering 仍待补齐。
 - `pdx-workspace` 不依赖 LSP 类型。
 - `pdx-analysis` 不依赖任何 editor API。
 - `pdx-lsp` 是唯一允许依赖 LSP protocol types 的核心 crate。

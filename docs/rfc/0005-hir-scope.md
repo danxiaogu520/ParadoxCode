@@ -3,9 +3,15 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
+## 实现状态（2026-07-20）
+
+第一段增量实现已经落地：`HirFile` 按源顺序保留 property path、key/value 精确 range、直接 scalar、非 key bare value 与 localisation entry；同一份不可变 HIR 由 `FileState`/overlay snapshot 缓存，并被 workspace 基础 index shard 和 analysis 的属性、definition、reference 查询共享。CWT type 匹配和 scripted parameter 扫描暂时保留各自的专用 CST/token 视图。
+
+本 RFC 描述的 typed semantic item、unknown construct、definition/reference fact、显式 `GameProfile` 输入和完整 scope evaluator 尚未完成。当前 `Scope` 仍保守为 `Unknown`，因此不能把本切片标记为“真实语义 HIR 全部完成”。
+
 ## 问题
 
-CST 只能回答文本结构，无法回答一个 key 是字段、effect、trigger、symbol definition 还是 scope link。语义还依赖 logical path、父 context、Eu4Rules 和当前 workspace snapshot。
+CST 只能回答文本结构，无法回答一个 key 是字段、effect、trigger、symbol definition 还是 scope link。语义还依赖 logical path、父 context、通用 `RuleSet`、所选 `GameProfile` 和当前 workspace snapshot。
 
 ## HIR 原则
 
@@ -93,7 +99,7 @@ ScopeState
 - `PREV`：pop current
 - logical wrappers：保持 scope
 
-Eu4Rules 将具体 spelling 映射到 intrinsic。大小写比较使用 EU4 rule policy。
+所选游戏 profile 将具体 spelling 映射到 intrinsic。大小写比较使用该 profile 的 rule policy。
 
 ## Link chain
 
@@ -127,7 +133,7 @@ command 可以声明：
 - `push_from`：是否将旧 current 加入 from stack。
 - `replace_root/current/from`：少量需要完整替换的规则。
 
-这些都是 Eu4Rules 的有类型操作，不是用户配置中的任意代码。
+这些都是 `RuleSet`/游戏 profile 的有类型操作，不是用户配置中的任意代码。
 
 ## Parameters
 
@@ -140,7 +146,7 @@ scripted effect/trigger definition 中扫描 `$NAME$` 和 conditional parameter 
 HIR cache key：
 
 ```text
-SourceFileId + FileRevision + Eu4RuleHash + FileCategory
+SourceFileId + FileRevision + GameId + RuleHash + FileCategory
 ```
 
-活动 Eu4Rules 变化会使内存 HIR cache 失效；单文件文本变化只使该文件失效。Vanilla 持久缓存不因 `rule_hash` 自动重建，这是明确的产品决策，用户可手动刷新。
+活动 `RuleSet` 或游戏 profile 变化会使内存 HIR cache 失效；单文件文本变化只使该文件失效。Vanilla 持久缓存不因 `rule_hash` 自动重建，这是明确的产品决策，用户可手动刷新。
