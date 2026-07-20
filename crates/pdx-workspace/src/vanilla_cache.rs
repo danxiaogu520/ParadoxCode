@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 
 use super::{
     AnalysisSnapshot, Definition, FileIndexShard, Reference, SourceFile, SourceFileId, SourceRoot,
-    SourceRootId, SourceRootKind, WorkspaceIndex, stable_file_id,
+    SourceRootId, SourceRootKind, WorkspaceIndex, WorkspaceScanToken, stable_file_id,
 };
 
 /// Current on-disk Vanilla cache schema.
@@ -124,6 +124,17 @@ impl VanillaIndexCache {
 
     /// Loads and validates a cache without reading or scanning its original Vanilla directory.
     pub fn load(path: &Path) -> Result<Self, VanillaCacheError> {
+        Self::load_cancellable(path, &WorkspaceScanToken::new())
+    }
+
+    /// Loads a cache while allowing an initialization worker to interrupt SQLite work.
+    pub fn load_cancellable(
+        path: &Path,
+        cancellation: &WorkspaceScanToken,
+    ) -> Result<Self, VanillaCacheError> {
+        if cancellation.is_cancelled() {
+            return Err(VanillaCacheError::Cancelled);
+        }
         let metadata = fs::metadata(path)?;
         if !metadata.is_file() {
             return Err(VanillaCacheError::InvalidData(format!(
@@ -138,29 +149,35 @@ impl VanillaIndexCache {
             ));
         }
         let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-        validate_database_identity(&connection)?;
-        let schema_version = metadata_text(&connection, "schema_version")?
+        let cancellation = cancellation.clone();
+        connection.progress_handler(1_000, Some(move || cancellation.is_cancelled()));
+        Self::load_connection(&connection).map_err(map_interrupted)
+    }
+
+    fn load_connection(connection: &Connection) -> Result<Self, VanillaCacheError> {
+        validate_database_identity(connection)?;
+        let schema_version = metadata_text(connection, "schema_version")?
             .parse::<u32>()
             .map_err(|_| VanillaCacheError::InvalidMetadata("schema_version"))?;
         if schema_version != CURRENT_VANILLA_CACHE_SCHEMA_VERSION {
             return Err(VanillaCacheError::UnsupportedSchema(schema_version));
         }
-        validate_table_limits(&connection)?;
+        validate_table_limits(connection)?;
         let source_root = decode_path(
-            &metadata_blob(&connection, "source_root")?,
-            &metadata_text(&connection, "path_encoding")?,
+            &metadata_blob(connection, "source_root")?,
+            &metadata_text(connection, "path_encoding")?,
         )?;
-        let game_id = metadata_text(&connection, "game_id")?;
-        let rule_hash = metadata_text(&connection, "rule_hash")?;
-        let source_identity = metadata_text(&connection, "source_identity")?;
-        let source_fingerprint = metadata_text(&connection, "source_fingerprint")?;
-        let created_unix_seconds = metadata_text(&connection, "created_unix_seconds")?
+        let game_id = metadata_text(connection, "game_id")?;
+        let rule_hash = metadata_text(connection, "rule_hash")?;
+        let source_identity = metadata_text(connection, "source_identity")?;
+        let source_fingerprint = metadata_text(connection, "source_fingerprint")?;
+        let created_unix_seconds = metadata_text(connection, "created_unix_seconds")?
             .parse::<u64>()
             .map_err(|_| VanillaCacheError::InvalidMetadata("created_unix_seconds"))?;
-        let indexed_files = metadata_text(&connection, "indexed_files")?
+        let indexed_files = metadata_text(connection, "indexed_files")?
             .parse::<usize>()
             .map_err(|_| VanillaCacheError::InvalidMetadata("indexed_files"))?;
-        let (source_files, index) = load_index(&connection, &source_root)?;
+        let (source_files, index) = load_index(connection, &source_root)?;
         if indexed_files != source_files.len() {
             return Err(VanillaCacheError::InvalidData(format!(
                 "metadata records {indexed_files} files but cache contains {}",
@@ -230,6 +247,8 @@ impl VanillaIndexCache {
 /// Errors raised while building, persisting, loading, or installing a Vanilla cache.
 #[derive(Debug)]
 pub enum VanillaCacheError {
+    /// The caller cancelled cache loading.
+    Cancelled,
     /// Filesystem access failed.
     Io(std::io::Error),
     /// SQLite rejected or could not query the cache.
@@ -253,6 +272,7 @@ pub enum VanillaCacheError {
 impl fmt::Display for VanillaCacheError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Cancelled => formatter.write_str("Vanilla cache loading was cancelled"),
             Self::Io(error) => write!(formatter, "Vanilla cache I/O error: {error}"),
             Self::Sql(error) => write!(formatter, "Vanilla cache SQLite error: {error}"),
             Self::NotVanillaCache => formatter.write_str(
@@ -289,6 +309,17 @@ impl std::error::Error for VanillaCacheError {
             Self::Sql(error) => Some(error),
             _ => None,
         }
+    }
+}
+
+fn map_interrupted(error: VanillaCacheError) -> VanillaCacheError {
+    match error {
+        VanillaCacheError::Sql(ref sqlite)
+            if sqlite.sqlite_error_code() == Some(rusqlite::ErrorCode::OperationInterrupted) =>
+        {
+            VanillaCacheError::Cancelled
+        }
+        error => error,
     }
 }
 

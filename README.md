@@ -10,8 +10,8 @@ semantic rename.
 
 The alpha is not yet a complete end-user release. Per-file HIR/index updates, cheap immutable
 snapshots, cancellable background work, formatter LSP wiring, and ordered read-only dependency
-configuration are implemented. Persistent Vanilla caching, watched-file updates, automatic server
-installation, and cross-platform release packaging remain active work. See
+configuration and explicit persistent Vanilla caching are implemented. Watched-file updates,
+automatic server installation, and cross-platform release packaging remain active work. See
 [workspace configuration](docs/configuration.md) for current Mod/dependency setup and
 [RFC 0013](docs/rfc/0013-generic-engine-eu4-first.md) for the accepted engine/profile boundary.
 
@@ -39,6 +39,12 @@ bash scripts/check-phase6a.sh
 The core workspace contains only `pdx-*` packages. Its binaries are `pdx`, `pdx-ls`,
 and `pdx-cwt`. The Zed extension is kept outside the Rust core workspace because it
 is an editor-facing package rather than an analysis dependency.
+
+Build or manually refresh a local Vanilla index with:
+
+```text
+pdx index vanilla --rules /path/to/eu4.pdxrules --source /path/to/eu4 --output /path/to/vanilla.pdxindex
+```
 
 See [the Phase 0 spike notes](docs/spikes/phase0-zed-grammar.md), [the Phase 1 grammar
 README](grammars/README.md), [the LSP runtime RFC](docs/rfc/0009-lsp-runtime.md), and

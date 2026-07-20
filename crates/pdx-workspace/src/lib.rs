@@ -3130,6 +3130,12 @@ mod tests {
             VanillaIndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
         let cache_path = root.join("cache/vanilla.pdxindex");
         cache.save(&cache_path).expect("save cache");
+        let cancelled = WorkspaceScanToken::new();
+        cancelled.cancel();
+        assert!(matches!(
+            VanillaIndexCache::load_cancellable(&cache_path, &cancelled),
+            Err(VanillaCacheError::Cancelled)
+        ));
         let loaded = VanillaIndexCache::load(&cache_path).expect("load cache");
         assert_eq!(loaded.metadata(), cache.metadata());
         assert_eq!(loaded.source_files(), cache.source_files());

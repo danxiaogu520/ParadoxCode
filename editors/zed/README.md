@@ -42,5 +42,6 @@ workspace containing a separate Mod directory and ordered dependency Mods, confi
 See [workspace configuration](../../docs/configuration.md) for the project TOML schema, relative
 path rules, inline configuration, and precedence. Initialization options require a language-server
 restart after changes. Rename produces a WorkspaceEdit only for the current Mod and its open
-overlays; dependency definitions are rejected as read-only. Persistent Vanilla cache loading is
-not enabled yet.
+overlays; dependency and cached Vanilla definitions are rejected as read-only. The core
+`pdx index vanilla` command and `vanilla_index_cache` project field are documented in the same
+workspace configuration guide; automatic first-run selection and refresh UI remain release work.

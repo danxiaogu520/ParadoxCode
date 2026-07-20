@@ -1,6 +1,6 @@
 # EU4 MVP 实施计划
 
-> 2026-07-20 重新审计：当前代码是 EU4 alpha 功能原型，不是已发布的 v0.1。Phase 2–3 的基础实现可继续作为基线；Phase 4–6A 的功能代码存在，依赖配置已经接入，但持久化 Vanilla cache、watched-file 定向更新、自动安装和跨平台发布退出条件尚未全部满足。后续先完成 RFC 0013 和发布前架构修复，再进入 Phase 6B。
+> 2026-07-20 重新审计：当前代码是 EU4 alpha 功能原型，不是已发布的 v0.1。Phase 2–3 的基础实现可继续作为基线；Phase 4–6A 的功能代码存在，依赖配置和持久化 Vanilla cache 已经接入，但 watched-file 定向更新、自动安装和跨平台发布退出条件尚未全部满足。后续先完成 RFC 0013 和发布前架构修复，再进入 Phase 6B。
 
 ## MVP 成功定义
 
@@ -123,7 +123,7 @@ Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 
 ## Phase 4：CWT 导入、EU4 权威规则数据库与 Workspace Index
 
-状态：`implemented, acceptance reopened`（2026-07-20 重新审计）；规则导入、SQLite runtime、root/overlay、基础 shard 和 dependency LSP/TOML 配置已实现，但 Vanilla cache 未持久化，watched-file 尚未接入定向磁盘更新。
+状态：`implemented, acceptance reopened`（2026-07-20 重新审计）；规则导入、SQLite runtime、root/overlay、基础 shard、dependency LSP/TOML 配置和本地持久化 Vanilla cache 已实现，但 watched-file 尚未接入定向磁盘更新。
 
 交付：
 

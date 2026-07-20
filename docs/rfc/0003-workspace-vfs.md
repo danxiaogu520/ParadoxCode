@@ -3,6 +3,8 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
+> 实现进度（2026-07-20）：Current Mod/Dependency 的类型化 LSP 与项目 TOML 配置已接入；`pdx index vanilla` 建立版本化本地 SQLite cache，LSP 可取消地只读加载并在后续 refresh 中跳过 Vanilla 目录。cache 不保存源码，缺失/损坏/错 game 降级 warning，旧 `rule_hash` 仅提示手动刷新。watched-file 定向磁盘更新待完成。
+
 ## 目标
 
 同时分析 Vanilla、依赖 Mod、当前 Mod和未保存文档，并对每个 definition/reference 给出确定的来源解析。EU4 DLC 不形成 source root。
@@ -116,14 +118,22 @@ workspace index 保留被覆盖文件及其 definitions，但带 `Visibility::Sh
 
 ## 项目与本机配置
 
-`.pdx/project.toml` 保存可提交的 EU4 项目身份：当前 Mod 相对根和从低到高排列的依赖 Mod 标识符。它不保存 game 字段、绝对机器路径，也不 pin `rule_hash`。
+`.pdx/project.toml` 保存可提交的 EU4 项目身份：当前 Mod 相对根、从低到高排列的依赖 Mod 路径，以及可选本机 Vanilla cache 路径。它不保存 game 字段，也不 pin `rule_hash`。机器专用路径的项目可把该文件留在本机，或由 editor initialization options 逐字段覆盖。
 
 ```toml
-current_mod = "."
-dependencies = ["shared-foundation", "content-extension"] # low -> high
+mod_directory = "mod"
+vanilla_index_cache = ".pdx/cache/vanilla.pdxindex"
+
+[[dependencies]]
+id = "shared-foundation"
+path = "dependencies/shared-foundation"
+
+[[dependencies]]
+id = "content-extension"
+path = "dependencies/content-extension" # later = higher priority
 ```
 
-用户级或编辑器本地配置负责把 Vanilla 和依赖标识符解析成绝对路径。这些本机设置不得成为 parser 或 HIR 的隐式全局输入。
+相对路径以 editor 打开的 worktree 为基准。配置只在 LSP/CLI adapter 显式解析，不得成为 parser 或 HIR 的隐式全局输入。
 
 ## Vanilla 索引缓存
 

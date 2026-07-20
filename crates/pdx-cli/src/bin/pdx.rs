@@ -1,4 +1,10 @@
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    println!("{}", pdx_cli::run_pdx(&args));
+    match pdx_cli::execute_pdx(&args) {
+        Ok(output) => println!("{output}"),
+        Err(error) => {
+            eprintln!("pdx: {error}");
+            std::process::exit(error.exit_code());
+        }
+    }
 }

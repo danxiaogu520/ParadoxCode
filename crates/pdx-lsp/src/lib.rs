@@ -21,9 +21,9 @@ use lsp_types::{
     DidSaveTextDocumentParams, DocumentFormattingParams, DocumentSymbol as LspDocumentSymbol,
     DocumentSymbolParams, Documentation, Hover as LspHover, HoverContents, HoverProviderCapability,
     InitializeParams, InitializeResult, InsertTextFormat, Location as LspLocation, MarkupContent,
-    MarkupKind, NumberOrString, OneOf, Position as LspPosition, PrepareRenameResponse,
+    MarkupKind, MessageType, NumberOrString, OneOf, Position as LspPosition, PrepareRenameResponse,
     Range as LspRange, ReferenceParams, RenameOptions, RenameParams, ServerCapabilities,
-    ServerInfo, SymbolInformation, SymbolKind, TextDocumentPositionParams,
+    ServerInfo, ShowMessageParams, SymbolInformation, SymbolKind, TextDocumentPositionParams,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, TextEdit, Uri,
     WorkDoneProgressOptions, WorkspaceEdit, WorkspaceSymbolParams,
 };
@@ -38,8 +38,8 @@ use pdx_rules::{GameProfile, RuleSet, RulesError};
 use pdx_text::{LineIndex, Position, TextRange};
 use pdx_workspace::{
     AnalysisHost, AnalysisSnapshot, DocumentError, DocumentId, DocumentSource, ParsedSource,
-    PreparedDocument, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange, WorkspaceError,
-    WorkspaceScanToken,
+    PreparedDocument, SourceRoot, SourceRootId, SourceRootKind, VanillaCacheError,
+    VanillaIndexCache, WorkspaceChange, WorkspaceError, WorkspaceScanToken,
 };
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -101,6 +101,13 @@ struct ProjectConfiguration {
     dependencies: Option<Vec<DependencyConfiguration>>,
     #[serde(alias = "vanillaIndexCache")]
     vanilla_index_cache: Option<PathBuf>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct ResolvedSourceRoots {
+    workspace_root: Option<PathBuf>,
+    roots: Vec<SourceRoot>,
+    vanilla_cache: Option<PathBuf>,
 }
 
 /// Errors raised by the server transport or process lifecycle.
@@ -228,7 +235,14 @@ struct InFlightInitialize {
 struct InitializeTaskResult {
     request_id: RequestId,
     id: Value,
-    result: Result<(AnalysisHost, Value), RpcError>,
+    result: Result<PreparedInitialize, RpcError>,
+}
+
+#[derive(Debug)]
+struct PreparedInitialize {
+    host: AnalysisHost,
+    result: Value,
+    warnings: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -556,27 +570,36 @@ impl LspServer {
                         }
                         let task = in_flight_initialize.take().expect("checked initialize task");
                         self.cancelled.remove(&result.request_id);
-                        let response = match result.result {
-                            Ok((host, value)) if !task.cancellation.is_cancelled() => {
-                                self.host = host;
+                        let (response, warnings) = match result.result {
+                            Ok(prepared) if !task.cancellation.is_cancelled() => {
+                                self.host = prepared.host;
                                 self.state = ServerState::Initialized;
-                                json!({
-                                    "jsonrpc": JSON_RPC_VERSION,
-                                    "id": result.id,
-                                    "result": value,
-                                })
+                                (
+                                    json!({
+                                        "jsonrpc": JSON_RPC_VERSION,
+                                        "id": result.id,
+                                        "result": prepared.result,
+                                    }),
+                                    prepared.warnings,
+                                )
                             }
                             Ok(_) => {
                                 self.state = ServerState::Uninitialized;
-                                RpcError::new(REQUEST_CANCELLED, "request was cancelled")
-                                    .response(result.id)
+                                (
+                                    RpcError::new(REQUEST_CANCELLED, "request was cancelled")
+                                        .response(result.id),
+                                    Vec::new(),
+                                )
                             }
                             Err(error) => {
                                 self.state = ServerState::Uninitialized;
-                                error.response(result.id)
+                                (error.response(result.id), Vec::new())
                             }
                         };
                         write_message(&mut output, &response)?;
+                        for warning in warnings {
+                            write_message(&mut output, &show_warning_notification(warning))?;
+                        }
                     }
                     TransportEvent::Parse(result) => {
                         if in_flight_parses
@@ -1039,15 +1062,15 @@ impl LspServer {
 
     fn handle_initialize(&mut self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<InitializeParams>(params, "initialize")?;
-        let (host, result) = prepare_initialize_candidate(
+        let prepared = prepare_initialize_candidate(
             self.host.clone(),
             params,
             self.options.rules_path.is_some(),
             &WorkspaceScanToken::new(),
         )?;
-        self.host = host;
+        self.host = prepared.host;
         self.state = ServerState::Initialized;
-        Ok(result)
+        Ok(prepared.result)
     }
 
     fn handle_did_open(&mut self, params: Option<&Value>) -> Result<String, RpcError> {
@@ -1108,7 +1131,7 @@ fn prepare_initialize_candidate(
     params: InitializeParams,
     scan_workspace: bool,
     cancellation: &WorkspaceScanToken,
-) -> Result<(AnalysisHost, Value), RpcError> {
+) -> Result<PreparedInitialize, RpcError> {
     if cancellation.is_cancelled() {
         return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
     }
@@ -1123,12 +1146,53 @@ fn prepare_initialize_candidate(
         .map(|folder| parse_file_uri_str(folder.uri.as_str()))
         .transpose()?;
     let client_root = root.or(workspace_root);
-    let (workspace_root, roots) =
+    let resolved =
         resolve_source_roots(client_root.as_deref(), initialization_options, cancellation)?;
-    host.apply_change(WorkspaceChange::SetWorkspaceRoot(workspace_root));
-    host.apply_change(WorkspaceChange::SetSourceRoots(roots.clone()));
-    if scan_workspace && !roots.is_empty() {
+    host.apply_change(WorkspaceChange::SetWorkspaceRoot(resolved.workspace_root));
+    host.apply_change(WorkspaceChange::SetSourceRoots(resolved.roots.clone()));
+    if scan_workspace && !resolved.roots.is_empty() {
         host.refresh_source_roots_cancellable(cancellation).map_err(workspace_scan_error)?;
+    }
+    let mut warnings = Vec::new();
+    if let Some(path) = resolved.vanilla_cache {
+        if !scan_workspace {
+            warnings.push(format!(
+                "Vanilla cache {} was not loaded because no validated rules artifact is active",
+                path.display()
+            ));
+        } else if !path.is_file() {
+            warnings.push(format!(
+                "Vanilla cache {} does not exist; continuing without Vanilla symbols",
+                path.display()
+            ));
+        } else {
+            match VanillaIndexCache::load_cancellable(&path, cancellation) {
+                Err(VanillaCacheError::Cancelled) => {
+                    return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
+                }
+                Err(error) => warnings.push(format!(
+                    "Vanilla cache {} could not be loaded; continuing without Vanilla symbols: {error}",
+                    path.display()
+                )),
+                Ok(cache) => {
+                    let cache_rule_hash = cache.metadata().rule_hash.clone();
+                    let current_rule_hash = host.snapshot().rules().rule_hash().to_hex();
+                    match host.install_vanilla_cache(cache) {
+                        Ok(()) => {
+                            if cache_rule_hash != current_rule_hash {
+                                warnings.push(format!(
+                                    "Vanilla cache was built with rules hash {cache_rule_hash}, but the active rules hash is {current_rule_hash}; the cache remains loaded until you refresh it explicitly"
+                                ));
+                            }
+                        }
+                        Err(error) => warnings.push(format!(
+                            "Vanilla cache {} is incompatible with this workspace; continuing without Vanilla symbols: {error}",
+                            path.display()
+                        )),
+                    }
+                }
+            }
+        }
     }
     if cancellation.is_cancelled() {
         return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
@@ -1167,14 +1231,14 @@ fn prepare_initialize_candidate(
         code: INTERNAL_ERROR,
         message: format!("failed to serialize initialize result: {error}"),
     })?;
-    Ok((host, result))
+    Ok(PreparedInitialize { host, result, warnings })
 }
 
 fn resolve_source_roots(
     client_root: Option<&Path>,
     initialization_options: Option<Value>,
     cancellation: &WorkspaceScanToken,
-) -> Result<(Option<PathBuf>, Vec<SourceRoot>), RpcError> {
+) -> Result<ResolvedSourceRoots, RpcError> {
     let inline = initialization_options.map_or_else(
         || Ok(WorkspaceInitializationOptions::default()),
         |value| {
@@ -1226,12 +1290,11 @@ fn resolve_source_roots(
     if inline.vanilla_index_cache.is_some() {
         project.vanilla_index_cache = inline.vanilla_index_cache;
     }
-    if project.vanilla_index_cache.is_some() {
-        return Err(RpcError::new(
-            INVALID_PARAMS,
-            "vanillaIndexCache is not supported until persistent cache loading is enabled",
-        ));
-    }
+    let vanilla_index_cache = project
+        .vanilla_index_cache
+        .as_deref()
+        .map(|path| resolve_configured_path(path, base.as_deref(), "vanillaIndexCache"))
+        .transpose()?;
 
     let current_mod = match project.mod_directory.as_deref() {
         Some(path) => Some(resolve_directory(path, base.as_deref(), "modDirectory")?),
@@ -1306,7 +1369,25 @@ fn resolve_source_roots(
     if let Some(path) = current_mod.clone() {
         roots.push(SourceRoot::new(SourceRootId::new(u32::MAX), SourceRootKind::CurrentMod, path));
     }
-    Ok((current_mod.or(base), roots))
+    Ok(ResolvedSourceRoots {
+        workspace_root: current_mod.or(base),
+        roots,
+        vanilla_cache: vanilla_index_cache,
+    })
+}
+
+fn resolve_configured_path(
+    path: &Path,
+    base: Option<&Path>,
+    field: &'static str,
+) -> Result<PathBuf, RpcError> {
+    if path.is_absolute() {
+        return Ok(path.to_owned());
+    }
+    let base = base.ok_or_else(|| {
+        RpcError::new(INVALID_PARAMS, format!("relative {field} requires a workspace root"))
+    })?;
+    Ok(base.join(path))
 }
 
 fn resolve_directory(
@@ -1741,6 +1822,15 @@ fn diagnostics_notification(uri: &str, values: Value) -> Value {
     })
 }
 
+fn show_warning_notification(message: String) -> Value {
+    let params = ShowMessageParams { typ: MessageType::WARNING, message };
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "method": "window/showMessage",
+        "params": params,
+    })
+}
+
 fn completion_kind(kind: CompletionKind) -> CompletionItemKind {
     match kind {
         CompletionKind::Key => CompletionItemKind::PROPERTY,
@@ -2077,7 +2167,10 @@ mod tests {
     };
     use pdx_rules::{RuleSet, RulesError, RulesModel};
     use pdx_text::TextRange;
-    use pdx_workspace::TextChange;
+    use pdx_workspace::{
+        AnalysisHost, SourceRoot, SourceRootId, SourceRootKind, TextChange, VanillaIndexCache,
+        WorkspaceChange,
+    };
     use serde::de::DeserializeOwned;
     use serde_json::{Value, json};
 
@@ -2416,11 +2509,12 @@ mod tests {
         let current = root.join("mod");
         let low = root.join("dependencies/low");
         let high = root.join("dependencies/high");
+        let vanilla = root.join("vanilla");
         fs::create_dir_all(&config_dir).expect("config directory");
-        for directory in [&current, &low, &high] {
+        for directory in [&current, &low, &high, &vanilla] {
             fs::create_dir_all(directory.join("common/events")).expect("fixture directory");
         }
-        let (_, inline_roots) = super::resolve_source_roots(
+        let inline = super::resolve_source_roots(
             Some(&root),
             Some(json!({
                 "modDirectory": "mod",
@@ -2432,7 +2526,7 @@ mod tests {
             &pdx_workspace::WorkspaceScanToken::new(),
         )
         .expect("inline initializationOptions");
-        assert_eq!(inline_roots.len(), 3);
+        assert_eq!(inline.roots.len(), 3);
         let overlap = super::resolve_source_roots(
             Some(&root),
             Some(json!({
@@ -2444,9 +2538,32 @@ mod tests {
         .expect_err("nested source roots must be rejected");
         assert_eq!(overlap.code, INVALID_PARAMS);
         assert!(overlap.message.contains("must not overlap"));
+        let rules_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
+        fs::write(
+            vanilla.join("common/events/definitions.txt"),
+            "country_event = { id = vanilla.1 }\n",
+        )
+        .expect("Vanilla definition");
+        let mut vanilla_host = AnalysisHost::with_profile(
+            RuleSet::load(&rules_path).expect("rules for Vanilla cache"),
+            pdx_game_eu4::profile(),
+        );
+        vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+        )]));
+        vanilla_host.refresh_source_roots().expect("scan Vanilla once");
+        let vanilla_cache = VanillaIndexCache::from_snapshot(&vanilla_host.snapshot())
+            .expect("build Vanilla cache");
+        let vanilla_cache_path = config_dir.join("vanilla.pdxindex");
+        vanilla_cache.save(&vanilla_cache_path).expect("save Vanilla cache");
+        fs::rename(&vanilla, root.join("vanilla-moved"))
+            .expect("make Vanilla source unavailable after caching");
         fs::write(
             config_dir.join("project.toml"),
             r#"mod_directory = "mod"
+vanilla_index_cache = ".pdx/vanilla.pdxindex"
 
 [[dependencies]]
 id = "low"
@@ -2480,7 +2597,6 @@ path = "dependencies/high"
         let reference_path = current.join("common/events/reference.txt");
         fs::write(&reference_path, "event = dependency.1\n").expect("current reference");
 
-        let rules_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let reference_uri = path_to_uri(&reference_path);
         let input = frames([
             json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&root),"capabilities":{},"initializationOptions":{"projectConfig":".pdx/project.toml"}}}),
@@ -2498,13 +2614,14 @@ path = "dependencies/high"
 
         let snapshot = server.snapshot();
         let roots = snapshot.source_roots();
-        assert_eq!(roots.len(), 3);
-        assert_eq!(roots[0].kind, pdx_workspace::SourceRootKind::Dependency);
-        assert_eq!(roots[0].order, 0);
+        assert_eq!(roots.len(), 4);
+        assert_eq!(roots[0].kind, pdx_workspace::SourceRootKind::Vanilla);
         assert_eq!(roots[1].kind, pdx_workspace::SourceRootKind::Dependency);
-        assert_eq!(roots[1].order, 1);
-        assert_eq!(roots[2].kind, pdx_workspace::SourceRootKind::CurrentMod);
-        assert!(roots[2].writable);
+        assert_eq!(roots[1].order, 0);
+        assert_eq!(roots[2].kind, pdx_workspace::SourceRootKind::Dependency);
+        assert_eq!(roots[2].order, 1);
+        assert_eq!(roots[3].kind, pdx_workspace::SourceRootKind::CurrentMod);
+        assert!(roots[3].writable);
         let active = snapshot
             .index()
             .active_definition("event", "shared.1")
@@ -2525,6 +2642,18 @@ path = "dependencies/high"
                 .get(&active_dependency.file_id)
                 .is_some_and(|file| file.physical_path.starts_with(&high))
         );
+        let vanilla_definition = snapshot
+            .index()
+            .active_definition("event", "vanilla.1")
+            .expect("cached Vanilla definition");
+        assert_eq!(
+            snapshot
+                .source_files()
+                .get(&vanilla_definition.file_id)
+                .expect("cached source metadata")
+                .root_id,
+            SourceRootId::new(0)
+        );
         let rename = responses.iter().find(|value| value["id"] == 2).expect("rename response");
         assert_eq!(rename["error"]["code"], INVALID_PARAMS);
         assert!(
@@ -2532,6 +2661,42 @@ path = "dependencies/high"
                 .as_str()
                 .is_some_and(|message| message.contains("read-only"))
         );
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn missing_vanilla_cache_degrades_with_an_lsp_warning() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-lsp-missing-vanilla-cache-{nonce}"));
+        fs::create_dir_all(root.join("common/events")).expect("workspace fixture");
+        let rules_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&root),"capabilities":{},"initializationOptions":{"vanillaIndexCache":".pdx/missing.pdxindex"}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server =
+            eu4_server(InitializeOptions { rules_path: Some(rules_path) }).expect("bundled rules");
+        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        let responses = decode_frames(&output);
+
+        assert!(responses.iter().any(|value| value["id"] == 1 && value.get("result").is_some()));
+        let warning = responses
+            .iter()
+            .find(|value| value["method"] == "window/showMessage")
+            .expect("missing cache warning");
+        assert_eq!(warning["params"]["type"], 2);
+        assert!(
+            warning["params"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("continuing without Vanilla symbols"))
+        );
+        assert_eq!(server.snapshot().source_roots().len(), 1);
         fs::remove_dir_all(root).expect("cleanup");
     }
 
