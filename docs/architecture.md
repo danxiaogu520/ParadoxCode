@@ -1,6 +1,6 @@
 # ParadoxCode 总体架构
 
-> 2026-07-21 状态说明：通用 `pdx-rules`、EU4 profile、per-file cache、廉价 snapshot、共享结构与 profile-aware definition/reference HIR facts、带协作式取消的 LSP initialize/parse/query/diagnostic worker，以及 Current Mod/Dependency/持久化 Vanilla cache 项目配置已落地；scope/CWT typed lowering、watched-file LSP 接入和发布闭环仍未达到本文约束。规则分发已由 [RFC 0014](rfc/0014-embedded-first-party-rules.md) 改为官方 binary 内嵌，代码迁移尚未完成。
+> 2026-07-22 状态说明：通用 `pdx-rules`、EU4 profile、per-file cache、廉价 snapshot、共享结构、协作式取消、Current Mod/Dependency/持久化 Vanilla cache 已落地。第一方 JSON 规则源码、严格 `pdx-rulec` 编译器和官方 binary 内嵌规则已经接入；CWT importer、外部 `--rules` 与扩展规则副本已经删除。scope typed lowering、watched-file LSP 接入和发布闭环仍待完成。
 
 ## 目标
 
@@ -39,10 +39,10 @@ Editor buffer / current mod / dependency mods / Vanilla cache
                   v
                  Zed
 
-One-time CWTools EU4 .cwt bootstrap input
+Developer-maintained rules/eu4 source tree
                   |
                   v
-          pdx-cwt importer v0.1
+        strict pdx-rulec compiler
                   |
                   v
       self-owned SQLite eu4.pdxrules
@@ -85,11 +85,11 @@ Vanilla cache 是本机版本化 SQLite artifact，只持久化 source-file loca
 
 ### 规则层
 
-`pdx-cwt v0.1` 只负责一次性读取 CWTools 建模的 EU4 `.cwt` 配置并导入自有 SQLite 规则数据库。导入完成后，`.cwt` 不再是项目的权威规则源，也不进入正常构建、发布或运行时。未来其他游戏可以拥有自己的 importer/profile，但不属于 EU4 v0.1。
+`pdx-rulec` 只接受仓库中的严格第一方 JSON 规则源码，校验稳定身份、cardinality、severity、type descriptor 和 artifact round-trip，然后生成 SQLite `eu4.pdxrules`。项目不提供 CWT importer、fallback 或同步入口。
 
 `pdx-rules` 定义通用 SQLite artifact schema、规范化逻辑视图、`rule_hash` 算法、只读加载与运行时查询 API，以及不含游戏名称的 data-only `GameProfile` 描述；`pdx-game-eu4` 填充 EU4 profile 与 bootstrap catalog。`pdx-eu4` 现在只保留临时 re-export facade，待调用方和文档迁移完成后删除。运行时只读加载并冻结 `RuleSet`，schema 12 将 `game_id` 纳入 metadata 与 canonical hash；EU4 组合入口在启动服务前校验 profile 身份，并把 profile 显式传入 LSP/host/snapshot。
 
-当前 workspace shard 的 symbol/reference 路径，以及 analysis 的 root scope、scope spelling/completion/compatibility、fallback key、CWT member alias 与额外 enum member，都由 EU4 profile 数据驱动。workspace/analysis/LSP 通用生产代码不再按 `game_id` 字符串或 EU4 名称白名单隐式启用这些行为；syntax crate 仍保留 `Eu4FileFormat`/`parse_eu4` 历史 API 名称，后续以行为保持重命名处理。
+当前 workspace shard 的 symbol/reference 路径，以及 analysis 的 root scope、scope spelling/completion/compatibility、fallback key、semantic member alias 与额外 enum member，都由 EU4 profile 数据驱动。workspace/analysis/LSP 通用生产代码不再按 `game_id` 字符串或 EU4 名称白名单隐式启用这些行为；syntax crate 仍保留 `Eu4FileFormat`/`parse_eu4` 历史 API 名称，后续以行为保持重命名处理。
 
 数据库保存 `TypeKey("scripted_effect")`、`AliasRef("effect")` 等 EU4 静态 matcher；实际 scripted effect、building 等成员来自 `WorkspaceIndex`。EU4 command、scope 和目录规则属于 EU4 profile 实现，不设计其他游戏的推测性替换层。
 
@@ -100,7 +100,7 @@ pdx-text
 pdx-syntax    -> pdx-text
 pdx-rules     -> pdx-text
 pdx-game-eu4  -> pdx-rules + pdx-text + pdx-syntax
-pdx-cwt       -> pdx-text + pdx-rules + pdx-game-eu4
+pdx-rulec     -> pdx-rules
 pdx-hir       -> pdx-text + pdx-syntax + pdx-rules
 pdx-workspace -> pdx-text + pdx-syntax + pdx-rules + pdx-hir
 pdx-analysis  -> pdx-workspace + pdx-hir + pdx-rules
@@ -113,10 +113,10 @@ pdx-cli       -> pdx-lsp + selected runtime crates
 
 - `pdx-text` 不依赖其他 workspace crate。
 - `pdx-syntax` 实现可复用 PDX 文本前端，但不依赖游戏规则数据库、workspace 或 LSP。
-- `pdx-rules` 定义 SQLite schema、hash 与只读 runtime view，不依赖具体游戏名称表、CWT parser 或 LSP。
+- `pdx-rules` 定义 SQLite schema、hash 与只读 runtime view，不依赖具体游戏名称表、外部规则语言或 LSP。
 - `pdx-game-eu4` 保存 EU4 profile 和无法由通用规则数据表达的 EU4 特殊语义。
-- `pdx-cwt` 依赖 `pdx-text`、`pdx-rules` 与 `pdx-game-eu4`，MVP 只提供 CWT 到 SQLite 数据库的一次性导入工具；它不是 runtime dependency。
-- `pdx-hir` 通过稳定的 typed CST API lowering；结构 facts 与 `RuleSet`/显式 profile 驱动的 definition/reference facts 已被 workspace shard 和 analysis 查询共享。profile/category 引用在 HIR 中保留来源，避免保守索引引用污染 hover/rename；scope 与 CWT typed lowering 仍待补齐。
+- `pdx-rulec` 是维护者工具，只把第一方规则源码编译成经过完整校验的 artifact；它不是 runtime dependency。
+- `pdx-hir` 通过稳定的 typed CST API lowering；结构 facts 与 `RuleSet`/显式 profile 驱动的 definition/reference facts 已被 workspace shard 和 analysis 查询共享。profile/category 引用在 HIR 中保留来源，避免保守索引引用污染 hover/rename；scope 与 semantic typed lowering 仍待补齐。
 - `pdx-workspace` 不依赖 LSP 类型。
 - `pdx-analysis` 不依赖任何 editor API。
 - `pdx-lsp` 是唯一允许依赖 LSP protocol types 的核心 crate。
@@ -145,7 +145,7 @@ VanillaIndexCache           local persistent Vanilla shard cache; manual refresh
 - LSP event loop 顺序应用文档版本和配置变化。
 - 编辑先在 event loop 提交最新文本、版本和 `LineIndex`，parse/单文件 HIR 在 immutable snapshot worker 中准备；结果只有在版本、文本和路径仍完全一致时才能提交。依赖语义的后续请求会有序等待最新 parse，不读取旧文本。
 - 查询获取 snapshot 后不持有 host 锁。
-- initialize 的 source-root scan 在候选 `AnalysisHost` worker 中运行，目录发现、受限读取、parse/lower、bulk index 和 priority resolution 均可取消，只有完整成功后才由 event loop 原子提交。semantic diagnostics 使用约 200ms debounce，在 immutable snapshot worker 上运行，提交时校验文档版本；新编辑会使旧任务失效。普通语言请求同样捕获单一 snapshot 后进入 worker。`$/cancelRequest` 和过期 diagnostics 通过共享的 editor-neutral `CancellationToken` 在 workspace semantic 合并、CWT 递归及主要结果遍历中协作式中止。
+- initialize 的 source-root scan 在候选 `AnalysisHost` worker 中运行，目录发现、受限读取、parse/lower、bulk index 和 priority resolution 均可取消，只有完整成功后才由 event loop 原子提交。semantic diagnostics 使用约 200ms debounce，在 immutable snapshot worker 上运行，提交时校验文档版本；新编辑会使旧任务失效。普通语言请求同样捕获单一 snapshot 后进入 worker。`$/cancelRequest` 和过期 diagnostics 通过共享的 editor-neutral `CancellationToken` 在 workspace semantic 合并、semantic rule 递归及主要结果遍历中协作式中止。
 - completion/hover 优先于后台全量诊断。
 
 MVP 不立即引入通用增量计算框架。先使用清晰的按文件 cache key 和 shard replacement；只有性能数据证明需要时再评估 query framework。
@@ -167,12 +167,12 @@ MVP 不立即引入通用增量计算框架。先使用清晰的按文件 cache 
 - syntax error 不阻止产生局部 CST。
 - lowering 遇到未知节点产生 `UnknownConstruct`，不 panic。
 - scope 未知时保留 `Unknown`，避免级联错误。
-- CWT bootstrap 导入遇到 corpus 中未支持的构造时失败；导入后数据库自身的 schema/invariant 错误阻止发布。
+- 第一方规则源码出现未知字段、重复身份或无效 invariant 时编译失败；数据库 schema/hash/round-trip 错误阻止发布。
 - formatter 在 CST 不安全时返回无编辑和明确原因。
 
 ## 安全与版权
 
-- 不执行 Mod 或 CWT 配置中的任意代码；CWT 只由受限 importer 解释。
+- 不执行 Mod 或规则源码中的任意代码；规则编译器只解析严格 JSON 数据。
 - 限制扫描文件大小和最大嵌套深度相关资源消耗。
-- CWT bootstrap 输入只存在于本地 `reference/` 调研工作树，不作为项目规则源或发布内容；导入 provenance 记录上游 commit 与许可证，但不保存原生 CWT 文本。
+- `reference/` 仅是历史研究资料，不作为规则编译、测试或发布输入。
 - 不提交或再分发 Vanilla 游戏文件；Vanilla 缓存只存在于用户本机。

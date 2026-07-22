@@ -8,8 +8,20 @@ use pdx_rules::{
     ProfileValueDefinitionRule, RuleSet, RulesModel, SymbolDescriptor, SymbolResolutionPolicy,
 };
 
+const FIRST_PARTY_RULES: &[u8] = include_bytes!("../../../rules/eu4.pdxrules");
+
 /// Stable identity stored by EU4 rule artifacts and selected by the server.
 pub const GAME_ID: &str = "eu4";
+
+/// Loads the immutable first-party EU4 rules embedded in the official binary.
+///
+/// No path, environment variable, initialization option, or project setting can replace these
+/// rules. A failure indicates a broken build artifact rather than user configuration.
+pub fn first_party_rules() -> Result<RuleSet, pdx_rules::RulesError> {
+    let rules = RuleSet::load_embedded(FIRST_PARTY_RULES)?;
+    rules.ensure_game(GAME_ID)?;
+    Ok(rules)
+}
 
 /// The built-in EU4 profile.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -541,7 +553,7 @@ pub fn bootstrap_model() -> RulesModel {
             },
         ],
         records: Vec::new(),
-        cwt: pdx_rules::CwtSemanticModel::default(),
+        semantic: pdx_rules::SemanticModel::default(),
     }
 }
 
@@ -553,7 +565,7 @@ pub fn bootstrap_rules() -> RuleSet {
 
 #[cfg(test)]
 mod tests {
-    use super::{Eu4Profile, GAME_ID, bootstrap_rules, profile};
+    use super::{Eu4Profile, GAME_ID, bootstrap_rules, first_party_rules, profile};
 
     #[test]
     fn profile_identity_and_bootstrap_catalog_are_stable() {
@@ -593,5 +605,12 @@ mod tests {
         assert_eq!(profile.member_kind_alias("COUNTRY_TAGS"), Some("country_tag"));
         assert!(profile.fallback_keys.iter().any(|key| key == "add_treasury"));
         assert!(profile.enum_extra_member("scripted_effect_params", "scaled_skill"));
+    }
+
+    #[test]
+    fn embedded_first_party_rules_match_the_eu4_profile() {
+        let rules = first_party_rules().expect("embedded EU4 rules");
+        assert_eq!(rules.game_id(), GAME_ID);
+        assert!(!rules.model().semantic.rules.is_empty());
     }
 }

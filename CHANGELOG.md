@@ -15,11 +15,14 @@ established.
 - Conservative document formatting over LSP.
 - Current Mod, ordered dependency, overlay, and persistent Vanilla index support.
 - Thin Zed extension with editor-only Tree-sitter grammars.
+- Strict developer-maintained EU4 rule source and reproducible `pdx-rulec` compiler.
 
 ### Changed
 
 - Split game-neutral rules infrastructure from the EU4 profile.
 - Reworked workspace snapshots and per-file state to avoid query-time workspace rebuilding.
+- Embedded first-party rules into official binaries and removed external rule arguments and the
+  retired CWT importer.
 
 ### Security
 

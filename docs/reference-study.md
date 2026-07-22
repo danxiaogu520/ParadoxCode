@@ -1,5 +1,8 @@
 # CWTools、EU4 Config 与 Jomini 调研
 
+> 历史说明（2026-07-22）：本文件记录早期研究过程，不定义当前规则权威链路。RFC 0015
+> 已禁止 CWT 作为构建、测试、运行或维护输入；当前唯一权威源是 `rules/eu4/*.json`。
+
 ## 调研基线
 
 参考代码以浅克隆形式保存在 `reference/`，只用于架构研究：
@@ -176,11 +179,11 @@ Jomini 的 README 明确指出其 tape writer 不保留注释。其 tape 还会�
 
 1. `pdx-syntax` 的 Rust parser 负责 loss-aware、error-tolerant CST；Tree-sitter 只服务 Zed 编辑器侧 grammar/highlighting。
 2. CST block 允许 property 与裸 value 混合。
-3. `pdx-cwt v0.1` 一次性导入 CWTools 的 type/alias/cardinality/path/scope/reference 等模型；SQLite `eu4.pdxrules` 随后成为唯一权威规则源。
+3. 第一方规则源码直接表达 type/alias/cardinality/path/scope/reference 等模型，并由 `pdx-rulec` 编译为 SQLite artifact。
 4. Workspace 使用 logical path、显式 source root 和按文件 shard。
 5. HIR 保留 definition/reference/invocation/scope transition，而不是 JSON 对象。
 6. MVP parser corpus 从一开始覆盖 Jomini 暴露的 EU4 特殊语法。
-7. CWTools 实现不成为运行时依赖；`.cwt` 兼容范围冻结为本次 bootstrap corpus，而不是永久跟随上游。
-8. 导入 provenance 锁定 config revision、输入逻辑 hash 和许可证，不记录或选择 EU4 版本。
-9. CWT 导入前先生成 construct/directive inventory，corpus 中的 legacy spelling 必须显式导入或显式报错。
+7. CWTools/CWT 不成为构建、测试、运行或规则维护依赖。
+8. 第一方 manifest 记录 source format、目标 EU4 版本、artifact schema、rule hash 和 checksum。
+9. 外部规则格式不会被导入、兼容或用作 fallback。
 10. 规则 matcher 与动态 workspace type members 分离；`rule_hash` 只描述规范化规则逻辑内容。

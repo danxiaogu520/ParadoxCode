@@ -1,19 +1,24 @@
 //! Game-independent PDX rules schema and runtime boundary.
 //!
-//! The importer owns construction of the database; this crate only owns the normalized runtime
+//! The first-party compiler owns construction of the database; this crate owns the normalized runtime
 //! model, read-only loading, validation, and the canonical logical hash. The SQLite layout is
-//! deliberately boring so the runtime remains inspectable without depending on CWT.
+//! deliberately boring so the runtime remains inspectable without an authoring-format parser.
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::fs;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use pdx_text::LogicalPath;
 use rusqlite::{Connection, OptionalExtension, params};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// The first runtime schema version reserved for the generated rule database.
-pub const CURRENT_SCHEMA_VERSION: u32 = 12;
+pub const CURRENT_SCHEMA_VERSION: u32 = 13;
+
+static EMBEDDED_LOAD_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 /// A stable digest of canonical rule content.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
@@ -65,7 +70,8 @@ impl fmt::Debug for RuleHash {
 }
 
 /// Parser families understood by the workspace.
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Ord, PartialOrd, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum ParserKind {
     /// Paradox key/value script grammar.
     PdxScript,
@@ -105,7 +111,8 @@ impl ParserKind {
 }
 
 /// Delimiters used by game CSV assets.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum CsvDialect {
     /// Comma-separated values.
     Comma,
@@ -126,7 +133,8 @@ impl CsvDialect {
 }
 
 /// File-level conflict behavior used by source-root resolution.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum FileResolutionPolicy {
     /// One candidate owns a relative path.
     ReplaceByRelativePath,
@@ -156,7 +164,8 @@ impl FileResolutionPolicy {
 }
 
 /// Symbol-level conflict behavior used by the index.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum SymbolResolutionPolicy {
     /// A higher-priority definition shadows lower-priority definitions.
     ReplaceBySymbol,
@@ -186,7 +195,8 @@ impl SymbolResolutionPolicy {
 }
 
 /// A path matcher from the rules file-category catalog.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct FileMatcher {
     /// Optional path prefix, without a leading slash.
     pub path_prefix: Option<String>,
@@ -238,7 +248,8 @@ impl FileMatcher {
 }
 
 /// A complete file-category rule.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct FileCategory {
     /// Stable importer-assigned identifier.
     pub id: String,
@@ -251,7 +262,8 @@ pub struct FileCategory {
 }
 
 /// The symbol policy for one semantic definition kind.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct SymbolDescriptor {
     /// Stable semantic kind, for example `event` or `localisation`.
     pub kind_id: String,
@@ -473,11 +485,11 @@ pub struct GameProfile {
     pub scope_names: Vec<String>,
     /// Scope spellings offered by completion.
     pub scope_completions: Vec<String>,
-    /// Root-key fallbacks used when CWT type metadata has no initial scope.
+    /// Root-key fallbacks used when semantic type metadata has no initial scope.
     pub root_scopes: Vec<ProfileRootScopeRule>,
     /// Additional asymmetric scope compatibility pairs.
     pub scope_compatibilities: Vec<ProfileScopeCompatibility>,
-    /// CWT type/enum spellings mapped to workspace symbol kinds.
+    /// semantic type/enum spellings mapped to workspace symbol kinds.
     pub member_kind_aliases: BTreeMap<String, String>,
     /// Profile fallback keys used when no imported semantic rule selects a property.
     pub fallback_keys: Vec<String>,
@@ -560,7 +572,7 @@ impl GameProfile {
             })
     }
 
-    /// Returns the workspace symbol kind aliased by one CWT member name.
+    /// Returns the workspace symbol kind aliased by one semantic member name.
     #[must_use]
     pub fn member_kind_alias(&self, name: &str) -> Option<&str> {
         self.member_kind_aliases
@@ -580,8 +592,9 @@ impl GameProfile {
 }
 
 /// A normalized rule row. Values are intentionally scalar and deterministic; runtime crates do
-/// not need to understand the CWT source representation.
-#[derive(Clone, Debug, Eq, PartialEq)]
+/// not need to understand the first-party source representation.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct RuleRecord {
     /// Normalized table family.
     pub table: String,
@@ -593,22 +606,23 @@ pub struct RuleRecord {
     pub fields: BTreeMap<String, String>,
 }
 
-/// A key matcher compiled from a CWTools field declaration.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum CwtKeyMatcher {
+/// A key matcher compiled from a first-party field declaration.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum KeyMatcher {
     /// Matches one concrete script key.
     Exact(String),
     /// Matches a key supplied by the workspace index for a named type.
     Type(String),
     /// Matches a member of a named static enum.
     Enum(String),
-    /// Matches any scalar key. This is the CWT `scalar` key form.
+    /// Matches any non-empty scalar key.
     AnyScalar,
-    /// Matches a key that declares a dynamic CWT value set (`value_set[...]`).
+    /// Matches a key that declares a dynamic value set.
     Dynamic(String),
 }
 
-impl CwtKeyMatcher {
+impl KeyMatcher {
     /// Tests a key against static and workspace-provided members.
     #[must_use]
     pub fn matches(
@@ -627,9 +641,10 @@ impl CwtKeyMatcher {
     }
 }
 
-/// A value matcher compiled from a CWTools field declaration.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum CwtValueMatcher {
+/// A value matcher compiled from a first-party field declaration.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ValueMatcher {
     /// Accepts any scalar value.
     AnyScalar,
     /// Accepts one exact scalar value.
@@ -654,11 +669,11 @@ pub enum CwtValueMatcher {
     Dynamic(String),
     /// Accepts any non-empty value while defining a dynamic value set.
     DynamicSet(String),
-    /// Retains a CWT matcher that has not been implemented yet.
+    /// Retains a semantic matcher that has not been implemented yet.
     Opaque(String),
 }
 
-impl CwtValueMatcher {
+impl ValueMatcher {
     /// Tests a scalar value against the compiled matcher.
     #[must_use]
     pub fn matches(
@@ -691,9 +706,10 @@ impl CwtValueMatcher {
     }
 }
 
-/// Source shape of a CWT rule.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum CwtRuleShape {
+/// Source shape of a semantic rule.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuleShape {
     /// The rule expects a nested block.
     Node,
     /// The rule expects a scalar leaf.
@@ -704,10 +720,11 @@ pub enum CwtRuleShape {
     ValueClause,
 }
 
-/// File and root-selection metadata declared by a CWT `type[...]` block.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct CwtTypeDescriptor {
-    /// CWT type name.
+/// File and root-selection metadata declared by a first-party type descriptor.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TypeDescriptor {
+    /// Semantic type name.
     pub name: String,
     /// Directory prefix declared by `path`.
     pub path: Option<String>,
@@ -725,16 +742,15 @@ pub struct CwtTypeDescriptor {
     pub name_field: Option<String>,
     /// Whether the filename supplies the definition name.
     pub name_from_file: bool,
-    /// Optional CWT `starts_with` discriminator.
+    /// Optional first-party `starts_with` discriminator.
     pub starts_with: Option<String>,
     /// Optional filter for keys that instantiate this type, paired with its negation flag.
     ///
-    /// CWTools evaluates this as `contains(key) != negate`, so `<>` filters are represented by
-    /// `negate = true`.
+    /// Negated filters are represented by `negate = true`.
     pub type_key_filter: Option<(Vec<String>, bool)>,
 }
 
-impl CwtRuleShape {
+impl RuleShape {
     fn as_str(self) -> &'static str {
         match self {
             Self::Node => "node",
@@ -750,14 +766,15 @@ impl CwtRuleShape {
             "leaf" => Ok(Self::Leaf),
             "leaf-value" => Ok(Self::LeafValue),
             "value-clause" => Ok(Self::ValueClause),
-            other => Err(RulesError::InvalidCwtShape(other.to_owned())),
+            other => Err(RulesError::InvalidRuleShape(other.to_owned())),
         }
     }
 }
 
-/// One executable rule alternative lowered from a CWT declaration.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CwtSemanticRule {
+/// One executable rule alternative lowered from a first-party declaration.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SemanticRule {
     /// Stable source-derived identity.
     pub id: String,
     /// Semantic root, such as `trigger`, `effect`, or `type:event`.
@@ -765,22 +782,22 @@ pub struct CwtSemanticRule {
     /// Parent keys below the semantic root.
     pub parent_path: Vec<String>,
     /// Key matcher.
-    pub key: CwtKeyMatcher,
-    /// Operator used by the CWT declaration, when it is semantically significant.
+    pub key: KeyMatcher,
+    /// Operator used by the first-party declaration, when it is semantically significant.
     pub operator: Option<String>,
     /// Value matcher.
-    pub value: CwtValueMatcher,
+    pub value: ValueMatcher,
     /// Source shape.
-    pub shape: CwtRuleShape,
-    /// Semantic context to use for children of this block, when CWT uses `alias_name[...]`.
+    pub shape: RuleShape,
+    /// Semantic context to use for children of this block.
     pub child_context: Option<String>,
-    /// Source alias alternative this rule belongs to, when the CWT declaration has alternatives.
+    /// Source alias alternative this rule belongs to, when the first-party declaration has alternatives.
     pub alternative_id: Option<String>,
-    /// Optional LSP severity from the CWT rule (`1` error, `2` warning, `3` info).
+    /// Optional LSP severity from the semantic rule (`1` error, `2` warning, `3` info).
     pub severity: Option<u8>,
-    /// Whether the CWT declaration explicitly requires this field.
+    /// Whether the first-party declaration explicitly requires this field.
     pub required: bool,
-    /// Documentation comments attached to the CWT declaration.
+    /// Documentation comments attached to the first-party declaration.
     pub documentation: Vec<String>,
     /// Scopes in which this rule is valid. An empty list means `scope = any` or no restriction.
     pub allowed_scopes: Vec<String>,
@@ -788,11 +805,11 @@ pub struct CwtSemanticRule {
     pub push_scope: Option<String>,
     /// Scope registers replaced by this rule, represented as `(register, scope)` pairs.
     pub replace_scope: Vec<(String, String)>,
-    /// Minimum number of occurrences when specified by CWT cardinality.
+    /// Minimum number of occurrences when specified by source cardinality.
     pub min_occurs: Option<u32>,
     /// Whether a minimum violation is strict (`cardinality` without `~`).
     pub strict_min: bool,
-    /// Maximum number of occurrences when specified by CWT cardinality.
+    /// Maximum number of occurrences when specified by source cardinality.
     pub max_occurs: Option<u32>,
     /// Source file retained for explainable diagnostics.
     pub source_file: String,
@@ -800,23 +817,25 @@ pub struct CwtSemanticRule {
     pub line: u32,
 }
 
-/// Static CWT data needed by runtime matching.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct CwtSemanticModel {
+/// Static semantic rule data needed by runtime matching.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SemanticModel {
     /// Compiled rule alternatives.
-    pub rules: Vec<CwtSemanticRule>,
+    pub rules: Vec<SemanticRule>,
     /// Enum names and their statically declared members.
     pub enum_values: BTreeMap<String, Vec<String>>,
-    /// Concrete root keys selected by `type_key_filter` for each CWT type.
+    /// Concrete root keys selected by `type_key_filter` for each semantic type.
     pub type_root_keys: BTreeMap<String, Vec<String>>,
     /// Initial scope selected by a type subtype's `type_key_filter` and `push_scope`.
     pub type_root_scopes: BTreeMap<String, BTreeMap<String, String>>,
-    /// File/root metadata declared by CWT type blocks.
-    pub type_descriptors: BTreeMap<String, CwtTypeDescriptor>,
+    /// File/root metadata declared by semantic type blocks.
+    pub type_descriptors: BTreeMap<String, TypeDescriptor>,
 }
 
 /// Normalized logical contents of one game rule database.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct RulesModel {
     /// Stable game profile identity, for example `eu4`.
     pub game_id: String,
@@ -826,8 +845,8 @@ pub struct RulesModel {
     pub symbol_descriptors: Vec<SymbolDescriptor>,
     /// Normalized semantic rule rows.
     pub records: Vec<RuleRecord>,
-    /// Executable CWT matcher model used by semantic analysis.
-    pub cwt: CwtSemanticModel,
+    /// Executable semantic matcher model used by semantic analysis.
+    pub semantic: SemanticModel,
 }
 
 impl RulesModel {
@@ -843,6 +862,8 @@ impl RulesModel {
 /// Errors from rule construction, validation, or SQLite loading.
 #[derive(Debug)]
 pub enum RulesError {
+    /// Filesystem failure while materializing an embedded artifact.
+    Io(std::io::Error),
     /// SQLite or filesystem error.
     Sql(rusqlite::Error),
     /// An invalid schema version was found.
@@ -861,13 +882,14 @@ pub enum RulesError {
     MissingMetadata(String),
     /// The artifact belongs to a different game profile.
     GameMismatch { expected: String, actual: String },
-    /// An unknown persisted CWT rule shape was found.
-    InvalidCwtShape(String),
+    /// An unknown persisted semantic rule shape was found.
+    InvalidRuleShape(String),
 }
 
 impl fmt::Display for RulesError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Io(error) => write!(formatter, "rules I/O error: {error}"),
             Self::Sql(error) => write!(formatter, "rules SQLite error: {error}"),
             Self::SchemaVersion(version) => {
                 write!(formatter, "unsupported rules schema version: {version}")
@@ -887,7 +909,9 @@ impl fmt::Display for RulesError {
             Self::GameMismatch { expected, actual } => {
                 write!(formatter, "rules game mismatch: expected {expected}, found {actual}")
             }
-            Self::InvalidCwtShape(value) => write!(formatter, "invalid CWT rule shape: {value}"),
+            Self::InvalidRuleShape(value) => {
+                write!(formatter, "invalid semantic rule shape: {value}")
+            }
         }
     }
 }
@@ -897,6 +921,12 @@ impl std::error::Error for RulesError {}
 impl From<rusqlite::Error> for RulesError {
     fn from(error: rusqlite::Error) -> Self {
         Self::Sql(error)
+    }
+}
+
+impl From<std::io::Error> for RulesError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(error)
     }
 }
 
@@ -920,7 +950,7 @@ impl RuleSet {
                 file_categories: Vec::new(),
                 symbol_descriptors: Vec::new(),
                 records: Vec::new(),
-                cwt: CwtSemanticModel {
+                semantic: SemanticModel {
                     rules: Vec::new(),
                     enum_values: BTreeMap::new(),
                     type_root_keys: BTreeMap::new(),
@@ -943,12 +973,12 @@ impl RuleSet {
                 right.source_order,
             ))
         });
-        model.cwt.rules.sort_by(|left, right| left.id.cmp(&right.id));
-        for values in model.cwt.enum_values.values_mut() {
+        model.semantic.rules.sort_by(|left, right| left.id.cmp(&right.id));
+        for values in model.semantic.enum_values.values_mut() {
             values.sort();
             values.dedup();
         }
-        for values in model.cwt.type_root_keys.values_mut() {
+        for values in model.semantic.type_root_keys.values_mut() {
             values.sort();
             values.dedup();
         }
@@ -1018,6 +1048,33 @@ impl RuleSet {
         Ok(rules)
     }
 
+    /// Loads an embedded SQLite artifact without exposing a user-selectable rules path.
+    ///
+    /// SQLite 3.32 does not expose a safe borrowed-byte connection. The official composition
+    /// root therefore materializes its compile-time bytes to a process-unique temporary file,
+    /// validates the complete logical model, and removes the file before returning.
+    pub fn load_embedded(bytes: &[u8]) -> Result<Self, RulesError> {
+        let sequence = EMBEDDED_LOAD_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir()
+            .join(format!("paradoxcode-rules-{}-{sequence}.pdxrules", std::process::id()));
+        let result = (|| {
+            let mut options = fs::OpenOptions::new();
+            options.write(true).create_new(true);
+            use std::io::Write as _;
+            let mut file = options.open(&path)?;
+            file.write_all(bytes)?;
+            file.sync_all()?;
+            drop(file);
+            Self::load(&path)
+        })();
+        let cleanup = fs::remove_file(&path);
+        match (result, cleanup) {
+            (Ok(rules), Ok(())) => Ok(rules),
+            (Err(error), _) => Err(error),
+            (Ok(_), Err(error)) => Err(RulesError::Io(error)),
+        }
+    }
+
     /// Returns the schema version.
     #[must_use]
     pub const fn schema_version(&self) -> u32 {
@@ -1033,7 +1090,7 @@ impl RuleSet {
 
 fn canonical_hash(model: &RulesModel) -> RuleHash {
     let mut bytes = Vec::new();
-    bytes.extend_from_slice(b"paradoxcode/rules/v5\0");
+    bytes.extend_from_slice(b"paradoxcode/rules/v6\0");
     put_str(&mut bytes, &model.game_id);
     let mut categories = model.file_categories.clone();
     categories.sort_by(|left, right| left.id.cmp(&right.id));
@@ -1077,19 +1134,19 @@ fn canonical_hash(model: &RulesModel) -> RuleHash {
             put_str(&mut bytes, &value);
         }
     }
-    let mut cwt_rules = model.cwt.rules.clone();
-    cwt_rules.sort_by(|left, right| left.id.cmp(&right.id));
-    put_len(&mut bytes, cwt_rules.len());
-    for rule in cwt_rules {
+    let mut semantic_rules = model.semantic.rules.clone();
+    semantic_rules.sort_by(|left, right| left.id.cmp(&right.id));
+    put_len(&mut bytes, semantic_rules.len());
+    for rule in semantic_rules {
         put_str(&mut bytes, &rule.id);
         put_str(&mut bytes, &rule.context);
         put_len(&mut bytes, rule.parent_path.len());
         for parent in rule.parent_path {
             put_str(&mut bytes, &parent);
         }
-        put_cwt_key(&mut bytes, &rule.key);
+        put_semantic_key(&mut bytes, &rule.key);
         put_opt_str(&mut bytes, rule.operator.as_deref());
-        put_cwt_value(&mut bytes, &rule.value);
+        put_semantic_value(&mut bytes, &rule.value);
         put_str(&mut bytes, rule.shape.as_str());
         put_opt_str(&mut bytes, rule.child_context.as_deref());
         put_opt_str(&mut bytes, rule.alternative_id.as_deref());
@@ -1137,47 +1194,47 @@ fn canonical_hash(model: &RulesModel) -> RuleHash {
         put_str(&mut bytes, &rule.source_file);
         bytes.extend_from_slice(&rule.line.to_le_bytes());
     }
-    let mut enum_names = model.cwt.enum_values.keys().cloned().collect::<Vec<_>>();
+    let mut enum_names = model.semantic.enum_values.keys().cloned().collect::<Vec<_>>();
     enum_names.sort();
     put_len(&mut bytes, enum_names.len());
     for name in enum_names {
         put_str(&mut bytes, &name);
-        let mut values = model.cwt.enum_values.get(&name).cloned().unwrap_or_default();
+        let mut values = model.semantic.enum_values.get(&name).cloned().unwrap_or_default();
         values.sort();
         put_len(&mut bytes, values.len());
         for value in values {
             put_str(&mut bytes, &value);
         }
     }
-    let mut type_names = model.cwt.type_root_keys.keys().cloned().collect::<Vec<_>>();
+    let mut type_names = model.semantic.type_root_keys.keys().cloned().collect::<Vec<_>>();
     type_names.sort();
     put_len(&mut bytes, type_names.len());
     for name in type_names {
         put_str(&mut bytes, &name);
-        let mut roots = model.cwt.type_root_keys.get(&name).cloned().unwrap_or_default();
+        let mut roots = model.semantic.type_root_keys.get(&name).cloned().unwrap_or_default();
         roots.sort();
         put_len(&mut bytes, roots.len());
         for root in roots {
             put_str(&mut bytes, &root);
         }
     }
-    let mut scoped_types = model.cwt.type_root_scopes.keys().cloned().collect::<Vec<_>>();
+    let mut scoped_types = model.semantic.type_root_scopes.keys().cloned().collect::<Vec<_>>();
     scoped_types.sort();
     put_len(&mut bytes, scoped_types.len());
     for type_name in scoped_types {
         put_str(&mut bytes, &type_name);
-        let scopes = model.cwt.type_root_scopes.get(&type_name).cloned().unwrap_or_default();
+        let scopes = model.semantic.type_root_scopes.get(&type_name).cloned().unwrap_or_default();
         put_len(&mut bytes, scopes.len());
         for (root, scope) in scopes {
             put_str(&mut bytes, &root);
             put_str(&mut bytes, &scope);
         }
     }
-    let mut descriptor_names = model.cwt.type_descriptors.keys().cloned().collect::<Vec<_>>();
+    let mut descriptor_names = model.semantic.type_descriptors.keys().cloned().collect::<Vec<_>>();
     descriptor_names.sort();
     put_len(&mut bytes, descriptor_names.len());
     for name in descriptor_names {
-        let descriptor = model.cwt.type_descriptors.get(&name).expect("type descriptor");
+        let descriptor = model.semantic.type_descriptors.get(&name).expect("type descriptor");
         put_str(&mut bytes, &descriptor.name);
         put_opt_str(&mut bytes, descriptor.path.as_deref());
         put_opt_str(&mut bytes, descriptor.path_file.as_deref());
@@ -1233,69 +1290,69 @@ fn put_opt_str(bytes: &mut Vec<u8>, value: Option<&str>) {
     }
 }
 
-fn put_cwt_key(bytes: &mut Vec<u8>, matcher: &CwtKeyMatcher) {
+fn put_semantic_key(bytes: &mut Vec<u8>, matcher: &KeyMatcher) {
     match matcher {
-        CwtKeyMatcher::Exact(value) => {
+        KeyMatcher::Exact(value) => {
             put_str(bytes, "exact");
             put_str(bytes, value);
         }
-        CwtKeyMatcher::Type(value) => {
+        KeyMatcher::Type(value) => {
             put_str(bytes, "type");
             put_str(bytes, value);
         }
-        CwtKeyMatcher::Enum(value) => {
+        KeyMatcher::Enum(value) => {
             put_str(bytes, "enum");
             put_str(bytes, value);
         }
-        CwtKeyMatcher::AnyScalar => put_str(bytes, "any"),
-        CwtKeyMatcher::Dynamic(value) => {
+        KeyMatcher::AnyScalar => put_str(bytes, "any"),
+        KeyMatcher::Dynamic(value) => {
             put_str(bytes, "dynamic");
             put_str(bytes, value);
         }
     }
 }
 
-fn put_cwt_value(bytes: &mut Vec<u8>, matcher: &CwtValueMatcher) {
+fn put_semantic_value(bytes: &mut Vec<u8>, matcher: &ValueMatcher) {
     match matcher {
-        CwtValueMatcher::AnyScalar => put_str(bytes, "any"),
-        CwtValueMatcher::Exact(value) => {
+        ValueMatcher::AnyScalar => put_str(bytes, "any"),
+        ValueMatcher::Exact(value) => {
             put_str(bytes, "exact");
             put_str(bytes, value);
         }
-        CwtValueMatcher::Bool => put_str(bytes, "bool"),
-        CwtValueMatcher::Int { min, max } => {
+        ValueMatcher::Bool => put_str(bytes, "bool"),
+        ValueMatcher::Int { min, max } => {
             put_str(bytes, "int");
             put_opt_str(bytes, min.map(|value| value.to_string()).as_deref());
             put_opt_str(bytes, max.map(|value| value.to_string()).as_deref());
         }
-        CwtValueMatcher::Float { min, max } => {
+        ValueMatcher::Float { min, max } => {
             put_str(bytes, "float");
             put_opt_str(bytes, min.as_deref());
             put_opt_str(bytes, max.as_deref());
         }
-        CwtValueMatcher::Type(value) => {
+        ValueMatcher::Type(value) => {
             put_str(bytes, "type");
             put_str(bytes, value);
         }
-        CwtValueMatcher::Enum(value) => {
+        ValueMatcher::Enum(value) => {
             put_str(bytes, "enum");
             put_str(bytes, value);
         }
-        CwtValueMatcher::Scope(value) => {
+        ValueMatcher::Scope(value) => {
             put_str(bytes, "scope");
             put_opt_str(bytes, value.as_deref());
         }
-        CwtValueMatcher::Localisation => put_str(bytes, "localisation"),
-        CwtValueMatcher::Filepath => put_str(bytes, "filepath"),
-        CwtValueMatcher::Dynamic(value) => {
+        ValueMatcher::Localisation => put_str(bytes, "localisation"),
+        ValueMatcher::Filepath => put_str(bytes, "filepath"),
+        ValueMatcher::Dynamic(value) => {
             put_str(bytes, "dynamic");
             put_str(bytes, value);
         }
-        CwtValueMatcher::DynamicSet(value) => {
+        ValueMatcher::DynamicSet(value) => {
             put_str(bytes, "dynamic-set");
             put_str(bytes, value);
         }
-        CwtValueMatcher::Opaque(value) => {
+        ValueMatcher::Opaque(value) => {
             put_str(bytes, "opaque");
             put_str(bytes, value);
         }
@@ -1323,7 +1380,7 @@ fn schema(connection: &Connection) -> Result<(), RulesError> {
             PRIMARY KEY (table_name, logical_id, field_name),
             FOREIGN KEY (table_name, logical_id) REFERENCES rule_records(table_name, logical_id) ON DELETE CASCADE
         );
-        CREATE TABLE IF NOT EXISTS cwt_rules (
+        CREATE TABLE IF NOT EXISTS semantic_rules (
             id TEXT PRIMARY KEY NOT NULL,
             context TEXT NOT NULL,
             parent_path TEXT NOT NULL,
@@ -1349,23 +1406,23 @@ fn schema(connection: &Connection) -> Result<(), RulesError> {
             source_file TEXT NOT NULL,
             line INTEGER NOT NULL
         );
-        CREATE TABLE IF NOT EXISTS cwt_enum_values (
+        CREATE TABLE IF NOT EXISTS enum_values (
             enum_name TEXT NOT NULL,
             value TEXT NOT NULL,
             PRIMARY KEY (enum_name, value)
         );
-        CREATE TABLE IF NOT EXISTS cwt_type_root_keys (
+        CREATE TABLE IF NOT EXISTS type_root_keys (
             type_name TEXT NOT NULL,
             root_key TEXT NOT NULL,
             PRIMARY KEY (type_name, root_key)
         );
-        CREATE TABLE IF NOT EXISTS cwt_type_root_scopes (
+        CREATE TABLE IF NOT EXISTS type_root_scopes (
             type_name TEXT NOT NULL,
             root_key TEXT NOT NULL,
             scope TEXT NOT NULL,
             PRIMARY KEY (type_name, root_key)
         );
-        CREATE TABLE IF NOT EXISTS cwt_type_descriptors (
+        CREATE TABLE IF NOT EXISTS type_descriptors (
             type_name TEXT PRIMARY KEY NOT NULL,
             path TEXT,
             path_file TEXT,
@@ -1382,11 +1439,11 @@ fn schema(connection: &Connection) -> Result<(), RulesError> {
         CREATE TABLE IF NOT EXISTS import_provenance (
             source_path TEXT PRIMARY KEY NOT NULL, source_sha256 TEXT NOT NULL, importer_version TEXT NOT NULL
         );")?;
-    ensure_cwt_columns(connection)?;
+    ensure_semantic_columns(connection)?;
     Ok(())
 }
 
-fn ensure_cwt_columns(connection: &Connection) -> Result<(), RulesError> {
+fn ensure_semantic_columns(connection: &Connection) -> Result<(), RulesError> {
     for (name, definition) in [
         ("child_context", "TEXT"),
         ("alternative_id", "TEXT"),
@@ -1401,13 +1458,15 @@ fn ensure_cwt_columns(connection: &Connection) -> Result<(), RulesError> {
         ("strict_min", "INTEGER NOT NULL DEFAULT 1"),
     ] {
         let present: i64 = connection.query_row(
-            "SELECT COUNT(*) FROM pragma_table_info('cwt_rules') WHERE name = ?1",
+            "SELECT COUNT(*) FROM pragma_table_info('semantic_rules') WHERE name = ?1",
             params![name],
             |row| row.get(0),
         )?;
         if present == 0 {
-            connection
-                .execute(&format!("ALTER TABLE cwt_rules ADD COLUMN {name} {definition}"), [])?;
+            connection.execute(
+                &format!("ALTER TABLE semantic_rules ADD COLUMN {name} {definition}"),
+                [],
+            )?;
         }
     }
     for (name, definition) in [
@@ -1415,13 +1474,13 @@ fn ensure_cwt_columns(connection: &Connection) -> Result<(), RulesError> {
         ("type_key_filter_negate", "INTEGER NOT NULL DEFAULT 0"),
     ] {
         let present: i64 = connection.query_row(
-            "SELECT COUNT(*) FROM pragma_table_info('cwt_type_descriptors') WHERE name = ?1",
+            "SELECT COUNT(*) FROM pragma_table_info('type_descriptors') WHERE name = ?1",
             params![name],
             |row| row.get(0),
         )?;
         if present == 0 {
             connection.execute(
-                &format!("ALTER TABLE cwt_type_descriptors ADD COLUMN {name} {definition}"),
+                &format!("ALTER TABLE type_descriptors ADD COLUMN {name} {definition}"),
                 [],
             )?;
         }
@@ -1432,7 +1491,7 @@ fn ensure_cwt_columns(connection: &Connection) -> Result<(), RulesError> {
 fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), RulesError> {
     schema(connection)?;
     let transaction = connection.transaction()?;
-    transaction.execute_batch("DELETE FROM metadata; DELETE FROM interned_names; DELETE FROM file_categories; DELETE FROM symbol_descriptors; DELETE FROM cwt_enum_values; DELETE FROM cwt_type_root_keys; DELETE FROM cwt_type_root_scopes; DELETE FROM cwt_type_descriptors; DELETE FROM cwt_rules; DELETE FROM rule_fields; DELETE FROM rule_records;")?;
+    transaction.execute_batch("DELETE FROM metadata; DELETE FROM interned_names; DELETE FROM file_categories; DELETE FROM symbol_descriptors; DELETE FROM enum_values; DELETE FROM type_root_keys; DELETE FROM type_root_scopes; DELETE FROM type_descriptors; DELETE FROM semantic_rules; DELETE FROM rule_fields; DELETE FROM rule_records;")?;
     transaction.execute(
         "INSERT INTO metadata(key, value) VALUES ('schema_version', ?1), ('rule_hash', ?2), ('game_id', ?3)",
         params![rules.schema_version.to_string(), rules.rule_hash.to_hex(), rules.game_id()],
@@ -1452,11 +1511,11 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
             transaction.execute("INSERT INTO rule_fields(table_name, logical_id, field_name, field_value) VALUES (?1, ?2, ?3, ?4)", params![record.table, record.logical_id, field_name, field_value])?;
         }
     }
-    for rule in &rules.model.cwt.rules {
-        let (key_kind, key_value) = cwt_key_columns(&rule.key);
-        let (value_kind, value_arg, value_min, value_max) = cwt_value_columns(&rule.value);
+    for rule in &rules.model.semantic.rules {
+        let (key_kind, key_value) = semantic_key_columns(&rule.key);
+        let (value_kind, value_arg, value_min, value_max) = semantic_value_columns(&rule.value);
         transaction.execute(
-            "INSERT INTO cwt_rules(id, context, parent_path, key_kind, key_value, operator, value_kind, value_arg, value_min, value_max, shape, child_context, alternative_id, severity, required, documentation, allowed_scopes, push_scope, replace_scope, min_occurs, strict_min, max_occurs, source_file, line) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
+            "INSERT INTO semantic_rules(id, context, parent_path, key_kind, key_value, operator, value_kind, value_arg, value_min, value_max, shape, child_context, alternative_id, severity, required, documentation, allowed_scopes, push_scope, replace_scope, min_occurs, strict_min, max_occurs, source_file, line) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
             params![
                 rule.id,
                 rule.context,
@@ -1485,33 +1544,33 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
             ],
         )?;
     }
-    for (name, values) in &rules.model.cwt.enum_values {
+    for (name, values) in &rules.model.semantic.enum_values {
         for value in values {
             transaction.execute(
-                "INSERT INTO cwt_enum_values(enum_name, value) VALUES (?1, ?2)",
+                "INSERT INTO enum_values(enum_name, value) VALUES (?1, ?2)",
                 params![name, value],
             )?;
         }
     }
-    for (type_name, roots) in &rules.model.cwt.type_root_keys {
+    for (type_name, roots) in &rules.model.semantic.type_root_keys {
         for root in roots {
             transaction.execute(
-                "INSERT INTO cwt_type_root_keys(type_name, root_key) VALUES (?1, ?2)",
+                "INSERT INTO type_root_keys(type_name, root_key) VALUES (?1, ?2)",
                 params![type_name, root],
             )?;
         }
     }
-    for (type_name, scopes) in &rules.model.cwt.type_root_scopes {
+    for (type_name, scopes) in &rules.model.semantic.type_root_scopes {
         for (root, scope) in scopes {
             transaction.execute(
-                "INSERT INTO cwt_type_root_scopes(type_name, root_key, scope) VALUES (?1, ?2, ?3)",
+                "INSERT INTO type_root_scopes(type_name, root_key, scope) VALUES (?1, ?2, ?3)",
                 params![type_name, root, scope],
             )?;
         }
     }
-    for (type_name, descriptor) in &rules.model.cwt.type_descriptors {
+    for (type_name, descriptor) in &rules.model.semantic.type_descriptors {
         transaction.execute(
-            "INSERT INTO cwt_type_descriptors(type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            "INSERT INTO type_descriptors(type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 type_name,
                 descriptor.path,
@@ -1542,35 +1601,35 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
     Ok(())
 }
 
-fn cwt_key_columns(matcher: &CwtKeyMatcher) -> (&'static str, Option<&str>) {
+fn semantic_key_columns(matcher: &KeyMatcher) -> (&'static str, Option<&str>) {
     match matcher {
-        CwtKeyMatcher::Exact(value) => ("exact", Some(value)),
-        CwtKeyMatcher::Type(value) => ("type", Some(value)),
-        CwtKeyMatcher::Enum(value) => ("enum", Some(value)),
-        CwtKeyMatcher::AnyScalar => ("any", None),
-        CwtKeyMatcher::Dynamic(value) => ("dynamic", Some(value)),
+        KeyMatcher::Exact(value) => ("exact", Some(value)),
+        KeyMatcher::Type(value) => ("type", Some(value)),
+        KeyMatcher::Enum(value) => ("enum", Some(value)),
+        KeyMatcher::AnyScalar => ("any", None),
+        KeyMatcher::Dynamic(value) => ("dynamic", Some(value)),
     }
 }
 
-fn cwt_value_columns(
-    matcher: &CwtValueMatcher,
+fn semantic_value_columns(
+    matcher: &ValueMatcher,
 ) -> (&'static str, Option<&str>, Option<String>, Option<String>) {
     match matcher {
-        CwtValueMatcher::AnyScalar => ("any", None, None, None),
-        CwtValueMatcher::Exact(value) => ("exact", Some(value), None, None),
-        CwtValueMatcher::Bool => ("bool", None, None, None),
-        CwtValueMatcher::Int { min, max } => {
+        ValueMatcher::AnyScalar => ("any", None, None, None),
+        ValueMatcher::Exact(value) => ("exact", Some(value), None, None),
+        ValueMatcher::Bool => ("bool", None, None, None),
+        ValueMatcher::Int { min, max } => {
             ("int", None, min.map(|value| value.to_string()), max.map(|value| value.to_string()))
         }
-        CwtValueMatcher::Float { min, max } => ("float", None, min.clone(), max.clone()),
-        CwtValueMatcher::Type(value) => ("type", Some(value), None, None),
-        CwtValueMatcher::Enum(value) => ("enum", Some(value), None, None),
-        CwtValueMatcher::Scope(value) => ("scope", value.as_deref(), None, None),
-        CwtValueMatcher::Localisation => ("localisation", None, None, None),
-        CwtValueMatcher::Filepath => ("filepath", None, None, None),
-        CwtValueMatcher::Dynamic(value) => ("dynamic", Some(value), None, None),
-        CwtValueMatcher::DynamicSet(value) => ("dynamic-set", Some(value), None, None),
-        CwtValueMatcher::Opaque(value) => ("opaque", Some(value), None, None),
+        ValueMatcher::Float { min, max } => ("float", None, min.clone(), max.clone()),
+        ValueMatcher::Type(value) => ("type", Some(value), None, None),
+        ValueMatcher::Enum(value) => ("enum", Some(value), None, None),
+        ValueMatcher::Scope(value) => ("scope", value.as_deref(), None, None),
+        ValueMatcher::Localisation => ("localisation", None, None, None),
+        ValueMatcher::Filepath => ("filepath", None, None, None),
+        ValueMatcher::Dynamic(value) => ("dynamic", Some(value), None, None),
+        ValueMatcher::DynamicSet(value) => ("dynamic-set", Some(value), None, None),
+        ValueMatcher::Opaque(value) => ("opaque", Some(value), None, None),
     }
 }
 
@@ -1659,20 +1718,20 @@ fn read_model(connection: &Connection) -> Result<RulesModel, RulesError> {
         }
         records.push(RuleRecord { table, logical_id, source_order, fields });
     }
-    let cwt = read_cwt_model(connection)?;
+    let semantic = read_semantic_model(connection)?;
     Ok(RulesModel {
         game_id: String::new(),
         file_categories: categories,
         symbol_descriptors: descriptors,
         records,
-        cwt,
+        semantic,
     })
 }
 
-fn read_cwt_model(connection: &Connection) -> Result<CwtSemanticModel, RulesError> {
+fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesError> {
     let mut rules = Vec::new();
     let mut statement = connection.prepare(
-        "SELECT id, context, parent_path, key_kind, key_value, operator, value_kind, value_arg, value_min, value_max, shape, child_context, alternative_id, severity, required, documentation, allowed_scopes, push_scope, replace_scope, min_occurs, strict_min, max_occurs, source_file, line FROM cwt_rules ORDER BY id",
+        "SELECT id, context, parent_path, key_kind, key_value, operator, value_kind, value_arg, value_min, value_max, shape, child_context, alternative_id, severity, required, documentation, allowed_scopes, push_scope, replace_scope, min_occurs, strict_min, max_occurs, source_file, line FROM semantic_rules ORDER BY id",
     )?;
     let rows = statement.query_map([], |row| {
         let key_kind: String = row.get(3)?;
@@ -1693,19 +1752,19 @@ fn read_cwt_model(connection: &Connection) -> Result<CwtSemanticModel, RulesErro
         let replace_scope: Option<String> = row.get(18)?;
         let min_occurs: Option<u32> = row.get(19)?;
         let strict_min: bool = row.get::<_, i64>(20)? != 0;
-        let key = decode_cwt_key(&key_kind, key_value.as_deref())
+        let key = decode_semantic_key(&key_kind, key_value.as_deref())
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
-        let value = decode_cwt_value(
+        let value = decode_semantic_value(
             &value_kind,
             value_arg.as_deref(),
             value_min.as_deref(),
             value_max.as_deref(),
         )
         .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
-        let shape = CwtRuleShape::parse(&shape_name)
+        let shape = RuleShape::parse(&shape_name)
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
         let parent_path: String = row.get(2)?;
-        Ok(CwtSemanticRule {
+        Ok(SemanticRule {
             id: row.get(0)?,
             context: row.get(1)?,
             parent_path: if parent_path.is_empty() {
@@ -1745,8 +1804,8 @@ fn read_cwt_model(connection: &Connection) -> Result<CwtSemanticModel, RulesErro
     }
 
     let mut enum_values = BTreeMap::new();
-    let mut statement = connection
-        .prepare("SELECT enum_name, value FROM cwt_enum_values ORDER BY enum_name, value")?;
+    let mut statement =
+        connection.prepare("SELECT enum_name, value FROM enum_values ORDER BY enum_name, value")?;
     let rows =
         statement.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?;
     for row in rows {
@@ -1754,9 +1813,8 @@ fn read_cwt_model(connection: &Connection) -> Result<CwtSemanticModel, RulesErro
         enum_values.entry(name).or_insert_with(Vec::new).push(value);
     }
     let mut type_root_keys = BTreeMap::new();
-    let mut statement = connection.prepare(
-        "SELECT type_name, root_key FROM cwt_type_root_keys ORDER BY type_name, root_key",
-    )?;
+    let mut statement = connection
+        .prepare("SELECT type_name, root_key FROM type_root_keys ORDER BY type_name, root_key")?;
     let rows =
         statement.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?;
     for row in rows {
@@ -1765,7 +1823,7 @@ fn read_cwt_model(connection: &Connection) -> Result<CwtSemanticModel, RulesErro
     }
     let mut type_root_scopes = BTreeMap::new();
     let mut statement = connection.prepare(
-        "SELECT type_name, root_key, scope FROM cwt_type_root_scopes ORDER BY type_name, root_key",
+        "SELECT type_name, root_key, scope FROM type_root_scopes ORDER BY type_name, root_key",
     )?;
     let rows = statement.query_map([], |row| {
         Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
@@ -1776,14 +1834,14 @@ fn read_cwt_model(connection: &Connection) -> Result<CwtSemanticModel, RulesErro
     }
     let mut type_descriptors = BTreeMap::new();
     let mut statement = connection.prepare(
-        "SELECT type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate FROM cwt_type_descriptors ORDER BY type_name",
+        "SELECT type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate FROM type_descriptors ORDER BY type_name",
     )?;
     let rows = statement.query_map([], |row| {
         let type_name: String = row.get(0)?;
         let skip_root_paths: String = row.get(6)?;
         let type_key_filter: String = row.get(10)?;
         let type_key_filter_negate: bool = row.get::<_, i64>(11)? != 0;
-        Ok(CwtTypeDescriptor {
+        Ok(TypeDescriptor {
             name: type_name.clone(),
             path: row.get(1)?,
             path_file: row.get(2)?,
@@ -1815,50 +1873,48 @@ fn read_cwt_model(connection: &Connection) -> Result<CwtSemanticModel, RulesErro
         let descriptor = row?;
         type_descriptors.insert(descriptor.name.clone(), descriptor);
     }
-    Ok(CwtSemanticModel { rules, enum_values, type_root_keys, type_root_scopes, type_descriptors })
+    Ok(SemanticModel { rules, enum_values, type_root_keys, type_root_scopes, type_descriptors })
 }
 
-fn decode_cwt_key(kind: &str, value: Option<&str>) -> Result<CwtKeyMatcher, RulesError> {
+fn decode_semantic_key(kind: &str, value: Option<&str>) -> Result<KeyMatcher, RulesError> {
     Ok(match kind {
-        "exact" => CwtKeyMatcher::Exact(value.unwrap_or_default().to_owned()),
-        "type" => CwtKeyMatcher::Type(value.unwrap_or_default().to_owned()),
-        "enum" => CwtKeyMatcher::Enum(value.unwrap_or_default().to_owned()),
-        "any" => CwtKeyMatcher::AnyScalar,
-        "dynamic" => CwtKeyMatcher::Dynamic(value.unwrap_or_default().to_owned()),
-        other => return Err(RulesError::InvalidCwtShape(other.to_owned())),
+        "exact" => KeyMatcher::Exact(value.unwrap_or_default().to_owned()),
+        "type" => KeyMatcher::Type(value.unwrap_or_default().to_owned()),
+        "enum" => KeyMatcher::Enum(value.unwrap_or_default().to_owned()),
+        "any" => KeyMatcher::AnyScalar,
+        "dynamic" => KeyMatcher::Dynamic(value.unwrap_or_default().to_owned()),
+        other => return Err(RulesError::InvalidRuleShape(other.to_owned())),
     })
 }
 
-fn decode_cwt_value(
+fn decode_semantic_value(
     kind: &str,
     arg: Option<&str>,
     min: Option<&str>,
     max: Option<&str>,
-) -> Result<CwtValueMatcher, RulesError> {
+) -> Result<ValueMatcher, RulesError> {
     Ok(match kind {
-        "any" => CwtValueMatcher::AnyScalar,
-        "exact" => CwtValueMatcher::Exact(arg.unwrap_or_default().to_owned()),
-        "bool" => CwtValueMatcher::Bool,
-        "int" => CwtValueMatcher::Int {
+        "any" => ValueMatcher::AnyScalar,
+        "exact" => ValueMatcher::Exact(arg.unwrap_or_default().to_owned()),
+        "bool" => ValueMatcher::Bool,
+        "int" => ValueMatcher::Int {
             min: min.map(str::parse).transpose().map_err(|_| {
-                RulesError::InvalidCwtShape("invalid integer matcher bound".to_owned())
+                RulesError::InvalidRuleShape("invalid integer matcher bound".to_owned())
             })?,
             max: max.map(str::parse).transpose().map_err(|_| {
-                RulesError::InvalidCwtShape("invalid integer matcher bound".to_owned())
+                RulesError::InvalidRuleShape("invalid integer matcher bound".to_owned())
             })?,
         },
-        "float" => {
-            CwtValueMatcher::Float { min: min.map(str::to_owned), max: max.map(str::to_owned) }
-        }
-        "type" => CwtValueMatcher::Type(arg.unwrap_or_default().to_owned()),
-        "enum" => CwtValueMatcher::Enum(arg.unwrap_or_default().to_owned()),
-        "scope" => CwtValueMatcher::Scope(arg.map(str::to_owned)),
-        "localisation" => CwtValueMatcher::Localisation,
-        "filepath" => CwtValueMatcher::Filepath,
-        "dynamic" => CwtValueMatcher::Dynamic(arg.unwrap_or_default().to_owned()),
-        "dynamic-set" => CwtValueMatcher::DynamicSet(arg.unwrap_or_default().to_owned()),
-        "opaque" => CwtValueMatcher::Opaque(arg.unwrap_or_default().to_owned()),
-        other => return Err(RulesError::InvalidCwtShape(other.to_owned())),
+        "float" => ValueMatcher::Float { min: min.map(str::to_owned), max: max.map(str::to_owned) },
+        "type" => ValueMatcher::Type(arg.unwrap_or_default().to_owned()),
+        "enum" => ValueMatcher::Enum(arg.unwrap_or_default().to_owned()),
+        "scope" => ValueMatcher::Scope(arg.map(str::to_owned)),
+        "localisation" => ValueMatcher::Localisation,
+        "filepath" => ValueMatcher::Filepath,
+        "dynamic" => ValueMatcher::Dynamic(arg.unwrap_or_default().to_owned()),
+        "dynamic-set" => ValueMatcher::DynamicSet(arg.unwrap_or_default().to_owned()),
+        "opaque" => ValueMatcher::Opaque(arg.unwrap_or_default().to_owned()),
+        other => return Err(RulesError::InvalidRuleShape(other.to_owned())),
     })
 }
 

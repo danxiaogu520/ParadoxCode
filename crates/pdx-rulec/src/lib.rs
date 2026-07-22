@@ -1,0 +1,360 @@
+//! Compiler for ParadoxCode's strict, first-party rule source format.
+//!
+//! This crate deliberately has no external rule-language parser or compatibility layer. Its only
+//! accepted input is the versioned source tree owned and reviewed in this repository.
+
+use std::collections::BTreeSet;
+use std::fmt;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use pdx_rules::{
+    FileCategory, RuleRecord, RuleSet, RulesError, RulesModel, SemanticModel, SymbolDescriptor,
+};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use sha2::{Digest, Sha256};
+
+/// Current version of the developer-maintained source layout.
+pub const SOURCE_FORMAT_VERSION: u32 = 1;
+
+const SOURCE_MANIFEST: &str = "manifest.json";
+const CATALOG: &str = "catalog.json";
+const SEMANTIC_RULES: &str = "semantic-rules.json";
+const ENUM_VALUES: &str = "enum-values.json";
+const TYPE_ROOT_KEYS: &str = "type-root-keys.json";
+const TYPE_ROOT_SCOPES: &str = "type-root-scopes.json";
+const TYPE_DESCRIPTORS: &str = "type-descriptors.json";
+
+/// Identity and compatibility metadata maintained with the rule source.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SourceManifest {
+    /// Strict source layout version.
+    pub source_format_version: u32,
+    /// Game profile selected by this source tree.
+    pub game_id: String,
+    /// Human-readable game release supported by this rule revision.
+    pub target_game_version: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CatalogSource {
+    file_categories: Vec<FileCategory>,
+    symbol_descriptors: Vec<SymbolDescriptor>,
+    records: Vec<RuleRecord>,
+}
+
+/// Release manifest generated from validated first-party source.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ArtifactManifest {
+    /// Rules artifact schema version.
+    pub schema_version: u32,
+    /// First-party source layout version.
+    pub source_format_version: u32,
+    /// Game profile identity.
+    pub game_id: String,
+    /// Supported game release.
+    pub target_game_version: String,
+    /// Canonical logical content hash.
+    pub rule_hash: String,
+    /// SHA-256 of the generated artifact bytes.
+    pub artifact_sha256: String,
+    /// Number of executable semantic rule alternatives.
+    pub semantic_rule_count: usize,
+    /// Number of file categories.
+    pub file_category_count: usize,
+    /// Number of symbol descriptors.
+    pub symbol_descriptor_count: usize,
+}
+
+/// Errors emitted by source loading, validation, and artifact publication.
+#[derive(Debug)]
+pub enum CompileError {
+    /// Filesystem failure at a named path.
+    Io { path: PathBuf, source: std::io::Error },
+    /// Strict JSON decoding failure at a named path.
+    Json { path: PathBuf, source: serde_json::Error },
+    /// Normalized rules runtime rejected the generated artifact.
+    Rules(RulesError),
+    /// Source metadata or cross-record invariants are invalid.
+    Validation(String),
+}
+
+impl fmt::Display for CompileError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Io { path, source } => {
+                write!(formatter, "rule source I/O error at {}: {source}", path.display())
+            }
+            Self::Json { path, source } => {
+                write!(formatter, "rule source JSON error at {}: {source}", path.display())
+            }
+            Self::Rules(error) => write!(formatter, "generated rules are invalid: {error}"),
+            Self::Validation(message) => write!(formatter, "invalid first-party rules: {message}"),
+        }
+    }
+}
+
+impl std::error::Error for CompileError {}
+
+impl From<RulesError> for CompileError {
+    fn from(error: RulesError) -> Self {
+        Self::Rules(error)
+    }
+}
+
+/// Loads and validates one complete first-party source tree.
+pub fn load_source(source: &Path) -> Result<(SourceManifest, RulesModel), CompileError> {
+    validate_source_layout(source)?;
+    let manifest: SourceManifest = read_json(&source.join(SOURCE_MANIFEST))?;
+    if manifest.source_format_version != SOURCE_FORMAT_VERSION {
+        return Err(CompileError::Validation(format!(
+            "unsupported source format version {}; expected {SOURCE_FORMAT_VERSION}",
+            manifest.source_format_version
+        )));
+    }
+    if manifest.game_id.trim().is_empty() {
+        return Err(CompileError::Validation("game_id must not be empty".to_owned()));
+    }
+    if manifest.target_game_version.trim().is_empty() {
+        return Err(CompileError::Validation("target_game_version must not be empty".to_owned()));
+    }
+
+    let catalog: CatalogSource = read_json(&source.join(CATALOG))?;
+    let semantic = SemanticModel {
+        rules: read_json(&source.join(SEMANTIC_RULES))?,
+        enum_values: read_json(&source.join(ENUM_VALUES))?,
+        type_root_keys: read_json(&source.join(TYPE_ROOT_KEYS))?,
+        type_root_scopes: read_json(&source.join(TYPE_ROOT_SCOPES))?,
+        type_descriptors: read_json(&source.join(TYPE_DESCRIPTORS))?,
+    };
+    let model = RulesModel {
+        game_id: manifest.game_id.clone(),
+        file_categories: catalog.file_categories,
+        symbol_descriptors: catalog.symbol_descriptors,
+        records: catalog.records,
+        semantic,
+    };
+    validate_model(&model)?;
+    Ok((manifest, model))
+}
+
+/// Compiles source into a validated SQLite artifact and release manifest.
+pub fn compile(
+    source: &Path,
+    output: &Path,
+    manifest_output: &Path,
+) -> Result<ArtifactManifest, CompileError> {
+    let (source_manifest, model) = load_source(source)?;
+    let rules = RuleSet::from_model(model);
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|source| CompileError::Io { path: parent.to_owned(), source })?;
+    }
+    let temporary = temporary_path(output);
+    if temporary.exists() {
+        fs::remove_file(&temporary)
+            .map_err(|source| CompileError::Io { path: temporary.clone(), source })?;
+    }
+    rules.write_sqlite(&temporary)?;
+    let loaded = RuleSet::load(&temporary)?;
+    if loaded != rules {
+        return Err(CompileError::Validation(
+            "generated artifact does not round-trip to the source model".to_owned(),
+        ));
+    }
+    let bytes = fs::read(&temporary)
+        .map_err(|source| CompileError::Io { path: temporary.clone(), source })?;
+    let artifact_manifest = ArtifactManifest {
+        schema_version: loaded.schema_version(),
+        source_format_version: source_manifest.source_format_version,
+        game_id: source_manifest.game_id,
+        target_game_version: source_manifest.target_game_version,
+        rule_hash: loaded.rule_hash().to_hex(),
+        artifact_sha256: format!("{:x}", Sha256::digest(&bytes)),
+        semantic_rule_count: loaded.model().semantic.rules.len(),
+        file_category_count: loaded.model().file_categories.len(),
+        symbol_descriptor_count: loaded.model().symbol_descriptors.len(),
+    };
+    write_json(manifest_output, &artifact_manifest)?;
+    if output.exists() {
+        fs::remove_file(output)
+            .map_err(|source| CompileError::Io { path: output.to_owned(), source })?;
+    }
+    fs::rename(&temporary, output)
+        .map_err(|source| CompileError::Io { path: output.to_owned(), source })?;
+    Ok(artifact_manifest)
+}
+
+fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
+    unique_nonempty(model.file_categories.iter().map(|item| item.id.as_str()), "file category")?;
+    unique_nonempty(
+        model.symbol_descriptors.iter().map(|item| item.kind_id.as_str()),
+        "symbol descriptor",
+    )?;
+    unique_nonempty(model.semantic.rules.iter().map(|item| item.id.as_str()), "semantic rule")?;
+    for rule in &model.semantic.rules {
+        if rule.context.trim().is_empty() {
+            return Err(CompileError::Validation(format!(
+                "semantic rule {} has an empty context",
+                rule.id
+            )));
+        }
+        if rule.severity.is_some_and(|severity| !(1..=3).contains(&severity)) {
+            return Err(CompileError::Validation(format!(
+                "semantic rule {} has invalid severity",
+                rule.id
+            )));
+        }
+        if rule.min_occurs.zip(rule.max_occurs).is_some_and(|(min, max)| min > max) {
+            return Err(CompileError::Validation(format!(
+                "semantic rule {} has minimum cardinality greater than maximum",
+                rule.id
+            )));
+        }
+    }
+    for (identity, descriptor) in &model.semantic.type_descriptors {
+        if identity != &descriptor.name {
+            return Err(CompileError::Validation(format!(
+                "type descriptor key {identity} disagrees with embedded name {}",
+                descriptor.name
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_source_layout(source: &Path) -> Result<(), CompileError> {
+    let expected = BTreeSet::from([
+        SOURCE_MANIFEST,
+        CATALOG,
+        SEMANTIC_RULES,
+        ENUM_VALUES,
+        TYPE_ROOT_KEYS,
+        TYPE_ROOT_SCOPES,
+        TYPE_DESCRIPTORS,
+    ]);
+    let entries = fs::read_dir(source)
+        .map_err(|error| CompileError::Io { path: source.to_owned(), source: error })?;
+    for entry in entries {
+        let entry =
+            entry.map_err(|error| CompileError::Io { path: source.to_owned(), source: error })?;
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|error| CompileError::Io { path: path.clone(), source: error })?;
+        if !file_type.is_file() {
+            return Err(CompileError::Validation(format!(
+                "rule source entry must be a regular file: {}",
+                path.display()
+            )));
+        }
+        let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+            return Err(CompileError::Validation(format!(
+                "rule source filename is not UTF-8: {}",
+                path.display()
+            )));
+        };
+        if !expected.contains(name.as_str()) {
+            return Err(CompileError::Validation(format!("unknown rule source file: {name}")));
+        }
+    }
+    Ok(())
+}
+
+fn unique_nonempty<'a>(
+    values: impl Iterator<Item = &'a str>,
+    family: &str,
+) -> Result<(), CompileError> {
+    let mut seen = BTreeSet::new();
+    for value in values {
+        if value.trim().is_empty() {
+            return Err(CompileError::Validation(format!("{family} identity must not be empty")));
+        }
+        if !seen.insert(value) {
+            return Err(CompileError::Validation(format!("duplicate {family} identity: {value}")));
+        }
+    }
+    Ok(())
+}
+
+fn read_json<T: DeserializeOwned>(path: &Path) -> Result<T, CompileError> {
+    let bytes =
+        fs::read(path).map_err(|source| CompileError::Io { path: path.to_owned(), source })?;
+    serde_json::from_slice(&bytes)
+        .map_err(|source| CompileError::Json { path: path.to_owned(), source })
+}
+
+fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), CompileError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|source| CompileError::Io { path: parent.to_owned(), source })?;
+    }
+    let mut bytes = serde_json::to_vec_pretty(value)
+        .map_err(|source| CompileError::Json { path: path.to_owned(), source })?;
+    bytes.push(b'\n');
+    fs::write(path, bytes).map_err(|source| CompileError::Io { path: path.to_owned(), source })
+}
+
+fn temporary_path(output: &Path) -> PathBuf {
+    let name = output.file_name().and_then(|name| name.to_str()).unwrap_or("rules.pdxrules");
+    output.with_file_name(format!(".{name}.{}.tmp", std::process::id()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdx_rules::{KeyMatcher, RuleShape, SemanticRule, ValueMatcher};
+
+    #[test]
+    fn validation_rejects_duplicate_rule_ids_and_invalid_cardinality() {
+        let rule = SemanticRule {
+            id: "duplicate".to_owned(),
+            context: "root".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("key".to_owned()),
+            operator: None,
+            value: ValueMatcher::AnyScalar,
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: Some(2),
+            strict_min: true,
+            max_occurs: Some(1),
+            source_file: "semantic-rules.json".to_owned(),
+            line: 1,
+        };
+        let mut model = RulesModel { game_id: "eu4".to_owned(), ..RulesModel::default() };
+        model.semantic.rules = vec![rule.clone(), rule];
+        assert!(validate_model(&model).is_err());
+    }
+
+    #[test]
+    fn committed_source_reproduces_the_release_manifest() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let expected: ArtifactManifest =
+            read_json(&root.join("rules/manifest.json")).expect("committed manifest");
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!("pdx-rulec-test-{nonce}"));
+        fs::create_dir_all(&directory).expect("temporary directory");
+        let actual = compile(
+            &root.join("rules/eu4"),
+            &directory.join("eu4.pdxrules"),
+            &directory.join("manifest.json"),
+        )
+        .expect("compile committed first-party source");
+        assert_eq!(actual, expected);
+        fs::remove_dir_all(directory).expect("cleanup");
+    }
+}

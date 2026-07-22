@@ -40,7 +40,7 @@ in [the implementation plan](plan.md) and [the MVP definition](docs/mvp.md).
 
 Current release blockers include:
 
-- embedding the first-party rules artifact so runtime rule injection is not accepted;
+- completing release checks for the embedded first-party rules artifact;
 - automatic, checksummed `pdx-ls` downloads from the Zed extension;
 - native Windows and other supported-platform release artifacts;
 - a clean-machine Zed install and startup smoke test;
@@ -91,9 +91,12 @@ python3 scripts/check-zed-extension.py
 bash scripts/check-phase6a.sh
 ```
 
-The full importer check additionally requires the pinned, local research checkout described in
-[the reference study](docs/reference-study.md). That checkout is not a runtime or release
-dependency.
+Compile the developer-maintained first-party rule source with `pdx-rulec`; no external checkout or
+rule corpus is required:
+
+```bash
+cargo run -p pdx-rulec -- build --source rules/eu4 --output rules/eu4.pdxrules --manifest rules/manifest.json
+```
 
 ## Development setup
 
@@ -105,13 +108,11 @@ Build or manually refresh a local Vanilla index with the current alpha CLI:
 
 ```bash
 pdx index vanilla \
-  --rules /path/to/eu4.pdxrules \
   --source /path/to/eu4 \
   --output /path/to/vanilla.pdxindex
 ```
 
-The external `--rules` argument is scheduled for removal before release when first-party rules are
-embedded in the official binaries.
+The CLI and language server use the embedded first-party EU4 rules and reject external rule inputs.
 
 ## Repository layout
 
@@ -120,7 +121,7 @@ embedded in the official binaries.
 | `crates/` | Rust parser, rules, HIR, workspace, analysis, formatter, LSP, and CLI crates |
 | `editors/zed/` | Thin Zed extension, language metadata, and queries |
 | `grammars/` | Editor-only Tree-sitter grammars and corpus tests |
-| `rules/` | Validated EU4 rules artifact and provenance metadata |
+| `rules/` | Authoritative first-party EU4 source and generated artifact/manifest |
 | `docs/` | Architecture, accepted RFCs, configuration, and release criteria |
 | `fuzz/` | Parser, edit, and formatter fuzz targets |
 | `scripts/` | Reproducible project quality checks |
@@ -137,5 +138,5 @@ Please do not report security vulnerabilities through public issues. Follow
 ## License
 
 ParadoxCode source code is available under the [MIT License](LICENSE). The repository does not
-redistribute EU4 game files, user Vanilla caches, or the original CWT source corpus. Rules artifact
-provenance and redistribution boundaries are documented in [rules/README.md](rules/README.md).
+redistribute EU4 game files, user Vanilla caches, or external rule corpora. Rule maintenance and
+redistribution boundaries are documented in [rules/README.md](rules/README.md).

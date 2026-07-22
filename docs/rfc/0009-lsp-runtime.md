@@ -28,7 +28,7 @@ MVP 只支持 stdio，stdout 专用于协议。日志写 stderr 或 LSP logging 
 Server 必须通过进程参数获得规则文件：
 
 ```text
-pdx-ls --rules <extension-install>/eu4.pdxrules
+pdx-ls
 ```
 
 `pdx-ls` 不内嵌、下载、更新或搜索规则。启动时校验 SQLite schema 和 `rule_hash`；失败则保留 syntax-only 能力并报告 workspace error。

@@ -263,10 +263,10 @@ impl<'source> Parser<'source> {
             }
             if byte == b'\\' {
                 self.position += 1;
-                if self.position < self.source.len() {
-                    if let Some(character) = self.source[self.position..].chars().next() {
-                        self.position += character.len_utf8();
-                    }
+                if self.position < self.source.len()
+                    && let Some(character) = self.source[self.position..].chars().next()
+                {
+                    self.position += character.len_utf8();
                 }
             } else if let Some(character) = self.source[self.position..].chars().next() {
                 self.position += character.len_utf8();

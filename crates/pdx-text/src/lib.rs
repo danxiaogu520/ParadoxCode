@@ -83,10 +83,10 @@ impl LineIndex {
     pub fn new(text: &str) -> Self {
         let mut line_starts = vec![0];
         for (offset, byte) in text.bytes().enumerate() {
-            if byte == b'\n' {
-                if let Ok(next) = TextSize::try_from(offset + 1) {
-                    line_starts.push(next);
-                }
+            if byte == b'\n'
+                && let Ok(next) = TextSize::try_from(offset + 1)
+            {
+                line_starts.push(next);
             }
         }
         let text_len = TextSize::try_from(text.len()).unwrap_or(TextSize::MAX);

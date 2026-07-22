@@ -4,12 +4,12 @@ fn main() -> Result<(), pdx_lsp::LspError> {
         println!("pdx-ls 0.1.0");
         return Ok(());
     }
-    let rules_path = args
-        .windows(2)
-        .find(|window| window[0] == "--rules")
-        .map(|window| std::path::PathBuf::from(&window[1]));
+    if !args.is_empty() {
+        return Err(pdx_lsp::LspError::Protocol(format!("unknown pdx-ls argument: {}", args[0])));
+    }
     pdx_lsp::LspServer::run_stdio_with_profile(
-        pdx_lsp::InitializeOptions { rules_path },
+        pdx_lsp::InitializeOptions,
+        pdx_game_eu4::first_party_rules()?,
         pdx_game_eu4::profile(),
     )
 }

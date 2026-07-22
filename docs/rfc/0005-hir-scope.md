@@ -5,7 +5,7 @@
 
 ## 实现状态（2026-07-20）
 
-第一段增量实现已经落地：`HirFile` 按源顺序保留 property path、key/value 精确 range、直接 scalar、非 key bare value 与 localisation entry；同一份不可变 HIR 由 `FileState`/overlay snapshot 缓存，并被 workspace 基础 index shard 和 analysis 的属性、definition、reference 查询共享。CWT type 匹配和 scripted parameter 扫描暂时保留各自的专用 CST/token 视图。
+第一段增量实现已经落地：`HirFile` 按源顺序保留 property path、key/value 精确 range、直接 scalar、非 key bare value 与 localisation entry；同一份不可变 HIR 由 `FileState`/overlay snapshot 缓存，并被 workspace 基础 index shard 和 analysis 的属性、definition、reference 查询共享。semantic type 匹配和 scripted parameter 扫描暂时保留各自的专用 CST/token 视图。
 
 本 RFC 描述的 typed semantic item、unknown construct、definition/reference fact、显式 `GameProfile` 输入和完整 scope evaluator 尚未完成。当前 `Scope` 仍保守为 `Unknown`，因此不能把本切片标记为“真实语义 HIR 全部完成”。
 

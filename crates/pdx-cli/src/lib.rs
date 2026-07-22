@@ -3,13 +3,12 @@
 use std::fmt;
 use std::path::PathBuf;
 
-use pdx_rules::RuleSet;
 use pdx_workspace::{
     AnalysisHost, SourceRoot, SourceRootId, SourceRootKind, VanillaCacheError, VanillaIndexCache,
     WorkspaceChange, WorkspaceError,
 };
 
-const USAGE: &str = "usage:\n  pdx --version\n  pdx index vanilla --rules <eu4.pdxrules> --source <EU4 directory> --output <cache.pdxindex>";
+const USAGE: &str = "usage:\n  pdx --version\n  pdx index vanilla --source <EU4 directory> --output <cache.pdxindex>";
 
 /// Executes one `pdx` command and returns text intended for stdout.
 pub fn execute_pdx(args: &[String]) -> Result<String, CliError> {
@@ -23,7 +22,6 @@ pub fn execute_pdx(args: &[String]) -> Result<String, CliError> {
 }
 
 fn index_vanilla(args: &[String]) -> Result<String, CliError> {
-    let mut rules = None;
     let mut source = None;
     let mut output = None;
     let mut index = 0;
@@ -33,7 +31,6 @@ fn index_vanilla(args: &[String]) -> Result<String, CliError> {
             .get(index + 1)
             .ok_or_else(|| CliError::Usage(format!("missing value for {flag}\n\n{USAGE}")))?;
         let target = match flag.as_str() {
-            "--rules" => &mut rules,
             "--source" => &mut source,
             "--output" => &mut output,
             _ => return Err(CliError::Usage(format!("unknown option: {flag}\n\n{USAGE}"))),
@@ -43,7 +40,6 @@ fn index_vanilla(args: &[String]) -> Result<String, CliError> {
         }
         index += 2;
     }
-    let rules_path = required_path(rules, "--rules")?;
     let source = required_path(source, "--source")?;
     let output = required_path(output, "--output")?;
     let source = std::fs::canonicalize(&source).map_err(|error| CliError::Path {
@@ -55,8 +51,7 @@ fn index_vanilla(args: &[String]) -> Result<String, CliError> {
         return Err(CliError::Usage(format!("--source is not a directory: {}", source.display())));
     }
 
-    let rules = RuleSet::load(&rules_path)?;
-    rules.ensure_game(pdx_game_eu4::GAME_ID)?;
+    let rules = pdx_game_eu4::first_party_rules()?;
     let mut host = AnalysisHost::with_profile(rules, pdx_game_eu4::profile());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
@@ -153,7 +148,6 @@ impl From<VanillaCacheError> for CliError {
 #[cfg(test)]
 mod tests {
     use std::fs;
-    use std::path::Path;
 
     use pdx_workspace::VanillaIndexCache;
 
@@ -182,12 +176,9 @@ mod tests {
         )
         .expect("fixture source");
         let output = root.join("cache/vanilla.pdxindex");
-        let rules = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let args = vec![
             "index".to_owned(),
             "vanilla".to_owned(),
-            "--rules".to_owned(),
-            rules.display().to_string(),
             "--source".to_owned(),
             source.display().to_string(),
             "--output".to_owned(),

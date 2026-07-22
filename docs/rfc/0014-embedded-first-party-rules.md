@@ -19,9 +19,9 @@ versions can drift; and Windows/WSL testing must translate an extra path across 
 
 ## Decision
 
-`rules/eu4.pdxrules` remains the repository's developer-maintained, auditable rules artifact. It is
-validated during development and release builds, then embedded into the official `pdx` and
-`pdx-ls` binaries as a build input.
+`rules/eu4/` is the repository's developer-maintained authority. `pdx-rulec` validates it and
+generates the auditable `rules/eu4.pdxrules` artifact, which is embedded into the official `pdx`
+and `pdx-ls` binaries as a build input.
 
 Official runtime entry points:
 
@@ -52,13 +52,16 @@ The following remain mandatory:
 
 - schema version and `game_id` validation;
 - canonical logical `rule_hash`;
-- importer/source provenance and redistribution review;
+- first-party source version, target game version, and redistribution review;
 - deterministic regeneration and invariant tests;
 - the rule hash recorded in Vanilla cache metadata;
 - identical embedded logical content across platform builds of one release.
 
 The original CWT corpus remains a local, one-time maintenance input and is never embedded or
 distributed. EU4 Vanilla files and user caches remain excluded from source and releases.
+
+This maintenance-input exception was removed by RFC 0015 on 2026-07-22. The embedded artifact is
+now compiled exclusively from `rules/eu4/`; no CWT input is permitted.
 
 ## Distribution
 

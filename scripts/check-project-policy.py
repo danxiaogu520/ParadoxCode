@@ -21,6 +21,7 @@ REQUIRED_FILES = (
     "SECURITY.md",
     "docs/releasing.md",
     "docs/rfc/0014-embedded-first-party-rules.md",
+    "docs/rfc/0015-first-party-rule-source.md",
     ".github/ISSUE_TEMPLATE/bug_report.yml",
     ".github/ISSUE_TEMPLATE/feature_request.yml",
     ".github/ISSUE_TEMPLATE/config.yml",
@@ -56,6 +57,14 @@ def main() -> int:
 
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         require("## [Unreleased]" in changelog, "CHANGELOG must keep an Unreleased section")
+
+        require(not (ROOT / "crates/pdx-cwt").exists(), "the retired CWT importer must not return")
+        rule_source = ROOT / "rules/eu4"
+        require(rule_source.is_dir(), "first-party EU4 rule source is missing")
+        require(
+            not any(path.suffix.lower() == ".cwt" for path in rule_source.rglob("*")),
+            "CWT files are prohibited in the authoritative rule source",
+        )
 
         metadata = cargo_metadata()
         packages = metadata.get("packages", [])

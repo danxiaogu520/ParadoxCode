@@ -24,7 +24,7 @@ ParadoxCode 采用“通用引擎、游戏 profile、EU4-first”的结构：
 
 ## 用户体验
 
-EU4 v0.1 不要求用户显式选择游戏。`eu4.pdxrules` artifact 自己携带 `game_id = "eu4"`，`pdx-ls --rules <path>` 加载规则后选择 EU4 profile。
+EU4 v0.1 不要求用户显式选择游戏。官方 binary 内嵌携带 `game_id = "eu4"` 的第一方 artifact，并在 composition root 选择 EU4 profile；不存在规则路径参数。
 
 未来可以增加 workspace 自动识别或显式配置，但 server 不应依赖 binary 名称、编辑器名称或硬编码默认路径来判断游戏。
 
@@ -43,8 +43,8 @@ pdx-rules
 pdx-game-eu4
   EU4 profile / scopes / path semantics / special lowering
 
-pdx-cwt
-  CWT import pipeline; v0.1 only emits the EU4 rule artifact
+pdx-rulec
+  strict first-party rule source compiler; emits the EU4 rule artifact
 
 pdx-hir
   CST + RuleSet + game profile -> semantic file
@@ -61,7 +61,7 @@ pdx-lsp
 
 ## 迁移策略
 
-> 实现进度（2026-07-20）：步骤 2–4 已完成。`pdx-rules` 持有通用 runtime 和 data-only `GameProfile` 类型，`pdx-game-eu4` 持有 EU4 profile 数据与 bootstrap catalog，`pdx-eu4` 只剩兼容 re-export。schema 12 已将 `game_id` 纳入 artifact metadata/hash；CLI → LSP → host → snapshot 显式传递并校验所选 profile。workspace symbol/reference 与 analysis scope/key/member fallback 已迁移，通用 runtime 不再含 EU4 名称白名单。步骤 5 已让 HIR 显式消费 `RuleSet`、逻辑路径和 profile，并统一 definition/reference facts；scope 与 CWT typed lowering 尚未完成。
+> 实现进度（2026-07-22）：步骤 2–5 已完成。`pdx-rules` 持有通用 runtime 和 data-only `GameProfile`，`pdx-game-eu4` 持有 EU4 profile 和内嵌 artifact provider，`pdx-eu4` 只剩兼容 re-export。schema 13 与第一方 source format 1 已落地；CLI → LSP → host → snapshot 显式传递并校验 profile。scope semantic lowering 尚未完成。
 
 当前 `pdx-eu4` 同时包含通用规则 runtime 与 EU4 数据。迁移必须分步进行：
 
@@ -71,7 +71,7 @@ pdx-lsp
 4. 将 EU4 scope、path、command 和特殊 symbol 逻辑集中到 `pdx-game-eu4`；
 5. 让 HIR lowering 显式消费 `RuleSet` 与 EU4 profile；
 6. 删除过渡 re-export，并更新 artifact schema metadata；
-7. 最后再评估 `pdx-cwt` 中哪些逻辑可以通用化。
+7. 第一方规则编译器保持独立，不把 authoring concern 引入 runtime。
 
 迁移期间每一步必须保持 workspace 可构建、现有 EU4 行为不变，且不得与 snapshot/index 性能修复混在同一个不可审查的大提交中。
 

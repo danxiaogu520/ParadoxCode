@@ -26,8 +26,8 @@ ParadoxCode 为 Europa Universalis IV（EU4）Mod 提供面向 Zed 的语言工�
 
 - `docs/architecture.md`：总体架构、数据流、crate 依赖和并发模型；
 - `docs/mvp.md`：MVP 成功定义、Phase 0–7 计划和质量预算；
-- `docs/rfc/0001`–`docs/rfc/0012`：系统边界、语法、VFS、规则数据库、HIR、索引、语言功能、格式化、LSP、Zed、测试和 CWT 导入约束；
-- `reference/`：只读的 CWTools、EU4 Config、Jomini 调研 checkout，不是构建依赖；
+- `docs/rfc/0001`–`docs/rfc/0015`：系统边界、语法、VFS、规则数据库、HIR、索引、语言功能、LSP、Zed、测试、内嵌规则和第一方规则源码约束；
+- `reference/`：只读历史调研资料，不是构建、测试或规则维护依赖；
 - Phase 0–6A 已建立 Rust workspace、EU4 parser、CSV/localisation facade、Zed syntax assets、JSON-RPC/LSP runtime、规则数据库、workspace overlay/index、规则驱动语言功能和安全 rename；这些能力是迁移基线，不代表 v0.1 已完成发布。
 
 因此第一步不是实现语言功能，而是建立能够持续验证这些设计的最小工程骨架。
@@ -39,8 +39,8 @@ ParadoxCode 为 Europa Universalis IV（EU4）Mod 提供面向 Zed 的语言工�
 - 游戏：只支持 EU4 的最新/最终版本；
 - 客户端：先支持 Zed；
 - 服务：`pdx-ls`；
-- CLI：用户入口为 `pdx`，规则维护工具为 `pdx-cwt`；
-- 规则：一次性从固定的 EU4 CWT corpus 导入自有 `eu4.pdxrules`，运行时不读取 CWT；
+- CLI：用户入口为 `pdx`，规则维护工具为 `pdx-rulec`；
+- 规则：开发者维护 `rules/eu4/*.json` 唯一权威源，严格编译成内嵌的 `eu4.pdxrules`；
 - 文件：规则数据库声明的所有可支持文本文件类别，按类别选择 PdxScript、localisation、CSV 或资源路径索引；
 - 发布：完成 Phase 1–6A 退出条件后发布 `v0.1.0`。
 
@@ -52,7 +52,7 @@ ParadoxCode 为 Europa Universalis IV（EU4）Mod 提供面向 Zed 的语言工�
 - 存档、二进制和媒体内容的语义解析；
 - EU4 运行时模拟；
 - 历史版本规则矩阵；
-- `pdx-cwt` 的 CRUD、历史、diff、rollback、持续同步和 CWT 导出；
+- 规则历史、diff、rollback 管理 UI以及任何外部规则格式兼容；
 - 自动监控或自动刷新 Vanilla 索引。
 
 ## 4. 目标结构
@@ -66,7 +66,7 @@ crates/
   pdx-rules/
   pdx-game-eu4/
   pdx-eu4/             # temporary compatibility facade
-  pdx-cwt/
+  pdx-rulec/
   pdx-hir/
   pdx-workspace/
   pdx-analysis/
@@ -89,7 +89,7 @@ pdx-text
   -> pdx-syntax -> pdx-hir -> pdx-workspace -> pdx-analysis -> pdx-lsp
   -> pdx-format                                      -> pdx-cli
 pdx-rules -> pdx-hir / pdx-workspace / pdx-analysis / pdx-lsp
-pdx-rules + pdx-game-eu4 -> pdx-cwt
+pdx-rules -> pdx-rulec
 ```
 
 关键对象包括 `AnalysisHost`、`AnalysisSnapshot`、`SourceRoot`、`SourceFile`、`OpenDocumentOverlay`、`ParsedFile`、`HirFile`、`FileIndexShard`、`WorkspaceIndex`、`RuleSet`、`Eu4Profile` 和 `VanillaIndexCache`。跨请求身份使用稳定 ID，不使用绝对路径字符串或 CST node pointer。
@@ -105,7 +105,7 @@ pdx-rules + pdx-game-eu4 -> pdx-cwt
 工作项：
 
 - [x] 初始化 Rust workspace、基础目录和最小 `pdx-*` crate；
-- [x] 创建 `pdx`、`pdx-ls`、`pdx-cwt` 的 CLI/server 占位入口；
+- [x] 创建 `pdx`、`pdx-ls` 与维护者规则编译器入口；
 - [x] 配置 rustfmt、clippy、测试、文档检查、依赖许可证/安全审计和基础 CI；
 - [x] 建立 grammar、fixture、fuzz、Zed extension 的最小目录；
 - [x] 验证 Zed 从 monorepo grammar 目录构建的可行性，并记录 local `file://` 与发布镜像方案；
@@ -173,11 +173,11 @@ PdxScript 至少覆盖 property、裸 value、嵌套/混合 block、八种 opera
 
 依赖：Phase 1、Phase 2 的文本同步基础。
 
-### Phase 4：CWT 导入、规则数据库和 Workspace Index
+### Phase 4：第一方规则源码、编译器和 Workspace Index
 
-状态：`implemented, acceptance reopened`（2026-07-20）；SQLite runtime、原创 CWT importer、root/overlay resolver、file shards、dependency LSP/TOML 配置、Vanilla 持久化 cache 和主要语义回归已实现，但 watched-file 定向更新仍需完成。
+状态：`implemented, acceptance reopened`（2026-07-22）；第一方 JSON source、严格 `pdx-rulec`、内嵌 runtime、root/overlay resolver、file shards、dependency 配置、Vanilla cache 和主要语义回归已实现，但 watched-file 定向更新仍需完成。
 
-这是 MVP 中最大的一阶段，应拆成“规则 schema/runtime”和“importer”两个可独立审查的序列。
+这是 MVP 中最大的一阶段，应拆成“规则 schema/runtime”和“第一方 source/compiler”两个可独立审查的序列。
 
 规则数据库：
 
@@ -187,15 +187,14 @@ PdxScript 至少覆盖 property、裸 value、嵌套/混合 block、八种 opera
 - [x] 为 EU4 path/type descriptor 生成 file category catalog；
 - [x] 校验 foreign key、stable ID、matcher/reference、schema 和 hash invariants。
 
-CWT importer：
+第一方规则编译器：
 
-- [x] 按规范路径发现并排序显式输入；
+- [x] 固定、严格读取 `rules/eu4/` source layout；
 - [x] 保留重复规则、source order、alternative identity、node/leaf/value clause 形状；
-- [x] 关联 `##` directive 和 `###` documentation；
-- [x] 导入 type、subtype、alias、enum、scope、link、effect、trigger、modifier、localisation、folder/path metadata；
-- [x] 未知 construct 保留为 normalized `cwt_nodes`，不得静默丢弃；
-- [x] 使用单事务写入、临时文件和 atomic replace；
-- [x] 输出 import report、provenance、输入 hash 和 logical row counts。
+- [x] 校验 unknown fields、stable identity、cardinality、severity 和 type descriptor；
+- [x] 编译 type、subtype、alias、enum、scope、link、effect、trigger、modifier、localisation 和 path metadata；
+- [x] 使用临时文件、完整 round-trip validation 和 atomic publish；
+- [x] 输出 source/game/schema version、rule hash、artifact checksum 和 logical counts。
 
 Workspace/index：
 
@@ -208,7 +207,7 @@ Workspace/index：
 
 退出条件：已验证来源顺序为 overlay > current mod > ordered dependencies > Vanilla；单文件变化只替换自身 shard；被覆盖 definition 可解释但不是活动跳转目标；73 文件 bootstrap corpus 无被静默忽略的构造；相同逻辑数据库内容产生相同 `rule_hash`；文件分类、解析和 Event/Scripted Effect/Scripted Trigger/Localisation definition fixture 已通过。
 
-依赖：Phase 3；CWT 调研基线见 `docs/reference-study.md` 和 RFC 0012。
+依赖：Phase 3；当前权威边界见 RFC 0015。
 
 ### Phase 5：语言功能
 
@@ -254,7 +253,7 @@ Workspace/index：
 按可独立验证的小切片执行：
 
 1. 接受 RFC 0013，拆分通用规则 runtime 与 EU4 profile，迁移期间保留兼容 re-export（`pdx-rules`、`pdx-game-eu4`、schema 12 `game_id` 校验与 `pdx-eu4` facade 已建立；data-only profile 已显式贯穿 CLI/LSP/host/snapshot，workspace symbol/reference 与 analysis scope/key/member fallback 已迁移；`pdx-eu4` facade 删除和 syntax 历史 API 重命名待后续独立切片）；
-2. 实现真实 per-file HIR/FileState，overlay 变化只更新一个文件（FileState、磁盘复用、overlay 按版本 parse/lower cache，以及供 workspace shard/analysis 共享的 property/localisation/scalar 与 profile-aware definition/reference HIR facts 已完成；scope/CWT typed lowering 待完成）；
+2. 实现真实 per-file HIR/FileState，overlay 变化只更新一个文件（FileState、磁盘复用、overlay 按版本 parse/lower cache，以及供 workspace shard/analysis 共享的 property/localisation/scalar 与 profile-aware definition/reference HIR facts 已完成；scope semantic lowering 待完成）；
 3. 将 snapshot 改为共享不可变状态，查询创建 snapshot 时不深拷贝 workspace 文本和索引（已完成）；
 4. 删除 analysis query-time 全 workspace 重解析，查询只读取当前 HIR 与 WorkspaceIndex（已完成）；
 5. 增加 index bulk build 和真正的单 shard 增量 replacement（已完成）；
@@ -262,7 +261,7 @@ Workspace/index：
 7. 将 LSP transport 迁移到类型化协议层，增加 worker、debounce、版本门和在途取消（已完成：stdio reader 分离，initialize 候选 host scan worker，prepared-document parse worker/三重提交门，semantic diagnostics 200ms debounce，snapshot request worker，共享 cancellation token 与 analysis 内部 checkpoint；workspace scan 覆盖目录/读取/parse/lower/index 检查点并有取消原子性回归；`lsp-types` 接管当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 和语言功能 response，轻量 JSON-RPC framing 有意保留）；
 8. 接入 formatting、dependency roots、Vanilla cache 持久化和文件变化更新（formatting 已完成：typed request/edits、capability、snapshot worker、UTF-16 与 unsafe-syntax integration 回归；dependency roots 已完成：类型化 initialization options、TOML、稳定 ID、有序优先级、重叠校验和只读 rename 回归；Vanilla cache 已完成：显式 CLI 建库/刷新、版本化 SQLite、source fingerprint、无源码持久化、可取消只读 LSP 加载、降级 warning 与不重扫回归；watched-file 定向更新待完成）；
 9. 建立大型 synthetic workspace benchmark 与“编辑一个文件只 parse/lower 一次”计数测试（已完成：默认 2,000 个原创 EU4 event 文件，覆盖 cold/unchanged/单磁盘变化/单 overlay 编辑；线程局部测试计数器证明 overlay 编辑 parse/lower 各一次且不重建磁盘 `FileState`）；
-10. 按 RFC 0014 内嵌第一方 EU4 规则，删除 runtime `--rules` 与扩展规则 asset；完成 Zed 自动获取、多平台 release、checksum 和干净 clone 端到端安装测试。
+10. 按 RFC 0014/0015 内嵌第一方 EU4 规则并删除 runtime `--rules` 与扩展规则 asset（已完成）；继续完成 Zed 自动获取、多平台 release、checksum 和干净 clone 端到端安装测试。
 
 Phase R 完成前不开始 Semantic Tokens、Quick Fix、其他游戏 profile 或新的编辑器客户端。
 
@@ -324,13 +323,13 @@ PdxScript fixture
 
 | 风险 | 早期信号 | 处理方式 |
 | --- | --- | --- |
-| CWT corpus 有未建模构造 | import report 出现 unknown/ignored construct | 在发布前实现 mapping 或人工批准 non-semantic；禁止静默跳过 |
+| 第一方规则遗漏或冲突 | source validation、真实 Mod 或回归 fixture 暴露差异 | 修订权威 source 并添加 fixture；禁止外部格式 fallback |
 | CST/formatter 丢失信息 | 注释、重复 key 或错误节点在 round-trip 中改变 | 保留 trivia 和 source order；不安全时不生成 edit |
 | source root 覆盖错误 | 跳转命中被覆盖 definition 或 overlay 被忽略 | 用 resolution policy fixture 固化顺序和 category 行为 |
 | 规则 hash 不稳定 | VACUUM/插入顺序改变 `rule_hash` | 只 hash canonical logical projection，加入稳定性测试 |
 | LSP 层积累业务逻辑 | handler 直接访问磁盘或 EU4 名称表 | 将查询移入 `pdx-analysis`，LSP 只做生命周期和转换 |
 | Zed 文件识别冲突 | 宽泛 `.txt` 关联误伤其他语言 | 由 EU4 规则生成项目级 glob；保留手动选择 fallback |
-| 版权/分发污染 | Vanilla 或原生 CWT 出现在提交/发布包 | 只提交自有 fixture、数据库和 provenance；检查 ignore 与 CI |
+| 版权/分发污染 | Vanilla 或外部规则语料出现在提交/发布包 | 只提交自有 fixture、第一方 source 和生成物；检查 ignore 与 CI |
 | 后台任务产生旧结果 | 编辑后 diagnostics 回退 | 版本校验、可取消任务、不可变 snapshot 和 shard replacement |
 
 ## 9. 完成定义
@@ -341,8 +340,8 @@ PdxScript fixture
 2. Zed 能安装 extension、启动 `pdx-ls`，并加载 extension 携带的 `eu4.pdxrules`；
 3. 当前 Mod、依赖、Vanilla 和未保存 overlay 的解析顺序有自动化回归测试；
 4. 主要语言功能均通过真实 LSP JSON-RPC integration test，而不是仅测试内部 handler；
-5. `rule_hash`、schema、manifest、runtime loader 和 importer report 均通过校验；
-6. 不提交 Vanilla 游戏文件、用户缓存或权威 CWT source tree；
+5. 第一方 source schema、`rule_hash`、artifact schema/checksum、manifest 和 runtime loader 均通过校验；
+6. 不提交 Vanilla 游戏文件、用户缓存或外部规则 source tree；
 7. 文档中的 initialize options、EU4 rules schema、CLI 和实际实现一致；
 8. 已知限制、平台支持和安装方式写入发布文档。
 

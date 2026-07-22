@@ -9,7 +9,7 @@
 
 ## 原则
 
-Zed extension 是薄客户端。它可以包含语言 metadata、Tree-sitter queries、server 安装/启动代码、配置映射，以及作为独立 asset 打包的 `eu4.pdxrules`，但不实现或解释任何 EU4 semantic rule。
+Zed extension 是薄客户端。它只包含语言 metadata、Tree-sitter queries、server 安装/启动代码和配置映射，不携带、实现或解释任何 EU4 semantic rule。
 
 ## Extension 结构
 
@@ -31,9 +31,6 @@ editors/zed/
       outline.scm
     pdx-eu4-csv/
       config.toml
-  bundled-rules/
-    eu4.pdxrules
-    manifest.json
 ```
 
 extension 注册 PdxScript/localisation grammar、CSV 文件关联和一个 `pdx-ls`。所有文本语言连接同一个 server；CSV 由 server 的独立 parser 分析，不伪装成 PdxScript CST。
@@ -100,13 +97,13 @@ Zed grammar registration 引用 repository 与固定 revision。当前 monorepo 
 
 extension 不自行构建 Rust server，也不运行 package manager 安装脚本。
 
-规则文件不随 server release 下载。它由 extension release 自身携带，扩展升级自然携带新规则和 `rule_hash`。extension 启动命令必须为：
+第一方规则内嵌于 server release。extension 启动命令必须为：
 
 ```text
-<resolved-pdx-ls> --rules <extension-path>/bundled-rules/eu4.pdxrules
+<resolved-pdx-ls>
 ```
 
-开发模式可以显式覆盖规则路径，但仍使用相同 CLI 参数。规则损坏或缺失时 extension 报告可操作错误，不从网络回退。
+开发模式也不能覆盖规则。内嵌规则损坏属于 server build/release defect。
 
 ## 配置传递
 
@@ -116,7 +113,6 @@ Zed settings 映射为 EU4 initialize options：
 - Vanilla 本地索引缓存路径
 - dependency mods（标识符和显式顺序，由本机设置解析路径）
 - current mod directory
-- development-only rule path override
 
 server 是配置含义的最终解释者。extension 只做 JSON 传递和必要路径发现。
 
@@ -128,7 +124,6 @@ server 是配置含义的最终解释者。extension 只做 JSON 传递和必要
 
 ```text
 pdx index vanilla \
-  --rules <extension-path>/bundled-rules/eu4.pdxrules \
   --source <selected-eu4-directory> \
   --output <extension-local-cache>
 ```

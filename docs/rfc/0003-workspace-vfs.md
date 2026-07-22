@@ -65,7 +65,7 @@ Vanilla < Dependency Mods（配置顺序）< Current Mod < Open Document Overlay
 
 ## 文件分类
 
-文件 matcher 完全来自 Eu4Rules，包括 bootstrap CWT 中 `type[...]` 的 `path`、`path_strict`、`path_file`、`path_extension`、`type_per_file` 等规范化约束。Event、scripted effect、scripted trigger 和 localisation 是强制回归类别，但不是分类白名单。
+文件 matcher 完全来自第一方 Eu4Rules source，包括 `path`、`path_strict`、`path_file`、`path_extension`、`type_per_file` 等规范化约束。Event、scripted effect、scripted trigger 和 localisation 是强制回归类别，但不是分类白名单。
 
 Eu4Rules 为每个 logical path 返回：
 

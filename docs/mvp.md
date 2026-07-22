@@ -15,7 +15,7 @@
 - 保守、幂等的全文格式化
 - 未保存文档、当前 Mod、有序依赖 Mod和 Vanilla 的优先级解析
 - 对权威 EU4 规则数据库声明的全部可支持文件类别提供与格式相称的分析
-- 使用 `pdx-cwt v0.1` 一次性导入 EU4 CWT corpus，生成项目自有 SQLite `eu4.pdxrules` 与 `rule_hash`
+- 由开发者维护严格第一方 EU4 规则源码，并用 `pdx-rulec` 生成 SQLite `eu4.pdxrules` 与 `rule_hash`
 - 首次建立并持久化本地 Vanilla 索引，之后仅支持用户手动刷新
 
 Event、Scripted Effect、Scripted Trigger 和 Localisation Key 仍是必须通过端到端测试的基准类型，但不再是 symbol 范围上限。数据库中的 type、enum、variable、alias、localisation 与 filepath descriptor 能够表达的 definition/reference 都进入统一索引。
@@ -31,8 +31,8 @@ Event、Scripted Effect、Scripted Trigger 和 Localisation Key 仍是必须通�
 - 对贴图、音频、字体等资产内容做语义解析；它们只作为路径索引目标
 - 完整模拟 EU4 运行时
 - 历史 EU4 版本或版本条件规则
-- `pdx-cwt` 的 CRUD、历史、diff 或 rollback；这些属于后续版本
-- 运行时读取、下载或重新导入 CWT
+- 规则历史、diff 或 rollback 管理 UI
+- 读取、下载、导入或兼容任何外部规则格式
 - 自动监控或自动刷新 Vanilla 索引
 
 ## Phase 0：工程和设计基线
@@ -50,7 +50,7 @@ Event、Scripted Effect、Scripted Trigger 和 Localisation Key 仍是必须通�
 
 - 空 crate 图可以构建且无环。
 - 核心 crate 不依赖 Zed 或具体 EU4 Rust 类型。
-- workspace 中不存在无 `pdx-` 前缀的项目 Cargo package；binary 为用户 CLI `pdx`、server `pdx-ls` 和维护者工具 `pdx-cwt`。
+- workspace 中不存在无 `pdx-` 前缀的项目 Cargo package；binary 为用户 CLI `pdx`、server `pdx-ls` 和维护者工具 `pdx-rulec`。
 - grammar 和 server distribution spike 都有书面结论。
 
 ## Phase 1：Zed 与 Tree-sitter
@@ -121,16 +121,16 @@ Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 - 格式化不丢失或移动注释到不同语义节点。
 - 含不安全 `ERROR` node 的文档不生成破坏性 edit。
 
-## Phase 4：CWT 导入、EU4 权威规则数据库与 Workspace Index
+## Phase 4：第一方 EU4 规则源码、编译器与 Workspace Index
 
 状态：`implemented, acceptance reopened`（2026-07-20 重新审计）；规则导入、SQLite runtime、root/overlay、基础 shard、dependency LSP/TOML 配置和本地持久化 Vanilla cache 已实现，但 watched-file 尚未接入定向磁盘更新。
 
 交付：
 
-- `pdx-cwt v0.1` importer 和本次 EU4 corpus construct inventory
-- `pdx-cwt` 的最小原创 CWT importer fixtures；不提交权威 CWT source tree
-- 一次性转换 CWT type/alias/enum/value/cardinality/path/scope/reference/documentation/directive metadata
-- 生成 SQLite `eu4.pdxrules`、规范化 manifest 与唯一 `rule_hash`，并提交 artifact
+- 严格、版本化、开发者维护的 `rules/eu4/*.json` 唯一权威源
+- `pdx-rulec` source schema、stable identity 和 invariant 验证
+- 编译 type/alias/enum/value/cardinality/path/scope/reference/documentation metadata
+- 生成 SQLite `eu4.pdxrules`、规范化 manifest 与唯一 `rule_hash`，并提交生成物
 - 只读加载 SQLite 后冻结为内存 `Eu4Rules`
 - 由数据库 path/type descriptor 生成完整的 EU4 file category catalog
 - vanilla/dependency/current mod source roots
@@ -145,7 +145,7 @@ Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 - 来源候选顺序符合 overlay > current mod > ordered dependencies > Vanilla。
 - file change 只替换自己的 shard。
 - 被覆盖 definition 可被解释但不作为活动跳转目标。
-- 本次 bootstrap corpus 中不存在被静默忽略的 CWT 构造。
+- 第一方 source 未知字段、重复身份或无效 invariant 必须阻止编译。
 - 对相同数据库逻辑内容计算相同 `rule_hash`，不受 SQLite 页布局、VACUUM 或写入顺序影响。
 - 每个数据库声明的可支持文件类别至少有 classification/parse fixture；主要语义类别有 definition/reference fixture。
 - 更新 server 内嵌新的规则和 `rule_hash`；项目配置不 pin `rule_hash`。

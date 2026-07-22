@@ -18,7 +18,7 @@ MVP 保留两个直接服务 EU4 的 Tree-sitter grammar 资产，供 Zed 编辑
 
 受支持的 EU4 CSV 使用独立的记录式 parser facade，不强行进入 Tree-sitter PdxScript CST。parser 必须保存 cell range、delimiter、行号和错误恢复信息，供索引和诊断使用。这里的前端选择只表示 EU4 文件格式，不是可替换的多游戏语言接口。
 
-`.cwt` 仅由 `pdx-cwt v0.1` 的一次性 importer 解析，不是编辑器语言前端，也不进入 LSP runtime。Importer 可以复用 PdxScript lexer 思路，但必须保留 bracketed meta key、特殊 field spelling 和 directive comment；导入完成后项目不保存权威 CWT 文本。
+规则维护不复用 PdxScript 或任何外部规则语言。`pdx-rulec` 只解析 RFC 0015 定义的严格第一方 JSON source；`.cwt` 不是项目支持的语言或输入。
 
 ## PdxScript CST
 

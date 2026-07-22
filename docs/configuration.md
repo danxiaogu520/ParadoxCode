@@ -89,7 +89,6 @@ Build the local cache explicitly after choosing the EU4 installation directory:
 
 ```text
 pdx index vanilla \
-  --rules /path/to/eu4.pdxrules \
   --source /path/to/Europa Universalis IV \
   --output /path/to/vanilla.pdxindex
 ```

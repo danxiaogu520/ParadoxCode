@@ -7,6 +7,9 @@
 >
 > 2026-07-21 amendment：第 5–6 条中的外部规则 artifact 分发边界已由
 > [RFC 0014](0014-embedded-first-party-rules.md) 取代；crate 依赖方向仍然有效。
+>
+> 2026-07-22 amendment：`pdx-cwt` 和所有 CWT 输入已由
+> [RFC 0015](0015-first-party-rule-source.md) 废止；维护者工具现为 `pdx-rulec`。
 
 ## 问题
 
@@ -23,26 +26,26 @@ Rust workspace 初始包含：
 | `pdx-rules` | 通用 SQLite schema、canonical hash、只读 runtime model 与查询 API |
 | `pdx-game-eu4` | EU4 profile、bootstrap catalog 与专属语义 |
 | `pdx-eu4` | 迁移期兼容 re-export facade |
-| `pdx-cwt` | MVP 一次性 CWT importer；未来的规则数据库 CRUD 管理工具 |
+| `pdx-rulec` | 第一方规则源码严格校验与 artifact/manifest 编译器 |
 | `pdx-hir` | 路径和规则感知的语义 lowering |
 | `pdx-workspace` | VFS、source roots、cache、snapshot、index |
 | `pdx-analysis` | diagnostics、completion、navigation、rename 查询 |
 | `pdx-format` | 编辑器无关格式化 |
 | `pdx-lsp` | LSP transport 和协议适配 |
-| `pdx-cli` | `pdx` 与 `pdx-ls` binary 入口；`pdx-cwt` crate 提供同名维护者 binary |
+| `pdx-cli` | `pdx` 与 `pdx-ls` binary 入口；`pdx-rulec` 是独立维护者 binary |
 
 `pdx-cli` 可以提供两个 binary target，也可以在实现 spike 后拆为独立 binary crate；这不改变核心边界。
 
 ## 依赖约束
 
 1. 运行时依赖沿 `text/rules -> syntax/hir -> workspace -> analysis -> lsp` 方向。
-2. `pdx-cwt` 依赖 `pdx-text`、`pdx-rules` 和 `pdx-game-eu4`，但任何 analysis runtime crate 都不反向依赖 `pdx-cwt`。
+2. `pdx-rulec` 只依赖 `pdx-rules`，任何 analysis runtime crate 都不反向依赖维护者编译器。
 3. `pdx-format` 只依赖 text/syntax 和格式配置，不依赖 workspace index。
 4. 只有 `pdx-lsp` 可以在公开 API 中使用 LSP protocol types。
-5. EU4 规则数据库是独立 SQLite artifact；通用加载位于 `pdx-rules`，EU4 规则适配位于 `pdx-game-eu4`，不把规则复制进 `pdx-ls` binary。
-6. Zed extension 不链接 analysis crate；它携带 `eu4.pdxrules` 并显式传给 server。
+5. EU4 规则数据库是由第一方源码生成的 SQLite artifact；通用加载位于 `pdx-rules`，官方 composition root 将其嵌入 binary。
+6. Zed extension 不链接 analysis crate，不携带或传递 semantic rules。
 7. 核心 API 不接受绝对游戏目录作为隐式全局；workspace configuration 显式传入。
-8. 所有 Cargo package/独立模块使用 `pdx-` 前缀；Rust identifier 必须使用下划线时采用 `pdx_*`。binary 固定为 `pdx`、`pdx-ls` 与维护者工具 `pdx-cwt`。
+8. 所有 Cargo package/独立模块使用 `pdx-` 前缀；Rust identifier 必须使用下划线时采用 `pdx_*`。binary 固定为 `pdx`、`pdx-ls` 与维护者工具 `pdx-rulec`。
 
 ## 分析门面
 
@@ -63,9 +66,9 @@ impl AnalysisHost {
 ## 仓库布局
 
 ```text
-crates/                  `pdx-*` Rust 核心与 CWT importer
+crates/                  `pdx-*` Rust 核心与第一方规则编译器
 grammars/                Zed editor-side Tree-sitter grammars
-rules/                   提交的 eu4.pdxrules、manifest 与测试 metadata
+rules/                   第一方 JSON source 与生成的 eu4.pdxrules/manifest
 editors/                 薄客户端，Cargo package 仍以 `pdx-` 命名
 docs/                    架构与 RFC
 tests/                   跨 crate fixtures/integration
@@ -77,7 +80,7 @@ reference/               只读参考仓库，不参与构建
 
 - CLI 可以在没有 LSP 的情况下复用分析。
 - Zed 和未来其他编辑器客户端不会产生两套 EU4 语义逻辑。
-- 一次性 CWT importer、通用 `RuleSet` schema 和 EU4 profile 可独立测试。
+- 第一方规则编译器、通用 `RuleSet` schema 和 EU4 profile 可独立测试。
 - crate 数量略多，但每个边界均对应不同的变化原因。
 
 ## 拒绝的方案

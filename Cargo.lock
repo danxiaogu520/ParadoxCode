@@ -228,19 +228,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pdx-cwt"
-version = "0.1.0"
-dependencies = [
- "pdx-game-eu4",
- "pdx-rules",
- "pdx-text",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
-]
-
-[[package]]
 name = "pdx-eu4"
 version = "0.1.0"
 dependencies = [
@@ -290,11 +277,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "pdx-rulec"
+version = "0.1.0"
+dependencies = [
+ "pdx-rules",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "pdx-rules"
 version = "0.1.0"
 dependencies = [
  "pdx-text",
  "rusqlite",
+ "serde",
+ "serde_json",
  "sha2",
 ]
 

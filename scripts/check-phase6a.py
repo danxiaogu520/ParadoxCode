@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sqlite3
@@ -14,7 +15,6 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 RULES = ROOT / "rules" / "eu4.pdxrules"
-BUNDLED_RULES = ROOT / "editors" / "zed" / "bundled-rules" / "eu4.pdxrules"
 MANIFEST = ROOT / "rules" / "manifest.json"
 SERVER = ROOT / "target" / "debug" / "pdx-ls"
 
@@ -53,9 +53,11 @@ def file_uri(path: Path) -> str:
 
 def check_artifact() -> None:
     require(RULES.is_file(), "rules/eu4.pdxrules is missing")
-    require(BUNDLED_RULES.is_file(), "Zed bundled rules artifact is missing")
-    require(RULES.read_bytes() == BUNDLED_RULES.read_bytes(), "bundled rules differ from authority")
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    require(
+        hashlib.sha256(RULES.read_bytes()).hexdigest() == manifest["artifact_sha256"],
+        "rules artifact checksum mismatch",
+    )
     with sqlite3.connect(RULES) as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         schema_version = connection.execute(
@@ -77,7 +79,7 @@ def check_artifact() -> None:
     require("[language_servers.pdx-ls]" in extension, "Zed language server is not registered")
     source = (ROOT / "editors" / "zed" / "src" / "lib.rs").read_text(encoding="utf-8")
     require("language_server_command" in source, "Zed language server command is not implemented")
-    require("bundled-rules/eu4.pdxrules" in source, "Zed command does not pass bundled rules")
+    require("--rules" not in source, "Zed command still exposes a rules override")
 
 
 def check_server_smoke() -> None:
@@ -122,7 +124,7 @@ def check_server_smoke() -> None:
             {"jsonrpc": "2.0", "method": "exit"},
         ]
         process = subprocess.run(
-            [os.fspath(SERVER), "--rules", os.fspath(BUNDLED_RULES)],
+            [os.fspath(SERVER)],
             input=b"".join(frame(message) for message in messages),
             capture_output=True,
             check=False,

@@ -1,8 +1,8 @@
 # ParadoxCode Zed extension
 
 The extension is a thin editor client. It owns language metadata, Tree-sitter query assets, the
-bundled read-only rules artifact, and server discovery/launch configuration; analysis and EU4
-semantics remain in the Rust core.
+server discovery and launch configuration; analysis and EU4 semantics remain in the Rust core.
+The official `pdx-ls` binary embeds the only supported first-party EU4 rules.
 
 The extension directory is deliberately outside the core Cargo workspace. The three grammar
 directories under `../../grammars/` are the source of truth; the development manifest points at
@@ -19,9 +19,8 @@ rule table.
 
 Install the directory as a Zed development extension, ensure `pdx-ls` is on Zed's worktree PATH
 (or configure `lsp.pdx-ls.binary.path`), and open an EU4 Mod workspace with the recommended
-settings. The extension registers one `pdx-ls` server for all three languages and passes
-`--rules bundled-rules/eu4.pdxrules` by default. A configured binary argument list can override
-that path for development or platform-specific packaging.
+settings. The extension registers one `pdx-ls` server for all three languages and launches it
+without a rules argument. Rules cannot be replaced through editor settings or project files.
 
 With no project configuration, the server uses the opened worktree as the current Mod root. For a
 workspace containing a separate Mod directory and ordered dependency Mods, configure

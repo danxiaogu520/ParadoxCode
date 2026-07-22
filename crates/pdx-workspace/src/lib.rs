@@ -1348,7 +1348,7 @@ fn shard_from_parsed(
     let mut references = Vec::new();
     collect_hir_semantics(file, hir, &mut definitions, &mut references);
     collect_profile_token_definitions(file, parsed, profile, &mut definitions);
-    collect_cwt_type_members(file, parsed, rules, &mut definitions);
+    collect_semantic_type_members(file, parsed, rules, &mut definitions);
     FileIndexShard {
         file_id: file.id,
         definitions,
@@ -1388,20 +1388,20 @@ fn collect_profile_csv_definitions(
         .collect()
 }
 
-/// Collects workspace members declared by CWT `type[...]` definitions.
+/// Collects workspace members declared by semantic `type[...]` definitions.
 ///
-/// CWTools builds these members from the parsed workspace, rather than treating a type's name as
+/// The semantic engine builds these members from the parsed workspace rather than treating a type's name as
 /// a literal root key. For example, `type[mission]` with `skip_root_key = any` exposes every child
 /// of every root clause in `missions/*.txt` as a `<mission>` member. Keeping this in the workspace
-/// shard makes CWT key/value matching, completion, and hover see the same dynamic names.
-fn collect_cwt_type_members(
+/// shard makes semantic key/value matching, completion, and hover see the same dynamic names.
+fn collect_semantic_type_members(
     file: &SourceFile,
     parsed: &ParsedFile,
     rules: &RuleSet,
     definitions: &mut Vec<Definition>,
 ) {
-    for descriptor in rules.model().cwt.type_descriptors.values() {
-        if !cwt_type_path_matches(descriptor, &file.logical_path) {
+    for descriptor in rules.model().semantic.type_descriptors.values() {
+        if !semantic_type_path_matches(descriptor, &file.logical_path) {
             continue;
         }
 
@@ -1425,7 +1425,7 @@ fn collect_cwt_type_members(
         if descriptor.skip_root_paths.is_empty() {
             for child in parsed.root().children() {
                 if child.kind() == CstKind::Property {
-                    collect_cwt_type_definition(file, parsed, descriptor, child, definitions);
+                    collect_semantic_type_definition(file, parsed, descriptor, child, definitions);
                 }
             }
         } else {
@@ -1434,7 +1434,7 @@ fn collect_cwt_type_members(
                     continue;
                 }
                 for skip_path in &descriptor.skip_root_paths {
-                    collect_cwt_skip_root_path(
+                    collect_semantic_skip_root_path(
                         file,
                         parsed,
                         descriptor,
@@ -1448,52 +1448,52 @@ fn collect_cwt_type_members(
     }
 }
 
-fn collect_cwt_skip_root_path(
+fn collect_semantic_skip_root_path(
     file: &SourceFile,
     parsed: &ParsedFile,
-    descriptor: &pdx_rules::CwtTypeDescriptor,
+    descriptor: &pdx_rules::TypeDescriptor,
     node: &CstNode,
     path: &[String],
     definitions: &mut Vec<Definition>,
 ) {
     let Some(head) = path.first() else {
-        collect_cwt_block_children(file, parsed, descriptor, node, definitions);
+        collect_semantic_block_children(file, parsed, descriptor, node, definitions);
         return;
     };
-    let node_key = cwt_property_key(node, parsed).unwrap_or_default();
+    let node_key = semantic_property_key(node, parsed).unwrap_or_default();
     if !head.eq_ignore_ascii_case("any") && !head.eq_ignore_ascii_case(&node_key) {
         return;
     }
     if path.len() == 1 {
-        collect_cwt_block_children(file, parsed, descriptor, node, definitions);
+        collect_semantic_block_children(file, parsed, descriptor, node, definitions);
         return;
     }
-    for child in cwt_block_properties(node) {
-        collect_cwt_skip_root_path(file, parsed, descriptor, child, &path[1..], definitions);
+    for child in semantic_block_properties(node) {
+        collect_semantic_skip_root_path(file, parsed, descriptor, child, &path[1..], definitions);
     }
 }
 
-fn collect_cwt_block_children(
+fn collect_semantic_block_children(
     file: &SourceFile,
     parsed: &ParsedFile,
-    descriptor: &pdx_rules::CwtTypeDescriptor,
+    descriptor: &pdx_rules::TypeDescriptor,
     node: &CstNode,
     definitions: &mut Vec<Definition>,
 ) {
-    for child in cwt_block_properties(node) {
-        collect_cwt_type_definition(file, parsed, descriptor, child, definitions);
+    for child in semantic_block_properties(node) {
+        collect_semantic_type_definition(file, parsed, descriptor, child, definitions);
     }
 }
 
-fn collect_cwt_type_definition(
+fn collect_semantic_type_definition(
     file: &SourceFile,
     parsed: &ParsedFile,
-    descriptor: &pdx_rules::CwtTypeDescriptor,
+    descriptor: &pdx_rules::TypeDescriptor,
     node: &CstNode,
     definitions: &mut Vec<Definition>,
 ) {
-    let Some(key) = cwt_property_key(node, parsed) else { return };
-    if !cwt_type_key_matches(descriptor, &key) {
+    let Some(key) = semantic_property_key(node, parsed) else { return };
+    if !semantic_type_key_matches(descriptor, &key) {
         return;
     }
     let Some(name) = descriptor
@@ -1516,13 +1516,13 @@ fn collect_cwt_type_definition(
     });
 }
 
-fn cwt_type_key_matches(descriptor: &pdx_rules::CwtTypeDescriptor, key: &str) -> bool {
+fn semantic_type_key_matches(descriptor: &pdx_rules::TypeDescriptor, key: &str) -> bool {
     descriptor.type_key_filter.as_ref().is_none_or(|(values, negate)| {
         (values.iter().any(|value| value.eq_ignore_ascii_case(key))) != *negate
     })
 }
 
-fn cwt_block_properties(node: &CstNode) -> impl Iterator<Item = &CstNode> {
+fn semantic_block_properties(node: &CstNode) -> impl Iterator<Item = &CstNode> {
     node.children().iter().flat_map(|child| {
         if child.kind() != CstKind::Value {
             return Vec::new();
@@ -1538,7 +1538,7 @@ fn cwt_block_properties(node: &CstNode) -> impl Iterator<Item = &CstNode> {
     })
 }
 
-fn cwt_property_key(node: &CstNode, parsed: &ParsedFile) -> Option<String> {
+fn semantic_property_key(node: &CstNode, parsed: &ParsedFile) -> Option<String> {
     node.children()
         .iter()
         .find(|child| child.kind() == CstKind::Key)
@@ -1547,8 +1547,8 @@ fn cwt_property_key(node: &CstNode, parsed: &ParsedFile) -> Option<String> {
         .filter(|key| !key.is_empty())
 }
 
-fn cwt_type_path_matches(
-    descriptor: &pdx_rules::CwtTypeDescriptor,
+fn semantic_type_path_matches(
+    descriptor: &pdx_rules::TypeDescriptor,
     logical_path: &LogicalPath,
 ) -> bool {
     let path = logical_path.as_str().replace('\\', "/").to_ascii_lowercase();
@@ -1676,14 +1676,14 @@ fn find_property(node: &CstNode, wanted: &str, parsed: &ParsedFile) -> Option<St
                         .text(child.range())
                         .map(|value| value.trim_matches('"').trim().to_owned());
                 }
-                if child.kind() == CstKind::Value {
-                    if let Some(value) = child.children().iter().find(|value| {
+                if child.kind() == CstKind::Value
+                    && let Some(value) = child.children().iter().find(|value| {
                         matches!(value.kind(), CstKind::BareValue | CstKind::QuotedString)
-                    }) {
-                        return parsed
-                            .text(value.range())
-                            .map(|value| value.trim_matches('"').trim().to_owned());
-                    }
+                    })
+                {
+                    return parsed
+                        .text(value.range())
+                        .map(|value| value.trim_matches('"').trim().to_owned());
                 }
             }
         }

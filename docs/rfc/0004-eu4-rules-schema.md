@@ -6,6 +6,10 @@
 > 2026-07-20 amendment：EU4 是当前唯一交付规则包，但通用 artifact/runtime 类型将按 [RFC 0013](0013-generic-engine-eu4-first.md) 迁入 `pdx-rules`，EU4 特有内容进入 EU4 profile。本 RFC 继续定义 `eu4.pdxrules` 的具体语义与发布要求。
 >
 > 2026-07-21 amendment：artifact 仍是开发期权威数据，但外部 runtime 文件与扩展携带规则的分发方式已由 [RFC 0014](0014-embedded-first-party-rules.md) 取代。
+>
+> 2026-07-22 amendment：SQLite 不再是人工维护的权威源，CWT bootstrap/CRUD 决策已废止。
+> `rules/eu4/*.json` 是唯一权威，`pdx-rulec` 生成并验证 SQLite artifact；详见
+> [RFC 0015](0015-first-party-rule-source.md)。
 
 ## 目标
 
@@ -17,8 +21,9 @@ EU4 profile 当前只服务项目选定的 EU4 规则基线。规则数据库可
 
 ```text
 rules/
-  eu4.pdxrules          committed SQLite authority
-  manifest.json         schema、rule_hash、provenance、统计
+  eu4/                  developer-maintained first-party JSON authority
+  eu4.pdxrules          generated SQLite artifact
+  manifest.json         schema、rule_hash、checksum、统计
   tests/
     fixtures/
 
@@ -27,17 +32,17 @@ editors/zed/
   bundled-rules/        发布打包时包含 eu4.pdxrules
 ```
 
-项目不提交权威 `.cwt` source tree。`reference/cwtools-eu4-config` 是本地调研与一次性 bootstrap 输入，不参与正常构建或发布。
+项目不接受 `.cwt` 或其他外部规则 source。`reference/` 仅是历史研究资料，不参与规则编译、测试或发布。
 
 `rules/` 是仓库内的 source-of-truth artifact 位置，不是独立分发渠道。面向用户的规则分发只通过编辑器扩展 release 完成。
 
 ## 权威链路
 
 ```text
-one-time EU4 CWT bootstrap corpus
+developer-maintained rules/eu4 source
                  |
                  v
-         pdx-cwt v0.1 import
+          pdx-rulec build
                  |
                  v
      self-owned SQLite eu4.pdxrules
@@ -48,7 +53,7 @@ one-time EU4 CWT bootstrap corpus
        read-only runtime RuleSet + Eu4Profile
 ```
 
-导入成功以后，SQLite 数据库是唯一权威。CWTools 行为兼容和 CWT source revision 不再是后续维护的约束。维护者未来通过 `pdx-cwt` CRUD 直接修订数据库；MVP 只实现 import。
+第一方 JSON source 是唯一权威。SQLite 仅为可复现生成物，不直接人工修订；项目不追踪或兼容 CWTools/CWT。
 
 ## SQLite 逻辑模型
 
@@ -169,26 +174,18 @@ Runtime API 不暴露 `insert`、`update` 或 `delete`。加载失败时 server 
 
 ## 分发与版本
 
-- `eu4.pdxrules` 是独立于 `pdx-ls` 的文件。
-- 规则完全由编辑器扩展拥有，随扩展 release 打包，不独立发布、下载或更新。
-- 扩展版本升级自然携带新的规则和 `rule_hash`。
+- `eu4.pdxrules` 是 repository/release 中可审计的生成物，并内嵌到官方 binary。
+- 规则由 server release 拥有；编辑器扩展不携带、不下载、不解释规则。
+- server 版本升级自然携带新的规则和 `rule_hash`。
 - `.pdx/project.toml` 不 pin `rule_hash`。
-- Zed 使用 `pdx-ls --rules <extension-path>/eu4.pdxrules` 显式传入。
-- `pdx-ls` 不内嵌、不下载、不更新规则。
-- 需要旧规则时只能使用携带它的旧扩展版本；MVP 不提供 hash registry。
+- `pdx-ls` 不接受规则路径，不下载或独立更新规则。
+- 需要旧规则时只能使用携带它的旧 server 版本；MVP 不提供 hash registry。
 
 artifact schema 不兼容时拒绝加载。schema version 只描述存储/API 格式，不代表另一个游戏或可切换的游戏版本。
 
-## 未来 CRUD
+## 已废止：数据库 CRUD
 
-未来 `pdx-cwt` 可以增加查询、增加、修改、删除、事务、diff、历史和 rollback。所有写操作必须：
-
-- 通过 schema/invariant validation。
-- 在事务中原子提交。
-- 重新计算并输出唯一 `rule_hash`。
-- 不要求还原或维护 CWT 文本。
-
-这些能力不属于 v0.1，不能延迟一次性 importer 和 LSP MVP。
+RFC 0015 禁止把 SQLite 作为人工编辑入口。历史提案中的数据库 CRUD 不再实施。所有规则修改必须作用于第一方 source，并通过 compiler validation。
 
 ## 非目标
 

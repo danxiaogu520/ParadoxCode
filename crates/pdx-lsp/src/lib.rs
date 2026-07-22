@@ -70,12 +70,12 @@ pub enum ServerState {
     Exited,
 }
 
-/// Explicit options passed by an editor or CLI.
+/// Explicit process-level options passed by an editor or CLI.
+///
+/// Rules are intentionally absent: official composition roots supply their compiled first-party
+/// [`RuleSet`] directly and no user-controlled path can replace it.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct InitializeOptions {
-    /// Optional packaged EU4 rules path. The server validates and loads it read-only before serving.
-    pub rules_path: Option<PathBuf>,
-}
+pub struct InitializeOptions;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
@@ -288,49 +288,20 @@ pub struct LspServer {
 }
 
 impl LspServer {
-    /// Creates a server and fails when an explicitly supplied rules artifact is invalid.
+    /// Creates an identity-only server for protocol tests and generic syntax operation.
     pub fn try_new(options: InitializeOptions) -> Result<Self, LspError> {
-        Self::try_new_with_expected_game(options, None, GameProfile::default())
+        Self::try_new_with_rules(options, RuleSet::empty(), GameProfile::default())
     }
 
-    /// Creates an identity-only server and rejects a rules artifact for a different game.
-    ///
-    /// Call [`Self::try_new_with_profile`] when game-specific interpretation is required.
-    pub fn try_new_for_game(
+    /// Creates a server from a composition-root-owned immutable rule set.
+    pub fn try_new_with_rules(
         options: InitializeOptions,
-        expected_game_id: &str,
-    ) -> Result<Self, LspError> {
-        Self::try_new_with_expected_game(
-            options,
-            Some(expected_game_id),
-            GameProfile::empty(expected_game_id),
-        )
-    }
-
-    /// Creates a server with explicit data-only game semantics.
-    pub fn try_new_with_profile(
-        options: InitializeOptions,
+        rules: RuleSet,
         profile: GameProfile,
     ) -> Result<Self, LspError> {
-        let expected_game_id = (!profile.game_id.is_empty()).then(|| profile.game_id.clone());
-        Self::try_new_with_expected_game(options, expected_game_id.as_deref(), profile)
-    }
-
-    fn try_new_with_expected_game(
-        options: InitializeOptions,
-        expected_game_id: Option<&str>,
-        profile: GameProfile,
-    ) -> Result<Self, LspError> {
-        let rules = match options.rules_path.as_deref() {
-            Some(path) => {
-                let rules = RuleSet::load(path)?;
-                if let Some(expected) = expected_game_id {
-                    rules.ensure_game(expected)?;
-                }
-                rules
-            }
-            None => RuleSet::empty(),
-        };
+        if !profile.game_id.is_empty() {
+            rules.ensure_game(&profile.game_id)?;
+        }
         Ok(Self {
             state: ServerState::Uninitialized,
             options,
@@ -393,27 +364,15 @@ impl LspServer {
         server.run_transport(stdin, stdout.lock())
     }
 
-    /// Runs identity-only stdio while enforcing the selected game identity.
-    ///
-    /// Call [`Self::run_stdio_with_profile`] for a game-aware language server.
-    pub fn run_stdio_for_game(
-        options: InitializeOptions,
-        expected_game_id: &str,
-    ) -> Result<(), LspError> {
-        let stdin = io::stdin();
-        let stdout = io::stdout();
-        let mut server = Self::try_new_for_game(options, expected_game_id)?;
-        server.run_transport(stdin, stdout.lock())
-    }
-
     /// Runs stdio with explicit game-profile interpretation and identity validation.
     pub fn run_stdio_with_profile(
         options: InitializeOptions,
+        rules: RuleSet,
         profile: GameProfile,
     ) -> Result<(), LspError> {
         let stdin = io::stdin();
         let stdout = io::stdout();
-        let mut server = Self::try_new_with_profile(options, profile)?;
+        let mut server = Self::try_new_with_rules(options, rules, profile)?;
         server.run_transport(stdin, stdout.lock())
     }
 
@@ -754,7 +713,7 @@ impl LspServer {
             cancellation.cancel();
         }
         let candidate = self.host.clone();
-        let scan_workspace = self.options.rules_path.is_some();
+        let scan_workspace = !self.host.snapshot().rules().game_id().is_empty();
         let sender = event_sender.clone();
         let id = id.clone();
         self.state = ServerState::Initializing;
@@ -1010,10 +969,10 @@ impl LspServer {
             }
             return self.handle_initialize(params);
         }
-        if let Some(request_id) = request_id {
-            if self.cancelled.remove(request_id) {
-                return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
-            }
+        if let Some(request_id) = request_id
+            && self.cancelled.remove(request_id)
+        {
+            return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
         }
         if matches!(self.state, ServerState::Uninitialized | ServerState::Initializing) {
             return Err(RpcError::new(SERVER_NOT_INITIALIZED, "server is not initialized"));
@@ -1065,7 +1024,7 @@ impl LspServer {
         let prepared = prepare_initialize_candidate(
             self.host.clone(),
             params,
-            self.options.rules_path.is_some(),
+            !self.host.snapshot().rules().game_id().is_empty(),
             &WorkspaceScanToken::new(),
         )?;
         self.host = prepared.host;
@@ -2153,7 +2112,6 @@ mod tests {
     use std::collections::HashMap;
     use std::fs;
     use std::io::Cursor;
-    use std::path::PathBuf;
 
     use super::{
         CancellationToken, DocumentId, INVALID_PARAMS, InFlightInitialize, InFlightRequest,
@@ -2175,7 +2133,11 @@ mod tests {
     use serde_json::{Value, json};
 
     fn eu4_server(options: InitializeOptions) -> Result<LspServer, LspError> {
-        LspServer::try_new_with_profile(options, pdx_game_eu4::profile())
+        LspServer::try_new_with_rules(
+            options,
+            pdx_game_eu4::first_party_rules()?,
+            pdx_game_eu4::profile(),
+        )
     }
 
     fn frame(value: Value) -> Vec<u8> {
@@ -2217,29 +2179,19 @@ mod tests {
 
     #[test]
     fn selected_game_rejects_a_mismatched_rules_artifact() {
-        let nonce = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        let path = std::env::temp_dir().join(format!("pdx-lsp-wrong-game-{nonce}.pdxrules"));
-        RuleSet::from_model(RulesModel {
+        let rules = RuleSet::from_model(RulesModel {
             game_id: "another-game".to_owned(),
             ..RulesModel::default()
-        })
-        .write_sqlite(&path)
-        .expect("write mismatched rules");
+        });
 
-        let error = LspServer::try_new_for_game(
-            InitializeOptions { rules_path: Some(path.clone()) },
-            "eu4",
-        )
-        .expect_err("mismatched game must be rejected");
+        let error =
+            LspServer::try_new_with_rules(InitializeOptions, rules, pdx_game_eu4::profile())
+                .expect_err("mismatched game must be rejected");
         assert!(matches!(
             error,
             LspError::Rules(RulesError::GameMismatch { expected, actual })
                 if expected == "eu4" && actual == "another-game"
         ));
-        fs::remove_file(path).expect("cleanup rules");
     }
 
     #[test]
@@ -2279,7 +2231,7 @@ mod tests {
         ]);
         let mut output = Vec::new();
         let mut server =
-            eu4_server(InitializeOptions::default()).expect("syntax-only server should initialize");
+            eu4_server(InitializeOptions).expect("syntax-only server should initialize");
         server.run_transport(Cursor::new(input), &mut output).expect("transport should finish");
 
         let responses = decode_frames(&output);
@@ -2318,7 +2270,7 @@ mod tests {
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let mut output = Vec::new();
-        let mut server = eu4_server(InitializeOptions::default()).expect("server");
+        let mut server = eu4_server(InitializeOptions).expect("server");
 
         server.run_transport(Cursor::new(input), &mut output).expect("transport");
 
@@ -2364,7 +2316,7 @@ mod tests {
         ]);
         let mut output = Vec::new();
         let mut server =
-            eu4_server(InitializeOptions::default()).expect("syntax-only server should initialize");
+            eu4_server(InitializeOptions).expect("syntax-only server should initialize");
         server.run_transport(Cursor::new(input), &mut output).expect("transport should finish");
         let responses = decode_frames(&output);
         let completion =
@@ -2447,7 +2399,7 @@ mod tests {
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let mut output = Vec::new();
-        let mut server = eu4_server(InitializeOptions::default()).expect("server");
+        let mut server = eu4_server(InitializeOptions).expect("server");
         server.run_transport(Cursor::new(input), &mut output).expect("transport");
         let responses = decode_frames(&output);
 
@@ -2471,7 +2423,6 @@ mod tests {
         fs::write(&references_path, "event = cross.1\n").expect("reference");
         let target_uri = path_to_uri(&target_path);
         let references_uri = path_to_uri(&references_path);
-        let rules_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let input = frames([
             json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&root),"capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -2481,8 +2432,7 @@ mod tests {
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let mut output = Vec::new();
-        let mut server = eu4_server(InitializeOptions { rules_path: Some(rules_path) })
-            .expect("bundled rules should load");
+        let mut server = eu4_server(InitializeOptions).expect("bundled rules should load");
         server.run_transport(Cursor::new(input), &mut output).expect("transport should finish");
         let responses = decode_frames(&output);
         let rename = responses.iter().find(|value| value["id"] == 2).expect("rename response");
@@ -2538,14 +2488,13 @@ mod tests {
         .expect_err("nested source roots must be rejected");
         assert_eq!(overlap.code, INVALID_PARAMS);
         assert!(overlap.message.contains("must not overlap"));
-        let rules_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         fs::write(
             vanilla.join("common/events/definitions.txt"),
             "country_event = { id = vanilla.1 }\n",
         )
         .expect("Vanilla definition");
         let mut vanilla_host = AnalysisHost::with_profile(
-            RuleSet::load(&rules_path).expect("rules for Vanilla cache"),
+            pdx_game_eu4::first_party_rules().expect("rules for Vanilla cache"),
             pdx_game_eu4::profile(),
         );
         vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -2607,8 +2556,7 @@ path = "dependencies/high"
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let mut output = Vec::new();
-        let mut server =
-            eu4_server(InitializeOptions { rules_path: Some(rules_path) }).expect("bundled rules");
+        let mut server = eu4_server(InitializeOptions).expect("embedded rules");
         server.run_transport(Cursor::new(input), &mut output).expect("transport");
         let responses = decode_frames(&output);
 
@@ -2672,7 +2620,6 @@ path = "dependencies/high"
             .as_nanos();
         let root = std::env::temp_dir().join(format!("pdx-lsp-missing-vanilla-cache-{nonce}"));
         fs::create_dir_all(root.join("common/events")).expect("workspace fixture");
-        let rules_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
         let input = frames([
             json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&root),"capabilities":{},"initializationOptions":{"vanillaIndexCache":".pdx/missing.pdxindex"}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -2680,8 +2627,7 @@ path = "dependencies/high"
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let mut output = Vec::new();
-        let mut server =
-            eu4_server(InitializeOptions { rules_path: Some(rules_path) }).expect("bundled rules");
+        let mut server = eu4_server(InitializeOptions).expect("embedded rules");
         server.run_transport(Cursor::new(input), &mut output).expect("transport");
         let responses = decode_frames(&output);
 
@@ -2703,7 +2649,7 @@ path = "dependencies/high"
     #[test]
     fn stale_diagnostics_do_not_replace_newer_results() {
         let mut server =
-            eu4_server(InitializeOptions::default()).expect("syntax-only server should initialize");
+            eu4_server(InitializeOptions).expect("syntax-only server should initialize");
         let uri = "file:///tmp/diagnostics.txt";
         let id = pdx_workspace::DocumentId::new(uri);
         server
@@ -2737,7 +2683,7 @@ path = "dependencies/high"
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let mut output = Vec::new();
-        let mut server = eu4_server(InitializeOptions::default()).expect("server");
+        let mut server = eu4_server(InitializeOptions).expect("server");
 
         server.run_transport(Cursor::new(input), &mut output).expect("transport");
 
@@ -2812,7 +2758,7 @@ path = "dependencies/high"
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let mut output = Vec::new();
-        let mut server = eu4_server(InitializeOptions::default()).expect("server");
+        let mut server = eu4_server(InitializeOptions).expect("server");
         server.run_transport(Cursor::new(input), &mut output).expect("transport");
         let responses = decode_frames(&output);
 

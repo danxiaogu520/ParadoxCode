@@ -14,7 +14,7 @@ ParadoxCode 是通用 PDX Mod 语言工具引擎。当前唯一有交付承诺�
 - 当前交付游戏：EU4（EU4-first，不排除未来 profile）
 - 模块命名：全部 Rust crate、binary 与内部包使用 `pdx-` 前缀
 - MVP 文件范围：EU4 规则数据库声明的全部可支持文件类别；PdxScript、localisation 和 CSV 使用独立语法前端，二进制/媒体资源只进入路径索引
-- 权威规则来源：提交到项目的自有 SQLite `eu4.pdxrules`；CWTools `.cwt` 仅作为一次性 bootstrap 导入源
+- 权威规则来源：开发者维护的 `rules/eu4/*.json`；`pdx-rulec` 严格校验并生成内嵌的 `eu4.pdxrules`
 - 规则版本：对数据库规范化逻辑内容计算唯一 `rule_hash`，与发布它的 server 版本绑定，与 EU4 版本无关
 - 工作区来源：未保存 overlay > 当前 Mod > 有序依赖 Mod > Vanilla；没有 DLC source root
 - Vanilla 索引：首次配置时建立本地缓存，此后仅由用户显式刷新，不因 `rule_hash` 或文件变化自动重建
@@ -25,6 +25,7 @@ ParadoxCode 是通用 PDX Mod 语言工具引擎。当前唯一有交付承诺�
 - [发布流程与检查清单](releasing.md)
 - [RFC 0013：通用 PDX 引擎与 EU4-first](rfc/0013-generic-engine-eu4-first.md)
 - [RFC 0014：内嵌第一方规则与发布所有权](rfc/0014-embedded-first-party-rules.md)
+- [RFC 0015：第一方规则源码与编译器](rfc/0015-first-party-rule-source.md)
 - [已取代：EU4-only 架构决策](decision-eu4-only.md)
 - [EU4 MVP 计划](mvp.md)
 - [CWTools、EU4 Config 与 Jomini 调研](reference-study.md)
@@ -39,10 +40,10 @@ ParadoxCode 是通用 PDX Mod 语言工具引擎。当前唯一有交付承诺�
 - [RFC 0009：LSP Runtime](rfc/0009-lsp-runtime.md)
 - [RFC 0010：Zed 集成](rfc/0010-zed-integration.md)
 - [RFC 0011：测试、Fuzz 与质量门禁](rfc/0011-testing-quality.md)
-- [RFC 0012：CWT 一次性导入与权威规则数据库](rfc/0012-cwt-rule-compiler.md)
+- [已取代：RFC 0012 CWT 一次性导入](rfc/0012-cwt-rule-compiler.md)
 
 ## 文档状态
 
-RFC 0001–0012 是首轮设计基线；其中 EU4-only 产品约束已由 RFC 0013 取代，外部规则文件的 runtime/分发决策已由 RFC 0014 取代。现有 Phase 0–6A 状态需要按真实端到端能力重新审计，不能把 crate 骨架、内部单元测试或开发机 smoke 等同于可发布产品。
+RFC 0001–0011 是首轮设计基线；RFC 0012 已由 RFC 0015 取代，EU4-only 产品约束已由 RFC 0013 取代，外部规则文件的 runtime/分发决策已由 RFC 0014 取代。现有 Phase 0–6A 状态需要按真实端到端能力重新审计，不能把 crate 骨架、内部单元测试或开发机 smoke 等同于可发布产品。
 
 文档中的示例是 ParadoxCode 自有设计示例，不应直接复制游戏文件或参考项目的测试 corpus。

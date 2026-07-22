@@ -12,7 +12,7 @@
 - `pdx-text`：offset、UTF-16、line endings、URI/path
 - `pdx-syntax`：typed CST、error extraction、revision-safe edit update
 - `pdx-eu4`：SQLite schema、只读加载、immutability、cross-reference index、canonical logical hash
-- `pdx-cwt`：bootstrap corpus construct、directive import、事务回滚、import report
+- `pdx-rulec`：strict source decoding、stable identity、invariant、artifact round-trip 和 manifest
 - `pdx-hir`：context lowering、scope transition
 - `pdx-workspace`：root order、overlay、shard replacement
 - `pdx-analysis`：feature query
@@ -71,7 +71,7 @@ MVP 至少包含：
 5. `hir_lower(bytes, minimal_rule_db)`
 6. `format(bytes)` 的 idempotence 与 token preservation
 7. `line_index(text, positions)`
-8. `parse_cwt_import(bytes)` 与 `import_cwt(source_set)`
+8. `load_first_party_rules(source_tree)` 与 `compile_rules(source_tree)`
 9. `parse_eu4_csv(bytes, dialect)`
 
 不变量：
@@ -139,7 +139,7 @@ cargo bench -p pdx-workspace --bench synthetic_workspace
 ## Fixture 与版权
 
 - 不提交 Vanilla EU4 文件或用户本地 Vanilla 索引缓存。
-- 不提交权威 CWT source tree；importer unit test 可以使用最小原创 inline CWT strings。
+- 不提交外部规则 source tree；compiler unit test 使用最小原创第一方 JSON fixture。
 - 不把参考仓库 corpus 复制进项目；需要同类 case 时编写最小原创样例。
 - 引用外部行为或设计时在文档中记录项目和 commit。
 - 任何第三方数据导入都必须先确认许可证和再分发条件。

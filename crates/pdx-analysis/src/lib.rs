@@ -11,9 +11,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use pdx_hir::{HirFile, HirReferenceOrigin, Scope};
-use pdx_rules::{
-    CwtKeyMatcher, CwtRuleShape, CwtValueMatcher, GameProfile, SymbolResolutionPolicy,
-};
+use pdx_rules::{GameProfile, KeyMatcher, RuleShape, SymbolResolutionPolicy, ValueMatcher};
 use pdx_syntax::{CstKind, CstNode, CsvParsedFile, Eu4FileFormat, ParsedFile, SyntaxError};
 use pdx_text::{LogicalPath, TextRange, TextSize};
 use pdx_workspace::{
@@ -23,7 +21,7 @@ use pdx_workspace::{
 /// Shared cooperative-cancellation state for editor-neutral analysis queries.
 ///
 /// Clones observe the same flag. Query implementations check it while traversing workspace and
-/// CWT data so protocol adapters can stop obsolete work without introducing protocol types here.
+/// semantic rule data so protocol adapters can stop obsolete work without introducing protocol types here.
 #[derive(Clone, Debug)]
 pub struct CancellationToken {
     cancelled: Arc<AtomicBool>,
@@ -106,11 +104,11 @@ pub enum DiagnosticCode {
     AmbiguousSymbol,
     /// An explicit scope expression is not recognised.
     UnknownScope,
-    /// A scalar or block does not satisfy the selected CWT matcher.
+    /// A scalar or block does not satisfy the selected semantic matcher.
     InvalidValue,
-    /// A CWT cardinality constraint was violated.
+    /// A semantic rule cardinality constraint was violated.
     Cardinality,
-    /// A key or value is known to CWT but is used from the wrong game scope.
+    /// A key or value is known to the semantic rule set but is used from the wrong game scope.
     WrongScope,
 }
 
@@ -442,12 +440,12 @@ pub fn complete_with_cancellation(
     let value_context = completion_value_context(&input, position);
     let all = all_semantics(snapshot, cancellation)?;
     let mut items = Vec::new();
-    let cwt_context = cwt_completion_context(snapshot, &input, position);
-    if let Some(context) = cwt_context.as_ref() {
+    let semantic_context = semantic_completion_context(snapshot, &input, position);
+    if let Some(context) = semantic_context.as_ref() {
         cancellation.checkpoint()?;
         if value_context {
             if let Some(property) = context.property.as_ref() {
-                add_cwt_value_items(
+                add_semantic_value_items(
                     snapshot,
                     context,
                     property,
@@ -457,7 +455,7 @@ pub fn complete_with_cancellation(
                 );
             }
         } else {
-            add_cwt_key_items(snapshot, context, &mut items, replacement_range, &prefix);
+            add_semantic_key_items(snapshot, context, &mut items, replacement_range, &prefix);
         }
     }
     if items.is_empty() && value_context {
@@ -550,29 +548,29 @@ pub fn complete_with_cancellation(
 }
 
 #[derive(Clone, Debug)]
-struct CwtCompletionContext {
+struct SemanticCompletionContext {
     context: String,
     parent_path: Vec<String>,
     scope: ScopeContext,
     property: Option<ScriptProperty>,
 }
 
-fn cwt_completion_context(
+fn semantic_completion_context(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     position: TextSize,
-) -> Option<CwtCompletionContext> {
+) -> Option<SemanticCompletionContext> {
     let ParsedContent::Text(parsed) = &input.parsed else { return None };
     for root in script_properties(input, parsed.root()) {
-        let Some(context) = cwt_root_context(snapshot, &root.key, input.path.as_ref()) else {
+        let Some(context) = semantic_root_context(snapshot, &root.key, input.path.as_ref()) else {
             continue;
         };
         let Some(block_range) = root.block_range else { continue };
         if !contains(block_range, position) {
             continue;
         }
-        let scope = cwt_initial_scope(snapshot, &context, &root.key);
-        return Some(cwt_completion_container(
+        let scope = semantic_initial_scope(snapshot, &context, &root.key);
+        return Some(semantic_completion_container(
             snapshot,
             context,
             Vec::new(),
@@ -585,7 +583,7 @@ fn cwt_completion_context(
     None
 }
 
-fn cwt_completion_container(
+fn semantic_completion_container(
     snapshot: &AnalysisSnapshot,
     context: String,
     parent_path: Vec<String>,
@@ -593,18 +591,18 @@ fn cwt_completion_container(
     _bare_values: Vec<(String, TextRange)>,
     scope: ScopeContext,
     position: TextSize,
-) -> CwtCompletionContext {
+) -> SemanticCompletionContext {
     for property in &properties {
         let Some(block_range) = property.block_range else { continue };
         if !contains(block_range, position) {
             continue;
         }
-        let next_rule = cwt_rules_for_container(snapshot, &context, &parent_path, &scope)
+        let next_rule = semantic_rules_for_container(snapshot, &context, &parent_path, &scope)
             .into_iter()
             .find(|rule| {
-                !matches!(rule.shape, CwtRuleShape::LeafValue)
-                    && cwt_key_matches(snapshot, &rule.key, &property.key)
-                    && cwt_scope_allows(rule, &scope)
+                !matches!(rule.shape, RuleShape::LeafValue)
+                    && semantic_key_matches(snapshot, &rule.key, &property.key)
+                    && semantic_scope_allows(rule, &scope)
             });
         let (next_context, child_path) =
             next_rule.and_then(|rule| rule.child_context.as_deref()).map_or_else(
@@ -616,8 +614,8 @@ fn cwt_completion_container(
                 |child_context| (child_context.to_owned(), Vec::new()),
             );
         let next_scope =
-            next_rule.map_or_else(|| scope.clone(), |rule| cwt_child_scope(&scope, rule));
-        return cwt_completion_container(
+            next_rule.map_or_else(|| scope.clone(), |rule| semantic_child_scope(&scope, rule));
+        return semantic_completion_container(
             snapshot,
             next_context,
             child_path,
@@ -628,19 +626,19 @@ fn cwt_completion_container(
         );
     }
     let property = properties.into_iter().find(|property| contains(property.range, position));
-    CwtCompletionContext { context, parent_path, scope, property }
+    SemanticCompletionContext { context, parent_path, scope, property }
 }
 
-fn cwt_rules_for_container<'a>(
+fn semantic_rules_for_container<'a>(
     snapshot: &'a AnalysisSnapshot,
     context: &str,
     parent_path: &[String],
     _scope: &ScopeContext,
-) -> Vec<&'a pdx_rules::CwtSemanticRule> {
+) -> Vec<&'a pdx_rules::SemanticRule> {
     snapshot
         .rules()
         .model()
-        .cwt
+        .semantic
         .rules
         .iter()
         .filter(|rule| {
@@ -648,33 +646,38 @@ fn cwt_rules_for_container<'a>(
                 || (context.strip_prefix("type:").is_some_and(|type_name| {
                     rule.context.eq_ignore_ascii_case(&format!("root:{type_name}"))
                 }));
-            context_matches && cwt_parent_path_matches(snapshot, &rule.parent_path, parent_path)
+            context_matches
+                && semantic_parent_path_matches(snapshot, &rule.parent_path, parent_path)
         })
         .collect()
 }
 
-fn add_cwt_key_items(
+fn add_semantic_key_items(
     snapshot: &AnalysisSnapshot,
-    context: &CwtCompletionContext,
+    context: &SemanticCompletionContext,
     items: &mut Vec<CompletionItem>,
     replacement_range: TextRange,
     prefix: &str,
 ) {
-    for rule in
-        cwt_rules_for_container(snapshot, &context.context, &context.parent_path, &context.scope)
-    {
-        if matches!(rule.shape, CwtRuleShape::LeafValue) || !cwt_scope_allows(rule, &context.scope)
+    for rule in semantic_rules_for_container(
+        snapshot,
+        &context.context,
+        &context.parent_path,
+        &context.scope,
+    ) {
+        if matches!(rule.shape, RuleShape::LeafValue)
+            || !semantic_scope_allows(rule, &context.scope)
         {
             continue;
         }
         let documentation = (!rule.documentation.is_empty()).then(|| rule.documentation.join("\n"));
         match &rule.key {
-            CwtKeyMatcher::Exact(label) => push_completion(
+            KeyMatcher::Exact(label) => push_completion(
                 items,
                 CompletionItem {
                     label: label.clone(),
                     kind: CompletionKind::Key,
-                    detail: cwt_rule_detail(rule),
+                    detail: semantic_rule_detail(rule),
                     documentation,
                     replacement_range,
                     insert_text: label.clone(),
@@ -683,14 +686,14 @@ fn add_cwt_key_items(
                 },
                 prefix,
             ),
-            CwtKeyMatcher::Type(type_name) => {
+            KeyMatcher::Type(type_name) => {
                 for label in workspace_member_names(snapshot, type_name) {
                     push_completion(
                         items,
                         CompletionItem {
                             label: label.clone(),
                             kind: CompletionKind::Key,
-                            detail: format!("CWT type key <{type_name}>"),
+                            detail: format!("semantic type key <{type_name}>"),
                             documentation: documentation.clone(),
                             replacement_range,
                             insert_text: label,
@@ -701,14 +704,14 @@ fn add_cwt_key_items(
                     );
                 }
             }
-            CwtKeyMatcher::Enum(enum_name) => {
+            KeyMatcher::Enum(enum_name) => {
                 for label in enum_member_names(snapshot, enum_name) {
                     push_completion(
                         items,
                         CompletionItem {
                             label: label.clone(),
                             kind: CompletionKind::Key,
-                            detail: format!("CWT enum key enum[{enum_name}]"),
+                            detail: format!("semantic enum key enum[{enum_name}]"),
                             documentation: documentation.clone(),
                             replacement_range,
                             insert_text: label,
@@ -719,14 +722,14 @@ fn add_cwt_key_items(
                     );
                 }
             }
-            CwtKeyMatcher::Dynamic(kind) => {
+            KeyMatcher::Dynamic(kind) => {
                 for label in workspace_member_names(snapshot, kind) {
                     push_completion(
                         items,
                         CompletionItem {
                             label: label.clone(),
                             kind: CompletionKind::Key,
-                            detail: format!("CWT dynamic key value_set[{kind}]"),
+                            detail: format!("semantic dynamic key value_set[{kind}]"),
                             documentation: documentation.clone(),
                             replacement_range,
                             insert_text: label,
@@ -737,44 +740,48 @@ fn add_cwt_key_items(
                     );
                 }
             }
-            CwtKeyMatcher::AnyScalar => {}
+            KeyMatcher::AnyScalar => {}
         }
     }
 }
 
-fn add_cwt_value_items(
+fn add_semantic_value_items(
     snapshot: &AnalysisSnapshot,
-    context: &CwtCompletionContext,
+    context: &SemanticCompletionContext,
     property: &ScriptProperty,
     items: &mut Vec<CompletionItem>,
     replacement_range: TextRange,
     prefix: &str,
 ) {
-    let matching =
-        cwt_rules_for_container(snapshot, &context.context, &context.parent_path, &context.scope)
-            .into_iter()
-            .filter(|rule| {
-                !matches!(rule.shape, CwtRuleShape::LeafValue)
-                    && cwt_key_matches(snapshot, &rule.key, &property.key)
-                    && rule
-                        .operator
-                        .as_deref()
-                        .is_none_or(|operator| property.operator.as_deref() == Some(operator))
-            })
-            .filter(|rule| cwt_scope_allows(rule, &context.scope))
-            .collect::<Vec<_>>();
+    let matching = semantic_rules_for_container(
+        snapshot,
+        &context.context,
+        &context.parent_path,
+        &context.scope,
+    )
+    .into_iter()
+    .filter(|rule| {
+        !matches!(rule.shape, RuleShape::LeafValue)
+            && semantic_key_matches(snapshot, &rule.key, &property.key)
+            && rule
+                .operator
+                .as_deref()
+                .is_none_or(|operator| property.operator.as_deref() == Some(operator))
+    })
+    .filter(|rule| semantic_scope_allows(rule, &context.scope))
+    .collect::<Vec<_>>();
     for rule in matching {
         let documentation = (!rule.documentation.is_empty()).then(|| rule.documentation.join("\n"));
         match &rule.value {
-            CwtValueMatcher::Exact(label) => add_value_completion(
+            ValueMatcher::Exact(label) => add_value_completion(
                 items,
                 label,
-                &cwt_value_matcher_label(&rule.value),
+                &semantic_value_matcher_label(&rule.value),
                 documentation.clone(),
                 replacement_range,
                 prefix,
             ),
-            CwtValueMatcher::Bool => {
+            ValueMatcher::Bool => {
                 add_value_completion(
                     items,
                     "yes",
@@ -792,7 +799,7 @@ fn add_cwt_value_items(
                     prefix,
                 );
             }
-            CwtValueMatcher::Int { min, max } => {
+            ValueMatcher::Int { min, max } => {
                 add_numeric_completion(
                     items,
                     min.map(|value| value.to_string()).as_deref(),
@@ -810,7 +817,7 @@ fn add_cwt_value_items(
                     prefix,
                 );
             }
-            CwtValueMatcher::Float { min, max } => {
+            ValueMatcher::Float { min, max } => {
                 add_value_completion(
                     items,
                     "0",
@@ -838,7 +845,7 @@ fn add_cwt_value_items(
                     );
                 }
             }
-            CwtValueMatcher::Type(type_name) => {
+            ValueMatcher::Type(type_name) => {
                 for label in workspace_member_names(snapshot, type_name) {
                     add_value_completion(
                         items,
@@ -850,7 +857,7 @@ fn add_cwt_value_items(
                     );
                 }
             }
-            CwtValueMatcher::Enum(enum_name) => {
+            ValueMatcher::Enum(enum_name) => {
                 for label in enum_member_names(snapshot, enum_name) {
                     add_value_completion(
                         items,
@@ -862,7 +869,7 @@ fn add_cwt_value_items(
                     );
                 }
             }
-            CwtValueMatcher::Scope(expected) => {
+            ValueMatcher::Scope(expected) => {
                 for label in &snapshot.game_profile().scope_completions {
                     if expected
                         .as_deref()
@@ -879,7 +886,7 @@ fn add_cwt_value_items(
                     }
                 }
             }
-            CwtValueMatcher::Localisation => {
+            ValueMatcher::Localisation => {
                 for label in workspace_member_names(snapshot, "localisation") {
                     add_value_completion(
                         items,
@@ -891,7 +898,7 @@ fn add_cwt_value_items(
                     );
                 }
             }
-            CwtValueMatcher::Dynamic(kind) => {
+            ValueMatcher::Dynamic(kind) => {
                 for label in workspace_member_names(snapshot, kind) {
                     add_value_completion(
                         items,
@@ -913,10 +920,10 @@ fn add_cwt_value_items(
                     );
                 }
             }
-            CwtValueMatcher::DynamicSet(_)
-            | CwtValueMatcher::AnyScalar
-            | CwtValueMatcher::Filepath
-            | CwtValueMatcher::Opaque(_) => {}
+            ValueMatcher::DynamicSet(_)
+            | ValueMatcher::AnyScalar
+            | ValueMatcher::Filepath
+            | ValueMatcher::Opaque(_) => {}
         }
     }
 }
@@ -962,14 +969,14 @@ fn add_numeric_completion(
     }
 }
 
-fn cwt_rule_detail(rule: &pdx_rules::CwtSemanticRule) -> String {
+fn semantic_rule_detail(rule: &pdx_rules::SemanticRule) -> String {
     let shape = match rule.shape {
-        CwtRuleShape::Node => "block",
-        CwtRuleShape::Leaf => "scalar",
-        CwtRuleShape::LeafValue => "bare value",
-        CwtRuleShape::ValueClause => "value clause",
+        RuleShape::Node => "block",
+        RuleShape::Leaf => "scalar",
+        RuleShape::LeafValue => "bare value",
+        RuleShape::ValueClause => "value clause",
     };
-    format!("CWT {shape}")
+    format!("semantic rule {shape}")
 }
 
 fn workspace_member_names(snapshot: &AnalysisSnapshot, type_name: &str) -> Vec<String> {
@@ -992,7 +999,7 @@ fn workspace_member_names(snapshot: &AnalysisSnapshot, type_name: &str) -> Vec<S
 
 fn enum_member_names(snapshot: &AnalysisSnapshot, enum_name: &str) -> Vec<String> {
     let mut names =
-        snapshot.rules().model().cwt.enum_values.get(enum_name).cloned().unwrap_or_default();
+        snapshot.rules().model().semantic.enum_values.get(enum_name).cloned().unwrap_or_default();
     names.extend(workspace_member_names(snapshot, enum_name));
     names.sort_by_key(|name| name.to_ascii_lowercase());
     names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
@@ -1054,7 +1061,7 @@ pub fn hover_with_cancellation(
         )));
     }
     cancellation.checkpoint()?;
-    if let Some(details) = cwt_rule_documentation_at(snapshot, &input, position) {
+    if let Some(details) = semantic_rule_documentation_at(snapshot, &input, position) {
         return Ok(Some(Hover {
             contents: format!("PDX property `{word}`\n\n{details}"),
             range: Some(range),
@@ -1062,7 +1069,7 @@ pub fn hover_with_cancellation(
     }
     let known = known_keys(snapshot);
     if known.contains(&word) {
-        let contents = cwt_rule_documentation(snapshot, &word).map_or_else(
+        let contents = semantic_rule_documentation(snapshot, &word).map_or_else(
             || format!("PDX property `{word}`"),
             |details| format!("PDX property `{word}`\n\n{details}"),
         );
@@ -1071,15 +1078,15 @@ pub fn hover_with_cancellation(
     Ok(Some(Hover { contents: format!("PDX value `{word}`"), range: Some(range) }))
 }
 
-fn cwt_rule_documentation(snapshot: &AnalysisSnapshot, key: &str) -> Option<String> {
+fn semantic_rule_documentation(snapshot: &AnalysisSnapshot, key: &str) -> Option<String> {
     let mut rules = snapshot
         .rules()
         .model()
-        .cwt
+        .semantic
         .rules
         .iter()
         .filter(|rule| match &rule.key {
-            CwtKeyMatcher::Exact(expected) => expected.eq_ignore_ascii_case(key),
+            KeyMatcher::Exact(expected) => expected.eq_ignore_ascii_case(key),
             _ => false,
         })
         .collect::<Vec<_>>();
@@ -1091,30 +1098,34 @@ fn cwt_rule_documentation(snapshot: &AnalysisSnapshot, key: &str) -> Option<Stri
             || rule.max_occurs != Some(1)
             || !rule.allowed_scopes.is_empty()
     })?;
-    cwt_rule_documentation_for_rule(rule)
+    semantic_rule_documentation_for_rule(rule)
 }
 
-fn cwt_rule_documentation_at(
+fn semantic_rule_documentation_at(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     position: TextSize,
 ) -> Option<String> {
-    let context = cwt_completion_context(snapshot, input, position)?;
+    let context = semantic_completion_context(snapshot, input, position)?;
     let property = context.property.as_ref()?;
-    let mut rules =
-        cwt_rules_for_container(snapshot, &context.context, &context.parent_path, &context.scope)
-            .into_iter()
-            .filter(|rule| {
-                !matches!(rule.shape, CwtRuleShape::LeafValue)
-                    && cwt_key_matches(snapshot, &rule.key, &property.key)
-                    && cwt_scope_allows(rule, &context.scope)
-            })
-            .collect::<Vec<_>>();
+    let mut rules = semantic_rules_for_container(
+        snapshot,
+        &context.context,
+        &context.parent_path,
+        &context.scope,
+    )
+    .into_iter()
+    .filter(|rule| {
+        !matches!(rule.shape, RuleShape::LeafValue)
+            && semantic_key_matches(snapshot, &rule.key, &property.key)
+            && semantic_scope_allows(rule, &context.scope)
+    })
+    .collect::<Vec<_>>();
     rules.sort_by_key(|rule| (&rule.context, &rule.parent_path, &rule.id));
-    rules.into_iter().find_map(cwt_rule_documentation_for_rule)
+    rules.into_iter().find_map(semantic_rule_documentation_for_rule)
 }
 
-fn cwt_rule_documentation_for_rule(rule: &pdx_rules::CwtSemanticRule) -> Option<String> {
+fn semantic_rule_documentation_for_rule(rule: &pdx_rules::SemanticRule) -> Option<String> {
     let mut lines = rule.documentation.clone();
     if rule.required {
         lines.push("required".to_owned());
@@ -1597,7 +1608,7 @@ fn analyze_input_with_cancellation(
     cancellation.checkpoint()?;
     let all = all_semantics(snapshot, cancellation)?;
     let mut diagnostics = syntax_diagnostics(input);
-    diagnostics.extend(cwt_rule_diagnostics(snapshot, input, cancellation)?);
+    diagnostics.extend(semantic_rule_diagnostics(snapshot, input, cancellation)?);
     let known = known_keys(snapshot);
     let mut unknown_scope_reported = false;
     for property in properties(input) {
@@ -1607,7 +1618,7 @@ fn analyze_input_with_cancellation(
                 && same_name(&definition.name, &property.key)
         });
         if !property.top_level
-            && !cwt_validates_path(snapshot, &property.path, input.path.as_ref())
+            && !semantic_validates_path(snapshot, &property.path, input.path.as_ref())
             && !known.contains(&property.key.to_ascii_lowercase())
             && !is_dynamic_command
             && looks_unknown_key(&property.key)
@@ -1713,13 +1724,15 @@ impl ScopeContext {
     }
 }
 
-fn cwt_rule_diagnostics(
+fn semantic_rule_diagnostics(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     cancellation: &CancellationToken,
 ) -> Result<Vec<Diagnostic>, Cancelled> {
     cancellation.checkpoint()?;
-    if input.format != Eu4FileFormat::PdxScript || snapshot.rules().model().cwt.rules.is_empty() {
+    if input.format != Eu4FileFormat::PdxScript
+        || snapshot.rules().model().semantic.rules.is_empty()
+    {
         return Ok(Vec::new());
     }
     let ParsedContent::Text(parsed) = &input.parsed else { return Ok(Vec::new()) };
@@ -1728,12 +1741,13 @@ fn cwt_rule_diagnostics(
     let mut diagnostics = Vec::new();
     for property in roots {
         cancellation.checkpoint()?;
-        let Some(context) = cwt_root_context(snapshot, &property.key, input.path.as_ref()) else {
+        let Some(context) = semantic_root_context(snapshot, &property.key, input.path.as_ref())
+        else {
             continue;
         };
-        let scope = cwt_initial_scope(snapshot, &context, &property.key);
+        let scope = semantic_initial_scope(snapshot, &context, &property.key);
         if let Some(type_name) = context.strip_prefix("type:")
-            && snapshot.rules().model().cwt.type_descriptors.get(type_name).is_some_and(
+            && snapshot.rules().model().semantic.type_descriptors.get(type_name).is_some_and(
                 |descriptor| {
                     descriptor.skip_root_paths.iter().any(|path| {
                         path.first().is_some_and(|key| {
@@ -1745,8 +1759,8 @@ fn cwt_rule_diagnostics(
             )
         {
             for child in &property.block {
-                let child_scope = cwt_initial_scope(snapshot, &context, &child.key);
-                validate_cwt_container(
+                let child_scope = semantic_initial_scope(snapshot, &context, &child.key);
+                validate_semantic_container(
                     snapshot,
                     &context,
                     &[],
@@ -1759,7 +1773,7 @@ fn cwt_rule_diagnostics(
             }
             continue;
         }
-        validate_cwt_container(
+        validate_semantic_container(
             snapshot,
             &context,
             &[],
@@ -1773,13 +1787,17 @@ fn cwt_rule_diagnostics(
     Ok(diagnostics)
 }
 
-fn cwt_initial_scope(snapshot: &AnalysisSnapshot, context: &str, root_key: &str) -> ScopeContext {
+fn semantic_initial_scope(
+    snapshot: &AnalysisSnapshot,
+    context: &str,
+    root_key: &str,
+) -> ScopeContext {
     let mut scope = ScopeContext::new(snapshot.game_profile_handle());
     if let Some(type_name) = context.strip_prefix("type:")
         && let Some(root_scope) = snapshot
             .rules()
             .model()
-            .cwt
+            .semantic
             .type_root_scopes
             .get(type_name)
             .and_then(|roots| roots.get(root_key))
@@ -1795,12 +1813,12 @@ fn cwt_initial_scope(snapshot: &AnalysisSnapshot, context: &str, root_key: &str)
     scope
 }
 
-fn cwt_root_context(
+fn semantic_root_context(
     snapshot: &AnalysisSnapshot,
     key: &str,
     logical_path: Option<&LogicalPath>,
 ) -> Option<String> {
-    let rules = &snapshot.rules().model().cwt.rules;
+    let rules = &snapshot.rules().model().semantic.rules;
     if rules.iter().any(|rule| rule.context.eq_ignore_ascii_case(key)) {
         return Some(key.to_owned());
     }
@@ -1811,11 +1829,11 @@ fn cwt_root_context(
     snapshot
         .rules()
         .model()
-        .cwt
+        .semantic
         .type_root_keys
         .iter()
         .find(|(type_name, roots)| {
-            let descriptor = snapshot.rules().model().cwt.type_descriptors.get(*type_name);
+            let descriptor = snapshot.rules().model().semantic.type_descriptors.get(*type_name);
             (roots.iter().any(|root| root.eq_ignore_ascii_case(key))
                 || descriptor.is_some_and(|descriptor| {
                     descriptor.starts_with.as_deref().is_some_and(|prefix| {
@@ -1830,7 +1848,7 @@ fn cwt_root_context(
                     .iter()
                     .any(|rule| rule.context.eq_ignore_ascii_case(&format!("root:{type_name}")))
                 && descriptor
-                    .is_none_or(|descriptor| cwt_type_path_matches(descriptor, logical_path))
+                    .is_none_or(|descriptor| semantic_type_path_matches(descriptor, logical_path))
         })
         .map(|(type_name, _)| format!("type:{type_name}"))
         .or_else(|| {
@@ -1840,14 +1858,14 @@ fn cwt_root_context(
             snapshot
                 .rules()
                 .model()
-                .cwt
+                .semantic
                 .type_descriptors
                 .iter()
                 .find(|(type_name, descriptor)| {
                     let starts_with = descriptor.starts_with.as_deref().is_some_and(|prefix| {
                         key.to_ascii_lowercase().starts_with(&prefix.to_ascii_lowercase())
                     });
-                    (!snapshot.rules().model().cwt.type_root_keys.contains_key(*type_name)
+                    (!snapshot.rules().model().semantic.type_root_keys.contains_key(*type_name)
                         || starts_with)
                         && (starts_with
                             || descriptor.skip_root_paths.iter().any(|path| {
@@ -1859,11 +1877,11 @@ fn cwt_root_context(
                         && rules.iter().any(|rule| {
                             rule.context.eq_ignore_ascii_case(&format!("root:{type_name}"))
                         })
-                        && cwt_type_path_matches(descriptor, logical_path)
+                        && semantic_type_path_matches(descriptor, logical_path)
                 })
                 .map(|(type_name, _)| format!("type:{type_name}"))
                 .or_else(|| {
-                    // CWTools applies a normal (type_per_file = no) type to every root clause
+                    // A normal (type_per_file = no) type applies to every root clause
                     // in its matching path. The root key therefore need not literally equal the
                     // type name; for example, `EDG_Bavarian_Missions = { ... }` uses the
                     // `mission_series` rules. The normalized artifact keeps the type descriptor
@@ -1872,13 +1890,18 @@ fn cwt_root_context(
                     snapshot
                         .rules()
                         .model()
-                        .cwt
+                        .semantic
                         .type_descriptors
                         .iter()
                         .find(|(type_name, descriptor)| {
-                            !snapshot.rules().model().cwt.type_root_keys.contains_key(*type_name)
-                                && cwt_type_path_matches(descriptor, logical_path)
-                                && snapshot.rules().model().cwt.rules.iter().any(|rule| {
+                            !snapshot
+                                .rules()
+                                .model()
+                                .semantic
+                                .type_root_keys
+                                .contains_key(*type_name)
+                                && semantic_type_path_matches(descriptor, logical_path)
+                                && snapshot.rules().model().semantic.rules.iter().any(|rule| {
                                     rule.context.eq_ignore_ascii_case(&format!("root:{type_name}"))
                                 })
                         })
@@ -1887,8 +1910,8 @@ fn cwt_root_context(
         })
 }
 
-fn cwt_type_path_matches(
-    descriptor: &pdx_rules::CwtTypeDescriptor,
+fn semantic_type_path_matches(
+    descriptor: &pdx_rules::TypeDescriptor,
     logical_path: Option<&LogicalPath>,
 ) -> bool {
     let Some(logical_path) = logical_path else { return true };
@@ -1926,13 +1949,13 @@ fn cwt_type_path_matches(
     true
 }
 
-fn cwt_validates_path(
+fn semantic_validates_path(
     snapshot: &AnalysisSnapshot,
     path: &[String],
     logical_path: Option<&LogicalPath>,
 ) -> bool {
     let Some(root) = path.first() else { return false };
-    cwt_root_context(snapshot, root, logical_path).is_some()
+    semantic_root_context(snapshot, root, logical_path).is_some()
 }
 
 fn script_properties(input: &ParsedInput, parent: &CstNode) -> Vec<ScriptProperty> {
@@ -1986,7 +2009,7 @@ fn script_properties(input: &ParsedInput, parent: &CstNode) -> Vec<ScriptPropert
 }
 
 #[allow(clippy::too_many_arguments)] // Recursive validation carries explicit semantic state.
-fn validate_cwt_container(
+fn validate_semantic_container(
     snapshot: &AnalysisSnapshot,
     context: &str,
     parent_path: &[String],
@@ -2000,7 +2023,7 @@ fn validate_cwt_container(
     let rules = snapshot
         .rules()
         .model()
-        .cwt
+        .semantic
         .rules
         .iter()
         .filter(|rule| {
@@ -2008,14 +2031,15 @@ fn validate_cwt_container(
                 || (context.strip_prefix("type:").is_some_and(|type_name| {
                     rule.context.eq_ignore_ascii_case(&format!("root:{type_name}"))
                 }));
-            context_matches && cwt_parent_path_matches(snapshot, &rule.parent_path, parent_path)
+            context_matches
+                && semantic_parent_path_matches(snapshot, &rule.parent_path, parent_path)
         })
         .collect::<Vec<_>>();
     if rules.is_empty() {
         return Ok(());
     }
     let selected_alternative =
-        cwt_selected_alternative(snapshot, &rules, properties, bare_values, scope);
+        semantic_selected_alternative(snapshot, &rules, properties, bare_values, scope);
     let mut counts = std::collections::BTreeMap::<String, u32>::new();
     for property in properties {
         cancellation.checkpoint()?;
@@ -2025,8 +2049,8 @@ fn validate_cwt_container(
         let matching = rules
             .iter()
             .filter(|rule| {
-                !matches!(rule.shape, CwtRuleShape::LeafValue)
-                    && cwt_key_matches(snapshot, &rule.key, &property.key)
+                !matches!(rule.shape, RuleShape::LeafValue)
+                    && semantic_key_matches(snapshot, &rule.key, &property.key)
             })
             .copied()
             .collect::<Vec<_>>();
@@ -2035,18 +2059,18 @@ fn validate_cwt_container(
                 code: DiagnosticCode::UnknownKey,
                 severity: DiagnosticCode::UnknownKey.severity(),
                 range: property.key_range,
-                message: format!("unexpected key `{}` in CWT context `{context}`", property.key),
+                message: format!("unexpected key `{}` in rule context `{context}`", property.key),
             });
         } else {
             let scoped_matching = matching
                 .iter()
-                .filter(|rule| cwt_scope_allows(rule, scope))
+                .filter(|rule| semantic_scope_allows(rule, scope))
                 .copied()
                 .collect::<Vec<_>>();
             if scoped_matching.is_empty() {
                 diagnostics.push(Diagnostic {
                     code: DiagnosticCode::WrongScope,
-                    severity: cwt_rule_severity(
+                    severity: semantic_rule_severity(
                         matching.iter().copied(),
                         DiagnosticCode::WrongScope,
                     ),
@@ -2058,22 +2082,26 @@ fn validate_cwt_container(
                 });
             }
             let applicable = if scoped_matching.is_empty() { &matching } else { &scoped_matching };
-            let valid =
-                applicable.iter().any(|rule| cwt_property_matches(snapshot, rule, property, scope));
+            let valid = applicable
+                .iter()
+                .any(|rule| semantic_property_matches(snapshot, rule, property, scope));
             if !valid {
                 diagnostics.push(Diagnostic {
                     code: DiagnosticCode::InvalidValue,
-                    severity: cwt_rule_severity(
+                    severity: semantic_rule_severity(
                         applicable.iter().copied(),
                         DiagnosticCode::InvalidValue,
                     ),
                     range: property.scalar.as_ref().map_or(property.key_range, |(_, range)| *range),
-                    message: format!("value of `{}` does not match the CWT rule", property.key),
+                    message: format!(
+                        "value of `{}` does not match the semantic rule",
+                        property.key
+                    ),
                 });
             }
             let max_occurs = applicable
                 .iter()
-                .filter(|rule| cwt_rule_is_selected(rule, selected_alternative.as_deref()))
+                .filter(|rule| semantic_rule_is_selected(rule, selected_alternative.as_deref()))
                 .filter_map(|rule| rule.max_occurs)
                 .max();
             if let Some(max_occurs) = max_occurs
@@ -2084,7 +2112,7 @@ fn validate_cwt_container(
                     severity: 2,
                     range: property.key_range,
                     message: format!(
-                        "`{}` occurs {} times, but CWT cardinality allows at most {}",
+                        "`{}` occurs {} times, but rule cardinality allows at most {}",
                         property.key, count, max_occurs
                     ),
                 });
@@ -2092,10 +2120,10 @@ fn validate_cwt_container(
         }
         let next_rule = matching
             .iter()
-            .filter(|rule| cwt_rule_is_selected(rule, selected_alternative.as_deref()))
-            .find(|rule| cwt_scope_allows(rule, scope))
+            .filter(|rule| semantic_rule_is_selected(rule, selected_alternative.as_deref()))
+            .find(|rule| semantic_scope_allows(rule, scope))
             .copied()
-            .or_else(|| matching.iter().find(|rule| cwt_scope_allows(rule, scope)).copied());
+            .or_else(|| matching.iter().find(|rule| semantic_scope_allows(rule, scope)).copied());
         let (next_context, child_path) =
             next_rule.and_then(|rule| rule.child_context.as_deref()).map_or_else(
                 || {
@@ -2106,8 +2134,8 @@ fn validate_cwt_container(
                 |child_context| (child_context.to_owned(), Vec::new()),
             );
         let next_scope =
-            next_rule.map_or_else(|| scope.clone(), |rule| cwt_child_scope(scope, rule));
-        validate_cwt_container(
+            next_rule.map_or_else(|| scope.clone(), |rule| semantic_child_scope(scope, rule));
+        validate_semantic_container(
             snapshot,
             &next_context,
             &child_path,
@@ -2123,8 +2151,8 @@ fn validate_cwt_container(
         let matching = rules
             .iter()
             .filter(|rule| {
-                matches!(rule.shape, CwtRuleShape::LeafValue)
-                    && cwt_leaf_value_matches(snapshot, rule, value, scope)
+                matches!(rule.shape, RuleShape::LeafValue)
+                    && semantic_leaf_value_matches(snapshot, rule, value, scope)
             })
             .copied()
             .collect::<Vec<_>>();
@@ -2133,21 +2161,23 @@ fn validate_cwt_container(
                 code: DiagnosticCode::InvalidValue,
                 severity: DiagnosticCode::InvalidValue.severity(),
                 range: *value_range,
-                message: format!("bare value `{value}` does not match the CWT value clause"),
+                message: format!(
+                    "bare value `{value}` does not match the semantic rule value clause"
+                ),
             });
         }
     }
     let empty_range =
         properties.first().map_or_else(|| TextRange::empty(0), |property| property.key_range);
-    for rule in rules.iter().filter(|rule| cwt_scope_allows(rule, scope)) {
+    for rule in rules.iter().filter(|rule| semantic_scope_allows(rule, scope)) {
         cancellation.checkpoint()?;
-        if !cwt_rule_is_selected(rule, selected_alternative.as_deref()) {
+        if !semantic_rule_is_selected(rule, selected_alternative.as_deref()) {
             continue;
         }
-        if matches!(rule.shape, CwtRuleShape::LeafValue) {
+        if matches!(rule.shape, RuleShape::LeafValue) {
             let count = bare_values
                 .iter()
-                .filter(|(value, _)| cwt_leaf_value_matches(snapshot, rule, value, scope))
+                .filter(|(value, _)| semantic_leaf_value_matches(snapshot, rule, value, scope))
                 .count();
             let count = u32::try_from(count).unwrap_or(u32::MAX);
             if let Some(min_occurs) = rule.min_occurs
@@ -2155,11 +2185,11 @@ fn validate_cwt_container(
             {
                 diagnostics.push(Diagnostic {
                     code: DiagnosticCode::Cardinality,
-                    severity: cwt_min_cardinality_severity(rule),
+                    severity: semantic_min_cardinality_severity(rule),
                     range: empty_range,
                     message: format!(
-                        "CWT value clause requires at least {min_occurs} value(s), but `{}` occurs {count} times",
-                        cwt_value_matcher_label(&rule.value)
+                        "semantic rule value clause requires at least {min_occurs} value(s), but `{}` occurs {count} times",
+                        semantic_value_matcher_label(&rule.value)
                     ),
                 });
             }
@@ -2171,7 +2201,7 @@ fn validate_cwt_container(
                     severity: 2,
                     range: bare_values.first().map_or(empty_range, |(_, range)| *range),
                     message: format!(
-                        "CWT value clause allows at most {max_occurs} value(s), but found {count}"
+                        "semantic rule value clause allows at most {max_occurs} value(s), but found {count}"
                     ),
                 });
             }
@@ -2181,19 +2211,19 @@ fn validate_cwt_container(
         let count = properties
             .iter()
             .filter(|property| {
-                cwt_key_matches(snapshot, &rule.key, &property.key)
-                    && !matches!(rule.shape, CwtRuleShape::LeafValue)
+                semantic_key_matches(snapshot, &rule.key, &property.key)
+                    && !matches!(rule.shape, RuleShape::LeafValue)
             })
             .count();
         let count = u32::try_from(count).unwrap_or(u32::MAX);
         if count < min_occurs {
             diagnostics.push(Diagnostic {
                 code: DiagnosticCode::Cardinality,
-                severity: cwt_min_cardinality_severity(rule),
+                severity: semantic_min_cardinality_severity(rule),
                 range: empty_range,
                 message: format!(
-                    "CWT rule requires at least {min_occurs} occurrence(s), but `{}` occurs {count} times",
-                    cwt_matcher_label(&rule.key)
+                    "semantic rule requires at least {min_occurs} occurrence(s), but `{}` occurs {count} times",
+                    semantic_matcher_label(&rule.key)
                 ),
             });
         }
@@ -2201,13 +2231,13 @@ fn validate_cwt_container(
     Ok(())
 }
 
-fn cwt_rule_is_selected(rule: &pdx_rules::CwtSemanticRule, selected: Option<&str>) -> bool {
+fn semantic_rule_is_selected(rule: &pdx_rules::SemanticRule, selected: Option<&str>) -> bool {
     rule.alternative_id.as_deref().is_none_or(|alternative| selected == Some(alternative))
 }
 
-fn cwt_selected_alternative(
+fn semantic_selected_alternative(
     snapshot: &AnalysisSnapshot,
-    rules: &[&pdx_rules::CwtSemanticRule],
+    rules: &[&pdx_rules::SemanticRule],
     properties: &[ScriptProperty],
     bare_values: &[(String, TextRange)],
     scope: &ScopeContext,
@@ -2231,15 +2261,15 @@ fn cwt_selected_alternative(
         let mut valid = 0_usize;
         for property in properties {
             let matching = group.iter().filter(|rule| {
-                !matches!(rule.shape, CwtRuleShape::LeafValue)
-                    && cwt_key_matches(snapshot, &rule.key, &property.key)
+                !matches!(rule.shape, RuleShape::LeafValue)
+                    && semantic_key_matches(snapshot, &rule.key, &property.key)
             });
             if matching.clone().next().is_some() {
                 present += 1;
             }
             if matching
-                .filter(|rule| cwt_scope_allows(rule, scope))
-                .any(|rule| cwt_property_matches(snapshot, rule, property, scope))
+                .filter(|rule| semantic_scope_allows(rule, scope))
+                .any(|rule| semantic_property_matches(snapshot, rule, property, scope))
             {
                 valid += 1;
             }
@@ -2248,8 +2278,8 @@ fn cwt_selected_alternative(
             .iter()
             .filter(|(value, _)| {
                 group.iter().any(|rule| {
-                    matches!(rule.shape, CwtRuleShape::LeafValue)
-                        && cwt_leaf_value_matches(snapshot, rule, value, scope)
+                    matches!(rule.shape, RuleShape::LeafValue)
+                        && semantic_leaf_value_matches(snapshot, rule, value, scope)
                 })
             })
             .count();
@@ -2263,15 +2293,15 @@ fn cwt_selected_alternative(
     best.map(|(_, _, alternative)| alternative)
 }
 
-fn cwt_leaf_value_matches(
+fn semantic_leaf_value_matches(
     snapshot: &AnalysisSnapshot,
-    rule: &pdx_rules::CwtSemanticRule,
+    rule: &pdx_rules::SemanticRule,
     value: &str,
     scope: &ScopeContext,
 ) -> bool {
     match &rule.value {
-        CwtValueMatcher::Dynamic(kind) => cwt_dynamic_value_matches(snapshot, kind, value, scope),
-        CwtValueMatcher::DynamicSet(_) => !value.is_empty(),
+        ValueMatcher::Dynamic(kind) => semantic_dynamic_value_matches(snapshot, kind, value, scope),
+        ValueMatcher::DynamicSet(_) => !value.is_empty(),
         matcher => matcher.matches(
             value,
             |type_name, member| workspace_member(snapshot, type_name, member),
@@ -2281,37 +2311,37 @@ fn cwt_leaf_value_matches(
     }
 }
 
-fn cwt_value_matcher_label(matcher: &CwtValueMatcher) -> String {
+fn semantic_value_matcher_label(matcher: &ValueMatcher) -> String {
     match matcher {
-        CwtValueMatcher::AnyScalar => "scalar".to_owned(),
-        CwtValueMatcher::Exact(value) => value.clone(),
-        CwtValueMatcher::Bool => "bool".to_owned(),
-        CwtValueMatcher::Int { .. } => "int".to_owned(),
-        CwtValueMatcher::Float { .. } => "float".to_owned(),
-        CwtValueMatcher::Type(value) => format!("<{value}>"),
-        CwtValueMatcher::Enum(value) => format!("enum[{value}]"),
-        CwtValueMatcher::Scope(value) => {
+        ValueMatcher::AnyScalar => "scalar".to_owned(),
+        ValueMatcher::Exact(value) => value.clone(),
+        ValueMatcher::Bool => "bool".to_owned(),
+        ValueMatcher::Int { .. } => "int".to_owned(),
+        ValueMatcher::Float { .. } => "float".to_owned(),
+        ValueMatcher::Type(value) => format!("<{value}>"),
+        ValueMatcher::Enum(value) => format!("enum[{value}]"),
+        ValueMatcher::Scope(value) => {
             value.as_deref().map_or_else(|| "scope".to_owned(), |value| format!("scope[{value}]"))
         }
-        CwtValueMatcher::Localisation => "localisation".to_owned(),
-        CwtValueMatcher::Filepath => "filepath".to_owned(),
-        CwtValueMatcher::Dynamic(value) => format!("value[{value}]"),
-        CwtValueMatcher::DynamicSet(value) => format!("value_set[{value}]"),
-        CwtValueMatcher::Opaque(value) => value.clone(),
+        ValueMatcher::Localisation => "localisation".to_owned(),
+        ValueMatcher::Filepath => "filepath".to_owned(),
+        ValueMatcher::Dynamic(value) => format!("value[{value}]"),
+        ValueMatcher::DynamicSet(value) => format!("value_set[{value}]"),
+        ValueMatcher::Opaque(value) => value.clone(),
     }
 }
 
-fn cwt_matcher_label(matcher: &CwtKeyMatcher) -> String {
+fn semantic_matcher_label(matcher: &KeyMatcher) -> String {
     match matcher {
-        CwtKeyMatcher::Exact(value) => value.clone(),
-        CwtKeyMatcher::Type(value) => format!("<{value}>"),
-        CwtKeyMatcher::Enum(value) => format!("enum[{value}]"),
-        CwtKeyMatcher::AnyScalar => "scalar".to_owned(),
-        CwtKeyMatcher::Dynamic(value) => format!("value_set[{value}]"),
+        KeyMatcher::Exact(value) => value.clone(),
+        KeyMatcher::Type(value) => format!("<{value}>"),
+        KeyMatcher::Enum(value) => format!("enum[{value}]"),
+        KeyMatcher::AnyScalar => "scalar".to_owned(),
+        KeyMatcher::Dynamic(value) => format!("value_set[{value}]"),
     }
 }
 
-fn cwt_parent_path_matches(
+fn semantic_parent_path_matches(
     snapshot: &AnalysisSnapshot,
     expected: &[String],
     actual: &[String],
@@ -2332,14 +2362,14 @@ fn cwt_parent_path_matches(
         })
 }
 
-fn cwt_rule_severity<'a>(
-    rules: impl IntoIterator<Item = &'a pdx_rules::CwtSemanticRule>,
+fn semantic_rule_severity<'a>(
+    rules: impl IntoIterator<Item = &'a pdx_rules::SemanticRule>,
     fallback: DiagnosticCode,
 ) -> u8 {
     rules.into_iter().filter_map(|rule| rule.severity).min().unwrap_or_else(|| fallback.severity())
 }
 
-fn cwt_min_cardinality_severity(rule: &pdx_rules::CwtSemanticRule) -> u8 {
+fn semantic_min_cardinality_severity(rule: &pdx_rules::SemanticRule) -> u8 {
     if !rule.strict_min {
         2
     } else {
@@ -2347,7 +2377,7 @@ fn cwt_min_cardinality_severity(rule: &pdx_rules::CwtSemanticRule) -> u8 {
     }
 }
 
-fn cwt_scope_allows(rule: &pdx_rules::CwtSemanticRule, scope: &ScopeContext) -> bool {
+fn semantic_scope_allows(rule: &pdx_rules::SemanticRule, scope: &ScopeContext) -> bool {
     rule.allowed_scopes.is_empty()
         || rule
             .allowed_scopes
@@ -2355,7 +2385,7 @@ fn cwt_scope_allows(rule: &pdx_rules::CwtSemanticRule, scope: &ScopeContext) -> 
             .any(|expected| scope.profile.scopes_compatible(&scope.current, expected))
 }
 
-fn cwt_child_scope(parent: &ScopeContext, rule: &pdx_rules::CwtSemanticRule) -> ScopeContext {
+fn semantic_child_scope(parent: &ScopeContext, rule: &pdx_rules::SemanticRule) -> ScopeContext {
     let mut child = parent.clone();
     if let Some(push_scope) = &rule.push_scope
         && !push_scope.eq_ignore_ascii_case("any")
@@ -2390,7 +2420,7 @@ fn set_scope_register(registers: &mut Vec<String>, depth: usize, value: &str) {
     registers[depth] = value.to_owned();
 }
 
-fn cwt_key_matches(snapshot: &AnalysisSnapshot, matcher: &CwtKeyMatcher, key: &str) -> bool {
+fn semantic_key_matches(snapshot: &AnalysisSnapshot, matcher: &KeyMatcher, key: &str) -> bool {
     matcher.matches(
         key,
         |type_name, member| workspace_member(snapshot, type_name, member),
@@ -2398,18 +2428,18 @@ fn cwt_key_matches(snapshot: &AnalysisSnapshot, matcher: &CwtKeyMatcher, key: &s
     )
 }
 
-fn cwt_property_matches(
+fn semantic_property_matches(
     snapshot: &AnalysisSnapshot,
-    rule: &pdx_rules::CwtSemanticRule,
+    rule: &pdx_rules::SemanticRule,
     property: &ScriptProperty,
     scope_context: &ScopeContext,
 ) -> bool {
     let shape_matches = match rule.shape {
-        CwtRuleShape::Node => property.block_range.is_some(),
-        CwtRuleShape::ValueClause => {
+        RuleShape::Node => property.block_range.is_some(),
+        RuleShape::ValueClause => {
             property.block_range.is_some() && !property.bare_values.is_empty()
         }
-        CwtRuleShape::Leaf | CwtRuleShape::LeafValue => property.scalar.is_some(),
+        RuleShape::Leaf | RuleShape::LeafValue => property.scalar.is_some(),
     };
     if !shape_matches {
         return false;
@@ -2422,12 +2452,12 @@ fn cwt_property_matches(
         return false;
     }
     let Some((value, _)) = property.scalar.as_ref() else {
-        return matches!(rule.value, CwtValueMatcher::AnyScalar | CwtValueMatcher::Opaque(_));
+        return matches!(rule.value, ValueMatcher::AnyScalar | ValueMatcher::Opaque(_));
     };
-    if let CwtValueMatcher::Dynamic(kind) = &rule.value {
-        return cwt_dynamic_value_matches(snapshot, kind, value, scope_context);
+    if let ValueMatcher::Dynamic(kind) = &rule.value {
+        return semantic_dynamic_value_matches(snapshot, kind, value, scope_context);
     }
-    if let CwtValueMatcher::DynamicSet(_) = &rule.value {
+    if let ValueMatcher::DynamicSet(_) = &rule.value {
         return !value.is_empty();
     }
     rule.value.matches(
@@ -2438,7 +2468,7 @@ fn cwt_property_matches(
     )
 }
 
-fn cwt_dynamic_value_matches(
+fn semantic_dynamic_value_matches(
     snapshot: &AnalysisSnapshot,
     kind: &str,
     value: &str,
@@ -2481,7 +2511,7 @@ fn enum_member(snapshot: &AnalysisSnapshot, enum_name: &str, member: &str) -> bo
     let static_member = snapshot
         .rules()
         .model()
-        .cwt
+        .semantic
         .enum_values
         .get(enum_name)
         .is_some_and(|values| values.iter().any(|value| value.eq_ignore_ascii_case(member)));
@@ -3072,7 +3102,7 @@ mod tests {
         references, rename, rename_with_cancellation, workspace_symbols,
         workspace_symbols_with_cancellation,
     };
-    use pdx_rules::{CwtKeyMatcher, CwtRuleShape, CwtSemanticRule, CwtValueMatcher, RuleSet};
+    use pdx_rules::{KeyMatcher, RuleSet, RuleShape, SemanticRule, ValueMatcher};
     use pdx_text::TextRange;
     use pdx_workspace::{AnalysisHost, DocumentId};
 
@@ -3087,29 +3117,32 @@ mod tests {
         (host, id)
     }
 
-    fn cwt_snapshot(text: &str) -> (AnalysisHost, DocumentId) {
-        cwt_snapshot_with_constraints(text, None, None, Some(1))
+    fn semantic_snapshot(text: &str) -> (AnalysisHost, DocumentId) {
+        semantic_snapshot_with_constraints(text, None, None, Some(1))
     }
 
-    fn cwt_snapshot_with_severity(text: &str, severity: Option<u8>) -> (AnalysisHost, DocumentId) {
-        cwt_snapshot_with_constraints(text, severity, None, Some(1))
+    fn semantic_snapshot_with_severity(
+        text: &str,
+        severity: Option<u8>,
+    ) -> (AnalysisHost, DocumentId) {
+        semantic_snapshot_with_constraints(text, severity, None, Some(1))
     }
 
-    fn cwt_snapshot_with_constraints(
+    fn semantic_snapshot_with_constraints(
         text: &str,
         severity: Option<u8>,
         min_occurs: Option<u32>,
         max_occurs: Option<u32>,
     ) -> (AnalysisHost, DocumentId) {
         let mut model = pdx_game_eu4::bootstrap_model();
-        model.cwt.rules.push(CwtSemanticRule {
+        model.semantic.rules.push(SemanticRule {
             id: "fixture:trigger:foo".to_owned(),
             context: "trigger".to_owned(),
             parent_path: Vec::new(),
-            key: CwtKeyMatcher::Exact("foo".to_owned()),
+            key: KeyMatcher::Exact("foo".to_owned()),
             operator: None,
-            value: CwtValueMatcher::Bool,
-            shape: CwtRuleShape::Leaf,
+            value: ValueMatcher::Bool,
+            shape: RuleShape::Leaf,
             child_context: None,
             alternative_id: None,
             severity,
@@ -3121,7 +3154,7 @@ mod tests {
             min_occurs,
             strict_min: true,
             max_occurs,
-            source_file: "fixture.cwt".to_owned(),
+            source_file: "fixture.semantic".to_owned(),
             line: 1,
         });
         let mut host = eu4_host(RuleSet::from_model(model));
@@ -3249,34 +3282,35 @@ mod tests {
     }
 
     #[test]
-    fn cwt_matcher_rejects_invalid_values_and_unknown_keys() {
-        let (host, id) = cwt_snapshot("trigger = { foo = maybe unknown = yes }\n");
+    fn semantic_matcher_rejects_invalid_values_and_unknown_keys() {
+        let (host, id) = semantic_snapshot("trigger = { foo = maybe unknown = yes }\n");
         let diagnostics = diagnostics(&host.snapshot(), &id);
         assert!(diagnostics.iter().any(|item| item.code == DiagnosticCode::InvalidValue));
         assert!(diagnostics.iter().any(|item| item.code == DiagnosticCode::UnknownKey));
     }
 
     #[test]
-    fn cwt_rule_severity_reaches_editor_diagnostic() {
-        let (host, id) = cwt_snapshot_with_severity("trigger = { foo = maybe }\n", Some(2));
+    fn semantic_rule_severity_reaches_editor_diagnostic() {
+        let (host, id) = semantic_snapshot_with_severity("trigger = { foo = maybe }\n", Some(2));
         let diagnostics = diagnostics(&host.snapshot(), &id);
         let invalid_value = diagnostics
             .iter()
             .find(|item| item.code == DiagnosticCode::InvalidValue)
-            .expect("invalid CWT value diagnostic");
+            .expect("invalid semantic rules value diagnostic");
         assert_eq!(invalid_value.severity, 2);
     }
 
     #[test]
-    fn cwt_matcher_enforces_max_cardinality() {
-        let (host, id) = cwt_snapshot("trigger = { foo = yes foo = no }\n");
+    fn semantic_matcher_enforces_max_cardinality() {
+        let (host, id) = semantic_snapshot("trigger = { foo = yes foo = no }\n");
         let results = diagnostics(&host.snapshot(), &id);
         assert!(results.iter().any(|item| item.code == DiagnosticCode::Cardinality));
     }
 
     #[test]
-    fn cwt_matcher_enforces_min_cardinality() {
-        let (host, id) = cwt_snapshot_with_constraints("trigger = { }\n", None, Some(1), Some(1));
+    fn semantic_matcher_enforces_min_cardinality() {
+        let (host, id) =
+            semantic_snapshot_with_constraints("trigger = { }\n", None, Some(1), Some(1));
         assert!(
             diagnostics(&host.snapshot(), &id)
                 .iter()
@@ -3285,16 +3319,16 @@ mod tests {
     }
 
     #[test]
-    fn cwt_value_clause_validates_bare_values_and_cardinality() {
+    fn semantic_value_clause_validates_bare_values_and_cardinality() {
         let mut model = pdx_game_eu4::bootstrap_model();
-        model.cwt.rules.push(CwtSemanticRule {
+        model.semantic.rules.push(SemanticRule {
             id: "fixture:terrain:color".to_owned(),
             context: "terrain".to_owned(),
             parent_path: Vec::new(),
-            key: CwtKeyMatcher::Exact("color".to_owned()),
+            key: KeyMatcher::Exact("color".to_owned()),
             operator: Some("=".to_owned()),
-            value: CwtValueMatcher::AnyScalar,
-            shape: CwtRuleShape::ValueClause,
+            value: ValueMatcher::AnyScalar,
+            shape: RuleShape::ValueClause,
             child_context: None,
             alternative_id: None,
             severity: None,
@@ -3306,17 +3340,17 @@ mod tests {
             min_occurs: None,
             strict_min: true,
             max_occurs: Some(1),
-            source_file: "fixture.cwt".to_owned(),
+            source_file: "fixture.semantic".to_owned(),
             line: 1,
         });
-        model.cwt.rules.push(CwtSemanticRule {
+        model.semantic.rules.push(SemanticRule {
             id: "fixture:terrain:color:int".to_owned(),
             context: "terrain".to_owned(),
             parent_path: vec!["color".to_owned()],
-            key: CwtKeyMatcher::AnyScalar,
+            key: KeyMatcher::AnyScalar,
             operator: None,
-            value: CwtValueMatcher::Int { min: Some(0), max: Some(255) },
-            shape: CwtRuleShape::LeafValue,
+            value: ValueMatcher::Int { min: Some(0), max: Some(255) },
+            shape: RuleShape::LeafValue,
             child_context: None,
             alternative_id: None,
             severity: None,
@@ -3328,7 +3362,7 @@ mod tests {
             min_occurs: Some(3),
             strict_min: true,
             max_occurs: Some(3),
-            source_file: "fixture.cwt".to_owned(),
+            source_file: "fixture.semantic".to_owned(),
             line: 2,
         });
         let mut host = eu4_host(RuleSet::from_model(model));
@@ -3341,24 +3375,22 @@ mod tests {
     }
 
     #[test]
-    fn cwt_rules_drive_value_completion_and_hover() {
-        let (host, id) = cwt_snapshot("trigger = { foo = yes }\n");
+    fn semantic_rules_drive_value_completion_and_hover() {
+        let (host, id) = semantic_snapshot("trigger = { foo = yes }\n");
         let snapshot = host.snapshot();
         let value = u32::try_from("trigger = { foo = ".len()).expect("offset");
         let result = complete(&snapshot, &id, value);
         assert!(result.items.iter().any(|item| item.label == "yes"));
-        let hover = hover(&snapshot, &id, 18).expect("CWT hover");
+        let hover = hover(&snapshot, &id, 18).expect("semantic hover");
         assert!(hover.contents.contains("foo") || hover.contents.contains("PDX"));
     }
 
     #[test]
-    fn committed_cwt_artifact_drives_runtime_value_diagnostics() {
-        let rules_path =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
-        assert!(!rules.model().cwt.rules.is_empty());
-        assert!(rules.model().cwt.rules.iter().any(|rule| rule.severity == Some(2)));
-        assert!(rules.model().cwt.rules.iter().any(|rule| rule.min_occurs == Some(1)));
+    fn embedded_first_party_rules_drive_runtime_value_diagnostics() {
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        assert!(!rules.model().semantic.rules.is_empty());
+        assert!(rules.model().semantic.rules.iter().any(|rule| rule.severity == Some(2)));
+        assert!(rules.model().semantic.rules.iter().any(|rule| rule.min_occurs == Some(1)));
         let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/common/events/test.txt");
         host.open_document(
@@ -3374,10 +3406,8 @@ mod tests {
     }
 
     #[test]
-    fn cwt_type_selector_applies_event_rules_to_country_event() {
-        let rules_path =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
+    fn semantic_type_selector_applies_event_rules_to_country_event() {
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/events/test.txt");
         host.open_document(
@@ -3407,9 +3437,7 @@ mod tests {
                 .as_nanos()
         ));
         fs::create_dir_all(root.join("missions")).expect("missions directory");
-        let rules_path =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
@@ -3444,9 +3472,7 @@ mod tests {
 
     #[test]
     fn eu4_starts_with_type_selector_applies_on_action_rules() {
-        let rules_path =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/common/on_actions/test.txt");
         host.open_document(
@@ -3465,9 +3491,7 @@ mod tests {
 
     #[test]
     fn eu4_scope_links_switch_effect_context_and_scope() {
-        let rules_path =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/events/scope.txt");
         host.open_document(
@@ -3487,9 +3511,7 @@ mod tests {
 
     #[test]
     fn eu4_alias_alternatives_do_not_cross_report_cardinality() {
-        let rules_path =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/events/alternatives.txt");
         host.open_document(
@@ -3508,9 +3530,7 @@ mod tests {
 
     #[test]
     fn eu4_common_links_allow_owner_to_push_province_scope_to_country() {
-        let rules_path =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/events/owner.txt");
         host.open_document(
@@ -3526,7 +3546,7 @@ mod tests {
     }
 
     #[test]
-    fn eu4_dynamic_culture_definition_is_used_by_cwt_type_matcher() {
+    fn eu4_dynamic_culture_definition_is_used_by_semantic_type_matcher() {
         use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
         use std::fs;
 
@@ -3535,9 +3555,7 @@ mod tests {
         fs::create_dir_all(root.join("common/cultures")).expect("culture directory");
         fs::write(root.join("common/cultures/00_test.txt"), "french = { }\n")
             .expect("culture definition");
-        let rules_path =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -3569,9 +3587,7 @@ mod tests {
             std::env::temp_dir().join(format!("pdx-analysis-cwt-province-{}", std::process::id()));
         fs::create_dir_all(root.join("map")).expect("map directory");
         fs::write(root.join("map/definition.csv"), "1;0;0;0;0;0\n").expect("province definition");
-        let rules_path =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -3610,9 +3626,7 @@ mod tests {
             "countries = { FRA = \"countries/France.txt\" }\n",
         )
         .expect("country tag definition");
-        let rules_path =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -3651,9 +3665,7 @@ mod tests {
             "country_event = { immediate = { set_country_flag = known_flag } }\n",
         )
         .expect("flag definition");
-        let rules_path =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -3693,9 +3705,7 @@ mod tests {
             "apply = { value = $amount$ }\n",
         )
         .expect("scripted effect definition");
-        let rules_path =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -3734,9 +3744,7 @@ mod tests {
             "reform_a = { legacy_government = yes }\n",
         )
         .expect("legacy reform definition");
-        let rules_path =
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../rules/eu4.pdxrules");
-        let rules = RuleSet::load(&rules_path).expect("load committed CWT artifact");
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),

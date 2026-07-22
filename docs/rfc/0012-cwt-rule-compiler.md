@@ -1,7 +1,10 @@
 # RFC 0012：CWT 一次性导入与权威规则数据库
 
-- 状态：Accepted
+- 状态：Superseded by RFC 0015
 - MVP：EU4 v0.1
+
+> 2026-07-22：本 RFC 仅保留为历史记录。项目已删除 CWT importer，任何 `.cwt` 输入均被
+> 禁止；当前权威链路由 [RFC 0015](0015-first-party-rule-source.md) 定义。
 
 > 2026-07-21 amendment：SQLite artifact 的导入、schema、hash 和 provenance 约束继续有效；
 > extension-owned 外部 runtime 文件的分发决策已由

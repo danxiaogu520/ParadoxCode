@@ -33,7 +33,7 @@
 2. `docs/architecture.md`：数据流、crate 依赖、并发、身份和错误恢复；
 3. `docs/mvp.md`：MVP 成功定义、非目标、阶段和退出条件；
 4. 与当前任务直接相关的 RFC；
-5. `docs/reference-study.md`：CWTools、EU4 Config、Jomini 的调研结论和版权边界；
+5. `docs/rfc/0015-first-party-rule-source.md`：第一方规则源码、编译和禁止外部规则输入的边界；
 6. `plan.md`：当前执行顺序、阶段状态和风险。
 
 不要把 `reference/` 当作生产代码或可直接复制的测试 corpus。它只用于研究。
@@ -77,7 +77,7 @@
 pdx-text
   -> pdx-syntax -> pdx-hir -> pdx-workspace -> pdx-analysis -> pdx-lsp
   -> pdx-format                                      -> pdx-cli
-pdx-rules -> pdx-cwt
+pdx-rules -> pdx-rulec
 pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 ```
 
@@ -89,10 +89,10 @@ pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 | --- | --- | --- |
 | `pdx-text` | offset、line index、UTF-8/UTF-16、URI/path 基础 | EU4 规则、workspace 状态 |
 | `pdx-syntax` | PDX Script、localisation、CSV 的 loss-aware CST、增量 parse、syntax error | 游戏规则数据库、磁盘扫描、LSP 类型 |
-| `pdx-rules` | 通用规则 schema、canonical view、`rule_hash`、只读 runtime API | 具体游戏名称表、CWT parser、LSP、动态 Mod symbol |
+| `pdx-rules` | 通用规则 schema、canonical view、`rule_hash`、只读 runtime API | 具体游戏名称表、外部规则 parser、LSP、动态 Mod symbol |
 | `pdx-game-eu4` | EU4 profile、路径、scope、command、symbol 和特殊语义 | LSP、workspace 可变状态、编辑器 API |
 | `pdx-eu4`（过渡） | 兼容 re-export；待迁移完成后删除 | 新增长期公共能力 |
-| `pdx-cwt` | 一次性 CWT discovery/import/report | runtime 依赖、持续同步、CWT fallback |
+| `pdx-rulec` | 严格读取第一方 JSON 规则源码、校验并生成 artifact/manifest | CWT 输入、runtime 依赖、网络同步、用户规则覆盖 |
 | `pdx-hir` | 基于 typed CST、RuleSet 和游戏 profile 的 lowering、scope | 编辑器 API、磁盘 I/O |
 | `pdx-workspace` | VFS、overlay、source roots、parse/HIR cache、index shards、snapshot | LSP protocol types |
 | `pdx-analysis` | 面向 snapshot 的 diagnostics/completion/hover/navigation/rename 查询 | 直接读磁盘、editor client |
@@ -119,14 +119,16 @@ pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 - syntax error 不阻止局部 CST 产生；
 - lowering 遇到未知节点生成 `UnknownConstruct`，不 panic；
 - 未知 scope 保留为 `Unknown`，避免级联错误；
-- importer 遇到未建模 CWT construct 必须失败，或在报告中明确记录并由人工批准为 non-semantic；
+- rule compiler 遇到未知字段、重复身份、无效 cardinality/severity 或 artifact round-trip 差异必须失败；
 - formatter 遇到不安全 `ERROR` node 返回无编辑和明确原因。
 
 ### 规则数据库
 
 - `eu4.pdxrules` 是开发期唯一权威规则 artifact，发布时嵌入官方 `pdx`/`pdx-ls`；
 - 官方 runtime 不接受外部规则路径、下载、搜索或用户覆盖；
-- runtime 不读取、下载或重新导入 CWT；
+- runtime 不读取、下载或导入任何外部规则源；
+- `.cwt` 文件不得作为规则编译、测试、运行或更新输入；
+- `rules/eu4/*.json` 是唯一权威源，`eu4.pdxrules` 与 manifest 是生成物；
 - `rule_hash` hash 的是规范化逻辑内容，不是 SQLite 文件 bytes；
 - hash 不受 rowid、插入顺序、页布局、index、VACUUM、时间戳和 import log 影响；
 - 动态 scripted effect、trigger、building 等成员来自 `WorkspaceIndex`，不得硬编码进核心 crate 或 extension；
@@ -156,7 +158,7 @@ pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 
 - 添加或更新 unit、golden、integration、corpus、property/fuzz 测试中的适用层级；
 - 对 parser/formatter 使用原创 fixture，避免复制 Vanilla 或参考仓库 corpus；
-- 对规则/importer 运行 schema、foreign key、stable ID 和 canonical hash 校验；
+- 对规则/compiler 运行 source schema、foreign key、stable ID、canonical hash 和 round-trip 校验；
 - 对 LSP 改动运行真实 JSON-RPC transport 测试；
 - 对 Zed 改动运行 manifest/build 或可行的 smoke test；
 - 更新 `plan.md` 阶段状态，或在交付报告中说明为什么暂不更新；
@@ -169,7 +171,7 @@ pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 - `pdx-text`：offset、line endings、UTF-16、URI/path；
 - `pdx-syntax`：typed CST、错误提取、增量编辑、错误恢复；
 - `pdx-rules`/过渡期 `pdx-eu4`：schema、只读加载、foreign key、hash 稳定性和 runtime invariants；
-- `pdx-cwt`：source discovery、construct inventory、directive/documentation 关联、事务回滚、报告；
+- `pdx-rulec`：严格 source schema、stable identity、invariant、deterministic hash、artifact round-trip；
 - `pdx-hir`：scope transition、unknown context、typed lowering；
 - `pdx-workspace`：root order、overlay、覆盖解析、shard replacement、snapshot；
 - `pdx-analysis`：diagnostics、completion、definition、references、hover、rename；
@@ -177,17 +179,17 @@ pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 - `pdx-lsp`：真实 JSON-RPC、capability fallback、版本乱序、取消、stale diagnostics；
 - Zed：manifest、Wasm/build、文件识别和 server 启动 smoke test。
 
-MVP fuzz 至少覆盖 PdxScript/localisation parse、incremental edit 等价性、typed CST walk、HIR lowering、formatter、line index、CWT import 和 EU4 CSV parser。发现的 crash 修复后必须进入 regression corpus。
+MVP fuzz 至少覆盖 PdxScript/localisation parse、incremental edit 等价性、typed CST walk、HIR lowering、formatter、line index、第一方规则源码解析和 EU4 CSV parser。发现的 crash 修复后必须进入 regression corpus。
 
 ## 8. 版权、安全和数据边界
 
-- 不提交或再分发 Vanilla EU4 文件、用户本地 Vanilla cache 或原生 CWT source tree；
+- 不提交或再分发 Vanilla EU4 文件、用户本地 Vanilla cache 或外部规则语料；
 - `reference/` 只用于研究，不进入正常构建和 runtime；
 - 规则 artifact 只包含已确认可再分发的数据和必要 provenance；
-- provenance 记录上游项目、固定 commit、输入 hash、许可证和 importer/schema 版本；
-- Mod/CWT 配置永不作为任意代码执行；
+- manifest 记录 source format、目标游戏版本、artifact schema、canonical hash 和 artifact checksum；
+- Mod/规则配置永不作为任意代码执行；
 - 扫描限制文件大小、嵌套深度、路径逃逸和资源消耗；
-- importer 输入路径必须显式、可复现、稳定排序，并拒绝重复 logical identity；
+- compiler 输入路径固定、可复现、稳定排序，并拒绝重复 logical identity；
 - atomic publish 前先完成完整 validation，禁止留下半写数据库。
 
 ## 9. 交付报告格式
@@ -219,5 +221,5 @@ MVP fuzz 至少覆盖 PdxScript/localisation parse、incremental edit 等价性�
 - [LSP Runtime](docs/rfc/0009-lsp-runtime.md)
 - [Zed 集成](docs/rfc/0010-zed-integration.md)
 - [测试与质量门禁](docs/rfc/0011-testing-quality.md)
-- [CWT 一次性导入](docs/rfc/0012-cwt-rule-compiler.md)
+- [第一方规则源码与编译器](docs/rfc/0015-first-party-rule-source.md)
 - [通用 PDX 引擎与 EU4-first](docs/rfc/0013-generic-engine-eu4-first.md)
