@@ -5,6 +5,11 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "VFS, source-root, and immutable snapshot boundary for ParadoxCode."
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish = false
 
 [dependencies]
 pdx-hir = { path = "../pdx-hir" }

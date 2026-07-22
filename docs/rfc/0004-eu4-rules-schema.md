@@ -4,6 +4,8 @@
 - MVP：EU4 v0.1
 
 > 2026-07-20 amendment：EU4 是当前唯一交付规则包，但通用 artifact/runtime 类型将按 [RFC 0013](0013-generic-engine-eu4-first.md) 迁入 `pdx-rules`，EU4 特有内容进入 EU4 profile。本 RFC 继续定义 `eu4.pdxrules` 的具体语义与发布要求。
+>
+> 2026-07-21 amendment：artifact 仍是开发期权威数据，但外部 runtime 文件与扩展携带规则的分发方式已由 [RFC 0014](0014-embedded-first-party-rules.md) 取代。
 
 ## 目标
 

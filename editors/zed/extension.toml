@@ -1,9 +1,9 @@
 id = "paradoxcode"
-name = "ParadoxCode"
+name = "ParadoxCode - EU4 Language Tools"
 version = "0.1.0"
 schema_version = 1
-authors = ["ParadoxCode maintainers"]
-description = "EU4 language tooling backed by pdx-ls."
+authors = ["ParadoxCode contributors"]
+description = "Independent, unofficial EU4 language tooling backed by pdx-ls."
 
 # Development manifest: use the repository remote so Zed can clone the grammars from Windows
 # and other worktrees. The release manifest must replace these URLs with read-only mirrors.

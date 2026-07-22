@@ -148,7 +148,7 @@ Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 - 本次 bootstrap corpus 中不存在被静默忽略的 CWT 构造。
 - 对相同数据库逻辑内容计算相同 `rule_hash`，不受 SQLite 页布局、VACUUM 或写入顺序影响。
 - 每个数据库声明的可支持文件类别至少有 classification/parse fixture；主要语义类别有 definition/reference fixture。
-- 更新扩展携带新的规则和 `rule_hash`；项目配置不 pin `rule_hash`。
+- 更新 server 内嵌新的规则和 `rule_hash`；项目配置不 pin `rule_hash`。
 
 ## Phase 5：语言功能
 
@@ -173,7 +173,7 @@ Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 
 ## Phase 6A：Rename 与 v0.1
 
-状态：`implemented, not released`（2026-07-20 重新审计）；rename 内部链路、formatter capability 和开发机 smoke 已通过，但自动获取 server、rules artifact 打包、跨平台 release 和干净 clone 安装尚未闭环。
+状态：`implemented, not released`（2026-07-21 重新审计）；rename 内部链路、formatter capability 和开发机 smoke 已通过，但 RFC 0014 规则内嵌、自动获取 server、跨平台 release 和干净 clone 安装尚未闭环。
 
 交付：
 

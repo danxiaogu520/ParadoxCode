@@ -1,0 +1,76 @@
+name: Bug report
+description: Report a reproducible problem in ParadoxCode
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a problem. Do not include private Mod content or security-sensitive details. Report vulnerabilities through SECURITY.md.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Language server
+        - Diagnostics or completion
+        - Navigation or rename
+        - Parser or formatter
+        - Workspace or Vanilla index
+        - Zed extension or highlighting
+        - Rules or importer
+        - CLI
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Output of `pdx-ls --version` and, for development builds, the commit hash.
+      placeholder: pdx-ls 0.1.0 / commit abc1234
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, architecture, Zed version, and installation method.
+      placeholder: Windows 11 x86_64, Zed 0.x, development extension
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Use a small original example that can be shared publicly.
+      placeholder: |
+        1. Open ...
+        2. Enter ...
+        3. Run ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and logs
+      description: Remove personal paths, private source, and credentials from logs.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched for an existing issue.
+          required: true
+        - label: This report does not contain EU4 game files, private Mod content, or secrets.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

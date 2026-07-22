@@ -4,6 +4,9 @@
 - MVP：EU4 v0.1
 
 > 2026-07-20 amendment：EU4-only 约束已被 [RFC 0013](0013-generic-engine-eu4-first.md) 取代。当前产品仍只交付 EU4，但 workspace、index、analysis、LSP 和规则 runtime 将迁移为通用引擎，EU4 专有行为进入游戏 profile。
+>
+> 2026-07-21 amendment：第 5–6 条中的外部规则 artifact 分发边界已由
+> [RFC 0014](0014-embedded-first-party-rules.md) 取代；crate 依赖方向仍然有效。
 
 ## 问题
 

@@ -5,6 +5,11 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "EU4 game profile and bootstrap rules for ParadoxCode."
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish = false
 
 [dependencies]
 pdx-rules = { path = "../pdx-rules" }

@@ -1,51 +1,141 @@
 # ParadoxCode
 
-ParadoxCode is a general PDX language-tooling engine developed EU4-first. EU4 is the only game
-currently scheduled for complete support; other game profiles are intentionally low priority.
-The repository is currently an alpha with a working CWTools-aligned EU4 feature prototype: a pure-Rust syntax/parser core, Zed-only Tree-sitter grammar assets, a
-conservative formatter, a Zed development extension, a stdio JSON-RPC/LSP server, an EU4-only CWT
-importer, a validated SQLite rules artifact, a source-root/overlay workspace index, and
-editor-neutral language analysis with diagnostics, completion, hover, navigation, and safe
-semantic rename.
+[![CI](https://github.com/danxiaogu520/ParadoxCode/actions/workflows/ci.yml/badge.svg)](https://github.com/danxiaogu520/ParadoxCode/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#project-status)
 
-The alpha is not yet a complete end-user release. Per-file HIR/index updates, cheap immutable
-snapshots, cancellable background work, formatter LSP wiring, and ordered read-only dependency
-configuration and explicit persistent Vanilla caching are implemented. Watched-file updates,
-automatic server installation, and cross-platform release packaging remain active work. See
-[workspace configuration](docs/configuration.md) for current Mod/dependency setup and
-[RFC 0013](docs/rfc/0013-generic-engine-eu4-first.md) for the accepted engine/profile boundary.
+ParadoxCode is an independent, open-source language toolkit for Paradox modding. It is built as a
+game-neutral PDX language engine with an EU4-first product scope. The first release targets Europa
+Universalis IV and the Zed editor.
 
-The runtime parser does not compile or link Tree-sitter C. The `grammars/tree-sitter-*` directories
-remain solely for Zed's editor-side highlighting and corpus checks. The committed rule artifact is
-schema 12, with canonical rule hash
-`446f21f2c08d8d802c8769df34259f880bb63467726592d3f95ee1cea7b71484`.
+> [!IMPORTANT]
+> ParadoxCode is in alpha and has not published an end-user release. The core language features are
+> implemented and tested, but automatic server installation, cross-platform release packaging,
+> watched-file updates, and final Zed installation testing are still in progress.
 
-## Build and verify Phase 6A
+ParadoxCode is not affiliated with or endorsed by Paradox Interactive. Europa Universalis IV and
+Paradox Interactive are trademarks of their respective owners.
+
+## What it provides
+
+- Error-tolerant parsers for PDX Script, EU4 localisation, and supported EU4 CSV files.
+- Syntax and semantic diagnostics driven by a validated EU4 rules database.
+- Completion, hover, go-to-definition, references, and document/workspace symbols.
+- Conflict-aware rename restricted to writable Mod sources.
+- A conservative formatter that refuses unsafe rewrites.
+- Workspace resolution across unsaved buffers, the current Mod, ordered dependency Mods, and a
+  persistent local Vanilla index.
+- A stdio Language Server (`pdx-ls`) with cancellation, stale-result protection, and immutable
+  analysis snapshots.
+- A thin Zed extension with Tree-sitter grammars used only for editor-side highlighting.
+
+The runtime parser is implemented in Rust and does not link Tree-sitter C. Tree-sitter assets under
+`grammars/` are isolated to Zed highlighting and grammar corpus tests.
+
+## Project status
+
+The repository currently contains an EU4 alpha rather than a production release. The main language
+features and real JSON-RPC integration tests exist; the remaining release-critical work is tracked
+in [the implementation plan](plan.md) and [the MVP definition](docs/mvp.md).
+
+Current release blockers include:
+
+- embedding the first-party rules artifact so runtime rule injection is not accepted;
+- automatic, checksummed `pdx-ls` downloads from the Zed extension;
+- native Windows and other supported-platform release artifacts;
+- a clean-machine Zed install and startup smoke test;
+- targeted watched-file updates through the full LSP path.
+
+No release date is promised until those checks pass.
+
+## Architecture
 
 ```text
-cargo check --workspace --all-targets
+source text
+    -> loss-aware syntax
+    -> profile- and rule-aware HIR
+    -> per-file index shards
+    -> immutable workspace snapshot
+    -> editor-neutral analysis
+    -> LSP adapter
+    -> Zed
+```
+
+The engine/profile boundary keeps workspace, indexing, analysis, LSP, and release infrastructure
+game-neutral while EU4 paths, scopes, commands, symbols, and special semantics remain in the EU4
+profile. See [the architecture guide](docs/architecture.md) and
+[RFC 0013](docs/rfc/0013-generic-engine-eu4-first.md) for the accepted design.
+
+## Building from source
+
+ParadoxCode currently requires Rust 1.88 or newer and Node.js 22 for the Tree-sitter corpus checks.
+
+```bash
+git clone https://github.com/danxiaogu520/ParadoxCode.git
+cd ParadoxCode
+cargo build --workspace
 cargo test --workspace --all-targets
+```
+
+Run the main quality gates with:
+
+```bash
+cargo fmt --all -- --check
+cargo check --workspace --all-targets --all-features
+cargo test --workspace --all-targets --all-features
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo doc --workspace --no-deps
 bash scripts/check-phase1-grammars.sh
 python3 scripts/prepare-zed-dev-manifest.py
 python3 scripts/check-zed-extension.py
-cargo check --manifest-path fuzz/Cargo.toml --bins
-cargo clippy --manifest-path fuzz/Cargo.toml --bins -- -D warnings
-cargo run -p pdx-cwt -- import --source reference/cwtools-eu4-config --output /tmp/eu4.pdxrules --manifest /tmp/eu4-manifest.json --report /tmp/eu4-report.json
 bash scripts/check-phase6a.sh
 ```
 
-The core workspace contains only `pdx-*` packages. Its binaries are `pdx`, `pdx-ls`,
-and `pdx-cwt`. The Zed extension is kept outside the Rust core workspace because it
-is an editor-facing package rather than an analysis dependency.
+The full importer check additionally requires the pinned, local research checkout described in
+[the reference study](docs/reference-study.md). That checkout is not a runtime or release
+dependency.
 
-Build or manually refresh a local Vanilla index with:
+## Development setup
 
-```text
-pdx index vanilla --rules /path/to/eu4.pdxrules --source /path/to/eu4 --output /path/to/vanilla.pdxindex
+The current alpha can launch `pdx-ls` from a configured path or from `PATH`. Workspace source roots
+are configured through `.pdx/project.toml`; see [workspace configuration](docs/configuration.md).
+The documented setup is for contributors and is not the final installation experience.
+
+Build or manually refresh a local Vanilla index with the current alpha CLI:
+
+```bash
+pdx index vanilla \
+  --rules /path/to/eu4.pdxrules \
+  --source /path/to/eu4 \
+  --output /path/to/vanilla.pdxindex
 ```
 
-See [the Phase 0 spike notes](docs/spikes/phase0-zed-grammar.md), [the Phase 1 grammar
-README](grammars/README.md), [the LSP runtime RFC](docs/rfc/0009-lsp-runtime.md), and
-[the implementation plan](plan.md) for the current boundary decisions.
+The external `--rules` argument is scheduled for removal before release when first-party rules are
+embedded in the official binaries.
+
+## Repository layout
+
+| Path | Purpose |
+| --- | --- |
+| `crates/` | Rust parser, rules, HIR, workspace, analysis, formatter, LSP, and CLI crates |
+| `editors/zed/` | Thin Zed extension, language metadata, and queries |
+| `grammars/` | Editor-only Tree-sitter grammars and corpus tests |
+| `rules/` | Validated EU4 rules artifact and provenance metadata |
+| `docs/` | Architecture, accepted RFCs, configuration, and release criteria |
+| `fuzz/` | Parser, edit, and formatter fuzz targets |
+| `scripts/` | Reproducible project quality checks |
+
+## Contributing and security
+
+Contributions are welcome once they follow the project's architecture, test, provenance, and
+copyright boundaries. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
+Please do not report security vulnerabilities through public issues. Follow
+[SECURITY.md](SECURITY.md) instead.
+
+## License
+
+ParadoxCode source code is available under the [MIT License](LICENSE). The repository does not
+redistribute EU4 game files, user Vanilla caches, or the original CWT source corpus. Rules artifact
+provenance and redistribution boundaries are documented in [rules/README.md](rules/README.md).

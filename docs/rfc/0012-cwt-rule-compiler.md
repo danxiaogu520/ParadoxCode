@@ -3,6 +3,10 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
+> 2026-07-21 amendment：SQLite artifact 的导入、schema、hash 和 provenance 约束继续有效；
+> extension-owned 外部 runtime 文件的分发决策已由
+> [RFC 0014](0014-embedded-first-party-rules.md) 取代。
+
 ## 决策
 
 `pdx-cwt` 是 ParadoxCode 的规则数据库管理程序。长期方向是对自有 SQLite 规则数据库提供 CRUD、验证、hash、diff 和历史能力；`v0.1` 只实现一项功能：把指定的 CWTools EU4 `.cwt` corpus 一次性导入 `eu4.pdxrules`。

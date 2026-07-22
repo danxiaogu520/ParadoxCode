@@ -3,6 +3,10 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
+> 2026-07-21 amendment：扩展携带规则和 `--rules` 启动参数已由
+> [RFC 0014](0014-embedded-first-party-rules.md) 取代。扩展只下载、校验、缓存并启动内嵌
+> 第一方规则的官方 server。
+
 ## 原则
 
 Zed extension 是薄客户端。它可以包含语言 metadata、Tree-sitter queries、server 安装/启动代码、配置映射，以及作为独立 asset 打包的 `eu4.pdxrules`，但不实现或解释任何 EU4 semantic rule。

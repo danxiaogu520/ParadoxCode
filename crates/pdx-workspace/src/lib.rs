@@ -499,6 +499,16 @@ impl WorkspaceIndex {
         self.sort_definition_buckets(&affected);
     }
 
+    fn remove_shard_resolved(
+        &mut self,
+        file_id: SourceFileId,
+        priorities: &BTreeMap<SourceFileId, u64>,
+        rules: &RuleSet,
+    ) {
+        let affected = self.remove_shard_entries(file_id);
+        self.resolve_definition_buckets(&affected, priorities, rules);
+    }
+
     fn resolve_priorities(&mut self, priorities: &BTreeMap<SourceFileId, u64>, rules: &RuleSet) {
         match self.resolve_priorities_cancellable(priorities, rules, &WorkspaceScanToken::new()) {
             Ok(()) => {}
@@ -794,6 +804,34 @@ pub enum WorkspaceChange {
     SetSourceRoots(Vec<SourceRoot>),
     /// Replace the explicit workspace root.
     SetWorkspaceRoot(Option<PathBuf>),
+}
+
+/// Filesystem event kind supplied by an editor watcher or save fallback.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DiskFileChangeKind {
+    /// A regular file appeared below a live source root.
+    Created,
+    /// An existing regular file may have changed contents.
+    Changed,
+    /// A path disappeared. A racing missing changed file is treated the same way.
+    Deleted,
+}
+
+/// One editor-neutral disk candidate event.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DiskFileChange {
+    /// Absolute path reported by the client.
+    pub path: PathBuf,
+    /// Reported change kind.
+    pub kind: DiskFileChangeKind,
+}
+
+impl DiskFileChange {
+    /// Creates one disk event.
+    #[must_use]
+    pub fn new(path: PathBuf, kind: DiskFileChangeKind) -> Self {
+        Self { path, kind }
+    }
 }
 
 /// Errors raised while applying an editor document event.
@@ -1921,6 +1959,146 @@ impl AnalysisHost {
         Ok(report)
     }
 
+    /// Applies a batch of Current Mod/Dependency disk events with one atomic snapshot commit.
+    ///
+    /// Only changed file states and their index shards are rebuilt. Open overlays remain intact,
+    /// and a persistent Vanilla root is never read or watched through this path.
+    pub fn apply_disk_file_changes(
+        &mut self,
+        changes: &[DiskFileChange],
+    ) -> Result<WorkspaceScanReport, WorkspaceError> {
+        self.apply_disk_file_changes_cancellable(changes, &WorkspaceScanToken::new())
+    }
+
+    /// Applies targeted disk events while cooperatively observing `cancellation`.
+    pub fn apply_disk_file_changes_cancellable(
+        &mut self,
+        changes: &[DiskFileChange],
+        cancellation: &WorkspaceScanToken,
+    ) -> Result<WorkspaceScanReport, WorkspaceError> {
+        cancellation.checkpoint()?;
+        let limits = WorkspaceScanLimits::default();
+        let mut files = self.source_files.as_ref().clone();
+        let mut file_states = self.file_states.as_ref().clone();
+        let mut index = self.index.as_ref().clone();
+        let mut report = WorkspaceScanReport::default();
+        let mut changed = false;
+
+        for change in changes {
+            cancellation.checkpoint()?;
+            let Some(root) = self
+                .roots
+                .iter()
+                .filter(|root| {
+                    matches!(root.kind, SourceRootKind::CurrentMod | SourceRootKind::Dependency)
+                })
+                .filter(|root| change.path.starts_with(&root.path))
+                .max_by_key(|root| root.path.as_os_str().len())
+            else {
+                continue;
+            };
+            let relative = change
+                .path
+                .strip_prefix(&root.path)
+                .map_err(|_| WorkspaceError::InvalidLogicalPath(change.path.clone()))?
+                .to_string_lossy()
+                .replace('\\', "/");
+            let logical = LogicalPath::parse(&relative)
+                .map_err(|_| WorkspaceError::InvalidLogicalPath(change.path.clone()))?;
+            let id = SourceFileId::new(stable_file_id(root.id, &logical));
+            report.discovered_files = report.discovered_files.saturating_add(1);
+
+            let missing = match fs::symlink_metadata(&change.path) {
+                Ok(metadata) if metadata.file_type().is_symlink() => {
+                    record_scan_issue(
+                        &mut report,
+                        limits,
+                        WorkspaceScanIssueKind::SymlinkSkipped,
+                        change.path.clone(),
+                        "symbolic links are not followed during targeted disk updates".to_owned(),
+                    );
+                    continue;
+                }
+                Ok(metadata) => !metadata.is_file(),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
+                Err(error) => {
+                    record_scan_issue(
+                        &mut report,
+                        limits,
+                        WorkspaceScanIssueKind::MetadataUnreadable,
+                        change.path.clone(),
+                        error.to_string(),
+                    );
+                    continue;
+                }
+            };
+            if change.kind == DiskFileChangeKind::Deleted || missing {
+                if files.remove(&id).is_some() {
+                    file_states.remove(&id);
+                    let priorities = source_priorities(&self.roots, &files);
+                    index.remove_shard_resolved(id, &priorities, self.rules.as_ref());
+                    changed = true;
+                }
+                continue;
+            }
+
+            let Some(category) = self.rules.classify(&logical) else {
+                continue;
+            };
+            let Some(text) =
+                read_source_file_cancellable(&change.path, limits, &mut report, cancellation)?
+            else {
+                continue;
+            };
+            let source_file = SourceFile {
+                id,
+                root_id: root.id,
+                physical_path: change.path.clone(),
+                logical_path: logical,
+                category_id: Some(category.id.clone()),
+                resolution: category.resolution,
+            };
+            if let Some(existing) = files.get(&id)
+                && existing.physical_path != source_file.physical_path
+            {
+                return Err(WorkspaceError::FileIdCollision {
+                    first: existing.physical_path.clone(),
+                    second: source_file.physical_path,
+                });
+            }
+            if files.get(&id) == Some(&source_file)
+                && file_states.get(&id).is_some_and(|state| state.source() == text)
+            {
+                continue;
+            }
+            let file_revision =
+                file_states.get(&id).map_or(0, |state| state.revision().saturating_add(1));
+            let state = Arc::new(build_file_state(
+                &source_file,
+                text,
+                file_revision,
+                self.rules.as_ref(),
+                self.profile.as_ref(),
+            ));
+            files.insert(id, source_file);
+            file_states.insert(id, Arc::clone(&state));
+            let priorities = source_priorities(&self.roots, &files);
+            index.replace_shard_resolved(state.shard().clone(), &priorities, self.rules.as_ref());
+            report.indexed_files = report.indexed_files.saturating_add(1);
+            changed = true;
+        }
+
+        cancellation.checkpoint()?;
+        if changed {
+            self.source_files = Arc::new(files);
+            self.file_states = Arc::new(file_states);
+            self.index = Arc::new(index);
+            self.scan_report = Arc::new(report.clone());
+            self.revision = self.revision.saturating_add(1);
+        }
+        Ok(report)
+    }
+
     /// Returns a mutable workspace index for targeted shard replacement.
     pub fn replace_index_shard(&mut self, shard: FileIndexShard) {
         let file_id = shard.file_id;
@@ -2302,11 +2480,11 @@ mod tests {
     use std::sync::Arc;
 
     use super::{
-        AnalysisHost, Definition, DocumentId, DocumentSource, FileIndexShard, ParsedSource,
-        Reference, SourceFileId, SourceRoot, SourceRootId, SourceRootKind, TextChange,
-        VanillaCacheError, VanillaIndexCache, WorkspaceError, WorkspaceIndex,
-        WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanToken, pipeline_counts,
-        reset_pipeline_counts,
+        AnalysisHost, Definition, DiskFileChange, DiskFileChangeKind, DocumentId, DocumentSource,
+        FileIndexShard, ParsedSource, Reference, SourceFileId, SourceRoot, SourceRootId,
+        SourceRootKind, TextChange, VanillaCacheError, VanillaIndexCache, WorkspaceError,
+        WorkspaceIndex, WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanToken,
+        pipeline_counts, reset_pipeline_counts,
     };
     use pdx_rules::RuleSet;
     use pdx_text::{LogicalPath, TextRange};
@@ -2489,20 +2667,105 @@ mod tests {
                 .file_id,
             second_file
         );
-        index.replace_shard_resolved(
-            FileIndexShard {
-                file_id: second_file,
-                definitions: Vec::new(),
-                references: Vec::new(),
-                syntax_error_count: 0,
-            },
-            &ordered,
-            &rules,
-        );
+        index.remove_shard_resolved(second_file, &ordered, &rules);
         assert_eq!(
             index.active_definition("event", "shared.1").expect("remaining definition").file_id,
             first_file
         );
+    }
+
+    #[test]
+    fn targeted_disk_changes_replace_one_shard_without_overwriting_an_overlay() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-workspace-targeted-disk-{nonce}"));
+        let events = root.join("common/events");
+        fs::create_dir_all(&events).expect("fixture directory");
+        let changed_path = events.join("changed.txt");
+        let untouched_path = events.join("untouched.txt");
+        fs::write(&changed_path, "country_event = { id = old.1 }\n").expect("changed fixture");
+        fs::write(&untouched_path, "country_event = { id = untouched.1 }\n")
+            .expect("untouched fixture");
+
+        let mut host = eu4_host();
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        host.refresh_source_roots().expect("initial scan");
+        let before = host.snapshot();
+        let changed_id = before
+            .source_files()
+            .values()
+            .find(|file| file.physical_path == changed_path)
+            .expect("changed source")
+            .id;
+        let untouched_id = before
+            .source_files()
+            .values()
+            .find(|file| file.physical_path == untouched_path)
+            .expect("untouched source")
+            .id;
+        let untouched_state = Arc::clone(before.file_states.get(&untouched_id).expect("state"));
+        let document = DocumentId::new("file:///targeted/changed.txt");
+        host.open_document(
+            document.clone(),
+            1,
+            "country_event = { id = overlay.1 }\n".to_owned(),
+            Some(changed_path.clone()),
+        )
+        .expect("open overlay");
+
+        fs::write(&changed_path, "country_event = { id = new.1 }\n").expect("disk edit");
+        reset_pipeline_counts();
+        host.apply_disk_file_changes(&[DiskFileChange::new(
+            changed_path.clone(),
+            DiskFileChangeKind::Changed,
+        )])
+        .expect("targeted change");
+        assert_eq!(pipeline_counts(), (1, 1));
+        let changed = host.snapshot();
+        assert!(changed.index().active_definition("event", "old.1").is_none());
+        assert!(changed.index().active_definition("event", "new.1").is_some());
+        assert_eq!(
+            changed.document(&document).expect("overlay remains").text(),
+            "country_event = { id = overlay.1 }\n"
+        );
+        assert!(Arc::ptr_eq(
+            changed.file_states.get(&untouched_id).expect("untouched current state"),
+            &untouched_state
+        ));
+        assert!(!Arc::ptr_eq(
+            changed.file_states.get(&changed_id).expect("changed current state"),
+            before.file_states.get(&changed_id).expect("changed old state")
+        ));
+
+        let created_path = events.join("created.txt");
+        fs::write(&created_path, "country_event = { id = created.1 }\n").expect("created fixture");
+        host.apply_disk_file_changes(&[DiskFileChange::new(
+            created_path,
+            DiskFileChangeKind::Created,
+        )])
+        .expect("targeted create");
+        assert!(host.snapshot().index().active_definition("event", "created.1").is_some());
+
+        fs::remove_file(&changed_path).expect("delete changed fixture");
+        host.apply_disk_file_changes(&[DiskFileChange::new(
+            changed_path,
+            DiskFileChangeKind::Deleted,
+        )])
+        .expect("targeted delete");
+        let deleted = host.snapshot();
+        assert!(deleted.source_files().get(&changed_id).is_none());
+        assert!(deleted.index().active_definition("event", "new.1").is_none());
+        assert_eq!(
+            deleted.document(&document).expect("overlay survives backing deletion").text(),
+            "country_event = { id = overlay.1 }\n"
+        );
+        fs::remove_dir_all(root).expect("cleanup");
     }
 
     #[test]

@@ -19,7 +19,11 @@ members = [
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-rust-version = "1.85"
+rust-version = "1.88"
+authors = ["ParadoxCode contributors"]
+homepage = "https://github.com/danxiaogu520/ParadoxCode"
+repository = "https://github.com/danxiaogu520/ParadoxCode"
+readme = "README.md"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

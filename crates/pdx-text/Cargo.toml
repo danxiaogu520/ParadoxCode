@@ -5,7 +5,11 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "Editor-neutral text, range, position, and path primitives for ParadoxCode."
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish = false
 
 [lints]
 workspace = true
-

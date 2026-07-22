@@ -3,6 +3,10 @@ set -euo pipefail
 
 test -f Cargo.toml
 test -f Cargo.lock
+test -f CHANGELOG.md
+test -f CONTRIBUTING.md
+test -f SECURITY.md
+test -f CODE_OF_CONDUCT.md
 test -f editors/zed/extension.toml
 test -f docs/spikes/phase0-zed-grammar.md
 test -f docs/spikes/phase0-server-distribution.md
@@ -21,4 +25,3 @@ done
 
 cargo metadata --no-deps --format-version 1 >/dev/null
 echo "Phase 0 layout checks passed."
-

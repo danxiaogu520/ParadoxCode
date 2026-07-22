@@ -1,6 +1,6 @@
 # ParadoxCode 总体架构
 
-> 2026-07-20 状态说明：通用 `pdx-rules`、EU4 profile、per-file cache、廉价 snapshot、共享结构与 profile-aware definition/reference HIR facts、带协作式取消的 LSP initialize/parse/query/diagnostic worker，以及 Current Mod/Dependency/持久化 Vanilla cache 项目配置已落地；scope/CWT typed lowering、watched-file 定向更新和发布闭环仍未达到本文约束。迁移计划见 [RFC 0013](rfc/0013-generic-engine-eu4-first.md)。
+> 2026-07-21 状态说明：通用 `pdx-rules`、EU4 profile、per-file cache、廉价 snapshot、共享结构与 profile-aware definition/reference HIR facts、带协作式取消的 LSP initialize/parse/query/diagnostic worker，以及 Current Mod/Dependency/持久化 Vanilla cache 项目配置已落地；scope/CWT typed lowering、watched-file LSP 接入和发布闭环仍未达到本文约束。规则分发已由 [RFC 0014](rfc/0014-embedded-first-party-rules.md) 改为官方 binary 内嵌，代码迁移尚未完成。
 
 ## 目标
 
@@ -61,7 +61,7 @@ Zed extension 只负责：
 - 获取或查找 `pdx-ls`
 - 启动 Language Server
 - 传递 workspace 配置
-- 从扩展安装包解析 `eu4.pdxrules`，使用 `pdx-ls --rules <path>` 显式传入
+- 下载、校验、缓存并启动与平台匹配的官方 `pdx-ls`；规则由 binary 内嵌
 - 首次配置时建立 Vanilla 本地索引缓存，并提供显式“刷新 Vanilla 索引”操作
 
 不得在扩展内实现 symbol 提取、scope 推导或诊断。Tree-sitter grammar/query 只属于这一层；

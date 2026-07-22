@@ -98,7 +98,7 @@ pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 | `pdx-analysis` | 面向 snapshot 的 diagnostics/completion/hover/navigation/rename 查询 | 直接读磁盘、editor client |
 | `pdx-format` | 安全 formatter 和 edit 生成 | 语义修复、破坏性重写 |
 | `pdx-lsp` | 生命周期、capability、协议转换、取消、publish diagnostics | EU4 名称表、业务查询、规则解释 |
-| `editors/zed` | language metadata、queries、server 获取/启动、配置传递 | symbol 提取、scope 推导、EU4 规则实现 |
+| `editors/zed` | language metadata、queries、server 获取/校验/启动、配置传递 | symbol 提取、scope 推导、EU4 规则实现或规则 artifact 分发 |
 
 `AnalysisHost` 是可变状态的拥有者；请求读取不可变 `AnalysisSnapshot`，查询期间不持有 host 锁。后台结果提交前必须校验文档版本或 snapshot 身份。
 
@@ -124,7 +124,8 @@ pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 
 ### 规则数据库
 
-- `eu4.pdxrules` 是 runtime 的唯一权威规则源；
+- `eu4.pdxrules` 是开发期唯一权威规则 artifact，发布时嵌入官方 `pdx`/`pdx-ls`；
+- 官方 runtime 不接受外部规则路径、下载、搜索或用户覆盖；
 - runtime 不读取、下载或重新导入 CWT；
 - `rule_hash` hash 的是规范化逻辑内容，不是 SQLite 文件 bytes；
 - hash 不受 rowid、插入顺序、页布局、index、VACUUM、时间戳和 import log 影响；

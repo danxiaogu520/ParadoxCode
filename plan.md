@@ -230,7 +230,7 @@ Workspace/index：
 
 ### Phase 6A：Rename 与 v0.1 发布
 
-状态：`implemented, not released`（2026-07-20）；prepare rename、safe WorkspaceEdit、只读来源保护与 formatter LSP 已实现，自动安装、规则包获取、跨平台 release 与干净 clone smoke 尚未完成。
+状态：`implemented, not released`（2026-07-21）；prepare rename、safe WorkspaceEdit、只读来源保护与 formatter LSP 已实现，RFC 0014 规则内嵌、自动安装、跨平台 release 与干净 clone smoke 尚未完成。
 
 工作项：
 
@@ -241,7 +241,7 @@ Workspace/index：
 - [x] 拒绝修改 Vanilla、依赖 Mod 或定义位于只读来源的 symbol；
 - [x] 完成发布构建、Zed 安装/启动 smoke test 和用户文档。
 
-退出条件：rename 后重新分析不产生新增 unresolved reference；ambiguous reference 直接拒绝；Phase 1–6A 全部退出条件通过；无已知 parser/formatter crash；规则数据库、manifest、`rule_hash` 和 extension asset 一致；支持平台完成 Zed smoke test。
+退出条件：rename 后重新分析不产生新增 unresolved reference；ambiguous reference 直接拒绝；Phase 1–6A 全部退出条件通过；无已知 parser/formatter crash；内嵌规则、manifest 与 `rule_hash` 一致；支持平台完成 Zed smoke test。
 
 依赖：Phase 5。
 
@@ -249,7 +249,7 @@ Workspace/index：
 
 ### Phase R：通用引擎边界与发布前架构修复
 
-状态：`in progress`（2026-07-20）
+状态：`in progress`（2026-07-21）
 
 按可独立验证的小切片执行：
 
@@ -262,7 +262,7 @@ Workspace/index：
 7. 将 LSP transport 迁移到类型化协议层，增加 worker、debounce、版本门和在途取消（已完成：stdio reader 分离，initialize 候选 host scan worker，prepared-document parse worker/三重提交门，semantic diagnostics 200ms debounce，snapshot request worker，共享 cancellation token 与 analysis 内部 checkpoint；workspace scan 覆盖目录/读取/parse/lower/index 检查点并有取消原子性回归；`lsp-types` 接管当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 和语言功能 response，轻量 JSON-RPC framing 有意保留）；
 8. 接入 formatting、dependency roots、Vanilla cache 持久化和文件变化更新（formatting 已完成：typed request/edits、capability、snapshot worker、UTF-16 与 unsafe-syntax integration 回归；dependency roots 已完成：类型化 initialization options、TOML、稳定 ID、有序优先级、重叠校验和只读 rename 回归；Vanilla cache 已完成：显式 CLI 建库/刷新、版本化 SQLite、source fingerprint、无源码持久化、可取消只读 LSP 加载、降级 warning 与不重扫回归；watched-file 定向更新待完成）；
 9. 建立大型 synthetic workspace benchmark 与“编辑一个文件只 parse/lower 一次”计数测试（已完成：默认 2,000 个原创 EU4 event 文件，覆盖 cold/unchanged/单磁盘变化/单 overlay 编辑；线程局部测试计数器证明 overlay 编辑 parse/lower 各一次且不重建磁盘 `FileState`）；
-10. 完成 Zed 自动获取、多平台 release、checksum 和干净 clone 端到端安装测试。
+10. 按 RFC 0014 内嵌第一方 EU4 规则，删除 runtime `--rules` 与扩展规则 asset；完成 Zed 自动获取、多平台 release、checksum 和干净 clone 端到端安装测试。
 
 Phase R 完成前不开始 Semantic Tokens、Quick Fix、其他游戏 profile 或新的编辑器客户端。
 
