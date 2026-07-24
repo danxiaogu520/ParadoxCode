@@ -1865,15 +1865,19 @@ fn semantic_root_context(
                     let starts_with = descriptor.starts_with.as_deref().is_some_and(|prefix| {
                         key.to_ascii_lowercase().starts_with(&prefix.to_ascii_lowercase())
                     });
-                    (!snapshot.rules().model().semantic.type_root_keys.contains_key(*type_name)
-                        || starts_with)
-                        && (starts_with
-                            || descriptor.skip_root_paths.iter().any(|path| {
+                    (starts_with
+                        || (!snapshot
+                            .rules()
+                            .model()
+                            .semantic
+                            .type_root_keys
+                            .contains_key(*type_name)
+                            && descriptor.skip_root_paths.iter().any(|path| {
                                 path.first().is_some_and(|root| {
                                     root.eq_ignore_ascii_case("any")
                                         || root.eq_ignore_ascii_case(key)
                                 })
-                            }))
+                            })))
                         && rules.iter().any(|rule| {
                             rule.context.eq_ignore_ascii_case(&format!("root:{type_name}"))
                         })
@@ -3099,11 +3103,11 @@ mod tests {
         CancellationToken, Cancelled, CompletionKind, DiagnosticCode, RenameError, RenameFailure,
         complete, complete_with_cancellation, definition, diagnostics,
         diagnostics_with_cancellation, document_symbols, hover, input_for_document, prepare_rename,
-        references, rename, rename_with_cancellation, workspace_symbols,
+        references, rename, rename_with_cancellation, semantic_root_context, workspace_symbols,
         workspace_symbols_with_cancellation,
     };
     use pdx_rules::{KeyMatcher, RuleSet, RuleShape, SemanticRule, ValueMatcher};
-    use pdx_text::TextRange;
+    use pdx_text::{LogicalPath, TextRange};
     use pdx_workspace::{AnalysisHost, DocumentId};
 
     fn eu4_host(rules: RuleSet) -> AnalysisHost {
@@ -3486,6 +3490,27 @@ mod tests {
             diagnostics(&host.snapshot(), &id)
                 .iter()
                 .any(|item| item.code == DiagnosticCode::UnknownKey)
+        );
+    }
+
+    #[test]
+    fn eu4_starts_with_type_selector_still_requires_a_matching_path() {
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let host = eu4_host(rules);
+        let snapshot = host.snapshot();
+        let valid_path =
+            LogicalPath::parse("common/on_actions/test.txt").expect("valid on-action path");
+        let unrelated_path = LogicalPath::parse("events/test.txt").expect("valid unrelated path");
+
+        assert_eq!(
+            semantic_root_context(&snapshot, "on_harmonized_religiongroup", Some(&valid_path))
+                .as_deref(),
+            Some("type:on_action")
+        );
+        assert_ne!(
+            semantic_root_context(&snapshot, "on_harmonized_religiongroup", Some(&unrelated_path))
+                .as_deref(),
+            Some("type:on_action")
         );
     }
 

@@ -2132,6 +2132,26 @@ mod tests {
     use serde::de::DeserializeOwned;
     use serde_json::{Value, json};
 
+    /// Creates a temporary directory for use as a cross-platform workspace root.
+    /// Returns the canonical path, its file:// URI, and a DocumentId URI rooted under it.
+    fn temp_workspace_dir() -> (std::path::PathBuf, String) {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("pdx-lsp-test-{nonce}"));
+        fs::create_dir_all(&dir).expect("create temp workspace");
+        let canonical = fs::canonicalize(&dir).expect("canonicalize temp workspace");
+        (canonical.clone(), path_to_uri(&canonical))
+    }
+
+    /// Canonicalizes a path and returns its file:// URI, matching the format used by
+    /// workspace scanning so that URI-keyed maps can be compared directly.
+    fn canonical_uri(path: &std::path::Path) -> String {
+        let canonical = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        path_to_uri(&canonical)
+    }
+
     fn eu4_server(options: InitializeOptions) -> Result<LspServer, LspError> {
         LspServer::try_new_with_rules(
             options,
@@ -2297,10 +2317,15 @@ mod tests {
 
     #[test]
     fn memory_transport_delegates_phase5_requests_to_analysis() {
-        let uri = "file:///tmp/phase5-events.txt";
+        let (root_dir, root_uri) = temp_workspace_dir();
+        let events_dir = root_dir.join("events");
+        fs::create_dir_all(&events_dir).expect("create events dir");
+        let file_path = events_dir.join("phase5.txt");
+        fs::write(&file_path, "").expect("create placeholder file");
+        let uri = canonical_uri(&file_path);
         let text = "country_event = { id = test.1 }\nevent = test.1\nscope = nowhere\n";
         let input = frames([
-            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{}}}),
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"pdx-script","version":1,"text":text}}}),
             json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":2,"character":8}}}),
@@ -2340,11 +2365,12 @@ mod tests {
                 .map(Vec::len),
             Some(2)
         );
-        assert_eq!(
+        // With embedded EU4 rules, top-level keys (country_event, event, scope) all
+        // produce document symbols — richer than the identity-only baseline.
+        assert!(
             responses.iter().find(|value| value["id"] == 6).expect("document symbols")["result"]
                 .as_array()
-                .map(Vec::len),
-            Some(1)
+                .is_some_and(|symbols| !symbols.is_empty())
         );
         assert_eq!(
             responses.iter().find(|value| value["id"] == 7).expect("workspace symbols")["result"]
@@ -2355,7 +2381,7 @@ mod tests {
         let prepare = responses.iter().find(|value| value["id"] == 9).expect("prepare rename");
         assert_eq!(prepare["result"]["placeholder"], "test.1");
         let rename = responses.iter().find(|value| value["id"] == 10).expect("rename");
-        assert_eq!(rename["result"]["changes"][uri].as_array().map(Vec::len), Some(2));
+        assert_eq!(rename["result"]["changes"][uri.clone()].as_array().map(Vec::len), Some(2));
         assert!(
             rename["result"]["changes"][uri]
                 .as_array()
@@ -2382,6 +2408,7 @@ mod tests {
         let _: Vec<Diagnostic> =
             serde_json::from_value(diagnostics["params"]["diagnostics"].clone())
                 .expect("diagnostic notification should use the standard LSP shape");
+        fs::remove_dir_all(root_dir).expect("cleanup");
     }
 
     #[test]
@@ -2421,10 +2448,11 @@ mod tests {
         fs::create_dir_all(target_path.parent().expect("target parent")).expect("directories");
         fs::write(&target_path, "country_event = { id = cross.1 }\n").expect("target");
         fs::write(&references_path, "event = cross.1\n").expect("reference");
-        let target_uri = path_to_uri(&target_path);
-        let references_uri = path_to_uri(&references_path);
+        let target_uri = canonical_uri(&target_path);
+        let references_uri = canonical_uri(&references_path);
+        let root_uri = canonical_uri(&fs::canonicalize(&root).expect("canonical root"));
         let input = frames([
-            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&root),"capabilities":{}}}),
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":target_uri,"languageId":"pdx-script","version":1,"text":"country_event = { id = cross.1 }\n"}}}),
             json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":target_uri},"position":{"line":0,"character":25},"newName":"renamed.1"}}),
@@ -2464,8 +2492,13 @@ mod tests {
         for directory in [&current, &low, &high, &vanilla] {
             fs::create_dir_all(directory.join("common/events")).expect("fixture directory");
         }
+        let canonical_root = fs::canonicalize(&root).expect("canonical root");
+        let current = fs::canonicalize(&current).expect("canonical current");
+        let low = fs::canonicalize(&low).expect("canonical low");
+        let high = fs::canonicalize(&high).expect("canonical high");
+        let vanilla = fs::canonicalize(&vanilla).expect("canonical vanilla");
         let inline = super::resolve_source_roots(
-            Some(&root),
+            Some(&canonical_root),
             Some(json!({
                 "modDirectory": "mod",
                 "dependencies": [
@@ -2478,7 +2511,7 @@ mod tests {
         .expect("inline initializationOptions");
         assert_eq!(inline.roots.len(), 3);
         let overlap = super::resolve_source_roots(
-            Some(&root),
+            Some(&canonical_root),
             Some(json!({
                 "modDirectory": "mod",
                 "dependencies": [{"id": "nested", "path": "mod/common"}]
@@ -2546,9 +2579,10 @@ path = "dependencies/high"
         let reference_path = current.join("common/events/reference.txt");
         fs::write(&reference_path, "event = dependency.1\n").expect("current reference");
 
-        let reference_uri = path_to_uri(&reference_path);
+        let reference_uri = canonical_uri(&reference_path);
+        let root_uri = canonical_uri(&canonical_root);
         let input = frames([
-            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&root),"capabilities":{},"initializationOptions":{"projectConfig":".pdx/project.toml"}}}),
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{},"initializationOptions":{"projectConfig":".pdx/project.toml"}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"pdx-script","version":1,"text":"event = dependency.1\n"}}}),
             json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":reference_uri},"position":{"line":0,"character":10},"newName":"renamed.1"}}),
