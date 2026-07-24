@@ -2,8 +2,10 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-tree_sitter_home="${TMPDIR:-/tmp}/pdx-tree-sitter-home"
-mkdir -p "$tree_sitter_home"
+tree_sitter_home="$(mktemp -d "${TMPDIR:-/tmp}/pdx-tree-sitter-home.XXXXXX")"
+tree_sitter_config="$tree_sitter_home/config"
+trap 'rm -r -- "$tree_sitter_home"' EXIT
+mkdir -p "$tree_sitter_config"
 
 for grammar in \
     "$root/grammars/tree-sitter-pdx-script" \
@@ -20,10 +22,10 @@ for grammar in \
             tree_sitter="$grammar/node_modules/.bin/tree-sitter"
         fi
         "$tree_sitter" generate
-        if [[ ! -f "$tree_sitter_home/.config/tree-sitter/config.json" ]]; then
-            HOME="$tree_sitter_home" "$tree_sitter" init-config >/dev/null
+        if [[ ! -f "$tree_sitter_config/tree-sitter/config.json" ]]; then
+            XDG_CONFIG_HOME="$tree_sitter_config" "$tree_sitter" init-config >/dev/null
         fi
-        HOME="$tree_sitter_home" "$tree_sitter" test
+        XDG_CONFIG_HOME="$tree_sitter_config" "$tree_sitter" test
     )
 done
 
