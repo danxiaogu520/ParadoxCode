@@ -4,6 +4,7 @@ members = [
     "crates/pdx-text",
     "crates/pdx-syntax",
     "crates/pdx-rules",
+    "crates/pdx-game",
     "crates/pdx-game-eu4",
     "crates/pdx-eu4",
     "crates/pdx-rulec",

@@ -104,7 +104,18 @@ The current alpha can launch `pdx-ls` from a configured path or from `PATH`. Wor
 are configured through `.pdx/project.toml`; see [workspace configuration](docs/configuration.md).
 The documented setup is for contributors and is not the final installation experience.
 
-Build or manually refresh a local Vanilla index with the current alpha CLI:
+Let ParadoxCode discover, validate, index, and remember the local EU4 installation:
+
+```bash
+pdx setup vanilla
+```
+
+The first `pdx-ls` launch also performs one non-blocking quick attempt when no project override or
+previous attempt exists. If common locations do not produce exactly one candidate, run
+`pdx setup vanilla --deep` or select a directory with `--source`. Searches are not repeated on
+normal startup.
+
+Build or manually refresh a cache at an explicit location with the lower-level command:
 
 ```bash
 pdx index vanilla \
