@@ -310,10 +310,10 @@ fn should_skip_directory(path: &Path) -> bool {
     let name = path.file_name().and_then(OsStr::to_str).unwrap_or_default();
     #[cfg(target_os = "windows")]
     {
-        return matches!(
+        matches!(
             name.to_ascii_lowercase().as_str(),
             "$recycle.bin" | "system volume information" | "recovery"
-        );
+        )
     }
     #[cfg(not(target_os = "windows"))]
     {
@@ -520,12 +520,9 @@ fn is_local_filesystem(kind: &str) -> bool {
     )
 }
 
+#[cfg(not(target_os = "windows"))]
 fn home_directory() -> Option<PathBuf> {
-    #[cfg(target_os = "windows")]
-    let value = std::env::var_os("USERPROFILE");
-    #[cfg(not(target_os = "windows"))]
-    let value = std::env::var_os("HOME");
-    value.map(PathBuf::from)
+    std::env::var_os("HOME").map(PathBuf::from)
 }
 
 /// Outcome retained to ensure an automatic discovery attempt never repeats on every startup.
@@ -632,18 +629,18 @@ impl UserPaths {
             let cache = std::env::var_os("LOCALAPPDATA")
                 .map(PathBuf::from)
                 .ok_or(UserConfigError::MissingEnvironment("LOCALAPPDATA"))?;
-            return Ok(Self {
+            Ok(Self {
                 config_file: config.join("ParadoxCode/config.toml"),
                 cache_root: cache.join("ParadoxCode/cache"),
-            });
+            })
         }
         #[cfg(target_os = "macos")]
         {
             let home = home_directory().ok_or(UserConfigError::MissingEnvironment("HOME"))?;
-            return Ok(Self {
+            Ok(Self {
                 config_file: home.join("Library/Application Support/ParadoxCode/config.toml"),
                 cache_root: home.join("Library/Caches/ParadoxCode"),
-            });
+            })
         }
         #[cfg(all(unix, not(target_os = "macos")))]
         {
