@@ -2485,6 +2485,30 @@ mod tests {
         path_to_uri(&canonical)
     }
 
+    #[test]
+    fn workspace_root_is_scanned_as_current_mod_without_project_config() {
+        let (root, root_uri) = temp_workspace_dir();
+        fs::create_dir_all(root.join("common/country_tags")).expect("country tags directory");
+        fs::create_dir_all(root.join("missions")).expect("missions directory");
+        fs::write(root.join("common/country_tags/00_tags.txt"), "KTP = \"countries/KTP.txt\"\n")
+            .expect("country tag source");
+        let mission = root.join("missions/test_missions.txt");
+        fs::write(&mission, "country_event = { id = test.1 }\n").expect("mission source");
+        let mission_uri = canonical_uri(&mission);
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":mission_uri,"languageId":"pdx-script","version":1,"text":"country_event = { id = test.1 }\n"}}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        assert!(server.snapshot().index().active_definition("country_tag", "KTP").is_some());
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
     fn eu4_server(options: InitializeOptions) -> Result<LspServer, LspError> {
         LspServer::try_new_with_rules(
             options,

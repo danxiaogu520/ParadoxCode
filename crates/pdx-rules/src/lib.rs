@@ -489,6 +489,11 @@ pub struct GameProfile {
     pub root_scopes: Vec<ProfileRootScopeRule>,
     /// Additional asymmetric scope compatibility pairs.
     pub scope_compatibilities: Vec<ProfileScopeCompatibility>,
+    /// Property keys whose blocks are transparent logical wrappers.
+    ///
+    /// A wrapper preserves the current semantic context and scope while its children are
+    /// validated.  The spelling is game-specific (for example, EU4's AND/OR/NOT).
+    pub transparent_scope_wrappers: Vec<String>,
     /// semantic type/enum spellings mapped to workspace symbol kinds.
     pub member_kind_aliases: BTreeMap<String, String>,
     /// Profile fallback keys used when no imported semantic rule selects a property.
@@ -514,6 +519,7 @@ impl GameProfile {
             scope_completions: Vec::new(),
             root_scopes: Vec::new(),
             scope_compatibilities: Vec::new(),
+            transparent_scope_wrappers: Vec::new(),
             member_kind_aliases: BTreeMap::new(),
             fallback_keys: Vec::new(),
             enum_extra_members: BTreeMap::new(),
@@ -570,6 +576,12 @@ impl GameProfile {
                 pair.actual.eq_ignore_ascii_case(actual)
                     && pair.expected.eq_ignore_ascii_case(expected)
             })
+    }
+
+    /// Returns whether a property is a profile-defined transparent logical wrapper.
+    #[must_use]
+    pub fn is_transparent_scope_wrapper(&self, key: &str) -> bool {
+        self.transparent_scope_wrappers.iter().any(|wrapper| wrapper.eq_ignore_ascii_case(key))
     }
 
     /// Returns the workspace symbol kind aliased by one semantic member name.

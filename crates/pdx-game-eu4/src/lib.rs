@@ -3,10 +3,10 @@
 use pdx_game::{GameInstallDescriptor, PlatformExecutablePaths};
 use pdx_rules::{
     CsvDialect, FileCategory, FileMatcher, FileResolutionPolicy, GameProfile, ParserKind,
-    ProfileConditionalDefinitionRule, ProfileContainerDefinitionRule, ProfileCsvDefinitionRule,
-    ProfileDefinitionRule, ProfileMatchMode, ProfileReferenceRule, ProfileRootScopeRule,
-    ProfileScopeCompatibility, ProfileTextMatcher, ProfileTokenDefinitionRule,
-    ProfileValueDefinitionRule, RuleSet, RulesModel, SymbolDescriptor, SymbolResolutionPolicy,
+    ProfileConditionalDefinitionRule, ProfileCsvDefinitionRule, ProfileDefinitionRule,
+    ProfileMatchMode, ProfileReferenceRule, ProfileRootScopeRule, ProfileScopeCompatibility,
+    ProfileTextMatcher, ProfileTokenDefinitionRule, ProfileValueDefinitionRule, RuleSet,
+    RulesModel, SymbolDescriptor, SymbolResolutionPolicy,
 };
 
 const FIRST_PARTY_RULES: &[u8] = include_bytes!("../../../rules/eu4.pdxrules");
@@ -134,6 +134,15 @@ pub fn profile() -> GameProfile {
             Some("id"),
             true,
         ),
+        definition(
+            ProfileMatchMode::Prefix,
+            "common/country_tags/",
+            ProfileMatchMode::Any,
+            "",
+            "country_tag",
+            None,
+            true,
+        ),
     ];
     for (directory, kind) in [
         ("common/cultures", "culture"),
@@ -230,11 +239,7 @@ pub fn profile() -> GameProfile {
             reference(ProfileMatchMode::Exact, "tooltip", "localisation"),
         ],
         value_definitions,
-        container_definitions: vec![ProfileContainerDefinitionRule {
-            path: matcher(ProfileMatchMode::Contains, "common/country_tags"),
-            key: matcher(ProfileMatchMode::Exact, "countries"),
-            kind: "country_tag".to_owned(),
-        }],
+        container_definitions: Vec::new(),
         conditional_definitions: vec![ProfileConditionalDefinitionRule {
             path: matcher(ProfileMatchMode::Contains, "common/government_reforms/"),
             kind: "hardcoded_legacy_government".to_owned(),
@@ -316,6 +321,7 @@ pub fn profile() -> GameProfile {
             actual: "trade_node".to_owned(),
             expected: "province".to_owned(),
         }],
+        transparent_scope_wrappers: ["AND", "OR", "NOT"].into_iter().map(str::to_owned).collect(),
         member_kind_aliases: [
             ("country_tags", "country_tag"),
             ("country_tag", "country_tag"),

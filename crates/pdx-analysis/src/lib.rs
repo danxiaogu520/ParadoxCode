@@ -2050,6 +2050,8 @@ fn validate_semantic_container(
         let key = property.key.to_ascii_lowercase();
         let count = counts.entry(key).or_default();
         *count = count.saturating_add(1);
+        let transparent_wrapper =
+            snapshot.game_profile().is_transparent_scope_wrapper(&property.key);
         let matching = rules
             .iter()
             .filter(|rule| {
@@ -2058,7 +2060,10 @@ fn validate_semantic_container(
             })
             .copied()
             .collect::<Vec<_>>();
-        if matching.is_empty() {
+        if matching.is_empty() && transparent_wrapper {
+            // EU4 logical wrappers (AND/OR/NOT) do not introduce a new rule context or
+            // scope. Their children are validated as siblings of the wrapper itself.
+        } else if matching.is_empty() {
             diagnostics.push(Diagnostic {
                 code: DiagnosticCode::UnknownKey,
                 severity: DiagnosticCode::UnknownKey.severity(),
@@ -2105,7 +2110,10 @@ fn validate_semantic_container(
             }
             let max_occurs = applicable
                 .iter()
-                .filter(|rule| semantic_rule_is_selected(rule, selected_alternative.as_deref()))
+                .filter(|rule| {
+                    !semantic_rule_is_alias_definition(rule)
+                        && semantic_rule_is_selected(rule, selected_alternative.as_deref())
+                })
                 .filter_map(|rule| rule.max_occurs)
                 .max();
             if let Some(max_occurs) = max_occurs
@@ -2132,7 +2140,9 @@ fn validate_semantic_container(
             next_rule.and_then(|rule| rule.child_context.as_deref()).map_or_else(
                 || {
                     let mut child_path = parent_path.to_vec();
-                    child_path.push(property.key.clone());
+                    if !transparent_wrapper {
+                        child_path.push(property.key.clone());
+                    }
                     (context.to_owned(), child_path)
                 },
                 |child_context| (child_context.to_owned(), Vec::new()),
@@ -2176,6 +2186,9 @@ fn validate_semantic_container(
     for rule in rules.iter().filter(|rule| semantic_scope_allows(rule, scope)) {
         cancellation.checkpoint()?;
         if !semantic_rule_is_selected(rule, selected_alternative.as_deref()) {
+            continue;
+        }
+        if semantic_rule_is_alias_definition(rule) {
             continue;
         }
         if matches!(rule.shape, RuleShape::LeafValue) {
@@ -2237,6 +2250,12 @@ fn validate_semantic_container(
 
 fn semantic_rule_is_selected(rule: &pdx_rules::SemanticRule, selected: Option<&str>) -> bool {
     rule.alternative_id.as_deref().is_none_or(|alternative| selected == Some(alternative))
+}
+
+/// Alias-definition cardinality describes the fields inside one invocation. It must not be
+/// applied to sibling invocations in the surrounding effect/trigger container.
+fn semantic_rule_is_alias_definition(rule: &pdx_rules::SemanticRule) -> bool {
+    rule.alternative_id.as_deref() == Some(rule.id.as_str())
 }
 
 fn semantic_selected_alternative(
@@ -3312,6 +3331,29 @@ mod tests {
     }
 
     #[test]
+    fn logical_scope_wrappers_keep_the_trigger_context() {
+        let (host, id) = semantic_snapshot("trigger = { OR = { foo = yes } NOT = { foo = no } }\n");
+        let results = diagnostics(&host.snapshot(), &id);
+        assert!(!results.iter().any(|item| item.code == DiagnosticCode::UnknownKey));
+    }
+
+    #[test]
+    fn alias_definition_cardinality_does_not_limit_repeated_effect_commands() {
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let mut host = eu4_host(rules);
+        let id = DocumentId::new("file:///tmp/events/repeated-tooltip.txt");
+        host.open_document(
+            id.clone(),
+            1,
+            "effect = { custom_tooltip = first custom_tooltip = second }\n".to_owned(),
+            None,
+        )
+        .expect("open");
+        let results = diagnostics(&host.snapshot(), &id);
+        assert!(!results.iter().any(|item| item.code == DiagnosticCode::Cardinality));
+    }
+
+    #[test]
     fn semantic_matcher_enforces_min_cardinality() {
         let (host, id) =
             semantic_snapshot_with_constraints("trigger = { }\n", None, Some(1), Some(1));
@@ -3646,11 +3688,8 @@ mod tests {
         let root =
             std::env::temp_dir().join(format!("pdx-analysis-cwt-tags-{}", std::process::id()));
         fs::create_dir_all(root.join("common/country_tags")).expect("country tag directory");
-        fs::write(
-            root.join("common/country_tags/00_test.txt"),
-            "countries = { FRA = \"countries/France.txt\" }\n",
-        )
-        .expect("country tag definition");
+        fs::write(root.join("common/country_tags/00_test.txt"), "FRA = \"countries/France.txt\"\n")
+            .expect("country tag definition");
         let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
