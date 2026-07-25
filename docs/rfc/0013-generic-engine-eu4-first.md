@@ -40,8 +40,11 @@ pdx-syntax
 pdx-rules
   RuleSet / RuleHash / artifact schema / matcher / descriptors
 
+pdx-game
+  data-only install markers / platform discovery / user-local game configuration
+
 pdx-game-eu4
-  EU4 profile / scopes / path semantics / special lowering
+  EU4 profile / install descriptor / scopes / path semantics / special lowering
 
 pdx-rulec
   strict first-party rule source compiler; emits the EU4 rule artifact
@@ -94,6 +97,10 @@ pdx-lsp
 4. 添加第二个 profile 不需要重写 LSP transport、snapshot 或 WorkspaceIndex；
 5. EU4 的现有 parser、diagnostics、completion、navigation 和 rename 回归继续通过；
 6. 没有只为假想第二游戏存在、且无法由测试说明价值的公共抽象。
+
+安装发现使用已经由 EU4 首次配置闭环证明需要的数据结构：通用层只消费平台可执行文件
+标志、验证目录和常见安装目录名；EU4 值由 `pdx-game-eu4` 提供。它不是动态 profile
+插件 ABI，也不意味着第二款游戏已经获得产品支持。
 
 ## 影响
 

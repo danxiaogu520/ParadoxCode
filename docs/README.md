@@ -18,6 +18,7 @@ ParadoxCode 是通用 PDX Mod 语言工具引擎。当前唯一有交付承诺�
 - 规则版本：对数据库规范化逻辑内容计算唯一 `rule_hash`，与发布它的 server 版本绑定，与 EU4 版本无关
 - 工作区来源：未保存 overlay > 当前 Mod > 有序依赖 Mod > Vanilla；没有 DLC source root
 - Vanilla 索引：首次配置时建立本地缓存，此后仅由用户显式刷新，不因 `rule_hash` 或文件变化自动重建
+- Vanilla 发现：首次 LSP 启动仅后台快速尝试一次；`pdx setup vanilla` 提供显式深度搜索、选择、建库和用户级持久化
 
 ## 文档索引
 

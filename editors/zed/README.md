@@ -42,5 +42,5 @@ See [workspace configuration](../../docs/configuration.md) for the project TOML 
 path rules, inline configuration, and precedence. Initialization options require a language-server
 restart after changes. Rename produces a WorkspaceEdit only for the current Mod and its open
 overlays; dependency and cached Vanilla definitions are rejected as read-only. The core
-`pdx index vanilla` command and `vanilla_index_cache` project field are documented in the same
-workspace configuration guide; automatic first-run selection and refresh UI remain release work.
+`pdx setup vanilla` discovery flow, lower-level `pdx index vanilla` command, and
+`vanilla_index_cache` project field are documented in the same workspace configuration guide.

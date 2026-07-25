@@ -12,6 +12,7 @@ readme.workspace = true
 publish = false
 
 [dependencies]
+pdx-game = { path = "../pdx-game" }
 pdx-game-eu4 = { path = "../pdx-game-eu4" }
 pdx-lsp = { path = "../pdx-lsp" }
 pdx-rules = { path = "../pdx-rules" }
@@ -27,3 +28,6 @@ path = "src/bin/pdx-ls.rs"
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,6 +1,6 @@
 # ParadoxCode 总体架构
 
-> 2026-07-22 状态说明：通用 `pdx-rules`、EU4 profile、per-file cache、廉价 snapshot、共享结构、协作式取消、Current Mod/Dependency/持久化 Vanilla cache 已落地。第一方 JSON 规则源码、严格 `pdx-rulec` 编译器和官方 binary 内嵌规则已经接入；CWT importer、外部 `--rules` 与扩展规则副本已经删除。scope typed lowering、watched-file LSP 接入和发布闭环仍待完成。
+> 2026-07-25 状态说明：通用 `pdx-rules`、`pdx-game` 安装发现层、EU4 profile、per-file cache、廉价 snapshot、共享结构、协作式取消、Current Mod/Dependency/持久化 Vanilla cache 已落地。第一方 JSON 规则源码、严格 `pdx-rulec` 编译器和官方 binary 内嵌规则已经接入；CWT importer、外部 `--rules` 与扩展规则副本已经删除。scope typed lowering、watched-file LSP 接入和发布闭环仍待完成。
 
 ## 目标
 
@@ -62,7 +62,7 @@ Zed extension 只负责：
 - 启动 Language Server
 - 传递 workspace 配置
 - 下载、校验、缓存并启动与平台匹配的官方 `pdx-ls`；规则由 binary 内嵌
-- 首次配置时建立 Vanilla 本地索引缓存，并提供显式“刷新 Vanilla 索引”操作
+- 首次启动时允许 server 在后台执行一次快速 Vanilla 发现；复杂选择和深度扫描交给 `pdx setup vanilla`
 
 不得在扩展内实现 symbol 提取、scope 推导或诊断。Tree-sitter grammar/query 只属于这一层；
 `pdx-syntax` 核心运行时使用纯 Rust parser，不链接 Tree-sitter C。
@@ -81,13 +81,13 @@ Zed extension 只负责：
 
 LSP initialize 将 client 打开的 root 与类型化 `initializationOptions` 解析成 source roots；可选 `.pdx/project.toml` 描述 Current Mod 和从低到高排列的 Dependency Mods，inline 字段可覆盖 TOML。相对路径以打开的 worktree 为基准，目录会 canonicalize 并拒绝重叠。配置入口和示例见 [Workspace configuration](configuration.md)。这属于 adapter 配置解析；优先级、只读属性和索引仍由 editor-neutral workspace 模型执行。
 
-Vanilla cache 是本机版本化 SQLite artifact，只持久化 source-file location metadata 和 semantic shards，不持久化源码、CST 或 HIR。`pdx index vanilla` 是唯一建立/刷新入口；LSP 只读、可取消地加载并与实时 Current Mod/Dependency shards 合并，后续 workspace refresh 会跳过 Vanilla root。cache `game_id` 必须匹配，`rule_hash` 只用于可观察性和手动刷新决策。
+Vanilla cache 是本机版本化 SQLite artifact，只持久化 source-file location metadata 和 semantic shards，不持久化源码、CST 或 HIR。`pdx index vanilla` 保留为显式低层建库入口；`pdx setup vanilla` 负责发现、验证、建库和用户级配置。首次 LSP 启动在没有项目覆盖和历史尝试记录时只后台执行一次快速发现；唯一候选完整建库后通过 event loop 原子安装，零候选或多候选记录结果并提示用户手动深度扫描。正常启动只读、可取消地加载 cache，并与实时 Current Mod/Dependency shards 合并；后续 workspace refresh 会跳过 Vanilla root。cache `game_id` 必须匹配，`rule_hash` 只用于可观察性和手动刷新决策。
 
 ### 规则层
 
 `pdx-rulec` 只接受仓库中的严格第一方 JSON 规则源码，校验稳定身份、cardinality、severity、type descriptor 和 artifact round-trip，然后生成 SQLite `eu4.pdxrules`。项目不提供 CWT importer、fallback 或同步入口。
 
-`pdx-rules` 定义通用 SQLite artifact schema、规范化逻辑视图、`rule_hash` 算法、只读加载与运行时查询 API，以及不含游戏名称的 data-only `GameProfile` 描述；`pdx-game-eu4` 填充 EU4 profile 与 bootstrap catalog。`pdx-eu4` 现在只保留临时 re-export facade，待调用方和文档迁移完成后删除。运行时只读加载并冻结 `RuleSet`，schema 12 将 `game_id` 纳入 metadata 与 canonical hash；EU4 组合入口在启动服务前校验 profile 身份，并把 profile 显式传入 LSP/host/snapshot。
+`pdx-rules` 定义通用 SQLite artifact schema、规范化逻辑视图、`rule_hash` 算法、只读加载与运行时查询 API，以及不含游戏名称的 data-only `GameProfile` 描述；`pdx-game` 定义数据驱动的安装标志、跨平台发现、最小验证和用户级本机配置；`pdx-game-eu4` 填充 EU4 profile、安装描述与 bootstrap catalog。`pdx-eu4` 现在只保留临时 re-export facade，待调用方和文档迁移完成后删除。运行时只读加载并冻结 `RuleSet`，schema 12 将 `game_id` 纳入 metadata 与 canonical hash；EU4 组合入口在启动服务前校验 profile 身份，并把 profile 显式传入 LSP/host/snapshot。
 
 当前 workspace shard 的 symbol/reference 路径，以及 analysis 的 root scope、scope spelling/completion/compatibility、fallback key、semantic member alias 与额外 enum member，都由 EU4 profile 数据驱动。workspace/analysis/LSP 通用生产代码不再按 `game_id` 字符串或 EU4 名称白名单隐式启用这些行为；syntax crate 仍保留 `Eu4FileFormat`/`parse_eu4` 历史 API 名称，后续以行为保持重命名处理。
 
@@ -99,7 +99,8 @@ Vanilla cache 是本机版本化 SQLite artifact，只持久化 source-file loca
 pdx-text
 pdx-syntax    -> pdx-text
 pdx-rules     -> pdx-text
-pdx-game-eu4  -> pdx-rules + pdx-text + pdx-syntax
+pdx-game      -> no core semantic crate
+pdx-game-eu4  -> pdx-game + pdx-rules + pdx-text + pdx-syntax
 pdx-rulec     -> pdx-rules
 pdx-hir       -> pdx-text + pdx-syntax + pdx-rules
 pdx-workspace -> pdx-text + pdx-syntax + pdx-rules + pdx-hir
@@ -114,6 +115,7 @@ pdx-cli       -> pdx-lsp + selected runtime crates
 - `pdx-text` 不依赖其他 workspace crate。
 - `pdx-syntax` 实现可复用 PDX 文本前端，但不依赖游戏规则数据库、workspace 或 LSP。
 - `pdx-rules` 定义 SQLite schema、hash 与只读 runtime view，不依赖具体游戏名称表、外部规则语言或 LSP。
+- `pdx-game` 不包含具体游戏名、规则语义、workspace 索引或编辑器 API。
 - `pdx-game-eu4` 保存 EU4 profile 和无法由通用规则数据表达的 EU4 特殊语义。
 - `pdx-rulec` 是维护者工具，只把第一方规则源码编译成经过完整校验的 artifact；它不是 runtime dependency。
 - `pdx-hir` 通过稳定的 typed CST API lowering；结构 facts 与 `RuleSet`/显式 profile 驱动的 definition/reference facts 已被 workspace shard 和 analysis 查询共享。profile/category 引用在 HIR 中保留来源，避免保守索引引用污染 hover/rename；scope 与 semantic typed lowering 仍待补齐。
@@ -143,6 +145,7 @@ VanillaIndexCache           local persistent Vanilla shard cache; manual refresh
 ## 并发模型
 
 - LSP event loop 顺序应用文档版本和配置变化。
+- 首次 Vanilla 快速发现与索引在可取消后台 worker 中运行；worker 只返回完整 cache，event loop 是安装 cache 和更新当前 snapshot 的唯一所有者。
 - 编辑先在 event loop 提交最新文本、版本和 `LineIndex`，parse/单文件 HIR 在 immutable snapshot worker 中准备；结果只有在版本、文本和路径仍完全一致时才能提交。依赖语义的后续请求会有序等待最新 parse，不读取旧文本。
 - 查询获取 snapshot 后不持有 host 锁。
 - initialize 的 source-root scan 在候选 `AnalysisHost` worker 中运行，目录发现、受限读取、parse/lower、bulk index 和 priority resolution 均可取消，只有完整成功后才由 event loop 原子提交。semantic diagnostics 使用约 200ms debounce，在 immutable snapshot worker 上运行，提交时校验文档版本；新编辑会使旧任务失效。普通语言请求同样捕获单一 snapshot 后进入 worker。`$/cancelRequest` 和过期 diagnostics 通过共享的 editor-neutral `CancellationToken` 在 workspace semantic 合并、semantic rule 递归及主要结果遍历中协作式中止。

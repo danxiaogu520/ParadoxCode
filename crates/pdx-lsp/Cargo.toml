@@ -12,6 +12,7 @@ readme.workspace = true
 publish = false
 
 [dependencies]
+pdx-game = { path = "../pdx-game" }
 pdx-rules = { path = "../pdx-rules" }
 pdx-analysis = { path = "../pdx-analysis" }
 pdx-format = { path = "../pdx-format" }

@@ -1,10 +1,10 @@
 [package]
-name = "pdx-game-eu4"
+name = "pdx-game"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "EU4 game profile and bootstrap rules for ParadoxCode."
+description = "Game-independent installation discovery and local configuration for ParadoxCode."
 authors.workspace = true
 homepage.workspace = true
 repository.workspace = true
@@ -12,8 +12,9 @@ readme.workspace = true
 publish = false
 
 [dependencies]
-pdx-game = { path = "../pdx-game" }
-pdx-rules = { path = "../pdx-rules" }
+serde = { version = "1", features = ["derive"] }
+toml = "1.1.3"
+tempfile = "3"
 
 [lints]
 workspace = true

@@ -34,6 +34,10 @@ use pdx_analysis::{
     references_with_cancellation, rename_with_cancellation, workspace_symbols_with_cancellation,
 };
 use pdx_format::{FormatOptions, IndentStyle, format_with_options};
+use pdx_game::{
+    DiscoveryOptions, DiscoveryOutcome, DiscoveryToken, GameInstallDescriptor, UserConfiguration,
+    UserPaths, discover_installations,
+};
 use pdx_rules::{GameProfile, RuleSet, RulesError};
 use pdx_text::{LineIndex, Position, TextRange};
 use pdx_workspace::{
@@ -108,6 +112,16 @@ struct ResolvedSourceRoots {
     workspace_root: Option<PathBuf>,
     roots: Vec<SourceRoot>,
     vanilla_cache: Option<PathBuf>,
+    vanilla_explicit: bool,
+}
+
+/// Machine-local automatic Vanilla discovery supplied by a game composition root.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AutoVanillaConfiguration {
+    /// Data-only installation facts for the selected profile.
+    pub descriptor: GameInstallDescriptor,
+    /// Shared user configuration and cache locations.
+    pub user_paths: UserPaths,
 }
 
 /// Errors raised by the server transport or process lifecycle.
@@ -243,6 +257,29 @@ struct PreparedInitialize {
     host: AnalysisHost,
     result: Value,
     warnings: Vec<String>,
+    auto_vanilla: Option<AutoVanillaConfiguration>,
+}
+
+#[derive(Debug)]
+struct VanillaSetupResult {
+    result: Result<(VanillaIndexCache, String), String>,
+}
+
+#[derive(Clone, Debug)]
+struct VanillaSetupCancellation {
+    discovery: DiscoveryToken,
+    workspace: WorkspaceScanToken,
+}
+
+impl VanillaSetupCancellation {
+    fn new() -> Self {
+        Self { discovery: DiscoveryToken::new(), workspace: WorkspaceScanToken::new() }
+    }
+
+    fn cancel(&self) {
+        self.discovery.cancel();
+        self.workspace.cancel();
+    }
 }
 
 #[derive(Debug)]
@@ -258,6 +295,7 @@ enum TransportEvent {
     Parse(ParseResult),
     Diagnostics(DiagnosticsResult),
     Request(SnapshotRequestResult),
+    VanillaSetup(VanillaSetupResult),
 }
 
 impl RpcError {
@@ -284,6 +322,7 @@ pub struct LspServer {
     diagnostics: BTreeMap<DocumentId, Value>,
     pending_parses: BTreeMap<DocumentId, PendingParse>,
     pending_diagnostics: BTreeMap<DocumentId, PendingDiagnostics>,
+    auto_vanilla: Option<AutoVanillaConfiguration>,
     clean_exit: bool,
 }
 
@@ -310,8 +349,16 @@ impl LspServer {
             diagnostics: BTreeMap::new(),
             pending_parses: BTreeMap::new(),
             pending_diagnostics: BTreeMap::new(),
+            auto_vanilla: None,
             clean_exit: false,
         })
+    }
+
+    /// Enables one-time user-level Vanilla discovery for a game composition root.
+    #[must_use]
+    pub fn with_auto_vanilla(mut self, configuration: AutoVanillaConfiguration) -> Self {
+        self.auto_vanilla = Some(configuration);
+        self
     }
 
     /// Returns the current lifecycle state.
@@ -376,6 +423,20 @@ impl LspServer {
         server.run_transport(stdin, stdout.lock())
     }
 
+    /// Runs stdio with a selected game profile and one-time user-level Vanilla discovery.
+    pub fn run_stdio_with_profile_and_auto_vanilla(
+        options: InitializeOptions,
+        rules: RuleSet,
+        profile: GameProfile,
+        auto_vanilla: AutoVanillaConfiguration,
+    ) -> Result<(), LspError> {
+        let stdin = io::stdin();
+        let stdout = io::stdout();
+        let mut server =
+            Self::try_new_with_rules(options, rules, profile)?.with_auto_vanilla(auto_vanilla);
+        server.run_transport(stdin, stdout.lock())
+    }
+
     /// Runs the same framed transport over arbitrary streams.
     ///
     /// This is public so integration tests can drive the actual JSON-RPC framing without a
@@ -409,6 +470,7 @@ impl LspServer {
             let mut in_flight = BTreeMap::<DocumentId, InFlightDiagnostics>::new();
             let mut in_flight_requests = HashMap::<RequestId, InFlightRequest>::new();
             let mut in_flight_initialize = None::<InFlightInitialize>;
+            let mut in_flight_vanilla = None::<VanillaSetupCancellation>;
             let mut deferred_messages = VecDeque::<Value>::new();
 
             loop {
@@ -510,6 +572,9 @@ impl LspServer {
                             if let Some(task) = in_flight_initialize.as_ref() {
                                 task.cancellation.cancel();
                             }
+                            if let Some(task) = in_flight_vanilla.as_ref() {
+                                task.cancel();
+                            }
                             return if self.clean_exit {
                                 Ok(())
                             } else {
@@ -529,7 +594,7 @@ impl LspServer {
                         }
                         let task = in_flight_initialize.take().expect("checked initialize task");
                         self.cancelled.remove(&result.request_id);
-                        let (response, warnings) = match result.result {
+                        let (response, warnings, auto_vanilla) = match result.result {
                             Ok(prepared) if !task.cancellation.is_cancelled() => {
                                 self.host = prepared.host;
                                 self.state = ServerState::Initialized;
@@ -540,6 +605,7 @@ impl LspServer {
                                         "result": prepared.result,
                                     }),
                                     prepared.warnings,
+                                    prepared.auto_vanilla,
                                 )
                             }
                             Ok(_) => {
@@ -548,16 +614,37 @@ impl LspServer {
                                     RpcError::new(REQUEST_CANCELLED, "request was cancelled")
                                         .response(result.id),
                                     Vec::new(),
+                                    None,
                                 )
                             }
                             Err(error) => {
                                 self.state = ServerState::Uninitialized;
-                                (error.response(result.id), Vec::new())
+                                (error.response(result.id), Vec::new(), None)
                             }
                         };
                         write_message(&mut output, &response)?;
                         for warning in warnings {
                             write_message(&mut output, &show_warning_notification(warning))?;
+                        }
+                        if let Some(configuration) = auto_vanilla {
+                            let cancellation = VanillaSetupCancellation::new();
+                            let sender = event_sender.clone();
+                            let rules = self.host.snapshot().rules().clone();
+                            let profile = self.host.snapshot().game_profile().clone();
+                            let worker_cancellation = cancellation.clone();
+                            in_flight_vanilla = Some(cancellation);
+                            scope.spawn(move || {
+                                let result = run_auto_vanilla_setup(
+                                    &configuration,
+                                    rules,
+                                    profile,
+                                    &worker_cancellation,
+                                );
+                                let _ =
+                                    sender.send(TransportEvent::VanillaSetup(VanillaSetupResult {
+                                        result,
+                                    }));
+                            });
                         }
                     }
                     TransportEvent::Parse(result) => {
@@ -606,6 +693,41 @@ impl LspServer {
                         };
                         write_message(&mut output, &response)?;
                     }
+                    TransportEvent::VanillaSetup(result) => {
+                        in_flight_vanilla = None;
+                        match result.result {
+                            Ok((cache, message)) => match self.host.install_vanilla_cache(cache) {
+                                Ok(()) => {
+                                    write_message(&mut output, &show_info_notification(message))?;
+                                    let open = self
+                                        .host
+                                        .snapshot()
+                                        .documents()
+                                        .iter()
+                                        .filter_map(|(id, document)| {
+                                            document.version().map(|version| (id.clone(), version))
+                                        })
+                                        .collect::<Vec<_>>();
+                                    for (id, version) in open {
+                                        self.schedule_diagnostics_for_document(
+                                            id,
+                                            version,
+                                            DIAGNOSTIC_DEBOUNCE,
+                                        );
+                                    }
+                                }
+                                Err(error) => write_message(
+                                    &mut output,
+                                    &show_warning_notification(format!(
+                                        "Vanilla cache was built but could not be enabled in this workspace: {error}"
+                                    )),
+                                )?,
+                            },
+                            Err(message) => {
+                                write_message(&mut output, &show_warning_notification(message))?;
+                            }
+                        }
+                    }
                 }
 
                 let draining_shutdown = self.state == ServerState::ShuttingDown
@@ -614,7 +736,8 @@ impl LspServer {
                         || !self.pending_diagnostics.is_empty()
                         || !in_flight.is_empty()
                         || !in_flight_requests.is_empty()
-                        || in_flight_initialize.is_some());
+                        || in_flight_initialize.is_some()
+                        || in_flight_vanilla.is_some());
                 if !reader_active && !draining_shutdown && deferred_messages.is_empty() {
                     read_sender.send(()).map_err(|_| {
                         LspError::Protocol("LSP transport reader stopped unexpectedly".to_owned())
@@ -714,6 +837,7 @@ impl LspServer {
         }
         let candidate = self.host.clone();
         let scan_workspace = !self.host.snapshot().rules().game_id().is_empty();
+        let auto_vanilla = self.auto_vanilla.clone();
         let sender = event_sender.clone();
         let id = id.clone();
         self.state = ServerState::Initializing;
@@ -723,7 +847,13 @@ impl LspServer {
         });
         scope.spawn(move || {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                prepare_initialize_candidate(candidate, params, scan_workspace, &cancellation)
+                prepare_initialize_candidate(
+                    candidate,
+                    params,
+                    scan_workspace,
+                    auto_vanilla.as_ref(),
+                    &cancellation,
+                )
             }))
             .unwrap_or_else(|_| {
                 Err(RpcError::new(INTERNAL_ERROR, "initialize worker failed unexpectedly"))
@@ -1025,6 +1155,7 @@ impl LspServer {
             self.host.clone(),
             params,
             !self.host.snapshot().rules().game_id().is_empty(),
+            None,
             &WorkspaceScanToken::new(),
         )?;
         self.host = prepared.host;
@@ -1089,6 +1220,7 @@ fn prepare_initialize_candidate(
     mut host: AnalysisHost,
     params: InitializeParams,
     scan_workspace: bool,
+    auto_vanilla: Option<&AutoVanillaConfiguration>,
     cancellation: &WorkspaceScanToken,
 ) -> Result<PreparedInitialize, RpcError> {
     if cancellation.is_cancelled() {
@@ -1105,14 +1237,20 @@ fn prepare_initialize_candidate(
         .map(|folder| parse_file_uri_str(folder.uri.as_str()))
         .transpose()?;
     let client_root = root.or(workspace_root);
-    let resolved =
+    let mut resolved =
         resolve_source_roots(client_root.as_deref(), initialization_options, cancellation)?;
+    let mut warnings = Vec::new();
+    let auto_vanilla = apply_user_vanilla_configuration(
+        &mut resolved,
+        auto_vanilla,
+        host.snapshot().rules().game_id(),
+        &mut warnings,
+    );
     host.apply_change(WorkspaceChange::SetWorkspaceRoot(resolved.workspace_root));
     host.apply_change(WorkspaceChange::SetSourceRoots(resolved.roots.clone()));
     if scan_workspace && !resolved.roots.is_empty() {
         host.refresh_source_roots_cancellable(cancellation).map_err(workspace_scan_error)?;
     }
-    let mut warnings = Vec::new();
     if let Some(path) = resolved.vanilla_cache {
         if !scan_workspace {
             warnings.push(format!(
@@ -1190,7 +1328,188 @@ fn prepare_initialize_candidate(
         code: INTERNAL_ERROR,
         message: format!("failed to serialize initialize result: {error}"),
     })?;
-    Ok(PreparedInitialize { host, result, warnings })
+    Ok(PreparedInitialize { host, result, warnings, auto_vanilla })
+}
+
+fn apply_user_vanilla_configuration(
+    resolved: &mut ResolvedSourceRoots,
+    auto_vanilla: Option<&AutoVanillaConfiguration>,
+    active_game_id: &str,
+    warnings: &mut Vec<String>,
+) -> Option<AutoVanillaConfiguration> {
+    let auto_vanilla = auto_vanilla?;
+    if resolved.vanilla_explicit || auto_vanilla.descriptor.game_id != active_game_id {
+        return None;
+    }
+    let configuration = match UserConfiguration::load(&auto_vanilla.user_paths.config_file) {
+        Ok(configuration) => configuration,
+        Err(error) => {
+            warnings.push(format!(
+                "ParadoxCode user configuration {} could not be loaded; automatic Vanilla discovery is disabled: {error}",
+                auto_vanilla.user_paths.config_file.display()
+            ));
+            return None;
+        }
+    };
+    let Some(game) = configuration.games.get(active_game_id) else {
+        return Some(auto_vanilla.clone());
+    };
+    if let Some(cache) = game.vanilla_cache.as_ref() {
+        resolved.vanilla_cache = Some(cache.clone());
+        return None;
+    }
+    if game.auto_discovery_attempted {
+        warnings.push(format!(
+            "Automatic {} discovery was already attempted without a usable cache; run `pdx setup vanilla --game {active_game_id} --deep` to search again",
+            auto_vanilla.descriptor.display_name
+        ));
+        None
+    } else {
+        Some(auto_vanilla.clone())
+    }
+}
+
+fn run_auto_vanilla_setup(
+    auto_vanilla: &AutoVanillaConfiguration,
+    rules: RuleSet,
+    profile: GameProfile,
+    cancellation: &VanillaSetupCancellation,
+) -> Result<(VanillaIndexCache, String), String> {
+    run_auto_vanilla_setup_with_options(
+        auto_vanilla,
+        rules,
+        profile,
+        cancellation,
+        &DiscoveryOptions::default(),
+    )
+}
+
+fn run_auto_vanilla_setup_with_options(
+    auto_vanilla: &AutoVanillaConfiguration,
+    rules: RuleSet,
+    profile: GameProfile,
+    cancellation: &VanillaSetupCancellation,
+    discovery_options: &DiscoveryOptions,
+) -> Result<(VanillaIndexCache, String), String> {
+    let descriptor = auto_vanilla.descriptor;
+    let mut configuration =
+        UserConfiguration::load(&auto_vanilla.user_paths.config_file).map_err(|error| {
+            format!("automatic Vanilla discovery could not load user configuration: {error}")
+        })?;
+    if configuration.games.get(descriptor.game_id).is_some_and(|game| game.auto_discovery_attempted)
+    {
+        return Err(format!(
+            "automatic {} discovery was skipped because it was already attempted",
+            descriptor.display_name
+        ));
+    }
+    let report = discover_installations(&descriptor, discovery_options, &cancellation.discovery);
+    if report.cancelled {
+        return Err(format!("automatic {} discovery was cancelled", descriptor.display_name));
+    }
+    let source = match report.installations.as_slice() {
+        [source] => source.clone(),
+        [] => {
+            record_discovery_outcome(
+                &mut configuration,
+                descriptor.game_id,
+                DiscoveryOutcome::NotFound,
+                &auto_vanilla.user_paths,
+            )?;
+            return Err(format!(
+                "{} was not found in common installation locations; run `pdx setup vanilla --game {} --deep` to search local disks",
+                descriptor.display_name, descriptor.game_id
+            ));
+        }
+        candidates => {
+            record_discovery_outcome(
+                &mut configuration,
+                descriptor.game_id,
+                DiscoveryOutcome::MultipleCandidates,
+                &auto_vanilla.user_paths,
+            )?;
+            return Err(format!(
+                "multiple {} installations were found:\n{}\nrun `pdx setup vanilla --game {} --source <directory>` to choose one",
+                descriptor.display_name,
+                candidates
+                    .iter()
+                    .map(|path| format!("  {}", path.display()))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                descriptor.game_id
+            ));
+        }
+    };
+
+    let mut host = AnalysisHost::with_profile(rules, profile);
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        source.clone(),
+    )]));
+    let setup = (|| {
+        host.refresh_source_roots_cancellable(&cancellation.workspace)
+            .map_err(|error| format!("Vanilla indexing failed: {error}"))?;
+        let cache = VanillaIndexCache::from_snapshot(&host.snapshot())
+            .map_err(|error| format!("Vanilla cache creation failed: {error}"))?;
+        let cache_path = auto_vanilla.user_paths.vanilla_cache(descriptor.game_id);
+        cache
+            .save(&cache_path)
+            .map_err(|error| format!("Vanilla cache could not be saved: {error}"))?;
+        Ok::<_, String>((cache, cache_path))
+    })();
+    match setup {
+        Ok((cache, cache_path)) => {
+            let game = configuration.games.entry(descriptor.game_id.to_owned()).or_default();
+            game.auto_discovery_attempted = true;
+            game.discovery_outcome = Some(DiscoveryOutcome::Configured);
+            game.vanilla_source = Some(source.clone());
+            game.vanilla_cache = Some(cache_path.clone());
+            configuration.save(&auto_vanilla.user_paths.config_file).map_err(|error| {
+                format!(
+                    "Vanilla cache was built but user configuration could not be saved: {error}"
+                )
+            })?;
+            Ok((
+                cache,
+                format!(
+                    "{} Vanilla symbols are now enabled from {}",
+                    descriptor.display_name,
+                    source.display()
+                ),
+            ))
+        }
+        Err(error) => {
+            if cancellation.discovery.is_cancelled() || cancellation.workspace.is_cancelled() {
+                return Err(format!("automatic {} setup was cancelled", descriptor.display_name));
+            }
+            let game = configuration.games.entry(descriptor.game_id.to_owned()).or_default();
+            game.auto_discovery_attempted = true;
+            game.discovery_outcome = Some(DiscoveryOutcome::Failed);
+            game.vanilla_source = Some(source);
+            let save_error = configuration.save(&auto_vanilla.user_paths.config_file).err();
+            match save_error {
+                Some(save_error) => {
+                    Err(format!("{error}; failed to record the attempt: {save_error}"))
+                }
+                None => Err(error),
+            }
+        }
+    }
+}
+
+fn record_discovery_outcome(
+    configuration: &mut UserConfiguration,
+    game_id: &str,
+    outcome: DiscoveryOutcome,
+    paths: &UserPaths,
+) -> Result<(), String> {
+    let game = configuration.games.entry(game_id.to_owned()).or_default();
+    game.auto_discovery_attempted = true;
+    game.discovery_outcome = Some(outcome);
+    configuration
+        .save(&paths.config_file)
+        .map_err(|error| format!("automatic discovery result could not be saved: {error}"))
 }
 
 fn resolve_source_roots(
@@ -1254,6 +1573,7 @@ fn resolve_source_roots(
         .as_deref()
         .map(|path| resolve_configured_path(path, base.as_deref(), "vanillaIndexCache"))
         .transpose()?;
+    let vanilla_explicit = vanilla_index_cache.is_some();
 
     let current_mod = match project.mod_directory.as_deref() {
         Some(path) => Some(resolve_directory(path, base.as_deref(), "modDirectory")?),
@@ -1332,6 +1652,7 @@ fn resolve_source_roots(
         workspace_root: current_mod.or(base),
         roots,
         vanilla_cache: vanilla_index_cache,
+        vanilla_explicit,
     })
 }
 
@@ -1790,6 +2111,15 @@ fn show_warning_notification(message: String) -> Value {
     })
 }
 
+fn show_info_notification(message: String) -> Value {
+    let params = ShowMessageParams { typ: MessageType::INFO, message };
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "method": "window/showMessage",
+        "params": params,
+    })
+}
+
 fn completion_kind(kind: CompletionKind) -> CompletionItemKind {
     match kind {
         CompletionKind::Key => CompletionItemKind::PROPERTY,
@@ -2114,15 +2444,18 @@ mod tests {
     use std::io::Cursor;
 
     use super::{
-        CancellationToken, DocumentId, INVALID_PARAMS, InFlightInitialize, InFlightRequest,
-        InitializeOptions, LspError, LspServer, RequestId, ServerState,
-        cancel_initialize_from_notification, cancel_request_from_notification, path_to_uri,
+        AutoVanillaConfiguration, CancellationToken, DocumentId, INVALID_PARAMS,
+        InFlightInitialize, InFlightRequest, InitializeOptions, LspError, LspServer, RequestId,
+        ResolvedSourceRoots, ServerState, VanillaSetupCancellation,
+        apply_user_vanilla_configuration, cancel_initialize_from_notification,
+        cancel_request_from_notification, path_to_uri, run_auto_vanilla_setup_with_options,
         uri_to_path,
     };
     use lsp_types::{
         CompletionResponse, Diagnostic, DocumentSymbol, Hover, Location, PrepareRenameResponse,
         SymbolInformation, WorkspaceEdit,
     };
+    use pdx_game::{DiscoveryOptions, DiscoveryOutcome, UserConfiguration, UserPaths};
     use pdx_rules::{RuleSet, RulesError, RulesModel};
     use pdx_text::TextRange;
     use pdx_workspace::{
@@ -2808,5 +3141,143 @@ path = "dependencies/high"
                 .is_some_and(|value| value["result"]["capabilities"].is_object())
         );
         assert_eq!(server.state(), ServerState::Exited);
+    }
+
+    #[test]
+    fn automatic_vanilla_setup_builds_cache_and_records_single_attempt() {
+        let (root, _) = temp_workspace_dir();
+        let source = root.join("library/Europa Universalis IV");
+        for directory in pdx_game_eu4::INSTALL_DESCRIPTOR.validation_directories {
+            fs::create_dir_all(source.join(directory)).expect("validation directory");
+        }
+        #[cfg(target_os = "windows")]
+        let executable = source.join("eu4.exe");
+        #[cfg(target_os = "linux")]
+        let executable = source.join("eu4");
+        #[cfg(target_os = "macos")]
+        let executable = source.join("Europa Universalis IV.app/Contents/MacOS/eu4");
+        fs::create_dir_all(executable.parent().expect("executable parent"))
+            .expect("executable parent directory");
+        fs::write(executable, b"fixture executable").expect("executable marker");
+        fs::create_dir_all(source.join("common/events")).expect("indexed directory");
+        fs::write(
+            source.join("common/events/definitions.txt"),
+            "country_event = { id = vanilla.1 }\n",
+        )
+        .expect("fixture source");
+        let automatic = AutoVanillaConfiguration {
+            descriptor: pdx_game_eu4::INSTALL_DESCRIPTOR,
+            user_paths: UserPaths {
+                config_file: root.join("user/config.toml"),
+                cache_root: root.join("user/cache"),
+            },
+        };
+        let options = DiscoveryOptions {
+            roots: vec![root.join("library")],
+            include_platform_locations: false,
+            ..DiscoveryOptions::default()
+        };
+        let (cache, message) = run_auto_vanilla_setup_with_options(
+            &automatic,
+            pdx_game_eu4::first_party_rules().expect("rules"),
+            pdx_game_eu4::profile(),
+            &VanillaSetupCancellation::new(),
+            &options,
+        )
+        .expect("automatic setup");
+        assert!(message.contains("Vanilla symbols are now enabled"));
+        assert_eq!(cache.metadata().game_id, "eu4");
+        assert!(automatic.user_paths.vanilla_cache("eu4").is_file());
+        let configuration =
+            UserConfiguration::load(&automatic.user_paths.config_file).expect("configuration");
+        let game = configuration.games.get("eu4").expect("EU4 configuration");
+        assert!(game.auto_discovery_attempted);
+        assert_eq!(game.discovery_outcome, Some(DiscoveryOutcome::Configured));
+
+        let repeated = run_auto_vanilla_setup_with_options(
+            &automatic,
+            pdx_game_eu4::first_party_rules().expect("rules"),
+            pdx_game_eu4::profile(),
+            &VanillaSetupCancellation::new(),
+            &options,
+        )
+        .expect_err("automatic setup only runs once");
+        assert!(repeated.contains("already attempted"));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn explicit_project_cache_precedes_user_discovery_configuration() {
+        let (root, _) = temp_workspace_dir();
+        let automatic = AutoVanillaConfiguration {
+            descriptor: pdx_game_eu4::INSTALL_DESCRIPTOR,
+            user_paths: UserPaths {
+                config_file: root.join("user/config.toml"),
+                cache_root: root.join("user/cache"),
+            },
+        };
+        let mut configuration = UserConfiguration::default();
+        let game = configuration.games.entry("eu4".to_owned()).or_default();
+        game.auto_discovery_attempted = true;
+        game.discovery_outcome = Some(DiscoveryOutcome::Configured);
+        game.vanilla_cache = Some(root.join("user/cache/eu4/vanilla.pdxindex"));
+        configuration.save(&automatic.user_paths.config_file).expect("save user configuration");
+
+        let project_cache = root.join("project/vanilla.pdxindex");
+        let mut resolved = ResolvedSourceRoots {
+            workspace_root: None,
+            roots: Vec::new(),
+            vanilla_cache: Some(project_cache.clone()),
+            vanilla_explicit: true,
+        };
+        let mut warnings = Vec::new();
+        let setup =
+            apply_user_vanilla_configuration(&mut resolved, Some(&automatic), "eu4", &mut warnings);
+        assert!(setup.is_none());
+        assert_eq!(resolved.vanilla_cache, Some(project_cache));
+        assert!(warnings.is_empty());
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn unsuccessful_automatic_discovery_is_recorded_and_not_repeated() {
+        let (root, _) = temp_workspace_dir();
+        let automatic = AutoVanillaConfiguration {
+            descriptor: pdx_game_eu4::INSTALL_DESCRIPTOR,
+            user_paths: UserPaths {
+                config_file: root.join("user/config.toml"),
+                cache_root: root.join("user/cache"),
+            },
+        };
+        let options = DiscoveryOptions {
+            roots: Vec::new(),
+            include_platform_locations: false,
+            ..DiscoveryOptions::default()
+        };
+        let first = run_auto_vanilla_setup_with_options(
+            &automatic,
+            pdx_game_eu4::first_party_rules().expect("rules"),
+            pdx_game_eu4::profile(),
+            &VanillaSetupCancellation::new(),
+            &options,
+        )
+        .expect_err("empty search has no candidate");
+        assert!(first.contains("was not found"));
+        let configuration =
+            UserConfiguration::load(&automatic.user_paths.config_file).expect("configuration");
+        let game = configuration.games.get("eu4").expect("EU4 configuration");
+        assert!(game.auto_discovery_attempted);
+        assert_eq!(game.discovery_outcome, Some(DiscoveryOutcome::NotFound));
+
+        let second = run_auto_vanilla_setup_with_options(
+            &automatic,
+            pdx_game_eu4::first_party_rules().expect("rules"),
+            pdx_game_eu4::profile(),
+            &VanillaSetupCancellation::new(),
+            &options,
+        )
+        .expect_err("failed automatic search is not repeated");
+        assert!(second.contains("already attempted"));
+        fs::remove_dir_all(root).expect("cleanup");
     }
 }

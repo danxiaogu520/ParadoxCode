@@ -77,6 +77,7 @@
 pdx-text
   -> pdx-syntax -> pdx-hir -> pdx-workspace -> pdx-analysis -> pdx-lsp
   -> pdx-format                                      -> pdx-cli
+pdx-game -> pdx-game-eu4
 pdx-rules -> pdx-rulec
 pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 ```
@@ -90,6 +91,7 @@ pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 | `pdx-text` | offset、line index、UTF-8/UTF-16、URI/path 基础 | EU4 规则、workspace 状态 |
 | `pdx-syntax` | PDX Script、localisation、CSV 的 loss-aware CST、增量 parse、syntax error | 游戏规则数据库、磁盘扫描、LSP 类型 |
 | `pdx-rules` | 通用规则 schema、canonical view、`rule_hash`、只读 runtime API | 具体游戏名称表、外部规则 parser、LSP、动态 Mod symbol |
+| `pdx-game` | 数据驱动安装标志、跨平台发现、最小验证、用户级本机配置 | 具体游戏名称、语义规则、workspace 索引、编辑器 API |
 | `pdx-game-eu4` | EU4 profile、路径、scope、command、symbol 和特殊语义 | LSP、workspace 可变状态、编辑器 API |
 | `pdx-eu4`（过渡） | 兼容 re-export；待迁移完成后删除 | 新增长期公共能力 |
 | `pdx-rulec` | 严格读取第一方 JSON 规则源码、校验并生成 artifact/manifest | CWT 输入、runtime 依赖、网络同步、用户规则覆盖 |

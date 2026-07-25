@@ -1,5 +1,6 @@
 //! EU4 profile data layered on the game-independent rules runtime.
 
+use pdx_game::{GameInstallDescriptor, PlatformExecutablePaths};
 use pdx_rules::{
     CsvDialect, FileCategory, FileMatcher, FileResolutionPolicy, GameProfile, ParserKind,
     ProfileConditionalDefinitionRule, ProfileContainerDefinitionRule, ProfileCsvDefinitionRule,
@@ -12,6 +13,19 @@ const FIRST_PARTY_RULES: &[u8] = include_bytes!("../../../rules/eu4.pdxrules");
 
 /// Stable identity stored by EU4 rule artifacts and selected by the server.
 pub const GAME_ID: &str = "eu4";
+
+/// Data-only installation discovery facts for the supported EU4 profile.
+pub const INSTALL_DESCRIPTOR: GameInstallDescriptor = GameInstallDescriptor {
+    game_id: GAME_ID,
+    display_name: "Europa Universalis IV",
+    executable_paths: PlatformExecutablePaths {
+        windows: &["eu4.exe"],
+        linux: &["eu4"],
+        macos: &["Europa Universalis IV.app/Contents/MacOS/eu4"],
+    },
+    validation_directories: &["common", "events", "missions", "decisions", "localisation"],
+    installation_directory_names: &["Europa Universalis IV"],
+};
 
 /// Loads the immutable first-party EU4 rules embedded in the official binary.
 ///
