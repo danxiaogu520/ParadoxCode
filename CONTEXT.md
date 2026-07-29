@@ -40,6 +40,30 @@ _Avoid_: list、简单 block
 以某个 block 为直接父级的 property，不包括更深层嵌套 block 中的 property。
 _Avoid_: 所有后代 property
 
+**语义上下文（Semantic Context）**:
+可跨文件类别和 Block Schema 复用的一组合法 property 含义，例如 Effect、Trigger 或 Modifier。
+_Avoid_: 文件 Schema、Block 类型
+
+**Block Schema**:
+一个 Block 的固定直接字段以及它允许嵌入的 body context 所构成的语义结构。
+_Avoid_: 普通 map、EffectBlock、TriggerBlock
+
+**Body Context**:
+Block Schema 用于解释非固定字段 direct property 的语义上下文；它可以固定指定或继承调用点。
+_Avoid_: 文件类型、scope
+
+**Scope Transition**:
+进入嵌套 Block 时对当前 scope 或 scope register 施加的语义转换，独立于 Body Context。
+_Avoid_: context switch、Block 类型
+
+**语义义项（Semantic Sense）**:
+同一文本拼写在特定文件、Schema、语义上下文和 scope 中的一种候选含义。
+_Avoid_: 字符串身份、随机选择的规则
+
+**语义歧义（Semantic Ambiguity）**:
+现有证据无法把多个候选语义义项缩减为一个语义等价结果的状态。
+_Avoid_: Unknown Key、多重语义事实
+
 **Quoted Script**:
 Script 文件中原本含有换行、且 decoded payload 能完整解释为包含 property、header block 或 parameter block 的 Script quoted scalar。
 _Avoid_: 普通 quoted scalar、localisation value

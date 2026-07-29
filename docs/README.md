@@ -42,6 +42,12 @@ alpha；实现状态以根目录的 [执行计划](../plan.md) 为准，不以�
 - [ADR 0001：固定规范格式与 quoted script](adr/0001-canonical-formatting-and-quoted-scripts.md)
 - [ADR 0002：EU4 language 与 Script format 命名](adr/0002-eu4-language-and-script-format-names.md)
 
+## 当前调研
+
+- [PDX Block 与共享语义上下文实证调研](research/semantic-context-block-schema.md)：基于真实
+  大型 EU4 Mod 的只读研究，提出 `SemanticContext + BlockSchema + body context` 模型；
+  结论尚未成为已接受 RFC。
+
 ## 基础 RFC
 
 | RFC | 主题 |
