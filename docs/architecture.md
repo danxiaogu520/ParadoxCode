@@ -1,6 +1,7 @@
 # ParadoxCode 总体架构
 
-> 2026-07-25 状态说明：通用 `pdx-rules`、`pdx-game` 安装发现层、EU4 profile、per-file cache、廉价 snapshot、共享结构、协作式取消、Current Mod/Dependency/持久化 Vanilla cache 与 watched-file 定向更新已落地。第一方 JSON 规则源码、严格 `pdx-rulec` 编译器和官方 binary 内嵌规则已经接入；CWT importer、外部 `--rules` 与扩展规则副本已经删除。scope typed lowering 和发布闭环仍待完成。
+> 本文件描述当前架构边界和已落地的数据流，不跟踪发布进度。当前状态与剩余工作见
+> [执行计划](../plan.md)。
 
 ## 目标
 

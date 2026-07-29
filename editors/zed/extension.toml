@@ -5,6 +5,10 @@ schema_version = 1
 authors = ["ParadoxCode contributors"]
 description = "Independent, unofficial EU4 language tooling backed by pdx-ls."
 
+[lib]
+kind = "Rust"
+version = "0.7.0"
+
 # Development manifest: use the repository remote so Zed can clone the grammars from Windows
 # and other worktrees. The release manifest must replace these URLs with read-only mirrors.
 [grammars.eu4]

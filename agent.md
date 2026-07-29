@@ -213,14 +213,14 @@ MVP fuzz 至少覆盖 Script/localisation parse、incremental edit 等价性、t
 
 ## 10. 常用文档入口
 
-- [实施计划](plan.md)
+- [当前执行计划](plan.md)
 - [设计文档索引](docs/README.md)
 - [总体架构](docs/architecture.md)
-- [EU4 MVP](docs/mvp.md)
+- [EU4 v0.1 MVP 验收基线](docs/mvp.md)
 - [系统边界与 crate 依赖](docs/rfc/0001-system-boundaries.md)
 - [语法、CST 与增量解析](docs/rfc/0002-syntax-cst.md)
 - [Workspace/VFS](docs/rfc/0003-workspace-vfs.md)
-- [Eu4Rules](docs/rfc/0004-eu4-rules-schema.md)
+- [EU4 规则 artifact](docs/rfc/0004-eu4-rules-schema.md)
 - [HIR 与 Scope](docs/rfc/0005-hir-scope.md)
 - [Symbol/Reference Index](docs/rfc/0006-symbol-index.md)
 - [诊断与补全](docs/rfc/0007-diagnostics-completion.md)

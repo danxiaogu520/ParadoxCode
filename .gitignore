@@ -1,15 +1,28 @@
+# Rust build output
 **/target/
-/.cargo/
 *.pdb
 *.wasm
+
+# Language-tool build caches
 **/node_modules/
-__pycache__/
+**/__pycache__/
+*.py[cod]
 
-# Zed development extensions clone and compile each configured grammar here.
-editors/zed/grammars/
+# Machine-local tool and editor configuration
+/.cargo/
+/.zed/
+.DS_Store
+Thumbs.db
 
-# Local rule and Vanilla index artifacts are never source-controlled.
-rules/*.pdxrules
-!rules/eu4.pdxrules
-rules/vanilla-cache/
-editors/zed/bundled-rules/*.pdxrules
+# Zed clones and compiles development grammars into this directory.
+/editors/zed/grammars/
+
+# Local indexes and generated runtime artifacts
+*.pdxindex
+**/.pdx/cache/
+/rules/vanilla-cache/
+/editors/zed/bundled-rules/*.pdxrules
+
+# The audited EU4 artifact is the only pdxrules file kept in source control.
+/rules/*.pdxrules
+!/rules/eu4.pdxrules

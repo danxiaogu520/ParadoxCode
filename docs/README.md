@@ -1,54 +1,75 @@
-# ParadoxCode 设计文档
+# ParadoxCode 文档
 
-ParadoxCode 是通用 PDX Mod 语言工具引擎。当前唯一有交付承诺和完整规则覆盖目标的游戏是 Europa Universalis IV（EU4）；其他游戏未来可以通过 profile 接入，但优先级低，当前不纳入版本计划。
+ParadoxCode 是通用 PDX Mod 语言引擎，当前按 EU4-first 路线交付。仓库仍处于
+alpha；实现状态以根目录的 [执行计划](../plan.md) 为准，不以文档数量、代码骨架或单项
+测试推断发布完成度。
 
-当前仓库处于 alpha：EU4 主要语言功能、增量 per-file HIR、共享 snapshot、后台取消和 formatter LSP 已有自动化回归，但完整 Vanilla/依赖配置和普通用户安装发布仍未闭环。
+## 如何使用这组文档
 
-## 当前决策
+不同文档只承担一种职责：
 
-- 项目名：ParadoxCode
-- Zed 主脚本语言名：`Europa Universalis IV`（机器标识 `eu4`）
-- 通用键值脚本格式：`Script`
-- Language Server：`pdx-ls`
-- 命令行入口：`pdx`
-- 首选编辑器：Zed
-- 当前交付游戏：EU4（EU4-first，不排除未来 profile）
-- 模块命名：全部 Rust crate、binary 与内部包使用 `pdx-` 前缀
-- MVP 文件范围：EU4 规则数据库声明的全部可支持文件类别；Script、localisation 和 CSV 使用独立语法前端，二进制/媒体资源只进入路径索引
-- 权威规则来源：开发者维护的 `rules/eu4/*.json`；`pdx-rulec` 严格校验并生成内嵌的 `eu4.pdxrules`
-- 规则版本：对数据库规范化逻辑内容计算唯一 `rule_hash`，与发布它的 server 版本绑定，与 EU4 版本无关
-- 工作区来源：未保存 overlay > 当前 Mod > 有序依赖 Mod > Vanilla；没有 DLC source root
-- Vanilla 索引：首次配置时建立本地缓存，此后仅由用户显式刷新，不因 `rule_hash` 或文件变化自动重建
-- Vanilla 发现：首次 LSP 启动仅后台快速尝试一次；`pdx setup vanilla` 提供显式深度搜索、选择、建库和用户级持久化
-- 格式化：固定 tab/LF/零布局空行的规范布局；可解析的多行 Script quoted script 递归格式化，普通 quoted scalar 保持 opaque
+| 文档 | 职责 | 是否描述当前进度 |
+| --- | --- | --- |
+| [项目 README](../README.md) | 面向用户和新贡献者的项目入口 | 仅概述 |
+| [MVP 验收基线](mvp.md) | v0.1 能力、非目标、阶段退出条件 | 否 |
+| [执行计划](../plan.md) | 当前状态、剩余工作、验证顺序 | 是 |
+| [总体架构](architecture.md) | 当前数据流、依赖边界和运行时不变量 | 仅记录已落地架构 |
+| RFC | 已接受设计及其修订历史 | 否 |
+| ADR | 较小且稳定的实现决策 | 否 |
+| 调研和 spike | 历史证据与早期结论 | 否 |
 
-## 文档索引
+发生冲突时，当前用户要求优先，其次是已接受 RFC 与总体架构，再其次是执行计划。
+被取代的决策和历史调研不约束当前实现。
+
+## 使用与维护
+
+- [Workspace 配置](configuration.md)
+- [发布流程与检查清单](releasing.md)
+- [贡献指南](../CONTRIBUTING.md)
+- [规则源码与生成物](../rules/README.md)
+- [Zed 扩展开发](../editors/zed/README.md)
+- [Grammar 说明](../grammars/README.md)
+- [测试说明](../tests/README.md)
+- [Fuzz 说明](../fuzz/README.md)
+
+## 当前设计
 
 - [总体架构](architecture.md)
-- [发布流程与检查清单](releasing.md)
+- [EU4 v0.1 MVP 验收基线](mvp.md)
 - [RFC 0013：通用 PDX 引擎与 EU4-first](rfc/0013-generic-engine-eu4-first.md)
 - [RFC 0014：内嵌第一方规则与发布所有权](rfc/0014-embedded-first-party-rules.md)
 - [RFC 0015：第一方规则源码与编译器](rfc/0015-first-party-rule-source.md)
-- [已取代：EU4-only 架构决策](decision-eu4-only.md)
-- [EU4 MVP 计划](mvp.md)
-- [CWTools、EU4 Config 与 Jomini 调研](reference-study.md)
-- [RFC 0001：系统边界与 crate 依赖](rfc/0001-system-boundaries.md)
-- [RFC 0002：语法、CST 与增量解析](rfc/0002-syntax-cst.md)
-- [RFC 0003：工作区、VFS 与覆盖解析](rfc/0003-workspace-vfs.md)
-- [RFC 0004：EU4 规则数据库与 Runtime Schema](rfc/0004-eu4-rules-schema.md)
-- [RFC 0005：HIR 与 Scope 系统](rfc/0005-hir-scope.md)
-- [RFC 0006：Symbol 与 Reference Index](rfc/0006-symbol-index.md)
-- [RFC 0007：诊断与补全策略](rfc/0007-diagnostics-completion.md)
-- [RFC 0008：安全格式化](rfc/0008-formatter.md)
-- [RFC 0009：LSP Runtime](rfc/0009-lsp-runtime.md)
-- [RFC 0010：Zed 集成](rfc/0010-zed-integration.md)
-- [RFC 0011：测试、Fuzz 与质量门禁](rfc/0011-testing-quality.md)
 - [ADR 0001：固定规范格式与 quoted script](adr/0001-canonical-formatting-and-quoted-scripts.md)
 - [ADR 0002：EU4 language 与 Script format 命名](adr/0002-eu4-language-and-script-format-names.md)
+
+## 基础 RFC
+
+| RFC | 主题 |
+| --- | --- |
+| [0001](rfc/0001-system-boundaries.md) | 系统边界与 crate 依赖 |
+| [0002](rfc/0002-syntax-cst.md) | 语法、CST 与编辑更新 |
+| [0003](rfc/0003-workspace-vfs.md) | Workspace、VFS 与覆盖解析 |
+| [0004](rfc/0004-eu4-rules-schema.md) | EU4 规则数据库与 runtime schema |
+| [0005](rfc/0005-hir-scope.md) | HIR 与 scope |
+| [0006](rfc/0006-symbol-index.md) | Symbol 与 reference index |
+| [0007](rfc/0007-diagnostics-completion.md) | Diagnostics 与 completion |
+| [0008](rfc/0008-formatter.md) | 安全格式化 |
+| [0009](rfc/0009-lsp-runtime.md) | LSP runtime |
+| [0010](rfc/0010-zed-integration.md) | Zed 集成 |
+| [0011](rfc/0011-testing-quality.md) | 测试、fuzz 与质量门禁 |
+
+RFC 0001–0011 是首轮设计基线；其中与后续 RFC 冲突的段落以文首 amendment 和 RFC
+0013–0015 为准。
+
+## 历史资料
+
+以下文件保留审计价值，但不定义当前产品行为：
+
+- [已取代：EU4-only 架构决策](decision-eu4-only.md)
 - [已取代：RFC 0012 CWT 一次性导入](rfc/0012-cwt-rule-compiler.md)
+- [CWTools、EU4 Config 与 Jomini 调研](reference-study.md)
+- [Phase 0：server 分发 spike](spikes/phase0-server-distribution.md)
+- [Phase 0：Zed grammar spike](spikes/phase0-zed-grammar.md)
 
-## 文档状态
-
-RFC 0001–0011 是首轮设计基线；RFC 0012 已由 RFC 0015 取代，EU4-only 产品约束已由 RFC 0013 取代，外部规则文件的 runtime/分发决策已由 RFC 0014 取代。现有 Phase 0–6A 状态需要按真实端到端能力重新审计，不能把 crate 骨架、内部单元测试或开发机 smoke 等同于可发布产品。
-
-文档中的示例是 ParadoxCode 自有设计示例，不应直接复制游戏文件或参考项目的测试 corpus。
+文档示例必须是 ParadoxCode 自有设计示例，不得直接复制游戏文件或参考项目测试
+corpus。
