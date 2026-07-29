@@ -1866,10 +1866,7 @@ struct SemanticFile {
 #[derive(Clone, Debug)]
 struct PropertyInfo {
     key: String,
-    key_range: TextRange,
     value: Option<(String, TextRange)>,
-    top_level: bool,
-    path: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -1973,26 +1970,9 @@ fn analyze_input_with_cancellation(
     let resolution = DirectResolutionContext::new(snapshot);
     let mut diagnostics = syntax_diagnostics(input);
     diagnostics.extend(semantic_rule_diagnostics(snapshot, input, cancellation)?);
-    let known = known_keys(snapshot);
     let mut unknown_scope_reported = false;
     for property in properties(input) {
         cancellation.checkpoint()?;
-        let is_dynamic_command = ["scripted_effect", "scripted_trigger"]
-            .iter()
-            .any(|kind| !matches!(resolution.resolve(kind, &property.key), Resolution::Missing));
-        if !property.top_level
-            && !semantic_validates_path(snapshot, &property.path, input.path.as_ref())
-            && !known.contains(&property.key.to_ascii_lowercase())
-            && !is_dynamic_command
-            && looks_unknown_key(&property.key)
-        {
-            diagnostics.push(Diagnostic {
-                code: DiagnosticCode::UnknownKey,
-                severity: DiagnosticCode::UnknownKey.severity(),
-                range: property.key_range,
-                message: format!("unknown PDX key `{}`", property.key),
-            });
-        }
         if property.key.eq_ignore_ascii_case("scope")
             && let Some((value, range)) = property.value.as_ref()
             && !input.profile.is_scope(value)
@@ -2212,15 +2192,6 @@ fn semantic_root_context(
     logical_path: Option<&LogicalPath>,
 ) -> Option<String> {
     hir_semantic_root_context(snapshot.rules(), logical_path, key)
-}
-
-fn semantic_validates_path(
-    snapshot: &AnalysisSnapshot,
-    path: &[String],
-    logical_path: Option<&LogicalPath>,
-) -> bool {
-    let Some(root) = path.first() else { return false };
-    semantic_root_context(snapshot, root, logical_path).is_some()
 }
 
 fn script_properties(input: &ParsedInput, parent: &CstNode) -> Vec<ScriptProperty> {
@@ -3307,10 +3278,7 @@ fn properties(input: &ParsedInput) -> Vec<PropertyInfo> {
             .iter()
             .map(|property| PropertyInfo {
                 key: property.key.clone(),
-                key_range: property.key_range,
                 value: property.scalar.as_ref().map(|scalar| (scalar.value.clone(), scalar.range)),
-                top_level: property.top_level,
-                path: property.path.clone(),
             })
             .collect()
     })
@@ -3741,10 +3709,6 @@ fn known_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
             .map(|descriptor| descriptor.kind_id.to_ascii_lowercase()),
     );
     keys
-}
-
-fn looks_unknown_key(key: &str) -> bool {
-    !key.trim().is_empty()
 }
 
 fn completion_value_context(input: &ParsedInput, position: TextSize) -> bool {
@@ -4307,13 +4271,23 @@ mod tests {
 
     #[test]
     fn unknown_key_and_unknown_scope_are_independent_diagnostics() {
-        let (host, id) = snapshot("country_event = { unknown_key = yes scope = nowhere }\n");
+        let (host, id) = semantic_snapshot("trigger = { unknown_key = yes scope = nowhere }\n");
         let diagnostics = diagnostics(&host.snapshot(), &id);
         assert!(diagnostics.iter().any(|item| item.code == DiagnosticCode::UnknownKey));
         assert!(diagnostics.iter().any(|item| item.code == DiagnosticCode::UnknownScope));
         assert_eq!(
             diagnostics.iter().filter(|item| item.code == DiagnosticCode::UnknownScope).count(),
             1
+        );
+    }
+
+    #[test]
+    fn uncovered_semantic_context_is_syntax_only() {
+        let (host, id) = semantic_snapshot("uncovered_root = { perfectly_valid_key = yes }\n");
+        let diagnostics = diagnostics(&host.snapshot(), &id);
+        assert!(
+            diagnostics.iter().all(|item| item.code != DiagnosticCode::UnknownKey),
+            "an uncovered semantic context must not fabricate unknown-key diagnostics"
         );
     }
 
