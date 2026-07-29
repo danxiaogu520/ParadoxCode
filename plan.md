@@ -13,7 +13,7 @@ ParadoxCode 为 Europa Universalis IV（EU4）Mod 提供面向 Zed 的语言工�
 - syntax、unknown key、unknown symbol、scope 等诊断；
 - key、effect、trigger、symbol、localisation 的补全、悬停、定义和引用查询；
 - document symbol、workspace symbol 和安全的语义 rename；
-- 保守、幂等、保留注释和非 trivia token 的全文格式化；
+- 固定、幂等、保留注释并递归处理可证明 quoted script 的规范全文格式化；
 - 未保存文档、当前 Mod、有序依赖 Mod、Vanilla 的正确覆盖解析；
 - 由自有 SQLite `eu4.pdxrules` 驱动的 EU4 文件分类和语义分析；
 - 首次建立、持久化，并仅通过用户显式操作刷新的 Vanilla 索引缓存。
@@ -156,7 +156,7 @@ PdxScript 至少覆盖 property、裸 value、嵌套/混合 block、八种 opera
 
 ### Phase 3：Typed CST、syntax diagnostics 与 formatter
 
-状态：`completed`（2026-07-18；纯 Rust typed CST facade、syntax error mapping、保守 formatter、fuzz targets 和编辑后/full parse 等价性已通过验证）
+状态：`completed`（2026-07-29 重新验收；固定规范布局、quoted-script 递归布局、精确 edits、LSP 固定风格、工作区测试和 formatter fuzz smoke 已通过）
 
 工作项：
 

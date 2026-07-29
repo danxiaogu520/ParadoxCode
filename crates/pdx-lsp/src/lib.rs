@@ -36,7 +36,7 @@ use pdx_analysis::{
     document_symbols_with_cancellation, hover_with_cancellation, prepare_rename_with_cancellation,
     references_with_cancellation, rename_with_cancellation, workspace_symbols_with_cancellation,
 };
-use pdx_format::{FormatOptions, IndentStyle, format_with_options};
+use pdx_format::format;
 use pdx_game::{
     DiscoveryOptions, DiscoveryOutcome, DiscoveryToken, GameInstallDescriptor, UserConfiguration,
     UserPaths, discover_installations,
@@ -2167,19 +2167,8 @@ impl SnapshotRequestContext {
         let Some(ParsedSource::Text(parsed)) = document.parsed() else {
             return typed_value(Vec::<TextEdit>::new(), "formatting response");
         };
-        let indent_width = u8::try_from(params.options.tab_size).unwrap_or(u8::MAX).max(1);
-        let result = format_with_options(
-            parsed,
-            FormatOptions {
-                indent_style: if params.options.insert_spaces {
-                    IndentStyle::Spaces
-                } else {
-                    IndentStyle::Tabs
-                },
-                indent_width,
-                ..FormatOptions::default()
-            },
-        );
+        let _client_options = params.options;
+        let result = format(parsed);
         self.ensure_active()?;
         let edits = result
             .edits
@@ -2767,7 +2756,7 @@ mod tests {
     };
     use pdx_game::{DiscoveryOptions, DiscoveryOutcome, UserConfiguration, UserPaths};
     use pdx_rules::{RuleSet, RulesError, RulesModel};
-    use pdx_text::TextRange;
+    use pdx_text::{LineIndex, Position, TextRange};
     use pdx_workspace::{
         AnalysisHost, SourceRoot, SourceRootId, SourceRootKind, TextChange, VanillaIndexCache,
         WorkspaceChange,
@@ -3343,7 +3332,7 @@ mod tests {
         let input = frames([
             json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":valid_uri,"languageId":"pdx-script","version":1,"text":"name=\"汉😀\""}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":valid_uri,"languageId":"pdx-script","version":1,"text":"root={name=\"汉😀\" other=yes}"}}}),
             json!({"jsonrpc":"2.0","id":2,"method":"textDocument/formatting","params":{"textDocument":{"uri":valid_uri},"options":{"tabSize":2,"insertSpaces":true}}}),
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":unsafe_uri,"languageId":"pdx-script","version":1,"text":"country_event = {"}}}),
             json!({"jsonrpc":"2.0","id":3,"method":"textDocument/formatting","params":{"textDocument":{"uri":unsafe_uri},"options":{"tabSize":4,"insertSpaces":true}}}),
@@ -3356,10 +3345,19 @@ mod tests {
         let responses = decode_frames(&output);
 
         let edits = typed_result::<Vec<lsp_types::TextEdit>>(&responses, 2);
-        assert_eq!(edits.len(), 1);
-        assert_eq!(edits[0].new_text, "name = \"汉😀\"");
-        assert_eq!(edits[0].range.start, lsp_types::Position::new(0, 0));
-        assert_eq!(edits[0].range.end, lsp_types::Position::new(0, 10));
+        let source = "root={name=\"汉😀\" other=yes}";
+        let line_index = LineIndex::new(source);
+        let mut formatted = source.to_owned();
+        for edit in edits.iter().rev() {
+            let start = line_index
+                .offset(source, Position::new(edit.range.start.line, edit.range.start.character))
+                .expect("format edit start");
+            let end = line_index
+                .offset(source, Position::new(edit.range.end.line, edit.range.end.character))
+                .expect("format edit end");
+            formatted.replace_range(start as usize..end as usize, &edit.new_text);
+        }
+        assert_eq!(formatted, "root = {\n\tname = \"汉😀\"\n\tother = yes\n}\n");
         let unsafe_edits = typed_result::<Vec<lsp_types::TextEdit>>(&responses, 3);
         assert!(unsafe_edits.is_empty());
     }

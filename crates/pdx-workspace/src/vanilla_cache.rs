@@ -55,6 +55,14 @@ pub struct VanillaIndexCache {
 }
 
 impl VanillaIndexCache {
+    /// Consumes a validated cache so installation can move its large semantic index.
+    pub(crate) fn into_parts(
+        self,
+    ) -> (VanillaIndexCacheMetadata, SourceRoot, BTreeMap<SourceFileId, SourceFile>, WorkspaceIndex)
+    {
+        (self.metadata, self.root, self.source_files, self.index)
+    }
+
     /// Builds a cache from a dedicated Vanilla-only workspace snapshot.
     pub fn from_snapshot(snapshot: &AnalysisSnapshot) -> Result<Self, VanillaCacheError> {
         let [root] = snapshot.source_roots() else {
