@@ -1271,7 +1271,8 @@ impl LspServer {
                 let params = typed_params::<DidSaveTextDocumentParams>(params, "didSave")?;
                 let uri = params.text_document.uri.as_str();
                 if let Ok(path) = parse_file_uri_str(uri) {
-                    self.pending_disk_changes.insert(path, DiskFileChangeKind::Changed);
+                    self.pending_disk_changes
+                        .insert(normalize_workspace_path(path), DiskFileChangeKind::Changed);
                 }
                 self.schedule_parse(uri);
                 self.schedule_diagnostics(uri, Duration::ZERO);
@@ -1316,7 +1317,7 @@ impl LspServer {
         let version = i64::from(params.text_document.version);
         let text = params.text_document.text;
         changed_document_len(0, None, text.len())?;
-        let path = uri_to_path(&uri).ok();
+        let path = uri_to_path(&uri).ok().map(normalize_workspace_path);
         self.host
             .stage_open_document(DocumentId::new(uri.clone()), version, text, path)
             .map_err(document_error)?;
@@ -1367,7 +1368,7 @@ impl LspServer {
     fn handle_did_change_watched_files(&mut self, params: Option<&Value>) -> Result<(), RpcError> {
         let params = typed_params::<DidChangeWatchedFilesParams>(params, "didChangeWatchedFiles")?;
         for event in params.changes {
-            let path = parse_file_uri_str(event.uri.as_str())?;
+            let path = normalize_workspace_path(parse_file_uri_str(event.uri.as_str())?);
             let kind = if event.typ == FileChangeType::CREATED {
                 DiskFileChangeKind::Created
             } else if event.typ == FileChangeType::CHANGED {
@@ -2504,6 +2505,27 @@ fn parse_file_uri_str(uri: &str) -> Result<PathBuf, RpcError> {
     uri_to_path(uri).map_err(|_| RpcError::new(INVALID_PARAMS, "only file:// URIs are supported"))
 }
 
+fn normalize_workspace_path(path: PathBuf) -> PathBuf {
+    if let Ok(canonical) = fs::canonicalize(&path) {
+        return canonical;
+    }
+
+    let mut ancestor = path.as_path();
+    let mut missing = Vec::new();
+    while let Some(name) = ancestor.file_name() {
+        missing.push(name.to_owned());
+        let Some(parent) = ancestor.parent() else { break };
+        ancestor = parent;
+        if let Ok(mut canonical) = fs::canonicalize(ancestor) {
+            for component in missing.iter().rev() {
+                canonical.push(component);
+            }
+            return canonical;
+        }
+    }
+    path
+}
+
 fn lsp_range_to_text_range(
     range: &LspRange,
     index: &LineIndex,
@@ -2806,6 +2828,46 @@ mod tests {
         server.run_transport(Cursor::new(input), &mut output).expect("transport");
         assert!(server.snapshot().index().active_definition("country_tag", "KTP").is_some());
         fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn noncanonical_document_uri_preserves_rule_path_context() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let container = std::env::temp_dir().join(format!("pdx-lsp-path-context-{nonce}"));
+        let root = container.join("workspace");
+        let decrees = root.join("common/decrees");
+        fs::create_dir_all(&decrees).expect("decrees directory");
+        fs::create_dir_all(container.join("detour")).expect("detour directory");
+        let file = decrees.join("test.txt");
+        fs::write(&file, "my_decree = { cost = 50 }\n").expect("decree source");
+
+        let aliased_root = container.join("detour/../workspace");
+        let aliased_file = aliased_root.join("common/decrees/test.txt");
+        let root_uri = path_to_uri(&aliased_root);
+        let uri = path_to_uri(&aliased_file);
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":"my_decree = { cost = 50 }\n"}}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":16}}}),
+            json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        let responses = decode_frames(&output);
+        let hover = responses.iter().find(|value| value["id"] == 2).expect("hover response");
+        assert!(
+            hover["result"]["contents"]["value"]
+                .as_str()
+                .is_some_and(|contents| contents.contains("Cost in meritocracy of enacting")),
+            "hover response={hover}"
+        );
+        fs::remove_dir_all(container).expect("cleanup");
     }
 
     fn eu4_server(options: InitializeOptions) -> Result<LspServer, LspError> {
