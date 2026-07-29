@@ -9,17 +9,17 @@ description = "Independent, unofficial EU4 language tooling backed by pdx-ls."
 # and other worktrees. The release manifest must replace these URLs with read-only mirrors.
 [grammars.eu4]
 repository = "https://github.com/danxiaogu520/ParadoxCode.git"
-rev = "d7b51c2b126b762c6021b42f229bb2867e8968f8"
+rev = "f0c4d252e4bf14dd1e438338f87e6466248d9228"
 path = "grammars/tree-sitter-eu4"
 
 [grammars.pdx_eu4_localisation]
 repository = "https://github.com/danxiaogu520/ParadoxCode.git"
-rev = "d7b51c2b126b762c6021b42f229bb2867e8968f8"
+rev = "f0c4d252e4bf14dd1e438338f87e6466248d9228"
 path = "grammars/tree-sitter-pdx-eu4-localisation"
 
 [grammars.pdx_eu4_csv]
 repository = "https://github.com/danxiaogu520/ParadoxCode.git"
-rev = "d7b51c2b126b762c6021b42f229bb2867e8968f8"
+rev = "f0c4d252e4bf14dd1e438338f87e6466248d9228"
 path = "grammars/tree-sitter-pdx-eu4-csv"
 
 [language_servers.pdx-ls]
