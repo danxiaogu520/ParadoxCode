@@ -948,6 +948,8 @@ pub struct RuleSet {
     schema_version: u32,
     rule_hash: RuleHash,
     model: RulesModel,
+    exact_semantic_rules: BTreeMap<String, Vec<usize>>,
+    semantic_rules_by_context: BTreeMap<String, Vec<usize>>,
 }
 
 impl RuleSet {
@@ -970,6 +972,8 @@ impl RuleSet {
                     type_descriptors: BTreeMap::new(),
                 },
             },
+            exact_semantic_rules: BTreeMap::new(),
+            semantic_rules_by_context: BTreeMap::new(),
         }
     }
 
@@ -995,13 +999,46 @@ impl RuleSet {
             values.dedup();
         }
         let rule_hash = canonical_hash(&model);
-        Self { schema_version: CURRENT_SCHEMA_VERSION, rule_hash, model }
+        let mut exact_semantic_rules = BTreeMap::<String, Vec<usize>>::new();
+        let mut semantic_rules_by_context = BTreeMap::<String, Vec<usize>>::new();
+        for (index, rule) in model.semantic.rules.iter().enumerate() {
+            if let KeyMatcher::Exact(key) = &rule.key {
+                exact_semantic_rules.entry(key.to_ascii_lowercase()).or_default().push(index);
+            }
+            semantic_rules_by_context
+                .entry(rule.context.to_ascii_lowercase())
+                .or_default()
+                .push(index);
+        }
+        Self {
+            schema_version: CURRENT_SCHEMA_VERSION,
+            rule_hash,
+            model,
+            exact_semantic_rules,
+            semantic_rules_by_context,
+        }
     }
 
     /// Returns the normalized model.
     #[must_use]
     pub const fn model(&self) -> &RulesModel {
         &self.model
+    }
+
+    /// Returns exact-key semantic rule candidates without scanning unrelated matchers.
+    pub fn exact_semantic_rules(&self, key: &str) -> impl Iterator<Item = &SemanticRule> {
+        case_insensitive_indices(&self.exact_semantic_rules, key)
+            .into_iter()
+            .flatten()
+            .map(|index| &self.model.semantic.rules[*index])
+    }
+
+    /// Returns semantic rules for one context without scanning unrelated contexts.
+    pub fn semantic_rules_for_context(&self, context: &str) -> impl Iterator<Item = &SemanticRule> {
+        case_insensitive_indices(&self.semantic_rules_by_context, context)
+            .into_iter()
+            .flatten()
+            .map(|index| &self.model.semantic.rules[*index])
     }
 
     /// Returns the matching file category.
@@ -1052,7 +1089,8 @@ impl RuleSet {
             .ok_or_else(|| RulesError::MissingMetadata("game_id".to_owned()))?;
         let mut model = read_model(&connection)?;
         model.game_id = game_id;
-        let rules = Self { schema_version: version, rule_hash: canonical_hash(&model), model };
+        let mut rules = Self::from_model(model);
+        rules.schema_version = version;
         let computed = rules.rule_hash.to_hex();
         if stored != computed {
             return Err(RulesError::HashMismatch { stored, computed });
@@ -1097,6 +1135,17 @@ impl RuleSet {
     #[must_use]
     pub const fn rule_hash(&self) -> RuleHash {
         self.rule_hash
+    }
+}
+
+fn case_insensitive_indices<'a>(
+    index: &'a BTreeMap<String, Vec<usize>>,
+    key: &str,
+) -> Option<&'a Vec<usize>> {
+    if key.bytes().any(|byte| byte.is_ascii_uppercase()) {
+        index.get(&key.to_ascii_lowercase())
+    } else {
+        index.get(key)
     }
 }
 
@@ -1933,8 +1982,8 @@ fn decode_semantic_value(
 #[cfg(test)]
 mod tests {
     use super::{
-        CURRENT_SCHEMA_VERSION, ProfileMatchMode, ProfileTextMatcher, RuleRecord, RuleSet,
-        RulesModel,
+        CURRENT_SCHEMA_VERSION, KeyMatcher, ProfileMatchMode, ProfileTextMatcher, RuleRecord,
+        RuleSet, RuleShape, RulesModel, SemanticRule, ValueMatcher,
     };
     use std::collections::BTreeMap;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -1983,6 +2032,52 @@ mod tests {
         let mut second = RulesModel { game_id: "test-game".to_owned(), ..RulesModel::default() };
         second.records.extend(records.into_iter().rev());
         assert_eq!(RuleSet::from_model(first).rule_hash(), RuleSet::from_model(second).rule_hash());
+    }
+
+    #[test]
+    fn exact_semantic_rule_index_is_case_insensitive_and_excludes_dynamic_matchers() {
+        let semantic_rule = |id: &str, key: KeyMatcher| SemanticRule {
+            id: id.to_owned(),
+            context: "effect".to_owned(),
+            parent_path: Vec::new(),
+            key,
+            operator: None,
+            value: ValueMatcher::AnyScalar,
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: false,
+            max_occurs: None,
+            source_file: String::new(),
+            line: 0,
+        };
+        let mut model = RulesModel::default();
+        model.semantic.rules = vec![
+            semantic_rule("exact", KeyMatcher::Exact("Owner".to_owned())),
+            semantic_rule("dynamic", KeyMatcher::Dynamic("scope".to_owned())),
+        ];
+        let rules = RuleSet::from_model(model);
+
+        assert_eq!(
+            rules.exact_semantic_rules("OWNER").map(|rule| rule.id.as_str()).collect::<Vec<_>>(),
+            vec!["exact"]
+        );
+        assert!(rules.exact_semantic_rules("missing").next().is_none());
+        assert_eq!(
+            rules
+                .semantic_rules_for_context("EFFECT")
+                .map(|rule| rule.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["dynamic", "exact"]
+        );
+        assert!(rules.semantic_rules_for_context("trigger").next().is_none());
     }
 
     #[test]

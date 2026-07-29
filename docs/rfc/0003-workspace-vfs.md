@@ -3,7 +3,7 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
-> 实现进度（2026-07-20）：Current Mod/Dependency 的类型化 LSP 与项目 TOML 配置已接入；`pdx index vanilla` 建立版本化本地 SQLite cache，LSP 可取消地只读加载并在后续 refresh 中跳过 Vanilla 目录。cache 不保存源码，缺失/损坏/错 game 降级 warning，旧 `rule_hash` 仅提示手动刷新。watched-file 定向磁盘更新待完成。
+> 实现进度（2026-07-25）：Current Mod/Dependency 的类型化 LSP 与项目 TOML 配置已接入；`pdx index vanilla` 建立版本化本地 SQLite cache，LSP 可取消地只读加载并在后续 refresh 中跳过 Vanilla 目录。cache 不保存源码，缺失/损坏/错 game 降级 warning，旧 `rule_hash` 仅提示手动刷新。Current Mod/Dependency 的 watched-file 事件通过后台 worker 定向替换单文件状态和 shard，打开 overlay 保持优先，Vanilla 不注册 watcher。
 
 ## 目标
 
@@ -105,6 +105,8 @@ PdxScript 可支持的脚本扩展（例如 `.txt`、`.gui`、`.gfx`、`.sfx`、
 - `Unique`
 
 所有 symbol kind 的具体策略由 Eu4Rules 声明。解析结果为 `Resolved`、`Ambiguous` 或 `Unresolved`，不能任意选择第一项。
+
+若多个 collector 对同一物理声明产生完全相同的 kind/name/file/range 记录，单文件 `FileIndexShard` 在提交前按完整 identity 保序去重，active view 也把外部/测试注入的相同 file/range 记录视为一个解析目标；只有不同 file/range 的活动声明才构成歧义。这允许 profile lowering 与规则 type lowering 安全地汇合，而不把同一源码节点误报为多定义或扩大缓存/查询结果。
 
 ## 保留非活动资源
 

@@ -10,9 +10,12 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use pdx_hir::{HirFile, HirReferenceOrigin, Scope};
+use pdx_hir::{
+    HirFile, HirReferenceOrigin, Scope, ScopeState, ScopeValue,
+    semantic_root_context as hir_semantic_root_context,
+};
 use pdx_rules::{GameProfile, KeyMatcher, RuleShape, SymbolResolutionPolicy, ValueMatcher};
-use pdx_syntax::{CstKind, CstNode, CsvParsedFile, Eu4FileFormat, ParsedFile, SyntaxError};
+use pdx_syntax::{CstKind, CstNode, CsvParsedFile, FileFormat, ParsedFile, SyntaxError};
 use pdx_text::{LogicalPath, TextRange, TextSize};
 use pdx_workspace::{
     AnalysisSnapshot, Definition, DocumentId, DocumentSource, ParsedSource, SourceFileId,
@@ -321,7 +324,7 @@ pub struct FileAnalysis {
     /// Disk file identity, if one exists.
     pub file: Option<SourceFileId>,
     /// Parsed frontend, if the file is a supported text frontend.
-    pub format: Option<Eu4FileFormat>,
+    pub format: Option<FileFormat>,
     /// Current conservative scope.
     pub scope: Scope,
     /// Diagnostics for this file.
@@ -551,8 +554,17 @@ pub fn complete_with_cancellation(
 struct SemanticCompletionContext {
     context: String,
     parent_path: Vec<String>,
+    structural_containers: Vec<(String, Vec<String>)>,
+    alternative_containers: Vec<SemanticCompletionContainer>,
     scope: ScopeContext,
     property: Option<ScriptProperty>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SemanticCompletionContainer {
+    context: String,
+    parent_path: Vec<String>,
+    scope: ScopeContext,
 }
 
 fn semantic_completion_context(
@@ -569,10 +581,13 @@ fn semantic_completion_context(
         if !contains(block_range, position) {
             continue;
         }
-        let scope = semantic_initial_scope(snapshot, &context, &root.key);
+        let scope = semantic_initial_scope(snapshot, input, &context, &root.key, root.key_range);
         return Some(semantic_completion_container(
             snapshot,
+            input.hir.as_deref(),
             context,
+            Vec::new(),
+            Vec::new(),
             Vec::new(),
             root.block,
             root.bare_values,
@@ -583,10 +598,14 @@ fn semantic_completion_context(
     None
 }
 
+#[allow(clippy::too_many_arguments)] // Recursive traversal carries immutable HIR and semantic state.
 fn semantic_completion_container(
     snapshot: &AnalysisSnapshot,
+    hir: Option<&HirFile>,
     context: String,
     parent_path: Vec<String>,
+    structural_containers: Vec<(String, Vec<String>)>,
+    alternative_containers: Vec<SemanticCompletionContainer>,
     properties: Vec<ScriptProperty>,
     _bare_values: Vec<(String, TextRange)>,
     scope: ScopeContext,
@@ -597,36 +616,157 @@ fn semantic_completion_container(
         if !contains(block_range, position) {
             continue;
         }
-        let next_rule = semantic_rules_for_container(snapshot, &context, &parent_path, &scope)
-            .into_iter()
-            .find(|rule| {
-                !matches!(rule.shape, RuleShape::LeafValue)
-                    && semantic_key_matches(snapshot, &rule.key, &property.key)
-                    && semantic_scope_allows(rule, &scope)
-            });
-        let (next_context, child_path) =
-            next_rule.and_then(|rule| rule.child_context.as_deref()).map_or_else(
-                || {
-                    let mut path = parent_path.clone();
-                    path.push(property.key.clone());
-                    (context.clone(), path)
-                },
-                |child_context| (child_context.to_owned(), Vec::new()),
+        let transparent_wrapper =
+            snapshot.game_profile().is_transparent_scope_wrapper(&property.key);
+        let cached_child_fact = property
+            .block
+            .iter()
+            .find_map(|child| hir.and_then(|hir| hir.scope_fact_at(child.key_range)));
+        if let Some(fact) = cached_child_fact {
+            let structural_containers = completion_structural_containers(
+                snapshot,
+                &context,
+                &parent_path,
+                &property.key,
+                transparent_wrapper,
+                &fact.context,
+                &fact.parent_path,
+                &scope,
             );
-        let next_scope =
-            next_rule.map_or_else(|| scope.clone(), |rule| semantic_child_scope(&scope, rule));
+            return semantic_completion_container(
+                snapshot,
+                hir,
+                fact.context.clone(),
+                fact.parent_path.clone(),
+                structural_containers,
+                Vec::new(),
+                property.block.clone(),
+                property.bare_values.clone(),
+                scope_context_from_hir(snapshot.game_profile_handle(), &fact.state),
+                position,
+            );
+        }
+        let next_rules = semantic_rules_for_container(snapshot, &context, &parent_path, &scope)
+            .into_iter()
+            .filter(|rule| {
+                !matches!(rule.shape, RuleShape::LeafValue)
+                    && semantic_rule_key_matches(snapshot, rule, &parent_path, &property.key)
+                    && semantic_scope_allows(rule, &scope)
+            })
+            .collect::<Vec<_>>();
+        let mut destinations = Vec::<SemanticCompletionContainer>::new();
+        for rule in next_rules {
+            let (destination_context, destination_path) =
+                rule.child_context.as_deref().map_or_else(
+                    || {
+                        let mut path = parent_path.clone();
+                        if !transparent_wrapper {
+                            path.push(property.key.clone());
+                        }
+                        (context.clone(), path)
+                    },
+                    |child_context| (child_context.to_owned(), Vec::new()),
+                );
+            let destination = SemanticCompletionContainer {
+                context: destination_context,
+                parent_path: destination_path,
+                scope: semantic_child_scope(snapshot, &scope, rule),
+            };
+            if !destinations
+                .iter()
+                .any(|known| semantic_completion_containers_equal(known, &destination))
+            {
+                destinations.push(destination);
+            }
+        }
+        let primary = destinations.first().cloned().unwrap_or_else(|| {
+            let mut path = parent_path.clone();
+            if !transparent_wrapper {
+                path.push(property.key.clone());
+            }
+            SemanticCompletionContainer {
+                context: context.clone(),
+                parent_path: path,
+                scope: scope.clone(),
+            }
+        });
+        let alternative_containers = destinations.into_iter().skip(1).collect::<Vec<_>>();
+        let structural_containers = completion_structural_containers(
+            snapshot,
+            &context,
+            &parent_path,
+            &property.key,
+            transparent_wrapper,
+            &primary.context,
+            &primary.parent_path,
+            &scope,
+        );
         return semantic_completion_container(
             snapshot,
-            next_context,
-            child_path,
+            hir,
+            primary.context,
+            primary.parent_path,
+            structural_containers,
+            alternative_containers,
             property.block.clone(),
             property.bare_values.clone(),
-            next_scope,
+            primary.scope,
             position,
         );
     }
     let property = properties.into_iter().find(|property| contains(property.range, position));
-    SemanticCompletionContext { context, parent_path, scope, property }
+    SemanticCompletionContext {
+        context,
+        parent_path,
+        structural_containers,
+        alternative_containers,
+        scope,
+        property,
+    }
+}
+
+fn semantic_completion_containers_equal(
+    left: &SemanticCompletionContainer,
+    right: &SemanticCompletionContainer,
+) -> bool {
+    left.context.eq_ignore_ascii_case(&right.context)
+        && left.parent_path.len() == right.parent_path.len()
+        && left
+            .parent_path
+            .iter()
+            .zip(&right.parent_path)
+            .all(|(left, right)| left.eq_ignore_ascii_case(right))
+        && left.scope == right.scope
+}
+
+#[allow(clippy::too_many_arguments)]
+fn completion_structural_containers(
+    snapshot: &AnalysisSnapshot,
+    context: &str,
+    parent_path: &[String],
+    property_key: &str,
+    transparent_wrapper: bool,
+    next_context: &str,
+    next_path: &[String],
+    scope: &ScopeContext,
+) -> Vec<(String, Vec<String>)> {
+    let mut structural_path = parent_path.to_vec();
+    if !transparent_wrapper {
+        structural_path.push(property_key.to_owned());
+    }
+    let destination_is_structural = next_context.eq_ignore_ascii_case(context)
+        && next_path.len() == structural_path.len()
+        && next_path
+            .iter()
+            .zip(&structural_path)
+            .all(|(left, right)| left.eq_ignore_ascii_case(right));
+    if destination_is_structural
+        || semantic_rules_for_container(snapshot, context, &structural_path, scope).is_empty()
+    {
+        Vec::new()
+    } else {
+        vec![(context.to_owned(), structural_path)]
+    }
 }
 
 fn semantic_rules_for_container<'a>(
@@ -635,21 +775,85 @@ fn semantic_rules_for_container<'a>(
     parent_path: &[String],
     _scope: &ScopeContext,
 ) -> Vec<&'a pdx_rules::SemanticRule> {
-    snapshot
-        .rules()
-        .model()
-        .semantic
-        .rules
-        .iter()
-        .filter(|rule| {
-            let context_matches = rule.context.eq_ignore_ascii_case(context)
-                || (context.strip_prefix("type:").is_some_and(|type_name| {
-                    rule.context.eq_ignore_ascii_case(&format!("root:{type_name}"))
-                }));
-            context_matches
-                && semantic_parent_path_matches(snapshot, &rule.parent_path, parent_path)
-        })
+    let mut candidates = snapshot.rules().semantic_rules_for_context(context).collect::<Vec<_>>();
+    if let Some(type_name) = context.strip_prefix("type:") {
+        candidates
+            .extend(snapshot.rules().semantic_rules_for_context(&format!("root:{type_name}")));
+        candidates.sort_by(|left, right| left.id.cmp(&right.id));
+    }
+    candidates
+        .into_iter()
+        .filter(|rule| semantic_parent_path_matches(snapshot, &rule.parent_path, parent_path))
         .collect()
+}
+
+struct SemanticCompletionRule<'rule, 'path> {
+    rule: &'rule pdx_rules::SemanticRule,
+    parent_path: &'path [String],
+    scope: &'path ScopeContext,
+}
+
+fn semantic_rules_for_completion<'rule, 'path>(
+    snapshot: &'rule AnalysisSnapshot,
+    context: &'path SemanticCompletionContext,
+) -> Vec<SemanticCompletionRule<'rule, 'path>> {
+    let mut rules = semantic_rules_for_container(
+        snapshot,
+        &context.context,
+        &context.parent_path,
+        &context.scope,
+    )
+    .into_iter()
+    .map(|rule| SemanticCompletionRule {
+        rule,
+        parent_path: &context.parent_path,
+        scope: &context.scope,
+    })
+    .collect::<Vec<_>>();
+    for (structural_context, structural_path) in &context.structural_containers {
+        rules.extend(
+            semantic_rules_for_container(
+                snapshot,
+                structural_context,
+                structural_path,
+                &context.scope,
+            )
+            .into_iter()
+            .map(|rule| SemanticCompletionRule {
+                rule,
+                parent_path: structural_path,
+                scope: &context.scope,
+            }),
+        );
+    }
+    for alternative in &context.alternative_containers {
+        rules.extend(
+            semantic_rules_for_container(
+                snapshot,
+                &alternative.context,
+                &alternative.parent_path,
+                &alternative.scope,
+            )
+            .into_iter()
+            .map(|rule| SemanticCompletionRule {
+                rule,
+                parent_path: &alternative.parent_path,
+                scope: &alternative.scope,
+            }),
+        );
+    }
+    rules.sort_by(|left, right| left.rule.id.cmp(&right.rule.id));
+    rules.dedup_by(|left, right| {
+        left.rule.id == right.rule.id
+            && left.parent_path.len() == right.parent_path.len()
+            && left
+                .parent_path
+                .iter()
+                .zip(right.parent_path)
+                .all(|(left, right)| left.eq_ignore_ascii_case(right))
+            && left.scope == right.scope
+    });
+    rules
 }
 
 fn add_semantic_key_items(
@@ -659,14 +863,10 @@ fn add_semantic_key_items(
     replacement_range: TextRange,
     prefix: &str,
 ) {
-    for rule in semantic_rules_for_container(
-        snapshot,
-        &context.context,
-        &context.parent_path,
-        &context.scope,
-    ) {
+    for candidate in semantic_rules_for_completion(snapshot, context) {
+        let rule = candidate.rule;
         if matches!(rule.shape, RuleShape::LeafValue)
-            || !semantic_scope_allows(rule, &context.scope)
+            || !semantic_scope_allows(rule, candidate.scope)
         {
             continue;
         }
@@ -705,7 +905,9 @@ fn add_semantic_key_items(
                 }
             }
             KeyMatcher::Enum(enum_name) => {
-                for label in enum_member_names(snapshot, enum_name) {
+                let labels = qualified_parameter_names(snapshot, rule, candidate.parent_path)
+                    .unwrap_or_else(|| enum_member_names(snapshot, enum_name));
+                for label in labels {
                     push_completion(
                         items,
                         CompletionItem {
@@ -753,24 +955,21 @@ fn add_semantic_value_items(
     replacement_range: TextRange,
     prefix: &str,
 ) {
-    let matching = semantic_rules_for_container(
-        snapshot,
-        &context.context,
-        &context.parent_path,
-        &context.scope,
-    )
-    .into_iter()
-    .filter(|rule| {
-        !matches!(rule.shape, RuleShape::LeafValue)
-            && semantic_key_matches(snapshot, &rule.key, &property.key)
-            && rule
-                .operator
-                .as_deref()
-                .is_none_or(|operator| property.operator.as_deref() == Some(operator))
-    })
-    .filter(|rule| semantic_scope_allows(rule, &context.scope))
-    .collect::<Vec<_>>();
-    for rule in matching {
+    let matching = semantic_rules_for_completion(snapshot, context)
+        .into_iter()
+        .filter(|candidate| {
+            let rule = candidate.rule;
+            !matches!(rule.shape, RuleShape::LeafValue)
+                && semantic_rule_key_matches(snapshot, rule, candidate.parent_path, &property.key)
+                && rule
+                    .operator
+                    .as_deref()
+                    .is_none_or(|operator| property.operator.as_deref() == Some(operator))
+        })
+        .filter(|candidate| semantic_scope_allows(candidate.rule, candidate.scope))
+        .collect::<Vec<_>>();
+    for candidate in matching {
+        let rule = candidate.rule;
         let documentation = (!rule.documentation.is_empty()).then(|| rule.documentation.join("\n"));
         match &rule.value {
             ValueMatcher::Exact(label) => add_value_completion(
@@ -1035,6 +1234,15 @@ pub fn hover_with_cancellation(
 ) -> Result<Option<Hover>, Cancelled> {
     cancellation.checkpoint()?;
     let Some(input) = input_for_document(snapshot, document) else { return Ok(None) };
+    if let Some((definition, reference)) = local_parameter_target(&input, position) {
+        return Ok(Some(Hover {
+            contents: format!(
+                "parameter `{}`\n\nLocal to this scripted definition; inferred from its first use",
+                definition.name
+            ),
+            range: Some(reference.name_range),
+        }));
+    }
     let range = word_range(&input.source, position);
     let Some(word) = input.source_text(range).map(|word| word.trim_matches('"').to_owned()) else {
         return Ok(None);
@@ -1108,21 +1316,19 @@ fn semantic_rule_documentation_at(
 ) -> Option<String> {
     let context = semantic_completion_context(snapshot, input, position)?;
     let property = context.property.as_ref()?;
-    let mut rules = semantic_rules_for_container(
-        snapshot,
-        &context.context,
-        &context.parent_path,
-        &context.scope,
-    )
-    .into_iter()
-    .filter(|rule| {
-        !matches!(rule.shape, RuleShape::LeafValue)
-            && semantic_key_matches(snapshot, &rule.key, &property.key)
-            && semantic_scope_allows(rule, &context.scope)
-    })
-    .collect::<Vec<_>>();
-    rules.sort_by_key(|rule| (&rule.context, &rule.parent_path, &rule.id));
-    rules.into_iter().find_map(semantic_rule_documentation_for_rule)
+    let mut rules = semantic_rules_for_completion(snapshot, &context)
+        .into_iter()
+        .filter(|candidate| {
+            let rule = candidate.rule;
+            !matches!(rule.shape, RuleShape::LeafValue)
+                && semantic_rule_key_matches(snapshot, rule, candidate.parent_path, &property.key)
+                && semantic_scope_allows(rule, candidate.scope)
+        })
+        .collect::<Vec<_>>();
+    rules.sort_by_key(|candidate| {
+        (&candidate.rule.context, &candidate.rule.parent_path, &candidate.rule.id)
+    });
+    rules.into_iter().find_map(|candidate| semantic_rule_documentation_for_rule(candidate.rule))
 }
 
 fn semantic_rule_documentation_for_rule(rule: &pdx_rules::SemanticRule) -> Option<String> {
@@ -1166,8 +1372,11 @@ pub fn definition_with_cancellation(
     cancellation: &CancellationToken,
 ) -> Result<Vec<Location>, Cancelled> {
     cancellation.checkpoint()?;
-    if input_for_document(snapshot, document).is_none() {
+    let Some(input) = input_for_document(snapshot, document) else {
         return Ok(Vec::new());
+    };
+    if let Some((definition, _)) = local_parameter_target(&input, position) {
+        return Ok(vec![local_location(&input, definition.name_range)]);
     }
     let all = all_semantics(snapshot, cancellation)?;
     let Some((kind, name)) = symbol_at(&all, document, position) else {
@@ -1208,7 +1417,22 @@ pub fn references_with_cancellation(
     let Some(input) = input_for_document(snapshot, document) else {
         return Ok(Vec::new());
     };
-    let _ = input;
+    if let Some((definition, _)) = local_parameter_target(&input, position) {
+        let Some(hir) = input.hir.as_deref() else { return Ok(Vec::new()) };
+        let mut result = Vec::new();
+        if include_declaration {
+            result.push(local_location(&input, definition.name_range));
+        }
+        result.extend(
+            hir.parameter_references_for_owner(definition.owner_range)
+                .filter(|reference| {
+                    reference.name.eq_ignore_ascii_case(&definition.name)
+                        && reference.name_range != definition.name_range
+                })
+                .map(|reference| local_location(&input, reference.name_range)),
+        );
+        return Ok(result);
+    }
     let all = all_semantics(snapshot, cancellation)?;
     let Some((kind, name)) = symbol_at(&all, document, position) else {
         return Ok(Vec::new());
@@ -1267,8 +1491,17 @@ pub fn prepare_rename_with_cancellation(
     cancellation: &CancellationToken,
 ) -> Result<PrepareRenameResult, RenameFailure> {
     cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
-    let target = rename_target(snapshot, document, position, cancellation)?;
     let input = input_for_document(snapshot, document).ok_or(RenameError::NoSymbol)?;
+    if let Some((_, reference)) = local_parameter_target(&input, position) {
+        if !writable_location(snapshot, &local_location(&input, reference.name_range)) {
+            return Err(RenameError::ReadOnly.into());
+        }
+        return Ok(PrepareRenameResult {
+            range: reference.name_range,
+            placeholder: reference.name.clone(),
+        });
+    }
+    let target = rename_target(snapshot, document, position, cancellation)?;
     let placeholder =
         input.source_text(target.cursor_range).ok_or(RenameError::NoSymbol)?.to_owned();
     Ok(PrepareRenameResult { range: target.cursor_range, placeholder })
@@ -1307,6 +1540,45 @@ pub fn rename_with_cancellation(
     cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
     if !valid_rename_name(new_name) {
         return Err(RenameError::InvalidName.into());
+    }
+    let input = input_for_document(snapshot, document).ok_or(RenameError::NoSymbol)?;
+    if let Some((definition, _)) = local_parameter_target(&input, position) {
+        if !valid_parameter_name(new_name) {
+            return Err(RenameError::InvalidName.into());
+        }
+        if !writable_location(snapshot, &local_location(&input, definition.name_range)) {
+            return Err(RenameError::ReadOnly.into());
+        }
+        let Some(hir) = input.hir.as_deref() else {
+            return Err(RenameError::NoSymbol.into());
+        };
+        if hir.parameter_definitions_for_owner(definition.owner_range).any(|candidate| {
+            candidate.name_range != definition.name_range
+                && candidate.name.eq_ignore_ascii_case(new_name)
+        }) {
+            return Err(RenameError::Conflict.into());
+        }
+        let mut edits = Vec::new();
+        for reference in hir
+            .parameter_references_for_owner(definition.owner_range)
+            .filter(|reference| reference.name.eq_ignore_ascii_case(&definition.name))
+        {
+            cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
+            edits.push(WorkspaceTextEdit {
+                location: local_location(&input, reference.name_range),
+                new_text: new_name.to_owned(),
+            });
+        }
+        edits.sort_by(|left, right| {
+            right
+                .location
+                .range
+                .start()
+                .cmp(&left.location.range.start())
+                .then_with(|| right.location.range.end().cmp(&left.location.range.end()))
+        });
+        edits.dedup_by(|left, right| left.location == right.location);
+        return Ok(WorkspaceEditPlan { revision: snapshot.revision(), edits });
     }
     let target = rename_target(snapshot, document, position, cancellation)?;
     let all =
@@ -1377,11 +1649,32 @@ pub fn document_symbols_with_cancellation(
         return Ok(Vec::new());
     };
     let data = semantic_data(&input);
-    let mut result = Vec::with_capacity(data.definitions.len());
+    let parameter_count = input.hir.as_deref().map_or(0, |hir| hir.parameter_definitions().len());
+    let mut result = Vec::with_capacity(data.definitions.len() + parameter_count);
     for definition in data.definitions {
         cancellation.checkpoint()?;
         result.push(definition.symbol);
     }
+    if let Some(hir) = input.hir.as_deref() {
+        for definition in hir.parameter_definitions() {
+            cancellation.checkpoint()?;
+            result.push(Symbol {
+                name: definition.name.clone(),
+                kind: "parameter".to_owned(),
+                range: definition.range,
+                selection_range: definition.name_range,
+                location: local_location(&input, definition.range),
+            });
+        }
+    }
+    result.sort_by(|left, right| {
+        left.range
+            .start()
+            .cmp(&right.range.start())
+            .then_with(|| left.range.end().cmp(&right.range.end()))
+            .then_with(|| left.kind.cmp(&right.kind))
+            .then_with(|| left.name.cmp(&right.name))
+    });
     Ok(result)
 }
 
@@ -1436,7 +1729,7 @@ struct ParsedInput {
     document: Option<DocumentId>,
     file: Option<SourceFileId>,
     path: Option<LogicalPath>,
-    format: Eu4FileFormat,
+    format: FileFormat,
     source: Arc<str>,
     parsed: ParsedContent,
     hir: Option<Arc<HirFile>>,
@@ -1730,9 +2023,7 @@ fn semantic_rule_diagnostics(
     cancellation: &CancellationToken,
 ) -> Result<Vec<Diagnostic>, Cancelled> {
     cancellation.checkpoint()?;
-    if input.format != Eu4FileFormat::PdxScript
-        || snapshot.rules().model().semantic.rules.is_empty()
-    {
+    if input.format != FileFormat::PdxScript || snapshot.rules().model().semantic.rules.is_empty() {
         return Ok(Vec::new());
     }
     let ParsedContent::Text(parsed) = &input.parsed else { return Ok(Vec::new()) };
@@ -1745,7 +2036,8 @@ fn semantic_rule_diagnostics(
         else {
             continue;
         };
-        let scope = semantic_initial_scope(snapshot, &context, &property.key);
+        let scope =
+            semantic_initial_scope(snapshot, input, &context, &property.key, property.key_range);
         if let Some(type_name) = context.strip_prefix("type:")
             && snapshot.rules().model().semantic.type_descriptors.get(type_name).is_some_and(
                 |descriptor| {
@@ -1759,7 +2051,8 @@ fn semantic_rule_diagnostics(
             )
         {
             for child in &property.block {
-                let child_scope = semantic_initial_scope(snapshot, &context, &child.key);
+                let child_scope =
+                    semantic_initial_scope(snapshot, input, &context, &child.key, child.key_range);
                 validate_semantic_container(
                     snapshot,
                     &context,
@@ -1767,6 +2060,7 @@ fn semantic_rule_diagnostics(
                     &child.block,
                     &child.bare_values,
                     &child_scope,
+                    input.hir.as_deref(),
                     &mut diagnostics,
                     cancellation,
                 )?;
@@ -1780,6 +2074,7 @@ fn semantic_rule_diagnostics(
             &property.block,
             &property.bare_values,
             &scope,
+            input.hir.as_deref(),
             &mut diagnostics,
             cancellation,
         )?;
@@ -1789,9 +2084,19 @@ fn semantic_rule_diagnostics(
 
 fn semantic_initial_scope(
     snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
     context: &str,
     root_key: &str,
+    key_range: TextRange,
 ) -> ScopeContext {
+    if let Some(state) = input
+        .hir
+        .as_deref()
+        .and_then(|hir| hir.scope_fact(key_range, context))
+        .map(|fact| &fact.state)
+    {
+        return scope_context_from_hir(snapshot.game_profile_handle(), state);
+    }
     let mut scope = ScopeContext::new(snapshot.game_profile_handle());
     if let Some(type_name) = context.strip_prefix("type:")
         && let Some(root_scope) = snapshot
@@ -1813,144 +2118,30 @@ fn semantic_initial_scope(
     scope
 }
 
+fn scope_context_from_hir(profile: Arc<GameProfile>, state: &ScopeState) -> ScopeContext {
+    fn spelling(value: &ScopeValue) -> String {
+        match value {
+            ScopeValue::Known(scopes) if scopes.len() == 1 => scopes[0].clone(),
+            ScopeValue::Known(_) => "any".to_owned(),
+            ScopeValue::Unknown => "any".to_owned(),
+            ScopeValue::Invalid => "invalid".to_owned(),
+        }
+    }
+    ScopeContext {
+        profile,
+        root: spelling(&state.root),
+        current: state.current.first().map_or_else(|| "any".to_owned(), spelling),
+        from: state.from.iter().map(spelling).collect(),
+        previous: state.previous.iter().map(spelling).collect(),
+    }
+}
+
 fn semantic_root_context(
     snapshot: &AnalysisSnapshot,
     key: &str,
     logical_path: Option<&LogicalPath>,
 ) -> Option<String> {
-    let rules = &snapshot.rules().model().semantic.rules;
-    if rules.iter().any(|rule| rule.context.eq_ignore_ascii_case(key)) {
-        return Some(key.to_owned());
-    }
-    let root = format!("root:{key}");
-    if rules.iter().any(|rule| rule.context.eq_ignore_ascii_case(&root)) {
-        return Some(root);
-    }
-    snapshot
-        .rules()
-        .model()
-        .semantic
-        .type_root_keys
-        .iter()
-        .find(|(type_name, roots)| {
-            let descriptor = snapshot.rules().model().semantic.type_descriptors.get(*type_name);
-            (roots.iter().any(|root| root.eq_ignore_ascii_case(key))
-                || descriptor.is_some_and(|descriptor| {
-                    descriptor.starts_with.as_deref().is_some_and(|prefix| {
-                        key.to_ascii_lowercase().starts_with(&prefix.to_ascii_lowercase())
-                    }) || descriptor.skip_root_paths.iter().any(|path| {
-                        path.first().is_some_and(|root| {
-                            root.eq_ignore_ascii_case("any") || root.eq_ignore_ascii_case(key)
-                        })
-                    })
-                }))
-                && rules
-                    .iter()
-                    .any(|rule| rule.context.eq_ignore_ascii_case(&format!("root:{type_name}")))
-                && descriptor
-                    .is_none_or(|descriptor| semantic_type_path_matches(descriptor, logical_path))
-        })
-        .map(|(type_name, _)| format!("type:{type_name}"))
-        .or_else(|| {
-            if !logical_path.is_some_and(|path| path.as_str().contains('/')) {
-                return None;
-            }
-            snapshot
-                .rules()
-                .model()
-                .semantic
-                .type_descriptors
-                .iter()
-                .find(|(type_name, descriptor)| {
-                    let starts_with = descriptor.starts_with.as_deref().is_some_and(|prefix| {
-                        key.to_ascii_lowercase().starts_with(&prefix.to_ascii_lowercase())
-                    });
-                    (starts_with
-                        || (!snapshot
-                            .rules()
-                            .model()
-                            .semantic
-                            .type_root_keys
-                            .contains_key(*type_name)
-                            && descriptor.skip_root_paths.iter().any(|path| {
-                                path.first().is_some_and(|root| {
-                                    root.eq_ignore_ascii_case("any")
-                                        || root.eq_ignore_ascii_case(key)
-                                })
-                            })))
-                        && rules.iter().any(|rule| {
-                            rule.context.eq_ignore_ascii_case(&format!("root:{type_name}"))
-                        })
-                        && semantic_type_path_matches(descriptor, logical_path)
-                })
-                .map(|(type_name, _)| format!("type:{type_name}"))
-                .or_else(|| {
-                    // A normal (type_per_file = no) type applies to every root clause
-                    // in its matching path. The root key therefore need not literally equal the
-                    // type name; for example, `EDG_Bavarian_Missions = { ... }` uses the
-                    // `mission_series` rules. The normalized artifact keeps the type descriptor
-                    // and the corresponding `root:<type>` rules separately, so recover that
-                    // path-based selection here after the more specific selectors above.
-                    snapshot
-                        .rules()
-                        .model()
-                        .semantic
-                        .type_descriptors
-                        .iter()
-                        .find(|(type_name, descriptor)| {
-                            !snapshot
-                                .rules()
-                                .model()
-                                .semantic
-                                .type_root_keys
-                                .contains_key(*type_name)
-                                && semantic_type_path_matches(descriptor, logical_path)
-                                && snapshot.rules().model().semantic.rules.iter().any(|rule| {
-                                    rule.context.eq_ignore_ascii_case(&format!("root:{type_name}"))
-                                })
-                        })
-                        .map(|(type_name, _)| format!("type:{type_name}"))
-                })
-        })
-}
-
-fn semantic_type_path_matches(
-    descriptor: &pdx_rules::TypeDescriptor,
-    logical_path: Option<&LogicalPath>,
-) -> bool {
-    let Some(logical_path) = logical_path else { return true };
-    let path = logical_path.as_str().replace('\\', "/").to_ascii_lowercase();
-    if !path.contains('/') {
-        return true;
-    }
-    if let Some(prefix) = descriptor.path.as_deref() {
-        let prefix = prefix
-            .trim_matches('/')
-            .strip_prefix("game/")
-            .unwrap_or(prefix.trim_matches('/'))
-            .to_ascii_lowercase();
-        let prefix_match = path == prefix || path.starts_with(&format!("{prefix}/"));
-        if !prefix_match {
-            return false;
-        }
-        if descriptor.path_strict
-            && path.strip_prefix(&format!("{prefix}/")).is_some_and(|rest| rest.contains('/'))
-        {
-            return false;
-        }
-    }
-    if let Some(file) = descriptor.path_file.as_deref()
-        && !path.ends_with(&file.to_ascii_lowercase())
-    {
-        return false;
-    }
-    if let Some(extension) = descriptor.path_extension.as_deref() {
-        let extension = extension.trim_start_matches('.').to_ascii_lowercase();
-        if !path.ends_with(&format!(".{extension}")) {
-            return false;
-        }
-    }
-    true
+    hir_semantic_root_context(snapshot.rules(), logical_path, key)
 }
 
 fn semantic_validates_path(
@@ -2020,33 +2211,30 @@ fn validate_semantic_container(
     properties: &[ScriptProperty],
     bare_values: &[(String, TextRange)],
     scope: &ScopeContext,
+    hir: Option<&HirFile>,
     diagnostics: &mut Vec<Diagnostic>,
     cancellation: &CancellationToken,
 ) -> Result<(), Cancelled> {
     cancellation.checkpoint()?;
-    let rules = snapshot
-        .rules()
-        .model()
-        .semantic
-        .rules
-        .iter()
-        .filter(|rule| {
-            let context_matches = rule.context.eq_ignore_ascii_case(context)
-                || (context.strip_prefix("type:").is_some_and(|type_name| {
-                    rule.context.eq_ignore_ascii_case(&format!("root:{type_name}"))
-                }));
-            context_matches
-                && semantic_parent_path_matches(snapshot, &rule.parent_path, parent_path)
-        })
-        .collect::<Vec<_>>();
+    let rules = semantic_rules_for_container(snapshot, context, parent_path, scope);
     if rules.is_empty() {
         return Ok(());
     }
-    let selected_alternative =
-        semantic_selected_alternative(snapshot, &rules, properties, bare_values, scope);
+    let selected_alternative = semantic_selected_alternative(
+        snapshot,
+        &rules,
+        parent_path,
+        properties,
+        bare_values,
+        scope,
+    );
     let mut counts = std::collections::BTreeMap::<String, u32>::new();
     for property in properties {
         cancellation.checkpoint()?;
+        let fact_scope = hir
+            .and_then(|hir| hir.scope_fact(property.key_range, context))
+            .map(|fact| scope_context_from_hir(snapshot.game_profile_handle(), &fact.state));
+        let scope = fact_scope.as_ref().unwrap_or(scope);
         let key = property.key.to_ascii_lowercase();
         let count = counts.entry(key).or_default();
         *count = count.saturating_add(1);
@@ -2056,7 +2244,7 @@ fn validate_semantic_container(
             .iter()
             .filter(|rule| {
                 !matches!(rule.shape, RuleShape::LeafValue)
-                    && semantic_key_matches(snapshot, &rule.key, &property.key)
+                    && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
             })
             .copied()
             .collect::<Vec<_>>();
@@ -2130,25 +2318,115 @@ fn validate_semantic_container(
                 });
             }
         }
-        let next_rule = matching
+        let cached_child_fact = property
+            .block
             .iter()
-            .filter(|rule| semantic_rule_is_selected(rule, selected_alternative.as_deref()))
-            .find(|rule| semantic_scope_allows(rule, scope))
-            .copied()
-            .or_else(|| matching.iter().find(|rule| semantic_scope_allows(rule, scope)).copied());
-        let (next_context, child_path) =
-            next_rule.and_then(|rule| rule.child_context.as_deref()).map_or_else(
-                || {
-                    let mut child_path = parent_path.to_vec();
-                    if !transparent_wrapper {
-                        child_path.push(property.key.clone());
-                    }
-                    (context.to_owned(), child_path)
-                },
-                |child_context| (child_context.to_owned(), Vec::new()),
-            );
-        let next_scope =
-            next_rule.map_or_else(|| scope.clone(), |rule| semantic_child_scope(scope, rule));
+            .find_map(|child| hir.and_then(|hir| hir.scope_fact_at(child.key_range)));
+        let destination = if let Some(fact) = cached_child_fact {
+            Some((
+                fact.context.clone(),
+                fact.parent_path.clone(),
+                scope_context_from_hir(snapshot.game_profile_handle(), &fact.state),
+            ))
+        } else {
+            semantic_selected_transition(
+                snapshot,
+                &matching,
+                selected_alternative.as_deref(),
+                context,
+                parent_path,
+                property,
+                scope,
+                transparent_wrapper,
+            )
+            .map(|rule| {
+                let (next_context, child_path) = semantic_transition_destination(
+                    rule,
+                    context,
+                    parent_path,
+                    &property.key,
+                    transparent_wrapper,
+                );
+                let next_scope = semantic_child_scope(snapshot, scope, rule);
+                (next_context, child_path, next_scope)
+            })
+        };
+        let mut structural_path = parent_path.to_vec();
+        if !transparent_wrapper {
+            structural_path.push(property.key.clone());
+        }
+        let Some((next_context, child_path, next_scope)) = destination else {
+            let structural_rules =
+                semantic_rules_for_container(snapshot, context, &structural_path, scope);
+            if !structural_rules.is_empty() {
+                validate_semantic_container(
+                    snapshot,
+                    context,
+                    &structural_path,
+                    &property.block,
+                    &property.bare_values,
+                    scope,
+                    hir,
+                    diagnostics,
+                    cancellation,
+                )?;
+            }
+            continue;
+        };
+        let destination_is_structural = next_context.eq_ignore_ascii_case(context)
+            && child_path.len() == structural_path.len()
+            && child_path
+                .iter()
+                .zip(&structural_path)
+                .all(|(left, right)| left.eq_ignore_ascii_case(right));
+        if !destination_is_structural {
+            let structural_rules =
+                semantic_rules_for_container(snapshot, context, &structural_path, scope);
+            if !structural_rules.is_empty() {
+                let (structural_properties, transition_properties): (Vec<_>, Vec<_>) =
+                    property.block.iter().cloned().partition(|child| {
+                        structural_rules.iter().any(|rule| {
+                            !matches!(rule.shape, RuleShape::LeafValue)
+                                && semantic_rule_key_matches(
+                                    snapshot,
+                                    rule,
+                                    &structural_path,
+                                    &child.key,
+                                )
+                        })
+                    });
+                let (structural_values, transition_values): (Vec<_>, Vec<_>) =
+                    property.bare_values.iter().cloned().partition(|(value, _)| {
+                        structural_rules.iter().any(|rule| {
+                            matches!(rule.shape, RuleShape::LeafValue)
+                                && semantic_leaf_value_matches(snapshot, rule, value, scope)
+                        })
+                    });
+                validate_semantic_container(
+                    snapshot,
+                    context,
+                    &structural_path,
+                    &structural_properties,
+                    &structural_values,
+                    scope,
+                    hir,
+                    diagnostics,
+                    cancellation,
+                )?;
+                validate_semantic_container(
+                    snapshot,
+                    &next_context,
+                    &child_path,
+                    &transition_properties,
+                    &transition_values,
+                    &next_scope,
+                    hir,
+                    diagnostics,
+                    cancellation,
+                )?;
+                continue;
+            }
+        }
         validate_semantic_container(
             snapshot,
             &next_context,
@@ -2156,6 +2434,7 @@ fn validate_semantic_container(
             &property.block,
             &property.bare_values,
             &next_scope,
+            hir,
             diagnostics,
             cancellation,
         )?;
@@ -2228,7 +2507,7 @@ fn validate_semantic_container(
         let count = properties
             .iter()
             .filter(|property| {
-                semantic_key_matches(snapshot, &rule.key, &property.key)
+                semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
                     && !matches!(rule.shape, RuleShape::LeafValue)
             })
             .count();
@@ -2258,9 +2537,126 @@ fn semantic_rule_is_alias_definition(rule: &pdx_rules::SemanticRule) -> bool {
     rule.alternative_id.as_deref() == Some(rule.id.as_str())
 }
 
+#[allow(clippy::too_many_arguments)]
+fn semantic_selected_transition<'rule>(
+    snapshot: &AnalysisSnapshot,
+    matching: &[&'rule pdx_rules::SemanticRule],
+    selected_alternative: Option<&str>,
+    context: &str,
+    parent_path: &[String],
+    property: &ScriptProperty,
+    scope: &ScopeContext,
+    transparent_wrapper: bool,
+) -> Option<&'rule pdx_rules::SemanticRule> {
+    let applicable = matching
+        .iter()
+        .copied()
+        .filter(|rule| {
+            selected_alternative.is_none() || semantic_rule_is_selected(rule, selected_alternative)
+        })
+        .filter(|rule| semantic_scope_allows(rule, scope))
+        .collect::<Vec<_>>();
+    if semantic_transitions_equivalent(&applicable) {
+        return applicable.first().copied();
+    }
+    if property.block.is_empty() && property.bare_values.is_empty() {
+        return None;
+    }
+
+    let mut structural_path = parent_path.to_vec();
+    if !transparent_wrapper {
+        structural_path.push(property.key.clone());
+    }
+    let structural_rules = semantic_rules_for_container(snapshot, context, &structural_path, scope);
+    let possible = applicable
+        .into_iter()
+        .filter(|candidate| {
+            let (child_context, child_path) = semantic_transition_destination(
+                candidate,
+                context,
+                parent_path,
+                &property.key,
+                transparent_wrapper,
+            );
+            let child_scope = semantic_child_scope(snapshot, scope, candidate);
+            let child_rules =
+                semantic_rules_for_container(snapshot, &child_context, &child_path, &child_scope);
+            property.block.iter().all(|child| {
+                structural_rules.iter().any(|rule| {
+                    !matches!(rule.shape, RuleShape::LeafValue)
+                        && semantic_rule_key_matches(snapshot, rule, &structural_path, &child.key)
+                }) || child_rules.iter().any(|rule| {
+                    !matches!(rule.shape, RuleShape::LeafValue)
+                        && semantic_rule_key_matches(snapshot, rule, &child_path, &child.key)
+                })
+            }) && property.bare_values.iter().all(|(value, _)| {
+                structural_rules.iter().any(|rule| {
+                    matches!(rule.shape, RuleShape::LeafValue)
+                        && semantic_leaf_value_matches(snapshot, rule, value, scope)
+                }) || child_rules.iter().any(|rule| {
+                    matches!(rule.shape, RuleShape::LeafValue)
+                        && semantic_leaf_value_matches(snapshot, rule, value, &child_scope)
+                })
+            })
+        })
+        .collect::<Vec<_>>();
+    semantic_transitions_equivalent(&possible).then(|| possible[0])
+}
+
+fn semantic_transition_destination(
+    rule: &pdx_rules::SemanticRule,
+    context: &str,
+    parent_path: &[String],
+    property_key: &str,
+    transparent_wrapper: bool,
+) -> (String, Vec<String>) {
+    rule.child_context.as_deref().map_or_else(
+        || {
+            let mut child_path = parent_path.to_vec();
+            if !transparent_wrapper {
+                child_path.push(property_key.to_owned());
+            }
+            (context.to_owned(), child_path)
+        },
+        |child_context| (child_context.to_owned(), Vec::new()),
+    )
+}
+
+fn semantic_transitions_equivalent(rules: &[&pdx_rules::SemanticRule]) -> bool {
+    let Some(first) = rules.first() else { return false };
+    rules.iter().all(|candidate| {
+        semantic_optional_text_eq(
+            first.child_context.as_deref(),
+            candidate.child_context.as_deref(),
+        ) && semantic_optional_text_eq(first.push_scope.as_deref(), candidate.push_scope.as_deref())
+            && first.replace_scope.len() == candidate.replace_scope.len()
+            && first.replace_scope.iter().all(|(left_register, left_scope)| {
+                candidate.replace_scope.iter().any(|(right_register, right_scope)| {
+                    left_register.eq_ignore_ascii_case(right_register)
+                        && left_scope.eq_ignore_ascii_case(right_scope)
+                })
+            })
+            && candidate.replace_scope.iter().all(|(right_register, right_scope)| {
+                first.replace_scope.iter().any(|(left_register, left_scope)| {
+                    left_register.eq_ignore_ascii_case(right_register)
+                        && left_scope.eq_ignore_ascii_case(right_scope)
+                })
+            })
+    })
+}
+
+fn semantic_optional_text_eq(left: Option<&str>, right: Option<&str>) -> bool {
+    match (left, right) {
+        (Some(left), Some(right)) => left.eq_ignore_ascii_case(right),
+        (None, None) => true,
+        _ => false,
+    }
+}
+
 fn semantic_selected_alternative(
     snapshot: &AnalysisSnapshot,
     rules: &[&pdx_rules::SemanticRule],
+    parent_path: &[String],
     properties: &[ScriptProperty],
     bare_values: &[(String, TextRange)],
     scope: &ScopeContext,
@@ -2273,7 +2669,8 @@ fn semantic_selected_alternative(
             alternatives.push(alternative.clone());
         }
     }
-    let mut best: Option<(usize, usize, String)> = None;
+    let mut best: Option<((usize, usize), String)> = None;
+    let mut tied = false;
     for alternative in alternatives {
         let group = rules
             .iter()
@@ -2285,7 +2682,7 @@ fn semantic_selected_alternative(
         for property in properties {
             let matching = group.iter().filter(|rule| {
                 !matches!(rule.shape, RuleShape::LeafValue)
-                    && semantic_key_matches(snapshot, &rule.key, &property.key)
+                    && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
             });
             if matching.clone().next().is_some() {
                 present += 1;
@@ -2306,14 +2703,21 @@ fn semantic_selected_alternative(
                 })
             })
             .count();
-        let score = (valid, present, alternative.clone());
-        if best.as_ref().is_none_or(|current| {
-            score.0 > current.0 || (score.0 == current.0 && score.1 > current.1)
-        }) {
-            best = Some(score);
+        let score = (valid, present);
+        match best.as_ref() {
+            None => {
+                best = Some((score, alternative));
+                tied = false;
+            }
+            Some((current, _)) if score > *current => {
+                best = Some((score, alternative));
+                tied = false;
+            }
+            Some((current, _)) if score == *current => tied = true,
+            Some(_) => {}
         }
     }
-    best.map(|(_, _, alternative)| alternative)
+    if tied { None } else { best.map(|(_, alternative)| alternative) }
 }
 
 fn semantic_leaf_value_matches(
@@ -2408,7 +2812,11 @@ fn semantic_scope_allows(rule: &pdx_rules::SemanticRule, scope: &ScopeContext) -
             .any(|expected| scope.profile.scopes_compatible(&scope.current, expected))
 }
 
-fn semantic_child_scope(parent: &ScopeContext, rule: &pdx_rules::SemanticRule) -> ScopeContext {
+fn semantic_child_scope(
+    snapshot: &AnalysisSnapshot,
+    parent: &ScopeContext,
+    rule: &pdx_rules::SemanticRule,
+) -> ScopeContext {
     let mut child = parent.clone();
     if let Some(push_scope) = &rule.push_scope
         && !push_scope.eq_ignore_ascii_case("any")
@@ -2417,23 +2825,108 @@ fn semantic_child_scope(parent: &ScopeContext, rule: &pdx_rules::SemanticRule) -
         child.current.clone_from(push_scope);
     }
     for (register, value) in &rule.replace_scope {
+        let value = resolve_scope_expression_context(snapshot, &child, value);
         let register = register.to_ascii_lowercase().replace('_', "");
         match register.as_str() {
-            "root" => child.root.clone_from(value),
-            "this" => child.current.clone_from(value),
-            _ if register.starts_with("from") => {
-                let depth = register.matches("from").count().saturating_sub(1);
-                set_scope_register(&mut child.from, depth, value);
+            "root" => child.root = value,
+            "this" => child.current = value,
+            _ => {
+                if let Some(depth) = repeated_scope_register_depth(&register, "from") {
+                    set_scope_register(&mut child.from, depth, &value);
+                } else if let Some(depth) = repeated_scope_register_depth(&register, "previous")
+                    .or_else(|| repeated_scope_register_depth(&register, "prev"))
+                {
+                    set_scope_register(&mut child.previous, depth, &value);
+                }
             }
-            _ if register.starts_with("prev") || register.starts_with("previous") => {
-                let prefix = if register.starts_with("previous") { "previous" } else { "prev" };
-                let depth = register.matches(prefix).count().saturating_sub(1);
-                set_scope_register(&mut child.previous, depth, value);
-            }
-            _ => {}
         }
     }
     child
+}
+
+fn resolve_scope_expression_context(
+    snapshot: &AnalysisSnapshot,
+    context: &ScopeContext,
+    expression: &str,
+) -> String {
+    if expression.contains('.') {
+        let mut segments = expression.split('.');
+        let Some(first) = segments.next() else {
+            return "any".to_owned();
+        };
+        let mut value = resolve_scope_expression_context(snapshot, context, first);
+        for segment in segments {
+            value = resolve_scope_link_context(snapshot, context, &value, segment)
+                .unwrap_or_else(|| "any".to_owned());
+            if value.eq_ignore_ascii_case("any") {
+                break;
+            }
+        }
+        return value;
+    }
+
+    let lowered = expression.to_ascii_lowercase().replace('_', "");
+    if lowered == "root" {
+        return context.root.clone();
+    }
+    if lowered == "this" {
+        return context.current.clone();
+    }
+    if let Some(depth) = repeated_scope_register_depth(&lowered, "from") {
+        return context.from.get(depth).cloned().unwrap_or_else(|| "any".to_owned());
+    }
+    if let Some(depth) = repeated_scope_register_depth(&lowered, "previous")
+        .or_else(|| repeated_scope_register_depth(&lowered, "prev"))
+    {
+        return context.previous.get(depth).cloned().unwrap_or_else(|| "any".to_owned());
+    }
+
+    let link_expression = snapshot.rules().exact_semantic_rules(expression).any(|rule| {
+        matches!(rule.context.to_ascii_lowercase().as_str(), "effect" | "trigger")
+            && rule.push_scope.is_some()
+    });
+    if let Some(target) =
+        resolve_scope_link_context(snapshot, context, &context.current, expression)
+    {
+        return target;
+    }
+    if expression.eq_ignore_ascii_case("any") || link_expression {
+        "any".to_owned()
+    } else if context.profile.is_scope(expression) {
+        expression.to_owned()
+    } else {
+        "any".to_owned()
+    }
+}
+
+fn resolve_scope_link_context(
+    snapshot: &AnalysisSnapshot,
+    context: &ScopeContext,
+    current: &str,
+    expression: &str,
+) -> Option<String> {
+    let mut targets = snapshot
+        .rules()
+        .exact_semantic_rules(expression)
+        .filter_map(|rule| {
+            if !matches!(rule.context.to_ascii_lowercase().as_str(), "effect" | "trigger")
+                || !rule.allowed_scopes.is_empty()
+                    && !rule
+                        .allowed_scopes
+                        .iter()
+                        .any(|expected| context.profile.scopes_compatible(current, expected))
+            {
+                return None;
+            }
+            rule.push_scope
+                .as_deref()
+                .filter(|target| !target.eq_ignore_ascii_case("any"))
+                .map(str::to_owned)
+        })
+        .collect::<Vec<_>>();
+    targets.sort_by_key(|target| target.to_ascii_lowercase());
+    targets.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+    if targets.len() == 1 { Some(targets.remove(0)) } else { None }
 }
 
 fn set_scope_register(registers: &mut Vec<String>, depth: usize, value: &str) {
@@ -2441,6 +2934,93 @@ fn set_scope_register(registers: &mut Vec<String>, depth: usize, value: &str) {
         registers.resize(depth + 1, "any".to_owned());
     }
     registers[depth] = value.to_owned();
+}
+
+fn repeated_scope_register_depth(value: &str, token: &str) -> Option<usize> {
+    let count = value.len().checked_div(token.len())?;
+    if count > 0 && token.repeat(count) == value { Some(count - 1) } else { None }
+}
+
+fn semantic_rule_key_matches(
+    snapshot: &AnalysisSnapshot,
+    rule: &pdx_rules::SemanticRule,
+    parent_path: &[String],
+    key: &str,
+) -> bool {
+    qualified_parameter_names(snapshot, rule, parent_path).map_or_else(
+        || semantic_key_matches(snapshot, &rule.key, key),
+        |names| names.iter().any(|name| name.eq_ignore_ascii_case(key)),
+    )
+}
+
+fn qualified_parameter_names(
+    snapshot: &AnalysisSnapshot,
+    rule: &pdx_rules::SemanticRule,
+    parent_path: &[String],
+) -> Option<Vec<String>> {
+    let KeyMatcher::Enum(enum_name) = &rule.key else { return None };
+    if !enum_name.eq_ignore_ascii_case("scripted_effect_params") {
+        return None;
+    }
+    let owner_kind = rule
+        .parent_path
+        .last()
+        .and_then(|segment| segment.strip_prefix('<'))
+        .and_then(|segment| segment.strip_suffix('>'))?;
+    if !matches!(owner_kind.to_ascii_lowercase().as_str(), "scripted_effect" | "scripted_trigger") {
+        return None;
+    }
+    let owner_name = parent_path.last()?;
+    parameter_names_for_owner(snapshot, owner_kind, owner_name)
+}
+
+fn parameter_names_for_owner(
+    snapshot: &AnalysisSnapshot,
+    owner_kind: &str,
+    owner_name: &str,
+) -> Option<Vec<String>> {
+    let mut overlay_candidates = Vec::new();
+    for document in snapshot
+        .documents()
+        .values()
+        .filter(|document| document.source() == DocumentSource::Overlay)
+    {
+        let Some(hir) = document.hir_handle() else { continue };
+        for definition in hir.definitions().iter().filter(|definition| {
+            definition.kind.eq_ignore_ascii_case(owner_kind)
+                && definition.name.eq_ignore_ascii_case(owner_name)
+        }) {
+            overlay_candidates.push((Arc::clone(&hir), definition.range));
+        }
+    }
+    if overlay_candidates.len() > 1 {
+        return None;
+    }
+    if let Some((hir, owner_range)) = overlay_candidates.pop() {
+        return Some(parameter_names_in_hir(&hir, owner_range));
+    }
+
+    let definition = snapshot.index().active_definition(owner_kind, owner_name)?;
+    let source_file = snapshot.source_files().get(&definition.file_id)?;
+    let hidden_by_overlay = snapshot.documents().values().any(|document| {
+        document.source() == DocumentSource::Overlay
+            && document.path().is_some_and(|path| path == source_file.physical_path)
+    });
+    if hidden_by_overlay {
+        return None;
+    }
+    let hir = snapshot.file_state(definition.file_id)?.hir()?;
+    Some(parameter_names_in_hir(hir, definition.range))
+}
+
+fn parameter_names_in_hir(hir: &HirFile, owner_range: TextRange) -> Vec<String> {
+    let mut names = hir
+        .parameter_definitions_for_owner(owner_range)
+        .map(|definition| definition.name.clone())
+        .collect::<Vec<_>>();
+    names.sort_by_key(|name| name.to_ascii_lowercase());
+    names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+    names
 }
 
 fn semantic_key_matches(snapshot: &AnalysisSnapshot, matcher: &KeyMatcher, key: &str) -> bool {
@@ -2553,11 +3133,12 @@ fn scope_member(scope: Option<&str>, member: &str, context: &ScopeContext) -> bo
         Some(context.root.as_str())
     } else if lowered == "this" {
         Some(context.current.as_str())
-    } else if lowered.starts_with("from") {
-        context.from.get(lowered.matches("from").count().saturating_sub(1)).map(String::as_str)
-    } else if lowered.starts_with("prev") || lowered.starts_with("previous") {
-        let prefix = if lowered.starts_with("previous") { "previous" } else { "prev" };
-        context.previous.get(lowered.matches(prefix).count().saturating_sub(1)).map(String::as_str)
+    } else if let Some(depth) = repeated_scope_register_depth(&lowered, "from") {
+        context.from.get(depth).map(String::as_str)
+    } else if let Some(depth) = repeated_scope_register_depth(&lowered, "previous")
+        .or_else(|| repeated_scope_register_depth(&lowered, "prev"))
+    {
+        context.previous.get(depth).map(String::as_str)
     } else {
         Some(member)
     };
@@ -2857,6 +3438,22 @@ fn symbol_at(
         .map(|definition| (definition.kind.clone(), definition.name.clone()))
 }
 
+fn local_parameter_target(
+    input: &ParsedInput,
+    position: TextSize,
+) -> Option<(&pdx_hir::HirParameterDefinition, &pdx_hir::HirParameterReference)> {
+    let hir = input.hir.as_deref()?;
+    let reference = hir.parameter_reference_at(position)?;
+    let definition = hir
+        .parameter_definitions_for_owner(reference.owner_range)
+        .find(|definition| definition.name.eq_ignore_ascii_case(&reference.name))?;
+    Some((definition, reference))
+}
+
+fn local_location(input: &ParsedInput, range: TextRange) -> Location {
+    Location { document: input.document.clone(), file: input.file, path: input.path.clone(), range }
+}
+
 fn hover_for_symbol(
     snapshot: &AnalysisSnapshot,
     all: &SemanticWorkspace,
@@ -2908,10 +3505,26 @@ fn looks_unknown_key(key: &str) -> bool {
 }
 
 fn completion_value_context(input: &ParsedInput, position: TextSize) -> bool {
+    if input.format == FileFormat::PdxScript
+        && let Some(hir) = input.hir.as_deref()
+    {
+        if hir.properties().iter().any(|property| {
+            position >= property.key_range.start() && position <= property.key_range.end()
+        }) {
+            return false;
+        }
+        if hir.properties().iter().any(|property| {
+            property.scalar.as_ref().is_some_and(|scalar| {
+                position >= scalar.range.start() && position <= scalar.range.end()
+            })
+        }) {
+            return true;
+        }
+    }
     let offset = usize::try_from(position).unwrap_or(input.source.len()).min(input.source.len());
     let line_start = input.source[..offset].rfind('\n').map_or(0, |index| index + 1);
     let line = &input.source[line_start..offset];
-    if input.format == Eu4FileFormat::Localisation {
+    if input.format == FileFormat::Localisation {
         return line.contains(':') && !line.trim_start().starts_with('#');
     }
     let equals = line.rfind('=');
@@ -3050,6 +3663,10 @@ fn valid_rename_name(name: &str) -> bool {
     !name.is_empty() && name.bytes().all(is_word_byte)
 }
 
+fn valid_parameter_name(name: &str) -> bool {
+    !name.is_empty() && name.bytes().all(|byte| byte != b'$' && is_word_byte(byte))
+}
+
 fn writable_location(snapshot: &AnalysisSnapshot, location: &Location) -> bool {
     if let Some(file) = location.file
         && let Some(source_file) = snapshot.source_files().get(&file)
@@ -3122,8 +3739,8 @@ mod tests {
         CancellationToken, Cancelled, CompletionKind, DiagnosticCode, RenameError, RenameFailure,
         complete, complete_with_cancellation, definition, diagnostics,
         diagnostics_with_cancellation, document_symbols, hover, input_for_document, prepare_rename,
-        references, rename, rename_with_cancellation, semantic_root_context, workspace_symbols,
-        workspace_symbols_with_cancellation,
+        references, rename, rename_with_cancellation, semantic_completion_context,
+        semantic_root_context, workspace_symbols, workspace_symbols_with_cancellation,
     };
     use pdx_rules::{KeyMatcher, RuleSet, RuleShape, SemanticRule, ValueMatcher};
     use pdx_text::{LogicalPath, TextRange};
@@ -3228,6 +3845,89 @@ mod tests {
     }
 
     #[test]
+    fn completion_traversal_uses_hir_to_disambiguate_nested_rule_contexts() {
+        let text = concat!(
+            "country_event = { mean_time_to_happen = { ",
+            "modifier = { factor = 0.5 always = maybe }",
+            " } }\n",
+        );
+        let mut host = eu4_host(pdx_game_eu4::first_party_rules().expect("first-party rules"));
+        let id = DocumentId::new("file:///tmp/events/completion_scope.txt");
+        host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
+        let snapshot = host.snapshot();
+        let input = input_for_document(&snapshot, &id).expect("analysis input");
+        let position =
+            u32::try_from(text.find("always").expect("trigger child")).expect("position");
+        let context = semantic_completion_context(&snapshot, &input, position)
+            .expect("semantic completion context");
+        assert_eq!(context.context, "trigger");
+        assert!(context.parent_path.is_empty());
+        assert_eq!(
+            context.structural_containers,
+            [("modifier_rule".to_owned(), vec!["modifier".to_owned()])]
+        );
+        assert_eq!(context.scope.current, "country");
+        let mut all_key_items = Vec::new();
+        super::add_semantic_key_items(
+            &snapshot,
+            &context,
+            &mut all_key_items,
+            TextRange::empty(position),
+            "",
+        );
+        assert!(all_key_items.iter().any(|item| item.label == "always"));
+        assert!(all_key_items.iter().any(|item| item.label == "factor"));
+        let completion = complete(&snapshot, &id, position);
+        assert!(
+            completion.items.iter().any(|item| item.label == "always"),
+            "trigger keys must be offered inside the disambiguated modifier block: {:?}",
+            completion.items
+        );
+        let results = diagnostics(&snapshot, &id);
+        assert!(
+            results.iter().all(|item| item.code != DiagnosticCode::UnknownKey),
+            "structural modifier fields and nested trigger keys must both be recognized: {results:?}"
+        );
+        assert!(
+            results.iter().any(|item| {
+                item.code == DiagnosticCode::InvalidValue && item.message.contains("always")
+            }),
+            "the nested trigger context must validate `always`: {results:?}"
+        );
+    }
+
+    #[test]
+    fn empty_ambiguous_block_completion_unions_possible_rule_destinations() {
+        let text = concat!(
+            "country_event = {\n",
+            "  mean_time_to_happen = {\n",
+            "    \n",
+            "  }\n",
+            "}\n",
+        );
+        let mut host = eu4_host(pdx_game_eu4::first_party_rules().expect("first-party rules"));
+        let id = DocumentId::new("file:///tmp/events/empty-scope-completion.txt");
+        host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
+        let snapshot = host.snapshot();
+        let input = input_for_document(&snapshot, &id).expect("analysis input");
+        let position = u32::try_from(text.find("    \n").expect("blank completion line"))
+            .expect("position")
+            .saturating_add(4);
+        let context = semantic_completion_context(&snapshot, &input, position)
+            .expect("semantic completion context");
+        assert!(
+            context
+                .alternative_containers
+                .iter()
+                .any(|container| container.context == "modifier_rule"),
+            "the conflicting modifier destination must remain available"
+        );
+        let completion = complete(&snapshot, &id, position);
+        assert!(completion.items.iter().any(|item| item.label == "days"));
+        assert!(completion.items.iter().any(|item| item.label == "modifier"));
+    }
+
+    #[test]
     fn query_input_reuses_the_document_hir_handle() {
         let (host, id) = snapshot("country_event = { id = shared.1 }\n");
         let snapshot = host.snapshot();
@@ -3268,6 +3968,24 @@ mod tests {
                 .iter()
                 .all(|item| item.code != DiagnosticCode::UnknownScope)
         );
+    }
+
+    #[test]
+    fn multiple_hir_scope_candidates_remain_conservative_in_analysis() {
+        let state = pdx_hir::ScopeState {
+            root: pdx_hir::ScopeValue::Known(vec!["country".to_owned(), "province".to_owned()]),
+            current: vec![pdx_hir::ScopeValue::Known(vec![
+                "country".to_owned(),
+                "province".to_owned(),
+            ])],
+            from: vec![pdx_hir::ScopeValue::Known(vec!["country".to_owned()])],
+            previous: Vec::new(),
+        };
+        let context =
+            super::scope_context_from_hir(std::sync::Arc::new(pdx_game_eu4::profile()), &state);
+        assert_eq!(context.root, "any");
+        assert_eq!(context.current, "any");
+        assert_eq!(context.from, ["country"]);
     }
 
     #[test]
@@ -3577,6 +4295,35 @@ mod tests {
     }
 
     #[test]
+    fn eu4_scope_link_chains_are_resolved_segment_by_segment() {
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let host = eu4_host(rules);
+        let snapshot = host.snapshot();
+        let mut context = super::ScopeContext::new(std::sync::Arc::new(pdx_game_eu4::profile()));
+        context.root = "province".to_owned();
+        context.current = "province".to_owned();
+
+        assert_eq!(
+            super::resolve_scope_expression_context(&snapshot, &context, "owner.capital_scope"),
+            "province"
+        );
+        assert_eq!(
+            super::resolve_scope_expression_context(&snapshot, &context, "owner.missing_link"),
+            "any"
+        );
+
+        let mut invalid_register_rule = snapshot.rules().model().semantic.rules[0].clone();
+        invalid_register_rule.push_scope = None;
+        invalid_register_rule.replace_scope = vec![
+            ("from_owner".to_owned(), "country".to_owned()),
+            ("previous_owner".to_owned(), "country".to_owned()),
+        ];
+        let unchanged = super::semantic_child_scope(&snapshot, &context, &invalid_register_rule);
+        assert!(unchanged.from.is_empty());
+        assert!(unchanged.previous.is_empty());
+    }
+
+    #[test]
     fn eu4_alias_alternatives_do_not_cross_report_cardinality() {
         let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
@@ -3596,6 +4343,155 @@ mod tests {
     }
 
     #[test]
+    fn semantic_alternative_selection_refuses_equal_scores() {
+        let host = eu4_host(pdx_game_eu4::first_party_rules().expect("first-party rules"));
+        let snapshot = host.snapshot();
+        let mut left = snapshot.rules().model().semantic.rules[0].clone();
+        left.id = "fixture:left".to_owned();
+        left.context = "fixture".to_owned();
+        left.parent_path.clear();
+        left.key = KeyMatcher::Exact("left".to_owned());
+        left.shape = RuleShape::Leaf;
+        left.value = ValueMatcher::Bool;
+        left.alternative_id = Some("left-alternative".to_owned());
+        left.allowed_scopes.clear();
+        let mut right = left.clone();
+        right.id = "fixture:right".to_owned();
+        right.key = KeyMatcher::Exact("right".to_owned());
+        right.alternative_id = Some("right-alternative".to_owned());
+        let rules = [&left, &right];
+        let scope = super::ScopeContext::new(std::sync::Arc::new(pdx_game_eu4::profile()));
+        assert_eq!(
+            super::semantic_selected_alternative(&snapshot, &rules, &[], &[], &[], &scope),
+            None
+        );
+
+        let property = super::ScriptProperty {
+            key: "left".to_owned(),
+            key_range: TextRange::empty(0),
+            range: TextRange::empty(0),
+            operator: None,
+            scalar: Some(("yes".to_owned(), TextRange::empty(0))),
+            block_range: None,
+            block: Vec::new(),
+            bare_values: Vec::new(),
+        };
+        assert_eq!(
+            super::semantic_selected_alternative(&snapshot, &rules, &[], &[property], &[], &scope,)
+                .as_deref(),
+            Some("left-alternative")
+        );
+    }
+
+    #[test]
+    fn workspace_type_child_key_selects_only_one_transition() {
+        use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use std::fs;
+
+        let root = std::env::temp_dir()
+            .join(format!("pdx-analysis-dynamic-transition-{}", std::process::id()));
+        fs::create_dir_all(root.join("common/country_tags")).expect("country tag directory");
+        fs::write(root.join("common/country_tags/00_test.txt"), "FRA = \"countries/France.txt\"\n")
+            .expect("country tag definition");
+
+        let mut model =
+            pdx_game_eu4::first_party_rules().expect("load first-party rules").model().clone();
+        let mut country_transition = model.semantic.rules[0].clone();
+        country_transition.id = "fixture:country-transition".to_owned();
+        country_transition.context = "fixture".to_owned();
+        country_transition.parent_path.clear();
+        country_transition.key = KeyMatcher::Exact("choose".to_owned());
+        country_transition.shape = RuleShape::Node;
+        country_transition.child_context = Some("country-destination".to_owned());
+        country_transition.alternative_id = None;
+        country_transition.allowed_scopes.clear();
+        country_transition.push_scope = None;
+        country_transition.replace_scope.clear();
+        let mut other_transition = country_transition.clone();
+        other_transition.id = "fixture:other-transition".to_owned();
+        other_transition.child_context = Some("other-destination".to_owned());
+
+        let mut country_child = country_transition.clone();
+        country_child.id = "fixture:country-child".to_owned();
+        country_child.context = "country-destination".to_owned();
+        country_child.key = KeyMatcher::Type("country_tag".to_owned());
+        country_child.shape = RuleShape::Leaf;
+        country_child.child_context = None;
+        country_child.value = ValueMatcher::Bool;
+        let mut other_child = country_child.clone();
+        other_child.id = "fixture:other-child".to_owned();
+        other_child.context = "other-destination".to_owned();
+        other_child.key = KeyMatcher::Exact("other".to_owned());
+        model.semantic.rules.extend([
+            country_transition.clone(),
+            other_transition.clone(),
+            country_child,
+            other_child,
+        ]);
+
+        let mut host = eu4_host(RuleSet::from_model(model));
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
+            id: SourceRootId::new(1),
+            kind: SourceRootKind::CurrentMod,
+            path: root.clone(),
+            order: 0,
+            writable: true,
+        }]));
+        host.refresh_source_roots().expect("scan country tag definition");
+        let snapshot = host.snapshot();
+        let scope = super::ScopeContext::new(std::sync::Arc::new(pdx_game_eu4::profile()));
+        let mut property = super::ScriptProperty {
+            key: "choose".to_owned(),
+            key_range: TextRange::empty(0),
+            range: TextRange::empty(0),
+            operator: Some("=".to_owned()),
+            scalar: None,
+            block_range: Some(TextRange::empty(0)),
+            block: vec![super::ScriptProperty {
+                key: "FRA".to_owned(),
+                key_range: TextRange::empty(0),
+                range: TextRange::empty(0),
+                operator: Some("=".to_owned()),
+                scalar: Some(("yes".to_owned(), TextRange::empty(0))),
+                block_range: None,
+                block: Vec::new(),
+                bare_values: Vec::new(),
+            }],
+            bare_values: Vec::new(),
+        };
+        let selected = super::semantic_selected_transition(
+            &snapshot,
+            &[&country_transition, &other_transition],
+            None,
+            "fixture",
+            &[],
+            &property,
+            &scope,
+            false,
+        )
+        .expect("workspace-backed child key selects a transition");
+        assert_eq!(selected.child_context.as_deref(), Some("country-destination"));
+
+        property.block[0].key = "MISSING".to_owned();
+        assert!(
+            super::semantic_selected_transition(
+                &snapshot,
+                &[&country_transition, &other_transition],
+                None,
+                "fixture",
+                &[],
+                &property,
+                &scope,
+                false,
+            )
+            .is_none(),
+            "an unresolved child key must not fall back to rule order"
+        );
+
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
     fn eu4_common_links_allow_owner_to_push_province_scope_to_country() {
         let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
@@ -3610,6 +4506,59 @@ mod tests {
         let results = diagnostics(&host.snapshot(), &id);
         assert!(results.iter().any(|item| item.code == DiagnosticCode::InvalidValue));
         assert!(!results.iter().any(|item| item.code == DiagnosticCode::UnknownKey));
+    }
+
+    #[test]
+    fn eu4_replace_scope_links_populate_from_intrinsics() {
+        use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use std::fs;
+
+        assert_eq!(super::repeated_scope_register_depth("prevprev", "prev"), Some(1));
+        assert_eq!(super::repeated_scope_register_depth("previous_owner", "previous"), None);
+
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-analysis-scope-intrinsics-{nonce}"));
+        let directory = root.join("common/buildings");
+        fs::create_dir_all(&directory).expect("building directory");
+        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let mut host = eu4_host(rules);
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+
+        let valid_id = DocumentId::new("file:///tmp/from-building.txt");
+        host.open_document(
+            valid_id.clone(),
+            1,
+            "test_building = { on_built = { cossack_infantry = FROM } }\n".to_owned(),
+            Some(directory.join("from.txt")),
+        )
+        .expect("open FROM fixture");
+        assert!(
+            diagnostics(&host.snapshot(), &valid_id)
+                .iter()
+                .all(|item| item.code != DiagnosticCode::InvalidValue)
+        );
+
+        let invalid_id = DocumentId::new("file:///tmp/this-building.txt");
+        host.open_document(
+            invalid_id.clone(),
+            1,
+            "other_building = { on_built = { cossack_infantry = THIS } }\n".to_owned(),
+            Some(directory.join("this.txt")),
+        )
+        .expect("open THIS fixture");
+        assert!(
+            diagnostics(&host.snapshot(), &invalid_id)
+                .iter()
+                .any(|item| item.code == DiagnosticCode::InvalidValue)
+        );
+        fs::remove_dir_all(root).expect("cleanup");
     }
 
     #[test]
@@ -3672,11 +4621,10 @@ mod tests {
             None,
         )
         .expect("open");
-        assert!(
-            diagnostics(&host.snapshot(), &id)
-                .iter()
-                .all(|item| item.code != DiagnosticCode::InvalidValue)
-        );
+        assert!(diagnostics(&host.snapshot(), &id).iter().all(|item| !matches!(
+            item.code,
+            DiagnosticCode::InvalidValue | DiagnosticCode::UnknownKey
+        )));
         fs::remove_dir_all(root).expect("cleanup");
     }
 
@@ -3756,7 +4704,7 @@ mod tests {
     }
 
     #[test]
-    fn eu4_scripted_effect_params_are_dynamic_enum_members() {
+    fn eu4_scripted_effect_params_are_owner_qualified() {
         use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
         use std::fs;
 
@@ -3764,9 +4712,13 @@ mod tests {
             std::env::temp_dir().join(format!("pdx-analysis-cwt-params-{}", std::process::id()));
         fs::create_dir_all(root.join("common/scripted_effects"))
             .expect("scripted effect directory");
+        let definition_path = root.join("common/scripted_effects/00_test.txt");
         fs::write(
-            root.join("common/scripted_effects/00_test.txt"),
-            "apply = { value = $amount$ }\n",
+            &definition_path,
+            concat!(
+                "apply = { value = $amount$ [[optional] enabled = yes ] }\n",
+                "other_effect = { value = $other$ }\n",
+            ),
         )
         .expect("scripted effect definition");
         let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
@@ -3780,17 +4732,177 @@ mod tests {
         }]));
         host.refresh_source_roots().expect("scan scripted effect definition");
         let id = DocumentId::new("file:///tmp/events/params.txt");
+        let invocation =
+            "country_event = { immediate = { apply = { amount = 1 optional = yes } } }\n";
+        host.open_document(id.clone(), 1, invocation.to_owned(), None).expect("open");
+        let snapshot = host.snapshot();
+        assert_eq!(snapshot.index().definitions("scripted_effect", "apply").len(), 1);
+        assert_eq!(
+            super::parameter_names_for_owner(&snapshot, "scripted_effect", "apply")
+                .expect("resolved owner parameters"),
+            ["amount", "optional"]
+        );
+        assert!(diagnostics(&snapshot, &id).iter().all(|item| !matches!(
+            item.code,
+            DiagnosticCode::InvalidValue | DiagnosticCode::UnknownKey
+        )));
+        let completion_position = u32::try_from(
+            invocation.find("apply = { ").expect("invocation") + "apply = { ".len() - 1,
+        )
+        .expect("position");
+        let labels = complete(&snapshot, &id, completion_position)
+            .items
+            .into_iter()
+            .map(|item| item.label)
+            .collect::<Vec<_>>();
+        assert!(labels.iter().any(|label| label.eq_ignore_ascii_case("amount")), "{labels:?}");
+        assert!(labels.iter().any(|label| label.eq_ignore_ascii_case("optional")), "{labels:?}");
+        assert!(!labels.iter().any(|label| label.eq_ignore_ascii_case("other")));
+
+        let wrong_id = DocumentId::new("file:///tmp/events/wrong-params.txt");
         host.open_document(
-            id.clone(),
+            wrong_id.clone(),
             1,
-            "country_event = { immediate = { apply = { amount = 1 } } }\n".to_owned(),
+            "country_event = { immediate = { apply = { other = 1 } } }\n".to_owned(),
             None,
         )
-        .expect("open");
+        .expect("open wrong invocation");
+        assert!(diagnostics(&host.snapshot(), &wrong_id).iter().any(|item| {
+            item.code == DiagnosticCode::UnknownKey && item.message.contains("`other`")
+        }));
+
+        let overlay_id = DocumentId::new("file:///tmp/common/scripted_effects/00_test.txt");
+        host.open_document(
+            overlay_id,
+            1,
+            "apply = { value = $overlay_only$ }\n".to_owned(),
+            Some(definition_path),
+        )
+        .expect("open scripted effect overlay");
+        let overlay_call = DocumentId::new("file:///tmp/events/overlay-params.txt");
+        host.open_document(
+            overlay_call.clone(),
+            1,
+            "country_event = { immediate = { apply = { overlay_only = 1 amount = 2 } } }\n"
+                .to_owned(),
+            None,
+        )
+        .expect("open overlay invocation");
+        let overlay_results = diagnostics(&host.snapshot(), &overlay_call);
+        assert!(!overlay_results.iter().any(|item| {
+            item.code == DiagnosticCode::UnknownKey && item.message.contains("`overlay_only`")
+        }));
+        assert!(overlay_results.iter().any(|item| {
+            item.code == DiagnosticCode::UnknownKey && item.message.contains("`amount`")
+        }));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn local_parameter_navigation_stays_within_its_scripted_definition() {
+        use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use std::fs;
+
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-analysis-local-params-{nonce}"));
+        let directory = root.join("common/scripted_effects");
+        fs::create_dir_all(&directory).expect("scripted effect directory");
+        let path = directory.join("parameters.txt");
+        let text = concat!(
+            "first = { value = $Amount$ again = $amount$ ",
+            "[[optional] enabled = yes ] }\n",
+            "second = { value = $amount$ }\n",
+        );
+        let mut host = eu4_host(pdx_game_eu4::bootstrap_rules());
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        let id = DocumentId::new("file:///tmp/parameters.txt");
+        host.open_document(id.clone(), 1, text.to_owned(), Some(path.clone()))
+            .expect("open parameter document");
+        let snapshot = host.snapshot();
+
+        let second_use =
+            u32::try_from(text.find("$amount$").expect("second use") + 1).expect("position");
+        let first_name = TextRange::new(
+            u32::try_from(text.find("Amount").expect("first definition")).expect("start"),
+            u32::try_from(text.find("Amount").expect("first definition") + "Amount".len())
+                .expect("end"),
+        )
+        .expect("first name range");
+        assert_eq!(definition(&snapshot, &id, second_use)[0].range, first_name);
+
+        let local_references = references(&snapshot, &id, second_use, true);
+        assert_eq!(local_references.len(), 2);
+        assert!(local_references.iter().all(|location| {
+            location.range.end()
+                < u32::try_from(text.find("second").expect("second definition")).expect("offset")
+        }));
+
+        let optional =
+            u32::try_from(text.find("optional").expect("conditional parameter")).expect("offset");
+        let hover = hover(&snapshot, &id, optional).expect("parameter hover");
+        assert!(hover.contents.contains("parameter `optional`"));
+
+        let preparation = prepare_rename(&snapshot, &id, second_use).expect("prepare local rename");
+        assert_eq!(preparation.placeholder, "amount");
+        let rename_plan = rename(&snapshot, &id, second_use, "total").expect("local rename");
+        assert_eq!(rename_plan.edits.len(), 2);
+        assert!(rename_plan.edits.iter().all(|edit| {
+            edit.new_text == "total"
+                && edit.location.range.end()
+                    < u32::try_from(text.find("second").expect("second definition"))
+                        .expect("offset")
+        }));
+        assert_eq!(
+            rename(&snapshot, &id, optional, "feature").expect("conditional rename").edits.len(),
+            1
+        );
+        assert_eq!(rename(&snapshot, &id, second_use, "optional"), Err(RenameError::Conflict));
+        assert_eq!(rename(&snapshot, &id, second_use, "$invalid$"), Err(RenameError::InvalidName));
+
+        let parameter_symbols = document_symbols(&snapshot, &id)
+            .into_iter()
+            .filter(|symbol| symbol.kind == "parameter")
+            .collect::<Vec<_>>();
+        assert_eq!(
+            parameter_symbols.iter().map(|symbol| symbol.name.as_str()).collect::<Vec<_>>(),
+            vec!["Amount", "optional", "amount"]
+        );
+        assert_eq!(parameter_symbols[0].selection_range, first_name);
         assert!(
-            diagnostics(&host.snapshot(), &id)
-                .iter()
-                .all(|item| item.code != DiagnosticCode::InvalidValue)
+            workspace_symbols(&snapshot, "amount").iter().all(|symbol| symbol.kind != "parameter")
+        );
+
+        let second_owner_use =
+            u32::try_from(text.rfind("$amount$").expect("second owner use") + 1).expect("position");
+        let second_target = definition(&snapshot, &id, second_owner_use);
+        assert_eq!(second_target.len(), 1);
+        assert!(second_target[0].range.start() > first_name.end());
+
+        let mut read_only = eu4_host(pdx_game_eu4::bootstrap_rules());
+        read_only.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(2),
+            SourceRootKind::Dependency,
+            root.clone(),
+        )]));
+        let read_only_id = DocumentId::new("file:///tmp/read-only-parameters.txt");
+        read_only
+            .open_document(read_only_id.clone(), 1, text.to_owned(), Some(path))
+            .expect("open dependency parameter document");
+        let read_only_snapshot = read_only.snapshot();
+        assert_eq!(
+            prepare_rename(&read_only_snapshot, &read_only_id, second_use),
+            Err(RenameError::ReadOnly)
+        );
+        assert_eq!(
+            rename(&read_only_snapshot, &read_only_id, second_use, "total"),
+            Err(RenameError::ReadOnly)
         );
         fs::remove_dir_all(root).expect("cleanup");
     }

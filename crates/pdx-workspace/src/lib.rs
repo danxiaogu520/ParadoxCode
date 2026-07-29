@@ -5,7 +5,7 @@
 
 #[cfg(test)]
 use std::cell::Cell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs;
 use std::io::Read;
@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use pdx_hir::{HirFile, lower_shared, lower_shared_with_profile};
 use pdx_rules::{FileResolutionPolicy, GameProfile, ParserKind, RuleSet, SymbolResolutionPolicy};
-use pdx_syntax::{CstKind, CstNode, Eu4FileFormat, ParsedFile, parse_eu4, parse_eu4_csv_file};
+use pdx_syntax::{CstKind, CstNode, FileFormat, ParsedFile, parse, parse_csv_file};
 use pdx_text::{LineIndex, LogicalPath, TextRange};
 
 mod vanilla_cache;
@@ -347,10 +347,10 @@ pub enum ParsedSource {
 impl ParsedSource {
     /// Returns the common frontend format.
     #[must_use]
-    pub fn format(&self) -> Eu4FileFormat {
+    pub fn format(&self) -> FileFormat {
         match self {
             Self::Text(parsed) => parsed.format(),
-            Self::Csv(_) => Eu4FileFormat::Csv,
+            Self::Csv(_) => FileFormat::Csv,
         }
     }
 }
@@ -462,7 +462,11 @@ impl WorkspaceIndex {
     pub fn active_definition(&self, kind: &str, name: &str) -> Option<&Definition> {
         let mut active = self.definitions(kind, name).iter().filter(|definition| definition.active);
         let definition = active.next()?;
-        active.next().is_none().then_some(definition)
+        active
+            .all(|candidate| {
+                candidate.file_id == definition.file_id && candidate.range == definition.range
+            })
+            .then_some(definition)
     }
 
     /// Iterates over all retained definitions in deterministic kind/name order.
@@ -1166,7 +1170,7 @@ fn parse_source(
         ParserKind::PdxScript => {
             #[cfg(test)]
             record_pipeline_parse();
-            let parsed = Arc::new(parse_eu4(Eu4FileFormat::PdxScript, source));
+            let parsed = Arc::new(parse(FileFormat::PdxScript, source));
             #[cfg(test)]
             record_pipeline_lower();
             let hir = Arc::new(logical_path.map_or_else(
@@ -1178,7 +1182,7 @@ fn parse_source(
         ParserKind::Localisation => {
             #[cfg(test)]
             record_pipeline_parse();
-            let parsed = Arc::new(parse_eu4(Eu4FileFormat::Localisation, source));
+            let parsed = Arc::new(parse(FileFormat::Localisation, source));
             #[cfg(test)]
             record_pipeline_lower();
             let hir = Arc::new(logical_path.map_or_else(
@@ -1195,7 +1199,7 @@ fn parse_source(
                 pdx_rules::CsvDialect::Tab => pdx_syntax::csv::CsvDialect::Tab,
                 pdx_rules::CsvDialect::Semicolon => pdx_syntax::csv::CsvDialect::Semicolon,
             };
-            (Some(ParsedSource::Csv(Arc::new(parse_eu4_csv_file(source, dialect)))), None)
+            (Some(ParsedSource::Csv(Arc::new(parse_csv_file(source, dialect)))), None)
         }
         ParserKind::Asset | ParserKind::SyntaxOnly => (None, None),
     }
@@ -1309,7 +1313,7 @@ fn build_file_state(
     };
     let (parsed, hir) =
         parse_source(&category.parser, &source, Some(&file.logical_path), rules, profile);
-    let shard = match (parsed.as_ref(), hir.as_deref()) {
+    let mut shard = match (parsed.as_ref(), hir.as_deref()) {
         (Some(ParsedSource::Text(parsed)), Some(hir)) => {
             shard_from_parsed(file, parsed, hir, rules, profile)
         }
@@ -1335,6 +1339,15 @@ fn build_file_state(
             syntax_error_count: 0,
         },
     };
+    let mut seen_definitions = BTreeSet::new();
+    shard.definitions.retain(|definition| {
+        seen_definitions.insert((
+            definition.kind.clone(),
+            definition.name.clone(),
+            definition.file_id,
+            definition.range,
+        ))
+    });
     FileState { revision, source: Arc::from(source), parsed, hir, shard: Arc::new(shard) }
 }
 
@@ -1348,7 +1361,7 @@ fn shard_from_parsed(
     let mut definitions = Vec::new();
     let mut references = Vec::new();
     collect_hir_semantics(file, hir, &mut definitions, &mut references);
-    collect_profile_token_definitions(file, parsed, profile, &mut definitions);
+    collect_profile_token_definitions(file, hir, profile, &mut definitions);
     collect_semantic_type_members(file, parsed, rules, &mut definitions);
     FileIndexShard {
         file_id: file.id,
@@ -1584,7 +1597,7 @@ fn semantic_type_path_matches(
 
 fn collect_profile_token_definitions(
     file: &SourceFile,
-    parsed: &ParsedFile,
+    hir: &HirFile,
     profile: &GameProfile,
     definitions: &mut Vec<Definition>,
 ) {
@@ -1593,46 +1606,23 @@ fn collect_profile_token_definitions(
         .iter()
         .filter(|rule| rule.path.matches(file.logical_path.as_str()))
     {
-        for token in
-            parsed.tokens().iter().filter(|token| token.kind() == pdx_syntax::TokenKind::Bare)
+        for parameter in
+            hir.parameter_definitions().iter().filter(|item| item.delimiter == rule.delimiter)
         {
-            let Some(raw) = parsed.text(token.range()) else { continue };
-            let mut opening: Option<usize> = None;
-            for (offset, character) in raw.char_indices() {
-                if character != rule.delimiter {
-                    continue;
-                }
-                if let Some(start) = opening.take() {
-                    if start + rule.delimiter.len_utf8() < offset {
-                        let name_start = start.saturating_add(rule.delimiter.len_utf8());
-                        let name = raw[name_start..offset].to_owned();
-                        let token_start = usize::try_from(token.range().start()).unwrap_or(0);
-                        let start =
-                            u32::try_from(token_start.saturating_add(start)).unwrap_or(u32::MAX);
-                        let end = u32::try_from(
-                            token_start.saturating_add(offset.saturating_add(character.len_utf8())),
-                        )
-                        .unwrap_or(u32::MAX);
-                        let range = TextRange::new(start, end).unwrap_or(token.range());
-                        definitions.push(Definition {
-                            kind: rule.inner_kind.clone(),
-                            name: name.clone(),
-                            file_id: file.id,
-                            range,
-                            active: true,
-                        });
-                        definitions.push(Definition {
-                            kind: rule.wrapped_kind.clone(),
-                            name: format!("{}{name}{}", rule.delimiter, rule.delimiter),
-                            file_id: file.id,
-                            range,
-                            active: true,
-                        });
-                    }
-                } else {
-                    opening = Some(offset);
-                }
-            }
+            definitions.push(Definition {
+                kind: rule.inner_kind.clone(),
+                name: parameter.name.clone(),
+                file_id: file.id,
+                range: parameter.range,
+                active: true,
+            });
+            definitions.push(Definition {
+                kind: rule.wrapped_kind.clone(),
+                name: format!("{}{}{}", rule.delimiter, parameter.name, rule.delimiter),
+                file_id: file.id,
+                range: parameter.range,
+                active: true,
+            });
         }
     }
 }
@@ -2673,6 +2663,57 @@ mod tests {
             index.active_definition("event", "shared.1").expect("remaining definition").file_id,
             first_file
         );
+    }
+
+    #[test]
+    fn identical_collector_records_resolve_as_one_physical_definition() {
+        let file_id = SourceFileId::new(1);
+        let range = TextRange::new(4, 12).expect("range");
+        let definition = Definition {
+            kind: "scripted_effect".to_owned(),
+            name: "apply".to_owned(),
+            file_id,
+            range,
+            active: true,
+        };
+        let index = WorkspaceIndex::from_shards([FileIndexShard {
+            file_id,
+            definitions: vec![definition.clone(), definition],
+            references: Vec::new(),
+            syntax_error_count: 0,
+        }]);
+
+        assert_eq!(
+            index
+                .active_definition("scripted_effect", "apply")
+                .expect("identical records are one physical definition")
+                .range,
+            range
+        );
+
+        let distinct_range = TextRange::new(20, 28).expect("distinct range");
+        let distinct = WorkspaceIndex::from_shards([FileIndexShard {
+            file_id,
+            definitions: vec![
+                Definition {
+                    kind: "scripted_effect".to_owned(),
+                    name: "apply".to_owned(),
+                    file_id,
+                    range,
+                    active: true,
+                },
+                Definition {
+                    kind: "scripted_effect".to_owned(),
+                    name: "apply".to_owned(),
+                    file_id,
+                    range: distinct_range,
+                    active: true,
+                },
+            ],
+            references: Vec::new(),
+            syntax_error_count: 0,
+        }]);
+        assert!(distinct.active_definition("scripted_effect", "apply").is_none());
     }
 
     #[test]

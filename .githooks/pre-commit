@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root=$(git rev-parse --show-toplevel)
+
+echo "Running ParadoxCode pre-commit quality gates..."
+exec "$root/scripts/check-quality-gates.sh"

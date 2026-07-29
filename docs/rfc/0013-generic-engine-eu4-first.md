@@ -64,9 +64,9 @@ pdx-lsp
 
 ## 迁移策略
 
-> 实现进度（2026-07-22）：步骤 2–5 已完成。`pdx-rules` 持有通用 runtime 和 data-only `GameProfile`，`pdx-game-eu4` 持有 EU4 profile 和内嵌 artifact provider，`pdx-eu4` 只剩兼容 re-export。schema 13 与第一方 source format 1 已落地；CLI → LSP → host → snapshot 显式传递并校验 profile。scope semantic lowering 尚未完成。
+> 实现进度（2026-07-25）：步骤 2–6 已完成。`pdx-rules` 持有通用 runtime 和 data-only `GameProfile`，`pdx-game-eu4` 持有 EU4 profile 和内嵌 artifact provider，迁移期 `pdx-eu4` re-export 已删除。schema 13 与第一方 source format 1 已落地；CLI → LSP → host → snapshot 显式传递并校验 profile。semantic root context、初始 scope state、静态 nested transition/intrinsic 与多段 exact link lowering 已进入 HIR。
 
-当前 `pdx-eu4` 同时包含通用规则 runtime 与 EU4 数据。迁移必须分步进行：
+原 `pdx-eu4` 同时包含通用规则 runtime 与 EU4 数据；迁移按以下步骤分阶段完成：
 
 1. 先为现有行为建立回归测试和性能计数器；
 2. 将不引用 EU4 名称或路径的规则类型移动到 `pdx-rules`；

@@ -62,10 +62,10 @@ pdx-cwt
   bootstrap parser and typed import model
   directive decoder
   corpus inventory
-  normalization into pdx-eu4 write model
+  normalization into pdx-rules write model
   import validation and report
 
-pdx-eu4
+pdx-rules
   SQLite schema and migrations
   stable logical IDs
   write transaction API used by importer

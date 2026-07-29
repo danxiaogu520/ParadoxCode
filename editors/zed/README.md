@@ -17,10 +17,17 @@ known EU4 directories with PdxScript, localisation, and CSV. The complete list w
 generated from `Eu4Rules`; this Phase 1 file is deliberately conservative and is not a semantic
 rule table.
 
-Install the directory as a Zed development extension, ensure `pdx-ls` is on Zed's worktree PATH
-(or configure `lsp.pdx-ls.binary.path`), and open an EU4 Mod workspace with the recommended
-settings. The extension registers one `pdx-ls` server for all three languages and launches it
-without a rules argument. Rules cannot be replaced through editor settings or project files.
+Install the directory as a Zed development extension and open an EU4 Mod workspace with the
+recommended settings. An explicitly configured `lsp.pdx-ls.binary.path` takes precedence, followed
+by `pdx-ls` on the worktree PATH. A published extension otherwise downloads the exact same-version
+GitHub Release asset for the current platform, validates its named SHA-256 sidecar, rejects
+multi-file/path-traversing archives, enforces bounded sidecar/archive/decompressed sizes, and caches
+the executable in the extension work directory. The cache stores a separate executable SHA-256 and
+revalidates it before every reuse; missing, truncated, or changed cache entries are removed and
+downloaded again. HTTP bodies are consumed through Zed's streaming API and rejected before a chunk
+would grow the buffer past its limit.
+The extension registers one `pdx-ls` server for all three languages and launches it without a rules
+argument. Rules cannot be replaced through editor settings or project files.
 
 With no project configuration, the server uses the opened worktree as the current Mod root. For a
 workspace containing a separate Mod directory and ordered dependency Mods, configure

@@ -8,7 +8,10 @@ import json
 import os
 import sqlite3
 import subprocess
+import sys
+import tarfile
 import tempfile
+import tomllib
 from pathlib import Path
 from urllib.parse import quote
 
@@ -17,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RULES = ROOT / "rules" / "eu4.pdxrules"
 MANIFEST = ROOT / "rules" / "manifest.json"
 SERVER = ROOT / "target" / "debug" / "pdx-ls"
+PACKAGER = ROOT / "scripts" / "package-server-release.py"
 
 
 def require(condition: bool, message: str) -> None:
@@ -138,12 +142,69 @@ def check_server_smoke() -> None:
         require(rename["result"]["changes"][uri][0]["newText"] == "smoke.2", "rename edit missing")
 
 
+def check_packaged_server() -> None:
+    require(SERVER.is_file(), "pdx-ls binary is missing; run cargo build first")
+    with (ROOT / "Cargo.toml").open("rb") as handle:
+        version = tomllib.load(handle)["workspace"]["package"]["version"]
+    with tempfile.TemporaryDirectory(prefix="pdx-packaged-server-smoke-") as directory:
+        destination = Path(directory)
+        process = subprocess.run(
+            [
+                sys.executable,
+                os.fspath(PACKAGER),
+                "--version",
+                version,
+                "--target",
+                "x86_64-unknown-linux-gnu",
+                "--binary",
+                os.fspath(SERVER),
+                "--output-dir",
+                os.fspath(destination),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        require(process.returncode == 0, f"server packaging failed: {process.stderr}")
+        archive_path = Path(process.stdout.strip())
+        sidecar_path = archive_path.with_name(f"{archive_path.name}.sha256")
+        digest, name = sidecar_path.read_text(encoding="utf-8").strip().split("  ", 1)
+        require(name == archive_path.name, "packaged server checksum filename mismatch")
+        require(
+            digest == hashlib.sha256(archive_path.read_bytes()).hexdigest(),
+            "packaged server checksum mismatch",
+        )
+        with tarfile.open(archive_path, "r:gz") as archive:
+            members = archive.getmembers()
+            require(
+                len(members) == 1 and members[0].name == "pdx-ls" and members[0].mode == 0o755,
+                "packaged server archive contract mismatch",
+            )
+            source = archive.extractfile(members[0])
+            require(source is not None, "packaged server executable is missing")
+            installed = destination / "installed-pdx-ls"
+            installed.write_bytes(source.read())
+        installed.chmod(0o755)
+        version_result = subprocess.run(
+            [os.fspath(installed), "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        require(version_result.returncode == 0, f"packaged pdx-ls failed: {version_result.stderr}")
+        require(
+            version_result.stdout.strip() == f"pdx-ls {version}",
+            "packaged pdx-ls version output mismatch",
+        )
+
+
 def main() -> int:
     try:
         check_artifact()
+        check_packaged_server()
         check_server_smoke()
-        print("Phase 6A release asset, server launch, and rename smoke passed.")
-    except (OSError, KeyError, sqlite3.Error, RuntimeError, StopIteration) as error:
+        print("Phase 6A release asset, packaged server launch, and rename smoke passed.")
+    except (OSError, KeyError, sqlite3.Error, RuntimeError, StopIteration, ValueError) as error:
         print(f"Phase 6A check failed: {error}")
         return 1
     return 0

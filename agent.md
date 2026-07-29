@@ -82,7 +82,7 @@ pdx-rules -> pdx-rulec
 pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 ```
 
-通用规则 runtime 已迁入 `pdx-rules`，EU4 bootstrap/profile 已迁入 `pdx-game-eu4`；`pdx-eu4` 只保留迁移期兼容 re-export。后续继续隔离 analysis/HIR 中的 EU4 特有语义，避免一次性重写。
+通用规则 runtime 已迁入 `pdx-rules`，EU4 bootstrap/profile 已迁入 `pdx-game-eu4`，迁移期 `pdx-eu4` re-export 已删除。后续继续隔离 analysis/HIR 中的 EU4 特有语义，避免一次性重写。
 
 各层职责：
 
@@ -93,7 +93,6 @@ pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 | `pdx-rules` | 通用规则 schema、canonical view、`rule_hash`、只读 runtime API | 具体游戏名称表、外部规则 parser、LSP、动态 Mod symbol |
 | `pdx-game` | 数据驱动安装标志、跨平台发现、最小验证、用户级本机配置 | 具体游戏名称、语义规则、workspace 索引、编辑器 API |
 | `pdx-game-eu4` | EU4 profile、路径、scope、command、symbol 和特殊语义 | LSP、workspace 可变状态、编辑器 API |
-| `pdx-eu4`（过渡） | 兼容 re-export；待迁移完成后删除 | 新增长期公共能力 |
 | `pdx-rulec` | 严格读取第一方 JSON 规则源码、校验并生成 artifact/manifest | CWT 输入、runtime 依赖、网络同步、用户规则覆盖 |
 | `pdx-hir` | 基于 typed CST、RuleSet 和游戏 profile 的 lowering、scope | 编辑器 API、磁盘 I/O |
 | `pdx-workspace` | VFS、overlay、source roots、parse/HIR cache、index shards、snapshot | LSP protocol types |
@@ -146,6 +145,12 @@ pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 4. 写出本次改动的最小范围、预期不变量和验证命令；
 5. 若发现已有改动，保留其内容，只编辑任务所需的区域。
 
+Git checkout 使用仓库版本化的 `.githooks/pre-commit` 作为本地质量门禁。首次 clone 后运行
+`bash scripts/install-git-hooks.sh`；代理发现 `core.hooksPath` 未指向 `.githooks` 时应自行
+安装。正常提交直接执行 `git commit`，让 hook 调用 `scripts/check-quality-gates.sh`，无需
+在提交前手工重复整套复杂命令。只有诊断某一失败时才单独运行 `core`、`grammars`、`zed`
+或 `release` 分组；CI 继续负责 Windows、MSRV 和依赖策略等环境专属门禁。
+
 ### 实现中
 
 - 每次改动保持可编译或尽量保持局部可验证；
@@ -172,7 +177,7 @@ pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 
 - `pdx-text`：offset、line endings、UTF-16、URI/path；
 - `pdx-syntax`：typed CST、错误提取、增量编辑、错误恢复；
-- `pdx-rules`/过渡期 `pdx-eu4`：schema、只读加载、foreign key、hash 稳定性和 runtime invariants；
+- `pdx-rules`：schema、只读加载、foreign key、hash 稳定性和 runtime invariants；
 - `pdx-rulec`：严格 source schema、stable identity、invariant、deterministic hash、artifact round-trip；
 - `pdx-hir`：scope transition、unknown context、typed lowering；
 - `pdx-workspace`：root order、overlay、覆盖解析、shard replacement、snapshot；
