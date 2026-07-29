@@ -1,6 +1,6 @@
 name = "Europa Universalis IV"
 grammar = "eu4"
-path_suffixes = [".gui", ".gfx"]
+path_suffixes = ["gui", "gfx"]
 line_comments = ["# "]
 tab_size = 4
 hard_tabs = true

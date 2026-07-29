@@ -1,355 +1,116 @@
-# ParadoxCode 实施计划
+# ParadoxCode 执行计划
 
-> 本文件是 ParadoxCode 从设计基线走向可工作的 EU4 语言工具链的执行计划。
-> 具体设计以 `docs/` 下的 RFC 为准；如果实现需要改变已接受的边界，先更新对应 RFC，再更新本计划。
+> 本文件只记录当前实现状态、剩余工作和执行顺序。产品能力、非目标和各阶段退出条件
+> 由 [EU4 v0.1 MVP 验收基线](docs/mvp.md) 定义；架构边界由
+> [总体架构](docs/architecture.md) 和已接受 RFC 定义。
 
-> 2026-07-20 scope amendment：项目调整为通用 `pdx-lsp` 引擎、EU4-first。EU4 仍是当前唯一交付目标，其他游戏优先级低且没有版本承诺；通用边界和迁移原则见 `docs/rfc/0013-generic-engine-eu4-first.md`。
+## 当前状态
 
-## 1. 项目目标
+ParadoxCode 当前是 EU4 alpha，尚未发布 `v0.1.0`。通用 `pdx-lsp` 引擎与 EU4-first
+边界已经建立，Phase 0–5 的主要能力和 Phase 6A 的代码链路已有自动化回归。以下事实
+不能被表述为已经完成：
 
-ParadoxCode 为 Europa Universalis IV（EU4）Mod 提供面向 Zed 的语言工具链，首个可交付版本为 `v0.1.0`。用户在打开一个 EU4 Mod workspace 后，应能获得：
+- 尚未用真实 tag 完成并复核五平台原生 release workflow；
+- 尚未在干净机器上对实际发布的 Zed extension 和 server asset 做端到端安装验收；
+- workspace-dependent scope transition 与冲突 alternative 的共同诊断仍不完整。
 
-- Script、EU4 localisation 和受支持 CSV 的语法识别与高亮基础；
-- syntax、unknown key、unknown symbol、scope 等诊断；
-- key、effect、trigger、symbol、localisation 的补全、悬停、定义和引用查询；
-- document symbol、workspace symbol 和安全的语义 rename；
-- 固定、幂等、保留注释并递归处理可证明 quoted script 的规范全文格式化；
-- 未保存文档、当前 Mod、有序依赖 Mod、Vanilla 的正确覆盖解析；
-- 由自有 SQLite `eu4.pdxrules` 驱动的 EU4 文件分类和语义分析；
-- 首次建立、持久化，并仅通过用户显式操作刷新的 Vanilla 索引缓存。
+## 阶段状态
 
-核心分析不依赖编辑器。Zed extension 是薄客户端，`pdx-ls` 只负责 LSP 生命周期和协议转换，语言功能集中在 `pdx-analysis`。
-
-## 2. 当前基线
-
-当前工作区已经实现 Phase 0–6A 的主要 EU4 功能原型，但 2026-07-20 重新审计确认它仍是 alpha：架构文档描述的 HIR/cache/snapshot/取消模型和普通用户发布链路尚未完全落地。后续先完成发布前修复阶段，再进入 Phase 6B：
-
-- `docs/architecture.md`：总体架构、数据流、crate 依赖和并发模型；
-- `docs/mvp.md`：MVP 成功定义、Phase 0–7 计划和质量预算；
-- `docs/rfc/0001`–`docs/rfc/0015`：系统边界、语法、VFS、规则数据库、HIR、索引、语言功能、LSP、Zed、测试、内嵌规则和第一方规则源码约束；
-- `reference/`：只读历史调研资料，不是构建、测试或规则维护依赖；
-- Phase 0–6A 已建立 Rust workspace、EU4 parser、CSV/localisation facade、Zed syntax assets、JSON-RPC/LSP runtime、规则数据库、workspace overlay/index、规则驱动语言功能和安全 rename；这些能力是迁移基线，不代表 v0.1 已完成发布。
-
-因此第一步不是实现语言功能，而是建立能够持续验证这些设计的最小工程骨架。
-
-## 3. 范围和明确的非目标
-
-### 本次范围
-
-- 游戏：只支持 EU4 的最新/最终版本；
-- 客户端：先支持 Zed；
-- 服务：`pdx-ls`；
-- CLI：用户入口为 `pdx`，规则维护工具为 `pdx-rulec`；
-- 规则：开发者维护 `rules/eu4/*.json` 唯一权威源，严格编译成内嵌的 `eu4.pdxrules`；
-- 文件：规则数据库声明的所有可支持文本文件类别，按类别选择 Script、localisation、CSV 或资源路径索引；
-- 发布：完成 Phase 1–6A 退出条件后发布 `v0.1.0`。
-
-### 不在 MVP
-
-- 当前版本实现其他游戏 profile、动态插件 ABI 或多游戏 workspace；
-- VS Code extension；
-- Semantic Tokens、Code Action、Quick Fix、Inlay Hint、Code Lens、Document Link；
-- 存档、二进制和媒体内容的语义解析；
-- EU4 运行时模拟；
-- 历史版本规则矩阵；
-- 规则历史、diff、rollback 管理 UI以及任何外部规则格式兼容；
-- 自动监控或自动刷新 Vanilla 索引。
-
-## 4. 目标结构
-
-目标仓库布局如下，具体目录可随实现调整，但依赖方向不能反转：
-
-```text
-crates/
-  pdx-text/
-  pdx-syntax/
-  pdx-rules/
-  pdx-game/
-  pdx-game-eu4/
-  pdx-rulec/
-  pdx-hir/
-  pdx-workspace/
-  pdx-analysis/
-  pdx-format/
-  pdx-lsp/
-  pdx-cli/
-grammars/
-editors/zed/
-rules/
-tests/
-fuzz/
-docs/
-reference/
-```
-
-依赖主链：
-
-```text
-pdx-text
-  -> pdx-syntax -> pdx-hir -> pdx-workspace -> pdx-analysis -> pdx-lsp
-  -> pdx-format                                      -> pdx-cli
-pdx-rules -> pdx-hir / pdx-workspace / pdx-analysis / pdx-lsp
-pdx-rules -> pdx-rulec
-```
-
-关键对象包括 `AnalysisHost`、`AnalysisSnapshot`、`SourceRoot`、`SourceFile`、`OpenDocumentOverlay`、`ParsedFile`、`HirFile`、`FileIndexShard`、`WorkspaceIndex`、`RuleSet`、`Eu4Profile` 和 `VanillaIndexCache`。跨请求身份使用稳定 ID，不使用绝对路径字符串或 CST node pointer。
-
-## 5. 分阶段路线
-
-所有阶段都应以小的、可审查的增量交付。阶段完成后满足退出条件，才进入下一阶段；阶段中的实现顺序可以在不改变边界的前提下调整。
-
-### Phase 0：工程骨架和设计基线
-
-状态：`completed`（2026-07-16）
-
-工作项：
-
-- [x] 初始化 Rust workspace、基础目录和最小 `pdx-*` crate；
-- [x] 创建 `pdx`、`pdx-ls` 与维护者规则编译器入口；
-- [x] 配置 rustfmt、clippy、测试、文档检查、依赖许可证/安全审计和基础 CI；
-- [x] 建立 grammar、fixture、fuzz、Zed extension 的最小目录；
-- [x] 验证 Zed 从 monorepo grammar 目录构建的可行性，并记录 local `file://` 与发布镜像方案；
-- [x] 验证多平台 `pdx-ls` 发布、查找和下载路径，并记录 artifact matrix；
-- [x] 将 RFC 0001–0012 的设计约束转成 crate-level 文档和最小 API 骨架。
-
-退出条件：空 crate 图可构建且无环；核心 crate 不依赖 Zed；EU4 语法和规则边界在核心 crate 内固定；所有 workspace package 使用 `pdx-` 前缀；grammar 和 server distribution spike 有书面结论。
-
-说明：当前目录不是 Git checkout，且 `agent.md` 禁止代理自行初始化或清理仓库状态，因此 Git 仓库初始化由宿主环境负责；这不影响 Cargo workspace、CI 和 Phase 1 的实现入口。
-
-依赖：无。
-
-### Phase 1：Zed 与 Tree-sitter grammar
-
-状态：`completed`（2026-07-17；源码与自动化质量门禁完成）
-
-工作项：
-
-- [x] 实现 `tree-sitter-eu4`；
-- [x] 实现 `tree-sitter-pdx-eu4-localisation`；
-- [x] 为受支持 CSV 确定独立 Rust parser facade，并提供 editor-only CSV grammar；
-- [x] 添加 grammar corpus、错误恢复和单字符删除测试；
-- [x] 添加 Zed 的 highlights、brackets、indents、outline queries；
-- [x] 建立 Zed dev extension、language metadata 和文件识别策略。
-
-Script 至少覆盖 property、裸 value、嵌套/混合 block、八种 operator、quoted/unquoted scalar、注释、header block、conditional parameter block、重复 key 和不完整 string/block/operator。
-
-退出条件：corpus 全部通过；任意 corpus 单字符删除不导致 parser panic；Zed manifest、metadata 和 query 编译检查通过；extension 源码不包含 effect/trigger 名称表或 scope 规则。当前环境没有可自动控制的 Zed GUI，因此示例 Mod 的最终识别/高亮仍应在发布前按编辑器手册执行一次宿主环境 smoke test。
-
-依赖：Phase 0。
-
-### Phase 2：最小 Language Server
-
-状态：`completed`（2026-07-18；stdio runtime、文档同步与内存 transport 集成测试完成）
-
-工作项：
-
-- [x] 实现 `initialize`、`initialized`、`shutdown`、`exit`；
-- [x] 实现 `didOpen`、增量 `didChange`、`didClose`；
-- [x] 跟踪文档版本和 open document overlay；
-- [x] 完成 URI、路径、UTF-8 byte、UTF-16 position 转换；
-- [x] 让 `pdx-ls` 通过 stdio 启动并完成最小握手；
-- [x] 用内存 transport 编写真实 JSON-RPC/LSP integration tests。
-
-退出条件：乱序版本不会覆盖新版本；`didClose` 恢复磁盘 candidate；emoji、CJK、组合字符位置测试通过；请求在未 initialize 时得到规范错误；取消和 stale result 不会污染当前状态。当前实现已通过内存 transport 集成测试；真实 Zed 安装 smoke test 仍属于宿主环境发布检查。
-
-依赖：Phase 0、Phase 1 的语言识别 spike。
-
-### Phase 3：Typed CST、syntax diagnostics 与 formatter
-
-状态：`completed`（2026-07-29 重新验收；固定规范布局、quoted-script 递归布局、精确 edits、LSP 固定风格、工作区测试和 formatter fuzz smoke 已通过）
-
-工作项：
-
-- [x] 在 syntax crate 上建立 typed CST facade；
-- [x] 实现 localisation 和受支持 CSV 的独立 typed parser facade；
-- [x] 接入 revision-safe 编辑更新，并验证与 full reparse 的可观察结果一致；
-- [x] 将 syntax error 映射到稳定 diagnostic；
-- [x] 实现保留 trivia 的保守全文 formatter；
-- [x] 添加 parser、增量编辑、formatter fuzz target；
-
-编辑更新使用纯 Rust parser 重新构建 CST；结果同时与 full reparse 的 typed CST、token 序列和 diagnostics 做等价性验证。Tree-sitter 仅留在 Zed grammar 资产，不进入核心运行时。
-
-退出条件：合法 corpus 格式化幂等；不丢失或跨语义节点移动注释；含不安全 `ERROR` node 的文档不生成破坏性 edit；所有输出 range 位于 source 范围内。
-
-依赖：Phase 1、Phase 2 的文本同步基础。
-
-### Phase 4：第一方规则源码、编译器和 Workspace Index
-
-状态：`completed`（2026-07-25）；第一方 JSON source、严格 `pdx-rulec`、内嵌 runtime、root/overlay resolver、file shards、dependency 配置、Vanilla cache、watched-file 定向更新和主要语义回归均已实现。
-
-这是 MVP 中最大的一阶段，应拆成“规则 schema/runtime”和“第一方 source/compiler”两个可独立审查的序列。
-
-规则数据库：
-
-- [x] 定义 SQLite schema、稳定 logical identity、schema version 和 runtime read-only loader；
-- [x] 实现 canonical logical projection 和版本化 `rule_hash`；
-- [x] 生成 `rules/eu4.pdxrules` 与 manifest/report；
-- [x] 为 EU4 path/type descriptor 生成 file category catalog；
-- [x] 校验 foreign key、stable ID、matcher/reference、schema 和 hash invariants。
-
-第一方规则编译器：
-
-- [x] 固定、严格读取 `rules/eu4/` source layout；
-- [x] 保留重复规则、source order、alternative identity、node/leaf/value clause 形状；
-- [x] 校验 unknown fields、stable identity、cardinality、severity 和 type descriptor；
-- [x] 编译 type、subtype、alias、enum、scope、link、effect、trigger、modifier、localisation 和 path metadata；
-- [x] 使用临时文件、完整 round-trip validation 和 atomic publish；
-- [x] 输出 source/game/schema version、rule hash、artifact checksum 和 logical counts。
-
-Workspace/index：
-
-- [x] 实现 vanilla、dependency、current mod source roots；
-- [x] 实现 open document overlay；
-- [x] 按 file/symbol category 实现 `ReplaceBySymbol`、`ReplaceByRelativePath`、`Merge`、`Unique` resolution seam；
-- [x] 实现 EU4 type/enum/variable/localisation/filepath definition/reference shard seam；
-- [x] 实现 Vanilla 首次索引缓存和显式手动刷新入口；
-- [x] 实现一次性跨平台 Vanilla 快速发现、用户级配置、手动深度扫描和当前 LSP 会话原子启用；
-- [x] 添加 Event、Scripted Effect、Scripted Trigger、Localisation 强制回归场景。
-
-退出条件：已验证来源顺序为 overlay > current mod > ordered dependencies > Vanilla；单文件变化只替换自身 shard；被覆盖 definition 可解释但不是活动跳转目标；73 文件 bootstrap corpus 无被静默忽略的构造；相同逻辑数据库内容产生相同 `rule_hash`；文件分类、解析和 Event/Scripted Effect/Scripted Trigger/Localisation definition fixture 已通过。
-
-依赖：Phase 3；当前权威边界见 RFC 0015。
-
-### Phase 5：语言功能
-
-状态：`completed`（2026-07-20 重新验收）；查询功能和 LSP integration 已实现，query-time 全 workspace 重解析、深拷贝 snapshot，以及 event-loop 上的 workspace scan、parse/lower、diagnostics 和语言查询已消除；initialize scan 与 analysis 内部协作式取消均有回归。
-
-工作项：
-
-- [x] 实现 syntax、unknown key、unknown symbol、ambiguous symbol、scope diagnostics；
-- [x] 实现 key/command、value、localisation、symbol completion；
-- [x] 实现 hover；
-- [x] 实现 definition、references、document symbol、workspace symbol；
-- [x] 将所有 handler 委托给 `pdx-analysis`，LSP 层只做协议转换；
-- [x] 为 incomplete CST、unresolved symbol、ambiguous symbol、unknown scope 添加回归测试；
-- [x] 默认只向编辑器发布当前 Mod 和未保存文件 diagnostics。
-
-退出条件：不完整输入仍有可用 completion；unresolved/ambiguous symbol 不产生随机跳转；unknown scope 不产生级联 scope errors；所有可支持文本类别至少有 syntax diagnostics；具有 descriptor 的类别获得相应 semantic features。
-
-依赖：Phase 4。
-
-### Phase 6A：Rename 与 v0.1 发布
-
-状态：`implemented, not released`（2026-07-21）；prepare rename、safe WorkspaceEdit、只读来源保护与 formatter LSP 已实现，RFC 0014 规则内嵌、自动安装、跨平台 release 与干净 clone smoke 尚未完成。
-
-工作项：
-
-- [x] 实现 prepare rename；
-- [x] 只对已解析且无冲突的 definition/reference 生成 WorkspaceEdit；
-- [x] 校验名称、冲突和修改范围；
-- [x] 只修改当前 Mod 和属于当前 Mod 的未保存 overlay；
-- [x] 拒绝修改 Vanilla、依赖 Mod 或定义位于只读来源的 symbol；
-- [x] 完成发布构建、Zed 安装/启动 smoke test 和用户文档。
-
-退出条件：rename 后重新分析不产生新增 unresolved reference；ambiguous reference 直接拒绝；Phase 1–6A 全部退出条件通过；无已知 parser/formatter crash；内嵌规则、manifest 与 `rule_hash` 一致；支持平台完成 Zed smoke test。
-
-依赖：Phase 5。
-
-重新满足所有退出条件后发布 `v0.1.0`。
-
-### Phase R：通用引擎边界与发布前架构修复
-
-状态：`in progress`（2026-07-21）
-
-按可独立验证的小切片执行：
-
-1. 接受 RFC 0013，拆分通用规则 runtime 与 EU4 profile（`pdx-rules`、`pdx-game-eu4`、schema 12 `game_id` 校验已建立，迁移期 `pdx-eu4` facade 已删除；data-only profile 已显式贯穿 CLI/LSP/host/snapshot，workspace symbol/reference 与 analysis scope/key/member fallback 已迁移；syntax 历史 API 已保持行为重命名）；
-2. 实现真实 per-file HIR/FileState，overlay 变化只更新一个文件（FileState、磁盘复用、overlay 按版本 parse/lower cache，以及供 workspace shard/analysis 共享的 property/localisation/scalar/recovery `UnknownConstruct`/`ParameterConditional`、按顶层 definition 隔离并支持 definition/references/hover/rename、document-local symbol 与唯一 invocation 精确校验/补全的 parameter facts、profile-aware definition/reference、semantic root context/parent path、初始 `ScopeState`、register intrinsic、多段 exact scope-link expression、无冲突 exact command transition〔含等价 alternative signature〕、可由直接子 key 唯一静态消歧的冲突 transition HIR facts，以及 diagnostics/已有子项 nested completion 对 scope facts 的复用、结构字段/child-context 混合 block 分区、空 block 多 destination completion、workspace type member 驱动的 diagnostics transition 过滤和 unresolved transition 禁止规则顺序回退已完成；仍不能静态消歧的冲突 diagnostics alternative 共同结果汇总待完成）；
-3. 将 snapshot 改为共享不可变状态，查询创建 snapshot 时不深拷贝 workspace 文本和索引（已完成）；
-4. 删除 analysis query-time 全 workspace 重解析，查询只读取当前 HIR 与 WorkspaceIndex（已完成）；
-5. 增加 index bulk build 和真正的单 shard 增量 replacement（已完成）；
-6. 修复稳定 SourceFileId、symlink 顺序、文件大小/深度/数量限制和错误隔离（已完成）；
-7. 将 LSP transport 迁移到类型化协议层，增加 worker、debounce、版本门和在途取消（已完成：stdio reader 分离，initialize 候选 host scan worker，prepared-document parse worker/三重提交门，semantic diagnostics 200ms debounce，snapshot request worker，共享 cancellation token 与 analysis 内部 checkpoint；workspace scan 覆盖目录/读取/parse/lower/index 检查点并有取消原子性回归；`lsp-types` 接管当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 和语言功能 response，轻量 JSON-RPC framing 有意保留）；
-8. 接入 formatting、dependency roots、Vanilla cache 持久化和文件变化更新（已完成：formatting 覆盖 typed request/edits、snapshot worker、UTF-16 与 unsafe-syntax integration；dependency roots 覆盖类型化 initialization options、TOML、稳定 ID、有序优先级、重叠校验和只读 rename；Vanilla cache 覆盖显式 CLI 建库/刷新、一次性跨平台自动发现、用户级配置、手动深度扫描、版本化 SQLite、source fingerprint、无源码持久化、可取消后台建库/只读加载、当前会话原子启用、降级 warning 与不重复搜索；watched-file 覆盖 Current Mod/Dependency 动态注册、后台定向更新、revision 提交门、overlay 保留和真实 JSON-RPC 回归）；
-9. 建立大型 synthetic workspace benchmark 与“编辑一个文件只 parse/lower 一次”计数测试（已完成：默认 2,000 个原创 EU4 event 文件，覆盖 cold/unchanged/单磁盘变化/单 overlay 编辑；线程局部测试计数器证明 overlay 编辑 parse/lower 各一次且不重建磁盘 `FileState`）；
-10. 按 RFC 0014/0015 内嵌第一方 EU4 规则并删除 runtime `--rules` 与扩展规则 asset（已完成）；Zed exact-version 自动获取、SHA-256 校验、受限解压、5-target 原生 tag workflow、deterministic archive/sidecar 与完整矩阵 verifier 已实现，实际发布资产上的干净机器端到端安装测试仍待完成。
-
-Phase R 完成前不开始 Semantic Tokens、Quick Fix、其他游戏 profile 或新的编辑器客户端。
-
-### Phase 6B：v0.2 与后续
-
-状态：`future`
-
-- Semantic Tokens；
-- Code Action 与 Quick Fix；
-- 其他经过实际用户需求验证的编辑器能力。
-
-### Phase 7：VS Code 薄客户端
-
-状态：`future`
-
-为 VS Code 编写复用 `pdx-ls` 的薄客户端。不得把语言分析规则复制进客户端。
-
-## 6. 建议的垂直切片
-
-为了尽早验证端到端链路，第一条可运行切片应围绕少量原创 fixture 完成：
-
-```text
-Script fixture
-  -> CST
-  -> syntax diagnostic
-  -> HIR lowering
-  -> file index shard
-  -> workspace snapshot
-  -> pdx-analysis query
-  -> LSP response
-  -> Zed smoke test
-```
-
-建议先覆盖 Event、Scripted Effect、Scripted Trigger 和 Localisation 四类基准对象，再扩展到规则数据库声明的其他类别。它们是回归基准，不是最终 symbol 范围上限。
-
-每个切片应同时提交：实现、最小原创 fixture、unit/golden/integration test、必要的 RFC/README 更新，以及已知限制。
-
-## 7. 质量门禁
-
-每个 pull request 至少应验证：
-
-- `cargo fmt --check`；
-- workspace/all-targets clippy，warnings denied；
-- unit、integration、doc tests；
-- Tree-sitter corpus；
-- `eu4.pdxrules` schema/invariant validation；
-- manifest `rule_hash` 与数据库 canonical logical content 一致；
-- logical hash 对插入顺序、SQLite index、VACUUM 和物理重建保持稳定；
-- runtime loader smoke test；
-- Zed extension manifest/build check；
-- 依赖许可证和 advisory policy；
-- fuzz target 编译和短 smoke。
-
-定时任务再运行长 fuzz、性能趋势和跨平台 build。性能目标作为基准和回归信号，不通过牺牲诊断正确性达成。
-
-建议基准：单文件 Rust full parse P95 < 20 ms；后续纯 Rust 增量优化必须保持同一可观察结果；completion P95 < 100 ms、hover/definition P95 < 50 ms、编辑后 semantic diagnostics 约 200 ms debounce 且可取消。
-
-## 8. 关键风险与决策门
-
-| 风险 | 早期信号 | 处理方式 |
+| 阶段 | 状态 | 说明 |
 | --- | --- | --- |
-| 第一方规则遗漏或冲突 | source validation、真实 Mod 或回归 fixture 暴露差异 | 修订权威 source 并添加 fixture；禁止外部格式 fallback |
-| CST/formatter 丢失信息 | 注释、重复 key 或错误节点在 round-trip 中改变 | 保留 trivia 和 source order；不安全时不生成 edit |
-| source root 覆盖错误 | 跳转命中被覆盖 definition 或 overlay 被忽略 | 用 resolution policy fixture 固化顺序和 category 行为 |
-| 规则 hash 不稳定 | VACUUM/插入顺序改变 `rule_hash` | 只 hash canonical logical projection，加入稳定性测试 |
-| LSP 层积累业务逻辑 | handler 直接访问磁盘或 EU4 名称表 | 将查询移入 `pdx-analysis`，LSP 只做生命周期和转换 |
-| Zed 文件识别冲突 | 宽泛 `.txt` 关联误伤其他语言 | 由 EU4 规则生成项目级 glob；保留手动选择 fallback |
-| 版权/分发污染 | Vanilla 或外部规则语料出现在提交/发布包 | 只提交自有 fixture、第一方 source 和生成物；检查 ignore 与 CI |
-| 后台任务产生旧结果 | 编辑后 diagnostics 回退 | 版本校验、可取消任务、不可变 snapshot 和 shard replacement |
+| Phase 0：工程与设计基线 | `completed` | Workspace、质量门禁和设计基线已建立 |
+| Phase 1：Zed 与 Tree-sitter | `completed` | 源码和自动化 grammar/Zed 检查已完成；发布前仍需宿主 smoke |
+| Phase 2：最小 Language Server | `completed` | stdio、文档同步、取消与真实 JSON-RPC 回归已完成 |
+| Phase 3：CST、诊断与 formatter | `completed` | 2026-07-29 按规范格式化设计重新验收 |
+| Phase 4：规则与 Workspace Index | `completed` | 第一方规则、增量 shard、dependency 与 Vanilla cache 已完成 |
+| Phase 5：语言功能 | `completed` | 查询、snapshot、worker 和 LSP integration 已完成 |
+| Phase R：发布前架构修复 | `in progress` | 剩余 scope 语义闭环 |
+| Phase 6A：Rename 与 v0.1 | `implemented, not released` | 代码链路已完成，发布退出条件未全部满足 |
+| Phase 6B / Phase 7 | `future` | v0.1 前不启动 |
 
-## 9. 完成定义
+`completed` 表示相应代码与自动化退出条件已满足，不代表 ParadoxCode 已可发布。发布结论
+必须同时满足 [MVP Phase 6A 验收基线](docs/mvp.md) 和
+[发布清单](docs/releasing.md)。
 
-只有同时满足以下条件，ParadoxCode 才算完成 `v0.1.0`：
+## 当前执行顺序
 
-1. Phase 1–6A 的实现和退出条件全部通过；
-2. Zed 能安装 extension、启动 `pdx-ls`，并加载 extension 携带的 `eu4.pdxrules`；
-3. 当前 Mod、依赖、Vanilla 和未保存 overlay 的解析顺序有自动化回归测试；
-4. 主要语言功能均通过真实 LSP JSON-RPC integration test，而不是仅测试内部 handler；
-5. 第一方 source schema、`rule_hash`、artifact schema/checksum、manifest 和 runtime loader 均通过校验；
-6. 不提交 Vanilla 游戏文件、用户缓存或外部规则 source tree；
-7. 文档中的 initialize options、EU4 rules schema、CLI 和实际实现一致；
-8. 已知限制、平台支持和安装方式写入发布文档。
+### 1. 完成 scope 语义闭环
 
-## 10. 文档维护规则
+在不改变 RFC 0013 的通用引擎边界下完成：
 
-- 架构或边界变化：先改对应 RFC，再改本文件；
-- 阶段状态、交付项或退出条件变化：改本文件，并在变更说明中写明原因；
-- 新增 crate、CLI、配置项或 artifact：同步更新 `docs/README.md` 和相关 RFC；
-- 外部调研结论：记录来源、commit、许可证和是否进入构建链；
-- 示例必须是 ParadoxCode 自有原创样例，不直接复制游戏文件或参考仓库 corpus。
+- workspace-dependent dynamic transition；
+- 不能由直接子 key 唯一消歧时，各 alternative 的安全共同诊断；
+- `Unknown`/`any` 保守回退，禁止按规则顺序随机选择；
+- HIR、analysis 与真实 LSP JSON-RPC 的分层回归。
+
+退出证据：
+
+- 唯一可解析 transition 得到确定 scope；
+- unresolved 或冲突 transition 不产生虚假确定性或级联错误；
+- diagnostics、completion 与 navigation 消费同一份 snapshot/HIR facts；
+- 新回归通过 workspace 和 LSP 两层验证。
+
+### 2. 完成真实发布演练
+
+代码中的 exact-version 下载、SHA-256 校验、受限解压、五 target matrix、确定性打包和
+verifier 已实现。剩余工作是用真实发布资产证明链路：
+
+1. 从候选提交运行完整质量门禁；
+2. 创建并审核测试 tag 的五平台产物和 checksum；
+3. 在干净机器安装实际 Zed extension；
+4. 验证下载、校验、缓存、启动、文件识别和主要语言功能；
+5. 记录平台、版本、结果和未覆盖风险；
+6. 仅在全部退出条件满足后发布 `v0.1.0`。
+
+发布、tag、GitHub Release 和 Zed registry 更新属于维护者外部操作，执行时遵循
+[发布流程](docs/releasing.md)。
+
+### 3. 发布前文档同步
+
+- `README.md` 只保留用户可验证的能力和真实限制；
+- 本文件更新阶段状态和剩余工作；
+- `docs/mvp.md` 只在验收范围或退出条件变化时修改；
+- 架构/API/规则 schema 变化先更新对应 RFC；
+- `CHANGELOG.md` 记录用户可见变化；
+- 不把开发机 smoke、内部单元测试或代码骨架描述为发布闭环。
+
+## 已完成的发布前架构切片
+
+以下工作已经落地并有回归，不再在本计划复制实现细节：
+
+- 通用 `pdx-rules`、`pdx-game` 与 EU4 profile 分层，删除迁移期 `pdx-eu4` facade；
+- 第一方 `rules/eu4/*.json`、严格 `pdx-rulec`、内嵌 `eu4.pdxrules`，删除 CWT 和外部
+  `--rules`；
+- per-file `FileState`/HIR cache、共享不可变 snapshot、bulk index 与单 shard replacement；
+- 稳定 `SourceFileId`、symlink 顺序、扫描资源限制和错误隔离；
+- LSP worker、debounce、版本提交门、协作式取消和类型化协议 DTO；
+- Current Mod、Dependency、overlay、持久化 Vanilla cache 和 watched-file 定向更新；
+- 2,000 文件 synthetic benchmark 与“单次编辑只 parse/lower 一次”的计数回归；
+- formatter 固定规范布局、quoted script 递归格式化、精确 edits 与 LSP/fuzz 回归；
+- Zed exact-version installer、受限下载/解压、五 target 发布 contract 和矩阵 verifier。
+
+更细的设计依据分别位于 [总体架构](docs/architecture.md)、[HIR 与 Scope RFC](docs/rfc/0005-hir-scope.md)、
+[LSP RFC](docs/rfc/0009-lsp-runtime.md) 和
+[内嵌规则 RFC](docs/rfc/0014-embedded-first-party-rules.md)。
+
+## 质量门禁
+
+正常提交通过版本化 pre-commit hook 调用：
+
+```text
+bash scripts/check-quality-gates.sh
+```
+
+只有诊断失败时才分别运行 `core`、`grammars`、`zed` 或 `release` 分组。CI 继续负责
+Windows、MSRV 和依赖策略等环境专属门禁。任何未运行的检查都必须在交付说明中明确
+记录原因和风险。
+
+## 暂不开始
+
+Phase R 和 Phase 6A 的发布退出条件满足前，不开始：
+
+- Semantic Tokens、Code Action、Quick Fix；
+- VS Code 客户端；
+- 第二个游戏 profile、动态插件 ABI 或多游戏 workspace；
+- 规则历史、diff、rollback UI；
+- 自动监控或自动刷新 Vanilla 索引。

@@ -3,6 +3,10 @@
 Status: concluded as a release contract; actual GitHub Release upload is a release-phase smoke
 test.
 
+> Historical note: RFC 0014 superseded the bundled-rules and `--rules` portions of this spike.
+> Official binaries now embed the first-party rules. The artifact matrix and server resolution
+> order remain current.
+
 ## Decision
 
 The Zed client resolves the server in this order:
@@ -11,8 +15,8 @@ The Zed client resolves the server in this order:
 2. `pdx-ls` on `PATH`;
 3. a cached platform artifact downloaded from the project release.
 
-The server is never built by the extension and the rules database is never downloaded with the
-server. The extension passes its own bundled rules path with `--rules`.
+The server is never built by the extension. Under the current RFC 0014 design, the rules database
+is embedded in the official binary and the extension passes no external rules path.
 
 ## Artifact matrix
 

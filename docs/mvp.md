@@ -1,6 +1,8 @@
-# EU4 MVP 实施计划
+# EU4 v0.1 MVP 验收基线
 
-> 2026-07-25 状态：当前代码是 EU4 alpha，不是已发布的 v0.1。Phase 2–5 的基础实现与 watched-file 定向更新已有真实 LSP 回归；scope typed lowering、自动安装和跨平台发布退出条件尚未全部满足。后续先完成 RFC 0013 和发布前架构修复，再进入 Phase 6B。
+> 本文件定义产品范围和阶段退出条件，不跟踪每日实现进度。当前状态、剩余工作和执行
+> 顺序见 [执行计划](../plan.md)。ParadoxCode 仍是 alpha，只有本文件与
+> [发布清单](releasing.md) 的全部条件都满足后才能发布 v0.1。
 
 ## MVP 成功定义
 
@@ -83,8 +85,6 @@ Event、Scripted Effect、Scripted Trigger 和 Localisation Key 仍是必须通�
 
 ## Phase 2：最小 Language Server
 
-状态：`completed`（2026-07-18；stdio runtime、文档同步和内存 JSON-RPC 集成测试完成）
-
 交付：
 
 - `initialize`, `initialized`, `shutdown`, `exit`
@@ -101,10 +101,6 @@ Event、Scripted Effect、Scripted Trigger 和 Localisation Key 仍是必须通�
 - emoji、CJK、组合字符位置测试通过。
 
 ## Phase 3：Typed CST、Syntax Diagnostics 与 Formatter
-
-状态：`completed`（2026-07-18）；纯 Rust typed CST、stable syntax error mapping、保守 formatter、
-独立 fuzz targets 和编辑后/full parse 等价性已实现并通过验证。运行时不依赖 Tree-sitter C；
-Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 
 交付：
 
@@ -123,15 +119,13 @@ Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 
 ## Phase 4：第一方 EU4 规则源码、编译器与 Workspace Index
 
-状态：`completed`（2026-07-25）；规则导入、SQLite runtime、root/overlay、基础 shard、dependency LSP/TOML 配置、本地持久化 Vanilla cache 和 watched-file 定向磁盘更新均已实现并通过回归。
-
 交付：
 
 - 严格、版本化、开发者维护的 `rules/eu4/*.json` 唯一权威源
 - `pdx-rulec` source schema、stable identity 和 invariant 验证
 - 编译 type/alias/enum/value/cardinality/path/scope/reference/documentation metadata
 - 生成 SQLite `eu4.pdxrules`、规范化 manifest 与唯一 `rule_hash`，并提交生成物
-- 只读加载 SQLite 后冻结为内存 `Eu4Rules`
+- 只读加载 SQLite 后冻结为通用 `RuleSet`
 - 由数据库 path/type descriptor 生成完整的 EU4 file category catalog
 - vanilla/dependency/current mod source roots
 - open document overlay
@@ -152,8 +146,6 @@ Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 
 ## Phase 5：语言功能
 
-状态：`completed`（2026-07-20 重新验收）；主要查询均有回归，query-time 全工作区重解析已删除，snapshot 共享不可变状态，单 overlay 编辑的计数测试证明只 parse/lower 各一次且不重建磁盘 `FileState`。
-
 交付：
 
 - syntax、unknown key、unknown symbol、ambiguous symbol、unknown scope diagnostics
@@ -168,12 +160,10 @@ Tree-sitter grammar 仅保留给 Zed 编辑器侧高亮和 grammar corpus。
 - incomplete CST 中 completion 仍有结果。
 - unresolved/ambiguous symbol 不产生随机跳转。
 - scope unknown 不产生级联 scope errors。
-- Eu4Rules 声明的所有可支持文本类别都至少获得 syntax diagnostics；具有结构/语义 descriptor 的类别获得对应 semantic features。
+- `RuleSet` 声明的所有可支持文本类别都至少获得 syntax diagnostics；具有结构/语义 descriptor 的类别获得对应 semantic features。
 - Vanilla 与依赖 Mod参与解析、索引和查询，但默认不向编辑器发布其 diagnostics；当前 Mod和未保存文件正常发布。
 
 ## Phase 6A：Rename 与 v0.1
-
-状态：`implemented, not released`（2026-07-21 重新审计）；rename 内部链路、formatter capability 和开发机 smoke 已通过，但 RFC 0014 规则内嵌、自动获取 server、跨平台 release 和干净 clone 安装尚未闭环。
 
 交付：
 
