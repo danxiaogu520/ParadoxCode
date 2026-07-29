@@ -21,7 +21,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 GRAMMARS = (
-    ROOT / "grammars" / "tree-sitter-pdx-script",
+    ROOT / "grammars" / "tree-sitter-eu4",
     ROOT / "grammars" / "tree-sitter-pdx-eu4-localisation",
     ROOT / "grammars" / "tree-sitter-pdx-eu4-csv",
 )
@@ -61,7 +61,7 @@ def parse_without_crash(grammar: Path, sources: list[str], home: str, suffix: st
             paths.append(str(path))
         paths_file.write_text("\n".join(paths) + "\n", encoding="utf-8")
         local_cli = grammar / "node_modules" / ".bin" / "tree-sitter"
-        shared_cli = ROOT / "grammars" / "tree-sitter-pdx-script" / "node_modules" / ".bin" / "tree-sitter"
+        shared_cli = ROOT / "grammars" / "tree-sitter-eu4" / "node_modules" / ".bin" / "tree-sitter"
         if local_cli.is_file():
             tree_sitter = str(local_cli)
         elif shared_cli.is_file():

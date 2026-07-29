@@ -7,10 +7,10 @@ description = "Independent, unofficial EU4 language tooling backed by pdx-ls."
 
 # Development manifest: use the repository remote so Zed can clone the grammars from Windows
 # and other worktrees. The release manifest must replace these URLs with read-only mirrors.
-[grammars.pdx_script]
+[grammars.eu4]
 repository = "https://github.com/danxiaogu520/ParadoxCode.git"
 rev = "d7b51c2b126b762c6021b42f229bb2867e8968f8"
-path = "grammars/tree-sitter-pdx-script"
+path = "grammars/tree-sitter-eu4"
 
 [grammars.pdx_eu4_localisation]
 repository = "https://github.com/danxiaogu520/ParadoxCode.git"
@@ -24,4 +24,4 @@ path = "grammars/tree-sitter-pdx-eu4-csv"
 
 [language_servers.pdx-ls]
 name = "ParadoxCode Language Server"
-languages = ["PdxScript", "EU4 Localisation", "EU4 CSV"]
+languages = ["Europa Universalis IV", "EU4 Localisation", "EU4 CSV"]

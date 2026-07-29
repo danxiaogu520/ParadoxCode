@@ -122,7 +122,7 @@ ParadoxCode 采用更明确的 file shard：每个文件产生独立的 definiti
 
 ### 5. Localisation 必须单独解析
 
-CWTools 有独立的 YAML localisation parser 和大量 BOM、语言头、引号、注释相关测试。这印证 EU4 localisation 不是普通 PdxScript，也不应该直接交给通用 YAML parser。
+CWTools 有独立的 YAML localisation parser 和大量 BOM、语言头、引号、注释相关测试。这印证 EU4 localisation 不是普通 Script，也不应该直接交给通用 YAML parser。
 
 ## 不照搬 CWTools 的部分
 

@@ -17,10 +17,10 @@ ROOT = Path(__file__).resolve().parents[1]
 EXTENSION = ROOT / "editors" / "zed"
 GRAMMAR_ROOT = ROOT / "grammars"
 LANGUAGES = {
-    "pdx-script": (
-        "pdx_script",
-        "tree-sitter-pdx-script",
-        "test/corpus/pdx-script.txt",
+    "eu4": (
+        "eu4",
+        "tree-sitter-eu4",
+        "test/corpus/eu4.txt",
         ("highlights.scm", "brackets.scm", "indents.scm", "outline.scm"),
     ),
     "pdx-eu4-localisation": (
@@ -45,7 +45,7 @@ def require(condition: bool, message: str) -> None:
 
 def tree_sitter_cli() -> str:
     candidates = [
-        GRAMMAR_ROOT / "tree-sitter-pdx-script" / "node_modules" / ".bin" / "tree-sitter",
+        GRAMMAR_ROOT / "tree-sitter-eu4" / "node_modules" / ".bin" / "tree-sitter",
         GRAMMAR_ROOT / "tree-sitter-pdx-eu4-localisation" / "node_modules" / ".bin" / "tree-sitter",
         GRAMMAR_ROOT / "tree-sitter-pdx-eu4-csv" / "node_modules" / ".bin" / "tree-sitter",
     ]
@@ -65,7 +65,7 @@ def main() -> int:
         require(manifest["schema_version"] == 1, "unsupported Zed extension schema")
         grammars = manifest.get("grammars", {})
         require(
-            set(grammars) == {"pdx_script", "pdx_eu4_localisation", "pdx_eu4_csv"},
+            set(grammars) == {"eu4", "pdx_eu4_localisation", "pdx_eu4_csv"},
             "manifest grammar set is incomplete",
         )
 
@@ -119,7 +119,7 @@ def main() -> int:
 
         settings = json.loads((EXTENSION / "recommended-settings.json").read_text(encoding="utf-8"))
         require(
-            set(settings["file_types"]) == {"PdxScript", "EU4 Localisation", "EU4 CSV"},
+            set(settings["file_types"]) == {"Europa Universalis IV", "EU4 Localisation", "EU4 CSV"},
             "recommended settings are incomplete",
         )
         print("Zed Phase 1 manifest, metadata, and queries passed.")

@@ -11,7 +11,7 @@ only a thin language client?
 ## Findings
 
 - Zed language metadata belongs under `editors/zed/languages/<language>/`, which is present for
-  PdxScript, EU4 localisation, and CSV.
+  Script, EU4 localisation, and CSV.
 - Zed registers a Tree-sitter grammar through an `extension.toml` grammar entry containing a
   repository and a Git revision. When the grammar is a subdirectory of a monorepo, the entry
   must also provide its relative `path`. A development or published extension needs a

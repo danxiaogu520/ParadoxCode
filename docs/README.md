@@ -7,19 +7,20 @@ ParadoxCode 是通用 PDX Mod 语言工具引擎。当前唯一有交付承诺�
 ## 当前决策
 
 - 项目名：ParadoxCode
-- EU4 脚本核心：PdxScript
+- Zed 主脚本语言名：`Europa Universalis IV`（机器标识 `eu4`）
+- 通用键值脚本格式：`Script`
 - Language Server：`pdx-ls`
 - 命令行入口：`pdx`
 - 首选编辑器：Zed
 - 当前交付游戏：EU4（EU4-first，不排除未来 profile）
 - 模块命名：全部 Rust crate、binary 与内部包使用 `pdx-` 前缀
-- MVP 文件范围：EU4 规则数据库声明的全部可支持文件类别；PdxScript、localisation 和 CSV 使用独立语法前端，二进制/媒体资源只进入路径索引
+- MVP 文件范围：EU4 规则数据库声明的全部可支持文件类别；Script、localisation 和 CSV 使用独立语法前端，二进制/媒体资源只进入路径索引
 - 权威规则来源：开发者维护的 `rules/eu4/*.json`；`pdx-rulec` 严格校验并生成内嵌的 `eu4.pdxrules`
 - 规则版本：对数据库规范化逻辑内容计算唯一 `rule_hash`，与发布它的 server 版本绑定，与 EU4 版本无关
 - 工作区来源：未保存 overlay > 当前 Mod > 有序依赖 Mod > Vanilla；没有 DLC source root
 - Vanilla 索引：首次配置时建立本地缓存，此后仅由用户显式刷新，不因 `rule_hash` 或文件变化自动重建
 - Vanilla 发现：首次 LSP 启动仅后台快速尝试一次；`pdx setup vanilla` 提供显式深度搜索、选择、建库和用户级持久化
-- 格式化：固定 tab/LF/零布局空行的规范布局；可解析的多行 PdxScript quoted script 递归格式化，普通 quoted scalar 保持 opaque
+- 格式化：固定 tab/LF/零布局空行的规范布局；可解析的多行 Script quoted script 递归格式化，普通 quoted scalar 保持 opaque
 
 ## 文档索引
 
@@ -43,6 +44,7 @@ ParadoxCode 是通用 PDX Mod 语言工具引擎。当前唯一有交付承诺�
 - [RFC 0010：Zed 集成](rfc/0010-zed-integration.md)
 - [RFC 0011：测试、Fuzz 与质量门禁](rfc/0011-testing-quality.md)
 - [ADR 0001：固定规范格式与 quoted script](adr/0001-canonical-formatting-and-quoted-scripts.md)
+- [ADR 0002：EU4 language 与 Script format 命名](adr/0002-eu4-language-and-script-format-names.md)
 - [已取代：RFC 0012 CWT 一次性导入](rfc/0012-cwt-rule-compiler.md)
 
 ## 文档状态

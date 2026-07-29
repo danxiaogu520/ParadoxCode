@@ -74,7 +74,7 @@ impl fmt::Debug for RuleHash {
 #[serde(rename_all = "kebab-case")]
 pub enum ParserKind {
     /// Paradox key/value script grammar.
-    PdxScript,
+    Script,
     /// Paradox localisation files.
     Localisation,
     /// A delimited table with an explicit dialect.
@@ -88,7 +88,7 @@ pub enum ParserKind {
 impl ParserKind {
     fn as_str(&self) -> String {
         match self {
-            Self::PdxScript => "pdx-script".to_owned(),
+            Self::Script => "script".to_owned(),
             Self::Localisation => "localisation".to_owned(),
             Self::Csv(dialect) => format!("csv-{}", dialect.as_str()),
             Self::Asset => "asset".to_owned(),
@@ -98,7 +98,7 @@ impl ParserKind {
 
     fn parse(value: &str) -> Result<Self, RulesError> {
         Ok(match value {
-            "pdx-script" => Self::PdxScript,
+            "script" => Self::Script,
             "localisation" => Self::Localisation,
             "csv-comma" => Self::Csv(CsvDialect::Comma),
             "csv-tab" => Self::Csv(CsvDialect::Tab),

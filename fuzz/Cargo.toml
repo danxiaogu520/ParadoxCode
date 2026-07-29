@@ -16,8 +16,8 @@ pdx-syntax = { path = "../crates/pdx-syntax" }
 pdx-text = { path = "../crates/pdx-text" }
 
 [[bin]]
-name = "parse-pdx-script"
-path = "fuzz_targets/parse_pdx_script.rs"
+name = "parse-script"
+path = "fuzz_targets/parse_script.rs"
 test = false
 doc = false
 bench = false
@@ -37,8 +37,8 @@ doc = false
 bench = false
 
 [[bin]]
-name = "format-pdx-script"
-path = "fuzz_targets/format_pdx_script.rs"
+name = "format-script"
+path = "fuzz_targets/format_script.rs"
 test = false
 doc = false
 bench = false

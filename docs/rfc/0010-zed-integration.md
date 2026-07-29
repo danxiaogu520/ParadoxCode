@@ -19,7 +19,7 @@ editors/zed/
   Cargo.toml
   src/lib.rs
   languages/
-    pdx-script/
+    eu4/
       config.toml
       highlights.scm
       brackets.scm
@@ -33,17 +33,19 @@ editors/zed/
       config.toml
 ```
 
-extension 注册 PdxScript/localisation grammar、CSV 文件关联和一个 `pdx-ls`。所有文本语言连接同一个 server；CSV 由 server 的独立 parser 分析，不伪装成 PdxScript CST。
+extension 将主脚本 grammar 注册为用户可见的 `Europa Universalis IV`（机器标识 `eu4`），
+并注册 EU4 Localisation、EU4 CSV 和一个 `pdx-ls`。所有文本语言连接同一个 server；
+CSV 由 server 的独立 parser 分析，不伪装成 Script CST。
 
 ## 文件识别冲突
 
-PdxScript 使用 `.txt`、`.gui`、`.gfx` 等多个共享扩展，EU4 localisation 使用 `.yml`，都与常见语言冲突。Zed language `path_suffixes` 不支持 glob，因此不能在 extension metadata 中安全地全局抢占这些扩展。
+Script 使用 `.txt`、`.gui`、`.gfx` 等多个共享扩展，EU4 localisation 使用 `.yml`，都与常见语言冲突。Zed language `path_suffixes` 不支持 glob，因此不能在 extension metadata 中安全地全局抢占这些扩展。
 
 MVP 策略：
 
 1. 不全局声明宽泛 `.txt` 关联，或只提供明确需用户确认的关联。
 2. localisation 使用 `l_<language>:` 首行模式作为辅助，但它不能识别缺少/错误语言头的文件。
-3. `pdx init --editor zed` 从 Eu4Rules 的完整 file matcher catalog 生成项目级 `.zed/settings.json` fragment，使用 `file_types` glob 将全部可支持 EU4 文件关联到相应语言。
+3. `pdx init --editor zed` 从 EU4 `RuleSet` 的完整 file matcher catalog 生成项目级 `.zed/settings.json` fragment，使用 `file_types` glob 将全部可支持 EU4 文件关联到相应语言。
 4. 用户可以手动选择语言。
 5. `pdx-ls` 始终根据 logical path 再分类，绝不信任 language id 决定语义。
 
@@ -52,7 +54,7 @@ MVP 策略：
 ```json
 {
   "file_types": {
-    "PdxScript": [
+    "Europa Universalis IV": [
       "common/**/*.txt",
       "events/**/*.txt",
       "decisions/**/*.txt",
@@ -66,7 +68,7 @@ MVP 策略：
 }
 ```
 
-实际列表不得由这段示例维护，而由 EU4 `Eu4Rules` 生成；其中包括全部数据库 path/type matcher 能够映射到 Zed glob 的类别。无法无损映射的 matcher 必须出现在生成报告中，并提供手动 language selection fallback。最终 key/name 以 Zed 实际 API spike 为准。
+实际列表不得由这段示例维护，而由 EU4 `RuleSet` 生成；其中包括全部数据库 path/type matcher 能够映射到 Zed glob 的类别。无法无损映射的 matcher 必须出现在生成报告中，并提供手动 language selection fallback。最终 key/name 以 Zed 实际 API spike 为准。
 
 ## Grammar 分发
 
@@ -74,7 +76,7 @@ Zed grammar registration 引用 repository 与固定 revision。当前 monorepo 
 
 若不支持，采用 CI split mirror：
 
-- `grammars/tree-sitter-pdx-script` 发布到独立只读镜像仓库。
+- `grammars/tree-sitter-eu4` 发布到独立只读镜像仓库。
 - `grammars/tree-sitter-pdx-eu4-localisation` 同理。
 - source of truth 仍在 ParadoxCode monorepo。
 - extension pin 镜像 revision（Zed manifest 的 `rev`），不追踪 branch。

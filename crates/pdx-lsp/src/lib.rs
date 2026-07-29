@@ -2797,7 +2797,7 @@ mod tests {
         let input = frames([
             json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":mission_uri,"languageId":"pdx-script","version":1,"text":"country_event = { id = test.1 }\n"}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":mission_uri,"languageId":"eu4","version":1,"text":"country_event = { id = test.1 }\n"}}}),
             json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
@@ -3041,7 +3041,7 @@ mod tests {
             json!({
                 "jsonrpc":"2.0",
                 "method":"textDocument/didOpen",
-                "params":{"textDocument":{"uri":uri,"languageId":"pdx-script","version":1,"text":"a\r\n汉😀e\u{301}\r\n"}}
+                "params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":"a\r\n汉😀e\u{301}\r\n"}}
             }),
             json!({
                 "jsonrpc":"2.0",
@@ -3142,7 +3142,7 @@ mod tests {
         let input = frames([
             json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"pdx-script","version":1,"text":text}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
             json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":2,"character":8}}}),
             json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8}}}),
             json!({"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8}}}),
@@ -3248,7 +3248,7 @@ mod tests {
         let input = frames([
             json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"pdx-script","version":1,"text":text}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
             json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":4,"character":6}}}),
             json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
             json!({"jsonrpc":"2.0","method":"exit"}),
@@ -3296,7 +3296,7 @@ mod tests {
         let input = frames([
             json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"pdx-script","version":1,"text":text}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
             json!({"jsonrpc":"2.0","id":2,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":uri}}}),
             json!({"jsonrpc":"2.0","id":3,"method":"workspace/symbol","params":{"query":"amount"}}),
             json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
@@ -3332,9 +3332,9 @@ mod tests {
         let input = frames([
             json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":valid_uri,"languageId":"pdx-script","version":1,"text":"root={name=\"汉😀\" other=yes}"}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":valid_uri,"languageId":"eu4","version":1,"text":"root={name=\"汉😀\" other=yes}"}}}),
             json!({"jsonrpc":"2.0","id":2,"method":"textDocument/formatting","params":{"textDocument":{"uri":valid_uri},"options":{"tabSize":2,"insertSpaces":true}}}),
-            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":unsafe_uri,"languageId":"pdx-script","version":1,"text":"country_event = {"}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":unsafe_uri,"languageId":"eu4","version":1,"text":"country_event = {"}}}),
             json!({"jsonrpc":"2.0","id":3,"method":"textDocument/formatting","params":{"textDocument":{"uri":unsafe_uri},"options":{"tabSize":4,"insertSpaces":true}}}),
             json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
             json!({"jsonrpc":"2.0","method":"exit"}),
@@ -3377,7 +3377,7 @@ mod tests {
         let input = frames([
             json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":target_uri,"languageId":"pdx-script","version":1,"text":"country_event = { id = cross.1 }\n"}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":target_uri,"languageId":"eu4","version":1,"text":"country_event = { id = cross.1 }\n"}}}),
             json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":target_uri},"position":{"line":0,"character":25},"newName":"renamed.1"}}),
             json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
             json!({"jsonrpc":"2.0","method":"exit"}),
@@ -3507,7 +3507,7 @@ path = "dependencies/high"
         let input = frames([
             json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{},"initializationOptions":{"projectConfig":".pdx/project.toml"}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"pdx-script","version":1,"text":"event = dependency.1\n"}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"eu4","version":1,"text":"event = dependency.1\n"}}}),
             json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":reference_uri},"position":{"line":0,"character":10},"newName":"renamed.1"}}),
             json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
             json!({"jsonrpc":"2.0","method":"exit"}),
@@ -3634,7 +3634,7 @@ path = "dependencies/high"
         let input = frames([
             json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"pdx-script","version":1,"text":"scope = nowhere\n"}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":"scope = nowhere\n"}}}),
             json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":uri,"version":2},"contentChanges":[{"text":"scope = country\n"}]}}),
             json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
             json!({"jsonrpc":"2.0","method":"exit"}),

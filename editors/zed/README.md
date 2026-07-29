@@ -11,11 +11,11 @@ the repository's reachable Git remote with a pinned revision and a grammar-speci
 grammar revision or remote. A published manifest must replace those URLs with the read-only
 mirrors and pinned revisions described in the Phase 0 spike.
 
-Because `.txt` is shared by many languages, PdxScript does not globally claim that suffix. Apply
-[`recommended-settings.json`](recommended-settings.json) to an EU4 Mod workspace to associate
-known EU4 directories with PdxScript, localisation, and CSV. The complete list will later be
-generated from `Eu4Rules`; this Phase 1 file is deliberately conservative and is not a semantic
-rule table.
+Because `.txt` is shared by many languages, Europa Universalis IV does not globally claim that
+suffix. Apply [`recommended-settings.json`](recommended-settings.json) to an EU4 Mod workspace to
+associate known EU4 directories with Europa Universalis IV, localisation, and CSV. The complete
+list will later be generated from the EU4 `RuleSet`; this Phase 1 file is deliberately conservative
+and is not a semantic rule table.
 
 Install the directory as a Zed development extension and open an EU4 Mod workspace with the
 recommended settings. An explicitly configured `lsp.pdx-ls.binary.path` takes precedence, followed

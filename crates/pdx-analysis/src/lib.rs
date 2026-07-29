@@ -2093,7 +2093,7 @@ fn semantic_rule_diagnostics(
     cancellation: &CancellationToken,
 ) -> Result<Vec<Diagnostic>, Cancelled> {
     cancellation.checkpoint()?;
-    if input.format != FileFormat::PdxScript || snapshot.rules().model().semantic.rules.is_empty() {
+    if input.format != FileFormat::Script || snapshot.rules().model().semantic.rules.is_empty() {
         return Ok(Vec::new());
     }
     let ParsedContent::Text(parsed) = &input.parsed else { return Ok(Vec::new()) };
@@ -3748,7 +3748,7 @@ fn looks_unknown_key(key: &str) -> bool {
 }
 
 fn completion_value_context(input: &ParsedInput, position: TextSize) -> bool {
-    if input.format == FileFormat::PdxScript
+    if input.format == FileFormat::Script
         && let Some(hir) = input.hir.as_deref()
     {
         if hir.properties().iter().any(|property| {

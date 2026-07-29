@@ -3,7 +3,7 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
-> 实现修订（2026-07-29）：formatter 采用固定、不可配置的规范布局。PdxScript block
+> 实现修订（2026-07-29）：formatter 采用固定、不可配置的规范布局。Script block
 > 根据 CST 内容递归选择单行或展开布局，多行 quoted script 递归格式化，block header
 > comment、LF、末尾换行和零布局空行均有唯一输出。LSP 的 `tabSize`/`insertSpaces`
 > 仍按协议接收但不影响结果。恢复语法、CSV 和不支持格式返回空 edits；range
@@ -51,7 +51,7 @@ layout_blank_lines = 0
 LSP 必须接收标准 `FormattingOptions`，但 formatter 忽略 `tabSize` 和 `insertSpaces`。
 不可拆分的普通 scalar、comment 和 opaque quoted scalar 可以超过 120 列。
 
-## PdxScript block
+## Script block
 
 - 空 block 的唯一形式是 `{ }`。
 - 只含 scalar 的 block 永远保持单行，花括号内侧各有一个空格。
@@ -96,7 +96,7 @@ MVP 若存在跨越 property/block 边界的 ERROR 或 missing delimiter，则�
 
 ## Quoted script
 
-PdxScript 文件中原本含换行的 quoted string 是 quoted-script candidate。formatter 解码其
+Script 文件中原本含换行的 quoted string 是 quoted-script candidate。formatter 解码其
 quoted payload；只有 payload 能完整解析且至少含一个 property、header block 或 parameter
 block 时，才递归使用本 RFC 的布局规则。单 property payload 可以收为单行：
 

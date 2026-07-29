@@ -1,7 +1,7 @@
 # tree-sitter-pdx-eu4-localisation
 
 The Tree-sitter grammar for EU4 localisation files. It is a separate frontend
-from PdxScript because localisation has a language header, line-oriented
+from Script because localisation has a language header, line-oriented
 entries, and quoted text with EU4 substitutions.
 
 Run the corpus and parser checks with:

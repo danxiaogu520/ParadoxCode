@@ -51,6 +51,10 @@ Source format changes require a version increment and an explicit migration. Sta
 must not be regenerated merely because files are reordered. Generated artifacts are never edited
 by hand.
 
+Source format 2 renames the generic key/value parser identity from `pdx-script` to `script`.
+This is a naming-only migration: EU4 file category identities, matchers, resolution policies, and
+semantic rules otherwise retain their stable identities.
+
 ## Runtime authority
 
 Official binaries embed the generated artifact and construct an immutable `RuleSet`. They reject

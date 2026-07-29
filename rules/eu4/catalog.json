@@ -37,7 +37,7 @@
     },
     {
       "id": "eu4-path-common",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common",
@@ -50,7 +50,7 @@
     },
     {
       "id": "eu4-path-common-advisortypes",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/advisortypes",
@@ -63,7 +63,7 @@
     },
     {
       "id": "eu4-path-common-ages",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/ages",
@@ -76,7 +76,7 @@
     },
     {
       "id": "eu4-path-common-ai_army",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/ai_army",
@@ -89,7 +89,7 @@
     },
     {
       "id": "eu4-path-common-ai_personalities",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/ai_personalities",
@@ -102,7 +102,7 @@
     },
     {
       "id": "eu4-path-common-ancestor_personalities",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/ancestor_personalities",
@@ -115,7 +115,7 @@
     },
     {
       "id": "eu4-path-common-bookmarks",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/bookmarks",
@@ -128,7 +128,7 @@
     },
     {
       "id": "eu4-path-common-buildings",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/buildings",
@@ -141,7 +141,7 @@
     },
     {
       "id": "eu4-path-common-cb_types",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/cb_types",
@@ -154,7 +154,7 @@
     },
     {
       "id": "eu4-path-common-centers_of_trade",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/centers_of_trade",
@@ -167,7 +167,7 @@
     },
     {
       "id": "eu4-path-common-church_aspects",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/church_aspects",
@@ -180,7 +180,7 @@
     },
     {
       "id": "eu4-path-common-client_states",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/client_states",
@@ -193,7 +193,7 @@
     },
     {
       "id": "eu4-path-common-colonial_regions",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/colonial_regions",
@@ -206,7 +206,7 @@
     },
     {
       "id": "eu4-path-common-countries",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/countries",
@@ -219,7 +219,7 @@
     },
     {
       "id": "eu4-path-common-country_colors",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/country_colors",
@@ -232,7 +232,7 @@
     },
     {
       "id": "eu4-path-common-country_tags",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/country_tags",
@@ -245,7 +245,7 @@
     },
     {
       "id": "eu4-path-common-cultures",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/cultures",
@@ -258,7 +258,7 @@
     },
     {
       "id": "eu4-path-common-custom_gui",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/custom_gui",
@@ -271,7 +271,7 @@
     },
     {
       "id": "eu4-path-common-custom_ideas",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/custom_ideas",
@@ -284,7 +284,7 @@
     },
     {
       "id": "eu4-path-common-decrees",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/decrees",
@@ -297,7 +297,7 @@
     },
     {
       "id": "eu4-path-common-defender_of_faith",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/defender_of_faith",
@@ -310,7 +310,7 @@
     },
     {
       "id": "eu4-path-common-diplomatic_actions",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/diplomatic_actions",
@@ -323,7 +323,7 @@
     },
     {
       "id": "eu4-path-common-disasters",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/disasters",
@@ -336,7 +336,7 @@
     },
     {
       "id": "eu4-path-common-dynasty_colors",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/dynasty_colors",
@@ -349,7 +349,7 @@
     },
     {
       "id": "eu4-path-common-estate_agendas",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/estate_agendas",
@@ -362,7 +362,7 @@
     },
     {
       "id": "eu4-path-common-estate_crown_land",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/estate_crown_land",
@@ -375,7 +375,7 @@
     },
     {
       "id": "eu4-path-common-estate_privileges",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/estate_privileges",
@@ -388,7 +388,7 @@
     },
     {
       "id": "eu4-path-common-estates",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/estates",
@@ -401,7 +401,7 @@
     },
     {
       "id": "eu4-path-common-estates_preload",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/estates_preload",
@@ -414,7 +414,7 @@
     },
     {
       "id": "eu4-path-common-event_modifiers",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/event_modifiers",
@@ -427,7 +427,7 @@
     },
     {
       "id": "eu4-path-common-factions",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/factions",
@@ -440,7 +440,7 @@
     },
     {
       "id": "eu4-path-common-federation_advancements",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/federation_advancements",
@@ -453,7 +453,7 @@
     },
     {
       "id": "eu4-path-common-fervor",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/fervor",
@@ -466,7 +466,7 @@
     },
     {
       "id": "eu4-path-common-fetishist_cults",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/fetishist_cults",
@@ -479,7 +479,7 @@
     },
     {
       "id": "eu4-path-common-flagship_modifications",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/flagship_modifications",
@@ -492,7 +492,7 @@
     },
     {
       "id": "eu4-path-common-golden_bulls",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/golden_bulls",
@@ -505,7 +505,7 @@
     },
     {
       "id": "eu4-path-common-government_mechanics",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/government_mechanics",
@@ -518,7 +518,7 @@
     },
     {
       "id": "eu4-path-common-government_names",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/government_names",
@@ -531,7 +531,7 @@
     },
     {
       "id": "eu4-path-common-government_ranks",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/government_ranks",
@@ -544,7 +544,7 @@
     },
     {
       "id": "eu4-path-common-government_reforms",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/government_reforms",
@@ -557,7 +557,7 @@
     },
     {
       "id": "eu4-path-common-governments",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/governments",
@@ -570,7 +570,7 @@
     },
     {
       "id": "eu4-path-common-great_projects",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/great_projects",
@@ -583,7 +583,7 @@
     },
     {
       "id": "eu4-path-common-hegemons",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/hegemons",
@@ -596,7 +596,7 @@
     },
     {
       "id": "eu4-path-common-holy_orders",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/holy_orders",
@@ -609,7 +609,7 @@
     },
     {
       "id": "eu4-path-common-ideas",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/ideas",
@@ -622,7 +622,7 @@
     },
     {
       "id": "eu4-path-common-imperial_incidents",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/imperial_incidents",
@@ -635,7 +635,7 @@
     },
     {
       "id": "eu4-path-common-imperial_reforms",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/imperial_reforms",
@@ -648,7 +648,7 @@
     },
     {
       "id": "eu4-path-common-incidents",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/incidents",
@@ -661,7 +661,7 @@
     },
     {
       "id": "eu4-path-common-institutions",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/institutions",
@@ -674,7 +674,7 @@
     },
     {
       "id": "eu4-path-common-insults",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/insults",
@@ -687,7 +687,7 @@
     },
     {
       "id": "eu4-path-common-isolationism",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/isolationism",
@@ -700,7 +700,7 @@
     },
     {
       "id": "eu4-path-common-leader_personalities",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/leader_personalities",
@@ -713,7 +713,7 @@
     },
     {
       "id": "eu4-path-common-mercenary_companies",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/mercenary_companies",
@@ -726,7 +726,7 @@
     },
     {
       "id": "eu4-path-common-native_advancements",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/native_advancements",
@@ -739,7 +739,7 @@
     },
     {
       "id": "eu4-path-common-natives",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/natives",
@@ -752,7 +752,7 @@
     },
     {
       "id": "eu4-path-common-naval_doctrines",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/naval_doctrines",
@@ -765,7 +765,7 @@
     },
     {
       "id": "eu4-path-common-new_diplomatic_actions",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/new_diplomatic_actions",
@@ -778,7 +778,7 @@
     },
     {
       "id": "eu4-path-common-on_actions",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/on_actions",
@@ -791,7 +791,7 @@
     },
     {
       "id": "eu4-path-common-opinion_modifiers",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/opinion_modifiers",
@@ -804,7 +804,7 @@
     },
     {
       "id": "eu4-path-common-parliament_bribes",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/parliament_bribes",
@@ -817,7 +817,7 @@
     },
     {
       "id": "eu4-path-common-parliament_issues",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/parliament_issues",
@@ -830,7 +830,7 @@
     },
     {
       "id": "eu4-path-common-peace_treaties",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/peace_treaties",
@@ -843,7 +843,7 @@
     },
     {
       "id": "eu4-path-common-personal_deities",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/personal_deities",
@@ -856,7 +856,7 @@
     },
     {
       "id": "eu4-path-common-policies",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/policies",
@@ -869,7 +869,7 @@
     },
     {
       "id": "eu4-path-common-powerprojection",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/powerprojection",
@@ -882,7 +882,7 @@
     },
     {
       "id": "eu4-path-common-prices",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/prices",
@@ -895,7 +895,7 @@
     },
     {
       "id": "eu4-path-common-professionalism",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/professionalism",
@@ -908,7 +908,7 @@
     },
     {
       "id": "eu4-path-common-province_names",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/province_names",
@@ -921,7 +921,7 @@
     },
     {
       "id": "eu4-path-common-province_triggered_modifiers",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/province_triggered_modifiers",
@@ -934,7 +934,7 @@
     },
     {
       "id": "eu4-path-common-rebel_types",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/rebel_types",
@@ -947,7 +947,7 @@
     },
     {
       "id": "eu4-path-common-region_colors",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/region_colors",
@@ -960,7 +960,7 @@
     },
     {
       "id": "eu4-path-common-religions",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/religions",
@@ -973,7 +973,7 @@
     },
     {
       "id": "eu4-path-common-religious_conversions",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/religious_conversions",
@@ -986,7 +986,7 @@
     },
     {
       "id": "eu4-path-common-religious_reforms",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/religious_reforms",
@@ -999,7 +999,7 @@
     },
     {
       "id": "eu4-path-common-revolt_triggers",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/revolt_triggers",
@@ -1012,7 +1012,7 @@
     },
     {
       "id": "eu4-path-common-revolution",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/revolution",
@@ -1025,7 +1025,7 @@
     },
     {
       "id": "eu4-path-common-ruler_personalities",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/ruler_personalities",
@@ -1038,7 +1038,7 @@
     },
     {
       "id": "eu4-path-common-scripted_effects",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/scripted_effects",
@@ -1051,7 +1051,7 @@
     },
     {
       "id": "eu4-path-common-scripted_functions",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/scripted_functions",
@@ -1064,7 +1064,7 @@
     },
     {
       "id": "eu4-path-common-scripted_triggers",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/scripted_triggers",
@@ -1077,7 +1077,7 @@
     },
     {
       "id": "eu4-path-common-state_edicts",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/state_edicts",
@@ -1090,7 +1090,7 @@
     },
     {
       "id": "eu4-path-common-static_modifiers",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/static_modifiers",
@@ -1103,7 +1103,7 @@
     },
     {
       "id": "eu4-path-common-subject_type_upgrades",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/subject_type_upgrades",
@@ -1116,7 +1116,7 @@
     },
     {
       "id": "eu4-path-common-subject_types",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/subject_types",
@@ -1129,7 +1129,7 @@
     },
     {
       "id": "eu4-path-common-technologies",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/technologies",
@@ -1142,7 +1142,7 @@
     },
     {
       "id": "eu4-path-common-timed_modifiers",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/timed_modifiers",
@@ -1155,7 +1155,7 @@
     },
     {
       "id": "eu4-path-common-trade_companies",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/trade_companies",
@@ -1168,7 +1168,7 @@
     },
     {
       "id": "eu4-path-common-tradecompany_investments",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/tradecompany_investments",
@@ -1181,7 +1181,7 @@
     },
     {
       "id": "eu4-path-common-tradegoods",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/tradegoods",
@@ -1194,7 +1194,7 @@
     },
     {
       "id": "eu4-path-common-tradenodes",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/tradenodes",
@@ -1207,7 +1207,7 @@
     },
     {
       "id": "eu4-path-common-trading_policies",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/trading_policies",
@@ -1220,7 +1220,7 @@
     },
     {
       "id": "eu4-path-common-triggered_modifiers",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/triggered_modifiers",
@@ -1233,7 +1233,7 @@
     },
     {
       "id": "eu4-path-common-units",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/units",
@@ -1246,7 +1246,7 @@
     },
     {
       "id": "eu4-path-common-wargoal_types",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "common/wargoal_types",
@@ -1259,7 +1259,7 @@
     },
     {
       "id": "eu4-path-customizable_localization",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "customizable_localization",
@@ -1272,7 +1272,7 @@
     },
     {
       "id": "eu4-path-decisions",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "decisions",
@@ -1285,7 +1285,7 @@
     },
     {
       "id": "eu4-path-dlc_metadata-dlc_info",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "dlc_metadata/dlc_info",
@@ -1298,7 +1298,7 @@
     },
     {
       "id": "eu4-path-dlc_metadata-dlc_recommendations",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "dlc_metadata/dlc_recommendations",
@@ -1311,7 +1311,7 @@
     },
     {
       "id": "eu4-path-events",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "events",
@@ -1324,7 +1324,7 @@
     },
     {
       "id": "eu4-path-gfx-entities",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "gfx/entities",
@@ -1337,7 +1337,7 @@
     },
     {
       "id": "eu4-path-gfx-sprite_packs",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "gfx/sprite_packs",
@@ -1350,7 +1350,7 @@
     },
     {
       "id": "eu4-path-gfx-sprite_packs_order",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "gfx/sprite_packs_order",
@@ -1363,7 +1363,7 @@
     },
     {
       "id": "eu4-path-history-advisors",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "history/advisors",
@@ -1376,7 +1376,7 @@
     },
     {
       "id": "eu4-path-history-countries",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "history/countries",
@@ -1389,7 +1389,7 @@
     },
     {
       "id": "eu4-path-history-diplomacy",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "history/diplomacy",
@@ -1402,7 +1402,7 @@
     },
     {
       "id": "eu4-path-history-provinces",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "history/provinces",
@@ -1415,7 +1415,7 @@
     },
     {
       "id": "eu4-path-history-wars",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "history/wars",
@@ -1428,7 +1428,7 @@
     },
     {
       "id": "eu4-path-interface",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "interface",
@@ -1441,7 +1441,7 @@
     },
     {
       "id": "eu4-path-map",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "map",
@@ -1454,7 +1454,7 @@
     },
     {
       "id": "eu4-path-map-random-tiles",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "map/random/tiles",
@@ -1467,7 +1467,7 @@
     },
     {
       "id": "eu4-path-missions",
-      "parser": "pdx-script",
+      "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "missions",
@@ -1493,8 +1493,8 @@
       }
     },
     {
-      "id": "pdx-script",
-      "parser": "pdx-script",
+      "id": "script",
+      "parser": "script",
       "resolution": "replace-by-relative-path",
       "matcher": {
         "path_prefix": null,

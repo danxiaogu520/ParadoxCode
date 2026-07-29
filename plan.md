@@ -9,7 +9,7 @@
 
 ParadoxCode 为 Europa Universalis IV（EU4）Mod 提供面向 Zed 的语言工具链，首个可交付版本为 `v0.1.0`。用户在打开一个 EU4 Mod workspace 后，应能获得：
 
-- PdxScript、EU4 localisation 和受支持 CSV 的语法识别与高亮基础；
+- Script、EU4 localisation 和受支持 CSV 的语法识别与高亮基础；
 - syntax、unknown key、unknown symbol、scope 等诊断；
 - key、effect、trigger、symbol、localisation 的补全、悬停、定义和引用查询；
 - document symbol、workspace symbol 和安全的语义 rename；
@@ -41,7 +41,7 @@ ParadoxCode 为 Europa Universalis IV（EU4）Mod 提供面向 Zed 的语言工�
 - 服务：`pdx-ls`；
 - CLI：用户入口为 `pdx`，规则维护工具为 `pdx-rulec`；
 - 规则：开发者维护 `rules/eu4/*.json` 唯一权威源，严格编译成内嵌的 `eu4.pdxrules`；
-- 文件：规则数据库声明的所有可支持文本文件类别，按类别选择 PdxScript、localisation、CSV 或资源路径索引；
+- 文件：规则数据库声明的所有可支持文本文件类别，按类别选择 Script、localisation、CSV 或资源路径索引；
 - 发布：完成 Phase 1–6A 退出条件后发布 `v0.1.0`。
 
 ### 不在 MVP
@@ -124,14 +124,14 @@ pdx-rules -> pdx-rulec
 
 工作项：
 
-- [x] 实现 `tree-sitter-pdx-script`；
+- [x] 实现 `tree-sitter-eu4`；
 - [x] 实现 `tree-sitter-pdx-eu4-localisation`；
 - [x] 为受支持 CSV 确定独立 Rust parser facade，并提供 editor-only CSV grammar；
 - [x] 添加 grammar corpus、错误恢复和单字符删除测试；
 - [x] 添加 Zed 的 highlights、brackets、indents、outline queries；
 - [x] 建立 Zed dev extension、language metadata 和文件识别策略。
 
-PdxScript 至少覆盖 property、裸 value、嵌套/混合 block、八种 operator、quoted/unquoted scalar、注释、header block、conditional parameter block、重复 key 和不完整 string/block/operator。
+Script 至少覆盖 property、裸 value、嵌套/混合 block、八种 operator、quoted/unquoted scalar、注释、header block、conditional parameter block、重复 key 和不完整 string/block/operator。
 
 退出条件：corpus 全部通过；任意 corpus 单字符删除不导致 parser panic；Zed manifest、metadata 和 query 编译检查通过；extension 源码不包含 effect/trigger 名称表或 scope 规则。当前环境没有可自动控制的 Zed GUI，因此示例 Mod 的最终识别/高亮仍应在发布前按编辑器手册执行一次宿主环境 smoke test。
 
@@ -285,7 +285,7 @@ Phase R 完成前不开始 Semantic Tokens、Quick Fix、其他游戏 profile �
 为了尽早验证端到端链路，第一条可运行切片应围绕少量原创 fixture 完成：
 
 ```text
-PdxScript fixture
+Script fixture
   -> CST
   -> syntax diagnostic
   -> HIR lowering

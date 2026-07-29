@@ -1,14 +1,14 @@
-//! Loss-aware EU4 syntax boundary.
+//! Loss-aware Paradox text syntax boundary.
 //!
 //! The Phase 3 facade exposes grammar-shaped, loss-aware CST nodes and stable syntax errors for
-//! the EU4 PdxScript, localisation, and CSV frontends. The supported syntax is fixed to EU4; there
-//! is no game selector or cross-game parser interface.
+//! reusable Paradox script, localisation, and CSV frontends. A game profile classifies files and
+//! selects the appropriate frontend.
 
 use pdx_text::TextRange;
 
 mod cst;
 mod localisation;
-mod pdx_script;
+mod script;
 
 pub use cst::{CstKind, CstNode, SyntaxError, SyntaxErrorKind, SyntaxToken, TokenKind};
 
@@ -268,11 +268,11 @@ pub mod csv {
     }
 }
 
-/// One of the EU4 text frontends.
+/// One of the reusable Paradox text frontends.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum FileFormat {
-    /// EU4 PdxScript.
-    PdxScript,
+    /// Paradox key/value script.
+    Script,
     /// EU4 localisation YAML-like text.
     Localisation,
     /// A supported EU4 CSV file.
@@ -484,7 +484,7 @@ pub fn parse(format: FileFormat, source: &str) -> ParsedFile {
 
 fn parse_with_revision(format: FileFormat, source: &str, revision: u64) -> ParsedFile {
     let parts = match format {
-        FileFormat::PdxScript => pdx_script::parse(source),
+        FileFormat::Script => script::parse(source),
         FileFormat::Localisation => localisation::parse(source),
         FileFormat::Csv => ParseParts {
             root: CstNode::new(CstKind::CsvDocument, range(0, source.len()), Vec::new()),
@@ -545,16 +545,16 @@ mod tests {
 
     #[test]
     fn phase0_parse_preserves_source() {
-        let parsed = parse(FileFormat::PdxScript, "# comment\nkey = value");
+        let parsed = parse(FileFormat::Script, "# comment\nkey = value");
         assert_eq!(parsed.source(), "# comment\nkey = value");
         assert!(parsed.errors().is_empty());
         assert_eq!(parsed.root().kind(), CstKind::Document);
     }
 
     #[test]
-    fn pdx_script_cst_preserves_duplicate_properties_comments_and_headers() {
+    fn script_cst_preserves_duplicate_properties_comments_and_headers() {
         let parsed = parse(
-            FileFormat::PdxScript,
+            FileFormat::Script,
             "# note\nname = one\nname = two\nrgb { 1 2 3 }\n[[!country] value = yes]",
         );
         assert!(parsed.errors().is_empty(), "errors: {:?}", parsed.errors());
@@ -567,7 +567,7 @@ mod tests {
 
     #[test]
     fn syntax_errors_have_stable_codes_and_safe_ranges() {
-        let parsed = parse(FileFormat::PdxScript, "key = { value = \"unfinished");
+        let parsed = parse(FileFormat::Script, "key = { value = \"unfinished");
         assert!(parsed.errors().iter().any(|error| {
             error.kind == SyntaxErrorKind::UnterminatedString
                 && error.code() == "pdx-syntax-unterminated-string"
@@ -580,7 +580,7 @@ mod tests {
 
     #[test]
     fn rust_parser_recovery_nodes_map_to_stable_errors() {
-        let parsed = parse(FileFormat::PdxScript, "\"top_level_string\"");
+        let parsed = parse(FileFormat::Script, "\"top_level_string\"");
         assert!(parsed.errors().iter().any(|error| {
             error.kind == SyntaxErrorKind::UnexpectedToken
                 && error.code() == "pdx-syntax-unexpected-token"
@@ -604,7 +604,7 @@ mod tests {
 
     #[test]
     fn incremental_edits_match_full_reparse() {
-        let mut current = parse(FileFormat::PdxScript, "name = one\nvalue = yes\n");
+        let mut current = parse(FileFormat::Script, "name = one\nvalue = yes\n");
         let edits = [
             SyntaxEdit::ranged(TextRange::new(8, 11).expect("range"), "two"),
             SyntaxEdit::ranged(TextRange::new(0, 4).expect("range"), "title"),
@@ -612,7 +612,7 @@ mod tests {
         ];
         for edit in edits {
             let next = current.apply_edit(&edit).expect("edit should apply");
-            let expected = parse(FileFormat::PdxScript, next.source());
+            let expected = parse(FileFormat::Script, next.source());
             assert_eq!(next.root(), expected.root());
             assert_eq!(next.tokens(), expected.tokens());
             assert_eq!(next.errors(), expected.errors());

@@ -1,0 +1,14 @@
+{
+  "name": "tree-sitter-eu4",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tree-sitter grammar for Europa Universalis IV script files",
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "test": "tree-sitter test",
+    "parse": "tree-sitter parse"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.25.6"
+  }
+}

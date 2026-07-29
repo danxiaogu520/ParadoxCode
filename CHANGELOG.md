@@ -10,7 +10,7 @@ established.
 
 ### Added
 
-- EU4-first PDX Script, localisation, and CSV syntax frontends.
+- EU4-first Paradox script, localisation, and CSV syntax frontends.
 - Rule-driven diagnostics, completion, hover, navigation, symbols, references, and safe rename.
 - Conservative document formatting over LSP.
 - Current Mod, ordered dependency, overlay, and persistent Vanilla index support.
@@ -21,6 +21,9 @@ established.
 
 ### Changed
 
+- Renamed the Zed script language to `Europa Universalis IV` with grammar/language identifier
+  `eu4`, while generic parser APIs now use `Script`.
+- Migrated the first-party rules source to format 2 with the generic parser identity `script`.
 - Split game-neutral rules infrastructure from the EU4 profile.
 - Reworked workspace snapshots and per-file state to avoid query-time workspace rebuilding.
 - Embedded first-party rules into official binaries and removed external rule arguments and the
