@@ -79,19 +79,15 @@ cargo build --workspace
 cargo test --workspace --all-targets
 ```
 
-Run the main quality gates with:
+Install the repository Git hooks once:
 
 ```bash
-cargo fmt --all -- --check
-cargo check --workspace --all-targets --all-features
-cargo test --workspace --all-targets --all-features
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo doc --workspace --no-deps
-bash scripts/check-phase1-grammars.sh
-python3 scripts/prepare-zed-dev-manifest.py
-python3 scripts/check-zed-extension.py
-bash scripts/check-phase6a.sh
+bash scripts/install-git-hooks.sh
 ```
+
+After installation, normal `git commit` commands run the complete local quality gates. Use
+`bash scripts/check-quality-gates.sh` to run them explicitly or pass `core`, `grammars`, `zed`, or
+`release` to diagnose one group.
 
 Compile the developer-maintained first-party rule source with `pdx-rulec`; no external checkout or
 rule corpus is required:

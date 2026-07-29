@@ -145,6 +145,12 @@ pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 4. 写出本次改动的最小范围、预期不变量和验证命令；
 5. 若发现已有改动，保留其内容，只编辑任务所需的区域。
 
+Git checkout 使用仓库版本化的 `.githooks/pre-commit` 作为本地质量门禁。首次 clone 后运行
+`bash scripts/install-git-hooks.sh`；代理发现 `core.hooksPath` 未指向 `.githooks` 时应自行
+安装。正常提交直接执行 `git commit`，让 hook 调用 `scripts/check-quality-gates.sh`，无需
+在提交前手工重复整套复杂命令。只有诊断某一失败时才单独运行 `core`、`grammars`、`zed`
+或 `release` 分组；CI 继续负责 Windows、MSRV 和依赖策略等环境专属门禁。
+
 ### 实现中
 
 - 每次改动保持可编译或尽量保持局部可验证；

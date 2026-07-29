@@ -26,22 +26,25 @@ to the core workspace dependency graph.
 
 ## Quality checks
 
-Run the checks relevant to your change. A full local pass is:
+Install the versioned Git hooks once after cloning:
 
 ```bash
-cargo fmt --all -- --check
-cargo check --workspace --all-targets --all-features
-cargo test --workspace --all-targets --all-features
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo doc --workspace --no-deps
-bash scripts/check-phase1-grammars.sh
-python3 scripts/prepare-zed-dev-manifest.py
-python3 scripts/check-zed-extension.py
-cargo check --manifest-path editors/zed/Cargo.toml --all-targets
-bash scripts/check-phase6a.sh
+bash scripts/install-git-hooks.sh
 ```
 
-If a check cannot be run, say so in the pull request and explain why.
+Normal `git commit` commands then run the complete local quality gates automatically. To diagnose a
+failure or run the same entry point without committing:
+
+```bash
+bash scripts/check-quality-gates.sh
+bash scripts/check-quality-gates.sh core
+bash scripts/check-quality-gates.sh grammars
+bash scripts/check-quality-gates.sh zed
+bash scripts/check-quality-gates.sh release
+```
+
+CI additionally covers Windows, the minimum supported Rust version, and dependency policy. If a
+check cannot be run, say so in the pull request and explain why.
 
 ## Architecture rules
 

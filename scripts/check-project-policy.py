@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "https://github.com/danxiaogu520/ParadoxCode"
 REQUIRED_FILES = (
+    ".githooks/pre-commit",
     "README.md",
     "LICENSE",
     "CHANGELOG.md",
@@ -27,6 +28,8 @@ REQUIRED_FILES = (
     "scripts/test-package-server-release.py",
     "scripts/verify-server-release.py",
     "scripts/check-release-version.py",
+    "scripts/check-quality-gates.sh",
+    "scripts/install-git-hooks.sh",
     ".github/workflows/release.yml",
     ".github/ISSUE_TEMPLATE/bug_report.yml",
     ".github/ISSUE_TEMPLATE/feature_request.yml",
@@ -65,6 +68,11 @@ def main() -> int:
         require("## [Unreleased]" in changelog, "CHANGELOG must keep an Unreleased section")
 
         require(not (ROOT / "crates/pdx-cwt").exists(), "the retired CWT importer must not return")
+        hook = (ROOT / ".githooks" / "pre-commit").read_text(encoding="utf-8")
+        require(
+            "scripts/check-quality-gates.sh" in hook,
+            "the pre-commit hook must invoke the versioned quality-gate entry point",
+        )
         require(
             not (ROOT / "crates/pdx-eu4").exists(),
             "the retired pdx-eu4 compatibility facade must not return",
