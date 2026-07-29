@@ -25,7 +25,6 @@ Rust workspace 初始包含：
 | `pdx-syntax` | 硬编码 EU4 Rust parser、source text、typed CST、syntax errors |
 | `pdx-rules` | 通用 SQLite schema、canonical hash、只读 runtime model 与查询 API |
 | `pdx-game-eu4` | EU4 profile、bootstrap catalog 与专属语义 |
-| `pdx-eu4` | 迁移期兼容 re-export facade |
 | `pdx-rulec` | 第一方规则源码严格校验与 artifact/manifest 编译器 |
 | `pdx-hir` | 路径和规则感知的语义 lowering |
 | `pdx-workspace` | VFS、source roots、cache、snapshot、index |

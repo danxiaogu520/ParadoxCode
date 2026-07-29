@@ -27,6 +27,40 @@ logs.
       the source or release artifacts.
 - [ ] Known limitations and supported platforms are documented accurately.
 
+The per-target packaging command is:
+
+```text
+python3 scripts/package-server-release.py \
+  --version MAJOR.MINOR.PATCH \
+  --target RUST_TARGET \
+  --binary PATH_TO_PDX_LS \
+  --output-dir DIST_DIRECTORY
+```
+
+It emits the exact archive declared by `editors/zed/server-distribution.json` plus
+`{archive}.sha256`. `python3 scripts/test-package-server-release.py` verifies deterministic
+tar/zip bytes, archive contents, executable mode, and sidecars without requiring a Rust build.
+The packager, matrix verifier, and packaging test all load that JSON through
+`scripts/server_release_contract.py`; target and filename changes therefore have one canonical
+source and fail the project-policy matrix check if they drift from the supported platform set.
+The same contract carries checksum/archive/executable size limits, so CI cannot publish an asset
+that the bounded Zed installer would necessarily reject.
+The packaging regression also requires the complete verifier to reject a changed checksum,
+an oversized sidecar/archive, an omitted asset, an unexpected file/directory, filesystem symlink
+assets, and tar/zip symlink members before restoring and accepting the matrix; the producer
+separately rejects an oversized executable before reading it. All release scripts share the same
+strict SemVer parser, including prerelease/build metadata and numeric leading-zero rejection.
+The Phase 6A gate additionally packages the real Linux `pdx-ls`, verifies its sidecar and archive
+contract, writes the executable into a fresh temporary install directory, and runs `--version`
+before exercising the JSON-RPC server smoke. The Zed native tests also feed Python-packaged tar.gz
+and zip fixtures into the Rust extension extractors, preventing the producer and consumer
+implementations from drifting independently, and compare all five Rust platform mappings against
+the canonical JSON contract. CI runs both gates on every main/PR build.
+The tag workflow also runs `scripts/check-release-version.py` across the workspace package version,
+Zed manifest, and Zed Rust package (whose `CARGO_PKG_VERSION` selects the download tag), then checks
+the built server's `--version` before packaging. A tag therefore cannot silently disagree with any
+runtime version source.
+
 ## Required smoke test
 
 On a clean EU4 Mod workspace, verify file recognition and highlighting, diagnostics, completion,

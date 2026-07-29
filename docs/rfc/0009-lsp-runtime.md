@@ -3,7 +3,7 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
-> 实现进度（2026-07-20）：stdio reader 与 workspace event loop 已分离；initialize 的 source-root scan 在候选 host worker 中运行，目录/读取/parse/lower/index 全链路可取消且仅在成功后提交；编辑先 stage 最新文本/版本，parse/lower 在 snapshot worker 准备，并通过版本、文本、路径三重提交门拒绝旧结果；依赖语义的请求按消息顺序等待最新 parse。semantic diagnostics 使用 200ms debounce 与版本门，普通语言请求也在 snapshot worker 执行；`$/cancelRequest` 与过期 diagnostics 使用共享的 editor-neutral token，在 workspace semantic 合并、CWT 递归和主要结果遍历中协作式中止。当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 与语言功能 response 已迁入 `lsp-types`，JSON-RPC framing 继续保持轻量自有实现。类型化 `initializationOptions`、项目 TOML、Current Mod、有序只读 Dependency roots 和持久化只读 Vanilla cache 已接入；watched-file 定向更新待完成。
+> 实现进度（2026-07-25）：stdio reader 与 workspace event loop 已分离；initialize 的 source-root scan 在候选 host worker 中运行，目录/读取/parse/lower/index 全链路可取消且仅在成功后提交；编辑先 stage 最新文本/版本，parse/lower 在 snapshot worker 准备，并通过版本、文本、路径三重提交门拒绝旧结果；依赖语义的请求按消息顺序等待最新 parse。semantic diagnostics 使用 200ms debounce 与版本门，普通语言请求也在 snapshot worker 执行；`$/cancelRequest` 与过期 diagnostics 使用共享的 editor-neutral token，在 workspace semantic 合并、semantic rule 递归及主要结果遍历中协作式中止。当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 与语言功能 response 已迁入 `lsp-types`，JSON-RPC framing 继续保持轻量自有实现。类型化 `initializationOptions`、项目 TOML、Current Mod、有序只读 Dependency roots、持久化只读 Vanilla cache，以及动态注册并在 revision 门后提交的 watched-file worker 均已接入。memory transport 回归还覆盖 scope-fact 消歧后的 mixed structural/child-context completion 与相应 publishDiagnostics。
 >
 > 2026-07-21 amendment：本 RFC 的 `--rules` runtime 输入已由 [RFC 0014](0014-embedded-first-party-rules.md) 取代；LSP 生命周期和协议边界不变。
 
@@ -22,21 +22,29 @@
 ## Transport
 
 MVP 只支持 stdio，stdout 专用于协议。日志写 stderr 或 LSP logging channel，并默认不记录完整用户源码。
+自有 framing 在分配 body 前限制总 header 为 8 KiB、单条 JSON-RPC message 为 32 MiB，
+并拒绝重复 `Content-Length`，避免损坏客户端造成无界分配或长度歧义。overlay 文档与
+磁盘扫描共享 16 MiB 单文件边界；增量 change 在修改 String 之前计算结果长度并拒绝越界。
+排序后的 completion 与 workspace symbol response 分别限制为 512/256 项；completion
+截断时设置 `isIncomplete`，客户端可用更具体前缀继续查询。单次 diagnostics publish
+最多 1000 项；超出时最后一项明确报告被省略数量，而不是静默生成无界 response。
 
 优先选用提供 protocol connection 与 types 的低层 Rust 库，避免 analysis API 被 async service trait 绑定。具体依赖版本在 Phase 0 spike 后锁定。
 
-Server 必须通过进程参数获得规则文件：
+Server 使用编译进官方 binary 的第一方规则：
 
 ```text
 pdx-ls
 ```
 
-`pdx-ls` 不内嵌、下载、更新或搜索规则。启动时校验 SQLite schema 和 `rule_hash`；失败则保留 syntax-only 能力并报告 workspace error。
+`pdx-ls` 不接受、下载、更新或搜索外部规则文件。启动时校验内嵌 artifact 的 SQLite
+schema、game identity 和 `rule_hash`；失败则保留 syntax-only 能力并报告 workspace error。
 
 ## Server 状态
 
 ```text
 Uninitialized
+Initializing
 Initialized
 ShuttingDown
 Exited
@@ -112,6 +120,10 @@ Phase 2 只声明同步能力。对应 feature 实现通过测试后逐步声明
 - document formatting provider
 
 未实现能力不能提前声明。Semantic Tokens 和 Code Action 在 v0.2 前不声明。
+
+Scripted definition 的 inferred parameter 通过 document symbol provider 以 LSP `VARIABLE`
+返回，selection range 精确覆盖参数名；workspace symbol provider 不返回这些 owner-local
+symbol。真实内存 transport 回归同时锁定这两个边界。
 
 ## Diagnostics
 

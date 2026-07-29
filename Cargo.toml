@@ -6,7 +6,6 @@ members = [
     "crates/pdx-rules",
     "crates/pdx-game",
     "crates/pdx-game-eu4",
-    "crates/pdx-eu4",
     "crates/pdx-rulec",
     "crates/pdx-hir",
     "crates/pdx-workspace",

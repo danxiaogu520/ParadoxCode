@@ -16,6 +16,8 @@ established.
 - Current Mod, ordered dependency, overlay, and persistent Vanilla index support.
 - Thin Zed extension with editor-only Tree-sitter grammars.
 - Strict developer-maintained EU4 rule source and reproducible `pdx-rulec` compiler.
+- Exact-version Zed server installation and a deterministic five-target native release workflow
+  with SHA-256 sidecars and complete-matrix verification.
 
 ### Changed
 
@@ -23,8 +25,13 @@ established.
 - Reworked workspace snapshots and per-file state to avoid query-time workspace rebuilding.
 - Embedded first-party rules into official binaries and removed external rule arguments and the
   retired CWT importer.
+- Reused conservative HIR scope transitions in nested diagnostics and completion, including
+  statically disambiguated rule contexts without choosing arbitrary multi-scope candidates.
 
 ### Security
 
-- Added cooperative cancellation, stale-result gates, scan limits, symlink handling, and read-only
-  source protections.
+- Added cooperative cancellation, stale-result gates, scan/message limits, strict LSP framing,
+  symlink handling, and read-only source protections.
+- Added bounded streaming downloads, restricted single-file archive extraction, tar/ZIP integrity
+  checks, container-overhead-aware executable limits, and self-validating executable caches to the
+  Zed server installer.

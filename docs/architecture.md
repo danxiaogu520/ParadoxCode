@@ -1,6 +1,6 @@
 # ParadoxCode 总体架构
 
-> 2026-07-25 状态说明：通用 `pdx-rules`、`pdx-game` 安装发现层、EU4 profile、per-file cache、廉价 snapshot、共享结构、协作式取消、Current Mod/Dependency/持久化 Vanilla cache 已落地。第一方 JSON 规则源码、严格 `pdx-rulec` 编译器和官方 binary 内嵌规则已经接入；CWT importer、外部 `--rules` 与扩展规则副本已经删除。scope typed lowering、watched-file LSP 接入和发布闭环仍待完成。
+> 2026-07-25 状态说明：通用 `pdx-rules`、`pdx-game` 安装发现层、EU4 profile、per-file cache、廉价 snapshot、共享结构、协作式取消、Current Mod/Dependency/持久化 Vanilla cache 与 watched-file 定向更新已落地。第一方 JSON 规则源码、严格 `pdx-rulec` 编译器和官方 binary 内嵌规则已经接入；CWT importer、外部 `--rules` 与扩展规则副本已经删除。scope typed lowering 和发布闭环仍待完成。
 
 ## 目标
 
@@ -87,9 +87,9 @@ Vanilla cache 是本机版本化 SQLite artifact，只持久化 source-file loca
 
 `pdx-rulec` 只接受仓库中的严格第一方 JSON 规则源码，校验稳定身份、cardinality、severity、type descriptor 和 artifact round-trip，然后生成 SQLite `eu4.pdxrules`。项目不提供 CWT importer、fallback 或同步入口。
 
-`pdx-rules` 定义通用 SQLite artifact schema、规范化逻辑视图、`rule_hash` 算法、只读加载与运行时查询 API，以及不含游戏名称的 data-only `GameProfile` 描述；`pdx-game` 定义数据驱动的安装标志、跨平台发现、最小验证和用户级本机配置；`pdx-game-eu4` 填充 EU4 profile、安装描述与 bootstrap catalog。`pdx-eu4` 现在只保留临时 re-export facade，待调用方和文档迁移完成后删除。运行时只读加载并冻结 `RuleSet`，schema 12 将 `game_id` 纳入 metadata 与 canonical hash；EU4 组合入口在启动服务前校验 profile 身份，并把 profile 显式传入 LSP/host/snapshot。
+`pdx-rules` 定义通用 SQLite artifact schema、规范化逻辑视图、`rule_hash` 算法、只读加载与运行时查询 API，以及不含游戏名称的 data-only `GameProfile` 描述；`pdx-game` 定义数据驱动的安装标志、跨平台发现、最小验证和用户级本机配置；`pdx-game-eu4` 填充 EU4 profile、安装描述与 bootstrap catalog。迁移期 `pdx-eu4` re-export 已在调用方清零后删除。运行时只读加载并冻结 `RuleSet`，同时建立不参与逻辑哈希的 case-insensitive exact-key/context semantic indices，供 scope-link、nested transition lowering、root selection、diagnostics 和 completion 等热点查询跳过无关规则；schema 12 将 `game_id` 纳入 metadata 与 canonical hash。EU4 组合入口在启动服务前校验 profile 身份，并把 profile 显式传入 LSP/host/snapshot。
 
-当前 workspace shard 的 symbol/reference 路径，以及 analysis 的 root scope、scope spelling/completion/compatibility、fallback key、semantic member alias 与额外 enum member，都由 EU4 profile 数据驱动。workspace/analysis/LSP 通用生产代码不再按 `game_id` 字符串或 EU4 名称白名单隐式启用这些行为；syntax crate 仍保留 `Eu4FileFormat`/`parse_eu4` 历史 API 名称，后续以行为保持重命名处理。
+当前 workspace shard 的 symbol/reference 路径，以及 analysis 的 root scope、scope spelling/completion/compatibility、fallback key、semantic member alias 与额外 enum member，都由 EU4 profile 数据驱动。workspace/analysis/LSP 通用生产代码不再按 `game_id` 字符串或 EU4 名称白名单隐式启用这些行为；syntax facade 的历史 `Eu4FileFormat`/`parse_eu4*` 名称也已在未发布边界内收敛为 `FileFormat`/`parse*`，具体 localisation/CSV 行为仍由 EU4 profile 的文件分类选择。
 
 数据库保存 `TypeKey("scripted_effect")`、`AliasRef("effect")` 等 EU4 静态 matcher；实际 scripted effect、building 等成员来自 `WorkspaceIndex`。EU4 command、scope 和目录规则属于 EU4 profile 实现，不设计其他游戏的推测性替换层。
 
@@ -118,7 +118,7 @@ pdx-cli       -> pdx-lsp + selected runtime crates
 - `pdx-game` 不包含具体游戏名、规则语义、workspace 索引或编辑器 API。
 - `pdx-game-eu4` 保存 EU4 profile 和无法由通用规则数据表达的 EU4 特殊语义。
 - `pdx-rulec` 是维护者工具，只把第一方规则源码编译成经过完整校验的 artifact；它不是 runtime dependency。
-- `pdx-hir` 通过稳定的 typed CST API lowering；结构 facts 与 `RuleSet`/显式 profile 驱动的 definition/reference facts 已被 workspace shard 和 analysis 查询共享。profile/category 引用在 HIR 中保留来源，避免保守索引引用污染 hover/rename；scope 与 semantic typed lowering 仍待补齐。
+- `pdx-hir` 通过稳定的 typed CST API lowering；结构/recovery/conditional-parameter facts 与 `RuleSet`/显式 profile 驱动的 definition/reference facts 已被 workspace shard 和 analysis 查询共享。profile/category 引用在 HIR 中保留来源，parser recovery 保留为 `UnknownConstruct`；parameter definition/reference 按 occurrence range 排序并按所属顶层 scripted definition 隔离，HIR 暴露 position/owner 有序查询，analysis definition/references/hover/rename 直接做 owner-local 解析，并将 inferred parameter 作为 document-local symbol 暴露而不注入 workspace symbol，唯一 active invocation 也通过 definition file/range 回到 HIR owner 做精确参数校验/补全，同时向 workspace 动态 enum 作 unresolved/ambiguous 兼容投影；scope lowering 以一次线性 stack pass 从 source-order properties 建直接子项邻接表，semantic root context/parent path、初始 `ScopeState`、`skip_root` 后代、register intrinsic、多段 exact scope-link expression、无冲突 command transition，以及能由直接子 key 静态排除其他 signature 的冲突 transition 已缓存为按 range 排序、可 logarithmic lookup 的 HIR facts。diagnostics 与已有子项的 nested completion traversal 复用这些 facts；结构 parent fields 与 child context 共存的 block 会被分区校验并合并补全，空 block completion 合并所有静态可能 destination。依赖 workspace 的动态 transition与仍不能静态消歧的 diagnostics alternative 待补齐。
 - `pdx-workspace` 不依赖 LSP 类型。
 - `pdx-analysis` 不依赖任何 editor API。
 - `pdx-lsp` 是唯一允许依赖 LSP protocol types 的核心 crate。

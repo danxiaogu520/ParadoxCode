@@ -95,7 +95,38 @@ Zed grammar registration 引用 repository 与固定 revision。当前 monorepo 
 - 缓存在 extension work directory。
 - 下载/解压失败返回可操作错误。
 
+Zed 0.7 adapter 已实现上述顺序：它查询与 extension `CARGO_PKG_VERSION` 完全相同的 tag，
+先读取命名 sidecar，再对 archive bytes 做 SHA-256；校验通过后只接受单个精确命名的
+`pdx-ls`/`pdx-ls.exe`。tar/zip 中的额外成员、目录、data descriptor、加密或未知压缩
+方式都会失败，tar header checksum/USTAR 标识和 ZIP local/central metadata/CRC 也必须
+一致；checksum sidecar、压缩 archive 与解压后 executable 还有独立硬上限。tar reader
+在 executable payload 上限之外只额外允许一个 Python USTAR record 的容器开销，并再次
+按 header size 校验 payload，避免容器开销误伤边界合法产物或反向放宽 executable 上限。
+HTTP body 通过 Zed streaming API 逐 chunk 检查并在扩容前拒绝越界，避免异常 asset 在
+下载、校验或解压阶段耗尽 extension WASM 内存。失败通过 language-server
+installation status 返回可操作错误。native 单测锁定 sidecar、受限 reader 与 extractor，
+并直接把 Python packager 生成的 tar.gz/zip 交给 Rust extractor 做跨实现契约回归；CI
+还逐项核对 Rust 五平台映射与 canonical `server-distribution.json`。CI 另行编译实际
+`wasm32-wasip1` extension，并对 native test targets 执行严格 clippy。
+
+安装完成时 extension 另存解压后 executable 的 SHA-256；命中 version+target cache 时先
+校验文件类型、非零/大小上限与该 digest。旧版本遗留的无 checksum cache、截断文件或被
+修改的 executable 都会被移除并重新下载，不会永久陷入重复启动坏 binary。文件类型
+检查不跟随 symlink，安装目录也必须是实际目录；写入前会清理精确命名的临时文件，因此
+预置 cache/temp symlink 不能把下载内容写出 extension work directory。
+
 extension 不自行构建 Rust server，也不运行 package manager 安装脚本。
+
+仓库内的 `scripts/package-server-release.py` 按上述 target matrix 生成只含一个 executable
+的 deterministic `.tar.gz`/`.zip` 与相邻 `{archive}.sha256`；CI 用原创 fixture 同时验证
+Linux/macOS archive contract、Windows archive contract、executable mode、checksum 和
+重复打包字节稳定性。packager、完整矩阵 verifier 和测试通过共用 loader 读取
+`server-distribution.json`，不各自复制 target/filename table；checksum/archive/executable
+大小上限也在该契约中声明，并由 Python producer/verifier、Rust mapping test 与 policy
+共同锁定。tag workflow 在五种原生
+runner 上构建并校验 server 版本，汇总后
+必须由完整矩阵 verifier 接受才创建 immutable GitHub Release。发布资产上的 clean-machine
+extension 下载/启动仍是发布阻塞项。
 
 第一方规则内嵌于 server release。extension 启动命令必须为：
 
@@ -152,6 +183,6 @@ Phase 1 提供：
 - 打开配置过的 EU4 workspace 时只启动一个 `pdx-ls`。
 - 所有注册的文本 language 都能发送 didOpen/change/close。
 - server path 配置和 PATH fallback 可测试。
-- extension 启动参数指向自己打包的规则数据库。
+- extension 启动命令不含可替换第一方规则的参数。
 - 首次 Vanilla cache 建立和手动刷新有发布前 smoke checklist。
 - extension 源码中搜索不到 effect/trigger 名称表或 scope 规则。

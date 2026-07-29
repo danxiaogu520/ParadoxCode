@@ -10,8 +10,9 @@ Universalis IV and the Zed editor.
 
 > [!IMPORTANT]
 > ParadoxCode is in alpha and has not published an end-user release. The core language features are
-> implemented and tested, but automatic server installation, cross-platform release packaging,
-> watched-file updates, and final Zed installation testing are still in progress.
+> implemented and tested, including checksummed server installation and a native release workflow,
+> but the first real release run, workspace-dependent scope transitions, and final clean-machine Zed
+> installation testing are still in progress.
 
 ParadoxCode is not affiliated with or endorsed by Paradox Interactive. Europa Universalis IV and
 Paradox Interactive are trademarks of their respective owners.
@@ -26,8 +27,10 @@ Paradox Interactive are trademarks of their respective owners.
 - Workspace resolution across unsaved buffers, the current Mod, ordered dependency Mods, and a
   persistent local Vanilla index.
 - A stdio Language Server (`pdx-ls`) with cancellation, stale-result protection, and immutable
-  analysis snapshots.
+  analysis snapshots, including targeted watched-file updates for live Mod roots.
 - A thin Zed extension with Tree-sitter grammars used only for editor-side highlighting.
+- Exact-version Zed server download with SHA-256 verification, restricted extraction, bounded
+  streaming, and self-validating executable caches.
 
 The runtime parser is implemented in Rust and does not link Tree-sitter C. Tree-sitter assets under
 `grammars/` are isolated to Zed highlighting and grammar corpus tests.
@@ -40,11 +43,9 @@ in [the implementation plan](plan.md) and [the MVP definition](docs/mvp.md).
 
 Current release blockers include:
 
-- completing release checks for the embedded first-party rules artifact;
-- automatic, checksummed `pdx-ls` downloads from the Zed extension;
-- native Windows and other supported-platform release artifacts;
-- a clean-machine Zed install and startup smoke test;
-- targeted watched-file updates through the full LSP path.
+- exercising and reviewing the first tag-driven five-target native release matrix;
+- a clean-machine smoke test against an actually published Zed extension and server release;
+- completing workspace-dependent and conflicting-alternative scope transitions.
 
 No release date is promised until those checks pass.
 
@@ -68,7 +69,8 @@ profile. See [the architecture guide](docs/architecture.md) and
 
 ## Building from source
 
-ParadoxCode currently requires Rust 1.88 or newer and Node.js 22 for the Tree-sitter corpus checks.
+ParadoxCode currently requires Rust 1.88 or newer, Python 3.11 or newer for repository/release
+checks, and Node.js 22 for the Tree-sitter corpus checks.
 
 ```bash
 git clone https://github.com/danxiaogu520/ParadoxCode.git

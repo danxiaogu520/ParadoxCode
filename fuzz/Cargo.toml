@@ -9,6 +9,9 @@ publish = false
 [dependencies]
 libfuzzer-sys = "0.4"
 pdx-format = { path = "../crates/pdx-format" }
+pdx-game-eu4 = { path = "../crates/pdx-game-eu4" }
+pdx-hir = { path = "../crates/pdx-hir" }
+pdx-rules = { path = "../crates/pdx-rules" }
 pdx-syntax = { path = "../crates/pdx-syntax" }
 pdx-text = { path = "../crates/pdx-text" }
 
@@ -36,6 +39,13 @@ bench = false
 [[bin]]
 name = "format-pdx-script"
 path = "fuzz_targets/format_pdx_script.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "lower-hir"
+path = "fuzz_targets/lower_hir.rs"
 test = false
 doc = false
 bench = false

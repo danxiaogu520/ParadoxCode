@@ -66,7 +66,6 @@ crates/
   pdx-rules/
   pdx-game/
   pdx-game-eu4/
-  pdx-eu4/             # temporary compatibility facade
   pdx-rulec/
   pdx-hir/
   pdx-workspace/
@@ -176,7 +175,7 @@ PdxScript 至少覆盖 property、裸 value、嵌套/混合 block、八种 opera
 
 ### Phase 4：第一方规则源码、编译器和 Workspace Index
 
-状态：`implemented, acceptance reopened`（2026-07-22）；第一方 JSON source、严格 `pdx-rulec`、内嵌 runtime、root/overlay resolver、file shards、dependency 配置、Vanilla cache 和主要语义回归已实现，但 watched-file 定向更新仍需完成。
+状态：`completed`（2026-07-25）；第一方 JSON source、严格 `pdx-rulec`、内嵌 runtime、root/overlay resolver、file shards、dependency 配置、Vanilla cache、watched-file 定向更新和主要语义回归均已实现。
 
 这是 MVP 中最大的一阶段，应拆成“规则 schema/runtime”和“第一方 source/compiler”两个可独立审查的序列。
 
@@ -254,16 +253,16 @@ Workspace/index：
 
 按可独立验证的小切片执行：
 
-1. 接受 RFC 0013，拆分通用规则 runtime 与 EU4 profile，迁移期间保留兼容 re-export（`pdx-rules`、`pdx-game-eu4`、schema 12 `game_id` 校验与 `pdx-eu4` facade 已建立；data-only profile 已显式贯穿 CLI/LSP/host/snapshot，workspace symbol/reference 与 analysis scope/key/member fallback 已迁移；`pdx-eu4` facade 删除和 syntax 历史 API 重命名待后续独立切片）；
-2. 实现真实 per-file HIR/FileState，overlay 变化只更新一个文件（FileState、磁盘复用、overlay 按版本 parse/lower cache，以及供 workspace shard/analysis 共享的 property/localisation/scalar 与 profile-aware definition/reference HIR facts 已完成；scope semantic lowering 待完成）；
+1. 接受 RFC 0013，拆分通用规则 runtime 与 EU4 profile（`pdx-rules`、`pdx-game-eu4`、schema 12 `game_id` 校验已建立，迁移期 `pdx-eu4` facade 已删除；data-only profile 已显式贯穿 CLI/LSP/host/snapshot，workspace symbol/reference 与 analysis scope/key/member fallback 已迁移；syntax 历史 API 已保持行为重命名）；
+2. 实现真实 per-file HIR/FileState，overlay 变化只更新一个文件（FileState、磁盘复用、overlay 按版本 parse/lower cache，以及供 workspace shard/analysis 共享的 property/localisation/scalar/recovery `UnknownConstruct`/`ParameterConditional`、按顶层 definition 隔离并支持 definition/references/hover/rename、document-local symbol 与唯一 invocation 精确校验/补全的 parameter facts、profile-aware definition/reference、semantic root context/parent path、初始 `ScopeState`、register intrinsic、多段 exact scope-link expression、无冲突 exact command transition〔含等价 alternative signature〕、可由直接子 key 唯一静态消歧的冲突 transition HIR facts，以及 diagnostics/已有子项 nested completion 对 scope facts 的复用、结构字段/child-context 混合 block 分区、空 block 多 destination completion、workspace type member 驱动的 diagnostics transition 过滤和 unresolved transition 禁止规则顺序回退已完成；仍不能静态消歧的冲突 diagnostics alternative 共同结果汇总待完成）；
 3. 将 snapshot 改为共享不可变状态，查询创建 snapshot 时不深拷贝 workspace 文本和索引（已完成）；
 4. 删除 analysis query-time 全 workspace 重解析，查询只读取当前 HIR 与 WorkspaceIndex（已完成）；
 5. 增加 index bulk build 和真正的单 shard 增量 replacement（已完成）；
 6. 修复稳定 SourceFileId、symlink 顺序、文件大小/深度/数量限制和错误隔离（已完成）；
 7. 将 LSP transport 迁移到类型化协议层，增加 worker、debounce、版本门和在途取消（已完成：stdio reader 分离，initialize 候选 host scan worker，prepared-document parse worker/三重提交门，semantic diagnostics 200ms debounce，snapshot request worker，共享 cancellation token 与 analysis 内部 checkpoint；workspace scan 覆盖目录/读取/parse/lower/index 检查点并有取消原子性回归；`lsp-types` 接管当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 和语言功能 response，轻量 JSON-RPC framing 有意保留）；
-8. 接入 formatting、dependency roots、Vanilla cache 持久化和文件变化更新（formatting 已完成：typed request/edits、capability、snapshot worker、UTF-16 与 unsafe-syntax integration 回归；dependency roots 已完成：类型化 initialization options、TOML、稳定 ID、有序优先级、重叠校验和只读 rename 回归；Vanilla cache 已完成：显式 CLI 建库/刷新、一次性跨平台自动发现、用户级配置、手动深度扫描、版本化 SQLite、source fingerprint、无源码持久化、可取消后台建库/只读加载、当前会话原子启用、降级 warning 与不重复搜索回归；watched-file 定向更新待完成）；
+8. 接入 formatting、dependency roots、Vanilla cache 持久化和文件变化更新（已完成：formatting 覆盖 typed request/edits、snapshot worker、UTF-16 与 unsafe-syntax integration；dependency roots 覆盖类型化 initialization options、TOML、稳定 ID、有序优先级、重叠校验和只读 rename；Vanilla cache 覆盖显式 CLI 建库/刷新、一次性跨平台自动发现、用户级配置、手动深度扫描、版本化 SQLite、source fingerprint、无源码持久化、可取消后台建库/只读加载、当前会话原子启用、降级 warning 与不重复搜索；watched-file 覆盖 Current Mod/Dependency 动态注册、后台定向更新、revision 提交门、overlay 保留和真实 JSON-RPC 回归）；
 9. 建立大型 synthetic workspace benchmark 与“编辑一个文件只 parse/lower 一次”计数测试（已完成：默认 2,000 个原创 EU4 event 文件，覆盖 cold/unchanged/单磁盘变化/单 overlay 编辑；线程局部测试计数器证明 overlay 编辑 parse/lower 各一次且不重建磁盘 `FileState`）；
-10. 按 RFC 0014/0015 内嵌第一方 EU4 规则并删除 runtime `--rules` 与扩展规则 asset（已完成）；继续完成 Zed 自动获取、多平台 release、checksum 和干净 clone 端到端安装测试。
+10. 按 RFC 0014/0015 内嵌第一方 EU4 规则并删除 runtime `--rules` 与扩展规则 asset（已完成）；Zed exact-version 自动获取、SHA-256 校验、受限解压、5-target 原生 tag workflow、deterministic archive/sidecar 与完整矩阵 verifier 已实现，实际发布资产上的干净机器端到端安装测试仍待完成。
 
 Phase R 完成前不开始 Semantic Tokens、Quick Fix、其他游戏 profile 或新的编辑器客户端。
 

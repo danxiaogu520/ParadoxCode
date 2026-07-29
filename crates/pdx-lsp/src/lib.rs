@@ -17,14 +17,17 @@ use std::time::{Duration, Instant};
 use lsp_types::{
     CancelParams, CompletionItem, CompletionItemKind, CompletionList, CompletionOptions,
     CompletionResponse, CompletionTextEdit, Diagnostic as LspDiagnostic, DiagnosticSeverity,
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, DocumentFormattingParams, DocumentSymbol as LspDocumentSymbol,
-    DocumentSymbolParams, Documentation, Hover as LspHover, HoverContents, HoverProviderCapability,
+    DidChangeTextDocumentParams, DidChangeWatchedFilesParams,
+    DidChangeWatchedFilesRegistrationOptions, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentFormattingParams,
+    DocumentSymbol as LspDocumentSymbol, DocumentSymbolParams, Documentation, FileChangeType,
+    FileSystemWatcher, GlobPattern, Hover as LspHover, HoverContents, HoverProviderCapability,
     InitializeParams, InitializeResult, InsertTextFormat, Location as LspLocation, MarkupContent,
     MarkupKind, MessageType, NumberOrString, OneOf, Position as LspPosition, PrepareRenameResponse,
-    Range as LspRange, ReferenceParams, RenameOptions, RenameParams, ServerCapabilities,
-    ServerInfo, ShowMessageParams, SymbolInformation, SymbolKind, TextDocumentPositionParams,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, TextEdit, Uri,
+    Range as LspRange, ReferenceParams, Registration, RegistrationParams, RelativePattern,
+    RenameOptions, RenameParams, ServerCapabilities, ServerInfo, ShowMessageParams,
+    SymbolInformation, SymbolKind, TextDocumentPositionParams, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextEdit, Uri, WatchKind,
     WorkDoneProgressOptions, WorkspaceEdit, WorkspaceSymbolParams,
 };
 use pdx_analysis::{
@@ -41,9 +44,9 @@ use pdx_game::{
 use pdx_rules::{GameProfile, RuleSet, RulesError};
 use pdx_text::{LineIndex, Position, TextRange};
 use pdx_workspace::{
-    AnalysisHost, AnalysisSnapshot, DocumentError, DocumentId, DocumentSource, ParsedSource,
-    PreparedDocument, SourceRoot, SourceRootId, SourceRootKind, VanillaCacheError,
-    VanillaIndexCache, WorkspaceChange, WorkspaceError, WorkspaceScanToken,
+    AnalysisHost, AnalysisSnapshot, DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId,
+    DocumentSource, ParsedSource, PreparedDocument, SourceRoot, SourceRootId, SourceRootKind,
+    VanillaCacheError, VanillaIndexCache, WorkspaceChange, WorkspaceError, WorkspaceScanToken,
 };
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -58,6 +61,14 @@ const SERVER_NOT_INITIALIZED: i64 = -32002;
 const REQUEST_CANCELLED: i64 = -32800;
 const DIAGNOSTIC_DEBOUNCE: Duration = Duration::from_millis(200);
 const PROJECT_CONFIG_MAX_BYTES: u64 = 1024 * 1024;
+const MAX_LSP_HEADER_BYTES: usize = 8 * 1024;
+const MAX_LSP_MESSAGE_BYTES: usize = 32 * 1024 * 1024;
+const MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
+const MAX_COMPLETION_RESULTS: usize = 512;
+const MAX_WORKSPACE_SYMBOL_RESULTS: usize = 256;
+const MAX_PUBLISHED_DIAGNOSTICS: usize = 1_000;
+const WATCHED_FILES_REGISTRATION_ID: &str = "pdx-source-roots";
+const WATCHED_FILES_REQUEST_ID: &str = "pdx/register-source-root-watchers";
 
 /// Lifecycle state of the server process.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -258,6 +269,7 @@ struct PreparedInitialize {
     result: Value,
     warnings: Vec<String>,
     auto_vanilla: Option<AutoVanillaConfiguration>,
+    watcher_registration: Option<Value>,
 }
 
 #[derive(Debug)]
@@ -289,6 +301,19 @@ struct SnapshotRequestResult {
     result: Result<Value, RpcError>,
 }
 
+#[derive(Debug)]
+struct InFlightDiskChanges {
+    base_revision: u64,
+    cancellation: WorkspaceScanToken,
+}
+
+#[derive(Debug)]
+struct DiskChangesResult {
+    base_revision: u64,
+    changes: Vec<DiskFileChange>,
+    result: Result<AnalysisHost, WorkspaceError>,
+}
+
 enum TransportEvent {
     Input(Result<Option<Value>, LspError>),
     Initialize(InitializeTaskResult),
@@ -296,6 +321,7 @@ enum TransportEvent {
     Diagnostics(DiagnosticsResult),
     Request(SnapshotRequestResult),
     VanillaSetup(VanillaSetupResult),
+    DiskChanges(DiskChangesResult),
 }
 
 impl RpcError {
@@ -322,6 +348,8 @@ pub struct LspServer {
     diagnostics: BTreeMap<DocumentId, Value>,
     pending_parses: BTreeMap<DocumentId, PendingParse>,
     pending_diagnostics: BTreeMap<DocumentId, PendingDiagnostics>,
+    pending_disk_changes: BTreeMap<PathBuf, DiskFileChangeKind>,
+    watcher_registration: Option<Value>,
     auto_vanilla: Option<AutoVanillaConfiguration>,
     clean_exit: bool,
 }
@@ -349,6 +377,8 @@ impl LspServer {
             diagnostics: BTreeMap::new(),
             pending_parses: BTreeMap::new(),
             pending_diagnostics: BTreeMap::new(),
+            pending_disk_changes: BTreeMap::new(),
+            watcher_registration: None,
             auto_vanilla: None,
             clean_exit: false,
         })
@@ -471,9 +501,11 @@ impl LspServer {
             let mut in_flight_requests = HashMap::<RequestId, InFlightRequest>::new();
             let mut in_flight_initialize = None::<InFlightInitialize>;
             let mut in_flight_vanilla = None::<VanillaSetupCancellation>;
+            let mut in_flight_disk_changes = None::<InFlightDiskChanges>;
             let mut deferred_messages = VecDeque::<Value>::new();
 
             loop {
+                self.spawn_pending_disk_changes(scope, &event_sender, &mut in_flight_disk_changes);
                 self.cancel_stale_parses(&in_flight_parses);
                 self.spawn_pending_parses(scope, &event_sender, &mut in_flight_parses);
                 self.cancel_stale_diagnostics(&in_flight);
@@ -485,8 +517,12 @@ impl LspServer {
                 );
                 let parse_busy = !self.pending_parses.is_empty() || !in_flight_parses.is_empty();
                 let initialize_busy = in_flight_initialize.is_some();
-                let deferred_ready =
-                    !parse_busy && !initialize_busy && !deferred_messages.is_empty();
+                let disk_changes_busy =
+                    !self.pending_disk_changes.is_empty() || in_flight_disk_changes.is_some();
+                let deferred_ready = !parse_busy
+                    && !initialize_busy
+                    && !disk_changes_busy
+                    && !deferred_messages.is_empty();
                 let (event, from_reader) = if deferred_ready {
                     let message = deferred_messages.pop_front().expect("checked non-empty");
                     (TransportEvent::Input(Ok(Some(message))), false)
@@ -528,8 +564,11 @@ impl LspServer {
                         let parse_busy =
                             !self.pending_parses.is_empty() || !in_flight_parses.is_empty();
                         let initialize_busy = in_flight_initialize.is_some();
+                        let disk_changes_busy = !self.pending_disk_changes.is_empty()
+                            || in_flight_disk_changes.is_some();
                         if from_reader
-                            && ((parse_busy && is_snapshot_request_message(&message))
+                            && (((parse_busy || disk_changes_busy)
+                                && is_snapshot_request_message(&message))
                                 || (initialize_busy && !is_initialize_control_message(&message)))
                         {
                             deferred_messages.push_back(message);
@@ -575,6 +614,9 @@ impl LspServer {
                             if let Some(task) = in_flight_vanilla.as_ref() {
                                 task.cancel();
                             }
+                            if let Some(task) = in_flight_disk_changes.as_ref() {
+                                task.cancellation.cancel();
+                            }
                             return if self.clean_exit {
                                 Ok(())
                             } else {
@@ -598,6 +640,7 @@ impl LspServer {
                             Ok(prepared) if !task.cancellation.is_cancelled() => {
                                 self.host = prepared.host;
                                 self.state = ServerState::Initialized;
+                                self.watcher_registration = prepared.watcher_registration;
                                 (
                                     json!({
                                         "jsonrpc": JSON_RPC_VERSION,
@@ -728,6 +771,52 @@ impl LspServer {
                             }
                         }
                     }
+                    TransportEvent::DiskChanges(result) => {
+                        let current = in_flight_disk_changes
+                            .as_ref()
+                            .is_some_and(|task| task.base_revision == result.base_revision);
+                        if !current {
+                            continue;
+                        }
+                        let task = in_flight_disk_changes.take().expect("checked disk change task");
+                        if task.cancellation.is_cancelled() {
+                            continue;
+                        }
+                        if self.host.snapshot().revision() != result.base_revision {
+                            self.requeue_disk_changes(result.changes);
+                            continue;
+                        }
+                        match result.result {
+                            Ok(host) => {
+                                self.host = host;
+                                let open = self
+                                    .host
+                                    .snapshot()
+                                    .documents()
+                                    .iter()
+                                    .filter_map(|(id, document)| {
+                                        document.version().map(|version| (id.clone(), version))
+                                    })
+                                    .collect::<Vec<_>>();
+                                for (id, version) in open {
+                                    self.schedule_diagnostics_for_document(
+                                        id,
+                                        version,
+                                        DIAGNOSTIC_DEBOUNCE,
+                                    );
+                                }
+                            }
+                            Err(WorkspaceError::Cancelled) => {}
+                            Err(error) => {
+                                write_message(
+                                    &mut output,
+                                    &show_warning_notification(format!(
+                                        "Workspace file changes could not be indexed: {error}"
+                                    )),
+                                )?;
+                            }
+                        }
+                    }
                 }
 
                 let draining_shutdown = self.state == ServerState::ShuttingDown
@@ -737,7 +826,9 @@ impl LspServer {
                         || !in_flight.is_empty()
                         || !in_flight_requests.is_empty()
                         || in_flight_initialize.is_some()
-                        || in_flight_vanilla.is_some());
+                        || in_flight_vanilla.is_some()
+                        || !self.pending_disk_changes.is_empty()
+                        || in_flight_disk_changes.is_some());
                 if !reader_active && !draining_shutdown && deferred_messages.is_empty() {
                     read_sender.send(()).map_err(|_| {
                         LspError::Protocol("LSP transport reader stopped unexpectedly".to_owned())
@@ -865,6 +956,54 @@ impl LspServer {
             }));
         });
         true
+    }
+
+    fn spawn_pending_disk_changes<'scope, 'environment>(
+        &mut self,
+        scope: &'scope std::thread::Scope<'scope, 'environment>,
+        event_sender: &mpsc::Sender<TransportEvent>,
+        in_flight: &mut Option<InFlightDiskChanges>,
+    ) {
+        if !matches!(self.state, ServerState::Initialized | ServerState::ShuttingDown)
+            || in_flight.is_some()
+            || self.pending_disk_changes.is_empty()
+        {
+            return;
+        }
+        let changes = std::mem::take(&mut self.pending_disk_changes)
+            .into_iter()
+            .map(|(path, kind)| DiskFileChange::new(path, kind))
+            .collect::<Vec<_>>();
+        let base_revision = self.host.snapshot().revision();
+        let cancellation = WorkspaceScanToken::new();
+        let worker_cancellation = cancellation.clone();
+        let worker_changes = changes.clone();
+        let mut candidate = self.host.clone();
+        let sender = event_sender.clone();
+        *in_flight = Some(InFlightDiskChanges { base_revision, cancellation });
+        scope.spawn(move || {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                candidate
+                    .apply_disk_file_changes_cancellable(&worker_changes, &worker_cancellation)
+                    .map(|_| candidate)
+            }))
+            .unwrap_or_else(|_| {
+                Err(WorkspaceError::Io(io::Error::other(
+                    "workspace file-change worker failed unexpectedly",
+                )))
+            });
+            let _ = sender.send(TransportEvent::DiskChanges(DiskChangesResult {
+                base_revision,
+                changes: worker_changes,
+                result,
+            }));
+        });
+    }
+
+    fn requeue_disk_changes(&mut self, changes: Vec<DiskFileChange>) {
+        for change in changes {
+            self.pending_disk_changes.entry(change.path).or_insert(change.kind);
+        }
     }
 
     fn schedule_parse(&mut self, uri: &str) {
@@ -1112,7 +1251,7 @@ impl LspServer {
         }
 
         match method {
-            "initialized" => Ok(Value::Null),
+            "initialized" => Ok(self.watcher_registration.take().unwrap_or(Value::Null)),
             "shutdown" => {
                 self.state = ServerState::ShuttingDown;
                 Ok(Value::Null)
@@ -1131,8 +1270,15 @@ impl LspServer {
             "textDocument/didSave" => {
                 let params = typed_params::<DidSaveTextDocumentParams>(params, "didSave")?;
                 let uri = params.text_document.uri.as_str();
+                if let Ok(path) = parse_file_uri_str(uri) {
+                    self.pending_disk_changes.insert(path, DiskFileChangeKind::Changed);
+                }
                 self.schedule_parse(uri);
                 self.schedule_diagnostics(uri, Duration::ZERO);
+                Ok(Value::Null)
+            }
+            "workspace/didChangeWatchedFiles" => {
+                self.handle_did_change_watched_files(params)?;
                 Ok(Value::Null)
             }
             method if is_snapshot_request(method) => {
@@ -1159,6 +1305,7 @@ impl LspServer {
             &WorkspaceScanToken::new(),
         )?;
         self.host = prepared.host;
+        self.watcher_registration = prepared.watcher_registration;
         self.state = ServerState::Initialized;
         Ok(prepared.result)
     }
@@ -1168,6 +1315,7 @@ impl LspServer {
         let uri = params.text_document.uri.as_str().to_owned();
         let version = i64::from(params.text_document.version);
         let text = params.text_document.text;
+        changed_document_len(0, None, text.len())?;
         let path = uri_to_path(&uri).ok();
         self.host
             .stage_open_document(DocumentId::new(uri.clone()), version, text, path)
@@ -1193,6 +1341,7 @@ impl LspServer {
                 .as_ref()
                 .map(|range| lsp_range_to_text_range(range, &line_index, &text))
                 .transpose()?;
+            changed_document_len(text.len(), range, change.text.len())?;
             apply_text_change(&mut text, range, &change.text)?;
             line_index = LineIndex::new(&text);
         }
@@ -1213,6 +1362,27 @@ impl LspServer {
             "method": "textDocument/publishDiagnostics",
             "params": {"uri": uri, "diagnostics": []}
         }))
+    }
+
+    fn handle_did_change_watched_files(&mut self, params: Option<&Value>) -> Result<(), RpcError> {
+        let params = typed_params::<DidChangeWatchedFilesParams>(params, "didChangeWatchedFiles")?;
+        for event in params.changes {
+            let path = parse_file_uri_str(event.uri.as_str())?;
+            let kind = if event.typ == FileChangeType::CREATED {
+                DiskFileChangeKind::Created
+            } else if event.typ == FileChangeType::CHANGED {
+                DiskFileChangeKind::Changed
+            } else if event.typ == FileChangeType::DELETED {
+                DiskFileChangeKind::Deleted
+            } else {
+                return Err(RpcError::new(
+                    INVALID_PARAMS,
+                    "didChangeWatchedFiles contains an unsupported change type",
+                ));
+            };
+            self.pending_disk_changes.insert(path, kind);
+        }
+        Ok(())
     }
 }
 
@@ -1237,6 +1407,11 @@ fn prepare_initialize_candidate(
         .map(|folder| parse_file_uri_str(folder.uri.as_str()))
         .transpose()?;
     let client_root = root.or(workspace_root);
+    let watched_files_capability = params
+        .capabilities
+        .workspace
+        .as_ref()
+        .and_then(|workspace| workspace.did_change_watched_files.as_ref());
     let mut resolved =
         resolve_source_roots(client_root.as_deref(), initialization_options, cancellation)?;
     let mut warnings = Vec::new();
@@ -1294,6 +1469,8 @@ fn prepare_initialize_candidate(
     if cancellation.is_cancelled() {
         return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
     }
+    let watcher_registration =
+        watched_files_registration(&resolved.roots, watched_files_capability)?;
     let result = serde_json::to_value(InitializeResult {
         capabilities: ServerCapabilities {
             text_document_sync: Some(TextDocumentSyncCapability::Options(
@@ -1328,7 +1505,70 @@ fn prepare_initialize_candidate(
         code: INTERNAL_ERROR,
         message: format!("failed to serialize initialize result: {error}"),
     })?;
-    Ok(PreparedInitialize { host, result, warnings, auto_vanilla })
+    Ok(PreparedInitialize { host, result, warnings, auto_vanilla, watcher_registration })
+}
+
+fn watched_files_registration(
+    roots: &[SourceRoot],
+    capability: Option<&lsp_types::DidChangeWatchedFilesClientCapabilities>,
+) -> Result<Option<Value>, RpcError> {
+    let Some(capability) =
+        capability.filter(|capability| capability.dynamic_registration == Some(true))
+    else {
+        return Ok(None);
+    };
+    let live_roots = roots
+        .iter()
+        .filter(|root| matches!(root.kind, SourceRootKind::CurrentMod | SourceRootKind::Dependency))
+        .collect::<Vec<_>>();
+    if live_roots.is_empty() {
+        return Ok(None);
+    }
+
+    let kind = WatchKind::Create | WatchKind::Change | WatchKind::Delete;
+    let watchers = if capability.relative_pattern_support == Some(true) {
+        live_roots
+            .into_iter()
+            .map(|root| {
+                let uri = path_to_uri(&root.path).parse::<Uri>().map_err(|_| {
+                    RpcError::new(
+                        INTERNAL_ERROR,
+                        format!("source root has no valid file URI: {}", root.path.display()),
+                    )
+                })?;
+                Ok(FileSystemWatcher {
+                    glob_pattern: GlobPattern::Relative(RelativePattern {
+                        base_uri: OneOf::Right(uri),
+                        pattern: "**/*".to_owned(),
+                    }),
+                    kind: Some(kind),
+                })
+            })
+            .collect::<Result<Vec<_>, RpcError>>()?
+    } else {
+        vec![FileSystemWatcher {
+            glob_pattern: GlobPattern::String("**/*".to_owned()),
+            kind: Some(kind),
+        }]
+    };
+    let options = serde_json::to_value(DidChangeWatchedFilesRegistrationOptions { watchers })
+        .map_err(|error| RpcError {
+            code: INTERNAL_ERROR,
+            message: format!("failed to serialize watched-file registration: {error}"),
+        })?;
+    let params = RegistrationParams {
+        registrations: vec![Registration {
+            id: WATCHED_FILES_REGISTRATION_ID.to_owned(),
+            method: "workspace/didChangeWatchedFiles".to_owned(),
+            register_options: Some(options),
+        }],
+    };
+    Ok(Some(json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "id": WATCHED_FILES_REQUEST_ID,
+        "method": "client/registerCapability",
+        "params": params,
+    })))
 }
 
 fn apply_user_vanilla_configuration(
@@ -1749,8 +1989,9 @@ impl SnapshotRequestContext {
             .document(&id)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
         self.ensure_active()?;
-        let items = result
-            .items
+        let (completion_items, is_incomplete) =
+            bounded_results(result.items, MAX_COMPLETION_RESULTS);
+        let items = completion_items
             .into_iter()
             .map(|item| {
                 let insert_text = item.insert_text;
@@ -1781,7 +2022,7 @@ impl SnapshotRequestContext {
             .collect::<Vec<_>>();
         self.ensure_active()?;
         typed_value(
-            CompletionResponse::List(CompletionList { is_incomplete: false, items }),
+            CompletionResponse::List(CompletionList { is_incomplete, items }),
             "completion response",
         )
     }
@@ -1968,6 +2209,7 @@ impl SnapshotRequestContext {
                         container_name: None,
                     })
                 })
+                .take(MAX_WORKSPACE_SYMBOL_RESULTS)
                 .collect::<Vec<_>>();
         self.ensure_active()?;
         typed_value(result, "workspace symbols response")
@@ -1997,6 +2239,21 @@ impl SnapshotRequestContext {
             .offset(document.text(), position)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "position is not valid UTF-16"))
             .map(|offset| (id, offset))
+    }
+}
+
+fn bounded_results<T>(mut values: Vec<T>, maximum: usize) -> (Vec<T>, bool) {
+    let incomplete = values.len() > maximum;
+    values.truncate(maximum);
+    (values, incomplete)
+}
+
+fn diagnostic_result_counts(total: usize, maximum: usize) -> (usize, usize) {
+    if total <= maximum {
+        (total, 0)
+    } else {
+        let retained = maximum.saturating_sub(1);
+        (retained, total - retained)
     }
 }
 
@@ -2068,10 +2325,13 @@ fn diagnostic_values(
     cancellation: &CancellationToken,
 ) -> Option<Value> {
     let values = snapshot.document(id).map_or_else(Vec::new, |document| {
-        diagnostics_with_cancellation(snapshot, id, cancellation)
-            .ok()
-            .unwrap_or_default()
+        let diagnostics =
+            diagnostics_with_cancellation(snapshot, id, cancellation).ok().unwrap_or_default();
+        let (retained, omitted) =
+            diagnostic_result_counts(diagnostics.len(), MAX_PUBLISHED_DIAGNOSTICS);
+        let mut values = diagnostics
             .into_iter()
+            .take(retained)
             .map(|diagnostic| {
                 LspDiagnostic::new(
                     range_to_lsp(document.line_index(), document.text(), diagnostic.range),
@@ -2089,7 +2349,19 @@ fn diagnostic_values(
                     None,
                 )
             })
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>();
+        if omitted > 0 {
+            values.push(LspDiagnostic::new(
+                LspRange::default(),
+                Some(DiagnosticSeverity::INFORMATION),
+                Some(NumberOrString::String("pdx-diagnostics-truncated".to_owned())),
+                Some("pdx-lsp".to_owned()),
+                format!("{omitted} additional diagnostics were omitted"),
+                None,
+                None,
+            ));
+        }
+        values
     });
     serde_json::to_value(values).ok()
 }
@@ -2281,6 +2553,26 @@ fn apply_text_change(
     Ok(())
 }
 
+fn changed_document_len(
+    current_len: usize,
+    range: Option<TextRange>,
+    replacement_len: usize,
+) -> Result<usize, RpcError> {
+    let removed =
+        range.map_or(current_len, |range| usize::try_from(range.len()).unwrap_or(usize::MAX));
+    let next = current_len
+        .checked_sub(removed)
+        .and_then(|length| length.checked_add(replacement_len))
+        .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document change has an invalid size"))?;
+    if next > MAX_DOCUMENT_BYTES {
+        return Err(RpcError::new(
+            INVALID_PARAMS,
+            format!("document exceeds the {MAX_DOCUMENT_BYTES}-byte safety limit"),
+        ));
+    }
+    Ok(next)
+}
+
 /// Converts a `file://` URI to a filesystem path.
 pub fn uri_to_path(uri: &str) -> Result<PathBuf, UriError> {
     let rest = uri
@@ -2392,9 +2684,20 @@ fn hex_digit(value: u8) -> char {
 fn read_message<R: BufRead>(reader: &mut R) -> Result<Option<Value>, LspError> {
     let mut content_length = None;
     let mut saw_header = false;
+    let mut header_bytes = 0_usize;
     loop {
+        let remaining = MAX_LSP_HEADER_BYTES.saturating_sub(header_bytes);
+        if remaining == 0 {
+            return Err(LspError::Protocol("LSP headers exceed the safety limit".to_owned()));
+        }
         let mut line = String::new();
-        let bytes = reader.read_line(&mut line)?;
+        let bytes = (&mut *reader)
+            .take(u64::try_from(remaining).unwrap_or(u64::MAX).saturating_add(1))
+            .read_line(&mut line)?;
+        header_bytes = header_bytes.saturating_add(bytes);
+        if header_bytes > MAX_LSP_HEADER_BYTES {
+            return Err(LspError::Protocol("LSP headers exceed the safety limit".to_owned()));
+        }
         if bytes == 0 {
             if saw_header {
                 return Err(LspError::Protocol("unexpected EOF in LSP headers".to_owned()));
@@ -2408,16 +2711,22 @@ fn read_message<R: BufRead>(reader: &mut R) -> Result<Option<Value>, LspError> {
         if let Some((name, value)) = line.split_once(':')
             && name.eq_ignore_ascii_case("Content-Length")
         {
-            content_length = Some(
-                value
-                    .trim()
-                    .parse::<usize>()
-                    .map_err(|_| LspError::Protocol("invalid Content-Length".to_owned()))?,
-            );
+            let parsed = value
+                .trim()
+                .parse::<usize>()
+                .map_err(|_| LspError::Protocol("invalid Content-Length".to_owned()))?;
+            if content_length.replace(parsed).is_some() {
+                return Err(LspError::Protocol("duplicate Content-Length".to_owned()));
+            }
         }
     }
     let content_length =
         content_length.ok_or_else(|| LspError::Protocol("missing Content-Length".to_owned()))?;
+    if content_length > MAX_LSP_MESSAGE_BYTES {
+        return Err(LspError::Protocol(format!(
+            "LSP message exceeds the {MAX_LSP_MESSAGE_BYTES}-byte safety limit"
+        )));
+    }
     let mut body = vec![0; content_length];
     reader.read_exact(&mut body)?;
     serde_json::from_slice(&body).map_err(|error| {
@@ -2439,21 +2748,22 @@ fn write_message<W: Write>(writer: &mut W, message: &Value) -> Result<(), LspErr
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{HashMap, VecDeque};
     use std::fs;
-    use std::io::Cursor;
+    use std::io::{Cursor, Read};
 
     use super::{
         AutoVanillaConfiguration, CancellationToken, DocumentId, INVALID_PARAMS,
-        InFlightInitialize, InFlightRequest, InitializeOptions, LspError, LspServer, RequestId,
+        InFlightInitialize, InFlightRequest, InitializeOptions, LspError, LspServer,
+        MAX_DOCUMENT_BYTES, MAX_LSP_HEADER_BYTES, MAX_LSP_MESSAGE_BYTES, RequestId,
         ResolvedSourceRoots, ServerState, VanillaSetupCancellation,
-        apply_user_vanilla_configuration, cancel_initialize_from_notification,
-        cancel_request_from_notification, path_to_uri, run_auto_vanilla_setup_with_options,
-        uri_to_path,
+        apply_user_vanilla_configuration, bounded_results, cancel_initialize_from_notification,
+        cancel_request_from_notification, changed_document_len, diagnostic_result_counts,
+        path_to_uri, read_message, run_auto_vanilla_setup_with_options, uri_to_path,
     };
     use lsp_types::{
         CompletionResponse, Diagnostic, DocumentSymbol, Hover, Location, PrepareRenameResponse,
-        SymbolInformation, WorkspaceEdit,
+        SymbolInformation, SymbolKind, WorkspaceEdit,
     };
     use pdx_game::{DiscoveryOptions, DiscoveryOutcome, UserConfiguration, UserPaths};
     use pdx_rules::{RuleSet, RulesError, RulesModel};
@@ -2528,6 +2838,90 @@ mod tests {
         values.into_iter().flat_map(frame).collect()
     }
 
+    #[test]
+    fn transport_framing_rejects_oversized_and_ambiguous_headers() {
+        let oversized =
+            format!("Content-Length: {}\r\n\r\n", MAX_LSP_MESSAGE_BYTES.saturating_add(1));
+        assert!(matches!(
+            read_message(&mut Cursor::new(oversized)),
+            Err(LspError::Protocol(message)) if message.contains("safety limit")
+        ));
+
+        let duplicate = b"Content-Length: 2\r\nContent-Length: 2\r\n\r\n{}";
+        assert!(matches!(
+            read_message(&mut Cursor::new(duplicate)),
+            Err(LspError::Protocol(message)) if message.contains("duplicate")
+        ));
+
+        let oversized_header = format!("X-Test: {}\r\n\r\n", "x".repeat(MAX_LSP_HEADER_BYTES));
+        assert!(matches!(
+            read_message(&mut Cursor::new(oversized_header)),
+            Err(LspError::Protocol(message)) if message.contains("headers")
+        ));
+    }
+
+    #[test]
+    fn document_changes_are_bounded_before_allocation() {
+        assert_eq!(
+            changed_document_len(0, None, MAX_DOCUMENT_BYTES).expect("boundary document"),
+            MAX_DOCUMENT_BYTES
+        );
+        assert!(changed_document_len(0, None, MAX_DOCUMENT_BYTES + 1).is_err());
+        assert!(
+            changed_document_len(
+                MAX_DOCUMENT_BYTES,
+                Some(TextRange::new(0, 1).expect("range")),
+                2,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn ranked_result_limits_report_completion_truncation() {
+        let (values, incomplete) = bounded_results(vec![0, 1, 2, 3], 3);
+        assert_eq!(values, [0, 1, 2]);
+        assert!(incomplete);
+        let (values, incomplete) = bounded_results(vec![0, 1, 2], 3);
+        assert_eq!(values, [0, 1, 2]);
+        assert!(!incomplete);
+        assert_eq!(diagnostic_result_counts(3, 3), (3, 0));
+        assert_eq!(diagnostic_result_counts(4, 3), (2, 2));
+    }
+
+    type ReadAction = Option<Box<dyn FnOnce() + Send>>;
+
+    struct ScriptedReader {
+        steps: VecDeque<(Vec<u8>, ReadAction)>,
+        current: Cursor<Vec<u8>>,
+    }
+
+    impl ScriptedReader {
+        fn new(steps: impl IntoIterator<Item = (Value, ReadAction)>) -> Self {
+            Self {
+                steps: steps.into_iter().map(|(value, action)| (frame(value), action)).collect(),
+                current: Cursor::new(Vec::new()),
+            }
+        }
+    }
+
+    impl Read for ScriptedReader {
+        fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+            if usize::try_from(self.current.position()).unwrap_or(usize::MAX)
+                >= self.current.get_ref().len()
+            {
+                let Some((bytes, action)) = self.steps.pop_front() else {
+                    return Ok(0);
+                };
+                if let Some(action) = action {
+                    action();
+                }
+                self.current = Cursor::new(bytes);
+            }
+            self.current.read(buffer)
+        }
+    }
+
     fn decode_frames(bytes: &[u8]) -> Vec<Value> {
         let mut cursor = Cursor::new(bytes);
         let mut decoded = Vec::new();
@@ -2535,6 +2929,81 @@ mod tests {
             decoded.push(value);
         }
         decoded
+    }
+
+    #[test]
+    fn watched_file_registration_and_notification_update_the_disk_index() {
+        let (root, root_uri) = temp_workspace_dir();
+        let events = root.join("common/events");
+        fs::create_dir_all(&events).expect("events directory");
+        let definition = events.join("watched.txt");
+        fs::write(&definition, "country_event = { id = old.1 }\n").expect("initial definition");
+        let definition_uri = canonical_uri(&definition);
+        let changed_definition = definition.clone();
+        let input = ScriptedReader::new([
+            (
+                json!({
+                    "jsonrpc":"2.0",
+                    "id":1,
+                    "method":"initialize",
+                    "params":{
+                        "rootUri":root_uri,
+                        "capabilities":{
+                            "workspace":{
+                                "didChangeWatchedFiles":{
+                                    "dynamicRegistration":true,
+                                    "relativePatternSupport":true
+                                }
+                            }
+                        }
+                    }
+                }),
+                None,
+            ),
+            (json!({"jsonrpc":"2.0","method":"initialized","params":{}}), None),
+            (
+                json!({
+                    "jsonrpc":"2.0",
+                    "method":"workspace/didChangeWatchedFiles",
+                    "params":{"changes":[{"uri":definition_uri,"type":2}]}
+                }),
+                Some(Box::new(move || {
+                    fs::write(changed_definition, "country_event = { id = watched-new.1 }\n")
+                        .expect("write watched definition");
+                }) as Box<dyn FnOnce() + Send>),
+            ),
+            (
+                json!({
+                    "jsonrpc":"2.0",
+                    "id":2,
+                    "method":"workspace/symbol",
+                    "params":{"query":"watched-new"}
+                }),
+                None,
+            ),
+            (json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}), None),
+            (json!({"jsonrpc":"2.0","method":"exit"}), None),
+        ]);
+        let mut output = Vec::new();
+        let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+        server.run_transport(input, &mut output).expect("transport");
+        let responses = decode_frames(&output);
+
+        let registration = responses
+            .iter()
+            .find(|value| value["method"] == "client/registerCapability")
+            .expect("watched-file dynamic registration");
+        let watcher = &registration["params"]["registrations"][0]["registerOptions"]["watchers"][0];
+        assert_eq!(watcher["globPattern"]["baseUri"], root_uri);
+        assert_eq!(watcher["globPattern"]["pattern"], "**/*");
+        assert_eq!(watcher["kind"], 7);
+
+        let symbols = typed_result::<Vec<SymbolInformation>>(&responses, 2);
+        assert_eq!(symbols.len(), 1);
+        assert_eq!(symbols[0].name, "watched-new.1");
+        assert!(server.snapshot().index().active_definition("event", "old.1").is_none());
+        assert!(server.snapshot().index().active_definition("event", "watched-new.1").is_some());
+        fs::remove_dir_all(root).expect("cleanup");
     }
 
     fn typed_result<T: DeserializeOwned>(responses: &[Value], id: i64) -> T {
@@ -2765,6 +3234,105 @@ mod tests {
         let _: Vec<Diagnostic> =
             serde_json::from_value(diagnostics["params"]["diagnostics"].clone())
                 .expect("diagnostic notification should use the standard LSP shape");
+        fs::remove_dir_all(root_dir).expect("cleanup");
+    }
+
+    #[test]
+    fn memory_transport_preserves_hir_disambiguated_mixed_context_completion() {
+        let (root_dir, root_uri) = temp_workspace_dir();
+        let events_dir = root_dir.join("events");
+        fs::create_dir_all(&events_dir).expect("create events dir");
+        let file_path = events_dir.join("mixed-completion.txt");
+        fs::write(&file_path, "").expect("create placeholder file");
+        let uri = canonical_uri(&file_path);
+        let text = concat!(
+            "country_event = {\n",
+            "  mean_time_to_happen = {\n",
+            "    modifier = {\n",
+            "      factor = 0.5\n",
+            "      \n",
+            "      always = maybe\n",
+            "    }\n",
+            "  }\n",
+            "}\n",
+        );
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"pdx-script","version":1,"text":text}}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":4,"character":6}}}),
+            json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        let responses = decode_frames(&output);
+        let completion =
+            responses.iter().find(|value| value["id"] == 2).expect("completion response");
+        let labels = completion["result"]["items"]
+            .as_array()
+            .expect("completion items")
+            .iter()
+            .filter_map(|item| item["label"].as_str())
+            .collect::<Vec<_>>();
+        assert!(labels.contains(&"factor"), "missing structural completion: {labels:?}");
+        assert!(labels.contains(&"always"), "missing trigger completion: {labels:?}");
+
+        let diagnostics = responses
+            .iter()
+            .find(|value| value["method"] == "textDocument/publishDiagnostics")
+            .expect("diagnostic notification");
+        let diagnostics = diagnostics["params"]["diagnostics"].as_array().expect("diagnostics");
+        assert!(
+            diagnostics.iter().all(|item| item["code"] != "pdx-unknown-key"),
+            "known mixed-context keys were rejected: {diagnostics:?}"
+        );
+        assert!(
+            diagnostics.iter().any(|item| item["code"] == "pdx-invalid-value"),
+            "invalid trigger value was not diagnosed: {diagnostics:?}"
+        );
+        fs::remove_dir_all(root_dir).expect("cleanup");
+    }
+
+    #[test]
+    fn memory_transport_exposes_parameters_as_document_local_symbols() {
+        let (root_dir, root_uri) = temp_workspace_dir();
+        let effects_dir = root_dir.join("common/scripted_effects");
+        fs::create_dir_all(&effects_dir).expect("create scripted effects directory");
+        let file_path = effects_dir.join("parameters.txt");
+        fs::write(&file_path, "").expect("create placeholder file");
+        let uri = canonical_uri(&file_path);
+        let text = "apply = { value = $Amount$ again = $amount$ [[optional] enabled = yes ] }\n";
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"pdx-script","version":1,"text":text}}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":uri}}}),
+            json!({"jsonrpc":"2.0","id":3,"method":"workspace/symbol","params":{"query":"amount"}}),
+            json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        let responses = decode_frames(&output);
+
+        let symbols: Vec<DocumentSymbol> = typed_result(&responses, 2);
+        let amount = symbols
+            .iter()
+            .find(|symbol| symbol.name == "Amount")
+            .expect("inferred parameter document symbol");
+        assert_eq!(amount.kind, SymbolKind::VARIABLE);
+        assert_eq!(
+            amount.selection_range.end.character - amount.selection_range.start.character,
+            u32::try_from("Amount".len()).expect("name length")
+        );
+        assert!(amount.range.start.character < amount.selection_range.start.character);
+        assert!(amount.selection_range.end.character < amount.range.end.character);
+
+        let workspace: Vec<SymbolInformation> = typed_result(&responses, 3);
+        assert!(workspace.iter().all(|symbol| !symbol.name.eq_ignore_ascii_case("amount")));
         fs::remove_dir_all(root_dir).expect("cleanup");
     }
 

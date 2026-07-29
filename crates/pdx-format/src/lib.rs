@@ -4,7 +4,7 @@
 //! add quotes, normalize scalar spelling, or format CSV. Any syntax error causes a safe no-edit
 //! result because a recovered tree may not provide enough boundaries to prove a rewrite safe.
 
-use pdx_syntax::{Eu4FileFormat, ParsedFile};
+use pdx_syntax::{FileFormat, ParsedFile};
 use pdx_text::TextRange;
 
 /// Indentation style used for generated leading whitespace.
@@ -80,9 +80,9 @@ pub fn format_with_options(file: &ParsedFile, options: FormatOptions) -> FormatR
         return FormatResult { edits: Vec::new(), skipped: Some(FormatSkipReason::UnsafeSyntax) };
     }
     let formatted = match file.format() {
-        Eu4FileFormat::PdxScript => format_pdx_script(file.source(), options),
-        Eu4FileFormat::Localisation => format_localisation(file.source(), options),
-        Eu4FileFormat::Csv => {
+        FileFormat::PdxScript => format_pdx_script(file.source(), options),
+        FileFormat::Localisation => format_localisation(file.source(), options),
+        FileFormat::Csv => {
             return FormatResult {
                 edits: Vec::new(),
                 skipped: Some(FormatSkipReason::UnsupportedFormat),
@@ -294,7 +294,7 @@ fn split_lines(source: &str) -> Vec<(&str, &str)> {
 
 #[cfg(test)]
 mod tests {
-    use pdx_syntax::{Eu4FileFormat, SyntaxErrorKind, TokenKind, parse_eu4};
+    use pdx_syntax::{FileFormat, SyntaxErrorKind, TokenKind, parse};
     use pdx_text::TextRange;
 
     use super::{FormatOptions, FormatSkipReason, IndentStyle, format, format_with_options};
@@ -326,11 +326,11 @@ mod tests {
     #[test]
     fn pdx_script_format_is_idempotent_and_only_changes_trivia() {
         let source = "# top\nroot={\nchild=1 # tail\n\n\n}\nroot = \"same\"\n";
-        let parsed = parse_eu4(Eu4FileFormat::PdxScript, source);
+        let parsed = parse(FileFormat::PdxScript, source);
         assert!(parsed.errors().is_empty(), "errors: {:?}", parsed.errors());
         let formatted = apply(&format(&parsed), source);
         assert_eq!(formatted, "# top\nroot = {\n    child = 1 # tail\n\n\n}\nroot = \"same\"\n");
-        let reparsed = parse_eu4(Eu4FileFormat::PdxScript, &formatted);
+        let reparsed = parse(FileFormat::PdxScript, &formatted);
         assert!(reparsed.errors().is_empty());
         assert_eq!(semantic_tokens(&parsed), semantic_tokens(&reparsed));
         assert_eq!(formatted, apply(&format(&reparsed), &formatted));
@@ -345,10 +345,10 @@ mod tests {
             "effect = {\n  [[name] value = yes ]\n  [[!other_name] nested = { enabled = yes } ]\n}\n",
         ];
         for source in pdx_fixtures {
-            let parsed = parse_eu4(Eu4FileFormat::PdxScript, source);
+            let parsed = parse(FileFormat::PdxScript, source);
             assert!(parsed.errors().is_empty(), "errors: {:?}", parsed.errors());
             let formatted = apply(&format(&parsed), source);
-            let reparsed = parse_eu4(Eu4FileFormat::PdxScript, &formatted);
+            let reparsed = parse(FileFormat::PdxScript, &formatted);
             assert!(reparsed.errors().is_empty(), "formatted errors: {:?}", reparsed.errors());
             assert_eq!(formatted, apply(&format(&reparsed), &formatted));
             assert_eq!(semantic_tokens(&parsed), semantic_tokens(&reparsed));
@@ -359,10 +359,10 @@ mod tests {
             "l_german:\nlegacy:0 legacy value\n",
         ];
         for source in localisation_fixtures {
-            let parsed = parse_eu4(Eu4FileFormat::Localisation, source);
+            let parsed = parse(FileFormat::Localisation, source);
             assert!(parsed.errors().is_empty(), "errors: {:?}", parsed.errors());
             let formatted = apply(&format(&parsed), source);
-            let reparsed = parse_eu4(Eu4FileFormat::Localisation, &formatted);
+            let reparsed = parse(FileFormat::Localisation, &formatted);
             assert!(reparsed.errors().is_empty(), "formatted errors: {:?}", reparsed.errors());
             assert_eq!(formatted, apply(&format(&reparsed), &formatted));
             assert_eq!(semantic_tokens(&parsed), semantic_tokens(&reparsed));
@@ -372,7 +372,7 @@ mod tests {
     #[test]
     fn formatter_preserves_comments_and_supports_tabs() {
         let source = "a = {\n  # keep me\n  b = yes\n}\n";
-        let parsed = parse_eu4(Eu4FileFormat::PdxScript, source);
+        let parsed = parse(FileFormat::PdxScript, source);
         let options = FormatOptions { indent_style: IndentStyle::Tabs, ..FormatOptions::default() };
         let formatted = apply(&format_with_options(&parsed, options), source);
         assert!(formatted.contains("\t# keep me\n"));
@@ -382,7 +382,7 @@ mod tests {
 
     #[test]
     fn unsafe_syntax_does_not_generate_a_destructive_edit() {
-        let parsed = parse_eu4(Eu4FileFormat::PdxScript, "broken = \"unfinished");
+        let parsed = parse(FileFormat::PdxScript, "broken = \"unfinished");
         assert!(
             parsed.errors().iter().any(|error| error.kind == SyntaxErrorKind::UnterminatedString)
         );
@@ -394,7 +394,7 @@ mod tests {
     #[test]
     fn localisation_formatter_only_normalizes_layout() {
         let source = "  l_english:  \n\n\nhello:0 \"  text  \"   \n";
-        let parsed = parse_eu4(Eu4FileFormat::Localisation, source);
+        let parsed = parse(FileFormat::Localisation, source);
         assert!(parsed.errors().is_empty(), "errors: {:?}", parsed.errors());
         let formatted = apply(&format(&parsed), source);
         assert_eq!(formatted, "l_english:\n\n\nhello:0 \"  text  \"\n");
@@ -402,7 +402,7 @@ mod tests {
 
     #[test]
     fn csv_formatter_is_explicitly_unsupported() {
-        let parsed = parse_eu4(Eu4FileFormat::Csv, "a,b\n1,2\n");
+        let parsed = parse(FileFormat::Csv, "a,b\n1,2\n");
         let result = format(&parsed);
         assert!(result.edits.is_empty());
         assert_eq!(result.skipped, Some(FormatSkipReason::UnsupportedFormat));

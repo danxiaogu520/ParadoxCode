@@ -11,7 +11,7 @@
 
 - `pdx-text`：offset、UTF-16、line endings、URI/path
 - `pdx-syntax`：typed CST、error extraction、revision-safe edit update
-- `pdx-eu4`：SQLite schema、只读加载、immutability、cross-reference index、canonical logical hash
+- `pdx-rules`：SQLite schema、只读加载、immutability、派生查询 index、canonical logical hash
 - `pdx-rulec`：strict source decoding、stable identity、invariant、artifact round-trip 和 manifest
 - `pdx-hir`：context lowering、scope transition
 - `pdx-workspace`：root order、overlay、shard replacement
@@ -72,7 +72,7 @@ MVP 至少包含：
 6. `format(bytes)` 的 idempotence 与 token preservation
 7. `line_index(text, positions)`
 8. `load_first_party_rules(source_tree)` 与 `compile_rules(source_tree)`
-9. `parse_eu4_csv(bytes, dialect)`
+9. `parse_csv(bytes, dialect)`
 
 不变量：
 

@@ -270,7 +270,7 @@ pub mod csv {
 
 /// One of the EU4 text frontends.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Eu4FileFormat {
+pub enum FileFormat {
     /// EU4 PdxScript.
     PdxScript,
     /// EU4 localisation YAML-like text.
@@ -330,7 +330,7 @@ pub(crate) struct ParseParts {
 /// A loss-aware parsed EU4 document.
 #[derive(Clone, Debug)]
 pub struct ParsedFile {
-    format: Eu4FileFormat,
+    format: FileFormat,
     source: String,
     root: CstNode,
     tokens: Vec<SyntaxToken>,
@@ -352,7 +352,7 @@ impl PartialEq for ParsedFile {
 impl Eq for ParsedFile {}
 
 impl ParsedFile {
-    fn from_parts(format: Eu4FileFormat, source: &str, parts: ParseParts, revision: u64) -> Self {
+    fn from_parts(format: FileFormat, source: &str, parts: ParseParts, revision: u64) -> Self {
         Self {
             format,
             source: source.to_owned(),
@@ -365,7 +365,7 @@ impl ParsedFile {
 
     /// Returns the selected frontend kind.
     #[must_use]
-    pub const fn format(&self) -> Eu4FileFormat {
+    pub const fn format(&self) -> FileFormat {
         self.format
     }
 
@@ -430,7 +430,7 @@ impl ParsedFile {
         } else {
             source = edit.replacement.clone();
         }
-        Ok(parse_eu4_with_revision(self.format, &source, self.revision.saturating_add(1)))
+        Ok(parse_with_revision(self.format, &source, self.revision.saturating_add(1)))
     }
 }
 
@@ -478,15 +478,15 @@ impl CsvParsedFile {
 
 /// Creates a typed parse handle for one EU4 text frontend.
 #[must_use]
-pub fn parse_eu4(format: Eu4FileFormat, source: &str) -> ParsedFile {
-    parse_eu4_with_revision(format, source, 0)
+pub fn parse(format: FileFormat, source: &str) -> ParsedFile {
+    parse_with_revision(format, source, 0)
 }
 
-fn parse_eu4_with_revision(format: Eu4FileFormat, source: &str, revision: u64) -> ParsedFile {
+fn parse_with_revision(format: FileFormat, source: &str, revision: u64) -> ParsedFile {
     let parts = match format {
-        Eu4FileFormat::PdxScript => pdx_script::parse(source),
-        Eu4FileFormat::Localisation => localisation::parse(source),
-        Eu4FileFormat::Csv => ParseParts {
+        FileFormat::PdxScript => pdx_script::parse(source),
+        FileFormat::Localisation => localisation::parse(source),
+        FileFormat::Csv => ParseParts {
             root: CstNode::new(CstKind::CsvDocument, range(0, source.len()), Vec::new()),
             tokens: Vec::new(),
             errors: Vec::new(),
@@ -497,13 +497,13 @@ fn parse_eu4_with_revision(format: Eu4FileFormat, source: &str, revision: u64) -
 
 /// Parses a supported EU4 CSV using its independent record-oriented facade.
 #[must_use]
-pub fn parse_eu4_csv(source: &str, dialect: csv::CsvDialect) -> csv::CsvParse {
+pub fn parse_csv(source: &str, dialect: csv::CsvDialect) -> csv::CsvParse {
     csv::parse(source, dialect)
 }
 
 /// Parses a supported EU4 CSV and exposes its rows/cells as typed CST nodes.
 #[must_use]
-pub fn parse_eu4_csv_file(source: &str, dialect: csv::CsvDialect) -> CsvParsedFile {
+pub fn parse_csv_file(source: &str, dialect: csv::CsvDialect) -> CsvParsedFile {
     let parse = csv::parse(source, dialect);
     let records = parse
         .records
@@ -539,13 +539,13 @@ mod tests {
     use pdx_text::TextRange;
 
     use super::{
-        CstKind, Eu4FileFormat, SyntaxEdit, SyntaxErrorKind, csv::CsvDialect, parse_eu4,
-        parse_eu4_csv, parse_eu4_csv_file,
+        CstKind, FileFormat, SyntaxEdit, SyntaxErrorKind, csv::CsvDialect, parse, parse_csv,
+        parse_csv_file,
     };
 
     #[test]
     fn phase0_parse_preserves_source() {
-        let parsed = parse_eu4(Eu4FileFormat::PdxScript, "# comment\nkey = value");
+        let parsed = parse(FileFormat::PdxScript, "# comment\nkey = value");
         assert_eq!(parsed.source(), "# comment\nkey = value");
         assert!(parsed.errors().is_empty());
         assert_eq!(parsed.root().kind(), CstKind::Document);
@@ -553,8 +553,8 @@ mod tests {
 
     #[test]
     fn pdx_script_cst_preserves_duplicate_properties_comments_and_headers() {
-        let parsed = parse_eu4(
-            Eu4FileFormat::PdxScript,
+        let parsed = parse(
+            FileFormat::PdxScript,
             "# note\nname = one\nname = two\nrgb { 1 2 3 }\n[[!country] value = yes]",
         );
         assert!(parsed.errors().is_empty(), "errors: {:?}", parsed.errors());
@@ -567,7 +567,7 @@ mod tests {
 
     #[test]
     fn syntax_errors_have_stable_codes_and_safe_ranges() {
-        let parsed = parse_eu4(Eu4FileFormat::PdxScript, "key = { value = \"unfinished");
+        let parsed = parse(FileFormat::PdxScript, "key = { value = \"unfinished");
         assert!(parsed.errors().iter().any(|error| {
             error.kind == SyntaxErrorKind::UnterminatedString
                 && error.code() == "pdx-syntax-unterminated-string"
@@ -580,7 +580,7 @@ mod tests {
 
     #[test]
     fn rust_parser_recovery_nodes_map_to_stable_errors() {
-        let parsed = parse_eu4(Eu4FileFormat::PdxScript, "\"top_level_string\"");
+        let parsed = parse(FileFormat::PdxScript, "\"top_level_string\"");
         assert!(parsed.errors().iter().any(|error| {
             error.kind == SyntaxErrorKind::UnexpectedToken
                 && error.code() == "pdx-syntax-unexpected-token"
@@ -589,22 +589,22 @@ mod tests {
 
     #[test]
     fn localisation_and_csv_have_independent_typed_facades() {
-        let localisation = parse_eu4(
-            Eu4FileFormat::Localisation,
+        let localisation = parse(
+            FileFormat::Localisation,
             "l_english:\nhello:0 \"Hello $NAME$\"\nother:0 text # note\n",
         );
         assert!(localisation.errors().is_empty(), "errors: {:?}", localisation.errors());
         assert_eq!(localisation.root().children().len(), 3);
         assert_eq!(localisation.root().children()[1].kind(), CstKind::LocalisationEntry);
 
-        let csv = parse_eu4_csv_file("id;name\n1;two\n", CsvDialect::Semicolon);
+        let csv = parse_csv_file("id;name\n1;two\n", CsvDialect::Semicolon);
         assert!(csv.errors().is_empty());
         assert_eq!(csv.root().children()[1].children().len(), 2);
     }
 
     #[test]
     fn incremental_edits_match_full_reparse() {
-        let mut current = parse_eu4(Eu4FileFormat::PdxScript, "name = one\nvalue = yes\n");
+        let mut current = parse(FileFormat::PdxScript, "name = one\nvalue = yes\n");
         let edits = [
             SyntaxEdit::ranged(TextRange::new(8, 11).expect("range"), "two"),
             SyntaxEdit::ranged(TextRange::new(0, 4).expect("range"), "title"),
@@ -612,7 +612,7 @@ mod tests {
         ];
         for edit in edits {
             let next = current.apply_edit(&edit).expect("edit should apply");
-            let expected = parse_eu4(Eu4FileFormat::PdxScript, next.source());
+            let expected = parse(FileFormat::PdxScript, next.source());
             assert_eq!(next.root(), expected.root());
             assert_eq!(next.tokens(), expected.tokens());
             assert_eq!(next.errors(), expected.errors());
@@ -624,7 +624,7 @@ mod tests {
     #[test]
     fn csv_facade_preserves_records_cells_and_quotes() {
         let parsed =
-            parse_eu4_csv("id;name;note\n1;\"A;B\";\"say \"\"hi\"\"\"\n", CsvDialect::Semicolon);
+            parse_csv("id;name;note\n1;\"A;B\";\"say \"\"hi\"\"\"\n", CsvDialect::Semicolon);
         assert_eq!(parsed.records.len(), 2);
         assert_eq!(parsed.records[1].cells.len(), 3);
         assert!(parsed.records[1].cells[1].quoted);
@@ -635,7 +635,7 @@ mod tests {
 
     #[test]
     fn csv_facade_recovers_unterminated_quotes() {
-        let parsed = parse_eu4_csv("id;name\n1;\"unfinished", CsvDialect::Semicolon);
+        let parsed = parse_csv("id;name\n1;\"unfinished", CsvDialect::Semicolon);
         assert_eq!(parsed.records.len(), 2);
         assert_eq!(parsed.errors.len(), 1);
         assert_eq!(parsed.errors[0].message, "unterminated quoted CSV cell");
@@ -643,7 +643,7 @@ mod tests {
 
     #[test]
     fn csv_facade_supports_tabs_without_guessing() {
-        let parsed = parse_eu4_csv("a\tb\n", CsvDialect::Tab);
+        let parsed = parse_csv("a\tb\n", CsvDialect::Tab);
         assert_eq!(parsed.records[0].cells.len(), 2);
         assert_eq!(parsed.records[0].cells[1].column, 1);
     }
