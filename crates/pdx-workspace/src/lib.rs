@@ -410,11 +410,16 @@ impl FileState {
 }
 
 /// Workspace-wide symbol index made from immutable file shards.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct DefinitionPointer {
+    file_id: SourceFileId,
+    ordinal: usize,
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct WorkspaceIndex {
     shards: BTreeMap<SourceFileId, FileIndexShard>,
-    definitions: BTreeMap<(String, String), Vec<Definition>>,
-    references: BTreeMap<SourceFileId, Vec<Reference>>,
+    definitions: BTreeMap<(String, String), Vec<DefinitionPointer>>,
 }
 
 impl WorkspaceIndex {
@@ -451,16 +456,20 @@ impl WorkspaceIndex {
 
     /// Returns all retained definitions for a kind/name, including shadowed ones.
     #[must_use]
-    pub fn definitions(&self, kind: &str, name: &str) -> &[Definition] {
+    pub fn definitions(&self, kind: &str, name: &str) -> Vec<&Definition> {
         self.definitions
             .get(&(kind.to_owned(), name.to_ascii_lowercase()))
-            .map_or(&[], Vec::as_slice)
+            .into_iter()
+            .flatten()
+            .filter_map(|pointer| self.definition_at(*pointer))
+            .collect()
     }
 
     /// Returns the active definition for a kind/name, if one exists.
     #[must_use]
     pub fn active_definition(&self, kind: &str, name: &str) -> Option<&Definition> {
-        let mut active = self.definitions(kind, name).iter().filter(|definition| definition.active);
+        let definitions = self.definitions(kind, name);
+        let mut active = definitions.into_iter().filter(|definition| definition.active);
         let definition = active.next()?;
         active
             .all(|candidate| {
@@ -472,7 +481,22 @@ impl WorkspaceIndex {
     /// Iterates over all retained definitions in deterministic kind/name order.
     #[must_use = "iterate the retained definitions"]
     pub fn definitions_iter(&self) -> impl Iterator<Item = &Definition> {
-        self.definitions.values().flat_map(|definitions| definitions.iter())
+        self.definitions.values().flatten().filter_map(|pointer| self.definition_at(*pointer))
+    }
+
+    /// Iterates over retained definitions of one exact kind without scanning unrelated symbols.
+    #[must_use = "iterate the retained definitions"]
+    pub fn definitions_for_kind<'index>(
+        &'index self,
+        kind: &str,
+    ) -> impl Iterator<Item = &'index Definition> {
+        let first_key = (kind.to_owned(), String::new());
+        let expected_kind = kind.to_owned();
+        self.definitions
+            .range(first_key..)
+            .take_while(move |((candidate_kind, _), _)| candidate_kind == &expected_kind)
+            .flat_map(|(_, pointers)| pointers)
+            .filter_map(|pointer| self.definition_at(*pointer))
     }
 
     /// Returns the shard for a file.
@@ -484,13 +508,17 @@ impl WorkspaceIndex {
     /// Returns all references from a file.
     #[must_use]
     pub fn references(&self, file_id: SourceFileId) -> &[Reference] {
-        self.references.get(&file_id).map_or(&[], Vec::as_slice)
+        self.shards.get(&file_id).map_or(&[], |shard| shard.references.as_slice())
     }
 
     /// Iterates over references from every retained file shard.
     #[must_use = "iterate the retained references"]
     pub fn references_iter(&self) -> impl Iterator<Item = &Reference> {
-        self.references.values().flat_map(|references| references.iter())
+        self.shards.values().flat_map(|shard| shard.references.iter())
+    }
+
+    fn definition_at(&self, pointer: DefinitionPointer) -> Option<&Definition> {
+        self.shards.get(&pointer.file_id)?.definitions.get(pointer.ordinal)
     }
 
     /// Replaces one shard and updates only lookup buckets touched by that file.
@@ -551,12 +579,14 @@ impl WorkspaceIndex {
     fn replace_shard_entries(&mut self, shard: FileIndexShard) -> Vec<(String, String)> {
         let file_id = shard.file_id;
         let mut affected = self.remove_shard_entries(file_id);
-        for definition in &shard.definitions {
+        for (ordinal, definition) in shard.definitions.iter().enumerate() {
             let key = definition_key(definition);
-            self.definitions.entry(key.clone()).or_default().push(definition.clone());
+            self.definitions
+                .entry(key.clone())
+                .or_default()
+                .push(DefinitionPointer { file_id, ordinal });
             affected.push(key);
         }
-        self.references.insert(file_id, shard.references.clone());
         self.shards.insert(file_id, shard);
         affected.sort();
         affected.dedup();
@@ -566,10 +596,8 @@ impl WorkspaceIndex {
 
     fn remove_shard_entries(&mut self, file_id: SourceFileId) -> Vec<(String, String)> {
         let Some(previous) = self.shards.remove(&file_id) else {
-            self.references.remove(&file_id);
             return Vec::new();
         };
-        self.references.remove(&file_id);
         let mut affected = previous.definitions.iter().map(definition_key).collect::<Vec<_>>();
         affected.sort();
         affected.dedup();
@@ -592,7 +620,7 @@ impl WorkspaceIndex {
         rules: &RuleSet,
     ) {
         for key in keys {
-            let Some(values) = self.definitions.get_mut(key) else { continue };
+            let Some(values) = self.definitions.get(key).cloned() else { continue };
             let policy = rules
                 .model()
                 .symbol_descriptors
@@ -603,9 +631,16 @@ impl WorkspaceIndex {
                 });
             let highest = values
                 .iter()
-                .map(|definition| priorities.get(&definition.file_id).copied().unwrap_or(0))
+                .map(|pointer| priorities.get(&pointer.file_id).copied().unwrap_or(0))
                 .max();
-            for definition in values.iter_mut() {
+            for pointer in values {
+                let Some(definition) = self
+                    .shards
+                    .get_mut(&pointer.file_id)
+                    .and_then(|shard| shard.definitions.get_mut(pointer.ordinal))
+                else {
+                    continue;
+                };
                 definition.active = match policy {
                     SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique => true,
                     SymbolResolutionPolicy::ReplaceBySymbol => {
@@ -613,14 +648,22 @@ impl WorkspaceIndex {
                     }
                 };
             }
-            values.sort_by_key(|definition| (!definition.active, definition.file_id));
+            self.sort_definition_buckets(std::slice::from_ref(key));
         }
     }
 
     fn sort_definition_buckets(&mut self, keys: &[(String, String)]) {
+        let shards = &self.shards;
         for key in keys {
             if let Some(values) = self.definitions.get_mut(key) {
-                values.sort_by_key(|definition| (!definition.active, definition.file_id));
+                values.sort_by_key(|pointer| {
+                    shards
+                        .get(&pointer.file_id)
+                        .and_then(|shard| shard.definitions.get(pointer.ordinal))
+                        .map_or((true, pointer.file_id), |definition| {
+                            (!definition.active, definition.file_id)
+                        })
+                });
             }
         }
     }
@@ -630,21 +673,27 @@ impl WorkspaceIndex {
         cancellation: &WorkspaceScanToken,
     ) -> Result<(), WorkspaceError> {
         self.definitions.clear();
-        self.references.clear();
-        for shard in self.shards.values() {
+        for (file_id, shard) in &self.shards {
             cancellation.checkpoint()?;
-            for definition in &shard.definitions {
+            for (ordinal, definition) in shard.definitions.iter().enumerate() {
                 cancellation.checkpoint()?;
                 self.definitions
                     .entry((definition.kind.clone(), definition.name.to_ascii_lowercase()))
                     .or_default()
-                    .push(definition.clone());
+                    .push(DefinitionPointer { file_id: *file_id, ordinal });
             }
-            self.references.insert(shard.file_id, shard.references.clone());
         }
+        let shards = &self.shards;
         for values in self.definitions.values_mut() {
             cancellation.checkpoint()?;
-            values.sort_by_key(|definition| (!definition.active, definition.file_id));
+            values.sort_by_key(|pointer| {
+                shards
+                    .get(&pointer.file_id)
+                    .and_then(|shard| shard.definitions.get(pointer.ordinal))
+                    .map_or((true, pointer.file_id), |definition| {
+                        (!definition.active, definition.file_id)
+                    })
+            });
         }
         Ok(())
     }
@@ -1001,6 +1050,9 @@ fn collect_disk_files(
             continue;
         }
         if file_type.is_dir() {
+            if ignored_workspace_directory(&entry.file_name()) {
+                continue;
+            }
             if depth >= limits.max_depth {
                 record_scan_issue(
                     report,
@@ -1034,6 +1086,10 @@ fn collect_disk_files(
         output.push((logical, path));
     }
     Ok(())
+}
+
+fn ignored_workspace_directory(name: &std::ffi::OsStr) -> bool {
+    matches!(name.to_str(), Some(".git" | ".hg" | ".svn" | "node_modules" | "target"))
 }
 
 fn read_source_file(
@@ -1695,7 +1751,7 @@ pub struct AnalysisHost {
     file_states: Arc<BTreeMap<SourceFileId, Arc<FileState>>>,
     index: Arc<WorkspaceIndex>,
     scan_report: Arc<WorkspaceScanReport>,
-    vanilla_cache: Option<Arc<VanillaIndexCache>>,
+    vanilla_root: Option<SourceRoot>,
 }
 
 impl AnalysisHost {
@@ -1726,7 +1782,7 @@ impl AnalysisHost {
             file_states: Arc::new(BTreeMap::new()),
             index: Arc::new(WorkspaceIndex::empty()),
             scan_report: Arc::new(WorkspaceScanReport::default()),
-            vanilla_cache: None,
+            vanilla_root: None,
         }
     }
 
@@ -1751,7 +1807,7 @@ impl AnalysisHost {
         match change {
             WorkspaceChange::SetSourceRoots(roots) => {
                 self.roots = Arc::from(roots);
-                self.vanilla_cache = None;
+                self.vanilla_root = None;
             }
             WorkspaceChange::SetWorkspaceRoot(root) => self.workspace_root = root,
         }
@@ -1795,7 +1851,7 @@ impl AnalysisHost {
             }
         }
 
-        let mut files = cache.source_files().clone();
+        let (_, vanilla, mut files, cached_index) = cache.into_parts();
         for (id, file) in self.source_files.iter() {
             if let Some(cached) = files.insert(*id, file.clone()) {
                 return Err(VanillaCacheError::InvalidData(format!(
@@ -1805,7 +1861,7 @@ impl AnalysisHost {
                 )));
             }
         }
-        let mut shards = cache.index().shards.values().cloned().collect::<Vec<_>>();
+        let mut shards = cached_index.shards.into_values().collect::<Vec<_>>();
         shards.extend(self.index.shards.values().cloned());
         let mut roots = Vec::with_capacity(self.roots.len().saturating_add(1));
         roots.push(vanilla.clone());
@@ -1817,7 +1873,7 @@ impl AnalysisHost {
         self.roots = Arc::from(roots);
         self.source_files = Arc::new(files);
         self.index = Arc::new(index);
-        self.vanilla_cache = Some(Arc::new(cache));
+        self.vanilla_root = Some(vanilla);
         self.revision = self.revision.saturating_add(1);
         Ok(())
     }
@@ -1858,7 +1914,7 @@ impl AnalysisHost {
         let mut report = WorkspaceScanReport::default();
         for root in self.roots.iter() {
             cancellation.checkpoint()?;
-            if self.vanilla_cache.as_ref().is_some_and(|cache| cache.source_root().id == root.id) {
+            if self.vanilla_root.as_ref().is_some_and(|vanilla| vanilla.id == root.id) {
                 continue;
             }
             let mut paths = Vec::new();
@@ -1927,8 +1983,10 @@ impl AnalysisHost {
         cancellation.checkpoint()?;
         let mut shards =
             file_states.values().map(|state| state.shard().clone()).collect::<Vec<_>>();
-        if let Some(cache) = self.vanilla_cache.as_ref() {
-            for (id, cached) in cache.source_files() {
+        if let Some(vanilla) = self.vanilla_root.as_ref() {
+            for (id, cached) in
+                self.source_files.iter().filter(|(_, file)| file.root_id == vanilla.id)
+            {
                 if let Some(existing) = files.insert(*id, cached.clone()) {
                     return Err(WorkspaceError::FileIdCollision {
                         first: existing.physical_path,
@@ -1936,7 +1994,15 @@ impl AnalysisHost {
                     });
                 }
             }
-            shards.extend(cache.index().shards.values().cloned());
+            shards.extend(
+                self.index
+                    .shards
+                    .iter()
+                    .filter(|(id, _)| {
+                        self.source_files.get(id).is_some_and(|file| file.root_id == vanilla.id)
+                    })
+                    .map(|(_, shard)| shard.clone()),
+            );
         }
         let mut index = WorkspaceIndex::from_shards_cancellable(shards, cancellation)?;
         let priorities = source_priorities(&self.roots, &files);
@@ -3217,6 +3283,37 @@ mod tests {
         );
         fs::remove_dir_all(root).expect("cleanup root");
         fs::remove_dir_all(outside).expect("cleanup outside directory");
+    }
+
+    #[test]
+    fn workspace_scan_skips_tool_generated_directories() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-workspace-ignored-tools-{nonce}"));
+        let events = root.join("events");
+        let generated_events = root.join("target/debug/events");
+        fs::create_dir_all(&events).expect("events directory");
+        fs::create_dir_all(&generated_events).expect("generated events directory");
+        fs::write(events.join("indexed.txt"), "country_event = { id = indexed.1 }\n")
+            .expect("indexed fixture");
+        fs::write(generated_events.join("ignored.txt"), "country_event = { id = ignored.1 }\n")
+            .expect("ignored fixture");
+
+        let mut host = eu4_host();
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        let report = host.refresh_source_roots().expect("bounded workspace scan");
+
+        assert_eq!(report.discovered_files, 1);
+        assert_eq!(report.indexed_files, 1);
+        assert!(host.snapshot().index().definitions("event", "indexed.1").len() == 1);
+        assert!(host.snapshot().index().definitions("event", "ignored.1").is_empty());
+        fs::remove_dir_all(root).expect("cleanup");
     }
 
     #[test]

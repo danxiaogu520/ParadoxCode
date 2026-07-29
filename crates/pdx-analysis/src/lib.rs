@@ -3,7 +3,9 @@
 //! The analysis crate owns all semantic decisions.  `pdx-lsp` only converts the DTOs in this
 //! module to protocol values, which keeps the same behaviour available to the CLI and tests.
 
-use std::collections::BTreeSet;
+#[cfg(test)]
+use std::cell::Cell;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::Arc;
 #[cfg(test)]
@@ -441,8 +443,8 @@ pub fn complete_with_cancellation(
     let replacement_range = word_range(&input.source, position);
     let prefix = input.source_text(replacement_range).unwrap_or_default().to_owned();
     let value_context = completion_value_context(&input, position);
-    let all = all_semantics(snapshot, cancellation)?;
     let mut items = Vec::new();
+    let mut member_cache = CompletionMemberCache::default();
     let semantic_context = semantic_completion_context(snapshot, &input, position);
     if let Some(context) = semantic_context.as_ref() {
         cancellation.checkpoint()?;
@@ -452,35 +454,44 @@ pub fn complete_with_cancellation(
                     snapshot,
                     context,
                     property,
+                    &mut member_cache,
                     &mut items,
                     replacement_range,
                     &prefix,
                 );
             }
         } else {
-            add_semantic_key_items(snapshot, context, &mut items, replacement_range, &prefix);
+            add_semantic_key_items(
+                snapshot,
+                context,
+                &mut member_cache,
+                &mut items,
+                replacement_range,
+                &prefix,
+            );
         }
     }
     if items.is_empty() && value_context {
         add_scalar_items(&mut items, replacement_range, &prefix);
-        for definition in &all.definitions {
+        for (kind_name, definition_name) in completion_definitions(snapshot, &prefix, cancellation)?
+        {
             cancellation.checkpoint()?;
-            let kind = if definition.kind == "localisation" {
+            let kind = if kind_name == "localisation" {
                 CompletionKind::Localisation
             } else {
                 CompletionKind::Symbol
             };
-            let detail = format!("{} symbol", definition.kind);
+            let detail = format!("{kind_name} symbol");
             push_completion(
                 &mut items,
                 CompletionItem {
-                    label: definition.name.clone(),
+                    label: definition_name.clone(),
                     kind,
                     detail,
                     documentation: None,
                     replacement_range,
-                    insert_text: definition.name.clone(),
-                    sort_score: if definition.kind == "localisation" { 20 } else { 30 },
+                    insert_text: definition_name,
+                    sort_score: if kind_name == "localisation" { 20 } else { 30 },
                     deprecated: false,
                 },
                 &prefix,
@@ -504,18 +515,23 @@ pub fn complete_with_cancellation(
                 &prefix,
             );
         }
-        for definition in &all.definitions {
+        for (kind_name, definition_name) in completion_definitions_for_kinds(
+            snapshot,
+            &prefix,
+            &["scripted_effect", "scripted_trigger"],
+            cancellation,
+        )? {
             cancellation.checkpoint()?;
-            if matches!(definition.kind.as_str(), "scripted_effect" | "scripted_trigger") {
+            if matches!(kind_name.as_str(), "scripted_effect" | "scripted_trigger") {
                 push_completion(
                     &mut items,
                     CompletionItem {
-                        label: definition.name.clone(),
+                        label: definition_name.clone(),
                         kind: CompletionKind::Symbol,
-                        detail: format!("{} command", definition.kind),
+                        detail: format!("{kind_name} command"),
                         documentation: None,
                         replacement_range,
-                        insert_text: format!("{} = {{\n    $0\n}}", definition.name),
+                        insert_text: format!("{definition_name} = {{\n    $0\n}}"),
                         sort_score: 15,
                         deprecated: false,
                     },
@@ -793,6 +809,67 @@ struct SemanticCompletionRule<'rule, 'path> {
     scope: &'path ScopeContext,
 }
 
+#[derive(Default)]
+struct CompletionMemberCache {
+    workspace: BTreeMap<(String, String), Vec<String>>,
+    enums: BTreeMap<(String, String), Vec<String>>,
+}
+
+impl CompletionMemberCache {
+    fn workspace_member_names(
+        &mut self,
+        snapshot: &AnalysisSnapshot,
+        type_name: &str,
+        prefix: &str,
+    ) -> &[String] {
+        let cache_key = (type_name.to_ascii_lowercase(), prefix.to_ascii_lowercase());
+        self.workspace.entry(cache_key).or_insert_with(|| {
+            let base = type_name.split_once('.').map_or(type_name, |(kind, _)| kind);
+            let alias = snapshot.game_profile().member_kind_alias(base);
+            let mut kinds = vec![type_name, base];
+            if let Some(alias) = alias {
+                kinds.push(alias);
+            }
+            kinds.sort_unstable();
+            kinds.dedup();
+            let mut names = kinds
+                .into_iter()
+                .flat_map(|kind| snapshot.index().definitions_for_kind(kind))
+                .map(|definition| definition.name.clone())
+                .filter(|name| starts_with_ignore_ascii_case(name, prefix))
+                .collect::<Vec<_>>();
+            names.sort_by_key(|name| name.to_ascii_lowercase());
+            names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+            names
+        })
+    }
+
+    fn enum_member_names(
+        &mut self,
+        snapshot: &AnalysisSnapshot,
+        enum_name: &str,
+        prefix: &str,
+    ) -> &[String] {
+        let cache_key = (enum_name.to_ascii_lowercase(), prefix.to_ascii_lowercase());
+        if !self.enums.contains_key(&cache_key) {
+            let mut names = snapshot
+                .rules()
+                .model()
+                .semantic
+                .enum_values
+                .get(enum_name)
+                .cloned()
+                .unwrap_or_default();
+            names.extend(self.workspace_member_names(snapshot, enum_name, prefix).iter().cloned());
+            names.retain(|name| starts_with_ignore_ascii_case(name, prefix));
+            names.sort_by_key(|name| name.to_ascii_lowercase());
+            names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+            self.enums.insert(cache_key.clone(), names);
+        }
+        self.enums.get(&cache_key).map_or(&[], Vec::as_slice)
+    }
+}
+
 fn semantic_rules_for_completion<'rule, 'path>(
     snapshot: &'rule AnalysisSnapshot,
     context: &'path SemanticCompletionContext,
@@ -859,6 +936,7 @@ fn semantic_rules_for_completion<'rule, 'path>(
 fn add_semantic_key_items(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
+    member_cache: &mut CompletionMemberCache,
     items: &mut Vec<CompletionItem>,
     replacement_range: TextRange,
     prefix: &str,
@@ -887,7 +965,7 @@ fn add_semantic_key_items(
                 prefix,
             ),
             KeyMatcher::Type(type_name) => {
-                for label in workspace_member_names(snapshot, type_name) {
+                for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
                     push_completion(
                         items,
                         CompletionItem {
@@ -896,7 +974,7 @@ fn add_semantic_key_items(
                             detail: format!("semantic type key <{type_name}>"),
                             documentation: documentation.clone(),
                             replacement_range,
-                            insert_text: label,
+                            insert_text: label.clone(),
                             sort_score: 8,
                             deprecated: false,
                         },
@@ -905,27 +983,46 @@ fn add_semantic_key_items(
                 }
             }
             KeyMatcher::Enum(enum_name) => {
-                let labels = qualified_parameter_names(snapshot, rule, candidate.parent_path)
-                    .unwrap_or_else(|| enum_member_names(snapshot, enum_name));
-                for label in labels {
-                    push_completion(
-                        items,
-                        CompletionItem {
-                            label: label.clone(),
-                            kind: CompletionKind::Key,
-                            detail: format!("semantic enum key enum[{enum_name}]"),
-                            documentation: documentation.clone(),
-                            replacement_range,
-                            insert_text: label,
-                            sort_score: 8,
-                            deprecated: false,
-                        },
-                        prefix,
-                    );
+                if let Some(labels) =
+                    qualified_parameter_names(snapshot, rule, candidate.parent_path)
+                {
+                    for label in labels {
+                        push_completion(
+                            items,
+                            CompletionItem {
+                                label: label.clone(),
+                                kind: CompletionKind::Key,
+                                detail: format!("semantic enum key enum[{enum_name}]"),
+                                documentation: documentation.clone(),
+                                replacement_range,
+                                insert_text: label,
+                                sort_score: 8,
+                                deprecated: false,
+                            },
+                            prefix,
+                        );
+                    }
+                } else {
+                    for label in member_cache.enum_member_names(snapshot, enum_name, prefix) {
+                        push_completion(
+                            items,
+                            CompletionItem {
+                                label: label.clone(),
+                                kind: CompletionKind::Key,
+                                detail: format!("semantic enum key enum[{enum_name}]"),
+                                documentation: documentation.clone(),
+                                replacement_range,
+                                insert_text: label.clone(),
+                                sort_score: 8,
+                                deprecated: false,
+                            },
+                            prefix,
+                        );
+                    }
                 }
             }
             KeyMatcher::Dynamic(kind) => {
-                for label in workspace_member_names(snapshot, kind) {
+                for label in member_cache.workspace_member_names(snapshot, kind, prefix) {
                     push_completion(
                         items,
                         CompletionItem {
@@ -934,7 +1031,7 @@ fn add_semantic_key_items(
                             detail: format!("semantic dynamic key value_set[{kind}]"),
                             documentation: documentation.clone(),
                             replacement_range,
-                            insert_text: label,
+                            insert_text: label.clone(),
                             sort_score: 8,
                             deprecated: false,
                         },
@@ -951,6 +1048,7 @@ fn add_semantic_value_items(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
     property: &ScriptProperty,
+    member_cache: &mut CompletionMemberCache,
     items: &mut Vec<CompletionItem>,
     replacement_range: TextRange,
     prefix: &str,
@@ -1045,10 +1143,10 @@ fn add_semantic_value_items(
                 }
             }
             ValueMatcher::Type(type_name) => {
-                for label in workspace_member_names(snapshot, type_name) {
+                for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
                     add_value_completion(
                         items,
-                        &label,
+                        label,
                         &format!("<{type_name}>"),
                         documentation.clone(),
                         replacement_range,
@@ -1057,10 +1155,10 @@ fn add_semantic_value_items(
                 }
             }
             ValueMatcher::Enum(enum_name) => {
-                for label in enum_member_names(snapshot, enum_name) {
+                for label in member_cache.enum_member_names(snapshot, enum_name, prefix) {
                     add_value_completion(
                         items,
-                        &label,
+                        label,
                         &format!("enum[{enum_name}]"),
                         documentation.clone(),
                         replacement_range,
@@ -1086,10 +1184,10 @@ fn add_semantic_value_items(
                 }
             }
             ValueMatcher::Localisation => {
-                for label in workspace_member_names(snapshot, "localisation") {
+                for label in member_cache.workspace_member_names(snapshot, "localisation", prefix) {
                     add_value_completion(
                         items,
-                        &label,
+                        label,
                         "localisation",
                         documentation.clone(),
                         replacement_range,
@@ -1098,10 +1196,10 @@ fn add_semantic_value_items(
                 }
             }
             ValueMatcher::Dynamic(kind) => {
-                for label in workspace_member_names(snapshot, kind) {
+                for label in member_cache.workspace_member_names(snapshot, kind, prefix) {
                     add_value_completion(
                         items,
-                        &label,
+                        label,
                         &format!("value[{kind}]"),
                         documentation.clone(),
                         replacement_range,
@@ -1176,33 +1274,6 @@ fn semantic_rule_detail(rule: &pdx_rules::SemanticRule) -> String {
         RuleShape::ValueClause => "value clause",
     };
     format!("semantic rule {shape}")
-}
-
-fn workspace_member_names(snapshot: &AnalysisSnapshot, type_name: &str) -> Vec<String> {
-    let base = type_name.split_once('.').map_or(type_name, |(kind, _)| kind);
-    let alias = snapshot.game_profile().member_kind_alias(base);
-    let mut names = snapshot
-        .index()
-        .definitions_iter()
-        .filter(|definition| {
-            definition.kind.eq_ignore_ascii_case(type_name)
-                || definition.kind.eq_ignore_ascii_case(base)
-                || alias.is_some_and(|alias| definition.kind.eq_ignore_ascii_case(alias))
-        })
-        .map(|definition| definition.name.clone())
-        .collect::<Vec<_>>();
-    names.sort_by_key(|name| name.to_ascii_lowercase());
-    names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
-    names
-}
-
-fn enum_member_names(snapshot: &AnalysisSnapshot, enum_name: &str) -> Vec<String> {
-    let mut names =
-        snapshot.rules().model().semantic.enum_values.get(enum_name).cloned().unwrap_or_default();
-    names.extend(workspace_member_names(snapshot, enum_name));
-    names.sort_by_key(|name| name.to_ascii_lowercase());
-    names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
-    names
 }
 
 /// Alias with the noun used by several editor adapters.
@@ -1899,17 +1970,16 @@ fn analyze_input_with_cancellation(
     cancellation.checkpoint()?;
     let semantic = semantic_data(input);
     cancellation.checkpoint()?;
-    let all = all_semantics(snapshot, cancellation)?;
+    let resolution = DirectResolutionContext::new(snapshot);
     let mut diagnostics = syntax_diagnostics(input);
     diagnostics.extend(semantic_rule_diagnostics(snapshot, input, cancellation)?);
     let known = known_keys(snapshot);
     let mut unknown_scope_reported = false;
     for property in properties(input) {
         cancellation.checkpoint()?;
-        let is_dynamic_command = all.definitions.iter().any(|definition| {
-            matches!(definition.kind.as_str(), "scripted_effect" | "scripted_trigger")
-                && same_name(&definition.name, &property.key)
-        });
+        let is_dynamic_command = ["scripted_effect", "scripted_trigger"]
+            .iter()
+            .any(|kind| !matches!(resolution.resolve(kind, &property.key), Resolution::Missing));
         if !property.top_level
             && !semantic_validates_path(snapshot, &property.path, input.path.as_ref())
             && !known.contains(&property.key.to_ascii_lowercase())
@@ -1939,7 +2009,7 @@ fn analyze_input_with_cancellation(
     }
     for reference in &semantic.references {
         cancellation.checkpoint()?;
-        match resolve_symbol(snapshot, &all, &reference.kind, &reference.name) {
+        match resolution.resolve(&reference.kind, &reference.name) {
             Resolution::Missing => diagnostics.push(Diagnostic {
                 code: DiagnosticCode::UnknownSymbol,
                 severity: DiagnosticCode::UnknownSymbol.severity(),
@@ -3104,10 +3174,7 @@ fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, member: &str) 
     let base = type_name.split_once('.').map_or(type_name, |(kind, _)| kind);
     let candidates =
         [type_name, base, snapshot.game_profile().member_kind_alias(base).unwrap_or(base)];
-    snapshot.index().definitions_iter().any(|definition| {
-        candidates.iter().any(|candidate| definition.kind.eq_ignore_ascii_case(candidate))
-            && definition.name.eq_ignore_ascii_case(member)
-    })
+    candidates.iter().any(|candidate| !snapshot.index().definitions(candidate, member).is_empty())
 }
 
 fn enum_member(snapshot: &AnalysisSnapshot, enum_name: &str, member: &str) -> bool {
@@ -3253,6 +3320,8 @@ fn all_semantics(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
 ) -> Result<SemanticWorkspace, Cancelled> {
+    #[cfg(test)]
+    ALL_SEMANTICS_CALLS.with(|calls| calls.set(calls.get().saturating_add(1)));
     let mut all = SemanticWorkspace::default();
     for definition in snapshot.index().definitions_iter() {
         cancellation.checkpoint()?;
@@ -3283,6 +3352,91 @@ fn all_semantics(
         }
     }
     Ok(all)
+}
+
+#[cfg(test)]
+thread_local! {
+    static ALL_SEMANTICS_CALLS: Cell<usize> = const { Cell::new(0) };
+}
+
+fn completion_definitions(
+    snapshot: &AnalysisSnapshot,
+    prefix: &str,
+    cancellation: &CancellationToken,
+) -> Result<Vec<(String, String)>, Cancelled> {
+    let mut definitions = Vec::new();
+    for definition in snapshot.index().definitions_iter() {
+        cancellation.checkpoint()?;
+        if starts_with_ignore_ascii_case(&definition.name, prefix) {
+            definitions.push((definition.kind.clone(), definition.name.clone()));
+        }
+    }
+    for document in snapshot.documents().values() {
+        cancellation.checkpoint()?;
+        if document.source() != DocumentSource::Overlay {
+            continue;
+        }
+        if let Some(input) = input_for_document(snapshot, document.id()) {
+            definitions.extend(
+                semantic_data(&input)
+                    .definitions
+                    .into_iter()
+                    .filter(|definition| starts_with_ignore_ascii_case(&definition.name, prefix))
+                    .map(|definition| (definition.kind, definition.name)),
+            );
+        }
+    }
+    definitions.sort_by(|left, right| {
+        (left.0.to_ascii_lowercase(), left.1.to_ascii_lowercase())
+            .cmp(&(right.0.to_ascii_lowercase(), right.1.to_ascii_lowercase()))
+    });
+    definitions.dedup_by(|left, right| {
+        left.0.eq_ignore_ascii_case(&right.0) && left.1.eq_ignore_ascii_case(&right.1)
+    });
+    Ok(definitions)
+}
+
+fn completion_definitions_for_kinds(
+    snapshot: &AnalysisSnapshot,
+    prefix: &str,
+    kinds: &[&str],
+    cancellation: &CancellationToken,
+) -> Result<Vec<(String, String)>, Cancelled> {
+    let mut definitions = Vec::new();
+    for kind in kinds {
+        for definition in snapshot.index().definitions_for_kind(kind) {
+            cancellation.checkpoint()?;
+            if starts_with_ignore_ascii_case(&definition.name, prefix) {
+                definitions.push((definition.kind.clone(), definition.name.clone()));
+            }
+        }
+    }
+    for document in snapshot.documents().values() {
+        cancellation.checkpoint()?;
+        if document.source() != DocumentSource::Overlay {
+            continue;
+        }
+        if let Some(input) = input_for_document(snapshot, document.id()) {
+            definitions.extend(
+                semantic_data(&input)
+                    .definitions
+                    .into_iter()
+                    .filter(|definition| {
+                        kinds.iter().any(|kind| definition.kind.eq_ignore_ascii_case(kind))
+                            && starts_with_ignore_ascii_case(&definition.name, prefix)
+                    })
+                    .map(|definition| (definition.kind, definition.name)),
+            );
+        }
+    }
+    definitions.sort_by(|left, right| {
+        (left.0.to_ascii_lowercase(), left.1.to_ascii_lowercase())
+            .cmp(&(right.0.to_ascii_lowercase(), right.1.to_ascii_lowercase()))
+    });
+    definitions.dedup_by(|left, right| {
+        left.0.eq_ignore_ascii_case(&right.0) && left.1.eq_ignore_ascii_case(&right.1)
+    });
+    Ok(definitions)
 }
 
 fn resolve_symbol(
@@ -3349,6 +3503,95 @@ fn resolve_symbol(
         Resolution::Unique(candidates.remove(0))
     } else {
         Resolution::Ambiguous
+    }
+}
+
+struct DirectResolutionContext<'snapshot> {
+    snapshot: &'snapshot AnalysisSnapshot,
+    overlay_files: BTreeSet<SourceFileId>,
+    overlay_definitions: BTreeMap<(String, String), Vec<ResolutionDefinition>>,
+}
+
+impl<'snapshot> DirectResolutionContext<'snapshot> {
+    fn new(snapshot: &'snapshot AnalysisSnapshot) -> Self {
+        let mut context =
+            Self { snapshot, overlay_files: BTreeSet::new(), overlay_definitions: BTreeMap::new() };
+        for document in snapshot
+            .documents()
+            .values()
+            .filter(|document| document.source() == DocumentSource::Overlay)
+        {
+            if let Some(path) = document.path()
+                && let Some(file) =
+                    snapshot.source_files().values().find(|file| file.physical_path == path)
+            {
+                context.overlay_files.insert(file.id);
+            }
+            let Some(input) = input_for_document(snapshot, document.id()) else {
+                continue;
+            };
+            for definition in semantic_data(&input).definitions {
+                let priority = definition_priority(snapshot, &definition);
+                context
+                    .overlay_definitions
+                    .entry((
+                        definition.kind.to_ascii_lowercase(),
+                        definition.name.to_ascii_lowercase(),
+                    ))
+                    .or_default()
+                    .push(ResolutionDefinition {
+                        location: definition.symbol.location,
+                        selection_range: definition.symbol.selection_range,
+                        priority,
+                    });
+            }
+        }
+        context
+    }
+
+    fn resolve(&self, kind: &str, name: &str) -> Resolution {
+        let mut candidates = self
+            .overlay_definitions
+            .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
+            .cloned()
+            .unwrap_or_default();
+        candidates.extend(
+            self.snapshot
+                .index()
+                .definitions(kind, name)
+                .into_iter()
+                .filter(|definition| !self.overlay_files.contains(&definition.file_id))
+                .map(|definition| ResolutionDefinition {
+                    location: index_definition(self.snapshot, definition).location,
+                    selection_range: definition.range,
+                    priority: definition_priority_for_file(self.snapshot, definition.file_id),
+                }),
+        );
+        if candidates.is_empty() {
+            return Resolution::Missing;
+        }
+        let policy = self
+            .snapshot
+            .rules()
+            .model()
+            .symbol_descriptors
+            .iter()
+            .find(|descriptor| descriptor.kind_id.eq_ignore_ascii_case(kind))
+            .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| descriptor.resolution);
+        if matches!(policy, SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique) {
+            return if candidates.len() == 1 {
+                Resolution::Unique(candidates.remove(0))
+            } else {
+                Resolution::Ambiguous
+            };
+        }
+        let highest = candidates.iter().map(|candidate| candidate.priority).max().unwrap_or(0);
+        candidates.retain(|candidate| candidate.priority == highest);
+        if candidates.len() == 1 {
+            Resolution::Unique(candidates.remove(0))
+        } else {
+            Resolution::Ambiguous
+        }
     }
 }
 
@@ -3554,11 +3797,14 @@ fn add_scalar_items(items: &mut Vec<CompletionItem>, range: TextRange, prefix: &
 }
 
 fn push_completion(items: &mut Vec<CompletionItem>, item: CompletionItem, prefix: &str) {
-    if prefix.is_empty()
-        || item.label.to_ascii_lowercase().starts_with(&prefix.to_ascii_lowercase())
-    {
+    if starts_with_ignore_ascii_case(&item.label, prefix) {
         items.push(item);
     }
+}
+
+fn starts_with_ignore_ascii_case(value: &str, prefix: &str) -> bool {
+    value.len() >= prefix.len()
+        && value.as_bytes()[..prefix.len()].eq_ignore_ascii_case(prefix.as_bytes())
 }
 
 fn word_range(source: &str, position: TextSize) -> TextRange {
@@ -3845,6 +4091,53 @@ mod tests {
     }
 
     #[test]
+    fn semantic_completion_does_not_materialize_the_full_workspace() {
+        let text = concat!(
+            "country_event = { mean_time_to_happen = { ",
+            "modifier = { factor = 0.5 always = maybe }",
+            " } }\n",
+        );
+        let mut host = eu4_host(pdx_game_eu4::first_party_rules().expect("first-party rules"));
+        let id = DocumentId::new("file:///tmp/events/completion-fast-path.txt");
+        host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
+        let snapshot = host.snapshot();
+        let position =
+            u32::try_from(text.find("always").expect("completion key")).expect("position");
+
+        super::ALL_SEMANTICS_CALLS.with(|calls| calls.set(0));
+        let completion = complete(&snapshot, &id, position);
+
+        assert!(completion.items.iter().any(|item| item.label == "always"));
+        super::ALL_SEMANTICS_CALLS.with(|calls| {
+            assert_eq!(
+                calls.get(),
+                0,
+                "contextual completion must not clone all workspace definitions and references"
+            );
+        });
+    }
+
+    #[test]
+    fn semantic_diagnostics_do_not_materialize_the_full_workspace() {
+        let (host, id) = snapshot(
+            "country_event = { id = direct.1 title = missing_title immediate = { always = yes } }\n",
+        );
+        let snapshot = host.snapshot();
+
+        super::ALL_SEMANTICS_CALLS.with(|calls| calls.set(0));
+        let results = diagnostics(&snapshot, &id);
+
+        assert!(results.iter().any(|item| item.code == DiagnosticCode::UnknownSymbol));
+        super::ALL_SEMANTICS_CALLS.with(|calls| {
+            assert_eq!(
+                calls.get(),
+                0,
+                "document diagnostics must query symbol buckets instead of cloning the workspace"
+            );
+        });
+    }
+
+    #[test]
     fn completion_traversal_uses_hir_to_disambiguate_nested_rule_contexts() {
         let text = concat!(
             "country_event = { mean_time_to_happen = { ",
@@ -3868,9 +4161,11 @@ mod tests {
         );
         assert_eq!(context.scope.current, "country");
         let mut all_key_items = Vec::new();
+        let mut member_cache = super::CompletionMemberCache::default();
         super::add_semantic_key_items(
             &snapshot,
             &context,
+            &mut member_cache,
             &mut all_key_items,
             TextRange::empty(position),
             "",

@@ -11,7 +11,14 @@
 
 ; Preserve useful visual distinctions for syntax-level special scalars without
 ; embedding an EU4 command or context name table in the extension.
-(bare_scalar) @variable.special
-  (#match? @variable.special "^@")
-(bare_scalar) @variable.parameter
-  (#match? @variable.parameter "^\\$[^$]+\\$$")
+((bare_scalar) @variable.special
+  (#match? @variable.special "^@"))
+
+((bare_scalar) @variable.parameter
+  (#match? @variable.parameter "^\\$[^$]+\\$$"))
+
+((bare_scalar) @number
+  (#match? @number "^-?[0-9]+(?:\\.[0-9]+)?$"))
+
+((bare_scalar) @boolean
+  (#match? @boolean "^(?:yes|no)$"))

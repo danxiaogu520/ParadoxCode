@@ -14,6 +14,7 @@ publish = false
 [dependencies]
 pdx-syntax = { path = "../pdx-syntax" }
 pdx-text = { path = "../pdx-text" }
+unicode-width = "0.2"
 
 [lints]
 workspace = true
