@@ -316,7 +316,7 @@ struct DiskChangesResult {
 
 enum TransportEvent {
     Input(Result<Option<Value>, LspError>),
-    Initialize(InitializeTaskResult),
+    Initialize(Box<InitializeTaskResult>),
     Parse(ParseResult),
     Diagnostics(DiagnosticsResult),
     Request(SnapshotRequestResult),
@@ -949,11 +949,11 @@ impl LspServer {
             .unwrap_or_else(|_| {
                 Err(RpcError::new(INTERNAL_ERROR, "initialize worker failed unexpectedly"))
             });
-            let _ = sender.send(TransportEvent::Initialize(InitializeTaskResult {
+            let _ = sender.send(TransportEvent::Initialize(Box::new(InitializeTaskResult {
                 request_id,
                 id,
                 result,
-            }));
+            })));
         });
         true
     }
