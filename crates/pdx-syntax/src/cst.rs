@@ -5,17 +5,17 @@ use pdx_text::TextRange;
 /// A loss-aware CST node kind shared by the EU4 syntax frontends.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CstKind {
-    /// Root node for a PdxScript document.
+    /// Root node for a Script document.
     Document,
     /// A `key operator value` property.
     Property,
     /// Property key.
     Key,
-    /// One of the eight supported PdxScript operators.
+    /// One of the eight supported Script operators.
     Operator,
     /// A value wrapper used by property nodes.
     Value,
-    /// A mixed PdxScript block.
+    /// A mixed Script block.
     Block,
     /// An unquoted scalar.
     BareValue,

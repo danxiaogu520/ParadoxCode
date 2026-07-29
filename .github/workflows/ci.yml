@@ -76,7 +76,7 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: |
-            grammars/tree-sitter-pdx-script/package-lock.json
+            grammars/tree-sitter-eu4/package-lock.json
             grammars/tree-sitter-pdx-eu4-localisation/package-lock.json
             grammars/tree-sitter-pdx-eu4-csv/package-lock.json
       - run: bash scripts/check-phase1-grammars.sh

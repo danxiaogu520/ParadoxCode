@@ -64,7 +64,7 @@ CI 能验证 extension manifest 和 Wasm build；文件识别、dev install、se
 
 MVP 至少包含：
 
-1. `parse_pdx_script(bytes)`
+1. `parse_script(bytes)`
 2. `parse_localisation(bytes)`
 3. `edit_updates(seed, edit_sequence)` 与 full reparse 等价性
 4. `typed_cst_walk(bytes)`

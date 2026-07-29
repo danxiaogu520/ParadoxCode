@@ -1,7 +1,0 @@
-name = "PdxScript"
-grammar = "pdx_script"
-path_suffixes = [".gui", ".gfx"]
-line_comments = ["# "]
-tab_size = 4
-hard_tabs = true
-word_characters = ["@", "$", ".", ":", "|", "-"]

@@ -9,7 +9,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "editors" / "zed" / "extension.toml"
 GRAMMARS = (
-    ("pdx_script", "pdx-script"),
+    ("eu4", "eu4"),
     ("pdx_eu4_localisation", "pdx-eu4-localisation"),
     ("pdx_eu4_csv", "pdx-eu4-csv"),
 )

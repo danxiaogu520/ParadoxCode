@@ -89,7 +89,7 @@ pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
 | 层 | 允许负责的事情 | 不应负责的事情 |
 | --- | --- | --- |
 | `pdx-text` | offset、line index、UTF-8/UTF-16、URI/path 基础 | EU4 规则、workspace 状态 |
-| `pdx-syntax` | PDX Script、localisation、CSV 的 loss-aware CST、增量 parse、syntax error | 游戏规则数据库、磁盘扫描、LSP 类型 |
+| `pdx-syntax` | Paradox script、localisation、CSV 的 loss-aware CST、增量 parse、syntax error | 游戏规则数据库、磁盘扫描、LSP 类型 |
 | `pdx-rules` | 通用规则 schema、canonical view、`rule_hash`、只读 runtime API | 具体游戏名称表、外部规则 parser、LSP、动态 Mod symbol |
 | `pdx-game` | 数据驱动安装标志、跨平台发现、最小验证、用户级本机配置 | 具体游戏名称、语义规则、workspace 索引、编辑器 API |
 | `pdx-game-eu4` | EU4 profile、路径、scope、command、symbol 和特殊语义 | LSP、workspace 可变状态、编辑器 API |
@@ -186,7 +186,7 @@ Git checkout 使用仓库版本化的 `.githooks/pre-commit` 作为本地质量�
 - `pdx-lsp`：真实 JSON-RPC、capability fallback、版本乱序、取消、stale diagnostics；
 - Zed：manifest、Wasm/build、文件识别和 server 启动 smoke test。
 
-MVP fuzz 至少覆盖 PdxScript/localisation parse、incremental edit 等价性、typed CST walk、HIR lowering、formatter、line index、第一方规则源码解析和 EU4 CSV parser。发现的 crash 修复后必须进入 regression corpus。
+MVP fuzz 至少覆盖 Script/localisation parse、incremental edit 等价性、typed CST walk、HIR lowering、formatter、line index、第一方规则源码解析和 EU4 CSV parser。发现的 crash 修复后必须进入 regression corpus。
 
 ## 8. 版权、安全和数据边界
 

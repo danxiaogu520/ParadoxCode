@@ -1,5 +1,5 @@
 // Presentation-only CSV grammar for Zed. Semantic CSV parsing lives in
-// crates/pdx-syntax and deliberately remains independent from PdxScript.
+// crates/pdx-syntax and deliberately remains independent from Script.
 
 module.exports = grammar({
   name: 'pdx_eu4_csv',

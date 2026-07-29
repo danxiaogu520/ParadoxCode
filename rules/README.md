@@ -27,5 +27,5 @@ binaries embed that artifact at compile time and expose no rule override. Every 
 include an appropriate regression fixture and regenerate both files. `rule_hash` identifies the
 canonical logical model; `artifact_sha256` protects the generated SQLite bytes.
 
-The current artifact uses schema 13 and source format 1. It contains 8,537 semantic rule
+The current artifact uses schema 13 and source format 2. It contains 8,537 semantic rule
 alternatives and targets EU4 1.37.5.

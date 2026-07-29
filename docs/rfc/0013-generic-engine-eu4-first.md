@@ -16,7 +16,7 @@ ParadoxCode 已经实现 EU4 规则导入、语法前端、workspace、analysis 
 ParadoxCode 采用“通用引擎、游戏 profile、EU4-first”的结构：
 
 - `pdx-lsp`、workspace/snapshot、文件索引、分析查询框架、CLI 和发布设施保持游戏无关；
-- PDX Script、localisation 和 CSV 的可复用语法能力属于 syntax 层；确实存在游戏差异时由 profile 选择 parser 配置或专用前端；
+- Script、localisation 和 CSV 的可复用语法能力属于 syntax 层；确实存在游戏差异时由 profile 选择 parser 配置或专用前端；
 - 规则 schema、artifact 读取、canonical hash、文件类别和 symbol/reference 描述迁入通用规则 runtime；
 - EU4 的路径、scope、command、特殊 symbol、规则补丁和语义 fallback 集中在 EU4 profile；
 - v0.1 只发布和验收 EU4 profile；其他游戏支持没有版本承诺，优先级低；
@@ -35,7 +35,7 @@ pdx-text
   range / line index / UTF-8 / UTF-16 / logical path
 
 pdx-syntax
-  PDX Script / localisation / CSV loss-aware frontends
+  Script / localisation / CSV loss-aware frontends
 
 pdx-rules
   RuleSet / RuleHash / artifact schema / matcher / descriptors
@@ -64,7 +64,7 @@ pdx-lsp
 
 ## 迁移策略
 
-> 实现进度（2026-07-25）：步骤 2–6 已完成。`pdx-rules` 持有通用 runtime 和 data-only `GameProfile`，`pdx-game-eu4` 持有 EU4 profile 和内嵌 artifact provider，迁移期 `pdx-eu4` re-export 已删除。schema 13 与第一方 source format 1 已落地；CLI → LSP → host → snapshot 显式传递并校验 profile。semantic root context、初始 scope state、静态 nested transition/intrinsic 与多段 exact link lowering 已进入 HIR。
+> 实现进度（2026-07-30）：步骤 2–6 已完成。`pdx-rules` 持有通用 runtime 和 data-only `GameProfile`，`pdx-game-eu4` 持有 EU4 profile 和内嵌 artifact provider，迁移期 `pdx-eu4` re-export 已删除。schema 13 与第一方 source format 2 已落地；Zed 主脚本语言使用 `Europa Universalis IV`/`eu4`，通用 parser family 使用 `Script`。CLI → LSP → host → snapshot 显式传递并校验 profile。semantic root context、初始 `ScopeState`、静态 nested transition/intrinsic 与多段 exact link lowering 已进入 HIR。
 
 原 `pdx-eu4` 同时包含通用规则 runtime 与 EU4 数据；迁移按以下步骤分阶段完成：
 

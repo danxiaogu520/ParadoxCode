@@ -19,7 +19,7 @@ Paradox Interactive are trademarks of their respective owners.
 
 ## What it provides
 
-- Error-tolerant parsers for PDX Script, EU4 localisation, and supported EU4 CSV files.
+- Error-tolerant parsers for Paradox script, EU4 localisation, and supported EU4 CSV files.
 - Syntax and semantic diagnostics driven by a validated EU4 rules database.
 - Completion, hover, go-to-definition, references, and document/workspace symbols.
 - Conflict-aware rename restricted to writable Mod sources.

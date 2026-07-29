@@ -78,7 +78,7 @@ SyntaxOnly(language)
 Unsupported(reason)
 ```
 
-PdxScript 可支持的脚本扩展（例如 `.txt`、`.gui`、`.gfx`、`.sfx`、`.asset`、`.map`）是否进入语义分析，由数据库 path/type matcher 决定。`.yml` 与受支持 `.csv` 使用各自 parser。贴图、音频、字体等文件只进入 asset filepath index。
+Script 可支持的脚本扩展（例如 `.txt`、`.gui`、`.gfx`、`.sfx`、`.asset`、`.map`）是否进入语义分析，由数据库 path/type matcher 决定。`.yml` 与受支持 `.csv` 使用各自 parser。贴图、音频、字体等文件只进入 asset filepath index。
 
 没有数据库 semantic rule 但语法可解析的文档仍获得高亮、syntax diagnostics 和 formatting，标记为 `SyntaxOnly`，不能伪造 unknown-key 诊断。分类不相信 editor language id。
 
