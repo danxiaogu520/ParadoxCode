@@ -491,8 +491,8 @@ pub fn bootstrap_model() -> RulesModel {
                 },
             },
             FileCategory {
-                id: "pdx-script".to_owned(),
-                parser: ParserKind::PdxScript,
+                id: "script".to_owned(),
+                parser: ParserKind::Script,
                 resolution: FileResolutionPolicy::ReplaceByRelativePath,
                 matcher: FileMatcher {
                     path_prefix: None,
@@ -591,7 +591,7 @@ mod tests {
     fn profile_identity_and_bootstrap_catalog_are_stable() {
         assert_eq!(Eu4Profile.game_id(), GAME_ID);
         let rules = bootstrap_rules();
-        assert!(rules.model().file_categories.iter().any(|category| category.id == "pdx-script"));
+        assert!(rules.model().file_categories.iter().any(|category| category.id == "script"));
         assert!(rules.model().symbol_descriptors.iter().any(|symbol| symbol.kind_id == "event"));
         let profile = profile();
         assert_eq!(profile.game_id, GAME_ID);

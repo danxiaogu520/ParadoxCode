@@ -6,7 +6,7 @@
 
 ParadoxCode 提供通用 PDX Mod 语言引擎。EU4 是当前唯一有完整交付承诺的游戏 profile；首个客户端是 Zed，核心分析独立于编辑器。未来编辑器和低优先级游戏 profile 复用同一套 workspace、index、analysis 和 LSP runtime。
 
-MVP 不以少数目录为边界。凡是权威 EU4 规则数据库能够分类的文件类别，都进入与其格式相称的分析范围。PdxScript、localisation 与受支持 CSV 使用独立 parser；媒体、字体、音频、贴图等资源只作为 filepath reference 目标被索引。存档和二进制数据不做内容解析。
+MVP 不以少数目录为边界。凡是权威 EU4 规则数据库能够分类的文件类别，都进入与其格式相称的分析范围。Script、localisation 与受支持 CSV 使用独立 parser；媒体、字体、音频、贴图等资源只作为 filepath reference 目标被索引。存档和二进制数据不做内容解析。
 
 当前 EU4 profile 服务项目选定的 EU4 规则基线。规则数据库可以继续由项目维护者修订，每次逻辑修订产生新的 `rule_hash`。通用引擎不假定所有游戏都只有一个版本；版本策略属于各游戏 profile 和规则 artifact metadata。
 

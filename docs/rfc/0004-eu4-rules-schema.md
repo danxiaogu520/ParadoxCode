@@ -122,7 +122,7 @@ overlay > current mod > ordered dependency mods > Vanilla cache
 
 数据库不得只使用四目录白名单。它应分类：
 
-- CWT bootstrap 建模的全部 PdxScript 文件类别。
+- CWT bootstrap 建模的全部 Script 文件类别。
 - EU4 localisation YAML。
 - 规则明确声明且 parser 支持的 CSV/特殊文本。
 - filepath/icon/file rule 引用的 asset 类别。

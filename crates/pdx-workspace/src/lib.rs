@@ -338,7 +338,7 @@ pub struct FileIndexShard {
 /// Parsed frontend retained by one immutable file state.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParsedSource {
-    /// PDX Script or localisation CST.
+    /// Paradox script or localisation CST.
     Text(Arc<ParsedFile>),
     /// Structured CSV parse.
     Csv(Arc<pdx_syntax::CsvParsedFile>),
@@ -1223,10 +1223,10 @@ fn parse_source(
     profile: &GameProfile,
 ) -> (Option<ParsedSource>, Option<Arc<HirFile>>) {
     match parser {
-        ParserKind::PdxScript => {
+        ParserKind::Script => {
             #[cfg(test)]
             record_pipeline_parse();
-            let parsed = Arc::new(parse(FileFormat::PdxScript, source));
+            let parsed = Arc::new(parse(FileFormat::Script, source));
             #[cfg(test)]
             record_pipeline_lower();
             let hir = Arc::new(logical_path.map_or_else(
@@ -1296,7 +1296,7 @@ fn parser_for_document(
     let parser = match extension.as_str() {
         "yml" | "yaml" => ParserKind::Localisation,
         "csv" => ParserKind::Csv(pdx_rules::CsvDialect::Semicolon),
-        "txt" | "gui" | "gfx" | "asset" | "sfx" => ParserKind::PdxScript,
+        "txt" | "gui" | "gfx" | "asset" | "sfx" => ParserKind::Script,
         _ => return None,
     };
     Some((parser, logical))

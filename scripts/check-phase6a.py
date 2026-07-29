@@ -108,7 +108,7 @@ def check_server_smoke() -> None:
                 "params": {
                     "textDocument": {
                         "uri": uri,
-                        "languageId": "pdx-script",
+                        "languageId": "eu4",
                         "version": 1,
                         "text": path.read_text(encoding="utf-8"),
                     }

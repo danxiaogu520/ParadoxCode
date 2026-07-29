@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 
 /// Current version of the developer-maintained source layout.
-pub const SOURCE_FORMAT_VERSION: u32 = 1;
+pub const SOURCE_FORMAT_VERSION: u32 = 2;
 
 const SOURCE_MANIFEST: &str = "manifest.json";
 const CATALOG: &str = "catalog.json";

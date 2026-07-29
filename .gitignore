@@ -5,6 +5,9 @@
 **/node_modules/
 __pycache__/
 
+# Zed development extensions clone and compile each configured grammar here.
+editors/zed/grammars/
+
 # Local rule and Vanilla index artifacts are never source-controlled.
 rules/*.pdxrules
 !rules/eu4.pdxrules

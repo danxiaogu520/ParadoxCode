@@ -10,7 +10,7 @@ test -f CODE_OF_CONDUCT.md
 test -f editors/zed/extension.toml
 test -f docs/spikes/phase0-zed-grammar.md
 test -f docs/spikes/phase0-server-distribution.md
-test -d grammars/tree-sitter-pdx-script
+test -d grammars/tree-sitter-eu4
 test -d grammars/tree-sitter-pdx-eu4-localisation
 test -d tests/fixtures/phase0
 test -d fuzz

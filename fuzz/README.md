@@ -7,10 +7,10 @@ free of fuzzing dependencies.
 Run a short smoke session after installing `cargo-fuzz`:
 
 ```text
-cargo fuzz run parse-pdx-script -- -runs=1000
+cargo fuzz run parse-script -- -runs=1000
 cargo fuzz run parse-localisation -- -runs=1000
 cargo fuzz run incremental-edits -- -runs=1000
-cargo fuzz run format-pdx-script -- -runs=1000
+cargo fuzz run format-script -- -runs=1000
 cargo fuzz run lower-hir -- -runs=1000
 ```
 

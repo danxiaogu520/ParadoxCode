@@ -10,7 +10,7 @@
 
 ParadoxCode 只支持 Europa Universalis IV（EU4）。项目不实现其他游戏适配，不保留可切换的 `game`/游戏规则抽象，也不为未来游戏预留替换式 parser 或规则接口。
 
-EU4 的 PdxScript、localisation 和 CSV 前端直接属于 `pdx-syntax`；公共 API 只表达 EU4 文件格式。EU4 语义规则由 `pdx-eu4` 和 `rules/eu4.pdxrules` 承载，`pdx-cwt` 只导入 EU4 CWT。
+EU4 的 Script、localisation 和 CSV 前端直接属于 `pdx-syntax`；公共 API 只表达 EU4 文件格式。EU4 语义规则由 `pdx-eu4` 和 `rules/eu4.pdxrules` 承载，`pdx-cwt` 只导入 EU4 CWT。
 
 ## 影响
 

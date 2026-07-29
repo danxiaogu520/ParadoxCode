@@ -4,6 +4,14 @@ ParadoxCode 使用统一术语描述 PDX 文本分析与编辑行为，避免产
 
 ## Language
 
+**Europa Universalis IV**:
+The Zed language shown for EU4 key/value script files.
+_Avoid_: EU4, Script
+
+**Script**:
+The reusable Paradox key/value text format selected by a game profile.
+_Avoid_: Europa Universalis IV format, game language
+
 **规范格式化（Canonical Formatting）**:
 在不改变文档语义内容的边界内，将所有可安全格式化的等价输入收敛为唯一、稳定的布局。
 _Avoid_: 美化、最小改动格式化
@@ -33,7 +41,7 @@ _Avoid_: list、简单 block
 _Avoid_: 所有后代 property
 
 **Quoted Script**:
-PdxScript 文件中原本含有换行、且 decoded payload 能完整解释为包含 property、header block 或 parameter block 的 PdxScript quoted scalar。
+Script 文件中原本含有换行、且 decoded payload 能完整解释为包含 property、header block 或 parameter block 的 Script quoted scalar。
 _Avoid_: 普通 quoted scalar、localisation value
 
 **Block Header Comment**:

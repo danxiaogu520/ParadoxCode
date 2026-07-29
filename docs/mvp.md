@@ -6,7 +6,7 @@
 
 用户在 Zed 中打开一个 EU4 Mod workspace 后，可以获得：
 
-- PdxScript 与 EU4 localisation 基础高亮
+- Script 与 EU4 localisation 基础高亮
 - syntax、unknown key、unknown symbol、scope diagnostics
 - key、effect、trigger、symbol、localisation completion
 - definition、references、hover
@@ -57,14 +57,14 @@ Event、Scripted Effect、Scripted Trigger 和 Localisation Key 仍是必须通�
 
 交付：
 
-- `tree-sitter-pdx-script`
+- `tree-sitter-eu4`
 - `tree-sitter-pdx-eu4-localisation`
 - grammar corpus tests
 - Zed `highlights.scm`、`brackets.scm`、`indents.scm`、`outline.scm`
 - Zed dev extension
 - 推荐的 EU4 workspace file type glob 配置
 
-必须覆盖的 PdxScript 语法：
+必须覆盖的 Script 语法：
 
 - property、裸 value、嵌套 block、mixed block
 - 八种 operator

@@ -12,7 +12,7 @@ static PROFILE_INPUTS: OnceLock<(RuleSet, GameProfile, LogicalPath)> = OnceLock:
 
 fuzz_target!(|data: &[u8]| {
     if let Ok(source) = std::str::from_utf8(data) {
-        let hir = lower(parse(FileFormat::PdxScript, source), &RuleSet::empty());
+        let hir = lower(parse(FileFormat::Script, source), &RuleSet::empty());
         check_ranges(&hir, source.len());
 
         let (rules, profile, path) = PROFILE_INPUTS.get_or_init(|| {
@@ -24,7 +24,7 @@ fuzz_target!(|data: &[u8]| {
             )
         });
         let profile_hir =
-            lower_with_profile(parse(FileFormat::PdxScript, source), path, rules, profile);
+            lower_with_profile(parse(FileFormat::Script, source), path, rules, profile);
         check_ranges(&profile_hir, source.len());
     }
 });

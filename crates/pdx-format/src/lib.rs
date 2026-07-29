@@ -1,9 +1,9 @@
 //! Canonical, editor-neutral formatting for the PDX text frontends.
 //!
-//! The formatter is intentionally non-configurable. PdxScript uses tabs, LF line endings,
+//! The formatter is intentionally non-configurable. Script uses tabs, LF line endings,
 //! recursive block layout, and no layout blank lines. Ordinary scalar spelling is preserved;
 //! multiline quoted strings are formatted recursively only when their decoded payload is
-//! demonstrably valid, non-empty PdxScript.
+//! demonstrably valid, non-empty Script.
 
 use pdx_syntax::{CstKind, CstNode, FileFormat, ParsedFile, TokenKind, parse};
 use pdx_text::TextRange;
@@ -77,7 +77,7 @@ fn skipped(reason: FormatSkipReason) -> FormatResult {
 
 fn canonical_text(file: &ParsedFile) -> String {
     match file.format() {
-        FileFormat::PdxScript => PdxFormatter::new(file, 0).document(),
+        FileFormat::Script => PdxFormatter::new(file, 0).document(),
         FileFormat::Localisation => format_localisation(file),
         FileFormat::Csv => file.source().to_owned(),
     }
@@ -516,7 +516,7 @@ fn quoted_script(source: &str, depth: usize) -> Option<QuotedScript> {
     }
     let payload = quoted_payload(source)?;
     let decoded = decode_payload(payload)?;
-    let parsed = parse(FileFormat::PdxScript, &decoded);
+    let parsed = parse(FileFormat::Script, &decoded);
     if !parsed.errors().is_empty() || !has_semantic_item(parsed.root()) {
         return None;
     }
@@ -656,7 +656,7 @@ fn equivalent(original: &ParsedFile, formatted: &ParsedFile, depth: usize) -> bo
             let Some(after_payload) = quoted_payload(after_text).and_then(decode_payload) else {
                 return false;
             };
-            let after_script = parse(FileFormat::PdxScript, &after_payload);
+            let after_script = parse(FileFormat::Script, &after_payload);
             return equivalent(&before_script.parsed, &after_script, depth.saturating_add(1));
         }
         before_text == after_text
@@ -827,27 +827,24 @@ mod tests {
             "\tb = 2\n",
             "}\n",
         );
-        let output = formatted(FileFormat::PdxScript, source);
+        let output = formatted(FileFormat::Script, source);
         assert_eq!(output, expected);
-        assert!(format(&parse(FileFormat::PdxScript, &output)).edits.is_empty());
+        assert!(format(&parse(FileFormat::Script, &output)).edits.is_empty());
     }
 
     #[test]
     fn comments_expand_blocks_and_first_leading_comment_joins_opener() {
         let source = "root = {\n\n# header\n# second\nchild=yes # tail\n}\n";
         let expected = "root = { # header\n\t# second\n\tchild = yes # tail\n}\n";
-        assert_eq!(formatted(FileFormat::PdxScript, source), expected);
+        assert_eq!(formatted(FileFormat::Script, source), expected);
     }
 
     #[test]
     fn parameter_blocks_are_compact_unless_they_contain_comments() {
         let compact = "[[name]\na=1\nb={x=1 y=2}\n]\n";
-        assert_eq!(
-            formatted(FileFormat::PdxScript, compact),
-            "[[name]a = 1 b = { x = 1 y = 2 }]\n"
-        );
+        assert_eq!(formatted(FileFormat::Script, compact), "[[name]a = 1 b = { x = 1 y = 2 }]\n");
         let commented = "[[name]\n# note\na=1\n]\n";
-        assert_eq!(formatted(FileFormat::PdxScript, commented), "[[name]\n\t# note\n\ta = 1\n]\n");
+        assert_eq!(formatted(FileFormat::Script, commented), "[[name]\n\t# note\n\ta = 1\n]\n");
     }
 
     #[test]
@@ -865,20 +862,20 @@ mod tests {
             "\"\n",
             "description = \"first prose line\n\nsecond prose line\"\n",
         );
-        assert_eq!(formatted(FileFormat::PdxScript, source), expected);
+        assert_eq!(formatted(FileFormat::Script, source), expected);
     }
 
     #[test]
     fn quoted_script_supports_escaped_nested_quotes() {
         let source = "effect = \"\n\tname = \\\"quoted\\\"\n\tvalue = yes\n\"\n";
         let expected = "effect = \"\n\tname = \\\"quoted\\\"\n\tvalue = yes\n\"\n";
-        assert_eq!(formatted(FileFormat::PdxScript, source), expected);
+        assert_eq!(formatted(FileFormat::Script, source), expected);
     }
 
     #[test]
     fn formatting_uses_tabs_lf_no_blank_lines_and_one_final_newline() {
         let source = "\u{feff}root = {\r\n  child = yes\r\n\r\n}\r\n\r\n";
-        assert_eq!(formatted(FileFormat::PdxScript, source), "\u{feff}root = { child = yes }\n");
+        assert_eq!(formatted(FileFormat::Script, source), "\u{feff}root = { child = yes }\n");
     }
 
     #[test]
@@ -886,12 +883,12 @@ mod tests {
         let long_key = "界".repeat(58);
         let property_source = format!("root = {{ {long_key} = yes }}\n");
         let property_expected = format!("root = {{\n\t{long_key} = yes\n}}\n");
-        assert_eq!(formatted(FileFormat::PdxScript, &property_source), property_expected);
+        assert_eq!(formatted(FileFormat::Script, &property_source), property_expected);
 
         let scalar = "value".repeat(30);
         let scalar_source = format!("list = {{\n{scalar}\n}}\n");
         assert_eq!(
-            formatted(FileFormat::PdxScript, &scalar_source),
+            formatted(FileFormat::Script, &scalar_source),
             format!("list = {{ {scalar} }}\n")
         );
     }
@@ -900,7 +897,7 @@ mod tests {
     fn opaque_multiline_scalar_preserves_internal_crlf_and_blank_lines() {
         let source = "description = \"first\r\n\r\nsecond\"\r\n";
         assert_eq!(
-            formatted(FileFormat::PdxScript, source),
+            formatted(FileFormat::Script, source),
             "description = \"first\r\n\r\nsecond\"\n"
         );
     }
@@ -914,7 +911,7 @@ mod tests {
 
     #[test]
     fn unsafe_syntax_does_not_generate_edits() {
-        let parsed = parse(FileFormat::PdxScript, "broken = \"unfinished");
+        let parsed = parse(FileFormat::Script, "broken = \"unfinished");
         assert!(
             parsed.errors().iter().any(|error| error.kind == SyntaxErrorKind::UnterminatedString)
         );
@@ -934,7 +931,7 @@ mod tests {
     #[test]
     fn formatter_emits_precise_non_overlapping_edits() {
         let source = "root={a=1 b=2}";
-        let parsed = parse(FileFormat::PdxScript, source);
+        let parsed = parse(FileFormat::Script, source);
         let result = format(&parsed);
         assert!(result.skipped.is_none());
         assert!(result.edits.len() > 1);

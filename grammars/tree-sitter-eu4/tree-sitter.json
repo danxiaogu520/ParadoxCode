@@ -1,0 +1,24 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "eu4",
+      "camelcase": "Eu4",
+      "title": "Europa Universalis IV",
+      "scope": "source.eu4",
+      "file-types": ["txt", "gui", "gfx"],
+      "injection-regex": "^eu4$",
+      "class-name": "TreeSitterEu4"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Tree-sitter grammar for Europa Universalis IV script files"
+  },
+  "bindings": {
+    "c": true,
+    "node": true,
+    "rust": true
+  }
+}

@@ -1424,7 +1424,7 @@ mod tests {
     #[test]
     fn lowering_retains_property_paths_scalars_and_top_level_identity() {
         let parsed =
-            parse(FileFormat::PdxScript, "root = { child = \"value\" nested = { leaf = yes } }\n");
+            parse(FileFormat::Script, "root = { child = \"value\" nested = { leaf = yes } }\n");
         let hir = lower(parsed, &RuleSet::empty());
 
         assert_eq!(hir.properties().len(), 4);
@@ -1444,7 +1444,7 @@ mod tests {
     fn property_adjacency_preserves_duplicate_siblings_and_nested_children() {
         let hir = lower(
             parse(
-                FileFormat::PdxScript,
+                FileFormat::Script,
                 concat!(
                     "root = { ",
                     "duplicate = { child = one } ",
@@ -1493,7 +1493,7 @@ mod tests {
     #[test]
     fn lowering_retains_recovery_nodes_as_unknown_constructs() {
         let source = "root = { = broken good = yes }\n";
-        let hir = lower(parse(FileFormat::PdxScript, source), &RuleSet::empty());
+        let hir = lower(parse(FileFormat::Script, source), &RuleSet::empty());
 
         assert!(!hir.syntax().errors().is_empty());
         assert!(!hir.unknown_constructs().is_empty());
@@ -1506,7 +1506,7 @@ mod tests {
     #[test]
     fn lowering_retains_parameter_conditionals_with_polarity() {
         let source = "[[enabled] value = yes ]\n[[!disabled] other = no ]\n";
-        let hir = lower(parse(FileFormat::PdxScript, source), &RuleSet::empty());
+        let hir = lower(parse(FileFormat::Script, source), &RuleSet::empty());
 
         assert_eq!(hir.parameter_conditionals().len(), 2);
         assert_eq!(hir.parameter_conditionals()[0].name, "enabled");
@@ -1529,7 +1529,7 @@ mod tests {
         let path =
             LogicalPath::parse("common/scripted_effects/parameters.txt").expect("logical path");
         let hir = lower_with_profile(
-            parse(FileFormat::PdxScript, source),
+            parse(FileFormat::Script, source),
             &path,
             &bootstrap_rules(),
             &profile(),
@@ -1577,8 +1577,7 @@ mod tests {
         let source =
             "country_event = { id = profile.1 title = profile_title set_country_flag = seen }\n";
 
-        let hir =
-            lower_with_profile(parse(FileFormat::PdxScript, source), &path, &rules, &profile());
+        let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile());
 
         assert!(hir.definitions().iter().any(|definition| {
             definition.kind == "event"
@@ -1602,7 +1601,7 @@ mod tests {
         let source = "country_event = { id = profile.1 title = profile_title }\n";
         let profile = GameProfile::empty(rules.game_id());
 
-        let hir = lower_with_profile(parse(FileFormat::PdxScript, source), &path, &rules, &profile);
+        let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile);
 
         assert!(hir.definitions().is_empty());
         assert!(!hir.references().iter().any(|reference| reference.kind == "localisation"));
@@ -1614,7 +1613,7 @@ mod tests {
         let path = LogicalPath::parse("events/scope_hir.txt").expect("logical path");
         let hir = lower_with_profile(
             parse(
-                FileFormat::PdxScript,
+                FileFormat::Script,
                 "country_event = { id = scope.1 immediate = { capital_scope = { add_base_tax = 1 } } }\n",
             ),
             &path,
@@ -1653,7 +1652,7 @@ mod tests {
         let path = LogicalPath::parse("events/alternative_scope_hir.txt").expect("logical path");
         let hir = lower_with_profile(
             parse(
-                FileFormat::PdxScript,
+                FileFormat::Script,
                 concat!(
                     "country_event = { immediate = { ",
                     "multiply_variable = { which = amount value = 2 }",
@@ -1681,10 +1680,7 @@ mod tests {
         );
 
         let conflicting = lower_with_profile(
-            parse(
-                FileFormat::PdxScript,
-                "country_event = { mean_time_to_happen = { days = 30 } }\n",
-            ),
+            parse(FileFormat::Script, "country_event = { mean_time_to_happen = { days = 30 } }\n"),
             &path,
             &rules,
             &profile(),
@@ -1707,7 +1703,7 @@ mod tests {
 
         let modifier = lower_with_profile(
             parse(
-                FileFormat::PdxScript,
+                FileFormat::Script,
                 concat!(
                     "country_event = { mean_time_to_happen = { ",
                     "modifier = { factor = 0.5 always = yes }",
@@ -1732,7 +1728,7 @@ mod tests {
         assert!(modifier_fact.parent_path.is_empty());
 
         let empty = lower_with_profile(
-            parse(FileFormat::PdxScript, "country_event = { mean_time_to_happen = { } }\n"),
+            parse(FileFormat::Script, "country_event = { mean_time_to_happen = { } }\n"),
             &path,
             &rules,
             &profile(),
@@ -1800,7 +1796,7 @@ mod tests {
         let path = LogicalPath::parse("common/on_actions/scope_hir.txt").expect("logical path");
         let hir = lower_with_profile(
             parse(
-                FileFormat::PdxScript,
+                FileFormat::Script,
                 concat!(
                     "on_harmonized_religiongroup = { ",
                     "random_events = { int = province_event.1 }",
@@ -1832,7 +1828,7 @@ mod tests {
         let path = LogicalPath::parse("common/buildings/scope_hir.txt").expect("logical path");
         let hir = lower_with_profile(
             parse(
-                FileFormat::PdxScript,
+                FileFormat::Script,
                 concat!("test_building = { ", "on_built = { cossack_infantry = FROM }", " }\n",),
             ),
             &path,
