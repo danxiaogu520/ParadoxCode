@@ -13,7 +13,10 @@ fn walk(node: &CstNode, source_len: u32) {
 fuzz_target!(|data: &[u8]| {
     if let Ok(source) = std::str::from_utf8(data) {
         let parsed = parse(FileFormat::Script, source);
-        walk(parsed.root(), u32::try_from(source.len()).unwrap_or(u32::MAX));
+        walk(
+            parsed.root(),
+            u32::try_from(source.len()).unwrap_or(u32::MAX),
+        );
         for token in parsed.tokens() {
             assert!(token.range().end() <= u32::try_from(source.len()).unwrap_or(u32::MAX));
         }

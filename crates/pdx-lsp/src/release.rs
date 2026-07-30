@@ -30,7 +30,8 @@ impl ServerArtifact {
     }
 
     pub fn checksum_name(&self, version: &str) -> String {
-        self.checksum_template.replace("{archive}", &self.archive_name(version))
+        self.checksum_template
+            .replace("{archive}", &self.archive_name(version))
     }
 
     pub fn archive_kind(&self) -> Result<ArchiveKind, ReleaseError> {
@@ -39,7 +40,9 @@ impl ServerArtifact {
         } else if self.archive_template.ends_with(".zip") {
             Ok(ArchiveKind::Zip)
         } else {
-            Err(ReleaseError::UnsupportedArchive(self.archive_template.clone()))
+            Err(ReleaseError::UnsupportedArchive(
+                self.archive_template.clone(),
+            ))
         }
     }
 }
@@ -79,10 +82,15 @@ struct DistributionArtifact {
 /// Loads and validates the server distribution contract.
 pub fn load_contract(root: &Path) -> Result<(ServerLimits, Vec<ServerArtifact>), ReleaseError> {
     let path = root.join(CONTRACT_PATH);
-    let text = fs::read_to_string(&path)
-        .map_err(|error| ReleaseError::Io { path: path.clone(), error })?;
-    let contract: DistributionContract = serde_json::from_str(&text)
-        .map_err(|error| ReleaseError::Json { path: path.clone(), error })?;
+    let text = fs::read_to_string(&path).map_err(|error| ReleaseError::Io {
+        path: path.clone(),
+        error,
+    })?;
+    let contract: DistributionContract =
+        serde_json::from_str(&text).map_err(|error| ReleaseError::Json {
+            path: path.clone(),
+            error,
+        })?;
     if contract.schema_version != 1 {
         return Err(ReleaseError::Contract(format!(
             "unsupported schema version: {}",
@@ -99,7 +107,9 @@ pub fn load_contract(root: &Path) -> Result<(ServerLimits, Vec<ServerArtifact>),
         || contract.limits.archive_bytes == 0
         || contract.limits.executable_bytes == 0
     {
-        return Err(ReleaseError::Contract("size limits must be positive".to_owned()));
+        return Err(ReleaseError::Contract(
+            "size limits must be positive".to_owned(),
+        ));
     }
     let expected_targets: BTreeSet<&str> = [
         "x86_64-unknown-linux-gnu",
@@ -162,15 +172,25 @@ pub fn create_tar_gz(binary: &[u8], executable: &str) -> Result<Vec<u8>, Release
         header.set_mtime(0);
         header.set_uid(0);
         header.set_gid(0);
-        header.set_username("").map_err(|error| ReleaseError::Packaging(error.to_string()))?;
-        header.set_groupname("").map_err(|error| ReleaseError::Packaging(error.to_string()))?;
-        header.set_path(executable).map_err(|error| ReleaseError::Packaging(error.to_string()))?;
+        header
+            .set_username("")
+            .map_err(|error| ReleaseError::Packaging(error.to_string()))?;
+        header
+            .set_groupname("")
+            .map_err(|error| ReleaseError::Packaging(error.to_string()))?;
+        header
+            .set_path(executable)
+            .map_err(|error| ReleaseError::Packaging(error.to_string()))?;
         header.set_cksum();
         archive
             .append_data(&mut header, executable, io::Cursor::new(binary))
             .map_err(|error| ReleaseError::Packaging(error.to_string()))?;
-        let encoder = archive.into_inner().map_err(|error| ReleaseError::Packaging(error.to_string()))?;
-        encoder.finish().map_err(|error| ReleaseError::Packaging(error.to_string()))?;
+        let encoder = archive
+            .into_inner()
+            .map_err(|error| ReleaseError::Packaging(error.to_string()))?;
+        encoder
+            .finish()
+            .map_err(|error| ReleaseError::Packaging(error.to_string()))?;
     }
     Ok(output)
 }
@@ -179,12 +199,14 @@ pub fn create_tar_gz(binary: &[u8], executable: &str) -> Result<Vec<u8>, Release
 pub fn create_zip(binary: &[u8], executable: &str) -> Result<Vec<u8>, ReleaseError> {
     let mut output = Vec::new();
     {
-        let mut archive =
-            zip::ZipWriter::new(io::Cursor::new(&mut output));
+        let mut archive = zip::ZipWriter::new(io::Cursor::new(&mut output));
         let options = zip::write::SimpleFileOptions::default()
             .compression_method(zip::CompressionMethod::Deflated)
             .unix_permissions(0o755)
-            .last_modified_time(zip::DateTime::from_date_and_time(1980, 1, 1, 0, 0, 0).map_err(|error| ReleaseError::Packaging(error.to_string()))?);
+            .last_modified_time(
+                zip::DateTime::from_date_and_time(1980, 1, 1, 0, 0, 0)
+                    .map_err(|error| ReleaseError::Packaging(error.to_string()))?,
+            );
         archive
             .start_file(executable, options)
             .map_err(|error| ReleaseError::Packaging(error.to_string()))?;
@@ -202,19 +224,27 @@ pub fn create_zip(binary: &[u8], executable: &str) -> Result<Vec<u8>, ReleaseErr
 /// Writes a file atomically via a temporary alongside the target.
 pub fn atomic_write(path: &Path, contents: &[u8]) -> Result<(), ReleaseError> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|error| ReleaseError::Io { path: parent.to_owned(), error })?;
+        fs::create_dir_all(parent).map_err(|error| ReleaseError::Io {
+            path: parent.to_owned(),
+            error,
+        })?;
     }
     let file_name = path
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| ReleaseError::Packaging(format!("invalid output path: {}", path.display())))?;
+        .ok_or_else(|| {
+            ReleaseError::Packaging(format!("invalid output path: {}", path.display()))
+        })?;
     let temp_name = format!(".{file_name}.{}.tmp", std::process::id());
     let temp_path = path.with_file_name(temp_name);
-    fs::write(&temp_path, contents)
-        .map_err(|error| ReleaseError::Io { path: temp_path.clone(), error })?;
-    fs::rename(&temp_path, path)
-        .map_err(|error| ReleaseError::Io { path: temp_path, error })?;
+    fs::write(&temp_path, contents).map_err(|error| ReleaseError::Io {
+        path: temp_path.clone(),
+        error,
+    })?;
+    fs::rename(&temp_path, path).map_err(|error| ReleaseError::Io {
+        path: temp_path,
+        error,
+    })?;
     Ok(())
 }
 
@@ -226,8 +256,11 @@ pub fn package_target(
     output_dir: &Path,
     limits: &ServerLimits,
 ) -> Result<(PathBuf, PathBuf), ReleaseError> {
-    let binary = fs::read(binary_path)
-        .map_err(|error| ReleaseError::Io { path: binary_path.to_owned(), error })?;
+    validate_release_version(version)?;
+    let binary = fs::read(binary_path).map_err(|error| ReleaseError::Io {
+        path: binary_path.to_owned(),
+        error,
+    })?;
     if binary.len() as u64 > limits.executable_bytes {
         return Err(ReleaseError::Limits(format!(
             "server binary exceeds the distribution executable size limit ({} > {})",
@@ -247,6 +280,11 @@ pub fn package_target(
         )));
     }
     let archive_name = artifact.archive_name(version);
+    if !is_plain_filename(&archive_name) {
+        return Err(ReleaseError::Packaging(format!(
+            "release version produced an invalid archive name: {archive_name}"
+        )));
+    }
     let archive_path = output_dir.join(&archive_name);
     atomic_write(&archive_path, &archive_bytes)?;
 
@@ -259,7 +297,13 @@ pub fn package_target(
             limits.checksum_bytes
         )));
     }
-    let sidecar_path = output_dir.join(artifact.checksum_name(version));
+    let sidecar_name = artifact.checksum_name(version);
+    if !is_plain_filename(&sidecar_name) {
+        return Err(ReleaseError::Packaging(format!(
+            "release version produced an invalid checksum name: {sidecar_name}"
+        )));
+    }
+    let sidecar_path = output_dir.join(sidecar_name);
     atomic_write(&sidecar_path, sidecar_contents.as_bytes())?;
     Ok((archive_path, sidecar_path))
 }
@@ -277,16 +321,20 @@ pub fn verify_archive(
             archive_path.display()
         )));
     }
-    let archive_bytes = fs::read(archive_path)
-        .map_err(|error| ReleaseError::Io { path: archive_path.to_owned(), error })?;
+    let archive_bytes = fs::read(archive_path).map_err(|error| ReleaseError::Io {
+        path: archive_path.to_owned(),
+        error,
+    })?;
     if archive_bytes.len() as u64 > limits.archive_bytes {
         return Err(ReleaseError::Verification(format!(
             "archive exceeds size limit: {}",
             archive_path.display()
         )));
     }
-    let sidecar_bytes = fs::read(sidecar_path)
-        .map_err(|error| ReleaseError::Io { path: sidecar_path.to_owned(), error })?;
+    let sidecar_bytes = fs::read(sidecar_path).map_err(|error| ReleaseError::Io {
+        path: sidecar_path.to_owned(),
+        error,
+    })?;
     if sidecar_bytes.len() as u64 > limits.checksum_bytes {
         return Err(ReleaseError::Verification(format!(
             "sidecar exceeds size limit: {}",
@@ -294,12 +342,9 @@ pub fn verify_archive(
         )));
     }
     let sidecar_text = String::from_utf8_lossy(&sidecar_bytes);
-    let (digest_str, name_in_sidecar) = sidecar_text
-        .trim()
-        .split_once("  ")
-        .ok_or_else(|| {
-            ReleaseError::Verification(format!("malformed sidecar: {}", sidecar_path.display()))
-        })?;
+    let (digest_str, name_in_sidecar) = sidecar_text.trim().split_once("  ").ok_or_else(|| {
+        ReleaseError::Verification(format!("malformed sidecar: {}", sidecar_path.display()))
+    })?;
     let expected_name = archive_path
         .file_name()
         .and_then(|name| name.to_str())
@@ -325,8 +370,10 @@ pub fn verify_archive(
 }
 
 fn verify_tar_gz(path: &Path, binary: &str, limits: &ServerLimits) -> Result<(), ReleaseError> {
-    let file = fs::File::open(path)
-        .map_err(|error| ReleaseError::Io { path: path.to_owned(), error })?;
+    let file = fs::File::open(path).map_err(|error| ReleaseError::Io {
+        path: path.to_owned(),
+        error,
+    })?;
     let decompressed = flate2::read::GzDecoder::new(io::BufReader::new(file));
     let mut archive = tar::Archive::new(decompressed);
     let entries: Vec<_> = archive
@@ -341,7 +388,10 @@ fn verify_tar_gz(path: &Path, binary: &str, limits: &ServerLimits) -> Result<(),
             entries.len()
         )));
     }
-    if entries[0].path().map_err(|error| ReleaseError::Verification(error.to_string()))?.as_ref()
+    if entries[0]
+        .path()
+        .map_err(|error| ReleaseError::Verification(error.to_string()))?
+        .as_ref()
         != Path::new(binary)
     {
         return Err(ReleaseError::Verification(format!(
@@ -371,10 +421,12 @@ fn verify_tar_gz(path: &Path, binary: &str, limits: &ServerLimits) -> Result<(),
 }
 
 fn verify_zip(path: &Path, binary: &str, limits: &ServerLimits) -> Result<(), ReleaseError> {
-    let file = fs::File::open(path)
-        .map_err(|error| ReleaseError::Io { path: path.to_owned(), error })?;
-    let mut archive =
-        zip::ZipArchive::new(file).map_err(|error| ReleaseError::Verification(error.to_string()))?;
+    let file = fs::File::open(path).map_err(|error| ReleaseError::Io {
+        path: path.to_owned(),
+        error,
+    })?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|error| ReleaseError::Verification(error.to_string()))?;
     if archive.len() != 1 {
         return Err(ReleaseError::Verification(format!(
             "{}: expected one entry, found {}",
@@ -382,7 +434,9 @@ fn verify_zip(path: &Path, binary: &str, limits: &ServerLimits) -> Result<(), Re
             archive.len()
         )));
     }
-    let entry = archive.by_index(0).map_err(|error| ReleaseError::Verification(error.to_string()))?;
+    let entry = archive
+        .by_index(0)
+        .map_err(|error| ReleaseError::Verification(error.to_string()))?;
     if entry.name() != binary {
         return Err(ReleaseError::Verification(format!(
             "{}: expected executable name {binary}",
@@ -411,6 +465,7 @@ pub fn verify_release_directory(
     artifacts: &[ServerArtifact],
     limits: &ServerLimits,
 ) -> Result<(), ReleaseError> {
+    validate_release_version(version)?;
     let mut expected_names = BTreeSet::new();
     for artifact in artifacts {
         let archive_name = artifact.archive_name(version);
@@ -422,7 +477,10 @@ pub fn verify_release_directory(
         verify_archive(&archive_path, &sidecar_path, artifact, limits)?;
     }
     let actual_names: BTreeSet<String> = fs::read_dir(directory)
-        .map_err(|error| ReleaseError::Io { path: directory.to_owned(), error })?
+        .map_err(|error| ReleaseError::Io {
+            path: directory.to_owned(),
+            error,
+        })?
         .filter_map(|entry| entry.ok())
         .map(|entry| entry.file_name().to_string_lossy().into_owned())
         .collect();
@@ -440,36 +498,22 @@ pub fn verify_release_directory(
 
 /// SemVer validation used by release packaging and verification.
 pub fn validate_release_version(version: &str) -> Result<String, ReleaseError> {
-    // MAJOR.MINOR.PATCH[-PRERELEASE][+BUILD]
-    let (major_str, rest) = version.split_once('.').ok_or_else(|| {
-        ReleaseError::Version(format!("invalid release version: {version}"))
-    })?;
-    let (minor_str, patch_str) = rest.split_once('.').ok_or_else(|| {
-        ReleaseError::Version(format!("invalid release version: {version}"))
-    })?;
-    for part in [major_str, minor_str] {
-        if part.is_empty() || (part.starts_with('0') && part.len() > 1) {
-            return Err(ReleaseError::Version(format!("invalid release version: {version}")));
-        }
-        part.parse::<u64>().map_err(|_| {
-            ReleaseError::Version(format!("invalid release version: {version}"))
-        })?;
-    }
-    let patch_numeric = patch_str.split_once('-').map_or(patch_str, |(num, _)| num);
-    if patch_numeric.is_empty() || (patch_numeric.starts_with('0') && patch_numeric.len() > 1) {
-        return Err(ReleaseError::Version(format!("invalid release version: {version}")));
-    }
-    patch_numeric.parse::<u64>().map_err(|_| {
-        ReleaseError::Version(format!("invalid release version: {version}"))
-    })?;
+    semver::Version::parse(version)
+        .map_err(|_| ReleaseError::Version(format!("invalid release version: {version}")))?;
     Ok(version.to_owned())
 }
 
 /// Errors from release packaging and verification.
 #[derive(Debug)]
 pub enum ReleaseError {
-    Io { path: PathBuf, error: io::Error },
-    Json { path: PathBuf, error: serde_json::Error },
+    Io {
+        path: PathBuf,
+        error: io::Error,
+    },
+    Json {
+        path: PathBuf,
+        error: serde_json::Error,
+    },
     Contract(String),
     Version(String),
     Limits(String),
@@ -491,7 +535,9 @@ impl fmt::Display for ReleaseError {
             Self::Version(message) => write!(formatter, "invalid version: {message}"),
             Self::Limits(message) => write!(formatter, "size limit exceeded: {message}"),
             Self::Packaging(message) => write!(formatter, "packaging error: {message}"),
-            Self::Verification(message) => write!(formatter, "release verification failed: {message}"),
+            Self::Verification(message) => {
+                write!(formatter, "release verification failed: {message}")
+            }
             Self::UnsupportedArchive(name) => {
                 write!(formatter, "unsupported archive template: {name}")
             }
@@ -509,7 +555,11 @@ mod tests {
     const PAYLOAD: &[u8] = b"portable pdx-ls fixture\n";
 
     fn fixture_limits() -> ServerLimits {
-        ServerLimits { checksum_bytes: 1024, archive_bytes: 64 * 1024 * 1024, executable_bytes: 128 * 1024 * 1024 }
+        ServerLimits {
+            checksum_bytes: 1024,
+            archive_bytes: 64 * 1024 * 1024,
+            executable_bytes: 128 * 1024 * 1024,
+        }
     }
 
     fn fixture_artifact(target: &str) -> ServerArtifact {
@@ -535,8 +585,20 @@ mod tests {
         assert!(validate_release_version("1.2.3").is_ok());
         assert!(validate_release_version("0.1.0").is_ok());
         assert!(validate_release_version("1.2.3-alpha.1").is_ok());
-        for invalid in ["01.2.3", "1.02.3", "1.2.03", "1.2", "v1.2.3"] {
-            assert!(validate_release_version(invalid).is_err(), "{invalid} should be rejected");
+        assert!(validate_release_version("1.2.3+build.1").is_ok());
+        for invalid in [
+            "01.2.3",
+            "1.02.3",
+            "1.2.03",
+            "1.2",
+            "v1.2.3",
+            "1.2.3-",
+            "1.2.3-alpha/../../escape",
+        ] {
+            assert!(
+                validate_release_version(invalid).is_err(),
+                "{invalid} should be rejected"
+            );
         }
     }
 
@@ -550,10 +612,17 @@ mod tests {
         let file = fs::File::open(&path).expect("open");
         let gz = flate2::read::GzDecoder::new(io::BufReader::new(file));
         let mut tar_archive = tar::Archive::new(gz);
-        let entries: Vec<_> = tar_archive.entries().expect("entries").filter_map(|e| e.ok()).collect();
+        let entries: Vec<_> = tar_archive
+            .entries()
+            .expect("entries")
+            .filter_map(|e| e.ok())
+            .collect();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].path().expect("path").as_os_str(), "pdx-ls");
-        assert_eq!(entries[0].header().size().unwrap_or(0), PAYLOAD.len() as u64);
+        assert_eq!(
+            entries[0].header().size().unwrap_or(0),
+            PAYLOAD.len() as u64
+        );
         assert_eq!(entries[0].header().mode().unwrap_or(0) & 0o777, 0o755);
         let _ = fs::remove_file(&path);
     }
@@ -567,7 +636,11 @@ mod tests {
         let mut archive = zip::ZipArchive::new(cursor).expect("open zip");
         assert_eq!(archive.len(), 1);
         let mut buf = Vec::new();
-        archive.by_index(0).expect("entry").read_to_end(&mut buf).expect("read entry");
+        archive
+            .by_index(0)
+            .expect("entry")
+            .read_to_end(&mut buf)
+            .expect("read entry");
         assert_eq!(buf, PAYLOAD);
     }
 
@@ -588,10 +661,9 @@ mod tests {
 
         for target in ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"] {
             let artifact = fixture_artifact(target);
-            let (archive_path, _sidecar) = package_target(
-                version, &artifact, &binary, &root, &limits,
-            )
-            .expect("package target");
+            let (archive_path, _sidecar) =
+                package_target(version, &artifact, &binary, &root, &limits)
+                    .expect("package target");
             assert!(archive_path.is_file());
 
             let sidecar_path = root.join(artifact.checksum_name(version));
@@ -615,7 +687,11 @@ mod tests {
         let oversized = vec![0u8; 1024];
         fs::write(&binary, &oversized).expect("write oversized");
 
-        let limits = ServerLimits { checksum_bytes: 1024, archive_bytes: 1024, executable_bytes: 10 };
+        let limits = ServerLimits {
+            checksum_bytes: 1024,
+            archive_bytes: 1024,
+            executable_bytes: 10,
+        };
         let artifact = fixture_artifact("x86_64-unknown-linux-gnu");
         let result = package_target("0.1.0", &artifact, &binary, &root, &limits);
         assert!(result.is_err());

@@ -29,33 +29,54 @@ pub enum CheckOutcome {
 
 impl CheckResult {
     fn pass(name: impl Into<String>) -> Self {
-        Self { name: name.into(), outcome: CheckOutcome::Passed }
+        Self {
+            name: name.into(),
+            outcome: CheckOutcome::Passed,
+        }
     }
 
     fn fail(name: impl Into<String>, message: impl Into<String>) -> Self {
-        Self { name: name.into(), outcome: CheckOutcome::Failed(message.into()) }
+        Self {
+            name: name.into(),
+            outcome: CheckOutcome::Failed(message.into()),
+        }
     }
 }
 
 fn check(condition: bool, name: &str, message: impl Into<String>) -> CheckResult {
-    if condition { CheckResult::pass(name) } else { CheckResult::fail(name, message) }
+    if condition {
+        CheckResult::pass(name)
+    } else {
+        CheckResult::fail(name, message)
+    }
 }
 
 /// Runs all policy checks against the repository root.
 pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     let mut results = Vec::new();
     let requires_file = |path: &str| -> CheckResult {
-        check(root.join(path).is_file(), &format!("file exists: {path}"), format!("missing required file: {path}"))
+        check(
+            root.join(path).is_file(),
+            &format!("file exists: {path}"),
+            format!("missing required file: {path}"),
+        )
     };
     let requires_dir = |path: &str| -> CheckResult {
-        check(root.join(path).is_dir(), &format!("dir exists: {path}"), format!("missing required directory: {path}"))
+        check(
+            root.join(path).is_dir(),
+            &format!("dir exists: {path}"),
+            format!("missing required directory: {path}"),
+        )
     };
 
     results.push(requires_file("Cargo.toml"));
     results.push(requires_file("Cargo.lock"));
     results.push(requires_file("README.md"));
     results.push(requires_file("LICENSE"));
-    results.push(requires_file("docs/mvp.md"));
+    results.push(requires_file("docs/architecture.md"));
+    results.push(requires_file(".github/workflows/ci.yml"));
+    results.push(requires_file(".github/workflows/release.yml"));
+    results.push(requires_file("deny.toml"));
     results.push(requires_file("editors/zed/extension.toml"));
     results.push(requires_dir("grammars/tree-sitter-eu4"));
     results.push(requires_dir("fuzz"));
@@ -99,9 +120,16 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
                 }
             }
         }
-        results.push(check(!cwt_found, "no CWT in rules/eu4", "CWT files are prohibited in the authoritative rule source"));
+        results.push(check(
+            !cwt_found,
+            "no CWT in rules/eu4",
+            "CWT files are prohibited in the authoritative rule source",
+        ));
     } else {
-        results.push(CheckResult::fail("rules/eu4 directory", "first-party EU4 rule source is missing"));
+        results.push(CheckResult::fail(
+            "rules/eu4 directory",
+            "first-party EU4 rule source is missing",
+        ));
     }
 
     // Pre-commit hook invokes quality gates.
@@ -116,7 +144,11 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     // Cargo metadata checks.
     match cargo_metadata(root) {
         Ok(packages) => {
-            results.push(check(!packages.is_empty(), "cargo metadata", "Cargo workspace has no packages"));
+            results.push(check(
+                !packages.is_empty(),
+                "cargo metadata",
+                "Cargo workspace has no packages",
+            ));
             let versions: BTreeSet<&str> = packages.iter().map(|p| p.version.as_str()).collect();
             results.push(check(
                 versions.len() == 1,
@@ -128,19 +160,47 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
                 results.push(check(
                     prefix_ok,
                     &format!("package prefix: {}", package.name),
-                    format!("workspace package does not use pdx- prefix: {}", package.name),
+                    format!(
+                        "workspace package does not use pdx- prefix: {}",
+                        package.name
+                    ),
                 ));
                 let repo_ok = package.repository.as_deref() == Some(REPOSITORY);
-                results.push(check(repo_ok, &format!("{}.repository", package.name), format!("{name}: repository metadata is missing", name = package.name)));
+                results.push(check(
+                    repo_ok,
+                    &format!("{}.repository", package.name),
+                    format!(
+                        "{name}: repository metadata is missing",
+                        name = package.name
+                    ),
+                ));
                 let license_ok = package.license.as_deref() == Some("MIT");
-                results.push(check(license_ok, &format!("{}.license", package.name), format!("{name}: expected MIT license metadata", name = package.name)));
-                let internal = ["pdx-lsp", "pdx-rules", "pdx-game", "pdx-parser", "pdx-text", "pdx-engine", "pdx-analysis"];
+                results.push(check(
+                    license_ok,
+                    &format!("{}.license", package.name),
+                    format!("{name}: expected MIT license metadata", name = package.name),
+                ));
+                let internal = [
+                    "pdx-lsp",
+                    "pdx-rules",
+                    "pdx-game",
+                    "pdx-parser",
+                    "pdx-text",
+                    "pdx-engine",
+                    "pdx-analysis",
+                ];
                 if internal.contains(&package.name.as_str()) {
-                    let publish_disabled = package.publish.as_ref().is_some_and(|registries| registries.is_empty());
+                    let publish_disabled = package
+                        .publish
+                        .as_ref()
+                        .is_some_and(|registries| registries.is_empty());
                     results.push(check(
                         publish_disabled,
                         &format!("{}.publish", package.name),
-                        format!("{name}: internal workspace crates must not be publishable", name = package.name),
+                        format!(
+                            "{name}: internal workspace crates must not be publishable",
+                            name = package.name
+                        ),
                     ));
                 }
             }
@@ -152,14 +212,18 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
 
     // Version agreement across workspace and Zed.
     if let Ok(workspace_version) = read_workspace_version(root) {
-        if let Ok(ext_version) = read_toml_value::<String>(root.join("editors/zed/extension.toml"), &["version"]) {
+        if let Ok(ext_version) =
+            read_toml_value::<String>(root.join("editors/zed/extension.toml"), &["version"])
+        {
             results.push(check(
                 ext_version == workspace_version,
                 "Zed extension version",
                 format!("Zed extension version {ext_version} != workspace {workspace_version}"),
             ));
         }
-        if let Ok(zc_version) = read_toml_value::<String>(root.join("editors/zed/Cargo.toml"), &["package", "version"]) {
+        if let Ok(zc_version) =
+            read_toml_value::<String>(root.join("editors/zed/Cargo.toml"), &["package", "version"])
+        {
             results.push(check(
                 zc_version == workspace_version,
                 "Zed Cargo version",
@@ -169,17 +233,26 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     }
 
     // Zed extension metadata.
-    if let Ok(ext_id) = read_toml_value::<String>(root.join("editors/zed/extension.toml"), &["id"]) {
-        results.push(check(ext_id == "paradoxcode", "Zed extension id", "published Zed extension id must remain stable"));
+    if let Ok(ext_id) = read_toml_value::<String>(root.join("editors/zed/extension.toml"), &["id"])
+    {
+        results.push(check(
+            ext_id == "paradoxcode",
+            "Zed extension id",
+            "published Zed extension id must remain stable",
+        ));
     }
-    if let Ok(ext_name) = read_toml_value::<String>(root.join("editors/zed/extension.toml"), &["name"]) {
+    if let Ok(ext_name) =
+        read_toml_value::<String>(root.join("editors/zed/extension.toml"), &["name"])
+    {
         results.push(check(
             ext_name == "ParadoxCode - EU4 Language Tools",
             "Zed extension name",
             "unexpected Zed display name",
         ));
     }
-    if let Ok(ext_desc) = read_toml_value::<String>(root.join("editors/zed/extension.toml"), &["description"]) {
+    if let Ok(ext_desc) =
+        read_toml_value::<String>(root.join("editors/zed/extension.toml"), &["description"])
+    {
         results.push(check(
             ext_desc.to_lowercase().contains("unofficial"),
             "Zed extension description",
@@ -219,7 +292,11 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
                 let actual_binaries: BTreeSet<(&str, &str)> = artifacts
                     .iter()
                     .map(|a| {
-                        let kind = if a.archive_template.ends_with(".tar.gz") { "tar.gz" } else { "zip" };
+                        let kind = if a.archive_template.ends_with(".tar.gz") {
+                            "tar.gz"
+                        } else {
+                            "zip"
+                        };
                         (kind, a.binary.as_str())
                     })
                     .collect();
@@ -230,27 +307,29 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
                 ));
             }
             Err(error) => {
-                results.push(CheckResult::fail("server distribution contract", error.to_string()));
+                results.push(CheckResult::fail(
+                    "server distribution contract",
+                    error.to_string(),
+                ));
             }
         }
     }
 
     // Rule source metadata.
     let rules_manifest = root.join("rules/eu4/manifest.json");
-    if rules_manifest.is_file() {
-        match fs::read_to_string(&rules_manifest) {
-            Ok(text) => {
-                if let Ok(manifest) = serde_json::from_str::<serde_json::Value>(&text) {
-                    let game_id = manifest.get("game_id").and_then(|v| v.as_str()).unwrap_or("");
-                    results.push(check(
-                        game_id == "eu4",
-                        "rules game_id",
-                        format!("rules manifest game_id is not eu4: {game_id}"),
-                    ));
-                }
-            }
-            Err(_) => {}
-        }
+    if rules_manifest.is_file()
+        && let Ok(text) = fs::read_to_string(&rules_manifest)
+        && let Ok(manifest) = serde_json::from_str::<serde_json::Value>(&text)
+    {
+        let game_id = manifest
+            .get("game_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        results.push(check(
+            game_id == "eu4",
+            "rules game_id",
+            format!("rules manifest game_id is not eu4: {game_id}"),
+        ));
     }
 
     results
@@ -261,7 +340,9 @@ pub fn check_zed_extension(root: &Path) -> Vec<CheckResult> {
     let mut results = Vec::new();
     let ext_dir = root.join("editors/zed");
 
-    if let Ok(ext_schema) = read_toml_value::<i64>(ext_dir.join("extension.toml"), &["schema_version"]) {
+    if let Ok(ext_schema) =
+        read_toml_value::<i64>(ext_dir.join("extension.toml"), &["schema_version"])
+    {
         results.push(check(
             ext_schema == 1,
             "Zed extension schema",
@@ -274,7 +355,12 @@ pub fn check_zed_extension(root: &Path) -> Vec<CheckResult> {
         "eu4",
         "tree-sitter-eu4",
         "test/corpus/eu4.txt",
-        &["highlights.scm", "brackets.scm", "indents.scm", "outline.scm"][..],
+        &[
+            "highlights.scm",
+            "brackets.scm",
+            "indents.scm",
+            "outline.scm",
+        ][..],
     )];
 
     for (lang_dir_name, grammar_dir_name, sample_relative, query_names) in languages {
@@ -299,14 +385,17 @@ pub fn check_zed_extension(root: &Path) -> Vec<CheckResult> {
                 &format!("{lang_dir_name}: {query_name}"),
                 format!("{lang_dir_name}: {query_name} missing"),
             ));
-            if query_path.is_file() {
-                if let Ok(contents) = fs::read_to_string(&query_path) {
-                    results.push(check(
-                        !contents.contains("Phase 0 query placeholder"),
-                        &format!("{lang_dir_name}: {query_name} real"),
-                        format!("{query_path}: placeholder query", query_path = query_path.display()),
-                    ));
-                }
+            if query_path.is_file()
+                && let Ok(contents) = fs::read_to_string(&query_path)
+            {
+                results.push(check(
+                    !contents.contains("Phase 0 query placeholder"),
+                    &format!("{lang_dir_name}: {query_name} real"),
+                    format!(
+                        "{query_path}: placeholder query",
+                        query_path = query_path.display()
+                    ),
+                ));
             }
         }
 
@@ -316,27 +405,31 @@ pub fn check_zed_extension(root: &Path) -> Vec<CheckResult> {
             let tree_sitter = find_tree_sitter(&grammar_root);
             for query_name in query_names {
                 let query_path = lang_dir.join(query_name);
-                if query_path.is_file() {
-                    match tree_sitter {
-                        Some(ref cli) => {
-                            let output = Command::new(cli)
-                                .args(["query", &query_path.to_string_lossy(), &sample.to_string_lossy(), "--quiet"])
-                                .current_dir(&grammar_path)
-                                .output();
-                            match output {
-                                Ok(out) if out.status.success() => {
-                                    results.push(CheckResult::pass(&format!("{lang_dir_name}: {query_name} query loads")));
-                                }
-                                Ok(out) => {
-                                    results.push(CheckResult::fail(
-                                        &format!("{lang_dir_name}: {query_name}"),
-                                        format!("query failed: {}", String::from_utf8_lossy(&out.stderr)),
-                                    ));
-                                }
-                                Err(_) => {} // tree-sitter not available, skip
-                            }
+                if query_path.is_file()
+                    && let Some(ref cli) = tree_sitter
+                {
+                    let output = Command::new(cli)
+                        .args([
+                            "query",
+                            &query_path.to_string_lossy(),
+                            &sample.to_string_lossy(),
+                            "--quiet",
+                        ])
+                        .current_dir(&grammar_path)
+                        .output();
+                    match output {
+                        Ok(out) if out.status.success() => {
+                            results.push(CheckResult::pass(format!(
+                                "{lang_dir_name}: {query_name} query loads"
+                            )));
                         }
-                        None => {} // No tree-sitter CLI, skip query validation
+                        Ok(out) => {
+                            results.push(CheckResult::fail(
+                                format!("{lang_dir_name}: {query_name}"),
+                                format!("query failed: {}", String::from_utf8_lossy(&out.stderr)),
+                            ));
+                        }
+                        Err(_) => {} // tree-sitter not available, skip
                     }
                 }
             }
@@ -345,22 +438,21 @@ pub fn check_zed_extension(root: &Path) -> Vec<CheckResult> {
 
     // Recommended settings.
     let settings_path = ext_dir.join("recommended-settings.json");
-    if settings_path.is_file() {
-        if let Ok(text) = fs::read_to_string(&settings_path) {
-            if let Ok(settings) = serde_json::from_str::<serde_json::Value>(&text) {
-                let file_types: BTreeSet<String> = settings
-                    .get("file_types")
-                    .and_then(|v| v.as_object())
-                    .map(|obj| obj.keys().cloned().collect())
-                    .unwrap_or_default();
-                let expected: BTreeSet<String> = ["Europa Universalis IV".to_owned()].into_iter().collect();
-                results.push(check(
-                    file_types == expected,
-                    "recommended settings",
-                    "recommended settings are incomplete",
-                ));
-            }
-        }
+    if settings_path.is_file()
+        && let Ok(text) = fs::read_to_string(&settings_path)
+        && let Ok(settings) = serde_json::from_str::<serde_json::Value>(&text)
+    {
+        let file_types: BTreeSet<String> = settings
+            .get("file_types")
+            .and_then(|v| v.as_object())
+            .map(|obj| obj.keys().cloned().collect())
+            .unwrap_or_default();
+        let expected: BTreeSet<String> = ["Europa Universalis IV".to_owned()].into_iter().collect();
+        results.push(check(
+            file_types == expected,
+            "recommended settings",
+            "recommended settings are incomplete",
+        ));
     }
 
     results
@@ -373,29 +465,47 @@ pub fn check_release_artifact(root: &Path) -> Vec<CheckResult> {
     let manifest_path = root.join("rules/manifest.json");
 
     if !rules_path.is_file() {
-        results.push(CheckResult::fail("rules artifact", "rules/eu4.pdxrules is missing"));
+        results.push(CheckResult::fail(
+            "rules artifact",
+            "rules/eu4.pdxrules is missing",
+        ));
         return results;
     }
     if !manifest_path.is_file() {
-        results.push(CheckResult::fail("rules manifest", "rules/manifest.json is missing"));
+        results.push(CheckResult::fail(
+            "rules manifest",
+            "rules/manifest.json is missing",
+        ));
         return results;
     }
 
     let Ok(rules_bytes) = fs::read(&rules_path) else {
-        results.push(CheckResult::fail("rules artifact", "cannot read rules/eu4.pdxrules"));
+        results.push(CheckResult::fail(
+            "rules artifact",
+            "cannot read rules/eu4.pdxrules",
+        ));
         return results;
     };
     let Ok(manifest_text) = fs::read_to_string(&manifest_path) else {
-        results.push(CheckResult::fail("rules manifest", "cannot read rules/manifest.json"));
+        results.push(CheckResult::fail(
+            "rules manifest",
+            "cannot read rules/manifest.json",
+        ));
         return results;
     };
     let Ok(manifest) = serde_json::from_str::<serde_json::Value>(&manifest_text) else {
-        results.push(CheckResult::fail("rules manifest", "invalid rules/manifest.json"));
+        results.push(CheckResult::fail(
+            "rules manifest",
+            "invalid rules/manifest.json",
+        ));
         return results;
     };
 
     // Checksum.
-    let expected_sha = manifest.get("artifact_sha256").and_then(|v| v.as_str()).unwrap_or("");
+    let expected_sha = manifest
+        .get("artifact_sha256")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let actual_sha = format!("{:x}", Sha256::digest(&rules_bytes));
     results.push(check(
         expected_sha == actual_sha,
@@ -406,19 +516,34 @@ pub fn check_release_artifact(root: &Path) -> Vec<CheckResult> {
     // SQLite validation via pdx_rules (if the checksum passes, the artifact is intact).
     match pdx_rules::RuleSet::load(&rules_path) {
         Ok(rules) => {
-            let schema_version = manifest.get("schema_version").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+            let schema_version = manifest
+                .get("schema_version")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as u32;
             results.push(check(
                 rules.schema_version() == schema_version,
                 "rules schema version",
-                format!("schema version mismatch: {} vs {schema_version}", rules.schema_version()),
+                format!(
+                    "schema version mismatch: {} vs {schema_version}",
+                    rules.schema_version()
+                ),
             ));
-            let hash = manifest.get("rule_hash").and_then(|v| v.as_str()).unwrap_or("");
+            let hash = manifest
+                .get("rule_hash")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             results.push(check(
                 rules.rule_hash().to_hex() == hash,
                 "rules rule_hash",
-                format!("rule_hash mismatch: {} vs {hash}", rules.rule_hash().to_hex()),
+                format!(
+                    "rule_hash mismatch: {} vs {hash}",
+                    rules.rule_hash().to_hex()
+                ),
             ));
-            let game_id = manifest.get("game_id").and_then(|v| v.as_str()).unwrap_or("");
+            let game_id = manifest
+                .get("game_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             results.push(check(
                 rules.game_id() == game_id && game_id == "eu4",
                 "rules game_id",
@@ -449,21 +574,30 @@ pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
     let mut results = Vec::new();
     let grammar_root = root.join("grammars/tree-sitter-eu4");
     if !grammar_root.is_dir() {
-        results.push(CheckResult::fail("grammar fuzz", "grammars/tree-sitter-eu4 missing"));
+        results.push(CheckResult::fail(
+            "grammar fuzz",
+            "grammars/tree-sitter-eu4 missing",
+        ));
         return results;
     }
 
     let tree_sitter = match find_tree_sitter(&root.join("grammars")) {
         Some(cli) => cli,
         None => {
-            results.push(CheckResult::fail("grammar fuzz", "tree-sitter CLI not found"));
+            results.push(CheckResult::fail(
+                "grammar fuzz",
+                "tree-sitter CLI not found",
+            ));
             return results;
         }
     };
 
     let corpus_dir = grammar_root.join("test/corpus");
     if !corpus_dir.is_dir() {
-        results.push(CheckResult::fail("grammar fuzz", "corpus directory missing"));
+        results.push(CheckResult::fail(
+            "grammar fuzz",
+            "corpus directory missing",
+        ));
         return results;
     }
 
@@ -472,7 +606,10 @@ pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
     let separator = "==================\n";
 
     let Ok(entries) = fs::read_dir(&corpus_dir) else {
-        results.push(CheckResult::fail("grammar fuzz", "cannot read corpus directory"));
+        results.push(CheckResult::fail(
+            "grammar fuzz",
+            "cannot read corpus directory",
+        ));
         return results;
     };
 
@@ -501,7 +638,7 @@ pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
                 break;
             };
             let input = &after_input[..dash_end];
-            for offset in 0..input.len() {
+            for (offset, _) in input.char_indices() {
                 let mut mutated = input.to_owned();
                 mutated.remove(offset);
                 sources.push(mutated);
@@ -516,9 +653,13 @@ pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos())
             .unwrap_or(0);
-        let temp_dir = std::env::temp_dir().join(format!("pdx-grammar-fuzz-{}-{}", std::process::id(), nonce));
+        let temp_dir =
+            std::env::temp_dir().join(format!("pdx-grammar-fuzz-{}-{}", std::process::id(), nonce));
         if fs::create_dir_all(&temp_dir).is_err() {
-            results.push(CheckResult::fail("grammar fuzz", "cannot create temp directory"));
+            results.push(CheckResult::fail(
+                "grammar fuzz",
+                "cannot create temp directory",
+            ));
             return results;
         }
         let paths_file = temp_dir.join("paths.txt");
@@ -537,7 +678,12 @@ pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
         }
 
         let output = Command::new(&tree_sitter)
-            .args(["parse", "--no-ranges", "--paths", &paths_file.to_string_lossy()])
+            .args([
+                "parse",
+                "--no-ranges",
+                "--paths",
+                &paths_file.to_string_lossy(),
+            ])
             .current_dir(&grammar_root)
             .output();
 
@@ -572,13 +718,18 @@ pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
                 }
             }
             Err(error) => {
-                results.push(CheckResult::fail("grammar fuzz", format!("cannot run tree-sitter: {error}")));
+                results.push(CheckResult::fail(
+                    "grammar fuzz",
+                    format!("cannot run tree-sitter: {error}"),
+                ));
                 return results;
             }
         }
     }
 
-    results.push(CheckResult::pass(&format!("grammar fuzz: {total} single-char deletions")));
+    results.push(CheckResult::pass(format!(
+        "grammar fuzz: {total} single-char deletions"
+    )));
     results
 }
 
@@ -632,13 +783,29 @@ fn cargo_metadata(root: &Path) -> Result<Vec<PackageInfo>, String> {
     let mut result = Vec::new();
     for package in packages {
         result.push(PackageInfo {
-            name: package.get("name").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
-            version: package.get("version").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
-            repository: package.get("repository").and_then(|v| v.as_str()).map(str::to_owned),
-            license: package.get("license").and_then(|v| v.as_str()).map(str::to_owned),
+            name: package
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_owned(),
+            version: package
+                .get("version")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_owned(),
+            repository: package
+                .get("repository")
+                .and_then(|v| v.as_str())
+                .map(str::to_owned),
+            license: package
+                .get("license")
+                .and_then(|v| v.as_str())
+                .map(str::to_owned),
             publish: package.get("publish").and_then(|v| {
                 v.as_array().map(|arr| {
-                    arr.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect()
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(str::to_owned))
+                        .collect()
                 })
             }),
         });
@@ -647,7 +814,10 @@ fn cargo_metadata(root: &Path) -> Result<Vec<PackageInfo>, String> {
 }
 
 fn read_workspace_version(root: &Path) -> Result<String, String> {
-    read_toml_value(root.join("Cargo.toml"), &["workspace", "package", "version"])
+    read_toml_value(
+        root.join("Cargo.toml"),
+        &["workspace", "package", "version"],
+    )
 }
 
 fn read_toml_value<T: for<'de> serde::Deserialize<'de>>(
@@ -664,8 +834,13 @@ fn read_toml_value<T: for<'de> serde::Deserialize<'de>>(
             .cloned()
             .ok_or_else(|| format!("missing key '{key}' in {}", path.display()))?;
     }
-    T::deserialize(value)
-        .map_err(|error| format!("type mismatch for '{}' in {}: {error}", keys.last().unwrap_or(&""), path.display()))
+    T::deserialize(value).map_err(|error| {
+        format!(
+            "type mismatch for '{}' in {}: {error}",
+            keys.last().unwrap_or(&""),
+            path.display()
+        )
+    })
 }
 
 fn find_tree_sitter(grammar_root: &Path) -> Option<String> {
@@ -679,12 +854,11 @@ fn find_tree_sitter(grammar_root: &Path) -> Option<String> {
         }
     }
     // Check PATH.
-    for name in ["tree-sitter"] {
-        if let Ok(output) = Command::new(name).arg("--version").output() {
-            if output.status.success() {
-                return Some(name.to_owned());
-            }
-        }
+    let name = "tree-sitter";
+    if let Ok(output) = Command::new(name).arg("--version").output()
+        && output.status.success()
+    {
+        return Some(name.to_owned());
     }
     None
 }
@@ -697,7 +871,9 @@ mod tests {
     fn project_policy_passes_on_this_repository() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let results = check_project_policy(&root);
-        let all_pass = results.iter().all(|r| matches!(r.outcome, CheckOutcome::Passed));
+        let all_pass = results
+            .iter()
+            .all(|r| matches!(r.outcome, CheckOutcome::Passed));
         for result in &results {
             if let CheckOutcome::Failed(ref msg) = result.outcome {
                 eprintln!("FAIL {}: {msg}", result.name);
@@ -710,7 +886,9 @@ mod tests {
     fn zed_extension_passes_on_this_repository() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let results = check_zed_extension(&root);
-        let all_pass = results.iter().all(|r| matches!(r.outcome, CheckOutcome::Passed));
+        let all_pass = results
+            .iter()
+            .all(|r| matches!(r.outcome, CheckOutcome::Passed));
         for result in &results {
             if let CheckOutcome::Failed(ref msg) = result.outcome {
                 eprintln!("FAIL {}: {msg}", result.name);
@@ -723,7 +901,9 @@ mod tests {
     fn release_artifact_passes_on_this_repository() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let results = check_release_artifact(&root);
-        let all_pass = results.iter().all(|r| matches!(r.outcome, CheckOutcome::Passed));
+        let all_pass = results
+            .iter()
+            .all(|r| matches!(r.outcome, CheckOutcome::Passed));
         for result in &results {
             if let CheckOutcome::Failed(ref msg) = result.outcome {
                 eprintln!("FAIL {}: {msg}", result.name);

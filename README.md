@@ -92,7 +92,7 @@ Compile the developer-maintained first-party rule source with `pdx-bake`; no ext
 rule corpus is required:
 
 ```bash
-cargo run -p pdx-bake -- build --source rules/eu4 --output rules/eu4.pdxrules --manifest rules/manifest.json
+cargo run -p pdx-rules --bin pdx-bake -- build --source rules/eu4 --output rules/eu4.pdxrules --manifest rules/manifest.json
 ```
 
 ## Development setup

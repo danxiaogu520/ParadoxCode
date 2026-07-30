@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 libfuzzer-sys = "0.4"
 pdx-game = { path = "../crates/pdx-game" }
-pdx-hir = { path = "../crates/pdx-hir" }
+pdx-engine = { path = "../crates/pdx-engine" }
 pdx-rules = { path = "../crates/pdx-rules" }
 pdx-parser = { path = "../crates/pdx-parser" }
 pdx-text = { path = "../crates/pdx-text" }

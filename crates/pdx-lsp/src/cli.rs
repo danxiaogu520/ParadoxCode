@@ -438,11 +438,13 @@ fn parse_root_flag(args: &[String]) -> Result<PathBuf, CliError> {
     let mut index = 0;
     while index < args.len() {
         if args[index] == "--root" {
-            let value = args.get(index + 1).ok_or_else(|| {
-                CliError::Usage(format!("missing value for --root\n\n{USAGE}"))
-            })?;
+            let value = args
+                .get(index + 1)
+                .ok_or_else(|| CliError::Usage(format!("missing value for --root\n\n{USAGE}")))?;
             if root.replace(PathBuf::from(value)).is_some() {
-                return Err(CliError::Usage("option supplied more than once: --root".to_owned()));
+                return Err(CliError::Usage(
+                    "option supplied more than once: --root".to_owned(),
+                ));
             }
             index += 2;
         } else {
@@ -475,7 +477,11 @@ fn execute_check(sub: &str, args: &[String]) -> Result<String, CliError> {
         _ => return Err(CliError::Usage(format!("unknown check: {sub}\n\n{USAGE}"))),
     };
     let all_pass = crate::check::report(&results);
-    if all_pass { Ok(format!("pdx check {sub} passed")) } else { Err(CliError::CheckFailed) }
+    if all_pass {
+        Ok(format!("pdx check {sub} passed"))
+    } else {
+        Err(CliError::CheckFailed)
+    }
 }
 
 fn execute_release(sub: &str, args: &[String]) -> Result<String, CliError> {
@@ -488,38 +494,51 @@ fn execute_release(sub: &str, args: &[String]) -> Result<String, CliError> {
     let mut index = 0;
     while index < args.len() {
         let flag = args[index].clone();
-        let value = args.get(index + 1).cloned().ok_or_else(|| {
-            CliError::Usage(format!("missing value for {flag}\n\n{USAGE}"))
-        })?;
+        let value = args
+            .get(index + 1)
+            .cloned()
+            .ok_or_else(|| CliError::Usage(format!("missing value for {flag}\n\n{USAGE}")))?;
         match flag.as_str() {
             "--root" => {
                 if root.replace(PathBuf::from(&value)).is_some() {
-                    return Err(CliError::Usage("option supplied more than once: --root".to_owned()));
+                    return Err(CliError::Usage(
+                        "option supplied more than once: --root".to_owned(),
+                    ));
                 }
             }
             "--version" => {
                 if version.replace(value).is_some() {
-                    return Err(CliError::Usage("option supplied more than once: --version".to_owned()));
+                    return Err(CliError::Usage(
+                        "option supplied more than once: --version".to_owned(),
+                    ));
                 }
             }
             "--target" => {
                 if target.replace(value).is_some() {
-                    return Err(CliError::Usage("option supplied more than once: --target".to_owned()));
+                    return Err(CliError::Usage(
+                        "option supplied more than once: --target".to_owned(),
+                    ));
                 }
             }
             "--binary" => {
                 if binary.replace(PathBuf::from(&value)).is_some() {
-                    return Err(CliError::Usage("option supplied more than once: --binary".to_owned()));
+                    return Err(CliError::Usage(
+                        "option supplied more than once: --binary".to_owned(),
+                    ));
                 }
             }
             "--output-dir" => {
                 if output_dir.replace(PathBuf::from(&value)).is_some() {
-                    return Err(CliError::Usage("option supplied more than once: --output-dir".to_owned()));
+                    return Err(CliError::Usage(
+                        "option supplied more than once: --output-dir".to_owned(),
+                    ));
                 }
             }
             "--directory" => {
                 if directory.replace(PathBuf::from(&value)).is_some() {
-                    return Err(CliError::Usage("option supplied more than once: --directory".to_owned()));
+                    return Err(CliError::Usage(
+                        "option supplied more than once: --directory".to_owned(),
+                    ));
                 }
             }
             _ => {
@@ -542,17 +561,15 @@ fn execute_release(sub: &str, args: &[String]) -> Result<String, CliError> {
             let output_dir = output_dir
                 .ok_or_else(|| CliError::Usage(format!("missing --output-dir\n\n{USAGE}")))?;
 
-            let (limits, artifacts) =
-                crate::release::load_contract(&root).map_err(|error| {
-                    CliError::Usage(format!("cannot load release contract: {error}"))
-                })?;
-            let _validated = crate::release::validate_release_version(&version).map_err(|error| {
-                CliError::Usage(error.to_string())
+            let (limits, artifacts) = crate::release::load_contract(&root).map_err(|error| {
+                CliError::Usage(format!("cannot load release contract: {error}"))
             })?;
-            let artifact =
-                artifacts.iter().find(|a| a.target == target).ok_or_else(|| {
-                    CliError::Usage(format!("unsupported target: {target}"))
-                })?;
+            let _validated = crate::release::validate_release_version(&version)
+                .map_err(|error| CliError::Usage(error.to_string()))?;
+            let artifact = artifacts
+                .iter()
+                .find(|a| a.target == target)
+                .ok_or_else(|| CliError::Usage(format!("unsupported target: {target}")))?;
             let (archive_path, _sidecar) =
                 crate::release::package_target(&version, artifact, &binary, &output_dir, &limits)
                     .map_err(|error| CliError::Usage(error.to_string()))?;
@@ -563,18 +580,18 @@ fn execute_release(sub: &str, args: &[String]) -> Result<String, CliError> {
                 version.ok_or_else(|| CliError::Usage(format!("missing --version\n\n{USAGE}")))?;
             let directory = directory
                 .ok_or_else(|| CliError::Usage(format!("missing --directory\n\n{USAGE}")))?;
-            let (limits, artifacts) =
-                crate::release::load_contract(&root).map_err(|error| {
-                    CliError::Usage(format!("cannot load release contract: {error}"))
-                })?;
-            let _validated = crate::release::validate_release_version(&version).map_err(|error| {
-                CliError::Usage(error.to_string())
+            let (limits, artifacts) = crate::release::load_contract(&root).map_err(|error| {
+                CliError::Usage(format!("cannot load release contract: {error}"))
             })?;
+            let _validated = crate::release::validate_release_version(&version)
+                .map_err(|error| CliError::Usage(error.to_string()))?;
             crate::release::verify_release_directory(&version, &directory, &artifacts, &limits)
                 .map_err(|error| CliError::Usage(error.to_string()))?;
             Ok("Complete server release matrix verified.".to_owned())
         }
-        _ => Err(CliError::Usage(format!("unknown release subcommand: {sub}\n\n{USAGE}"))),
+        _ => Err(CliError::Usage(format!(
+            "unknown release subcommand: {sub}\n\n{USAGE}"
+        ))),
     }
 }
 
@@ -590,9 +607,7 @@ fn dev_prepare_manifest(args: &[String]) -> Result<String, CliError> {
     let repo = std::process::Command::new("git")
         .args(["-C", &root.to_string_lossy(), "remote", "get-url", "origin"])
         .output()
-        .map_err(|error| {
-            CliError::Usage(format!("cannot get git remote: {error}"))
-        })?;
+        .map_err(|error| CliError::Usage(format!("cannot get git remote: {error}")))?;
     if !repo.status.success() {
         return Err(CliError::Usage(
             "the Zed development manifest needs an origin remote so Zed can fetch grammar sources"
@@ -613,10 +628,13 @@ fn dev_prepare_manifest(args: &[String]) -> Result<String, CliError> {
     }
     let revision = String::from_utf8_lossy(&rev.stdout).trim().to_owned();
 
-    for (grammar_id, grammar_dir_name) in [("eu4", "eu4")] {
+    {
+        let (grammar_id, grammar_dir_name) = ("eu4", "eu4");
         let table = format!("[grammars.{grammar_id}]");
         if let Some(start) = text.find(&table) {
-            let next = text[start + table.len()..].find("\n[").map(|offset| start + table.len() + offset);
+            let next = text[start + table.len()..]
+                .find("\n[")
+                .map(|offset| start + table.len() + offset);
             let end = next.unwrap_or(text.len());
             let block = &text[start..end];
             let mut new_block = block
@@ -641,9 +659,15 @@ fn dev_prepare_manifest(args: &[String]) -> Result<String, CliError> {
             text = format!("{}{new_block}{}", &text[..start], &text[end..]);
         }
     }
-    fs::write(&manifest_path, &text)
-        .map_err(|error| CliError::Path { field: "manifest", path: manifest_path.clone(), error })?;
-    Ok(format!("Updated {} for this checkout.", manifest_path.display()))
+    fs::write(&manifest_path, &text).map_err(|error| CliError::Path {
+        field: "manifest",
+        path: manifest_path.clone(),
+        error,
+    })?;
+    Ok(format!(
+        "Updated {} for this checkout.",
+        manifest_path.display()
+    ))
 }
 
 fn extract_toml_value(block: &str, key: &str) -> String {

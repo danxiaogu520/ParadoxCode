@@ -4,8 +4,8 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use pdx_engine::hir::{HirFile, lower, lower_with_profile};
-use pdx_rules::{GameProfile, RuleSet};
 use pdx_parser::{FileFormat, parse};
+use pdx_rules::{GameProfile, RuleSet};
 use pdx_text::LogicalPath;
 
 static PROFILE_INPUTS: OnceLock<(RuleSet, GameProfile, LogicalPath)> = OnceLock::new();
@@ -36,15 +36,31 @@ fn check_ranges(hir: &HirFile, source_len: usize) {
             && property.key_range.end() <= property.range.end()
             && property.range.end() <= source_len
     }));
-    assert!(hir.bare_values().iter().all(|value| value.range.end() <= source_len));
+    assert!(
+        hir.bare_values()
+            .iter()
+            .all(|value| value.range.end() <= source_len)
+    );
     assert!(hir.definitions().iter().all(|definition| {
         definition.selection_range.start() >= definition.range.start()
             && definition.selection_range.end() <= definition.range.end()
             && definition.range.end() <= source_len
     }));
-    assert!(hir.references().iter().all(|reference| reference.range.end() <= source_len));
-    assert!(hir.scope_facts().iter().all(|fact| fact.range.end() <= source_len));
-    assert!(hir.unknown_constructs().iter().all(|unknown| unknown.range.end() <= source_len));
+    assert!(
+        hir.references()
+            .iter()
+            .all(|reference| reference.range.end() <= source_len)
+    );
+    assert!(
+        hir.scope_facts()
+            .iter()
+            .all(|fact| fact.range.end() <= source_len)
+    );
+    assert!(
+        hir.unknown_constructs()
+            .iter()
+            .all(|unknown| unknown.range.end() <= source_len)
+    );
     assert!(hir.parameter_conditionals().iter().all(|conditional| {
         conditional.name_range.start() >= conditional.condition_range.start()
             && conditional.name_range.end() <= conditional.condition_range.end()

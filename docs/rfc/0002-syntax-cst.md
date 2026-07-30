@@ -13,7 +13,7 @@ MVP 保留一个 EU4 Tree-sitter grammar 资产，供 Zed 编辑器侧使用：
 
 - `tree-sitter-eu4`
 
-EU4 本地化文件由通用 YAML LSP 处理，本项目不提供编辑器端语法高亮。可复用的 Script 和 localisation frontend 属于 syntax 层；具体文件分类由游戏 profile 负责。
+EU4 localisation 不注册独立编辑器语言或语法高亮，但 `pdx-ls` 会在 workspace 扫描中静默解析并索引。可复用的 Script 和 localisation frontend 属于 parser 层；具体文件分类由游戏 profile 负责。EU4 CSV 在 v0.1 中是 opaque resource，不提供 parser、CST、格式化或列级诊断。
 
 规则维护不复用 Script 或任何外部规则语言。`pdx-bake` 只解析 RFC 0014 定义的严格第一方 JSON source；`.cwt` 不是项目支持的语言或输入。
 

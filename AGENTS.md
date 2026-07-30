@@ -172,7 +172,7 @@ Choose tests at the level of the change; do not test only the innermost function
 - `pdx-lsp` — real JSON-RPC, capability fallback, out-of-order versions, cancellation, stale diagnostics;
 - Zed — manifest, Wasm/build, file recognition, and server launch smoke tests.
 
-MVP fuzzing must cover at minimum: Script/localisation parse, incremental edit equivalence, typed CST walk, HIR lowering, formatter, line index, first-party rule source parsing, and the EU4 CSV parser. Any discovered crash must enter the regression corpus after being fixed.
+MVP fuzzing must cover at minimum: Script/localisation parse, incremental edit equivalence, typed CST walk, HIR lowering, formatter, line index, and first-party rule source parsing. EU4 CSV files are opaque resources in v0.1 and do not require a parser fuzz target. Any discovered crash must enter the regression corpus after being fixed.
 
 ## 8. Copyright, Security & Data Boundaries
 

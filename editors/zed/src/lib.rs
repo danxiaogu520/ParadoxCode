@@ -43,12 +43,16 @@ fn platform_artifact(platform: (zed::Os, zed::Architecture)) -> zed::Result<Arti
             binary: "pdx-ls",
             kind: ArchiveKind::TarGz,
         },
-        (Os::Mac, Architecture::X8664) => {
-            Artifact { target: "x86_64-apple-darwin", binary: "pdx-ls", kind: ArchiveKind::TarGz }
-        }
-        (Os::Mac, Architecture::Aarch64) => {
-            Artifact { target: "aarch64-apple-darwin", binary: "pdx-ls", kind: ArchiveKind::TarGz }
-        }
+        (Os::Mac, Architecture::X8664) => Artifact {
+            target: "x86_64-apple-darwin",
+            binary: "pdx-ls",
+            kind: ArchiveKind::TarGz,
+        },
+        (Os::Mac, Architecture::Aarch64) => Artifact {
+            target: "aarch64-apple-darwin",
+            binary: "pdx-ls",
+            kind: ArchiveKind::TarGz,
+        },
         (Os::Windows, Architecture::X8664) => Artifact {
             target: "x86_64-pc-windows-msvc",
             binary: "pdx-ls.exe",
@@ -85,7 +89,9 @@ fn fetch(url: &str, maximum: usize, label: &str) -> zed::Result<Vec<u8>> {
             .checked_add(chunk.len())
             .ok_or_else(|| format!("downloaded {label} exceeds the safety limit"))?;
         if length > maximum {
-            return Err(format!("downloaded {label} exceeds the {maximum}-byte safety limit"));
+            return Err(format!(
+                "downloaded {label} exceeds the {maximum}-byte safety limit"
+            ));
         }
         body.extend_from_slice(&chunk);
     }
@@ -99,7 +105,9 @@ fn read_limited(reader: impl Read, maximum: usize, label: &str) -> zed::Result<V
         .read_to_end(&mut output)
         .map_err(|error| format!("failed to decompress {label}: {error}"))?;
     if output.len() > maximum {
-        return Err(format!("decompressed {label} exceeds the {maximum}-byte safety limit"));
+        return Err(format!(
+            "decompressed {label} exceeds the {maximum}-byte safety limit"
+        ));
     }
     Ok(output)
 }
@@ -108,8 +116,9 @@ fn expected_checksum(sidecar: &[u8], archive: &str) -> zed::Result<String> {
     let text = std::str::from_utf8(sidecar)
         .map_err(|_| "release checksum sidecar is not UTF-8".to_owned())?
         .trim();
-    let (digest, name) =
-        text.split_once("  ").ok_or_else(|| "release checksum sidecar is malformed".to_owned())?;
+    let (digest, name) = text
+        .split_once("  ")
+        .ok_or_else(|| "release checksum sidecar is malformed".to_owned())?;
     if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) || name != archive
     {
         return Err("release checksum sidecar does not match the selected archive".to_owned());
@@ -127,12 +136,19 @@ fn extract_tar_gz_with_limit(
     maximum_executable_bytes: usize,
 ) -> zed::Result<Vec<u8>> {
     let maximum_tar_bytes = maximum_executable_bytes.saturating_add(MAX_TAR_OVERHEAD_BYTES);
-    let tar = read_limited(GzDecoder::new(archive), maximum_tar_bytes, "server tar archive")?;
+    let tar = read_limited(
+        GzDecoder::new(archive),
+        maximum_tar_bytes,
+        "server tar archive",
+    )?;
     if tar.len() < 1024 {
         return Err("server tar archive is truncated".to_owned());
     }
     let header = &tar[..512];
-    let name_end = header[..100].iter().position(|byte| *byte == 0).unwrap_or(100);
+    let name_end = header[..100]
+        .iter()
+        .position(|byte| *byte == 0)
+        .unwrap_or(100);
     let name = std::str::from_utf8(&header[..name_end])
         .map_err(|_| "server tar member name is not UTF-8".to_owned())?;
     let checksum_text = std::str::from_utf8(&header[148..156])
@@ -143,19 +159,22 @@ fn extract_tar_gz_with_limit(
     let actual_checksum = header
         .iter()
         .enumerate()
-        .map(
-            |(index, byte)| {
-                if (148..156).contains(&index) { u64::from(b' ') } else { u64::from(*byte) }
-            },
-        )
+        .map(|(index, byte)| {
+            if (148..156).contains(&index) {
+                u64::from(b' ')
+            } else {
+                u64::from(*byte)
+            }
+        })
         .sum::<u64>();
     let size_text = std::str::from_utf8(&header[124..136])
         .map_err(|_| "server tar size is malformed".to_owned())?
         .trim_matches(['\0', ' ']);
     let size = usize::from_str_radix(size_text, 8)
         .map_err(|_| "server tar size is malformed".to_owned())?;
-    let end =
-        512_usize.checked_add(size).ok_or_else(|| "server tar member is too large".to_owned())?;
+    let end = 512_usize
+        .checked_add(size)
+        .ok_or_else(|| "server tar member is too large".to_owned())?;
     let padded_end = end
         .checked_add(511)
         .map(|value| value / 512 * 512)
@@ -326,18 +345,24 @@ fn sha256_file(path: &str) -> std::io::Result<String> {
 
 fn cached_server_is_valid(binary_path: &str) -> bool {
     let checksum_path = format!("{binary_path}.sha256");
-    let Ok(metadata) = fs::symlink_metadata(binary_path) else { return false };
+    let Ok(metadata) = fs::symlink_metadata(binary_path) else {
+        return false;
+    };
     if !metadata.is_file()
         || metadata.len() == 0
         || metadata.len() > u64::try_from(MAX_EXECUTABLE_BYTES).unwrap_or(u64::MAX)
     {
         return false;
     }
-    let Ok(checksum_metadata) = fs::symlink_metadata(&checksum_path) else { return false };
+    let Ok(checksum_metadata) = fs::symlink_metadata(&checksum_path) else {
+        return false;
+    };
     if !checksum_metadata.is_file() || checksum_metadata.len() > 128 {
         return false;
     }
-    let Ok(expected) = fs::read_to_string(checksum_path) else { return false };
+    let Ok(expected) = fs::read_to_string(checksum_path) else {
+        return false;
+    };
     let expected = expected.trim();
     if expected.len() != 64 || !expected.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return false;
@@ -349,18 +374,24 @@ fn remove_cache_file(path: &str) -> zed::Result<()> {
     match fs::remove_file(path) {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(format!("failed to remove invalid server cache entry `{path}`: {error}")),
+        Err(error) => Err(format!(
+            "failed to remove invalid server cache entry `{path}`: {error}"
+        )),
     }
 }
 
 fn ensure_install_directory(path: &str) -> zed::Result<()> {
     match fs::symlink_metadata(path) {
         Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => Ok(()),
-        Ok(_) => Err(format!("server cache directory `{path}` is not a regular directory")),
+        Ok(_) => Err(format!(
+            "server cache directory `{path}` is not a regular directory"
+        )),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             fs::create_dir(path).map_err(|error| format!("failed to create server cache: {error}"))
         }
-        Err(error) => Err(format!("failed to inspect server cache directory `{path}`: {error}")),
+        Err(error) => Err(format!(
+            "failed to inspect server cache directory `{path}`: {error}"
+        )),
     }
 }
 
@@ -446,8 +477,9 @@ impl zed::Extension for ParadoxCodeExtension {
         }
         let settings = zed::settings::LspSettings::for_worktree(LANGUAGE_SERVER_ID, worktree)
             .unwrap_or_default();
-        let (configured_path, configured_args) =
-            settings.binary.map_or((None, None), |binary| (binary.path, binary.arguments));
+        let (configured_path, configured_args) = settings
+            .binary
+            .map_or((None, None), |binary| (binary.path, binary.arguments));
         let binary = configured_path
             .or_else(|| worktree.which(LANGUAGE_SERVER_ID))
             .map_or_else(|| install_server(language_server_id), Ok)?;
@@ -466,10 +498,9 @@ pub const fn extension_id() -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use std::ffi::OsString;
     use std::fs;
     use std::io::Write;
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use flate2::Compression;
@@ -490,8 +521,10 @@ mod tests {
 
     impl TestDirectory {
         fn new() -> Self {
-            let nonce =
-                SystemTime::now().duration_since(UNIX_EPOCH).expect("system clock").as_nanos();
+            let nonce = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system clock")
+                .as_nanos();
             let path = std::env::temp_dir()
                 .join(format!("pdx-zed-contract-{}-{nonce}", std::process::id()));
             fs::create_dir(&path).expect("create contract test directory");
@@ -516,11 +549,13 @@ mod tests {
         let checksum = tar[..512]
             .iter()
             .enumerate()
-            .map(
-                |(index, byte)| {
-                    if (148..156).contains(&index) { u64::from(b' ') } else { u64::from(*byte) }
-                },
-            )
+            .map(|(index, byte)| {
+                if (148..156).contains(&index) {
+                    u64::from(b' ')
+                } else {
+                    u64::from(*byte)
+                }
+            })
             .sum::<u64>();
         tar[148..156].copy_from_slice(format!("{checksum:06o}\0 ").as_bytes());
         tar.splice(512..512, payload.iter().copied());
@@ -546,10 +581,16 @@ mod tests {
         archive.extend_from_slice(&[0; 4]);
         archive.extend_from_slice(&crc32fast::hash(payload).to_le_bytes());
         archive.extend_from_slice(
-            &u32::try_from(compressed.len()).expect("compressed size").to_le_bytes(),
+            &u32::try_from(compressed.len())
+                .expect("compressed size")
+                .to_le_bytes(),
         );
         archive.extend_from_slice(&u32::try_from(payload.len()).expect("size").to_le_bytes());
-        archive.extend_from_slice(&u16::try_from(name.len()).expect("name length").to_le_bytes());
+        archive.extend_from_slice(
+            &u16::try_from(name.len())
+                .expect("name length")
+                .to_le_bytes(),
+        );
         archive.extend_from_slice(&0_u16.to_le_bytes());
         archive.extend_from_slice(name.as_bytes());
         archive.extend_from_slice(&compressed);
@@ -562,10 +603,16 @@ mod tests {
         archive.extend_from_slice(&[0; 4]);
         archive.extend_from_slice(&crc32fast::hash(payload).to_le_bytes());
         archive.extend_from_slice(
-            &u32::try_from(compressed.len()).expect("compressed size").to_le_bytes(),
+            &u32::try_from(compressed.len())
+                .expect("compressed size")
+                .to_le_bytes(),
         );
         archive.extend_from_slice(&u32::try_from(payload.len()).expect("size").to_le_bytes());
-        archive.extend_from_slice(&u16::try_from(name.len()).expect("name length").to_le_bytes());
+        archive.extend_from_slice(
+            &u16::try_from(name.len())
+                .expect("name length")
+                .to_le_bytes(),
+        );
         archive.extend_from_slice(&0_u16.to_le_bytes());
         archive.extend_from_slice(&0_u16.to_le_bytes());
         archive.extend_from_slice(&0_u16.to_le_bytes());
@@ -616,7 +663,10 @@ mod tests {
         let artifacts = contract["artifacts"].as_object().expect("artifact table");
         let cases = [
             ((Os::Linux, Architecture::X8664), "x86_64-unknown-linux-gnu"),
-            ((Os::Linux, Architecture::Aarch64), "aarch64-unknown-linux-gnu"),
+            (
+                (Os::Linux, Architecture::Aarch64),
+                "aarch64-unknown-linux-gnu",
+            ),
             ((Os::Mac, Architecture::X8664), "x86_64-apple-darwin"),
             ((Os::Mac, Architecture::Aarch64), "aarch64-apple-darwin"),
             ((Os::Windows, Architecture::X8664), "x86_64-pc-windows-msvc"),
@@ -641,7 +691,10 @@ mod tests {
 
     #[test]
     fn decompression_reader_stops_at_the_safety_limit() {
-        assert_eq!(read_limited(&b"four"[..], 4, "fixture"), Ok(b"four".to_vec()));
+        assert_eq!(
+            read_limited(&b"four"[..], 4, "fixture"),
+            Ok(b"four".to_vec())
+        );
         assert!(read_limited(&b"five!"[..], 4, "fixture").is_err());
     }
 
@@ -682,8 +735,7 @@ mod tests {
     }
 
     #[test]
-    fn python_packager_outputs_are_accepted_by_the_rust_extractors() {
-        let root = TestDirectory::new();
+    fn release_archive_shapes_are_accepted_by_the_rust_extractors() {
         assert_eq!(
             extract_tar_gz(&tar_gz("pdx-ls", PAYLOAD), "pdx-ls"),
             Ok(PAYLOAD.to_vec())
@@ -701,8 +753,11 @@ mod tests {
         let binary_path = binary.to_str().expect("UTF-8 test path");
         fs::write(&binary, PAYLOAD).expect("write cached executable");
         assert!(!cached_server_is_valid(binary_path));
-        fs::write(format!("{binary_path}.sha256"), format!("{:x}\n", Sha256::digest(PAYLOAD)))
-            .expect("write cached checksum");
+        fs::write(
+            format!("{binary_path}.sha256"),
+            format!("{:x}\n", Sha256::digest(PAYLOAD)),
+        )
+        .expect("write cached checksum");
         assert!(cached_server_is_valid(binary_path));
         fs::write(&binary, b"corrupt").expect("corrupt cached executable");
         assert!(!cached_server_is_valid(binary_path));
@@ -727,7 +782,9 @@ mod tests {
             format!("{:x}\n", Sha256::digest(PAYLOAD)),
         )
         .expect("write cached checksum");
-        assert!(!cached_server_is_valid(binary.to_str().expect("UTF-8 test path")));
+        assert!(!cached_server_is_valid(
+            binary.to_str().expect("UTF-8 test path")
+        ));
         remove_cache_file(binary.to_str().expect("UTF-8 test path")).expect("remove cache link");
         assert_eq!(fs::read(&target).expect("read symlink target"), PAYLOAD);
 

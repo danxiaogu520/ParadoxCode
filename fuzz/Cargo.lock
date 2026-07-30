@@ -239,12 +239,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
-name = "pdx-format"
+name = "pdx-engine"
 version = "0.1.0"
 dependencies = [
- "pdx-syntax",
+ "pdx-parser",
+ "pdx-rules",
  "pdx-text",
- "unicode-width",
+ "rusqlite",
+ "sha2",
 ]
 
 [[package]]
@@ -252,11 +254,10 @@ name = "pdx-fuzz"
 version = "0.1.0"
 dependencies = [
  "libfuzzer-sys",
- "pdx-format",
- "pdx-game-eu4",
- "pdx-hir",
+ "pdx-engine",
+ "pdx-game",
+ "pdx-parser",
  "pdx-rules",
- "pdx-syntax",
  "pdx-text",
 ]
 
@@ -264,26 +265,18 @@ dependencies = [
 name = "pdx-game"
 version = "0.1.0"
 dependencies = [
+ "pdx-rules",
  "serde",
  "tempfile",
  "toml",
 ]
 
 [[package]]
-name = "pdx-game-eu4"
+name = "pdx-parser"
 version = "0.1.0"
 dependencies = [
- "pdx-game",
- "pdx-rules",
-]
-
-[[package]]
-name = "pdx-hir"
-version = "0.1.0"
-dependencies = [
- "pdx-rules",
- "pdx-syntax",
  "pdx-text",
+ "unicode-width",
 ]
 
 [[package]]
@@ -295,13 +288,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
-]
-
-[[package]]
-name = "pdx-syntax"
-version = "0.1.0"
-dependencies = [
- "pdx-text",
 ]
 
 [[package]]

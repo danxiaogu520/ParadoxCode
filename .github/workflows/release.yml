@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            binary: pdx-ls
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            binary: pdx-ls
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            binary: pdx-ls
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            binary: pdx-ls
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            binary: pdx-ls.exe
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+      - name: Build server
+        shell: bash
+        run: cargo build --locked --release -p pdx-lsp --bin pdx-ls --target "${{ matrix.target }}"
+      - name: Verify release version
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cargo run --locked --bin pdx -- check policy --root .
+          binary="target/${{ matrix.target }}/release/${{ matrix.binary }}"
+          test "$("$binary" --version)" = "pdx-ls $version"
+      - name: Package server and checksum
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cargo run --locked --bin pdx -- release package \
+            --version "$version" \
+            --target "${{ matrix.target }}" \
+            --binary "target/${{ matrix.target }}/release/${{ matrix.binary }}" \
+            --output-dir dist \
+            --root .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish immutable GitHub Release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: server-*
+          path: dist
+          merge-multiple: true
+      - name: Verify complete matrix and checksums
+        shell: bash
+        run: |
+          cargo run --locked --bin pdx -- release verify \
+            --version "${GITHUB_REF_NAME#v}" \
+            --directory dist \
+            --root .
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes

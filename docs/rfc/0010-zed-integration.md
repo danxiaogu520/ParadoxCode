@@ -28,7 +28,8 @@ editors/zed/
 ```
 
 extension 将主脚本 grammar 注册为用户可见的 `Europa Universalis IV`（机器标识 `eu4`），
-并注册一个 `pdx-ls`。本地化文件由通用 YAML LSP 处理。
+并注册一个 `pdx-ls`。extension 不为 localisation 或 CSV 注册编辑器语言；server 仍会在
+workspace 扫描中静默解析 localisation，以支持跨文件索引和 Script 中的 localisation 引用。
 
 ## 文件识别冲突
 
