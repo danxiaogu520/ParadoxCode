@@ -1,19 +1,20 @@
 //! User-facing command-line entry points.
 
 use std::fmt;
+use std::fs;
 use std::io::{self, IsTerminal, Write};
 use std::path::PathBuf;
 
-use pdx_game::{
-    DiscoveryDepth, DiscoveryOptions, DiscoveryOutcome, DiscoveryToken, GameInstallDescriptor,
-    UserConfigError, UserConfiguration, UserPaths, discover_installations, validate_installation,
-};
 use pdx_engine::{
     AnalysisHost, SourceRoot, SourceRootId, SourceRootKind, VanillaCacheError, VanillaIndexCache,
     WorkspaceChange, WorkspaceError,
 };
+use pdx_game::{
+    DiscoveryDepth, DiscoveryOptions, DiscoveryOutcome, DiscoveryToken, GameInstallDescriptor,
+    UserConfigError, UserConfiguration, UserPaths, discover_installations, validate_installation,
+};
 
-const USAGE: &str = "usage:\n  pdx --version\n  pdx index vanilla --source <EU4 directory> --output <cache.pdxindex>\n  pdx setup vanilla [--game eu4] [--deep] [--root <directory>]... [--source <game directory>]";
+const USAGE: &str = "usage:\n  pdx --version\n  pdx index vanilla --source <EU4 directory> --output <cache.pdxindex>\n  pdx setup vanilla [--game eu4] [--deep] [--root <directory>]... [--source <game directory>]\n  pdx check policy|zed|release|grammar-fuzz|all [--root <repository root>]\n  pdx release package --version <semver> --target <target> --binary <path> --output-dir <path> [--root <repository root>]\n  pdx release verify --version <semver> --directory <path> [--root <repository root>]\n  pdx dev prepare-manifest [--root <repository root>]";
 const SUPPORTED_GAME_INSTALLATIONS: &[GameInstallDescriptor] = &[pdx_game::eu4::INSTALL_DESCRIPTOR];
 
 /// Executes one `pdx` command and returns text intended for stdout.
@@ -26,6 +27,13 @@ pub fn execute_pdx(args: &[String]) -> Result<String, CliError> {
         [setup, vanilla, rest @ ..] if setup == "setup" && vanilla == "vanilla" => {
             let paths = UserPaths::platform()?;
             setup_vanilla(rest, &paths)
+        }
+        [check, sub, rest @ ..] if check == "check" => execute_check(sub, rest),
+        [release, sub, rest @ ..] if release == "release" => execute_release(sub, rest),
+        [dev, prepare_manifest, rest @ ..]
+            if dev == "dev" && prepare_manifest == "prepare-manifest" =>
+        {
+            dev_prepare_manifest(rest)
         }
         _ => Err(CliError::Usage(USAGE.to_owned())),
     }
@@ -73,7 +81,9 @@ fn setup_vanilla(args: &[String], paths: &UserPaths) -> Result<String, CliError>
                 index += 2;
             }
             flag => {
-                return Err(CliError::Usage(format!("unknown option: {flag}\n\n{USAGE}")));
+                return Err(CliError::Usage(format!(
+                    "unknown option: {flag}\n\n{USAGE}"
+                )));
             }
         }
     }
@@ -102,7 +112,13 @@ fn setup_vanilla(args: &[String], paths: &UserPaths) -> Result<String, CliError>
     }
     let mut output = Vec::with_capacity(games.len());
     for descriptor in games {
-        output.push(setup_game(*descriptor, source.clone(), roots.clone(), deep, paths)?);
+        output.push(setup_game(
+            *descriptor,
+            source.clone(),
+            roots.clone(),
+            deep,
+            paths,
+        )?);
     }
     Ok(output.join("\n\n"))
 }
@@ -115,7 +131,11 @@ fn setup_game(
     paths: &UserPaths,
 ) -> Result<String, CliError> {
     let mut configuration = UserConfiguration::load(&paths.config_file)?;
-    let previous = configuration.games.get(descriptor.game_id).cloned().unwrap_or_default();
+    let previous = configuration
+        .games
+        .get(descriptor.game_id)
+        .cloned()
+        .unwrap_or_default();
     let explicit_search = source.is_some() || deep || !roots.is_empty();
     let candidates = if let Some(source) = source {
         let source = std::fs::canonicalize(&source).map_err(|error| CliError::Path {
@@ -141,14 +161,20 @@ fn setup_game(
                 let report = discover_installations(
                     &descriptor,
                     &DiscoveryOptions {
-                        depth: if deep { DiscoveryDepth::Deep } else { DiscoveryDepth::Quick },
+                        depth: if deep {
+                            DiscoveryDepth::Deep
+                        } else {
+                            DiscoveryDepth::Quick
+                        },
                         roots,
                         include_platform_locations: true,
                     },
                     &DiscoveryToken::new(),
                 );
                 if report.cancelled {
-                    return Err(CliError::Discovery("Vanilla discovery was cancelled".to_owned()));
+                    return Err(CliError::Discovery(
+                        "Vanilla discovery was cancelled".to_owned(),
+                    ));
                 }
                 report.installations
             }
@@ -157,7 +183,10 @@ fn setup_game(
 
     let selected = match candidates.as_slice() {
         [] => {
-            let game = configuration.games.entry(descriptor.game_id.to_owned()).or_default();
+            let game = configuration
+                .games
+                .entry(descriptor.game_id.to_owned())
+                .or_default();
             game.auto_discovery_attempted = true;
             game.discovery_outcome = Some(DiscoveryOutcome::NotFound);
             configuration.save(&paths.config_file)?;
@@ -174,7 +203,10 @@ fn setup_game(
     let summary = match build_eu4_cache(&selected, &cache_path) {
         Ok(summary) => summary,
         Err(error) => {
-            let game = configuration.games.entry(descriptor.game_id.to_owned()).or_default();
+            let game = configuration
+                .games
+                .entry(descriptor.game_id.to_owned())
+                .or_default();
             game.auto_discovery_attempted = true;
             game.discovery_outcome = Some(DiscoveryOutcome::Failed);
             game.vanilla_source = Some(selected);
@@ -182,7 +214,10 @@ fn setup_game(
             return Err(error);
         }
     };
-    let game = configuration.games.entry(descriptor.game_id.to_owned()).or_default();
+    let game = configuration
+        .games
+        .entry(descriptor.game_id.to_owned())
+        .or_default();
     game.auto_discovery_attempted = true;
     game.discovery_outcome = Some(DiscoveryOutcome::Configured);
     game.vanilla_source = Some(selected.clone());
@@ -214,7 +249,9 @@ fn select_candidate(display_name: &str, candidates: &[PathBuf]) -> Result<PathBu
     eprint!("Select an installation [1-{}]: ", candidates.len());
     io::stderr().flush().map_err(CliError::Interactive)?;
     let mut answer = String::new();
-    io::stdin().read_line(&mut answer).map_err(CliError::Interactive)?;
+    io::stdin()
+        .read_line(&mut answer)
+        .map_err(CliError::Interactive)?;
     let selected = answer
         .trim()
         .parse::<usize>()
@@ -236,10 +273,16 @@ fn index_vanilla(args: &[String]) -> Result<String, CliError> {
         let target = match flag.as_str() {
             "--source" => &mut source,
             "--output" => &mut output,
-            _ => return Err(CliError::Usage(format!("unknown option: {flag}\n\n{USAGE}"))),
+            _ => {
+                return Err(CliError::Usage(format!(
+                    "unknown option: {flag}\n\n{USAGE}"
+                )));
+            }
         };
         if target.replace(PathBuf::from(value)).is_some() {
-            return Err(CliError::Usage(format!("option supplied more than once: {flag}")));
+            return Err(CliError::Usage(format!(
+                "option supplied more than once: {flag}"
+            )));
         }
         index += 2;
     }
@@ -251,7 +294,10 @@ fn index_vanilla(args: &[String]) -> Result<String, CliError> {
         error,
     })?;
     if !source.is_dir() {
-        return Err(CliError::Usage(format!("--source is not a directory: {}", source.display())));
+        return Err(CliError::Usage(format!(
+            "--source is not a directory: {}",
+            source.display()
+        )));
     }
 
     build_eu4_cache(&source, &output)
@@ -288,7 +334,11 @@ pub enum CliError {
     /// Command-line shape or option validation failed.
     Usage(String),
     /// A configured filesystem path could not be resolved.
-    Path { field: &'static str, path: PathBuf, error: std::io::Error },
+    Path {
+        field: &'static str,
+        path: PathBuf,
+        error: std::io::Error,
+    },
     /// The rules artifact failed validation.
     Rules(pdx_rules::RulesError),
     /// The one-shot Vanilla source scan failed.
@@ -301,6 +351,8 @@ pub enum CliError {
     UserConfig(UserConfigError),
     /// Interactive candidate selection failed.
     Interactive(std::io::Error),
+    /// Quality-gate checks found failures.
+    CheckFailed,
 }
 
 impl CliError {
@@ -315,7 +367,8 @@ impl CliError {
             | Self::Cache(_)
             | Self::Discovery(_)
             | Self::UserConfig(_)
-            | Self::Interactive(_) => 1,
+            | Self::Interactive(_)
+            | Self::CheckFailed => 1,
         }
     }
 }
@@ -325,7 +378,11 @@ impl fmt::Display for CliError {
         match self {
             Self::Usage(message) => formatter.write_str(message),
             Self::Path { field, path, error } => {
-                write!(formatter, "cannot resolve {field} {}: {error}", path.display())
+                write!(
+                    formatter,
+                    "cannot resolve {field} {}: {error}",
+                    path.display()
+                )
             }
             Self::Rules(error) => write!(formatter, "rules artifact error: {error}"),
             Self::Workspace(error) => write!(formatter, "Vanilla indexing error: {error}"),
@@ -333,6 +390,7 @@ impl fmt::Display for CliError {
             Self::Discovery(message) => formatter.write_str(message),
             Self::UserConfig(error) => write!(formatter, "{error}"),
             Self::Interactive(error) => write!(formatter, "interactive selection failed: {error}"),
+            Self::CheckFailed => formatter.write_str("one or more checks failed"),
         }
     }
 }
@@ -346,7 +404,7 @@ impl std::error::Error for CliError {
             Self::Cache(error) => Some(error),
             Self::UserConfig(error) => Some(error),
             Self::Interactive(error) => Some(error),
-            Self::Usage(_) | Self::Discovery(_) => None,
+            Self::Usage(_) | Self::Discovery(_) | Self::CheckFailed => None,
         }
     }
 }
@@ -375,18 +433,244 @@ impl From<UserConfigError> for CliError {
     }
 }
 
+fn parse_root_flag(args: &[String]) -> Result<PathBuf, CliError> {
+    let mut root = None;
+    let mut index = 0;
+    while index < args.len() {
+        if args[index] == "--root" {
+            let value = args.get(index + 1).ok_or_else(|| {
+                CliError::Usage(format!("missing value for --root\n\n{USAGE}"))
+            })?;
+            if root.replace(PathBuf::from(value)).is_some() {
+                return Err(CliError::Usage("option supplied more than once: --root".to_owned()));
+            }
+            index += 2;
+        } else {
+            index += 1;
+        }
+    }
+    root.ok_or_else(|| CliError::Usage(format!("missing required option: --root\n\n{USAGE}")))
+}
+
+fn execute_check(sub: &str, args: &[String]) -> Result<String, CliError> {
+    let root = parse_root_flag(args)?;
+    if !root.join("Cargo.toml").is_file() {
+        return Err(CliError::Usage(format!(
+            "--root {} does not contain Cargo.toml",
+            root.display()
+        )));
+    }
+    let results = match sub {
+        "policy" => crate::check::check_project_policy(&root),
+        "zed" => crate::check::check_zed_extension(&root),
+        "release" => crate::check::check_release_artifact(&root),
+        "grammar-fuzz" => crate::check::check_grammar_fuzz(&root),
+        "all" => {
+            let mut all = Vec::new();
+            all.extend(crate::check::check_project_policy(&root));
+            all.extend(crate::check::check_zed_extension(&root));
+            all.extend(crate::check::check_release_artifact(&root));
+            all
+        }
+        _ => return Err(CliError::Usage(format!("unknown check: {sub}\n\n{USAGE}"))),
+    };
+    let all_pass = crate::check::report(&results);
+    if all_pass { Ok(format!("pdx check {sub} passed")) } else { Err(CliError::CheckFailed) }
+}
+
+fn execute_release(sub: &str, args: &[String]) -> Result<String, CliError> {
+    let mut root = None;
+    let mut version = None;
+    let mut target = None;
+    let mut binary = None;
+    let mut output_dir = None;
+    let mut directory = None;
+    let mut index = 0;
+    while index < args.len() {
+        let flag = args[index].clone();
+        let value = args.get(index + 1).cloned().ok_or_else(|| {
+            CliError::Usage(format!("missing value for {flag}\n\n{USAGE}"))
+        })?;
+        match flag.as_str() {
+            "--root" => {
+                if root.replace(PathBuf::from(&value)).is_some() {
+                    return Err(CliError::Usage("option supplied more than once: --root".to_owned()));
+                }
+            }
+            "--version" => {
+                if version.replace(value).is_some() {
+                    return Err(CliError::Usage("option supplied more than once: --version".to_owned()));
+                }
+            }
+            "--target" => {
+                if target.replace(value).is_some() {
+                    return Err(CliError::Usage("option supplied more than once: --target".to_owned()));
+                }
+            }
+            "--binary" => {
+                if binary.replace(PathBuf::from(&value)).is_some() {
+                    return Err(CliError::Usage("option supplied more than once: --binary".to_owned()));
+                }
+            }
+            "--output-dir" => {
+                if output_dir.replace(PathBuf::from(&value)).is_some() {
+                    return Err(CliError::Usage("option supplied more than once: --output-dir".to_owned()));
+                }
+            }
+            "--directory" => {
+                if directory.replace(PathBuf::from(&value)).is_some() {
+                    return Err(CliError::Usage("option supplied more than once: --directory".to_owned()));
+                }
+            }
+            _ => {
+                return Err(CliError::Usage(format!(
+                    "unknown option: {flag}\n\n{USAGE}"
+                )));
+            }
+        }
+        index += 2;
+    }
+    let root = root.unwrap_or_else(|| PathBuf::from("."));
+    match sub {
+        "package" => {
+            let version =
+                version.ok_or_else(|| CliError::Usage(format!("missing --version\n\n{USAGE}")))?;
+            let target =
+                target.ok_or_else(|| CliError::Usage(format!("missing --target\n\n{USAGE}")))?;
+            let binary =
+                binary.ok_or_else(|| CliError::Usage(format!("missing --binary\n\n{USAGE}")))?;
+            let output_dir = output_dir
+                .ok_or_else(|| CliError::Usage(format!("missing --output-dir\n\n{USAGE}")))?;
+
+            let (limits, artifacts) =
+                crate::release::load_contract(&root).map_err(|error| {
+                    CliError::Usage(format!("cannot load release contract: {error}"))
+                })?;
+            let _validated = crate::release::validate_release_version(&version).map_err(|error| {
+                CliError::Usage(error.to_string())
+            })?;
+            let artifact =
+                artifacts.iter().find(|a| a.target == target).ok_or_else(|| {
+                    CliError::Usage(format!("unsupported target: {target}"))
+                })?;
+            let (archive_path, _sidecar) =
+                crate::release::package_target(&version, artifact, &binary, &output_dir, &limits)
+                    .map_err(|error| CliError::Usage(error.to_string()))?;
+            Ok(archive_path.display().to_string())
+        }
+        "verify" => {
+            let version =
+                version.ok_or_else(|| CliError::Usage(format!("missing --version\n\n{USAGE}")))?;
+            let directory = directory
+                .ok_or_else(|| CliError::Usage(format!("missing --directory\n\n{USAGE}")))?;
+            let (limits, artifacts) =
+                crate::release::load_contract(&root).map_err(|error| {
+                    CliError::Usage(format!("cannot load release contract: {error}"))
+                })?;
+            let _validated = crate::release::validate_release_version(&version).map_err(|error| {
+                CliError::Usage(error.to_string())
+            })?;
+            crate::release::verify_release_directory(&version, &directory, &artifacts, &limits)
+                .map_err(|error| CliError::Usage(error.to_string()))?;
+            Ok("Complete server release matrix verified.".to_owned())
+        }
+        _ => Err(CliError::Usage(format!("unknown release subcommand: {sub}\n\n{USAGE}"))),
+    }
+}
+
+fn dev_prepare_manifest(args: &[String]) -> Result<String, CliError> {
+    let root = parse_root_flag(args)?;
+    let manifest_path = root.join("editors/zed/extension.toml");
+    let mut text = fs::read_to_string(&manifest_path).map_err(|error| CliError::Path {
+        field: "manifest",
+        path: manifest_path.clone(),
+        error,
+    })?;
+
+    let repo = std::process::Command::new("git")
+        .args(["-C", &root.to_string_lossy(), "remote", "get-url", "origin"])
+        .output()
+        .map_err(|error| {
+            CliError::Usage(format!("cannot get git remote: {error}"))
+        })?;
+    if !repo.status.success() {
+        return Err(CliError::Usage(
+            "the Zed development manifest needs an origin remote so Zed can fetch grammar sources"
+                .to_owned(),
+        ));
+    }
+    let repository = String::from_utf8_lossy(&repo.stdout).trim().to_owned();
+
+    let rev = std::process::Command::new("git")
+        .args(["-C", &root.to_string_lossy(), "rev-parse", "HEAD"])
+        .output()
+        .map_err(|error| CliError::Usage(format!("cannot get git revision: {error}")))?;
+    if !rev.status.success() {
+        return Err(CliError::Usage(
+            "the Zed development manifest needs a Git checkout so its grammar revision can be pinned"
+                .to_owned(),
+        ));
+    }
+    let revision = String::from_utf8_lossy(&rev.stdout).trim().to_owned();
+
+    for (grammar_id, grammar_dir_name) in [("eu4", "eu4")] {
+        let table = format!("[grammars.{grammar_id}]");
+        if let Some(start) = text.find(&table) {
+            let next = text[start + table.len()..].find("\n[").map(|offset| start + table.len() + offset);
+            let end = next.unwrap_or(text.len());
+            let block = &text[start..end];
+            let mut new_block = block
+                .replacen(
+                    &extract_toml_value(block, "repository"),
+                    &format!(r#""{repository}""#),
+                    1,
+                )
+                .replacen(
+                    &extract_toml_value(block, "rev"),
+                    &format!(r#""{revision}""#),
+                    1,
+                )
+                .replacen(
+                    &extract_toml_value(block, "path"),
+                    &format!(r#""grammars/tree-sitter-{grammar_dir_name}""#),
+                    1,
+                );
+            if !new_block.ends_with('\n') {
+                new_block.push('\n');
+            }
+            text = format!("{}{new_block}{}", &text[..start], &text[end..]);
+        }
+    }
+    fs::write(&manifest_path, &text)
+        .map_err(|error| CliError::Path { field: "manifest", path: manifest_path.clone(), error })?;
+    Ok(format!("Updated {} for this checkout.", manifest_path.display()))
+}
+
+fn extract_toml_value(block: &str, key: &str) -> String {
+    for line in block.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix(&format!("{key} = ")) {
+            return rest.to_owned();
+        }
+    }
+    String::new()
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
 
-    use pdx_game::{DiscoveryOutcome, UserConfiguration, UserPaths};
     use pdx_engine::VanillaIndexCache;
+    use pdx_game::{DiscoveryOutcome, UserConfiguration, UserPaths};
 
     use super::{CliError, execute_pdx, setup_vanilla};
 
     #[test]
     fn version_and_invalid_usage_have_stable_results() {
-        assert_eq!(execute_pdx(&["--version".to_owned()]).expect("version"), "pdx 0.1.0");
+        assert_eq!(
+            execute_pdx(&["--version".to_owned()]).expect("version"),
+            "pdx 0.1.0"
+        );
         let error = execute_pdx(&[]).expect_err("missing command");
         assert!(matches!(error, CliError::Usage(_)));
         assert_eq!(error.exit_code(), 2);
@@ -456,8 +740,11 @@ mod tests {
             config_file: temporary.path().join("config/config.toml"),
             cache_root: temporary.path().join("cache"),
         };
-        let output = setup_vanilla(&["--source".to_owned(), source.display().to_string()], &paths)
-            .expect("setup succeeds");
+        let output = setup_vanilla(
+            &["--source".to_owned(), source.display().to_string()],
+            &paths,
+        )
+        .expect("setup succeeds");
         assert!(output.contains("Europa Universalis IV configured"));
         let configuration =
             UserConfiguration::load(&paths.config_file).expect("load user configuration");
@@ -466,7 +753,11 @@ mod tests {
         assert_eq!(game.discovery_outcome, Some(DiscoveryOutcome::Configured));
         assert_eq!(
             game.vanilla_source.as_deref(),
-            Some(fs::canonicalize(&source).expect("canonical source").as_path())
+            Some(
+                fs::canonicalize(&source)
+                    .expect("canonical source")
+                    .as_path()
+            )
         );
         let cache_path = game.vanilla_cache.as_ref().expect("cache path");
         let cache = VanillaIndexCache::load(cache_path).expect("load generated cache");
@@ -492,8 +783,11 @@ mod tests {
             config_file: temporary.path().join("config/config.toml"),
             cache_root: temporary.path().join("cache"),
         };
-        let error = setup_vanilla(&["--source".to_owned(), source.display().to_string()], &paths)
-            .expect_err("incomplete installation rejected");
+        let error = setup_vanilla(
+            &["--source".to_owned(), source.display().to_string()],
+            &paths,
+        )
+        .expect_err("incomplete installation rejected");
         assert!(matches!(error, CliError::Discovery(_)));
         assert!(!paths.config_file.exists());
     }
@@ -522,8 +816,11 @@ mod tests {
         fs::create_dir_all(cache_path.parent().expect("cache parent")).expect("cache directory");
         fs::write(&cache_path, b"not a ParadoxCode cache").expect("unrelated cache file");
 
-        let error = setup_vanilla(&["--source".to_owned(), source.display().to_string()], &paths)
-            .expect_err("unrelated cache blocks indexing");
+        let error = setup_vanilla(
+            &["--source".to_owned(), source.display().to_string()],
+            &paths,
+        )
+        .expect_err("unrelated cache blocks indexing");
         assert!(matches!(error, CliError::Cache(_)));
         let configuration =
             UserConfiguration::load(&paths.config_file).expect("load failed setup state");
@@ -532,7 +829,11 @@ mod tests {
         assert_eq!(game.discovery_outcome, Some(DiscoveryOutcome::Failed));
         assert_eq!(
             game.vanilla_source.as_deref(),
-            Some(fs::canonicalize(source).expect("canonical source").as_path())
+            Some(
+                fs::canonicalize(source)
+                    .expect("canonical source")
+                    .as_path()
+            )
         );
         assert!(game.vanilla_cache.is_none());
     }

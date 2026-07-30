@@ -18,8 +18,8 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::hir::{HirFile, lower_shared, lower_shared_with_profile};
-use pdx_rules::{FileResolutionPolicy, GameProfile, ParserKind, RuleSet, SymbolResolutionPolicy};
 use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile, parse};
+use pdx_rules::{FileResolutionPolicy, GameProfile, ParserKind, RuleSet, SymbolResolutionPolicy};
 use pdx_text::{LineIndex, LogicalPath, TextRange};
 
 mod vanilla_cache;
@@ -99,7 +99,13 @@ impl SourceRoot {
     #[must_use]
     pub fn new(id: SourceRootId, kind: SourceRootKind, path: PathBuf) -> Self {
         let writable = matches!(kind, SourceRootKind::CurrentMod);
-        Self { id, kind, path, order: id.get(), writable }
+        Self {
+            id,
+            kind,
+            path,
+            order: id.get(),
+            writable,
+        }
     }
 }
 
@@ -203,13 +209,21 @@ impl WorkspaceScanToken {
         if self
             .remaining_checkpoints
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
-                if remaining != usize::MAX && remaining > 0 { Some(remaining - 1) } else { None }
+                if remaining != usize::MAX && remaining > 0 {
+                    Some(remaining - 1)
+                } else {
+                    None
+                }
             })
             .is_err_and(|remaining| remaining == 0)
         {
             self.cancel();
         }
-        if self.is_cancelled() { Err(WorkspaceError::Cancelled) } else { Ok(()) }
+        if self.is_cancelled() {
+            Err(WorkspaceError::Cancelled)
+        } else {
+            Ok(())
+        }
     }
 
     #[cfg(test)]
@@ -468,7 +482,9 @@ impl WorkspaceIndex {
     #[must_use]
     pub fn active_definition(&self, kind: &str, name: &str) -> Option<&Definition> {
         let definitions = self.definitions(kind, name);
-        let mut active = definitions.into_iter().filter(|definition| definition.active);
+        let mut active = definitions
+            .into_iter()
+            .filter(|definition| definition.active);
         let definition = active.next()?;
         active
             .all(|candidate| {
@@ -480,7 +496,10 @@ impl WorkspaceIndex {
     /// Iterates over all retained definitions in deterministic kind/name order.
     #[must_use = "iterate the retained definitions"]
     pub fn definitions_iter(&self) -> impl Iterator<Item = &Definition> {
-        self.definitions.values().flatten().filter_map(|pointer| self.definition_at(*pointer))
+        self.definitions
+            .values()
+            .flatten()
+            .filter_map(|pointer| self.definition_at(*pointer))
     }
 
     /// Iterates over retained definitions of one exact kind without scanning unrelated symbols.
@@ -507,17 +526,24 @@ impl WorkspaceIndex {
     /// Returns all references from a file.
     #[must_use]
     pub fn references(&self, file_id: SourceFileId) -> &[Reference] {
-        self.shards.get(&file_id).map_or(&[], |shard| shard.references.as_slice())
+        self.shards
+            .get(&file_id)
+            .map_or(&[], |shard| shard.references.as_slice())
     }
 
     /// Iterates over references from every retained file shard.
     #[must_use = "iterate the retained references"]
     pub fn references_iter(&self) -> impl Iterator<Item = &Reference> {
-        self.shards.values().flat_map(|shard| shard.references.iter())
+        self.shards
+            .values()
+            .flat_map(|shard| shard.references.iter())
     }
 
     fn definition_at(&self, pointer: DefinitionPointer) -> Option<&Definition> {
-        self.shards.get(&pointer.file_id)?.definitions.get(pointer.ordinal)
+        self.shards
+            .get(&pointer.file_id)?
+            .definitions
+            .get(pointer.ordinal)
     }
 
     /// Replaces one shard and updates only lookup buckets touched by that file.
@@ -597,7 +623,11 @@ impl WorkspaceIndex {
         let Some(previous) = self.shards.remove(&file_id) else {
             return Vec::new();
         };
-        let mut affected = previous.definitions.iter().map(definition_key).collect::<Vec<_>>();
+        let mut affected = previous
+            .definitions
+            .iter()
+            .map(definition_key)
+            .collect::<Vec<_>>();
         affected.sort();
         affected.dedup();
         for key in &affected {
@@ -619,7 +649,9 @@ impl WorkspaceIndex {
         rules: &RuleSet,
     ) {
         for key in keys {
-            let Some(values) = self.definitions.get(key).cloned() else { continue };
+            let Some(values) = self.definitions.get(key).cloned() else {
+                continue;
+            };
             let policy = rules
                 .model()
                 .symbol_descriptors
@@ -677,9 +709,15 @@ impl WorkspaceIndex {
             for (ordinal, definition) in shard.definitions.iter().enumerate() {
                 cancellation.checkpoint()?;
                 self.definitions
-                    .entry((definition.kind.clone(), definition.name.to_ascii_lowercase()))
+                    .entry((
+                        definition.kind.clone(),
+                        definition.name.to_ascii_lowercase(),
+                    ))
                     .or_default()
-                    .push(DefinitionPointer { file_id: *file_id, ordinal });
+                    .push(DefinitionPointer {
+                        file_id: *file_id,
+                        ordinal,
+                    });
             }
         }
         let shards = &self.shards;
@@ -699,7 +737,10 @@ impl WorkspaceIndex {
 }
 
 fn definition_key(definition: &Definition) -> (String, String) {
-    (definition.kind.clone(), definition.name.to_ascii_lowercase())
+    (
+        definition.kind.clone(),
+        definition.name.to_ascii_lowercase(),
+    )
 }
 
 /// Stable identity for an editor document during one server lifetime.
@@ -840,13 +881,19 @@ impl TextChange {
     /// Creates a full-document replacement.
     #[must_use]
     pub fn full(text: impl Into<String>) -> Self {
-        Self { range: None, text: text.into() }
+        Self {
+            range: None,
+            text: text.into(),
+        }
     }
 
     /// Creates a ranged replacement.
     #[must_use]
     pub fn ranged(range: TextRange, text: impl Into<String>) -> Self {
-        Self { range: Some(range), text: text.into() }
+        Self {
+            range: Some(range),
+            text: text.into(),
+        }
     }
 }
 
@@ -895,9 +942,16 @@ pub enum DocumentError {
     /// A change or close notification targeted no open overlay.
     NotOpen(DocumentId),
     /// A change version was not newer than the current version.
-    StaleVersion { document: DocumentId, current: i64, received: i64 },
+    StaleVersion {
+        document: DocumentId,
+        current: i64,
+        received: i64,
+    },
     /// A change range was not on UTF-8 boundaries or exceeded the current text.
-    InvalidRange { document: DocumentId, range: TextRange },
+    InvalidRange {
+        document: DocumentId,
+        range: TextRange,
+    },
 }
 
 impl fmt::Display for DocumentError {
@@ -909,7 +963,11 @@ impl fmt::Display for DocumentError {
             Self::NotOpen(document) => {
                 write!(formatter, "document is not open: {}", document.as_str())
             }
-            Self::StaleVersion { document, current, received } => write!(
+            Self::StaleVersion {
+                document,
+                current,
+                received,
+            } => write!(
                 formatter,
                 "stale document version for {}: current {}, received {}",
                 document.as_str(),
@@ -950,7 +1008,11 @@ impl fmt::Display for WorkspaceError {
             Self::Cancelled => formatter.write_str("workspace scan was cancelled"),
             Self::Io(error) => write!(formatter, "workspace I/O error: {error}"),
             Self::InvalidLogicalPath(path) => {
-                write!(formatter, "invalid workspace logical path: {}", path.display())
+                write!(
+                    formatter,
+                    "invalid workspace logical path: {}",
+                    path.display()
+                )
             }
             Self::FileIdCollision { first, second } => write!(
                 formatter,
@@ -959,7 +1021,10 @@ impl fmt::Display for WorkspaceError {
                 second.display()
             ),
             Self::FileLimitExceeded { limit } => {
-                write!(formatter, "workspace contains more than the allowed {limit} files")
+                write!(
+                    formatter,
+                    "workspace contains more than the allowed {limit} files"
+                )
             }
         }
     }
@@ -976,7 +1041,9 @@ fn record_scan_issue(
 ) {
     report.skipped_entries = report.skipped_entries.saturating_add(1);
     if report.issues.len() < limits.max_reported_issues {
-        report.issues.push(WorkspaceScanIssue { kind, path, detail });
+        report
+            .issues
+            .push(WorkspaceScanIssue { kind, path, detail });
     } else {
         report.omitted_issues = report.omitted_issues.saturating_add(1);
     }
@@ -1072,7 +1139,9 @@ fn collect_disk_files(
             continue;
         }
         if report.discovered_files >= limits.max_files {
-            return Err(WorkspaceError::FileLimitExceeded { limit: limits.max_files });
+            return Err(WorkspaceError::FileLimitExceeded {
+                limit: limits.max_files,
+            });
         }
         report.discovered_files = report.discovered_files.saturating_add(1);
         let relative = path
@@ -1088,7 +1157,10 @@ fn collect_disk_files(
 }
 
 fn ignored_workspace_directory(name: &std::ffi::OsStr) -> bool {
-    matches!(name.to_str(), Some(".git" | ".hg" | ".svn" | "node_modules" | "target"))
+    matches!(
+        name.to_str(),
+        Some(".git" | ".hg" | ".svn" | "node_modules" | "target")
+    )
 }
 
 fn read_source_file(
@@ -1096,7 +1168,9 @@ fn read_source_file(
     limits: WorkspaceScanLimits,
     report: &mut WorkspaceScanReport,
 ) -> Option<String> {
-    read_source_file_cancellable(path, limits, report, &WorkspaceScanToken::new()).ok().flatten()
+    read_source_file_cancellable(path, limits, report, &WorkspaceScanToken::new())
+        .ok()
+        .flatten()
 }
 
 fn read_source_file_cancellable(
@@ -1147,7 +1221,10 @@ fn read_source_file_cancellable(
         }
     };
     let mut bytes = Vec::new();
-    if let Err(error) = file.take(limits.max_file_size.saturating_add(1)).read_to_end(&mut bytes) {
+    if let Err(error) = file
+        .take(limits.max_file_size.saturating_add(1))
+        .read_to_end(&mut bytes)
+    {
         record_scan_issue(
             report,
             limits,
@@ -1164,7 +1241,10 @@ fn read_source_file_cancellable(
             limits,
             WorkspaceScanIssueKind::FileTooLarge,
             path.to_owned(),
-            format!("file grew beyond the configured limit of {} bytes", limits.max_file_size),
+            format!(
+                "file grew beyond the configured limit of {} bytes",
+                limits.max_file_size
+            ),
         );
         return Ok(None);
     }
@@ -1279,7 +1359,9 @@ fn parser_for_document(
         .map(str::to_ascii_lowercase)
         .or_else(|| {
             logical.as_ref().and_then(|path| {
-                path.as_str().rsplit_once('.').map(|(_, ext)| ext.to_ascii_lowercase())
+                path.as_str()
+                    .rsplit_once('.')
+                    .map(|(_, ext)| ext.to_ascii_lowercase())
             })
         })?;
     let parser = match extension.as_str() {
@@ -1298,7 +1380,13 @@ fn prepare_document_snapshot(
 ) -> DocumentSnapshot {
     let (parsed, hir) = parser_for_document(rules, roots, &document.id, document.path.as_deref())
         .map_or((None, None), |(parser, logical_path)| {
-            parse_source(&parser, &document.text, logical_path.as_ref(), rules, profile)
+            parse_source(
+                &parser,
+                &document.text,
+                logical_path.as_ref(),
+                rules,
+                profile,
+            )
         });
     document.parsed = parsed;
     document.hir = hir;
@@ -1355,8 +1443,13 @@ fn build_file_state(
             }),
         };
     };
-    let (parsed, hir) =
-        parse_source(&category.parser, &source, Some(&file.logical_path), rules, profile);
+    let (parsed, hir) = parse_source(
+        &category.parser,
+        &source,
+        Some(&file.logical_path),
+        rules,
+        profile,
+    );
     let mut shard = match (parsed.as_ref(), hir.as_deref()) {
         (Some(ParsedSource::Text(parsed)), Some(hir)) => {
             shard_from_parsed(file, parsed, hir, rules, profile)
@@ -1383,7 +1476,13 @@ fn build_file_state(
             definition.range,
         ))
     });
-    FileState { revision, source: Arc::from(source), parsed, hir, shard: Arc::new(shard) }
+    FileState {
+        revision,
+        source: Arc::from(source),
+        parsed,
+        hir,
+        shard: Arc::new(shard),
+    }
 }
 
 fn shard_from_parsed(
@@ -1427,7 +1526,9 @@ fn collect_semantic_type_members(
             let Some(file_name) = file.logical_path.as_str().rsplit('/').next() else {
                 continue;
             };
-            let name = file_name.rsplit_once('.').map_or(file_name, |(stem, _)| stem);
+            let name = file_name
+                .rsplit_once('.')
+                .map_or(file_name, |(stem, _)| stem);
             if !name.is_empty() {
                 definitions.push(Definition {
                     kind: descriptor.name.clone(),
@@ -1510,7 +1611,9 @@ fn collect_semantic_type_definition(
     node: &CstNode,
     definitions: &mut Vec<Definition>,
 ) {
-    let Some(key) = semantic_property_key(node, parsed) else { return };
+    let Some(key) = semantic_property_key(node, parsed) else {
+        return;
+    };
     if !semantic_type_key_matches(descriptor, &key) {
         return;
     }
@@ -1535,9 +1638,12 @@ fn collect_semantic_type_definition(
 }
 
 fn semantic_type_key_matches(descriptor: &pdx_rules::TypeDescriptor, key: &str) -> bool {
-    descriptor.type_key_filter.as_ref().is_none_or(|(values, negate)| {
-        (values.iter().any(|value| value.eq_ignore_ascii_case(key))) != *negate
-    })
+    descriptor
+        .type_key_filter
+        .as_ref()
+        .is_none_or(|(values, negate)| {
+            (values.iter().any(|value| value.eq_ignore_ascii_case(key))) != *negate
+        })
 }
 
 fn semantic_block_properties(node: &CstNode) -> impl Iterator<Item = &CstNode> {
@@ -1550,7 +1656,10 @@ fn semantic_block_properties(node: &CstNode) -> impl Iterator<Item = &CstNode> {
             .iter()
             .filter(|block| block.kind() == CstKind::Block)
             .flat_map(|block| {
-                block.children().iter().filter(|child| child.kind() == CstKind::Property)
+                block
+                    .children()
+                    .iter()
+                    .filter(|child| child.kind() == CstKind::Property)
             })
             .collect::<Vec<_>>()
     })
@@ -1569,11 +1678,16 @@ fn semantic_type_path_matches(
     descriptor: &pdx_rules::TypeDescriptor,
     logical_path: &LogicalPath,
 ) -> bool {
-    let path = logical_path.as_str().replace('\\', "/").to_ascii_lowercase();
+    let path = logical_path
+        .as_str()
+        .replace('\\', "/")
+        .to_ascii_lowercase();
     let (directory, file_name) = path.rsplit_once('/').unwrap_or(("", path.as_str()));
     if let Some(prefix) = descriptor.path.as_deref() {
-        let prefix =
-            prefix.trim_matches('/').strip_prefix("game/").unwrap_or(prefix.trim_matches('/'));
+        let prefix = prefix
+            .trim_matches('/')
+            .strip_prefix("game/")
+            .unwrap_or(prefix.trim_matches('/'));
         let prefix = prefix.to_ascii_lowercase();
         let matches = if descriptor.path_strict {
             directory == prefix
@@ -1591,7 +1705,9 @@ fn semantic_type_path_matches(
     }
     if let Some(expected_extension) = descriptor.path_extension.as_deref() {
         let expected_extension = expected_extension.trim_start_matches('.');
-        let actual_extension = file_name.rsplit_once('.').map_or("", |(_, extension)| extension);
+        let actual_extension = file_name
+            .rsplit_once('.')
+            .map_or("", |(_, extension)| extension);
         if !actual_extension.eq_ignore_ascii_case(expected_extension) {
             return false;
         }
@@ -1610,8 +1726,10 @@ fn collect_profile_token_definitions(
         .iter()
         .filter(|rule| rule.path.matches(file.logical_path.as_str()))
     {
-        for parameter in
-            hir.parameter_definitions().iter().filter(|item| item.delimiter == rule.delimiter)
+        for parameter in hir
+            .parameter_definitions()
+            .iter()
+            .filter(|item| item.delimiter == rule.delimiter)
         {
             definitions.push(Definition {
                 kind: rule.inner_kind.clone(),
@@ -1683,7 +1801,9 @@ fn find_property(node: &CstNode, wanted: &str, parsed: &ParsedFile) -> Option<St
             }
         }
     }
-    node.children().iter().find_map(|child| find_property(child, wanted, parsed))
+    node.children()
+        .iter()
+        .find_map(|child| find_property(child, wanted, parsed))
 }
 
 /// Mutable owner of workspace state.
@@ -1862,7 +1982,11 @@ impl AnalysisHost {
         let mut report = WorkspaceScanReport::default();
         for root in self.roots.iter() {
             cancellation.checkpoint()?;
-            if self.vanilla_root.as_ref().is_some_and(|vanilla| vanilla.id == root.id) {
+            if self
+                .vanilla_root
+                .as_ref()
+                .is_some_and(|vanilla| vanilla.id == root.id)
+            {
                 continue;
             }
             let mut paths = Vec::new();
@@ -1879,7 +2003,9 @@ impl AnalysisHost {
             for (logical, physical) in paths {
                 cancellation.checkpoint()?;
                 let id = SourceFileId::new(stable_file_id(root.id, &logical));
-                let Some(category) = self.rules.classify(&logical) else { continue };
+                let Some(category) = self.rules.classify(&logical) else {
+                    continue;
+                };
                 let Some(text) =
                     read_source_file_cancellable(&physical, limits, &mut report, cancellation)?
                 else {
@@ -1907,7 +2033,9 @@ impl AnalysisHost {
         let mut file_states = BTreeMap::new();
         for (id, file) in &files {
             cancellation.checkpoint()?;
-            let Some(text) = texts.remove(id) else { continue };
+            let Some(text) = texts.remove(id) else {
+                continue;
+            };
             let state = match self.file_states.get(id) {
                 Some(previous)
                     if self.source_files.get(id) == Some(file) && previous.source() == text =>
@@ -1929,11 +2057,15 @@ impl AnalysisHost {
             file_states.insert(*id, state);
         }
         cancellation.checkpoint()?;
-        let mut shards =
-            file_states.values().map(|state| state.shard().clone()).collect::<Vec<_>>();
+        let mut shards = file_states
+            .values()
+            .map(|state| state.shard().clone())
+            .collect::<Vec<_>>();
         if let Some(vanilla) = self.vanilla_root.as_ref() {
-            for (id, cached) in
-                self.source_files.iter().filter(|(_, file)| file.root_id == vanilla.id)
+            for (id, cached) in self
+                .source_files
+                .iter()
+                .filter(|(_, file)| file.root_id == vanilla.id)
             {
                 if let Some(existing) = files.insert(*id, cached.clone()) {
                     return Err(WorkspaceError::FileIdCollision {
@@ -1947,7 +2079,9 @@ impl AnalysisHost {
                     .shards
                     .iter()
                     .filter(|(id, _)| {
-                        self.source_files.get(id).is_some_and(|file| file.root_id == vanilla.id)
+                        self.source_files
+                            .get(id)
+                            .is_some_and(|file| file.root_id == vanilla.id)
                     })
                     .map(|(_, shard)| shard.clone()),
             );
@@ -1995,7 +2129,10 @@ impl AnalysisHost {
                 .roots
                 .iter()
                 .filter(|root| {
-                    matches!(root.kind, SourceRootKind::CurrentMod | SourceRootKind::Dependency)
+                    matches!(
+                        root.kind,
+                        SourceRootKind::CurrentMod | SourceRootKind::Dependency
+                    )
                 })
                 .filter(|root| change.path.starts_with(&root.path))
                 .max_by_key(|root| root.path.as_os_str().len())
@@ -2072,12 +2209,15 @@ impl AnalysisHost {
                 });
             }
             if files.get(&id) == Some(&source_file)
-                && file_states.get(&id).is_some_and(|state| state.source() == text)
+                && file_states
+                    .get(&id)
+                    .is_some_and(|state| state.source() == text)
             {
                 continue;
             }
-            let file_revision =
-                file_states.get(&id).map_or(0, |state| state.revision().saturating_add(1));
+            let file_revision = file_states
+                .get(&id)
+                .map_or(0, |state| state.revision().saturating_add(1));
             let state = Arc::new(build_file_state(
                 &source_file,
                 text,
@@ -2136,8 +2276,13 @@ impl AnalysisHost {
         {
             return Err(DocumentError::AlreadyOpen(id));
         }
-        let document =
-            self.document_snapshot(id.clone(), Some(version), text, DocumentSource::Overlay, path);
+        let document = self.document_snapshot(
+            id.clone(),
+            Some(version),
+            text,
+            DocumentSource::Overlay,
+            path,
+        );
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
         self.revision = self.revision.saturating_add(1);
         Ok(())
@@ -2197,7 +2342,9 @@ impl AnalysisHost {
     /// Commits a worker-prepared document only while its exact staged text/version is current.
     pub fn commit_prepared_document(&mut self, prepared: PreparedDocument) -> bool {
         let id = prepared.document.id.clone();
-        let Some(current) = self.documents.get(&id) else { return false };
+        let Some(current) = self.documents.get(&id) else {
+            return false;
+        };
         let matches_current = current.source == DocumentSource::Overlay
             && current.version == prepared.document.version
             && current.text == prepared.document.text
@@ -2241,7 +2388,10 @@ impl AnalysisHost {
                     .zip(end)
                     .is_some_and(|(start, end)| start <= end && text.get(start..end).is_some());
                 if !valid {
-                    return Err(DocumentError::InvalidRange { document: id.clone(), range });
+                    return Err(DocumentError::InvalidRange {
+                        document: id.clone(),
+                        range,
+                    });
                 }
                 if let (Some(start), Some(end)) = (start, end) {
                     text.replace_range(start..end, &change.text);
@@ -2252,8 +2402,13 @@ impl AnalysisHost {
         }
 
         let path = current.path.clone();
-        let document =
-            self.document_snapshot(id.clone(), Some(version), text, DocumentSource::Overlay, path);
+        let document = self.document_snapshot(
+            id.clone(),
+            Some(version),
+            text,
+            DocumentSource::Overlay,
+            path,
+        );
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
         self.revision = self.revision.saturating_add(1);
         Ok(())
@@ -2418,8 +2573,11 @@ impl AnalysisSnapshot {
             .values()
             .filter(|file| &file.logical_path == logical_path)
             .map(|file| {
-                let priority =
-                    self.roots.iter().find(|root| root.id == file.root_id).map_or(0, root_priority);
+                let priority = self
+                    .roots
+                    .iter()
+                    .find(|root| root.id == file.root_id)
+                    .map_or(0, root_priority);
                 ResolvedCandidate {
                     logical_path: logical_path.clone(),
                     file_id: Some(file.id),
@@ -2431,7 +2589,9 @@ impl AnalysisSnapshot {
             })
             .collect::<Vec<_>>();
         for document in self.documents.values() {
-            let Some(path) = document.path() else { continue };
+            let Some(path) = document.path() else {
+                continue;
+            };
             let Some(root) = self.roots.iter().find(|root| path.starts_with(&root.path)) else {
                 continue;
             };
@@ -2453,7 +2613,9 @@ impl AnalysisSnapshot {
             }
         }
         candidates.sort_by_key(|candidate| std::cmp::Reverse(candidate.priority));
-        let overlay_present = candidates.iter().any(|candidate| candidate.document_id.is_some());
+        let overlay_present = candidates
+            .iter()
+            .any(|candidate| candidate.document_id.is_some());
         if overlay_present {
             if let Some(first) = candidates.first_mut() {
                 first.active = true;
@@ -2554,21 +2716,41 @@ mod tests {
             "germanic = { set_country_flag = generic_flag }\n",
         )
         .expect("culture fixture");
-        fs::write(scripted_effects.join("effects.txt"), "example = { value = $AMOUNT$ }\n")
-            .expect("scripted effect fixture");
+        fs::write(
+            scripted_effects.join("effects.txt"),
+            "example = { value = $AMOUNT$ }\n",
+        )
+        .expect("scripted effect fixture");
 
         let mut host = AnalysisHost::new(pdx_game::eu4::bootstrap_rules());
-        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
-            root.clone(),
-        )]));
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
         host.refresh_source_roots().expect("scan roots");
         let snapshot = host.snapshot();
 
-        assert!(snapshot.index().definitions("culture", "germanic").is_empty());
-        assert!(snapshot.index().definitions("country_flag", "generic_flag").is_empty());
-        assert!(snapshot.index().definitions("scripted_effect_param", "AMOUNT").is_empty());
+        assert!(
+            snapshot
+                .index()
+                .definitions("culture", "germanic")
+                .is_empty()
+        );
+        assert!(
+            snapshot
+                .index()
+                .definitions("country_flag", "generic_flag")
+                .is_empty()
+        );
+        assert!(
+            snapshot
+                .index()
+                .definitions("scripted_effect_param", "AMOUNT")
+                .is_empty()
+        );
         fs::remove_dir_all(root).expect("cleanup");
     }
 
@@ -2617,7 +2799,13 @@ mod tests {
         assert_eq!(index.definitions("event", "untouched.1").len(), 1);
         assert_eq!(index.references(first_file)[0].name, "new.1");
         assert_eq!(index.references(second_file)[0].name, "untouched.1");
-        assert_eq!(index.shard(first_file).expect("replacement shard").syntax_error_count, 1);
+        assert_eq!(
+            index
+                .shard(first_file)
+                .expect("replacement shard")
+                .syntax_error_count,
+            1
+        );
 
         index.remove_shard(first_file);
         assert!(index.definitions("event", "new.1").is_empty());
@@ -2655,7 +2843,11 @@ mod tests {
         let tied = BTreeMap::from([(first_file, 10), (second_file, 10)]);
         index.resolve_priorities(&tied, &rules);
         assert_eq!(
-            index.definitions("event", "shared.1").iter().filter(|item| item.active).count(),
+            index
+                .definitions("event", "shared.1")
+                .iter()
+                .filter(|item| item.active)
+                .count(),
             2
         );
         assert!(index.active_definition("event", "shared.1").is_none());
@@ -2671,7 +2863,10 @@ mod tests {
         );
         index.remove_shard_resolved(second_file, &ordered, &rules);
         assert_eq!(
-            index.active_definition("event", "shared.1").expect("remaining definition").file_id,
+            index
+                .active_definition("event", "shared.1")
+                .expect("remaining definition")
+                .file_id,
             first_file
         );
     }
@@ -2724,7 +2919,11 @@ mod tests {
             references: Vec::new(),
             syntax_error_count: 0,
         }]);
-        assert!(distinct.active_definition("scripted_effect", "apply").is_none());
+        assert!(
+            distinct
+                .active_definition("scripted_effect", "apply")
+                .is_none()
+        );
     }
 
     #[test]
@@ -2743,11 +2942,13 @@ mod tests {
             .expect("untouched fixture");
 
         let mut host = eu4_host();
-        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
-            root.clone(),
-        )]));
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
         host.refresh_source_roots().expect("initial scan");
         let before = host.snapshot();
         let changed_id = before
@@ -2781,19 +2982,38 @@ mod tests {
         .expect("targeted change");
         assert_eq!(pipeline_counts(), (1, 1));
         let changed = host.snapshot();
-        assert!(changed.index().active_definition("event", "old.1").is_none());
-        assert!(changed.index().active_definition("event", "new.1").is_some());
+        assert!(
+            changed
+                .index()
+                .active_definition("event", "old.1")
+                .is_none()
+        );
+        assert!(
+            changed
+                .index()
+                .active_definition("event", "new.1")
+                .is_some()
+        );
         assert_eq!(
             changed.document(&document).expect("overlay remains").text(),
             "country_event = { id = overlay.1 }\n"
         );
         assert!(Arc::ptr_eq(
-            changed.file_states.get(&untouched_id).expect("untouched current state"),
+            changed
+                .file_states
+                .get(&untouched_id)
+                .expect("untouched current state"),
             &untouched_state
         ));
         assert!(!Arc::ptr_eq(
-            changed.file_states.get(&changed_id).expect("changed current state"),
-            before.file_states.get(&changed_id).expect("changed old state")
+            changed
+                .file_states
+                .get(&changed_id)
+                .expect("changed current state"),
+            before
+                .file_states
+                .get(&changed_id)
+                .expect("changed old state")
         ));
 
         let created_path = events.join("created.txt");
@@ -2803,7 +3023,12 @@ mod tests {
             DiskFileChangeKind::Created,
         )])
         .expect("targeted create");
-        assert!(host.snapshot().index().active_definition("event", "created.1").is_some());
+        assert!(
+            host.snapshot()
+                .index()
+                .active_definition("event", "created.1")
+                .is_some()
+        );
 
         fs::remove_file(&changed_path).expect("delete changed fixture");
         host.apply_disk_file_changes(&[DiskFileChange::new(
@@ -2813,9 +3038,17 @@ mod tests {
         .expect("targeted delete");
         let deleted = host.snapshot();
         assert!(deleted.source_files().get(&changed_id).is_none());
-        assert!(deleted.index().active_definition("event", "new.1").is_none());
+        assert!(
+            deleted
+                .index()
+                .active_definition("event", "new.1")
+                .is_none()
+        );
         assert_eq!(
-            deleted.document(&document).expect("overlay survives backing deletion").text(),
+            deleted
+                .document(&document)
+                .expect("overlay survives backing deletion")
+                .text(),
             "country_event = { id = overlay.1 }\n"
         );
         fs::remove_dir_all(root).expect("cleanup");
@@ -2834,11 +3067,13 @@ mod tests {
         fs::write(events.join("c.txt"), "country_event = { id = stable.c }\n").expect("c event");
 
         let mut host = eu4_host();
-        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
-            root.clone(),
-        )]));
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
         host.refresh_source_roots().expect("initial scan");
         let before = host.snapshot();
         let b_before = before
@@ -2888,11 +3123,13 @@ mod tests {
         fs::write(events.join("b.txt"), "country_event = { id = state.b }\n").expect("b event");
 
         let mut host = eu4_host();
-        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
-            root.clone(),
-        )]));
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
         host.refresh_source_roots().expect("initial scan");
         let first = host.snapshot();
         let a = first
@@ -2915,7 +3152,12 @@ mod tests {
         };
         assert!(std::ptr::eq(
             parsed.as_ref(),
-            first.file_state(a).expect("a state").hir().expect("a HIR").syntax()
+            first
+                .file_state(a)
+                .expect("a state")
+                .hir()
+                .expect("a HIR")
+                .syntax()
         ));
 
         host.refresh_source_roots().expect("unchanged scan");
@@ -2929,8 +3171,11 @@ mod tests {
             second.file_states.get(&b).expect("second b state")
         ));
 
-        fs::write(events.join("b.txt"), "country_event = { id = state.changed }\n")
-            .expect("changed b event");
+        fs::write(
+            events.join("b.txt"),
+            "country_event = { id = state.changed }\n",
+        )
+        .expect("changed b event");
         host.refresh_source_roots().expect("changed scan");
         let third = host.snapshot();
         assert!(Arc::ptr_eq(
@@ -2943,7 +3188,11 @@ mod tests {
         ));
         assert_eq!(
             third.file_state(b).expect("changed b state").revision(),
-            second.file_state(b).expect("old b state").revision().saturating_add(1)
+            second
+                .file_state(b)
+                .expect("old b state")
+                .revision()
+                .saturating_add(1)
         );
         assert_eq!(third.index().definitions("event", "state.changed").len(), 1);
         fs::remove_dir_all(root).expect("cleanup");
@@ -2967,11 +3216,13 @@ mod tests {
         }
 
         let mut host = eu4_host();
-        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
-            root.clone(),
-        )]));
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
         host.refresh_source_roots().expect("initial scan");
 
         let path = events.join("event-00.txt");
@@ -2983,30 +3234,62 @@ mod tests {
             Some(path),
         )
         .expect("stage initial overlay");
-        let initial = host.snapshot().prepare_document(&id).expect("prepare initial overlay");
+        let initial = host
+            .snapshot()
+            .prepare_document(&id)
+            .expect("prepare initial overlay");
         assert!(host.commit_prepared_document(initial));
         let before_edit = host.snapshot();
 
         reset_pipeline_counts();
-        host.stage_document_text(&id, 2, "country_event = { id = synthetic.changed }\n".to_owned())
-            .expect("stage edit");
-        assert_eq!(pipeline_counts(), (0, 0), "staging must not run semantic work");
+        host.stage_document_text(
+            &id,
+            2,
+            "country_event = { id = synthetic.changed }\n".to_owned(),
+        )
+        .expect("stage edit");
+        assert_eq!(
+            pipeline_counts(),
+            (0, 0),
+            "staging must not run semantic work"
+        );
 
-        let prepared = host.snapshot().prepare_document(&id).expect("prepare edited overlay");
+        let prepared = host
+            .snapshot()
+            .prepare_document(&id)
+            .expect("prepare edited overlay");
         assert_eq!(pipeline_counts(), (1, 1));
         assert!(host.commit_prepared_document(prepared));
-        assert_eq!(pipeline_counts(), (1, 1), "commit must not repeat worker work");
+        assert_eq!(
+            pipeline_counts(),
+            (1, 1),
+            "commit must not repeat worker work"
+        );
 
         let after_edit = host.snapshot();
         for file_id in before_edit.source_files().keys() {
             assert!(Arc::ptr_eq(
-                before_edit.file_states.get(file_id).expect("old disk state"),
-                after_edit.file_states.get(file_id).expect("current disk state"),
+                before_edit
+                    .file_states
+                    .get(file_id)
+                    .expect("old disk state"),
+                after_edit
+                    .file_states
+                    .get(file_id)
+                    .expect("current disk state"),
             ));
         }
-        assert!(after_edit.document(&id).expect("edited overlay").hir().is_some_and(|hir| {
-            hir.definitions().iter().any(|definition| definition.name == "synthetic.changed")
-        }));
+        assert!(
+            after_edit
+                .document(&id)
+                .expect("edited overlay")
+                .hir()
+                .is_some_and(|hir| {
+                    hir.definitions()
+                        .iter()
+                        .any(|definition| definition.name == "synthetic.changed")
+                })
+        );
         fs::remove_dir_all(root).expect("cleanup");
     }
 
@@ -3026,11 +3309,18 @@ mod tests {
         assert!(Arc::ptr_eq(&first.scan_report, &second.scan_report));
 
         let id = DocumentId::new("file:///tmp/snapshot.txt");
-        host.open_document(id.clone(), 1, "one".to_owned(), None).expect("open should succeed");
+        host.open_document(id.clone(), 1, "one".to_owned(), None)
+            .expect("open should succeed");
         let third = host.snapshot();
 
         assert!(first.document(&id).is_none());
-        assert_eq!(third.document(&id).expect("new snapshot sees document").text(), "one");
+        assert_eq!(
+            third
+                .document(&id)
+                .expect("new snapshot sees document")
+                .text(),
+            "one"
+        );
         assert!(!Arc::ptr_eq(&first.documents, &third.documents));
         assert!(Arc::ptr_eq(&first.roots, &third.roots));
         assert!(Arc::ptr_eq(&first.profile, &third.profile));
@@ -3055,11 +3345,13 @@ mod tests {
         fs::write(events.join("large.txt"), vec![b'x'; 65]).expect("oversized event");
 
         let mut host = eu4_host();
-        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
-            root.clone(),
-        )]));
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
         let report = host
             .refresh_source_roots_with_limits(WorkspaceScanLimits {
                 max_file_size: 64,
@@ -3071,10 +3363,16 @@ mod tests {
         assert_eq!(report.indexed_files, 1);
         assert_eq!(report.skipped_entries, 2);
         assert!(
-            report.issues.iter().any(|issue| issue.kind == WorkspaceScanIssueKind::InvalidUtf8)
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.kind == WorkspaceScanIssueKind::InvalidUtf8)
         );
         assert!(
-            report.issues.iter().any(|issue| issue.kind == WorkspaceScanIssueKind::FileTooLarge)
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.kind == WorkspaceScanIssueKind::FileTooLarge)
         );
         assert_eq!(host.snapshot().scan_report(), &report);
         assert_eq!(host.snapshot().source_files().len(), 1);
@@ -3094,11 +3392,13 @@ mod tests {
             .expect("deep event");
 
         let mut host = eu4_host();
-        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
-            root.clone(),
-        )]));
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
         let report = host
             .refresh_source_roots_with_limits(WorkspaceScanLimits {
                 max_depth: 0,
@@ -3128,11 +3428,13 @@ mod tests {
         fs::write(events.join("a.txt"), "country_event = { id = limit.a }\n").expect("a event");
 
         let mut host = eu4_host();
-        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
-            root.clone(),
-        )]));
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
         host.refresh_source_roots().expect("initial scan");
         let before = host.snapshot();
         fs::write(events.join("b.txt"), "country_event = { id = limit.b }\n").expect("b event");
@@ -3143,7 +3445,10 @@ mod tests {
                 ..WorkspaceScanLimits::default()
             })
             .expect_err("the total file limit must be enforced");
-        assert!(matches!(error, super::WorkspaceError::FileLimitExceeded { limit: 1 }));
+        assert!(matches!(
+            error,
+            super::WorkspaceError::FileLimitExceeded { limit: 1 }
+        ));
         let after = host.snapshot();
         assert_eq!(after.revision(), before.revision());
         assert_eq!(after.source_files(), before.source_files());
@@ -3160,15 +3465,20 @@ mod tests {
         let root = std::env::temp_dir().join(format!("pdx-engine-cancel-scan-{nonce}"));
         let events = root.join("events");
         fs::create_dir_all(&events).expect("event directory");
-        fs::write(events.join("baseline.txt"), "country_event = { id = baseline.1 }\n")
-            .expect("baseline event");
+        fs::write(
+            events.join("baseline.txt"),
+            "country_event = { id = baseline.1 }\n",
+        )
+        .expect("baseline event");
 
         let mut host = eu4_host();
-        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
-            root.clone(),
-        )]));
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
         host.refresh_source_roots().expect("initial scan");
         let before = host.snapshot();
         for index in 0..32 {
@@ -3209,22 +3519,30 @@ mod tests {
         let outside = std::env::temp_dir().join(format!("pdx-engine-symlink-outside-{nonce}"));
         fs::create_dir_all(&root).expect("source root");
         fs::create_dir_all(&outside).expect("outside directory");
-        fs::write(outside.join("leak.txt"), "country_event = { id = leak.1 }\n")
-            .expect("outside event");
+        fs::write(
+            outside.join("leak.txt"),
+            "country_event = { id = leak.1 }\n",
+        )
+        .expect("outside event");
         symlink(&outside, root.join("events")).expect("directory symlink");
 
         let mut host = eu4_host();
-        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
-            root.clone(),
-        )]));
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
         let report = host.refresh_source_roots().expect("symlink-safe scan");
 
         assert_eq!(report.discovered_files, 0);
         assert_eq!(report.indexed_files, 0);
         assert!(
-            report.issues.iter().any(|issue| issue.kind == WorkspaceScanIssueKind::SymlinkSkipped)
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.kind == WorkspaceScanIssueKind::SymlinkSkipped)
         );
         fs::remove_dir_all(root).expect("cleanup root");
         fs::remove_dir_all(outside).expect("cleanup outside directory");
@@ -3241,23 +3559,42 @@ mod tests {
         let generated_events = root.join("target/debug/events");
         fs::create_dir_all(&events).expect("events directory");
         fs::create_dir_all(&generated_events).expect("generated events directory");
-        fs::write(events.join("indexed.txt"), "country_event = { id = indexed.1 }\n")
-            .expect("indexed fixture");
-        fs::write(generated_events.join("ignored.txt"), "country_event = { id = ignored.1 }\n")
-            .expect("ignored fixture");
+        fs::write(
+            events.join("indexed.txt"),
+            "country_event = { id = indexed.1 }\n",
+        )
+        .expect("indexed fixture");
+        fs::write(
+            generated_events.join("ignored.txt"),
+            "country_event = { id = ignored.1 }\n",
+        )
+        .expect("ignored fixture");
 
         let mut host = eu4_host();
-        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
-            root.clone(),
-        )]));
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
         let report = host.refresh_source_roots().expect("bounded workspace scan");
 
         assert_eq!(report.discovered_files, 1);
         assert_eq!(report.indexed_files, 1);
-        assert!(host.snapshot().index().definitions("event", "indexed.1").len() == 1);
-        assert!(host.snapshot().index().definitions("event", "ignored.1").is_empty());
+        assert!(
+            host.snapshot()
+                .index()
+                .definitions("event", "indexed.1")
+                .len()
+                == 1
+        );
+        assert!(
+            host.snapshot()
+                .index()
+                .definitions("event", "ignored.1")
+                .is_empty()
+        );
         fs::remove_dir_all(root).expect("cleanup");
     }
 
@@ -3265,7 +3602,8 @@ mod tests {
     fn stale_document_versions_are_rejected_atomically() {
         let mut host = AnalysisHost::new(RuleSet::empty());
         let id = DocumentId::new("file:///tmp/example.txt");
-        host.open_document(id.clone(), 1, "a😀z".to_owned(), None).expect("open should succeed");
+        host.open_document(id.clone(), 1, "a😀z".to_owned(), None)
+            .expect("open should succeed");
         let first = host.snapshot();
         let first_document = first.document(&id).expect("first document");
         let Some(ParsedSource::Text(first_parse)) = first_document.parsed() else {
@@ -3280,7 +3618,13 @@ mod tests {
             .apply_document_changes(&id, 1, &[TextChange::ranged(range, "x")])
             .expect_err("same version must be rejected");
         assert!(matches!(error, super::DocumentError::StaleVersion { .. }));
-        assert_eq!(host.snapshot().document(&id).expect("document exists").text(), "a😀z");
+        assert_eq!(
+            host.snapshot()
+                .document(&id)
+                .expect("document exists")
+                .text(),
+            "a😀z"
+        );
         host.apply_document_changes(&id, 2, &[TextChange::ranged(range, "x")])
             .expect("new version should succeed");
         let second = host.snapshot();
@@ -3290,7 +3634,13 @@ mod tests {
             panic!("changed txt overlay should retain a text parse");
         };
         assert!(!Arc::ptr_eq(first_parse, second_parse));
-        assert_eq!(first.document(&id).expect("old snapshot remains valid").text(), "a😀z");
+        assert_eq!(
+            first
+                .document(&id)
+                .expect("old snapshot remains valid")
+                .text(),
+            "a😀z"
+        );
     }
 
     #[test]
@@ -3305,13 +3655,24 @@ mod tests {
         )
         .expect("stage open");
         let staged = host.snapshot();
-        assert!(staged.document(&id).expect("staged document").parsed().is_none());
-        let stale = staged.prepare_document(&id).expect("prepare stale candidate");
+        assert!(
+            staged
+                .document(&id)
+                .expect("staged document")
+                .parsed()
+                .is_none()
+        );
+        let stale = staged
+            .prepare_document(&id)
+            .expect("prepare stale candidate");
 
         host.stage_document_text(&id, 2, "country_event = { id = current.1 }\n".to_owned())
             .expect("stage newer text");
         assert!(!host.commit_prepared_document(stale));
-        let current = host.snapshot().prepare_document(&id).expect("prepare current candidate");
+        let current = host
+            .snapshot()
+            .prepare_document(&id)
+            .expect("prepare current candidate");
         assert!(host.commit_prepared_document(current));
 
         let committed = host.snapshot();
@@ -3330,11 +3691,13 @@ mod tests {
         let path = std::env::temp_dir().join(format!("pdx-engine-{}.txt", std::process::id()));
         fs::write(&path, "disk").expect("write fixture");
         let mut host = AnalysisHost::new(RuleSet::empty());
-        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(1),
-            SourceRootKind::CurrentMod,
-            path.parent().expect("temp parent").to_owned(),
-        )]));
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                path.parent().expect("temp parent").to_owned(),
+            ),
+        ]));
         let id = DocumentId::new("file:///tmp/pdx-engine.txt");
         host.open_document(id.clone(), 1, "overlay".to_owned(), Some(path.clone()))
             .expect("open should succeed");
@@ -3367,10 +3730,16 @@ mod tests {
         ] {
             fs::create_dir_all(directory).expect("fixture directory");
         }
-        fs::write(vanilla.join("common/events/foo.txt"), "country_event = { id = foo.1 }\n")
-            .expect("vanilla event");
-        fs::write(dependency.join("common/events/foo.txt"), "country_event = { id = foo.1 }\n")
-            .expect("dependency event");
+        fs::write(
+            vanilla.join("common/events/foo.txt"),
+            "country_event = { id = foo.1 }\n",
+        )
+        .expect("vanilla event");
+        fs::write(
+            dependency.join("common/events/foo.txt"),
+            "country_event = { id = foo.1 }\n",
+        )
+        .expect("dependency event");
         fs::write(
             dependency.join("common/scripted_effects/effects.txt"),
             "heal_army = { add_manpower = 1 }\n",
@@ -3418,16 +3787,42 @@ mod tests {
         let event_definitions = snapshot.index().definitions("event", "foo.1");
         assert_eq!(event_definitions.len(), 3);
         assert_eq!(
-            snapshot.index().active_definition("event", "foo.1").expect("active event").file_id,
+            snapshot
+                .index()
+                .active_definition("event", "foo.1")
+                .expect("active event")
+                .file_id,
             event_definitions[0].file_id
         );
-        assert_eq!(snapshot.index().definitions("scripted_effect", "heal_army").len(), 1);
-        assert_eq!(snapshot.index().definitions("scripted_trigger", "is_ready").len(), 1);
-        assert_eq!(snapshot.index().definitions("localisation", "foo_name").len(), 1);
+        assert_eq!(
+            snapshot
+                .index()
+                .definitions("scripted_effect", "heal_army")
+                .len(),
+            1
+        );
+        assert_eq!(
+            snapshot
+                .index()
+                .definitions("scripted_trigger", "is_ready")
+                .len(),
+            1
+        );
+        assert_eq!(
+            snapshot
+                .index()
+                .definitions("localisation", "foo_name")
+                .len(),
+            1
+        );
 
         let logical = LogicalPath::new("common/events/foo.txt");
         assert_eq!(
-            snapshot.resolve(&logical).iter().filter(|candidate| candidate.active).count(),
+            snapshot
+                .resolve(&logical)
+                .iter()
+                .filter(|candidate| candidate.active)
+                .count(),
             1
         );
         host.open_document(
@@ -3439,7 +3834,12 @@ mod tests {
         .expect("overlay");
         let overlay_snapshot = host.snapshot();
         let resolved = overlay_snapshot.resolve(&logical);
-        assert!(resolved.first().and_then(|candidate| candidate.document_id.as_ref()).is_some());
+        assert!(
+            resolved
+                .first()
+                .and_then(|candidate| candidate.document_id.as_ref())
+                .is_some()
+        );
         assert!(resolved.first().is_some_and(|candidate| candidate.active));
         fs::remove_dir_all(root).expect("cleanup");
     }
@@ -3467,12 +3867,16 @@ mod tests {
         .expect("current definition");
 
         let mut vanilla_host = eu4_host();
-        vanilla_host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(0),
-            SourceRootKind::Vanilla,
-            fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
-        )]));
-        vanilla_host.refresh_source_roots().expect("scan Vanilla once");
+        vanilla_host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(0),
+                SourceRootKind::Vanilla,
+                fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+            ),
+        ]));
+        vanilla_host
+            .refresh_source_roots()
+            .expect("scan Vanilla once");
         let cache =
             VanillaIndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
         let cache_path = root.join("cache/vanilla.pdxindex");
@@ -3490,13 +3894,19 @@ mod tests {
 
         let foreign_path = root.join("foreign.sqlite");
         let foreign = rusqlite::Connection::open(&foreign_path).expect("foreign database");
-        foreign.execute("CREATE TABLE marker(value TEXT)", []).expect("foreign schema");
+        foreign
+            .execute("CREATE TABLE marker(value TEXT)", [])
+            .expect("foreign schema");
         drop(foreign);
-        assert!(matches!(cache.save(&foreign_path), Err(VanillaCacheError::NotVanillaCache)));
+        assert!(matches!(
+            cache.save(&foreign_path),
+            Err(VanillaCacheError::NotVanillaCache)
+        ));
         let foreign = rusqlite::Connection::open(&foreign_path).expect("reopen foreign database");
         assert_eq!(
             foreign
-                .query_row("SELECT count(*) FROM marker", [], |row| row.get::<_, i64>(0))
+                .query_row("SELECT count(*) FROM marker", [], |row| row
+                    .get::<_, i64>(0))
                 .expect("foreign table remains"),
             0
         );
@@ -3504,14 +3914,18 @@ mod tests {
 
         fs::rename(&vanilla, root.join("vanilla-moved")).expect("make original source unavailable");
         let mut host = eu4_host();
-        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(u32::MAX),
-            SourceRootKind::CurrentMod,
-            fs::canonicalize(&current).expect("canonical current root"),
-        )]));
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(u32::MAX),
+                SourceRootKind::CurrentMod,
+                fs::canonicalize(&current).expect("canonical current root"),
+            ),
+        ]));
         host.refresh_source_roots().expect("scan current root");
-        host.install_vanilla_cache(loaded).expect("install cache without Vanilla source access");
-        host.refresh_source_roots().expect("refresh must skip unavailable Vanilla root");
+        host.install_vanilla_cache(loaded)
+            .expect("install cache without Vanilla source access");
+        host.refresh_source_roots()
+            .expect("refresh must skip unavailable Vanilla root");
 
         let snapshot = host.snapshot();
         assert_eq!(snapshot.source_roots()[0].kind, SourceRootKind::Vanilla);
@@ -3520,7 +3934,11 @@ mod tests {
             .active_definition("event", "shared.1")
             .expect("current definition wins");
         assert_eq!(
-            snapshot.source_files().get(&shared.file_id).expect("shared file").root_id,
+            snapshot
+                .source_files()
+                .get(&shared.file_id)
+                .expect("shared file")
+                .root_id,
             SourceRootId::new(u32::MAX)
         );
         let vanilla_definition = snapshot

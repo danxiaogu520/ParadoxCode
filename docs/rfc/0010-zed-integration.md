@@ -4,7 +4,7 @@
 - MVP：EU4 v0.1
 
 > 2026-07-21 amendment：扩展携带规则和 `--rules` 启动参数已由
-> [RFC 0014](0014-embedded-first-party-rules.md) 取代。扩展只下载、校验、缓存并启动内嵌
+> [RFC 0013](0013-embedded-first-party-rules.md) 取代。扩展只下载、校验、缓存并启动内嵌
 > 第一方规则的官方 server。
 
 ## 原则
@@ -109,12 +109,12 @@ installation status 返回可操作错误。native 单测锁定 sidecar、受限
 
 extension 不自行构建 Rust server，也不运行 package manager 安装脚本。
 
-仓库内的 `scripts/package-server-release.py` 按上述 target matrix 生成只含一个 executable
-的 deterministic `.tar.gz`/`.zip` 与相邻 `{archive}.sha256`；CI 用原创 fixture 同时验证
-Linux/macOS archive contract、Windows archive contract、executable mode、checksum 和
-重复打包字节稳定性。packager、完整矩阵 verifier 和测试通过共用 loader 读取
-`server-distribution.json`，不各自复制 target/filename table；checksum/archive/executable
-大小上限也在该契约中声明，并由 Python producer/verifier、Rust mapping test 与 policy
+仓库内的 `pdx release package` 子命令按上述 target matrix 生成只含一个 executable
+的 deterministic `.tar.gz`/`.zip` 与相邻 `{archive}.sha256`；`cargo test` 用原创 fixture
+同时验证 Linux/macOS archive contract、Windows archive contract、executable mode、checksum
+和重复打包字节稳定性。packager、完整矩阵 verifier 和测试通过共用 `crates/pdx-lsp/src/release.rs`
+读取 `server-distribution.json`，不各自复制 target/filename table；checksum/archive/executable
+大小上限也在该契约中声明，并由 Rust producer/verifier 与 policy
 共同锁定。tag workflow 在五种原生
 runner 上构建并校验 server 版本，汇总后
 必须由完整矩阵 verifier 接受才创建 immutable GitHub Release。发布资产上的 clean-machine

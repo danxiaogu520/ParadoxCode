@@ -62,7 +62,11 @@ pub struct CstNode {
 
 impl CstNode {
     pub(crate) fn new(kind: CstKind, range: TextRange, children: Vec<CstNode>) -> Self {
-        Self { kind, range, children }
+        Self {
+            kind,
+            range,
+            children,
+        }
     }
 
     /// Returns the node kind.
@@ -192,7 +196,11 @@ pub struct SyntaxError {
 
 impl SyntaxError {
     pub(crate) fn new(kind: SyntaxErrorKind, range: TextRange, message: impl Into<String>) -> Self {
-        Self { kind, range, message: message.into() }
+        Self {
+            kind,
+            range,
+            message: message.into(),
+        }
     }
 
     /// Returns the stable diagnostic code.

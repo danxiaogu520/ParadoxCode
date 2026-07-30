@@ -16,12 +16,12 @@ use pdx_engine::hir::{
     HirFile, HirReferenceOrigin, Scope, ScopeState, ScopeValue,
     semantic_root_context as hir_semantic_root_context,
 };
-use pdx_rules::{GameProfile, KeyMatcher, RuleShape, SymbolResolutionPolicy, ValueMatcher};
-use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile, SyntaxError};
-use pdx_text::{LogicalPath, TextRange, TextSize};
 use pdx_engine::{
     AnalysisSnapshot, Definition, DocumentId, DocumentSource, ParsedSource, SourceFileId,
 };
+use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile, SyntaxError};
+use pdx_rules::{GameProfile, KeyMatcher, RuleShape, SymbolResolutionPolicy, ValueMatcher};
+use pdx_text::{LogicalPath, TextRange, TextSize};
 
 /// Shared cooperative-cancellation state for editor-neutral analysis queries.
 ///
@@ -67,13 +67,21 @@ impl CancellationToken {
         if self
             .remaining_checkpoints
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
-                if remaining != usize::MAX && remaining > 0 { Some(remaining - 1) } else { None }
+                if remaining != usize::MAX && remaining > 0 {
+                    Some(remaining - 1)
+                } else {
+                    None
+                }
             })
             .is_err_and(|remaining| remaining == 0)
         {
             self.cancel();
         }
-        if self.is_cancelled() { Err(Cancelled) } else { Ok(()) }
+        if self.is_cancelled() {
+            Err(Cancelled)
+        } else {
+            Ok(())
+        }
     }
 
     #[cfg(test)]
@@ -376,9 +384,17 @@ pub fn analyze(snapshot: &AnalysisSnapshot) -> AnalysisResult {
         }
     }
     diagnostics.sort_by_key(|diagnostic| {
-        (diagnostic.range.start(), diagnostic.range.end(), diagnostic.code)
+        (
+            diagnostic.range.start(),
+            diagnostic.range.end(),
+            diagnostic.code,
+        )
     });
-    AnalysisResult { revision: snapshot.revision(), scope: Scope::Unknown, diagnostics }
+    AnalysisResult {
+        revision: snapshot.revision(),
+        scope: Scope::Unknown,
+        diagnostics,
+    }
 }
 
 /// Analyses one open or disk-backed document.
@@ -404,7 +420,11 @@ pub fn analyze_source_file(
 /// Returns diagnostics for one document, or an empty vector for unsupported/nonexistent files.
 #[must_use]
 pub fn diagnostics(snapshot: &AnalysisSnapshot, document: &DocumentId) -> Vec<Diagnostic> {
-    uncancelled(diagnostics_with_cancellation(snapshot, document, &CancellationToken::new()))
+    uncancelled(diagnostics_with_cancellation(
+        snapshot,
+        document,
+        &CancellationToken::new(),
+    ))
 }
 
 /// Returns diagnostics while cooperatively stopping when `cancellation` is marked.
@@ -414,7 +434,9 @@ pub fn diagnostics_with_cancellation(
     cancellation: &CancellationToken,
 ) -> Result<Vec<Diagnostic>, Cancelled> {
     cancellation.checkpoint()?;
-    let Some(input) = input_for_document(snapshot, document) else { return Ok(Vec::new()) };
+    let Some(input) = input_for_document(snapshot, document) else {
+        return Ok(Vec::new());
+    };
     analyze_input_with_cancellation(snapshot, &input, cancellation)
         .map(|analysis| analysis.diagnostics)
 }
@@ -426,7 +448,12 @@ pub fn complete(
     document: &DocumentId,
     position: TextSize,
 ) -> CompletionResult {
-    uncancelled(complete_with_cancellation(snapshot, document, position, &CancellationToken::new()))
+    uncancelled(complete_with_cancellation(
+        snapshot,
+        document,
+        position,
+        &CancellationToken::new(),
+    ))
 }
 
 /// Computes completion with cooperative cancellation checkpoints.
@@ -438,10 +465,16 @@ pub fn complete_with_cancellation(
 ) -> Result<CompletionResult, Cancelled> {
     cancellation.checkpoint()?;
     let Some(input) = input_for_document(snapshot, document) else {
-        return Ok(CompletionResult { revision: snapshot.revision(), items: Vec::new() });
+        return Ok(CompletionResult {
+            revision: snapshot.revision(),
+            items: Vec::new(),
+        });
     };
     let replacement_range = word_range(&input.source, position);
-    let prefix = input.source_text(replacement_range).unwrap_or_default().to_owned();
+    let prefix = input
+        .source_text(replacement_range)
+        .unwrap_or_default()
+        .to_owned();
     let value_context = completion_value_context(&input, position);
     let mut items = Vec::new();
     let mut member_cache = CompletionMemberCache::default();
@@ -563,7 +596,10 @@ pub fn complete_with_cancellation(
     items.sort_by_key(|item| (item.sort_score, item.label.to_ascii_lowercase()));
     items.dedup_by(|left, right| left.label == right.label && left.kind == right.kind);
     cancellation.checkpoint()?;
-    Ok(CompletionResult { revision: snapshot.revision(), items })
+    Ok(CompletionResult {
+        revision: snapshot.revision(),
+        items,
+    })
 }
 
 #[derive(Clone, Debug)]
@@ -593,7 +629,9 @@ fn semantic_completion_context(
         let Some(context) = semantic_root_context(snapshot, &root.key, input.path.as_ref()) else {
             continue;
         };
-        let Some(block_range) = root.block_range else { continue };
+        let Some(block_range) = root.block_range else {
+            continue;
+        };
         if !contains(block_range, position) {
             continue;
         }
@@ -628,12 +666,15 @@ fn semantic_completion_container(
     position: TextSize,
 ) -> SemanticCompletionContext {
     for property in &properties {
-        let Some(block_range) = property.block_range else { continue };
+        let Some(block_range) = property.block_range else {
+            continue;
+        };
         if !contains(block_range, position) {
             continue;
         }
-        let transparent_wrapper =
-            snapshot.game_profile().is_transparent_scope_wrapper(&property.key);
+        let transparent_wrapper = snapshot
+            .game_profile()
+            .is_transparent_scope_wrapper(&property.key);
         let cached_child_fact = property
             .block
             .iter()
@@ -730,7 +771,9 @@ fn semantic_completion_container(
             position,
         );
     }
-    let property = properties.into_iter().find(|property| contains(property.range, position));
+    let property = properties
+        .into_iter()
+        .find(|property| contains(property.range, position));
     SemanticCompletionContext {
         context,
         parent_path,
@@ -791,10 +834,16 @@ fn semantic_rules_for_container<'a>(
     parent_path: &[String],
     _scope: &ScopeContext,
 ) -> Vec<&'a pdx_rules::SemanticRule> {
-    let mut candidates = snapshot.rules().semantic_rules_for_context(context).collect::<Vec<_>>();
+    let mut candidates = snapshot
+        .rules()
+        .semantic_rules_for_context(context)
+        .collect::<Vec<_>>();
     if let Some(type_name) = context.strip_prefix("type:") {
-        candidates
-            .extend(snapshot.rules().semantic_rules_for_context(&format!("root:{type_name}")));
+        candidates.extend(
+            snapshot
+                .rules()
+                .semantic_rules_for_context(&format!("root:{type_name}")),
+        );
         candidates.sort_by(|left, right| left.id.cmp(&right.id));
     }
     candidates
@@ -824,7 +873,9 @@ impl CompletionMemberCache {
     ) -> &[String] {
         let cache_key = (type_name.to_ascii_lowercase(), prefix.to_ascii_lowercase());
         self.workspace.entry(cache_key).or_insert_with(|| {
-            let base = type_name.split_once('.').map_or(type_name, |(kind, _)| kind);
+            let base = type_name
+                .split_once('.')
+                .map_or(type_name, |(kind, _)| kind);
             let alias = snapshot.game_profile().member_kind_alias(base);
             let mut kinds = vec![type_name, base];
             if let Some(alias) = alias {
@@ -860,7 +911,11 @@ impl CompletionMemberCache {
                 .get(enum_name)
                 .cloned()
                 .unwrap_or_default();
-            names.extend(self.workspace_member_names(snapshot, enum_name, prefix).iter().cloned());
+            names.extend(
+                self.workspace_member_names(snapshot, enum_name, prefix)
+                    .iter()
+                    .cloned(),
+            );
             names.retain(|name| starts_with_ignore_ascii_case(name, prefix));
             names.sort_by_key(|name| name.to_ascii_lowercase());
             names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
@@ -1262,7 +1317,14 @@ fn add_numeric_completion(
     prefix: &str,
 ) {
     if let Some(label) = label {
-        add_value_completion(items, label, detail, documentation, replacement_range, prefix);
+        add_value_completion(
+            items,
+            label,
+            detail,
+            documentation,
+            replacement_range,
+            prefix,
+        );
     }
 }
 
@@ -1293,7 +1355,12 @@ pub fn hover(
     document: &DocumentId,
     position: TextSize,
 ) -> Option<Hover> {
-    uncancelled(hover_with_cancellation(snapshot, document, position, &CancellationToken::new()))
+    uncancelled(hover_with_cancellation(
+        snapshot,
+        document,
+        position,
+        &CancellationToken::new(),
+    ))
 }
 
 /// Computes hover information with cooperative cancellation checkpoints.
@@ -1304,7 +1371,9 @@ pub fn hover_with_cancellation(
     cancellation: &CancellationToken,
 ) -> Result<Option<Hover>, Cancelled> {
     cancellation.checkpoint()?;
-    let Some(input) = input_for_document(snapshot, document) else { return Ok(None) };
+    let Some(input) = input_for_document(snapshot, document) else {
+        return Ok(None);
+    };
     if let Some((definition, reference)) = local_parameter_target(&input, position) {
         return Ok(Some(Hover {
             contents: format!(
@@ -1315,7 +1384,10 @@ pub fn hover_with_cancellation(
         }));
     }
     let range = word_range(&input.source, position);
-    let Some(word) = input.source_text(range).map(|word| word.trim_matches('"').to_owned()) else {
+    let Some(word) = input
+        .source_text(range)
+        .map(|word| word.trim_matches('"').to_owned())
+    else {
         return Ok(None);
     };
     if word.is_empty() {
@@ -1325,7 +1397,13 @@ pub fn hover_with_cancellation(
     if let Some(reference) = all.references.iter().find(|reference| {
         reference.document.as_ref() == Some(document) && contains(reference.range, position)
     }) {
-        return Ok(Some(hover_for_symbol(snapshot, &all, &reference.kind, &reference.name, range)));
+        return Ok(Some(hover_for_symbol(
+            snapshot,
+            &all,
+            &reference.kind,
+            &reference.name,
+            range,
+        )));
     }
     if let Some(definition) = all.definitions.iter().find(|definition| {
         definition.document.as_ref() == Some(document)
@@ -1352,9 +1430,15 @@ pub fn hover_with_cancellation(
             || format!("PDX property `{word}`"),
             |details| format!("PDX property `{word}`\n\n{details}"),
         );
-        return Ok(Some(Hover { contents, range: Some(range) }));
+        return Ok(Some(Hover {
+            contents,
+            range: Some(range),
+        }));
     }
-    Ok(Some(Hover { contents: format!("PDX value `{word}`"), range: Some(range) }))
+    Ok(Some(Hover {
+        contents: format!("PDX value `{word}`"),
+        range: Some(range),
+    }))
 }
 
 fn semantic_rule_documentation(snapshot: &AnalysisSnapshot, key: &str) -> Option<String> {
@@ -1397,9 +1481,15 @@ fn semantic_rule_documentation_at(
         })
         .collect::<Vec<_>>();
     rules.sort_by_key(|candidate| {
-        (&candidate.rule.context, &candidate.rule.parent_path, &candidate.rule.id)
+        (
+            &candidate.rule.context,
+            &candidate.rule.parent_path,
+            &candidate.rule.id,
+        )
     });
-    rules.into_iter().find_map(|candidate| semantic_rule_documentation_for_rule(candidate.rule))
+    rules
+        .into_iter()
+        .find_map(|candidate| semantic_rule_documentation_for_rule(candidate.rule))
 }
 
 fn semantic_rule_documentation_for_rule(rule: &pdx_rules::SemanticRule) -> Option<String> {
@@ -1489,7 +1579,9 @@ pub fn references_with_cancellation(
         return Ok(Vec::new());
     };
     if let Some((definition, _)) = local_parameter_target(&input, position) {
-        let Some(hir) = input.hir.as_deref() else { return Ok(Vec::new()) };
+        let Some(hir) = input.hir.as_deref() else {
+            return Ok(Vec::new());
+        };
         let mut result = Vec::new();
         if include_declaration {
             result.push(local_location(&input, definition.name_range));
@@ -1529,7 +1621,10 @@ pub fn references_with_cancellation(
     }
     result.sort_by_key(|location| {
         (
-            location.path.as_ref().map_or(String::new(), |path| path.as_str().to_owned()),
+            location
+                .path
+                .as_ref()
+                .map_or(String::new(), |path| path.as_str().to_owned()),
             location.range.start(),
         )
     });
@@ -1561,7 +1656,9 @@ pub fn prepare_rename_with_cancellation(
     position: TextSize,
     cancellation: &CancellationToken,
 ) -> Result<PrepareRenameResult, RenameFailure> {
-    cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
+    cancellation
+        .checkpoint()
+        .map_err(|Cancelled| RenameFailure::Cancelled)?;
     let input = input_for_document(snapshot, document).ok_or(RenameError::NoSymbol)?;
     if let Some((_, reference)) = local_parameter_target(&input, position) {
         if !writable_location(snapshot, &local_location(&input, reference.name_range)) {
@@ -1573,9 +1670,14 @@ pub fn prepare_rename_with_cancellation(
         });
     }
     let target = rename_target(snapshot, document, position, cancellation)?;
-    let placeholder =
-        input.source_text(target.cursor_range).ok_or(RenameError::NoSymbol)?.to_owned();
-    Ok(PrepareRenameResult { range: target.cursor_range, placeholder })
+    let placeholder = input
+        .source_text(target.cursor_range)
+        .ok_or(RenameError::NoSymbol)?
+        .to_owned();
+    Ok(PrepareRenameResult {
+        range: target.cursor_range,
+        placeholder,
+    })
 }
 
 /// Builds a safe, editor-neutral WorkspaceEdit for a semantic rename.
@@ -1608,7 +1710,9 @@ pub fn rename_with_cancellation(
     new_name: &str,
     cancellation: &CancellationToken,
 ) -> Result<WorkspaceEditPlan, RenameFailure> {
-    cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
+    cancellation
+        .checkpoint()
+        .map_err(|Cancelled| RenameFailure::Cancelled)?;
     if !valid_rename_name(new_name) {
         return Err(RenameError::InvalidName.into());
     }
@@ -1623,10 +1727,13 @@ pub fn rename_with_cancellation(
         let Some(hir) = input.hir.as_deref() else {
             return Err(RenameError::NoSymbol.into());
         };
-        if hir.parameter_definitions_for_owner(definition.owner_range).any(|candidate| {
-            candidate.name_range != definition.name_range
-                && candidate.name.eq_ignore_ascii_case(new_name)
-        }) {
+        if hir
+            .parameter_definitions_for_owner(definition.owner_range)
+            .any(|candidate| {
+                candidate.name_range != definition.name_range
+                    && candidate.name.eq_ignore_ascii_case(new_name)
+            })
+        {
             return Err(RenameError::Conflict.into());
         }
         let mut edits = Vec::new();
@@ -1634,7 +1741,9 @@ pub fn rename_with_cancellation(
             .parameter_references_for_owner(definition.owner_range)
             .filter(|reference| reference.name.eq_ignore_ascii_case(&definition.name))
         {
-            cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
+            cancellation
+                .checkpoint()
+                .map_err(|Cancelled| RenameFailure::Cancelled)?;
             edits.push(WorkspaceTextEdit {
                 location: local_location(&input, reference.name_range),
                 new_text: new_name.to_owned(),
@@ -1649,7 +1758,10 @@ pub fn rename_with_cancellation(
                 .then_with(|| right.location.range.end().cmp(&left.location.range.end()))
         });
         edits.dedup_by(|left, right| left.location == right.location);
-        return Ok(WorkspaceEditPlan { revision: snapshot.revision(), edits });
+        return Ok(WorkspaceEditPlan {
+            revision: snapshot.revision(),
+            edits,
+        });
     }
     let target = rename_target(snapshot, document, position, cancellation)?;
     let all =
@@ -1665,14 +1777,18 @@ pub fn rename_with_cancellation(
     }];
     let overlay_files = overlay_file_ids(snapshot);
     for reference in &all.references {
-        cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
+        cancellation
+            .checkpoint()
+            .map_err(|Cancelled| RenameFailure::Cancelled)?;
         if reference.kind != target.kind || !same_name(&reference.name, &target.name) {
             continue;
         }
         // A document overlay replaces its disk candidate.  Do not return edits for the hidden
         // disk text as that would overwrite user changes when the client applies the WorkspaceEdit.
         if reference.document.is_none()
-            && reference.file.is_some_and(|file| overlay_files.contains(&file))
+            && reference
+                .file
+                .is_some_and(|file| overlay_files.contains(&file))
         {
             continue;
         }
@@ -1694,19 +1810,34 @@ pub fn rename_with_cancellation(
     edits.sort_by(|left, right| {
         edit_target_key(&left.location)
             .cmp(&edit_target_key(&right.location))
-            .then_with(|| right.location.range.start().cmp(&left.location.range.start()))
+            .then_with(|| {
+                right
+                    .location
+                    .range
+                    .start()
+                    .cmp(&left.location.range.start())
+            })
             .then_with(|| right.location.range.end().cmp(&left.location.range.end()))
     });
     edits
         .dedup_by(|left, right| left.location == right.location && left.new_text == right.new_text);
-    cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
-    Ok(WorkspaceEditPlan { revision: snapshot.revision(), edits })
+    cancellation
+        .checkpoint()
+        .map_err(|Cancelled| RenameFailure::Cancelled)?;
+    Ok(WorkspaceEditPlan {
+        revision: snapshot.revision(),
+        edits,
+    })
 }
 
 /// Returns symbols declared by one document.
 #[must_use]
 pub fn document_symbols(snapshot: &AnalysisSnapshot, document: &DocumentId) -> Vec<Symbol> {
-    uncancelled(document_symbols_with_cancellation(snapshot, document, &CancellationToken::new()))
+    uncancelled(document_symbols_with_cancellation(
+        snapshot,
+        document,
+        &CancellationToken::new(),
+    ))
 }
 
 /// Returns document symbols with cooperative cancellation checkpoints.
@@ -1720,7 +1851,10 @@ pub fn document_symbols_with_cancellation(
         return Ok(Vec::new());
     };
     let data = semantic_data(&input);
-    let parameter_count = input.hir.as_deref().map_or(0, |hir| hir.parameter_definitions().len());
+    let parameter_count = input
+        .hir
+        .as_deref()
+        .map_or(0, |hir| hir.parameter_definitions().len());
     let mut result = Vec::with_capacity(data.definitions.len() + parameter_count);
     for definition in data.definitions {
         cancellation.checkpoint()?;
@@ -1752,7 +1886,11 @@ pub fn document_symbols_with_cancellation(
 /// Returns active workspace symbols using deterministic prefix/fuzzy ranking.
 #[must_use]
 pub fn workspace_symbols(snapshot: &AnalysisSnapshot, query: &str) -> Vec<WorkspaceSymbol> {
-    uncancelled(workspace_symbols_with_cancellation(snapshot, query, &CancellationToken::new()))
+    uncancelled(workspace_symbols_with_cancellation(
+        snapshot,
+        query,
+        &CancellationToken::new(),
+    ))
 }
 
 /// Returns workspace symbols with cooperative cancellation checkpoints.
@@ -1789,7 +1927,11 @@ pub fn workspace_symbols_with_cancellation(
         }
     }
     result.sort_by_key(|(score, symbol)| {
-        (*score, symbol.name.to_ascii_lowercase(), symbol.kind.clone())
+        (
+            *score,
+            symbol.name.to_ascii_lowercase(),
+            symbol.kind.clone(),
+        )
     });
     cancellation.checkpoint()?;
     Ok(result.into_iter().map(|(_, symbol)| symbol).collect())
@@ -1891,16 +2033,24 @@ enum Resolution {
 
 fn input_for_document(snapshot: &AnalysisSnapshot, id: &DocumentId) -> Option<ParsedInput> {
     let document = snapshot.document(id)?;
-    let path = document.path().and_then(|path| logical_path(snapshot, path)).or_else(|| {
-        id.as_str()
-            .split(['/', '\\'])
-            .next_back()
-            .filter(|name| name.contains('.'))
-            .and_then(|name| LogicalPath::parse(name).ok())
-    });
+    let path = document
+        .path()
+        .and_then(|path| logical_path(snapshot, path))
+        .or_else(|| {
+            id.as_str()
+                .split(['/', '\\'])
+                .next_back()
+                .filter(|name| name.contains('.'))
+                .and_then(|name| LogicalPath::parse(name).ok())
+        });
     let file = document
         .path()
-        .and_then(|path| snapshot.source_files().values().find(|file| file.physical_path == path))
+        .and_then(|path| {
+            snapshot
+                .source_files()
+                .values()
+                .find(|file| file.physical_path == path)
+        })
         .map(|file| file.id);
     let source = document.text_handle();
     let parsed = document.parsed()?;
@@ -1948,12 +2098,17 @@ fn logical_path(snapshot: &AnalysisSnapshot, path: &Path) -> Option<LogicalPath>
         .filter_map(|relative| LogicalPath::parse(&relative.to_string_lossy()).ok())
         .min_by_key(|path| path.as_str().len())
         .or_else(|| {
-            path.file_name().and_then(|name| LogicalPath::parse(&name.to_string_lossy()).ok())
+            path.file_name()
+                .and_then(|name| LogicalPath::parse(&name.to_string_lossy()).ok())
         })
 }
 
 fn analyze_input(snapshot: &AnalysisSnapshot, input: &ParsedInput) -> FileAnalysis {
-    uncancelled(analyze_input_with_cancellation(snapshot, input, &CancellationToken::new()))
+    uncancelled(analyze_input_with_cancellation(
+        snapshot,
+        input,
+        &CancellationToken::new(),
+    ))
 }
 
 fn analyze_input_with_cancellation(
@@ -2003,7 +2158,11 @@ fn analyze_input_with_cancellation(
         }
     }
     diagnostics.sort_by_key(|diagnostic| {
-        (diagnostic.range.start(), diagnostic.range.end(), diagnostic.code)
+        (
+            diagnostic.range.start(),
+            diagnostic.range.end(),
+            diagnostic.code,
+        )
     });
     diagnostics.dedup_by(|left, right| {
         left.code == right.code
@@ -2019,13 +2178,21 @@ fn analyze_input_with_cancellation(
         format: Some(input.format),
         scope: Scope::Unknown,
         diagnostics,
-        symbols: semantic.definitions.into_iter().map(|definition| definition.symbol).collect(),
+        symbols: semantic
+            .definitions
+            .into_iter()
+            .map(|definition| definition.symbol)
+            .collect(),
         references: semantic
             .references
             .into_iter()
             .map(|reference| {
                 let location = reference.location();
-                ReferenceInfo { kind: reference.kind, name: reference.name, location }
+                ReferenceInfo {
+                    kind: reference.kind,
+                    name: reference.name,
+                    location,
+                }
             })
             .collect(),
     })
@@ -2086,16 +2253,20 @@ fn semantic_rule_diagnostics(
         let scope =
             semantic_initial_scope(snapshot, input, &context, &property.key, property.key_range);
         if let Some(type_name) = context.strip_prefix("type:")
-            && snapshot.rules().model().semantic.type_descriptors.get(type_name).is_some_and(
-                |descriptor| {
+            && snapshot
+                .rules()
+                .model()
+                .semantic
+                .type_descriptors
+                .get(type_name)
+                .is_some_and(|descriptor| {
                     descriptor.skip_root_paths.iter().any(|path| {
                         path.first().is_some_and(|key| {
                             key.eq_ignore_ascii_case("any")
                                 || key.eq_ignore_ascii_case(&property.key)
                         })
                     })
-                },
-            )
+                })
         {
             for child in &property.block {
                 let child_scope =
@@ -2177,7 +2348,10 @@ fn scope_context_from_hir(profile: Arc<GameProfile>, state: &ScopeState) -> Scop
     ScopeContext {
         profile,
         root: spelling(&state.root),
-        current: state.current.first().map_or_else(|| "any".to_owned(), spelling),
+        current: state
+            .current
+            .first()
+            .map_or_else(|| "any".to_owned(), spelling),
         from: state.from.iter().map(spelling).collect(),
         previous: state.previous.iter().map(spelling).collect(),
     }
@@ -2198,9 +2372,15 @@ fn script_properties(input: &ParsedInput, parent: &CstNode) -> Vec<ScriptPropert
         .filter(|node| node.kind() == CstKind::Property)
         .filter_map(|node| {
             let (key, key_range) = property_key(input, node)?;
-            let value = node.children().iter().find(|child| child.kind() == CstKind::Value);
+            let value = node
+                .children()
+                .iter()
+                .find(|child| child.kind() == CstKind::Value);
             let block_node = value.and_then(|value| {
-                value.children().iter().find(|child| child.kind() == CstKind::Block)
+                value
+                    .children()
+                    .iter()
+                    .find(|child| child.kind() == CstKind::Block)
             });
             let block = block_node.map_or_else(Vec::new, |block| script_properties(input, block));
             let bare_values = block_node.map_or_else(Vec::new, |block| {
@@ -2276,8 +2456,9 @@ fn validate_semantic_container(
         let key = property.key.to_ascii_lowercase();
         let count = counts.entry(key).or_default();
         *count = count.saturating_add(1);
-        let transparent_wrapper =
-            snapshot.game_profile().is_transparent_scope_wrapper(&property.key);
+        let transparent_wrapper = snapshot
+            .game_profile()
+            .is_transparent_scope_wrapper(&property.key);
         let matching = rules
             .iter()
             .filter(|rule| {
@@ -2294,7 +2475,10 @@ fn validate_semantic_container(
                 code: DiagnosticCode::UnknownKey,
                 severity: DiagnosticCode::UnknownKey.severity(),
                 range: property.key_range,
-                message: format!("unexpected key `{}` in rule context `{context}`", property.key),
+                message: format!(
+                    "unexpected key `{}` in rule context `{context}`",
+                    property.key
+                ),
             });
         } else {
             let scoped_matching = matching
@@ -2316,7 +2500,11 @@ fn validate_semantic_container(
                     ),
                 });
             }
-            let applicable = if scoped_matching.is_empty() { &matching } else { &scoped_matching };
+            let applicable = if scoped_matching.is_empty() {
+                &matching
+            } else {
+                &scoped_matching
+            };
             let valid = applicable
                 .iter()
                 .any(|rule| semantic_property_matches(snapshot, rule, property, scope));
@@ -2327,7 +2515,10 @@ fn validate_semantic_container(
                         applicable.iter().copied(),
                         DiagnosticCode::InvalidValue,
                     ),
-                    range: property.scalar.as_ref().map_or(property.key_range, |(_, range)| *range),
+                    range: property
+                        .scalar
+                        .as_ref()
+                        .map_or(property.key_range, |(_, range)| *range),
                     message: format!(
                         "value of `{}` does not match the semantic rule",
                         property.key
@@ -2433,8 +2624,11 @@ fn validate_semantic_container(
                                 )
                         })
                     });
-                let (structural_values, transition_values): (Vec<_>, Vec<_>) =
-                    property.bare_values.iter().cloned().partition(|(value, _)| {
+                let (structural_values, transition_values): (Vec<_>, Vec<_>) = property
+                    .bare_values
+                    .iter()
+                    .cloned()
+                    .partition(|(value, _)| {
                         structural_rules.iter().any(|rule| {
                             matches!(rule.shape, RuleShape::LeafValue)
                                 && semantic_leaf_value_matches(snapshot, rule, value, scope)
@@ -2498,9 +2692,13 @@ fn validate_semantic_container(
             });
         }
     }
-    let empty_range =
-        properties.first().map_or_else(|| TextRange::empty(0), |property| property.key_range);
-    for rule in rules.iter().filter(|rule| semantic_scope_allows(rule, scope)) {
+    let empty_range = properties
+        .first()
+        .map_or_else(|| TextRange::empty(0), |property| property.key_range);
+    for rule in rules
+        .iter()
+        .filter(|rule| semantic_scope_allows(rule, scope))
+    {
         cancellation.checkpoint()?;
         if !semantic_rule_is_selected(rule, selected_alternative.as_deref()) {
             continue;
@@ -2541,7 +2739,9 @@ fn validate_semantic_container(
             }
             continue;
         }
-        let Some(min_occurs) = rule.min_occurs else { continue };
+        let Some(min_occurs) = rule.min_occurs else {
+            continue;
+        };
         let count = properties
             .iter()
             .filter(|property| {
@@ -2566,7 +2766,9 @@ fn validate_semantic_container(
 }
 
 fn semantic_rule_is_selected(rule: &pdx_rules::SemanticRule, selected: Option<&str>) -> bool {
-    rule.alternative_id.as_deref().is_none_or(|alternative| selected == Some(alternative))
+    rule.alternative_id
+        .as_deref()
+        .is_none_or(|alternative| selected == Some(alternative))
 }
 
 /// Alias-definition cardinality describes the fields inside one invocation. It must not be
@@ -2661,25 +2863,39 @@ fn semantic_transition_destination(
 }
 
 fn semantic_transitions_equivalent(rules: &[&pdx_rules::SemanticRule]) -> bool {
-    let Some(first) = rules.first() else { return false };
+    let Some(first) = rules.first() else {
+        return false;
+    };
     rules.iter().all(|candidate| {
         semantic_optional_text_eq(
             first.child_context.as_deref(),
             candidate.child_context.as_deref(),
         ) && semantic_optional_text_eq(first.push_scope.as_deref(), candidate.push_scope.as_deref())
             && first.replace_scope.len() == candidate.replace_scope.len()
-            && first.replace_scope.iter().all(|(left_register, left_scope)| {
-                candidate.replace_scope.iter().any(|(right_register, right_scope)| {
-                    left_register.eq_ignore_ascii_case(right_register)
-                        && left_scope.eq_ignore_ascii_case(right_scope)
+            && first
+                .replace_scope
+                .iter()
+                .all(|(left_register, left_scope)| {
+                    candidate
+                        .replace_scope
+                        .iter()
+                        .any(|(right_register, right_scope)| {
+                            left_register.eq_ignore_ascii_case(right_register)
+                                && left_scope.eq_ignore_ascii_case(right_scope)
+                        })
                 })
-            })
-            && candidate.replace_scope.iter().all(|(right_register, right_scope)| {
-                first.replace_scope.iter().any(|(left_register, left_scope)| {
-                    left_register.eq_ignore_ascii_case(right_register)
-                        && left_scope.eq_ignore_ascii_case(right_scope)
+            && candidate
+                .replace_scope
+                .iter()
+                .all(|(right_register, right_scope)| {
+                    first
+                        .replace_scope
+                        .iter()
+                        .any(|(left_register, left_scope)| {
+                            left_register.eq_ignore_ascii_case(right_register)
+                                && left_scope.eq_ignore_ascii_case(right_scope)
+                        })
                 })
-            })
     })
 }
 
@@ -2755,7 +2971,11 @@ fn semantic_selected_alternative(
             Some(_) => {}
         }
     }
-    if tied { None } else { best.map(|(_, alternative)| alternative) }
+    if tied {
+        None
+    } else {
+        best.map(|(_, alternative)| alternative)
+    }
 }
 
 fn semantic_leaf_value_matches(
@@ -2785,9 +3005,9 @@ fn semantic_value_matcher_label(matcher: &ValueMatcher) -> String {
         ValueMatcher::Float { .. } => "float".to_owned(),
         ValueMatcher::Type(value) => format!("<{value}>"),
         ValueMatcher::Enum(value) => format!("enum[{value}]"),
-        ValueMatcher::Scope(value) => {
-            value.as_deref().map_or_else(|| "scope".to_owned(), |value| format!("scope[{value}]"))
-        }
+        ValueMatcher::Scope(value) => value
+            .as_deref()
+            .map_or_else(|| "scope".to_owned(), |value| format!("scope[{value}]")),
         ValueMatcher::Localisation => "localisation".to_owned(),
         ValueMatcher::Filepath => "filepath".to_owned(),
         ValueMatcher::Dynamic(value) => format!("value[{value}]"),
@@ -2813,12 +3033,14 @@ fn semantic_parent_path_matches(
 ) -> bool {
     expected.len() == actual.len()
         && expected.iter().zip(actual).all(|(expected, actual)| {
-            if let Some(type_name) =
-                expected.strip_prefix('<').and_then(|name| name.strip_suffix('>'))
+            if let Some(type_name) = expected
+                .strip_prefix('<')
+                .and_then(|name| name.strip_suffix('>'))
             {
                 workspace_member(snapshot, type_name, actual)
-            } else if let Some(enum_name) =
-                expected.strip_prefix("enum[").and_then(|name| name.strip_suffix(']'))
+            } else if let Some(enum_name) = expected
+                .strip_prefix("enum[")
+                .and_then(|name| name.strip_suffix(']'))
             {
                 enum_member(snapshot, enum_name, actual)
             } else {
@@ -2831,14 +3053,19 @@ fn semantic_rule_severity<'a>(
     rules: impl IntoIterator<Item = &'a pdx_rules::SemanticRule>,
     fallback: DiagnosticCode,
 ) -> u8 {
-    rules.into_iter().filter_map(|rule| rule.severity).min().unwrap_or_else(|| fallback.severity())
+    rules
+        .into_iter()
+        .filter_map(|rule| rule.severity)
+        .min()
+        .unwrap_or_else(|| fallback.severity())
 }
 
 fn semantic_min_cardinality_severity(rule: &pdx_rules::SemanticRule) -> u8 {
     if !rule.strict_min {
         2
     } else {
-        rule.severity.unwrap_or(DiagnosticCode::Cardinality.severity())
+        rule.severity
+            .unwrap_or(DiagnosticCode::Cardinality.severity())
     }
 }
 
@@ -2911,18 +3138,31 @@ fn resolve_scope_expression_context(
         return context.current.clone();
     }
     if let Some(depth) = repeated_scope_register_depth(&lowered, "from") {
-        return context.from.get(depth).cloned().unwrap_or_else(|| "any".to_owned());
+        return context
+            .from
+            .get(depth)
+            .cloned()
+            .unwrap_or_else(|| "any".to_owned());
     }
     if let Some(depth) = repeated_scope_register_depth(&lowered, "previous")
         .or_else(|| repeated_scope_register_depth(&lowered, "prev"))
     {
-        return context.previous.get(depth).cloned().unwrap_or_else(|| "any".to_owned());
+        return context
+            .previous
+            .get(depth)
+            .cloned()
+            .unwrap_or_else(|| "any".to_owned());
     }
 
-    let link_expression = snapshot.rules().exact_semantic_rules(expression).any(|rule| {
-        matches!(rule.context.to_ascii_lowercase().as_str(), "effect" | "trigger")
-            && rule.push_scope.is_some()
-    });
+    let link_expression = snapshot
+        .rules()
+        .exact_semantic_rules(expression)
+        .any(|rule| {
+            matches!(
+                rule.context.to_ascii_lowercase().as_str(),
+                "effect" | "trigger"
+            ) && rule.push_scope.is_some()
+        });
     if let Some(target) =
         resolve_scope_link_context(snapshot, context, &context.current, expression)
     {
@@ -2947,12 +3187,14 @@ fn resolve_scope_link_context(
         .rules()
         .exact_semantic_rules(expression)
         .filter_map(|rule| {
-            if !matches!(rule.context.to_ascii_lowercase().as_str(), "effect" | "trigger")
-                || !rule.allowed_scopes.is_empty()
-                    && !rule
-                        .allowed_scopes
-                        .iter()
-                        .any(|expected| context.profile.scopes_compatible(current, expected))
+            if !matches!(
+                rule.context.to_ascii_lowercase().as_str(),
+                "effect" | "trigger"
+            ) || !rule.allowed_scopes.is_empty()
+                && !rule
+                    .allowed_scopes
+                    .iter()
+                    .any(|expected| context.profile.scopes_compatible(current, expected))
             {
                 return None;
             }
@@ -2964,7 +3206,11 @@ fn resolve_scope_link_context(
         .collect::<Vec<_>>();
     targets.sort_by_key(|target| target.to_ascii_lowercase());
     targets.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
-    if targets.len() == 1 { Some(targets.remove(0)) } else { None }
+    if targets.len() == 1 {
+        Some(targets.remove(0))
+    } else {
+        None
+    }
 }
 
 fn set_scope_register(registers: &mut Vec<String>, depth: usize, value: &str) {
@@ -2976,7 +3222,11 @@ fn set_scope_register(registers: &mut Vec<String>, depth: usize, value: &str) {
 
 fn repeated_scope_register_depth(value: &str, token: &str) -> Option<usize> {
     let count = value.len().checked_div(token.len())?;
-    if count > 0 && token.repeat(count) == value { Some(count - 1) } else { None }
+    if count > 0 && token.repeat(count) == value {
+        Some(count - 1)
+    } else {
+        None
+    }
 }
 
 fn semantic_rule_key_matches(
@@ -2996,7 +3246,9 @@ fn qualified_parameter_names(
     rule: &pdx_rules::SemanticRule,
     parent_path: &[String],
 ) -> Option<Vec<String>> {
-    let KeyMatcher::Enum(enum_name) = &rule.key else { return None };
+    let KeyMatcher::Enum(enum_name) = &rule.key else {
+        return None;
+    };
     if !enum_name.eq_ignore_ascii_case("scripted_effect_params") {
         return None;
     }
@@ -3005,7 +3257,10 @@ fn qualified_parameter_names(
         .last()
         .and_then(|segment| segment.strip_prefix('<'))
         .and_then(|segment| segment.strip_suffix('>'))?;
-    if !matches!(owner_kind.to_ascii_lowercase().as_str(), "scripted_effect" | "scripted_trigger") {
+    if !matches!(
+        owner_kind.to_ascii_lowercase().as_str(),
+        "scripted_effect" | "scripted_trigger"
+    ) {
         return None;
     }
     let owner_name = parent_path.last()?;
@@ -3023,7 +3278,9 @@ fn parameter_names_for_owner(
         .values()
         .filter(|document| document.source() == DocumentSource::Overlay)
     {
-        let Some(hir) = document.hir_handle() else { continue };
+        let Some(hir) = document.hir_handle() else {
+            continue;
+        };
         for definition in hir.definitions().iter().filter(|definition| {
             definition.kind.eq_ignore_ascii_case(owner_kind)
                 && definition.name.eq_ignore_ascii_case(owner_name)
@@ -3042,7 +3299,9 @@ fn parameter_names_for_owner(
     let source_file = snapshot.source_files().get(&definition.file_id)?;
     let hidden_by_overlay = snapshot.documents().values().any(|document| {
         document.source() == DocumentSource::Overlay
-            && document.path().is_some_and(|path| path == source_file.physical_path)
+            && document
+                .path()
+                .is_some_and(|path| path == source_file.physical_path)
     });
     if hidden_by_overlay {
         return None;
@@ -3093,7 +3352,10 @@ fn semantic_property_matches(
         return false;
     }
     let Some((value, _)) = property.scalar.as_ref() else {
-        return matches!(rule.value, ValueMatcher::AnyScalar | ValueMatcher::Opaque(_));
+        return matches!(
+            rule.value,
+            ValueMatcher::AnyScalar | ValueMatcher::Opaque(_)
+        );
     };
     if let ValueMatcher::Dynamic(kind) = &rule.value {
         return semantic_dynamic_value_matches(snapshot, kind, value, scope_context);
@@ -3139,10 +3401,20 @@ fn semantic_dynamic_value_matches(
 }
 
 fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
-    let base = type_name.split_once('.').map_or(type_name, |(kind, _)| kind);
-    let candidates =
-        [type_name, base, snapshot.game_profile().member_kind_alias(base).unwrap_or(base)];
-    candidates.iter().any(|candidate| !snapshot.index().definitions(candidate, member).is_empty())
+    let base = type_name
+        .split_once('.')
+        .map_or(type_name, |(kind, _)| kind);
+    let candidates = [
+        type_name,
+        base,
+        snapshot
+            .game_profile()
+            .member_kind_alias(base)
+            .unwrap_or(base),
+    ];
+    candidates
+        .iter()
+        .any(|candidate| !snapshot.index().definitions(candidate, member).is_empty())
 }
 
 fn enum_member(snapshot: &AnalysisSnapshot, enum_name: &str, member: &str) -> bool {
@@ -3152,7 +3424,11 @@ fn enum_member(snapshot: &AnalysisSnapshot, enum_name: &str, member: &str) -> bo
         .semantic
         .enum_values
         .get(enum_name)
-        .is_some_and(|values| values.iter().any(|value| value.eq_ignore_ascii_case(member)));
+        .is_some_and(|values| {
+            values
+                .iter()
+                .any(|value| value.eq_ignore_ascii_case(member))
+        });
     static_member
         || snapshot.game_profile().enum_extra_member(enum_name, member)
         || snapshot
@@ -3177,7 +3453,9 @@ fn scope_member(scope: Option<&str>, member: &str, context: &ScopeContext) -> bo
     } else {
         Some(member)
     };
-    let Some(resolved) = resolved else { return false };
+    let Some(resolved) = resolved else {
+        return false;
+    };
     context.profile.is_scope(resolved)
         && scope.is_none_or(|expected| context.profile.scopes_compatible(resolved, expected))
 }
@@ -3198,8 +3476,13 @@ fn diagnostic_from_syntax(error: &SyntaxError) -> Diagnostic {
 }
 
 fn semantic_data(input: &ParsedInput) -> SemanticFile {
-    let mut data = SemanticFile { definitions: Vec::new(), references: Vec::new() };
-    let Some(hir) = input.hir.as_deref() else { return data };
+    let mut data = SemanticFile {
+        definitions: Vec::new(),
+        references: Vec::new(),
+    };
+    let Some(hir) = input.hir.as_deref() else {
+        return data;
+    };
     for definition in hir.definitions() {
         data.definitions.push(make_definition(
             input,
@@ -3209,8 +3492,10 @@ fn semantic_data(input: &ParsedInput) -> SemanticFile {
             definition.selection_range,
         ));
     }
-    for reference in
-        hir.references().iter().filter(|reference| reference.origin == HirReferenceOrigin::Profile)
+    for reference in hir
+        .references()
+        .iter()
+        .filter(|reference| reference.origin == HirReferenceOrigin::Profile)
     {
         data.references.push(ReferenceInternal {
             kind: reference.kind.clone(),
@@ -3240,27 +3525,42 @@ fn make_definition(
     DefinitionInfo {
         kind: kind.to_owned(),
         name: name.clone(),
-        symbol: Symbol { name, kind: kind.to_owned(), range, selection_range, location },
+        symbol: Symbol {
+            name,
+            kind: kind.to_owned(),
+            range,
+            selection_range,
+            location,
+        },
         document: input.document.clone(),
         file: input.file,
     }
 }
 
 fn property_key(input: &ParsedInput, node: &CstNode) -> Option<(String, TextRange)> {
-    let key = node.children().iter().find(|child| child.kind() == CstKind::Key)?;
+    let key = node
+        .children()
+        .iter()
+        .find(|child| child.kind() == CstKind::Key)?;
     let text = text(input, key.range())?.trim().to_owned();
     Some((text, key.range()))
 }
 
 fn property_scalar(input: &ParsedInput, node: &CstNode) -> Option<(String, TextRange)> {
-    let value = node.children().iter().find(|child| child.kind() == CstKind::Value)?;
+    let value = node
+        .children()
+        .iter()
+        .find(|child| child.kind() == CstKind::Value)?;
     let scalar = value
         .children()
         .iter()
         .find(|child| matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString))?;
     let raw = text(input, scalar.range())?.trim();
-    let value =
-        raw.strip_prefix('"').and_then(|value| value.strip_suffix('"')).unwrap_or(raw).to_owned();
+    let value = raw
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+        .unwrap_or(raw)
+        .to_owned();
     Some((value, scalar.range()))
 }
 
@@ -3274,7 +3574,10 @@ fn properties(input: &ParsedInput) -> Vec<PropertyInfo> {
             .iter()
             .map(|property| PropertyInfo {
                 key: property.key.clone(),
-                value: property.scalar.as_ref().map(|scalar| (scalar.value.clone(), scalar.range)),
+                value: property
+                    .scalar
+                    .as_ref()
+                    .map(|scalar| (scalar.value.clone(), scalar.range)),
             })
             .collect()
     })
@@ -3289,12 +3592,15 @@ fn all_semantics(
     let mut all = SemanticWorkspace::default();
     for definition in snapshot.index().definitions_iter() {
         cancellation.checkpoint()?;
-        all.definitions.push(index_definition_info(snapshot, definition));
+        all.definitions
+            .push(index_definition_info(snapshot, definition));
     }
     for reference in snapshot.index().references_iter() {
         cancellation.checkpoint()?;
-        let path =
-            snapshot.source_files().get(&reference.file_id).map(|file| file.logical_path.clone());
+        let path = snapshot
+            .source_files()
+            .get(&reference.file_id)
+            .map(|file| file.logical_path.clone());
         all.references.push(ReferenceInternal {
             kind: reference.kind.clone(),
             name: reference.name.clone(),
@@ -3386,7 +3692,9 @@ fn completion_definitions_for_kinds(
                     .definitions
                     .into_iter()
                     .filter(|definition| {
-                        kinds.iter().any(|kind| definition.kind.eq_ignore_ascii_case(kind))
+                        kinds
+                            .iter()
+                            .any(|kind| definition.kind.eq_ignore_ascii_case(kind))
                             && starts_with_ignore_ascii_case(&definition.name, prefix)
                     })
                     .map(|definition| (definition.kind, definition.name)),
@@ -3453,15 +3761,24 @@ fn resolve_symbol(
         .symbol_descriptors
         .iter()
         .find(|descriptor| descriptor.kind_id.eq_ignore_ascii_case(kind))
-        .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| descriptor.resolution);
-    if matches!(policy, SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique) {
+        .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| {
+            descriptor.resolution
+        });
+    if matches!(
+        policy,
+        SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique
+    ) {
         return if candidates.len() == 1 {
             Resolution::Unique(candidates.remove(0))
         } else {
             Resolution::Ambiguous
         };
     }
-    let highest = candidates.iter().map(|candidate| candidate.priority).max().unwrap_or(0);
+    let highest = candidates
+        .iter()
+        .map(|candidate| candidate.priority)
+        .max()
+        .unwrap_or(0);
     candidates.retain(|candidate| candidate.priority == highest);
     if candidates.len() == 1 {
         Resolution::Unique(candidates.remove(0))
@@ -3478,16 +3795,21 @@ struct DirectResolutionContext<'snapshot> {
 
 impl<'snapshot> DirectResolutionContext<'snapshot> {
     fn new(snapshot: &'snapshot AnalysisSnapshot) -> Self {
-        let mut context =
-            Self { snapshot, overlay_files: BTreeSet::new(), overlay_definitions: BTreeMap::new() };
+        let mut context = Self {
+            snapshot,
+            overlay_files: BTreeSet::new(),
+            overlay_definitions: BTreeMap::new(),
+        };
         for document in snapshot
             .documents()
             .values()
             .filter(|document| document.source() == DocumentSource::Overlay)
         {
             if let Some(path) = document.path()
-                && let Some(file) =
-                    snapshot.source_files().values().find(|file| file.physical_path == path)
+                && let Some(file) = snapshot
+                    .source_files()
+                    .values()
+                    .find(|file| file.physical_path == path)
             {
                 context.overlay_files.insert(file.id);
             }
@@ -3541,15 +3863,24 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
             .symbol_descriptors
             .iter()
             .find(|descriptor| descriptor.kind_id.eq_ignore_ascii_case(kind))
-            .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| descriptor.resolution);
-        if matches!(policy, SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique) {
+            .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| {
+                descriptor.resolution
+            });
+        if matches!(
+            policy,
+            SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique
+        ) {
             return if candidates.len() == 1 {
                 Resolution::Unique(candidates.remove(0))
             } else {
                 Resolution::Ambiguous
             };
         }
-        let highest = candidates.iter().map(|candidate| candidate.priority).max().unwrap_or(0);
+        let highest = candidates
+            .iter()
+            .map(|candidate| candidate.priority)
+            .max()
+            .unwrap_or(0);
         candidates.retain(|candidate| candidate.priority == highest);
         if candidates.len() == 1 {
             Resolution::Unique(candidates.remove(0))
@@ -3563,10 +3894,17 @@ fn definition_priority(snapshot: &AnalysisSnapshot, definition: &DefinitionInfo)
     if definition.document.is_some() {
         return 20_000;
     }
-    let Some(file) = definition.file.and_then(|id| snapshot.source_files().get(&id)) else {
+    let Some(file) = definition
+        .file
+        .and_then(|id| snapshot.source_files().get(&id))
+    else {
         return 0;
     };
-    let Some(root) = snapshot.source_roots().iter().find(|root| root.id == file.root_id) else {
+    let Some(root) = snapshot
+        .source_roots()
+        .iter()
+        .find(|root| root.id == file.root_id)
+    else {
         return 0;
     };
     match root.kind {
@@ -3595,10 +3933,16 @@ fn index_definition(snapshot: &AnalysisSnapshot, definition: &Definition) -> Res
 }
 
 fn index_definition_info(snapshot: &AnalysisSnapshot, definition: &Definition) -> DefinitionInfo {
-    let path =
-        snapshot.source_files().get(&definition.file_id).map(|file| file.logical_path.clone());
-    let location =
-        Location { document: None, file: Some(definition.file_id), path, range: definition.range };
+    let path = snapshot
+        .source_files()
+        .get(&definition.file_id)
+        .map(|file| file.logical_path.clone());
+    let location = Location {
+        document: None,
+        file: Some(definition.file_id),
+        path,
+        range: definition.range,
+    };
     DefinitionInfo {
         kind: definition.kind.clone(),
         name: definition.name.clone(),
@@ -3615,8 +3959,14 @@ fn index_definition_info(snapshot: &AnalysisSnapshot, definition: &Definition) -
 }
 
 fn definition_priority_for_file(snapshot: &AnalysisSnapshot, id: SourceFileId) -> u64 {
-    let Some(file) = snapshot.source_files().get(&id) else { return 0 };
-    let Some(root) = snapshot.source_roots().iter().find(|root| root.id == file.root_id) else {
+    let Some(file) = snapshot.source_files().get(&id) else {
+        return 0;
+    };
+    let Some(root) = snapshot
+        .source_roots()
+        .iter()
+        .find(|root| root.id == file.root_id)
+    else {
         return 0;
     };
     match root.kind {
@@ -3648,7 +3998,10 @@ fn symbol_at(
 fn local_parameter_target(
     input: &ParsedInput,
     position: TextSize,
-) -> Option<(&pdx_engine::hir::HirParameterDefinition, &pdx_engine::hir::HirParameterReference)> {
+) -> Option<(
+    &pdx_engine::hir::HirParameterDefinition,
+    &pdx_engine::hir::HirParameterReference,
+)> {
     let hir = input.hir.as_deref()?;
     let reference = hir.parameter_reference_at(position)?;
     let definition = hir
@@ -3658,7 +4011,12 @@ fn local_parameter_target(
 }
 
 fn local_location(input: &ParsedInput, range: TextRange) -> Location {
-    Location { document: input.document.clone(), file: input.file, path: input.path.clone(), range }
+    Location {
+        document: input.document.clone(),
+        file: input.file,
+        path: input.path.clone(),
+        range,
+    }
 }
 
 fn hover_for_symbol(
@@ -3670,17 +4028,19 @@ fn hover_for_symbol(
 ) -> Hover {
     let contents = match resolve_symbol(snapshot, all, kind, name) {
         Resolution::Unique(definition) => {
-            let path = definition
-                .location
-                .path
-                .as_ref()
-                .map_or_else(|| "<open document>".to_owned(), |path| path.as_str().to_owned());
+            let path = definition.location.path.as_ref().map_or_else(
+                || "<open document>".to_owned(),
+                |path| path.as_str().to_owned(),
+            );
             format!("{} `{}`\n\nDefined in `{}`", kind, name, path)
         }
         Resolution::Ambiguous => format!("ambiguous {} `{}`", kind, name),
         Resolution::Missing => format!("unresolved {} `{}`", kind, name),
     };
-    Hover { contents, range: Some(range) }
+    Hover {
+        contents,
+        range: Some(range),
+    }
 }
 
 fn known_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
@@ -3724,8 +4084,12 @@ fn completion_value_context(input: &ParsedInput, position: TextSize) -> bool {
             return true;
         }
     }
-    let offset = usize::try_from(position).unwrap_or(input.source.len()).min(input.source.len());
-    let line_start = input.source[..offset].rfind('\n').map_or(0, |index| index + 1);
+    let offset = usize::try_from(position)
+        .unwrap_or(input.source.len())
+        .min(input.source.len());
+    let line_start = input.source[..offset]
+        .rfind('\n')
+        .map_or(0, |index| index + 1);
     let line = &input.source[line_start..offset];
     if input.format == FileFormat::Localisation {
         return line.contains(':') && !line.trim_start().starts_with('#');
@@ -3736,9 +4100,15 @@ fn completion_value_context(input: &ParsedInput, position: TextSize) -> bool {
 }
 
 fn add_scalar_items(items: &mut Vec<CompletionItem>, range: TextRange, prefix: &str) {
-    for (label, score) in
-        [("yes", 0), ("no", 0), ("true", 5), ("false", 5), ("ROOT", 10), ("FROM", 10), ("PREV", 10)]
-    {
+    for (label, score) in [
+        ("yes", 0),
+        ("no", 0),
+        ("true", 5),
+        ("false", 5),
+        ("ROOT", 10),
+        ("FROM", 10),
+        ("PREV", 10),
+    ] {
         push_completion(
             items,
             CompletionItem {
@@ -3768,7 +4138,9 @@ fn starts_with_ignore_ascii_case(value: &str, prefix: &str) -> bool {
 }
 
 fn word_range(source: &str, position: TextSize) -> TextRange {
-    let mut offset = usize::try_from(position).unwrap_or(source.len()).min(source.len());
+    let mut offset = usize::try_from(position)
+        .unwrap_or(source.len())
+        .min(source.len());
     while offset > 0 && !source.is_char_boundary(offset) {
         offset -= 1;
     }
@@ -3780,8 +4152,11 @@ fn word_range(source: &str, position: TextSize) -> TextRange {
     while end < source.len() && is_word_byte(source.as_bytes()[end]) {
         end += 1;
     }
-    TextRange::new(u32::try_from(start).unwrap_or(u32::MAX), u32::try_from(end).unwrap_or(u32::MAX))
-        .unwrap_or_else(|| TextRange::empty(u32::try_from(start).unwrap_or(u32::MAX)))
+    TextRange::new(
+        u32::try_from(start).unwrap_or(u32::MAX),
+        u32::try_from(end).unwrap_or(u32::MAX),
+    )
+    .unwrap_or_else(|| TextRange::empty(u32::try_from(start).unwrap_or(u32::MAX)))
 }
 
 fn is_word_byte(byte: u8) -> bool {
@@ -3813,7 +4188,9 @@ fn rename_target(
     position: TextSize,
     cancellation: &CancellationToken,
 ) -> Result<RenameTarget, RenameFailure> {
-    cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
+    cancellation
+        .checkpoint()
+        .map_err(|Cancelled| RenameFailure::Cancelled)?;
     let input = input_for_document(snapshot, document).ok_or(RenameError::NoSymbol)?;
     let all =
         all_semantics(snapshot, cancellation).map_err(|Cancelled| RenameFailure::Cancelled)?;
@@ -3828,7 +4205,12 @@ fn rename_target(
     if !writable_location(snapshot, &definition.location) {
         return Err(RenameError::ReadOnly.into());
     }
-    Ok(RenameTarget { kind, name, cursor_range: word_range(&input.source, position), definition })
+    Ok(RenameTarget {
+        kind,
+        name,
+        cursor_range: word_range(&input.source, position),
+        definition,
+    })
 }
 
 fn check_rename_conflict(
@@ -3844,9 +4226,13 @@ fn check_rename_conflict(
         .symbol_descriptors
         .iter()
         .find(|descriptor| descriptor.kind_id.eq_ignore_ascii_case(&target.kind))
-        .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| descriptor.resolution);
+        .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| {
+            descriptor.resolution
+        });
     for definition in &all.definitions {
-        cancellation.checkpoint().map_err(|Cancelled| RenameFailure::Cancelled)?;
+        cancellation
+            .checkpoint()
+            .map_err(|Cancelled| RenameFailure::Cancelled)?;
         if definition.kind != target.kind || !same_name(&definition.name, new_name) {
             continue;
         }
@@ -3931,12 +4317,20 @@ fn edit_target_key(location: &Location) -> (u8, String) {
     if let Some(file) = location.file {
         return (1, file.get().to_string());
     }
-    (2, location.path.as_ref().map_or_else(String::new, |path| path.as_str().to_owned()))
+    (
+        2,
+        location
+            .path
+            .as_ref()
+            .map_or_else(String::new, |path| path.as_str().to_owned()),
+    )
 }
 
 fn fuzzy_match(value: &str, query: &str) -> bool {
     let mut chars = value.chars();
-    query.chars().all(|wanted| chars.by_ref().any(|actual| actual == wanted))
+    query
+        .chars()
+        .all(|wanted| chars.by_ref().any(|actual| actual == wanted))
 }
 
 #[cfg(test)]
@@ -3948,9 +4342,9 @@ mod tests {
         references, rename, rename_with_cancellation, semantic_completion_context,
         semantic_root_context, workspace_symbols, workspace_symbols_with_cancellation,
     };
+    use pdx_engine::{AnalysisHost, DocumentId};
     use pdx_rules::{KeyMatcher, RuleSet, RuleShape, SemanticRule, ValueMatcher};
     use pdx_text::{LogicalPath, TextRange};
-    use pdx_engine::{AnalysisHost, DocumentId};
 
     fn eu4_host(rules: RuleSet) -> AnalysisHost {
         AnalysisHost::with_profile(rules, pdx_game::eu4::profile())
@@ -3959,7 +4353,8 @@ mod tests {
     fn snapshot(text: &str) -> (AnalysisHost, DocumentId) {
         let mut host = eu4_host(pdx_game::eu4::bootstrap_rules());
         let id = DocumentId::new("file:///tmp/common/events/test.txt");
-        host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open");
         (host, id)
     }
 
@@ -4005,7 +4400,8 @@ mod tests {
         });
         let mut host = eu4_host(RuleSet::from_model(model));
         let id = DocumentId::new("file:///tmp/common/events/test.txt");
-        host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open");
         (host, id)
     }
 
@@ -4045,7 +4441,11 @@ mod tests {
     fn incomplete_input_has_syntax_diagnostics_and_completion() {
         let (host, id) = snapshot("country_event = { id = test.1\n  un");
         let snapshot = host.snapshot();
-        assert!(diagnostics(&snapshot, &id).iter().any(|item| item.code == DiagnosticCode::Syntax));
+        assert!(
+            diagnostics(&snapshot, &id)
+                .iter()
+                .any(|item| item.code == DiagnosticCode::Syntax)
+        );
         let result = complete(&snapshot, &id, 35);
         assert!(!result.items.is_empty());
     }
@@ -4059,7 +4459,8 @@ mod tests {
         );
         let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
         let id = DocumentId::new("file:///tmp/events/completion-fast-path.txt");
-        host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open");
         let snapshot = host.snapshot();
         let position =
             u32::try_from(text.find("always").expect("completion key")).expect("position");
@@ -4087,7 +4488,11 @@ mod tests {
         super::ALL_SEMANTICS_CALLS.with(|calls| calls.set(0));
         let results = diagnostics(&snapshot, &id);
 
-        assert!(results.iter().any(|item| item.code == DiagnosticCode::UnknownSymbol));
+        assert!(
+            results
+                .iter()
+                .any(|item| item.code == DiagnosticCode::UnknownSymbol)
+        );
         super::ALL_SEMANTICS_CALLS.with(|calls| {
             assert_eq!(
                 calls.get(),
@@ -4106,7 +4511,8 @@ mod tests {
         );
         let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
         let id = DocumentId::new("file:///tmp/events/completion_scope.txt");
-        host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open");
         let snapshot = host.snapshot();
         let input = input_for_document(&snapshot, &id).expect("analysis input");
         let position =
@@ -4140,7 +4546,9 @@ mod tests {
         );
         let results = diagnostics(&snapshot, &id);
         assert!(
-            results.iter().all(|item| item.code != DiagnosticCode::UnknownKey),
+            results
+                .iter()
+                .all(|item| item.code != DiagnosticCode::UnknownKey),
             "structural modifier fields and nested trigger keys must both be recognized: {results:?}"
         );
         assert!(
@@ -4162,7 +4570,8 @@ mod tests {
         );
         let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
         let id = DocumentId::new("file:///tmp/events/empty-scope-completion.txt");
-        host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open");
         let snapshot = host.snapshot();
         let input = input_for_document(&snapshot, &id).expect("analysis input");
         let position = u32::try_from(text.find("    \n").expect("blank completion line"))
@@ -4186,7 +4595,11 @@ mod tests {
     fn query_input_reuses_the_document_hir_handle() {
         let (host, id) = snapshot("country_event = { id = shared.1 }\n");
         let snapshot = host.snapshot();
-        let document_hir = snapshot.document(&id).expect("document").hir_handle().expect("HIR");
+        let document_hir = snapshot
+            .document(&id)
+            .expect("document")
+            .hir_handle()
+            .expect("HIR");
         let input = input_for_document(&snapshot, &id).expect("analysis input");
         let input_hir = input.hir.as_ref().expect("shared analysis HIR");
 
@@ -4228,12 +4641,17 @@ mod tests {
     #[test]
     fn multiple_hir_scope_candidates_remain_conservative_in_analysis() {
         let state = pdx_engine::hir::ScopeState {
-            root: pdx_engine::hir::ScopeValue::Known(vec!["country".to_owned(), "province".to_owned()]),
+            root: pdx_engine::hir::ScopeValue::Known(vec![
+                "country".to_owned(),
+                "province".to_owned(),
+            ]),
             current: vec![pdx_engine::hir::ScopeValue::Known(vec![
                 "country".to_owned(),
                 "province".to_owned(),
             ])],
-            from: vec![pdx_engine::hir::ScopeValue::Known(vec!["country".to_owned()])],
+            from: vec![pdx_engine::hir::ScopeValue::Known(vec![
+                "country".to_owned(),
+            ])],
             previous: Vec::new(),
         };
         let context =
@@ -4247,7 +4665,11 @@ mod tests {
     fn unresolved_symbol_is_diagnosed_without_a_definition() {
         let (host, id) = snapshot("event = missing.1\n");
         let diagnostics = diagnostics(&host.snapshot(), &id);
-        assert!(diagnostics.iter().any(|item| item.code == DiagnosticCode::UnknownSymbol));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|item| item.code == DiagnosticCode::UnknownSymbol)
+        );
         assert!(definition(&host.snapshot(), &id, 8).is_empty());
     }
 
@@ -4269,10 +4691,21 @@ mod tests {
     fn unknown_key_and_unknown_scope_are_independent_diagnostics() {
         let (host, id) = semantic_snapshot("trigger = { unknown_key = yes scope = nowhere }\n");
         let diagnostics = diagnostics(&host.snapshot(), &id);
-        assert!(diagnostics.iter().any(|item| item.code == DiagnosticCode::UnknownKey));
-        assert!(diagnostics.iter().any(|item| item.code == DiagnosticCode::UnknownScope));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|item| item.code == DiagnosticCode::UnknownKey)
+        );
+        assert!(
+            diagnostics
+                .iter()
+                .any(|item| item.code == DiagnosticCode::UnknownScope)
+        );
         assert_eq!(
-            diagnostics.iter().filter(|item| item.code == DiagnosticCode::UnknownScope).count(),
+            diagnostics
+                .iter()
+                .filter(|item| item.code == DiagnosticCode::UnknownScope)
+                .count(),
             1
         );
     }
@@ -4282,7 +4715,9 @@ mod tests {
         let (host, id) = semantic_snapshot("uncovered_root = { perfectly_valid_key = yes }\n");
         let diagnostics = diagnostics(&host.snapshot(), &id);
         assert!(
-            diagnostics.iter().all(|item| item.code != DiagnosticCode::UnknownKey),
+            diagnostics
+                .iter()
+                .all(|item| item.code != DiagnosticCode::UnknownKey),
             "an uncovered semantic context must not fabricate unknown-key diagnostics"
         );
     }
@@ -4291,8 +4726,16 @@ mod tests {
     fn semantic_matcher_rejects_invalid_values_and_unknown_keys() {
         let (host, id) = semantic_snapshot("trigger = { foo = maybe unknown = yes }\n");
         let diagnostics = diagnostics(&host.snapshot(), &id);
-        assert!(diagnostics.iter().any(|item| item.code == DiagnosticCode::InvalidValue));
-        assert!(diagnostics.iter().any(|item| item.code == DiagnosticCode::UnknownKey));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|item| item.code == DiagnosticCode::InvalidValue)
+        );
+        assert!(
+            diagnostics
+                .iter()
+                .any(|item| item.code == DiagnosticCode::UnknownKey)
+        );
     }
 
     #[test]
@@ -4310,14 +4753,22 @@ mod tests {
     fn semantic_matcher_enforces_max_cardinality() {
         let (host, id) = semantic_snapshot("trigger = { foo = yes foo = no }\n");
         let results = diagnostics(&host.snapshot(), &id);
-        assert!(results.iter().any(|item| item.code == DiagnosticCode::Cardinality));
+        assert!(
+            results
+                .iter()
+                .any(|item| item.code == DiagnosticCode::Cardinality)
+        );
     }
 
     #[test]
     fn logical_scope_wrappers_keep_the_trigger_context() {
         let (host, id) = semantic_snapshot("trigger = { OR = { foo = yes } NOT = { foo = no } }\n");
         let results = diagnostics(&host.snapshot(), &id);
-        assert!(!results.iter().any(|item| item.code == DiagnosticCode::UnknownKey));
+        assert!(
+            !results
+                .iter()
+                .any(|item| item.code == DiagnosticCode::UnknownKey)
+        );
     }
 
     #[test]
@@ -4333,7 +4784,11 @@ mod tests {
         )
         .expect("open");
         let results = diagnostics(&host.snapshot(), &id);
-        assert!(!results.iter().any(|item| item.code == DiagnosticCode::Cardinality));
+        assert!(
+            !results
+                .iter()
+                .any(|item| item.code == DiagnosticCode::Cardinality)
+        );
     }
 
     #[test]
@@ -4378,7 +4833,10 @@ mod tests {
             parent_path: vec!["color".to_owned()],
             key: KeyMatcher::AnyScalar,
             operator: None,
-            value: ValueMatcher::Int { min: Some(0), max: Some(255) },
+            value: ValueMatcher::Int {
+                min: Some(0),
+                max: Some(255),
+            },
             shape: RuleShape::LeafValue,
             child_context: None,
             alternative_id: None,
@@ -4396,11 +4854,24 @@ mod tests {
         });
         let mut host = eu4_host(RuleSet::from_model(model));
         let id = DocumentId::new("file:///tmp/common/terrain/test.txt");
-        host.open_document(id.clone(), 1, "terrain = { color = { 1 2 300 } }\n".to_owned(), None)
-            .expect("open");
+        host.open_document(
+            id.clone(),
+            1,
+            "terrain = { color = { 1 2 300 } }\n".to_owned(),
+            None,
+        )
+        .expect("open");
         let diagnostics = diagnostics(&host.snapshot(), &id);
-        assert!(diagnostics.iter().any(|item| item.code == DiagnosticCode::InvalidValue));
-        assert!(diagnostics.iter().any(|item| item.code == DiagnosticCode::Cardinality));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|item| item.code == DiagnosticCode::InvalidValue)
+        );
+        assert!(
+            diagnostics
+                .iter()
+                .any(|item| item.code == DiagnosticCode::Cardinality)
+        );
     }
 
     #[test]
@@ -4418,8 +4889,22 @@ mod tests {
     fn embedded_first_party_rules_drive_runtime_value_diagnostics() {
         let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         assert!(!rules.model().semantic.rules.is_empty());
-        assert!(rules.model().semantic.rules.iter().any(|rule| rule.severity == Some(2)));
-        assert!(rules.model().semantic.rules.iter().any(|rule| rule.min_occurs == Some(1)));
+        assert!(
+            rules
+                .model()
+                .semantic
+                .rules
+                .iter()
+                .any(|rule| rule.severity == Some(2))
+        );
+        assert!(
+            rules
+                .model()
+                .semantic
+                .rules
+                .iter()
+                .any(|rule| rule.min_occurs == Some(1))
+        );
         let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/common/events/test.txt");
         host.open_document(
@@ -4430,8 +4915,16 @@ mod tests {
         )
         .expect("open");
         let diagnostics = diagnostics(&host.snapshot(), &id);
-        assert!(diagnostics.iter().any(|item| item.code == DiagnosticCode::InvalidValue));
-        assert!(diagnostics.iter().any(|item| item.code == DiagnosticCode::UnknownKey));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|item| item.code == DiagnosticCode::InvalidValue)
+        );
+        assert!(
+            diagnostics
+                .iter()
+                .any(|item| item.code == DiagnosticCode::UnknownKey)
+        );
     }
 
     #[test]
@@ -4484,9 +4977,15 @@ mod tests {
         assert!(
             !results.iter().any(|item| {
                 item.code == DiagnosticCode::UnknownKey
-                    && ["slot", "generic", "ai", "has_country_shield", "EDG_bav_claim"]
-                        .iter()
-                        .any(|key| item.message.contains(&format!("`{key}`")))
+                    && [
+                        "slot",
+                        "generic",
+                        "ai",
+                        "has_country_shield",
+                        "EDG_bav_claim",
+                    ]
+                    .iter()
+                    .any(|key| item.message.contains(&format!("`{key}`")))
             }),
             "mission fields were not selected by the path-based type: {results:?}"
         );
@@ -4533,8 +5032,12 @@ mod tests {
             Some("type:on_action")
         );
         assert_ne!(
-            semantic_root_context(&snapshot, "on_harmonized_religiongroup", Some(&unrelated_path))
-                .as_deref(),
+            semantic_root_context(
+                &snapshot,
+                "on_harmonized_religiongroup",
+                Some(&unrelated_path)
+            )
+            .as_deref(),
             Some("type:on_action")
         );
     }
@@ -4602,7 +5105,9 @@ mod tests {
         .expect("open");
         let results = diagnostics(&host.snapshot(), &id);
         assert!(
-            !results.iter().any(|item| item.code == DiagnosticCode::Cardinality),
+            !results
+                .iter()
+                .any(|item| item.code == DiagnosticCode::Cardinality),
             "unexpected diagnostics: {results:?}"
         );
     }
@@ -4653,14 +5158,21 @@ mod tests {
         use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
         use std::fs;
 
-        let root = std::env::temp_dir()
-            .join(format!("pdx-analysis-dynamic-transition-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!(
+            "pdx-analysis-dynamic-transition-{}",
+            std::process::id()
+        ));
         fs::create_dir_all(root.join("common/country_tags")).expect("country tag directory");
-        fs::write(root.join("common/country_tags/00_test.txt"), "FRA = \"countries/France.txt\"\n")
-            .expect("country tag definition");
+        fs::write(
+            root.join("common/country_tags/00_test.txt"),
+            "FRA = \"countries/France.txt\"\n",
+        )
+        .expect("country tag definition");
 
-        let mut model =
-            pdx_game::eu4::first_party_rules().expect("load first-party rules").model().clone();
+        let mut model = pdx_game::eu4::first_party_rules()
+            .expect("load first-party rules")
+            .model()
+            .clone();
         let mut country_transition = model.semantic.rules[0].clone();
         country_transition.id = "fixture:country-transition".to_owned();
         country_transition.context = "fixture".to_owned();
@@ -4702,7 +5214,8 @@ mod tests {
             order: 0,
             writable: true,
         }]));
-        host.refresh_source_roots().expect("scan country tag definition");
+        host.refresh_source_roots()
+            .expect("scan country tag definition");
         let snapshot = host.snapshot();
         let scope = super::ScopeContext::new(std::sync::Arc::new(pdx_game::eu4::profile()));
         let mut property = super::ScriptProperty {
@@ -4735,7 +5248,10 @@ mod tests {
             false,
         )
         .expect("workspace-backed child key selects a transition");
-        assert_eq!(selected.child_context.as_deref(), Some("country-destination"));
+        assert_eq!(
+            selected.child_context.as_deref(),
+            Some("country-destination")
+        );
 
         property.block[0].key = "MISSING".to_owned();
         assert!(
@@ -4769,8 +5285,16 @@ mod tests {
         )
         .expect("open");
         let results = diagnostics(&host.snapshot(), &id);
-        assert!(results.iter().any(|item| item.code == DiagnosticCode::InvalidValue));
-        assert!(!results.iter().any(|item| item.code == DiagnosticCode::UnknownKey));
+        assert!(
+            results
+                .iter()
+                .any(|item| item.code == DiagnosticCode::InvalidValue)
+        );
+        assert!(
+            !results
+                .iter()
+                .any(|item| item.code == DiagnosticCode::UnknownKey)
+        );
     }
 
     #[test]
@@ -4778,8 +5302,14 @@ mod tests {
         use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
         use std::fs;
 
-        assert_eq!(super::repeated_scope_register_depth("prevprev", "prev"), Some(1));
-        assert_eq!(super::repeated_scope_register_depth("previous_owner", "previous"), None);
+        assert_eq!(
+            super::repeated_scope_register_depth("prevprev", "prev"),
+            Some(1)
+        );
+        assert_eq!(
+            super::repeated_scope_register_depth("previous_owner", "previous"),
+            None
+        );
 
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -4845,7 +5375,8 @@ mod tests {
             order: 0,
             writable: true,
         }]));
-        host.refresh_source_roots().expect("scan culture definition");
+        host.refresh_source_roots()
+            .expect("scan culture definition");
         let id = DocumentId::new("file:///tmp/events/culture.txt");
         host.open_document(
             id.clone(),
@@ -4855,7 +5386,11 @@ mod tests {
         )
         .expect("open");
         let results = diagnostics(&host.snapshot(), &id);
-        assert!(results.iter().all(|item| item.code != DiagnosticCode::InvalidValue));
+        assert!(
+            results
+                .iter()
+                .all(|item| item.code != DiagnosticCode::InvalidValue)
+        );
         fs::remove_dir_all(root).expect("cleanup");
     }
 
@@ -4867,8 +5402,11 @@ mod tests {
         let root =
             std::env::temp_dir().join(format!("pdx-analysis-cwt-tags-{}", std::process::id()));
         fs::create_dir_all(root.join("common/country_tags")).expect("country tag directory");
-        fs::write(root.join("common/country_tags/00_test.txt"), "FRA = \"countries/France.txt\"\n")
-            .expect("country tag definition");
+        fs::write(
+            root.join("common/country_tags/00_test.txt"),
+            "FRA = \"countries/France.txt\"\n",
+        )
+        .expect("country tag definition");
         let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
@@ -4878,7 +5416,8 @@ mod tests {
             order: 0,
             writable: true,
         }]));
-        host.refresh_source_roots().expect("scan country tag definition");
+        host.refresh_source_roots()
+            .expect("scan country tag definition");
         let id = DocumentId::new("file:///tmp/events/tag.txt");
         host.open_document(
             id.clone(),
@@ -4961,13 +5500,21 @@ mod tests {
             order: 0,
             writable: true,
         }]));
-        host.refresh_source_roots().expect("scan scripted effect definition");
+        host.refresh_source_roots()
+            .expect("scan scripted effect definition");
         let id = DocumentId::new("file:///tmp/events/params.txt");
         let invocation =
             "country_event = { immediate = { apply = { amount = 1 optional = yes } } }\n";
-        host.open_document(id.clone(), 1, invocation.to_owned(), None).expect("open");
+        host.open_document(id.clone(), 1, invocation.to_owned(), None)
+            .expect("open");
         let snapshot = host.snapshot();
-        assert_eq!(snapshot.index().definitions("scripted_effect", "apply").len(), 1);
+        assert_eq!(
+            snapshot
+                .index()
+                .definitions("scripted_effect", "apply")
+                .len(),
+            1
+        );
         assert_eq!(
             super::parameter_names_for_owner(&snapshot, "scripted_effect", "apply")
                 .expect("resolved owner parameters"),
@@ -4986,9 +5533,23 @@ mod tests {
             .into_iter()
             .map(|item| item.label)
             .collect::<Vec<_>>();
-        assert!(labels.iter().any(|label| label.eq_ignore_ascii_case("amount")), "{labels:?}");
-        assert!(labels.iter().any(|label| label.eq_ignore_ascii_case("optional")), "{labels:?}");
-        assert!(!labels.iter().any(|label| label.eq_ignore_ascii_case("other")));
+        assert!(
+            labels
+                .iter()
+                .any(|label| label.eq_ignore_ascii_case("amount")),
+            "{labels:?}"
+        );
+        assert!(
+            labels
+                .iter()
+                .any(|label| label.eq_ignore_ascii_case("optional")),
+            "{labels:?}"
+        );
+        assert!(
+            !labels
+                .iter()
+                .any(|label| label.eq_ignore_ascii_case("other"))
+        );
 
         let wrong_id = DocumentId::new("file:///tmp/events/wrong-params.txt");
         host.open_document(
@@ -5091,23 +5652,37 @@ mod tests {
                         .expect("offset")
         }));
         assert_eq!(
-            rename(&snapshot, &id, optional, "feature").expect("conditional rename").edits.len(),
+            rename(&snapshot, &id, optional, "feature")
+                .expect("conditional rename")
+                .edits
+                .len(),
             1
         );
-        assert_eq!(rename(&snapshot, &id, second_use, "optional"), Err(RenameError::Conflict));
-        assert_eq!(rename(&snapshot, &id, second_use, "$invalid$"), Err(RenameError::InvalidName));
+        assert_eq!(
+            rename(&snapshot, &id, second_use, "optional"),
+            Err(RenameError::Conflict)
+        );
+        assert_eq!(
+            rename(&snapshot, &id, second_use, "$invalid$"),
+            Err(RenameError::InvalidName)
+        );
 
         let parameter_symbols = document_symbols(&snapshot, &id)
             .into_iter()
             .filter(|symbol| symbol.kind == "parameter")
             .collect::<Vec<_>>();
         assert_eq!(
-            parameter_symbols.iter().map(|symbol| symbol.name.as_str()).collect::<Vec<_>>(),
+            parameter_symbols
+                .iter()
+                .map(|symbol| symbol.name.as_str())
+                .collect::<Vec<_>>(),
             vec!["Amount", "optional", "amount"]
         );
         assert_eq!(parameter_symbols[0].selection_range, first_name);
         assert!(
-            workspace_symbols(&snapshot, "amount").iter().all(|symbol| symbol.kind != "parameter")
+            workspace_symbols(&snapshot, "amount")
+                .iter()
+                .all(|symbol| symbol.kind != "parameter")
         );
 
         let second_owner_use =
@@ -5160,7 +5735,8 @@ mod tests {
             order: 0,
             writable: true,
         }]));
-        host.refresh_source_roots().expect("scan legacy reform definition");
+        host.refresh_source_roots()
+            .expect("scan legacy reform definition");
         let id = DocumentId::new("file:///tmp/events/legacy.txt");
         host.open_document(
             id.clone(),

@@ -1,7 +1,6 @@
 # ParadoxCode 总体架构
 
-> 本文件描述当前架构边界和已落地的数据流，不跟踪发布进度。当前状态与剩余工作见
-> [执行计划](../plan.md)。
+> 本文件描述当前架构边界和已落地的数据流。
 
 ## 目标
 
@@ -80,7 +79,7 @@ Zed extension 只负责：
 
 `pdx-engine` 维护 VFS、open document overlay、source roots、parse/HIR cache 和 index shards。可变状态只存在于 `AnalysisHost`；请求使用不可变 snapshot。
 
-LSP initialize 将 client 打开的 root 与类型化 `initializationOptions` 解析成 source roots；可选 `.pdx/project.toml` 描述 Current Mod 和从低到高排列的 Dependency Mods，inline 字段可覆盖 TOML。相对路径以打开的 worktree 为基准，目录会 canonicalize 并拒绝重叠。配置入口和示例见 [Workspace configuration](configuration.md)。这属于 adapter 配置解析；优先级、只读属性和索引仍由 editor-neutral workspace 模型执行。
+LSP initialize 将 client 打开的 root 与类型化 `initializationOptions` 解析成 source roots；可选 `.pdx/project.toml` 描述 Current Mod 和从低到高排列的 Dependency Mods，inline 字段可覆盖 TOML。相对路径以打开的 worktree 为基准，目录会 canonicalize 并拒绝重叠。这属于 adapter 配置解析；优先级、只读属性和索引仍由 editor-neutral workspace 模型执行。
 
 Vanilla cache 是本机版本化 SQLite artifact，只持久化 source-file location metadata 和 semantic shards，不持久化源码、CST 或 HIR。`pdx index vanilla` 保留为显式低层建库入口；`pdx setup vanilla` 负责发现、验证、建库和用户级配置。首次 LSP 启动在没有项目覆盖和历史尝试记录时只后台执行一次快速发现；唯一候选完整建库后通过 event loop 原子安装，零候选或多候选记录结果并提示用户手动深度扫描。正常启动只读、可取消地加载 cache，并与实时 Current Mod/Dependency shards 合并；后续 workspace refresh 会跳过 Vanilla root。cache `game_id` 必须匹配，`rule_hash` 只用于可观察性和手动刷新决策。
 
@@ -102,9 +101,8 @@ pdx-parser    -> pdx-text
 pdx-rules     -> pdx-text
 pdx-game      -> pdx-rules
 pdx-bake     -> pdx-rules
-pdx-hir       -> pdx-text + pdx-parser + pdx-rules
-pdx-engine -> pdx-text + pdx-parser + pdx-rules + pdx-hir
-pdx-analysis  -> pdx-engine + pdx-hir + pdx-rules
+pdx-engine -> pdx-text + pdx-parser + pdx-rules
+pdx-analysis  -> pdx-engine + pdx-rules
 pdx-lsp       -> pdx-analysis + pdx-parser
 pdx-lsp       -> engine, analysis, parser, rules, game crates (includes CLI binaries)
 ```
@@ -116,8 +114,7 @@ pdx-lsp       -> engine, analysis, parser, rules, game crates (includes CLI bina
 - `pdx-rules` 定义 SQLite schema、hash 与只读 runtime view，不依赖具体游戏名称表、外部规则语言或 LSP。
 - `pdx-game` 包含安装发现和 EU4 profile（`eu4` 模块）。
 - `pdx-bake` 是维护者工具，只把第一方规则源码编译成经过完整校验的 artifact；它不是 runtime dependency。
-- `pdx-hir` 通过稳定的 typed CST API lowering；结构/recovery/conditional-parameter facts 与 `RuleSet`/显式 profile 驱动的 definition/reference facts 已被 workspace shard 和 analysis 查询共享。profile/category 引用在 HIR 中保留来源，parser recovery 保留为 `UnknownConstruct`；parameter definition/reference 按 occurrence range 排序并按所属顶层 scripted definition 隔离，HIR 暴露 position/owner 有序查询，analysis definition/references/hover/rename 直接做 owner-local 解析，并将 inferred parameter 作为 document-local symbol 暴露而不注入 workspace symbol，唯一 active invocation 也通过 definition file/range 回到 HIR owner 做精确参数校验/补全，同时向 workspace 动态 enum 作 unresolved/ambiguous 兼容投影；scope lowering 以一次线性 stack pass 从 source-order properties 建直接子项邻接表，semantic root context/parent path、初始 `ScopeState`、`skip_root` 后代、register intrinsic、多段 exact scope-link expression、无冲突 command transition，以及能由直接子 key 静态排除其他 signature 的冲突 transition 已缓存为按 range 排序、可 logarithmic lookup 的 HIR facts。diagnostics 与已有子项的 nested completion traversal 复用这些 facts；结构 parent fields 与 child context 共存的 block 会被分区校验并合并补全，空 block completion 合并所有静态可能 destination。依赖 workspace 的动态 transition与仍不能静态消歧的 diagnostics alternative 待补齐。
-- `pdx-engine` 不依赖 LSP 类型。
+- `pdx-engine`（含 HIR lowering 模块）通过稳定的 typed CST API lowering；结构/recovery/conditional-parameter facts 与 `RuleSet`/显式 profile 驱动的 definition/reference facts 已被 workspace shard 和 analysis 查询共享。不依赖 LSP 类型。
 - `pdx-analysis` 不依赖任何 editor API。
 - `pdx-lsp` 是唯一允许依赖 LSP protocol types 的核心 crate。
 - `editors/zed` 不属于 Rust workspace 的核心依赖图。
@@ -175,5 +172,5 @@ MVP 不立即引入通用增量计算框架。先使用清晰的按文件 cache 
 
 - 不执行 Mod 或规则源码中的任意代码；规则编译器只解析严格 JSON 数据。
 - 限制扫描文件大小和最大嵌套深度相关资源消耗。
-- `reference/` 仅是历史研究资料，不作为规则编译、测试或发布输入。
+- 不编译、测试或发布任何外部规则输入，包括 `.cwt` 文件。
 - 不提交或再分发 Vanilla 游戏文件；Vanilla 缓存只存在于用户本机。

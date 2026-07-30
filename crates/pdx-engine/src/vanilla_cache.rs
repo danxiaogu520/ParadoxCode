@@ -58,8 +58,12 @@ impl VanillaIndexCache {
     /// Consumes a validated cache so installation can move its large semantic index.
     pub(crate) fn into_parts(
         self,
-    ) -> (VanillaIndexCacheMetadata, SourceRoot, BTreeMap<SourceFileId, SourceFile>, WorkspaceIndex)
-    {
+    ) -> (
+        VanillaIndexCacheMetadata,
+        SourceRoot,
+        BTreeMap<SourceFileId, SourceFile>,
+        WorkspaceIndex,
+    ) {
         (self.metadata, self.root, self.source_files, self.index)
     }
 
@@ -85,10 +89,16 @@ impl VanillaIndexCache {
             return Err(VanillaCacheError::LimitExceeded("file", MAX_CACHE_FILES));
         }
         if snapshot.index().definitions_iter().count() > MAX_CACHE_SYMBOLS {
-            return Err(VanillaCacheError::LimitExceeded("definition", MAX_CACHE_SYMBOLS));
+            return Err(VanillaCacheError::LimitExceeded(
+                "definition",
+                MAX_CACHE_SYMBOLS,
+            ));
         }
         if snapshot.index().references_iter().count() > MAX_CACHE_SYMBOLS {
-            return Err(VanillaCacheError::LimitExceeded("reference", MAX_CACHE_SYMBOLS));
+            return Err(VanillaCacheError::LimitExceeded(
+                "reference",
+                MAX_CACHE_SYMBOLS,
+            ));
         }
         let mut hasher = Sha256::new();
         hasher.update(b"paradoxcode/vanilla-source/v1\0");
@@ -212,11 +222,18 @@ impl VanillaIndexCache {
     ///
     /// An existing non-cache SQLite file is never overwritten.
     pub fn save(&self, path: &Path) -> Result<(), VanillaCacheError> {
-        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
             fs::create_dir_all(parent)?;
         }
         let existed = path.exists();
-        let existing_len = if existed { fs::metadata(path)?.len() } else { 0 };
+        let existing_len = if existed {
+            fs::metadata(path)?.len()
+        } else {
+            0
+        };
         let mut connection = Connection::open(path)?;
         if existed && existing_len > 0 {
             validate_database_identity(&connection)?;
@@ -274,7 +291,10 @@ pub enum VanillaCacheError {
     /// Cache and selected game profile identities differ.
     GameMismatch { expected: String, actual: String },
     /// The cached Vanilla root conflicts with a configured source root.
-    RootConflict { vanilla: PathBuf, configured: PathBuf },
+    RootConflict {
+        vanilla: PathBuf,
+        configured: PathBuf,
+    },
 }
 
 impl fmt::Display for VanillaCacheError {
@@ -287,20 +307,32 @@ impl fmt::Display for VanillaCacheError {
                 "the selected file is not a ParadoxCode Vanilla cache and will not be overwritten",
             ),
             Self::UnsupportedSchema(version) => {
-                write!(formatter, "unsupported Vanilla cache schema version: {version}")
+                write!(
+                    formatter,
+                    "unsupported Vanilla cache schema version: {version}"
+                )
             }
             Self::InvalidMetadata(key) => {
-                write!(formatter, "invalid or missing Vanilla cache metadata: {key}")
+                write!(
+                    formatter,
+                    "invalid or missing Vanilla cache metadata: {key}"
+                )
             }
             Self::LimitExceeded(kind, limit) => {
-                write!(formatter, "Vanilla cache exceeds the {kind} limit of {limit}")
+                write!(
+                    formatter,
+                    "Vanilla cache exceeds the {kind} limit of {limit}"
+                )
             }
             Self::InvalidData(detail) => write!(formatter, "invalid Vanilla cache data: {detail}"),
             Self::GameMismatch { expected, actual } => write!(
                 formatter,
                 "Vanilla cache game mismatch: expected {expected}, found {actual}"
             ),
-            Self::RootConflict { vanilla, configured } => write!(
+            Self::RootConflict {
+                vanilla,
+                configured,
+            } => write!(
                 formatter,
                 "Vanilla cache root {} overlaps configured source root {}",
                 vanilla.display(),
@@ -359,16 +391,23 @@ fn validate_database_identity(connection: &Connection) -> Result<(), VanillaCach
 
 fn metadata_blob(connection: &Connection, key: &'static str) -> Result<Vec<u8>, VanillaCacheError> {
     let length = connection
-        .query_row("SELECT length(value) FROM metadata WHERE key = ?1", [key], |row| {
-            row.get::<_, i64>(0)
-        })
+        .query_row(
+            "SELECT length(value) FROM metadata WHERE key = ?1",
+            [key],
+            |row| row.get::<_, i64>(0),
+        )
         .optional()?
         .ok_or(VanillaCacheError::InvalidMetadata(key))?;
     if length < 0 || usize::try_from(length).map_or(true, |length| length > MAX_TEXT_FIELD_BYTES) {
-        return Err(VanillaCacheError::LimitExceeded("metadata field byte", MAX_TEXT_FIELD_BYTES));
+        return Err(VanillaCacheError::LimitExceeded(
+            "metadata field byte",
+            MAX_TEXT_FIELD_BYTES,
+        ));
     }
     connection
-        .query_row("SELECT value FROM metadata WHERE key = ?1", [key], |row| row.get(0))
+        .query_row("SELECT value FROM metadata WHERE key = ?1", [key], |row| {
+            row.get(0)
+        })
         .optional()?
         .ok_or(VanillaCacheError::InvalidMetadata(key))
 }
@@ -397,7 +436,10 @@ fn validate_table_limits(connection: &Connection) -> Result<(), VanillaCacheErro
         );
         let max = connection.query_row(&query, [], |row| row.get::<_, i64>(0))?;
         if max < 0 || usize::try_from(max).map_or(true, |max| max > MAX_TEXT_FIELD_BYTES) {
-            return Err(VanillaCacheError::LimitExceeded("text field byte", MAX_TEXT_FIELD_BYTES));
+            return Err(VanillaCacheError::LimitExceeded(
+                "text field byte",
+                MAX_TEXT_FIELD_BYTES,
+            ));
         }
     }
     Ok(())
@@ -408,8 +450,9 @@ fn validate_count(
     table: &'static str,
     limit: usize,
 ) -> Result<(), VanillaCacheError> {
-    let count = connection
-        .query_row(&format!("SELECT count(*) FROM {table}"), [], |row| row.get::<_, i64>(0))?;
+    let count = connection.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
+        row.get::<_, i64>(0)
+    })?;
     if count < 0 || usize::try_from(count).map_or(true, |count| count > limit) {
         return Err(VanillaCacheError::LimitExceeded(table, limit));
     }
@@ -457,18 +500,35 @@ fn write_cache(
     transaction.pragma_update(None, "user_version", CURRENT_VANILLA_CACHE_SCHEMA_VERSION)?;
     let (path_encoding, source_root) = encode_path(&cache.root.path)?;
     for (key, value) in [
-        ("schema_version", cache.metadata.schema_version.to_string().into_bytes()),
+        (
+            "schema_version",
+            cache.metadata.schema_version.to_string().into_bytes(),
+        ),
         ("game_id", cache.metadata.game_id.as_bytes().to_vec()),
         ("rule_hash", cache.metadata.rule_hash.as_bytes().to_vec()),
-        ("source_identity", cache.metadata.source_identity.as_bytes().to_vec()),
-        ("source_fingerprint", cache.metadata.source_fingerprint.as_bytes().to_vec()),
-        ("created_unix_seconds", cache.metadata.created_unix_seconds.to_string().into_bytes()),
-        ("indexed_files", cache.metadata.indexed_files.to_string().into_bytes()),
+        (
+            "source_identity",
+            cache.metadata.source_identity.as_bytes().to_vec(),
+        ),
+        (
+            "source_fingerprint",
+            cache.metadata.source_fingerprint.as_bytes().to_vec(),
+        ),
+        (
+            "created_unix_seconds",
+            cache.metadata.created_unix_seconds.to_string().into_bytes(),
+        ),
+        (
+            "indexed_files",
+            cache.metadata.indexed_files.to_string().into_bytes(),
+        ),
         ("path_encoding", path_encoding.as_bytes().to_vec()),
         ("source_root", source_root),
     ] {
-        transaction
-            .execute("INSERT INTO metadata(key, value) VALUES (?1, ?2)", params![key, value])?;
+        transaction.execute(
+            "INSERT INTO metadata(key, value) VALUES (?1, ?2)",
+            params![key, value],
+        )?;
     }
     for (id, file) in &cache.source_files {
         let shard = cache.index.shard(*id).ok_or_else(|| {
@@ -582,7 +642,10 @@ fn load_index(
     }
     load_definitions(connection, &mut shards)?;
     load_references(connection, &mut shards)?;
-    Ok((source_files, WorkspaceIndex::from_shards(shards.into_values())))
+    Ok((
+        source_files,
+        WorkspaceIndex::from_shards(shards.into_values()),
+    ))
 }
 
 fn load_definitions(
@@ -625,7 +688,13 @@ fn load_definitions(
                 ))
             })?
             .definitions
-            .push(Definition { kind, name, file_id, range, active });
+            .push(Definition {
+                kind,
+                name,
+                file_id,
+                range,
+                active,
+            });
     }
     Ok(())
 }
@@ -660,7 +729,12 @@ fn load_references(
                 ))
             })?
             .references
-            .push(Reference { kind, name, file_id, range });
+            .push(Reference {
+                kind,
+                name,
+                file_id,
+                range,
+            });
     }
     Ok(())
 }
@@ -698,14 +772,17 @@ fn parse_resolution(value: &str) -> Result<FileResolutionPolicy, VanillaCacheErr
         "replace-by-relative-path" => Ok(FileResolutionPolicy::ReplaceByRelativePath),
         "merge" => Ok(FileResolutionPolicy::Merge),
         "replace-directory" => Ok(FileResolutionPolicy::ReplaceDirectory),
-        value => {
-            Err(VanillaCacheError::InvalidData(format!("unknown file resolution policy: {value}")))
-        }
+        value => Err(VanillaCacheError::InvalidData(format!(
+            "unknown file resolution policy: {value}"
+        ))),
     }
 }
 
 fn join_logical_path(root: &Path, logical: &LogicalPath) -> PathBuf {
-    logical.as_str().split('/').fold(root.to_owned(), |path, component| path.join(component))
+    logical
+        .as_str()
+        .split('/')
+        .fold(root.to_owned(), |path, component| path.join(component))
 }
 
 #[cfg(unix)]
@@ -729,7 +806,11 @@ fn decode_path(bytes: &[u8], encoding: &str) -> Result<PathBuf, VanillaCacheErro
 #[cfg(windows)]
 fn encode_path(path: &Path) -> Result<(&'static str, Vec<u8>), VanillaCacheError> {
     use std::os::windows::ffi::OsStrExt;
-    let bytes = path.as_os_str().encode_wide().flat_map(u16::to_le_bytes).collect::<Vec<_>>();
+    let bytes = path
+        .as_os_str()
+        .encode_wide()
+        .flat_map(u16::to_le_bytes)
+        .collect::<Vec<_>>();
     Ok(("windows-utf16le-v1", bytes))
 }
 

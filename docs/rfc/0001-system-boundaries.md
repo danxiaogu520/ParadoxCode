@@ -3,13 +3,13 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
-> 2026-07-20 amendment：EU4-only 约束已被 [RFC 0013](0013-generic-engine-eu4-first.md) 取代。当前产品仍只交付 EU4，但 workspace、index、analysis、LSP 和规则 runtime 将迁移为通用引擎，EU4 专有行为进入游戏 profile。
+> 2026-07-20 amendment：EU4-only 约束已被 [RFC 0012](0012-generic-engine-eu4-first.md) 取代。当前产品仍只交付 EU4，但 workspace、index、analysis、LSP 和规则 runtime 将迁移为通用引擎，EU4 专有行为进入游戏 profile。
 >
 > 2026-07-21 amendment：第 5–6 条中的外部规则 artifact 分发边界已由
-> [RFC 0014](0014-embedded-first-party-rules.md) 取代；crate 依赖方向仍然有效。
+> [RFC 0013](0013-embedded-first-party-rules.md) 取代；crate 依赖方向仍然有效。
 >
 > 2026-07-22 amendment：`pdx-cwt` 和所有 CWT 输入已由
-> [RFC 0015](0015-first-party-rule-source.md) 废止；维护者工具现为 `pdx-bake`。
+> [RFC 0014](0014-first-party-rule-source.md) 废止；维护者工具现为 `pdx-bake`。
 
 ## 问题
 
@@ -67,7 +67,6 @@ editors/                 薄客户端，Cargo package 仍以 `pdx-` 命名
 docs/                    架构与 RFC
 tests/                   跨 crate fixtures/integration
 fuzz/                    fuzz targets
-reference/               只读参考仓库，不参与构建
 ```
 
 ## 结果

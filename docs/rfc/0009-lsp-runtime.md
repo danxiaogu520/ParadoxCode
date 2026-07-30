@@ -5,7 +5,7 @@
 
 > 实现进度（2026-07-25）：stdio reader 与 workspace event loop 已分离；initialize 的 source-root scan 在候选 host worker 中运行，目录/读取/parse/lower/index 全链路可取消且仅在成功后提交；编辑先 stage 最新文本/版本，parse/lower 在 snapshot worker 准备，并通过版本、文本、路径三重提交门拒绝旧结果；依赖语义的请求按消息顺序等待最新 parse。semantic diagnostics 使用 200ms debounce 与版本门，普通语言请求也在 snapshot worker 执行；`$/cancelRequest` 与过期 diagnostics 使用共享的 editor-neutral token，在 workspace semantic 合并、semantic rule 递归及主要结果遍历中协作式中止。当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 与语言功能 response 已迁入 `lsp-types`，JSON-RPC framing 继续保持轻量自有实现。类型化 `initializationOptions`、项目 TOML、Current Mod、有序只读 Dependency roots、持久化只读 Vanilla cache，以及动态注册并在 revision 门后提交的 watched-file worker 均已接入。memory transport 回归还覆盖 scope-fact 消歧后的 mixed structural/child-context completion 与相应 publishDiagnostics。
 >
-> 2026-07-21 amendment：本 RFC 的 `--rules` runtime 输入已由 [RFC 0014](0014-embedded-first-party-rules.md) 取代；LSP 生命周期和协议边界不变。
+> 2026-07-21 amendment：本 RFC 的 `--rules` runtime 输入已由 [RFC 0013](0013-embedded-first-party-rules.md) 取代；LSP 生命周期和协议边界不变。
 
 ## 边界
 

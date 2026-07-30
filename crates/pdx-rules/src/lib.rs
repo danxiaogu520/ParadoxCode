@@ -196,15 +196,21 @@ impl FileMatcher {
             path.as_str().to_ascii_lowercase()
         };
         if let Some(prefix) = &self.path_prefix {
-            let prefix =
-                if self.case_sensitive { prefix.clone() } else { prefix.to_ascii_lowercase() };
+            let prefix = if self.case_sensitive {
+                prefix.clone()
+            } else {
+                prefix.to_ascii_lowercase()
+            };
             if !candidate.starts_with(&prefix) {
                 return false;
             }
         }
         if let Some(suffix) = &self.path_suffix {
-            let suffix =
-                if self.case_sensitive { suffix.clone() } else { suffix.to_ascii_lowercase() };
+            let suffix = if self.case_sensitive {
+                suffix.clone()
+            } else {
+                suffix.to_ascii_lowercase()
+            };
             if !candidate.ends_with(&suffix) {
                 return false;
             }
@@ -283,7 +289,11 @@ impl ProfileTextMatcher {
     /// Creates a case-insensitive selector.
     #[must_use]
     pub fn insensitive(mode: ProfileMatchMode, pattern: impl Into<String>) -> Self {
-        Self { mode, pattern: pattern.into(), case_sensitive: false }
+        Self {
+            mode,
+            pattern: pattern.into(),
+            case_sensitive: false,
+        }
     }
 
     /// Creates a selector that accepts every candidate.
@@ -306,7 +316,9 @@ impl ProfileTextMatcher {
                 ProfileMatchMode::Suffix => candidate.ends_with(&self.pattern),
                 ProfileMatchMode::Contains => candidate.contains(&self.pattern),
                 ProfileMatchMode::Directory => {
-                    candidate.rsplit_once('/').map_or("", |(directory, _)| directory)
+                    candidate
+                        .rsplit_once('/')
+                        .map_or("", |(directory, _)| directory)
                         == self.pattern
                 }
             };
@@ -499,7 +511,10 @@ impl GameProfile {
     /// Returns the target kind for a scalar property reference.
     #[must_use]
     pub fn reference_kind(&self, key: &str) -> Option<&str> {
-        self.references.iter().find(|rule| rule.key.matches(key)).map(|rule| rule.kind.as_str())
+        self.references
+            .iter()
+            .find(|rule| rule.key.matches(key))
+            .map(|rule| rule.kind.as_str())
     }
 
     /// Returns the declared kind for one scalar value property.
@@ -519,13 +534,18 @@ impl GameProfile {
     /// Returns the profile fallback scope for one root key.
     #[must_use]
     pub fn root_scope(&self, key: &str) -> Option<&str> {
-        self.root_scopes.iter().find(|rule| rule.key.matches(key)).map(|rule| rule.scope.as_str())
+        self.root_scopes
+            .iter()
+            .find(|rule| rule.key.matches(key))
+            .map(|rule| rule.scope.as_str())
     }
 
     /// Returns whether a scope spelling is known to this profile.
     #[must_use]
     pub fn is_scope(&self, value: &str) -> bool {
-        self.scope_names.iter().any(|scope| scope.eq_ignore_ascii_case(value))
+        self.scope_names
+            .iter()
+            .any(|scope| scope.eq_ignore_ascii_case(value))
     }
 
     /// Tests profile scope compatibility, including the generic `any` scope.
@@ -543,7 +563,9 @@ impl GameProfile {
     /// Returns whether a property is a profile-defined transparent logical wrapper.
     #[must_use]
     pub fn is_transparent_scope_wrapper(&self, key: &str) -> bool {
-        self.transparent_scope_wrappers.iter().any(|wrapper| wrapper.eq_ignore_ascii_case(key))
+        self.transparent_scope_wrappers
+            .iter()
+            .any(|wrapper| wrapper.eq_ignore_ascii_case(key))
     }
 
     /// Returns the workspace symbol kind aliased by one semantic member name.
@@ -560,7 +582,9 @@ impl GameProfile {
     pub fn enum_extra_member(&self, enum_name: &str, member: &str) -> bool {
         self.enum_extra_members.iter().any(|(name, members)| {
             name.eq_ignore_ascii_case(enum_name)
-                && members.iter().any(|value| value.eq_ignore_ascii_case(member))
+                && members
+                    .iter()
+                    .any(|value| value.eq_ignore_ascii_case(member))
         })
     }
 }
@@ -628,7 +652,10 @@ pub enum ValueMatcher {
     /// Accepts an integer, optionally constrained by an inclusive range.
     Int { min: Option<i64>, max: Option<i64> },
     /// Accepts a floating point value, optionally constrained by an inclusive range.
-    Float { min: Option<String>, max: Option<String> },
+    Float {
+        min: Option<String>,
+        max: Option<String>,
+    },
     /// Accepts a member supplied by the workspace index.
     Type(String),
     /// Accepts a member of a named static enum.
@@ -662,11 +689,15 @@ impl ValueMatcher {
             Self::Exact(expected) => expected == value,
             Self::Bool => matches!(value.to_ascii_lowercase().as_str(), "yes" | "no"),
             Self::Int { min, max } => {
-                let Ok(value) = value.parse::<i64>() else { return false };
+                let Ok(value) = value.parse::<i64>() else {
+                    return false;
+                };
                 min.is_none_or(|min| value >= min) && max.is_none_or(|max| value <= max)
             }
             Self::Float { min, max } => {
-                let Ok(value) = value.parse::<f64>() else { return false };
+                let Ok(value) = value.parse::<f64>() else {
+                    return false;
+                };
                 let lower = min.as_deref().and_then(|min| min.parse::<f64>().ok());
                 let upper = max.as_deref().and_then(|max| max.parse::<f64>().ok());
                 lower.is_none_or(|min| value >= min) && upper.is_none_or(|max| value <= max)
@@ -827,9 +858,16 @@ impl RulesModel {
     /// Returns the first matching category in stable catalog order.
     #[must_use]
     pub fn classify(&self, path: &LogicalPath) -> Option<&FileCategory> {
-        self.file_categories.iter().filter(|category| category.matcher.matches(path)).max_by_key(
-            |category| category.matcher.path_prefix.as_ref().map_or(0, |prefix| prefix.len()),
-        )
+        self.file_categories
+            .iter()
+            .filter(|category| category.matcher.matches(path))
+            .max_by_key(|category| {
+                category
+                    .matcher
+                    .path_prefix
+                    .as_ref()
+                    .map_or(0, |prefix| prefix.len())
+            })
     }
 }
 
@@ -869,7 +907,10 @@ impl fmt::Display for RulesError {
                 write!(formatter, "unsupported rules schema version: {version}")
             }
             Self::HashMismatch { stored, computed } => {
-                write!(formatter, "rules hash mismatch: stored {stored}, computed {computed}")
+                write!(
+                    formatter,
+                    "rules hash mismatch: stored {stored}, computed {computed}"
+                )
             }
             Self::InvalidHash(value) => write!(formatter, "invalid rule hash: {value}"),
             Self::InvalidParser(value) => write!(formatter, "invalid parser kind: {value}"),
@@ -881,7 +922,10 @@ impl fmt::Display for RulesError {
             }
             Self::MissingMetadata(key) => write!(formatter, "missing rules metadata: {key}"),
             Self::GameMismatch { expected, actual } => {
-                write!(formatter, "rules game mismatch: expected {expected}, found {actual}")
+                write!(
+                    formatter,
+                    "rules game mismatch: expected {expected}, found {actual}"
+                )
             }
             Self::InvalidRuleShape(value) => {
                 write!(formatter, "invalid semantic rule shape: {value}")
@@ -942,8 +986,12 @@ impl RuleSet {
     /// Builds a runtime rule set and computes its canonical logical hash.
     #[must_use]
     pub fn from_model(mut model: RulesModel) -> Self {
-        model.file_categories.sort_by(|left, right| left.id.cmp(&right.id));
-        model.symbol_descriptors.sort_by(|left, right| left.kind_id.cmp(&right.kind_id));
+        model
+            .file_categories
+            .sort_by(|left, right| left.id.cmp(&right.id));
+        model
+            .symbol_descriptors
+            .sort_by(|left, right| left.kind_id.cmp(&right.kind_id));
         model.records.sort_by(|left, right| {
             (&left.table, &left.logical_id, left.source_order).cmp(&(
                 &right.table,
@@ -951,7 +999,10 @@ impl RuleSet {
                 right.source_order,
             ))
         });
-        model.semantic.rules.sort_by(|left, right| left.id.cmp(&right.id));
+        model
+            .semantic
+            .rules
+            .sort_by(|left, right| left.id.cmp(&right.id));
         for values in model.semantic.enum_values.values_mut() {
             values.sort();
             values.dedup();
@@ -965,7 +1016,10 @@ impl RuleSet {
         let mut semantic_rules_by_context = BTreeMap::<String, Vec<usize>>::new();
         for (index, rule) in model.semantic.rules.iter().enumerate() {
             if let KeyMatcher::Exact(key) = &rule.key {
-                exact_semantic_rules.entry(key.to_ascii_lowercase()).or_default().push(index);
+                exact_semantic_rules
+                    .entry(key.to_ascii_lowercase())
+                    .or_default()
+                    .push(index);
             }
             semantic_rules_by_context
                 .entry(rule.context.to_ascii_lowercase())
@@ -1067,8 +1121,10 @@ impl RuleSet {
     /// validates the complete logical model, and removes the file before returning.
     pub fn load_embedded(bytes: &[u8]) -> Result<Self, RulesError> {
         let sequence = EMBEDDED_LOAD_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir()
-            .join(format!("paradoxcode-rules-{}-{sequence}.pdxrules", std::process::id()));
+        let path = std::env::temp_dir().join(format!(
+            "paradoxcode-rules-{}-{sequence}.pdxrules",
+            std::process::id()
+        ));
         let result = (|| {
             let mut options = fs::OpenOptions::new();
             options.write(true).create_new(true);
@@ -1217,47 +1273,86 @@ fn canonical_hash(model: &RulesModel) -> RuleHash {
         put_str(&mut bytes, &rule.source_file);
         bytes.extend_from_slice(&rule.line.to_le_bytes());
     }
-    let mut enum_names = model.semantic.enum_values.keys().cloned().collect::<Vec<_>>();
+    let mut enum_names = model
+        .semantic
+        .enum_values
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
     enum_names.sort();
     put_len(&mut bytes, enum_names.len());
     for name in enum_names {
         put_str(&mut bytes, &name);
-        let mut values = model.semantic.enum_values.get(&name).cloned().unwrap_or_default();
+        let mut values = model
+            .semantic
+            .enum_values
+            .get(&name)
+            .cloned()
+            .unwrap_or_default();
         values.sort();
         put_len(&mut bytes, values.len());
         for value in values {
             put_str(&mut bytes, &value);
         }
     }
-    let mut type_names = model.semantic.type_root_keys.keys().cloned().collect::<Vec<_>>();
+    let mut type_names = model
+        .semantic
+        .type_root_keys
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
     type_names.sort();
     put_len(&mut bytes, type_names.len());
     for name in type_names {
         put_str(&mut bytes, &name);
-        let mut roots = model.semantic.type_root_keys.get(&name).cloned().unwrap_or_default();
+        let mut roots = model
+            .semantic
+            .type_root_keys
+            .get(&name)
+            .cloned()
+            .unwrap_or_default();
         roots.sort();
         put_len(&mut bytes, roots.len());
         for root in roots {
             put_str(&mut bytes, &root);
         }
     }
-    let mut scoped_types = model.semantic.type_root_scopes.keys().cloned().collect::<Vec<_>>();
+    let mut scoped_types = model
+        .semantic
+        .type_root_scopes
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
     scoped_types.sort();
     put_len(&mut bytes, scoped_types.len());
     for type_name in scoped_types {
         put_str(&mut bytes, &type_name);
-        let scopes = model.semantic.type_root_scopes.get(&type_name).cloned().unwrap_or_default();
+        let scopes = model
+            .semantic
+            .type_root_scopes
+            .get(&type_name)
+            .cloned()
+            .unwrap_or_default();
         put_len(&mut bytes, scopes.len());
         for (root, scope) in scopes {
             put_str(&mut bytes, &root);
             put_str(&mut bytes, &scope);
         }
     }
-    let mut descriptor_names = model.semantic.type_descriptors.keys().cloned().collect::<Vec<_>>();
+    let mut descriptor_names = model
+        .semantic
+        .type_descriptors
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
     descriptor_names.sort();
     put_len(&mut bytes, descriptor_names.len());
     for name in descriptor_names {
-        let descriptor = model.semantic.type_descriptors.get(&name).expect("type descriptor");
+        let descriptor = model
+            .semantic
+            .type_descriptors
+            .get(&name)
+            .expect("type descriptor");
         put_str(&mut bytes, &descriptor.name);
         put_opt_str(&mut bytes, descriptor.path.as_deref());
         put_opt_str(&mut bytes, descriptor.path_file.as_deref());
@@ -1641,9 +1736,12 @@ fn semantic_value_columns(
         ValueMatcher::AnyScalar => ("any", None, None, None),
         ValueMatcher::Exact(value) => ("exact", Some(value), None, None),
         ValueMatcher::Bool => ("bool", None, None, None),
-        ValueMatcher::Int { min, max } => {
-            ("int", None, min.map(|value| value.to_string()), max.map(|value| value.to_string()))
-        }
+        ValueMatcher::Int { min, max } => (
+            "int",
+            None,
+            min.map(|value| value.to_string()),
+            max.map(|value| value.to_string()),
+        ),
         ValueMatcher::Float { min, max } => ("float", None, min.clone(), max.clone()),
         ValueMatcher::Type(value) => ("type", Some(value), None, None),
         ValueMatcher::Enum(value) => ("enum", Some(value), None, None),
@@ -1675,7 +1773,11 @@ fn decode_replace_scope(value: Option<&str>) -> Vec<(String, String)> {
 
 fn metadata(connection: &Connection, key: &str) -> Result<Option<String>, RulesError> {
     connection
-        .query_row("SELECT value FROM metadata WHERE key = ?1", params![key], |row| row.get(0))
+        .query_row(
+            "SELECT value FROM metadata WHERE key = ?1",
+            params![key],
+            |row| row.get(0),
+        )
         .optional()
         .map_err(Into::into)
 }
@@ -1727,7 +1829,11 @@ fn read_model(connection: &Connection) -> Result<RulesModel, RulesError> {
     let mut records = Vec::new();
     let mut statement = connection.prepare("SELECT table_name, logical_id, source_order FROM rule_records ORDER BY table_name, logical_id")?;
     let rows = statement.query_map([], |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, u32>(2)?))
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, u32>(2)?,
+        ))
     })?;
     for row in rows {
         let (table, logical_id, source_order) = row?;
@@ -1739,7 +1845,12 @@ fn read_model(connection: &Connection) -> Result<RulesModel, RulesError> {
             let (key, value) = field?;
             fields.insert(key, value);
         }
-        records.push(RuleRecord { table, logical_id, source_order, fields });
+        records.push(RuleRecord {
+            table,
+            logical_id,
+            source_order,
+            fields,
+        });
     }
     let semantic = read_semantic_model(connection)?;
     Ok(RulesModel {
@@ -1829,8 +1940,9 @@ fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesEr
     let mut enum_values = BTreeMap::new();
     let mut statement =
         connection.prepare("SELECT enum_name, value FROM enum_values ORDER BY enum_name, value")?;
-    let rows =
-        statement.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?;
+    let rows = statement.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
     for row in rows {
         let (name, value) = row?;
         enum_values.entry(name).or_insert_with(Vec::new).push(value);
@@ -1838,22 +1950,33 @@ fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesEr
     let mut type_root_keys = BTreeMap::new();
     let mut statement = connection
         .prepare("SELECT type_name, root_key FROM type_root_keys ORDER BY type_name, root_key")?;
-    let rows =
-        statement.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?;
+    let rows = statement.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
     for row in rows {
         let (type_name, root_key) = row?;
-        type_root_keys.entry(type_name).or_insert_with(Vec::new).push(root_key);
+        type_root_keys
+            .entry(type_name)
+            .or_insert_with(Vec::new)
+            .push(root_key);
     }
     let mut type_root_scopes = BTreeMap::new();
     let mut statement = connection.prepare(
         "SELECT type_name, root_key, scope FROM type_root_scopes ORDER BY type_name, root_key",
     )?;
     let rows = statement.query_map([], |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+        ))
     })?;
     for row in rows {
         let (type_name, root_key, scope) = row?;
-        type_root_scopes.entry(type_name).or_insert_with(BTreeMap::new).insert(root_key, scope);
+        type_root_scopes
+            .entry(type_name)
+            .or_insert_with(BTreeMap::new)
+            .insert(root_key, scope);
     }
     let mut type_descriptors = BTreeMap::new();
     let mut statement = connection.prepare(
@@ -1896,7 +2019,13 @@ fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesEr
         let descriptor = row?;
         type_descriptors.insert(descriptor.name.clone(), descriptor);
     }
-    Ok(SemanticModel { rules, enum_values, type_root_keys, type_root_scopes, type_descriptors })
+    Ok(SemanticModel {
+        rules,
+        enum_values,
+        type_root_keys,
+        type_root_scopes,
+        type_descriptors,
+    })
 }
 
 fn decode_semantic_key(kind: &str, value: Option<&str>) -> Result<KeyMatcher, RulesError> {
@@ -1928,7 +2057,10 @@ fn decode_semantic_value(
                 RulesError::InvalidRuleShape("invalid integer matcher bound".to_owned())
             })?,
         },
-        "float" => ValueMatcher::Float { min: min.map(str::to_owned), max: max.map(str::to_owned) },
+        "float" => ValueMatcher::Float {
+            min: min.map(str::to_owned),
+            max: max.map(str::to_owned),
+        },
         "type" => ValueMatcher::Type(arg.unwrap_or_default().to_owned()),
         "enum" => ValueMatcher::Enum(arg.unwrap_or_default().to_owned()),
         "scope" => ValueMatcher::Scope(arg.map(str::to_owned)),
@@ -1975,7 +2107,10 @@ mod tests {
 
     #[test]
     fn canonical_hash_is_independent_of_record_insertion_order() {
-        let mut first = RulesModel { game_id: "test-game".to_owned(), ..RulesModel::default() };
+        let mut first = RulesModel {
+            game_id: "test-game".to_owned(),
+            ..RulesModel::default()
+        };
         let records = [
             RuleRecord {
                 table: "types".to_owned(),
@@ -1991,9 +2126,15 @@ mod tests {
             },
         ];
         first.records.extend(records.clone());
-        let mut second = RulesModel { game_id: "test-game".to_owned(), ..RulesModel::default() };
+        let mut second = RulesModel {
+            game_id: "test-game".to_owned(),
+            ..RulesModel::default()
+        };
         second.records.extend(records.into_iter().rev());
-        assert_eq!(RuleSet::from_model(first).rule_hash(), RuleSet::from_model(second).rule_hash());
+        assert_eq!(
+            RuleSet::from_model(first).rule_hash(),
+            RuleSet::from_model(second).rule_hash()
+        );
     }
 
     #[test]
@@ -2028,7 +2169,10 @@ mod tests {
         let rules = RuleSet::from_model(model);
 
         assert_eq!(
-            rules.exact_semantic_rules("OWNER").map(|rule| rule.id.as_str()).collect::<Vec<_>>(),
+            rules
+                .exact_semantic_rules("OWNER")
+                .map(|rule| rule.id.as_str())
+                .collect::<Vec<_>>(),
             vec!["exact"]
         );
         assert!(rules.exact_semantic_rules("missing").next().is_none());
@@ -2044,7 +2188,10 @@ mod tests {
 
     #[test]
     fn sqlite_round_trip_validates_logical_hash() {
-        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).expect("clock").as_nanos();
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
         let path = std::env::temp_dir().join(format!("paradoxcode-rules-{nonce}.pdxrules"));
         let rules = RuleSet::from_model(RulesModel {
             game_id: "test-game".to_owned(),

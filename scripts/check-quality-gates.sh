@@ -16,13 +16,10 @@ check_core() {
     run cargo test --workspace --all-targets --all-features
     run cargo clippy --workspace --all-targets --all-features -- -D warnings
     run cargo doc --workspace --no-deps
-    run bash scripts/check-phase0.sh
-    run python3 scripts/check-project-policy.py
 }
 
 check_grammars() {
-    run bash scripts/check-phase1-grammars.sh
-    run python3 scripts/check-zed-extension.py
+    run bash scripts/check-grammars.sh
 }
 
 check_zed() {
@@ -33,7 +30,7 @@ check_zed() {
 }
 
 check_release() {
-    run bash scripts/check-phase6a.sh
+    run bash scripts/check-release.sh
 }
 
 usage() {

@@ -19,13 +19,20 @@ impl TextRange {
     /// Creates a range. Returns `None` when the end precedes the start.
     #[must_use]
     pub const fn new(start: TextSize, end: TextSize) -> Option<Self> {
-        if end < start { None } else { Some(Self { start, end }) }
+        if end < start {
+            None
+        } else {
+            Some(Self { start, end })
+        }
     }
 
     /// Creates an empty range at an offset.
     #[must_use]
     pub const fn empty(offset: TextSize) -> Self {
-        Self { start: offset, end: offset }
+        Self {
+            start: offset,
+            end: offset,
+        }
     }
 
     /// Returns the start offset.
@@ -90,7 +97,10 @@ impl LineIndex {
             }
         }
         let text_len = TextSize::try_from(text.len()).unwrap_or(TextSize::MAX);
-        Self { line_starts, text_len }
+        Self {
+            line_starts,
+            text_len,
+        }
     }
 
     /// Returns the byte offset for an editor position, if it is on a UTF-8 boundary.
@@ -241,24 +251,39 @@ mod tests {
         let text = "head\r\n汉😀e\u{301}\r\ntail";
         let index = LineIndex::new(text);
         let start_of_second_line = Position::new(1, 0);
-        let second_line_offset = index.offset(text, start_of_second_line).expect("line start");
-        assert_eq!(index.position(text, second_line_offset), Some(start_of_second_line));
+        let second_line_offset = index
+            .offset(text, start_of_second_line)
+            .expect("line start");
+        assert_eq!(
+            index.position(text, second_line_offset),
+            Some(start_of_second_line)
+        );
 
         let after_combining_mark = Position::new(1, 5);
-        let offset = index.offset(text, after_combining_mark).expect("valid UTF-16 position");
+        let offset = index
+            .offset(text, after_combining_mark)
+            .expect("valid UTF-16 position");
         assert_eq!(index.position(text, offset), Some(after_combining_mark));
-        assert!(index.offset(text, Position::new(1, 2)).is_none(), "must reject half an emoji");
+        assert!(
+            index.offset(text, Position::new(1, 2)).is_none(),
+            "must reject half an emoji"
+        );
     }
 
     #[test]
     fn logical_path_normalizes_separators() {
-        assert_eq!(LogicalPath::new("\\common\\events\\x.txt").as_str(), "common/events/x.txt");
+        assert_eq!(
+            LogicalPath::new("\\common\\events\\x.txt").as_str(),
+            "common/events/x.txt"
+        );
     }
 
     #[test]
     fn logical_path_rejects_escape_and_normalizes_dots() {
         assert_eq!(
-            LogicalPath::parse("common/./events/../events/x.txt").unwrap().as_str(),
+            LogicalPath::parse("common/./events/../events/x.txt")
+                .unwrap()
+                .as_str(),
             "common/events/x.txt"
         );
         assert!(LogicalPath::parse("../../x.txt").is_err());

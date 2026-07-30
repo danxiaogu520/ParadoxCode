@@ -92,7 +92,11 @@ pub struct DiscoveryOptions {
 
 impl Default for DiscoveryOptions {
     fn default() -> Self {
-        Self { depth: DiscoveryDepth::Quick, roots: Vec::new(), include_platform_locations: true }
+        Self {
+            depth: DiscoveryDepth::Quick,
+            roots: Vec::new(),
+            include_platform_locations: true,
+        }
     }
 }
 
@@ -179,8 +183,11 @@ pub fn discover_installations(
             let explicit_roots = options.roots.iter().cloned().collect::<BTreeSet<_>>();
             let mut visited = BTreeSet::new();
             for root in candidates {
-                let exclusions =
-                    if explicit_roots.contains(&root) { None } else { Some(&excluded) };
+                let exclusions = if explicit_roots.contains(&root) {
+                    None
+                } else {
+                    Some(&excluded)
+                };
                 walk_root(
                     &root,
                     descriptor,
@@ -421,7 +428,10 @@ fn local_volume_roots() -> BTreeSet<PathBuf> {
     #[cfg(target_os = "windows")]
     {
         if let Some(system_drive) = std::env::var_os("SystemDrive") {
-            roots.insert(PathBuf::from(format!("{}\\", system_drive.to_string_lossy())));
+            roots.insert(PathBuf::from(format!(
+                "{}\\",
+                system_drive.to_string_lossy()
+            )));
         }
         if let Ok(output) = Command::new("powershell.exe")
             .args([
@@ -568,7 +578,10 @@ pub struct UserConfiguration {
 
 impl Default for UserConfiguration {
     fn default() -> Self {
-        Self { version: CONFIG_VERSION, games: BTreeMap::new() }
+        Self {
+            version: CONFIG_VERSION,
+            games: BTreeMap::new(),
+        }
     }
 }
 
@@ -599,15 +612,19 @@ impl UserConfiguration {
         if self.version != CONFIG_VERSION {
             return Err(UserConfigError::UnsupportedVersion(self.version));
         }
-        let parent =
-            path.parent().filter(|parent| !parent.as_os_str().is_empty()).ok_or_else(|| {
+        let parent = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .ok_or_else(|| {
                 UserConfigError::InvalidPath("configuration path has no parent".to_owned())
             })?;
         fs::create_dir_all(parent)?;
         let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
         temporary.write_all(toml::to_string_pretty(self)?.as_bytes())?;
         temporary.as_file().sync_all()?;
-        temporary.persist(path).map_err(|error| UserConfigError::Io(error.error))?;
+        temporary
+            .persist(path)
+            .map_err(|error| UserConfigError::Io(error.error))?;
         Ok(())
     }
 }
@@ -696,7 +713,10 @@ impl fmt::Display for UserConfigError {
             Self::InvalidPath(message) => formatter.write_str(message),
             Self::TooLarge => formatter.write_str("user configuration exceeds 1 MiB"),
             Self::UnsupportedVersion(version) => {
-                write!(formatter, "unsupported user configuration version: {version}")
+                write!(
+                    formatter,
+                    "unsupported user configuration version: {version}"
+                )
             }
             Self::Io(error) => write!(formatter, "user configuration I/O error: {error}"),
             Self::Decode(error) => write!(formatter, "invalid user configuration TOML: {error}"),
@@ -755,7 +775,11 @@ mod tests {
         }
         let executable = super::join_portable(
             &root,
-            TEST_GAME.executable_paths.current().first().expect("supported test platform"),
+            TEST_GAME
+                .executable_paths
+                .current()
+                .first()
+                .expect("supported test platform"),
         );
         fs::create_dir_all(executable.parent().expect("executable parent"))
             .expect("executable parent directory");
@@ -835,7 +859,9 @@ mod tests {
         game.discovery_outcome = Some(DiscoveryOutcome::Configured);
         game.vanilla_source = Some(temporary.path().join("source"));
         game.vanilla_cache = Some(paths.vanilla_cache("test"));
-        configuration.save(&paths.config_file).expect("save configuration");
+        configuration
+            .save(&paths.config_file)
+            .expect("save configuration");
         assert_eq!(
             UserConfiguration::load(&paths.config_file).expect("load configuration"),
             configuration
@@ -853,7 +879,11 @@ mod tests {
         }
         let executable = super::join_portable(
             &installation,
-            TEST_GAME.executable_paths.current().first().expect("supported test platform"),
+            TEST_GAME
+                .executable_paths
+                .current()
+                .first()
+                .expect("supported test platform"),
         );
         fs::create_dir_all(executable.parent().expect("executable parent"))
             .expect("executable parent directory");
@@ -861,7 +891,10 @@ mod tests {
         fs::create_dir_all(steam.join("steamapps")).expect("Steam metadata directory");
         fs::write(
             steam.join("steamapps/libraryfolders.vdf"),
-            format!("\"LibraryFolders\"\n{{\n  \"1\" \"{}\"\n}}\n", library.display()),
+            format!(
+                "\"LibraryFolders\"\n{{\n  \"1\" \"{}\"\n}}\n",
+                library.display()
+            ),
         )
         .expect("legacy library metadata");
         let candidates = super::steam_library_candidates(&steam, &TEST_GAME);

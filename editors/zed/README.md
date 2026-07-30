@@ -6,9 +6,8 @@ The official `pdx-ls` binary embeds the only supported first-party EU4 rules.
 
 The extension directory is deliberately outside the core Cargo workspace. The three grammar
 directories under `../../grammars/` are the source of truth; the development manifest points at
-the repository's reachable Git remote with a pinned revision and a grammar-specific `path`. Run
-`python3 scripts/prepare-zed-dev-manifest.py` from the repository root after changing the
-grammar revision or remote. A published manifest must replace those URLs with the read-only
+the repository's reachable Git remote with a pinned revision and a grammar-specific `path`. Run `cargo run --bin pdx -- dev prepare-manifest --root .` from the repository root
+after changing the grammar revision or remote. A published manifest must replace those URLs with the read-only
 mirrors and pinned revisions described in the Phase 0 spike.
 
 Because `.txt` is shared by many languages, Europa Universalis IV does not globally claim that
@@ -45,9 +44,6 @@ workspace containing a separate Mod directory and ordered dependency Mods, confi
 }
 ```
 
-See [workspace configuration](../../docs/configuration.md) for the project TOML schema, relative
-path rules, inline configuration, and precedence. Initialization options require a language-server
-restart after changes. Rename produces a WorkspaceEdit only for the current Mod and its open
-overlays; dependency and cached Vanilla definitions are rejected as read-only. The core
-`pdx setup vanilla` discovery flow, lower-level `pdx index vanilla` command, and
-`vanilla_index_cache` project field are documented in the same workspace configuration guide.
+Initialization options require a language-server restart after changes.
+Rename produces a WorkspaceEdit only for the current Mod and its open
+overlays; dependency and cached Vanilla definitions are rejected as read-only. The `pdx setup vanilla` discovery flow and `pdx index vanilla` command handle Vanilla cache management.

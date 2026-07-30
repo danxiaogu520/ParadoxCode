@@ -4,7 +4,11 @@ pub(crate) fn parse(source: &str) -> ParseParts {
     let mut parser = Parser::new(source);
     let children = parser.parse_container(None);
     let root = parser.node(CstKind::Document, 0, source.len(), children);
-    ParseParts { root, tokens: parser.tokens, errors: parser.errors }
+    ParseParts {
+        root,
+        tokens: parser.tokens,
+        errors: parser.errors,
+    }
 }
 
 struct Parser<'source> {
@@ -16,7 +20,12 @@ struct Parser<'source> {
 
 impl<'source> Parser<'source> {
     fn new(source: &'source str) -> Self {
-        Self { source, position: 0, tokens: Vec::new(), errors: Vec::new() }
+        Self {
+            source,
+            position: 0,
+            tokens: Vec::new(),
+            errors: Vec::new(),
+        }
     }
 
     fn node(&self, kind: CstKind, start: usize, end: usize, children: Vec<CstNode>) -> CstNode {
@@ -141,7 +150,12 @@ impl<'source> Parser<'source> {
                     vec![key],
                 ),
                 operator,
-                self.node(CstKind::Value, value.range().start() as usize, end, vec![value]),
+                self.node(
+                    CstKind::Value,
+                    value.range().start() as usize,
+                    end,
+                    vec![value],
+                ),
             ],
         )
     }
@@ -160,7 +174,12 @@ impl<'source> Parser<'source> {
         let Some(value) = self.parse_bare() else {
             let end = self.position.saturating_add(1).min(self.source.len());
             self.position = end;
-            self.error(SyntaxErrorKind::UnexpectedToken, start, end, "expected a script value");
+            self.error(
+                SyntaxErrorKind::UnexpectedToken,
+                start,
+                end,
+                "expected a script value",
+            );
             return self.node(CstKind::Error, start, end, Vec::new());
         };
         self.skip_whitespace();
@@ -221,8 +240,12 @@ impl<'source> Parser<'source> {
                 "parameter condition is missing `]`",
             );
         }
-        let condition_node =
-            self.node(CstKind::ParameterCondition, condition_start, condition_end, vec![condition]);
+        let condition_node = self.node(
+            CstKind::ParameterCondition,
+            condition_start,
+            condition_end,
+            vec![condition],
+        );
         let mut children = vec![condition_node];
         children.extend(self.parse_container(Some(b']')));
         if self.peek() == Some(b']') {
@@ -235,7 +258,12 @@ impl<'source> Parser<'source> {
                 "parameter block is missing `]`",
             );
         }
-        self.node(CstKind::ParameterBlock, start, self.position.max(start), children)
+        self.node(
+            CstKind::ParameterBlock,
+            start,
+            self.position.max(start),
+            children,
+        )
     }
 
     fn parse_comment(&mut self) -> CstNode {
@@ -246,7 +274,8 @@ impl<'source> Parser<'source> {
             self.position += 1;
         }
         let range = super::range(start, self.position);
-        self.tokens.push(SyntaxToken::new(TokenKind::Comment, range));
+        self.tokens
+            .push(SyntaxToken::new(TokenKind::Comment, range));
         self.node(CstKind::Comment, start, self.position, Vec::new())
     }
 
@@ -275,7 +304,10 @@ impl<'source> Parser<'source> {
             }
         }
         let end = self.position;
-        self.tokens.push(SyntaxToken::new(TokenKind::Quoted, super::range(start, end)));
+        self.tokens.push(SyntaxToken::new(
+            TokenKind::Quoted,
+            super::range(start, end),
+        ));
         if !closed {
             self.error(
                 SyntaxErrorKind::UnterminatedString,
@@ -326,8 +358,12 @@ impl<'source> Parser<'source> {
         };
         self.position += length;
         let range = super::range(start, self.position);
-        self.tokens.push(SyntaxToken::new(TokenKind::Operator, range));
-        Some((self.position, self.node(CstKind::Operator, start, self.position, Vec::new())))
+        self.tokens
+            .push(SyntaxToken::new(TokenKind::Operator, range));
+        Some((
+            self.position,
+            self.node(CstKind::Operator, start, self.position, Vec::new()),
+        ))
     }
 
     fn operator_starts_here(&self) -> bool {
@@ -335,7 +371,10 @@ impl<'source> Parser<'source> {
     }
 
     fn starts_parameter_block(&self) -> bool {
-        self.source.as_bytes().get(self.position..self.position.saturating_add(2)) == Some(b"[[")
+        self.source
+            .as_bytes()
+            .get(self.position..self.position.saturating_add(2))
+            == Some(b"[[")
     }
 
     fn skip_whitespace(&mut self) {
@@ -348,8 +387,11 @@ impl<'source> Parser<'source> {
 
     fn consume_expected(&mut self, expected: u8) {
         if self.peek() == Some(expected) {
-            let kind =
-                if expected == b'{' { TokenKind::OpenDelimiter } else { TokenKind::CloseDelimiter };
+            let kind = if expected == b'{' {
+                TokenKind::OpenDelimiter
+            } else {
+                TokenKind::CloseDelimiter
+            };
             self.consume_delimiter(kind);
         }
     }
@@ -357,7 +399,8 @@ impl<'source> Parser<'source> {
     fn consume_delimiter(&mut self, kind: TokenKind) {
         let start = self.position;
         self.position = self.position.saturating_add(1).min(self.source.len());
-        self.tokens.push(SyntaxToken::new(kind, super::range(start, self.position)));
+        self.tokens
+            .push(SyntaxToken::new(kind, super::range(start, self.position)));
     }
 
     fn peek(&self) -> Option<u8> {
@@ -365,6 +408,7 @@ impl<'source> Parser<'source> {
     }
 
     fn error(&mut self, kind: SyntaxErrorKind, start: usize, end: usize, message: &'static str) {
-        self.errors.push(SyntaxError::new(kind, super::range(start, end), message));
+        self.errors
+            .push(SyntaxError::new(kind, super::range(start, end), message));
     }
 }

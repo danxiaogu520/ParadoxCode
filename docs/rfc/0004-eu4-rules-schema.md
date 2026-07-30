@@ -3,13 +3,13 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
-> 2026-07-20 amendment：EU4 是当前唯一交付规则包，但通用 artifact/runtime 类型将按 [RFC 0013](0013-generic-engine-eu4-first.md) 迁入 `pdx-rules`，EU4 特有内容进入 EU4 profile。本 RFC 继续定义 `eu4.pdxrules` 的具体语义与发布要求。
+> 2026-07-20 amendment：EU4 是当前唯一交付规则包，但通用 artifact/runtime 类型将按 [RFC 0012](0012-generic-engine-eu4-first.md) 迁入 `pdx-rules`，EU4 特有内容进入 EU4 profile。本 RFC 继续定义 `eu4.pdxrules` 的具体语义与发布要求。
 >
-> 2026-07-21 amendment：artifact 仍是开发期权威数据，但外部 runtime 文件与扩展携带规则的分发方式已由 [RFC 0014](0014-embedded-first-party-rules.md) 取代。
+> 2026-07-21 amendment：artifact 仍是开发期权威数据，但外部 runtime 文件与扩展携带规则的分发方式已由 [RFC 0013](0013-embedded-first-party-rules.md) 取代。
 >
 > 2026-07-22 amendment：SQLite 不再是人工维护的权威源，CWT bootstrap/CRUD 决策已废止。
 > `rules/eu4/*.json` 是唯一权威，`pdx-bake` 生成并验证 SQLite artifact；详见
-> [RFC 0015](0015-first-party-rule-source.md)。
+> [RFC 0014](0014-first-party-rule-source.md)。
 
 ## 目标
 
@@ -32,7 +32,7 @@ editors/zed/
   bundled-rules/        发布打包时包含 eu4.pdxrules
 ```
 
-项目不接受 `.cwt` 或其他外部规则 source。`reference/` 仅是历史研究资料，不参与规则编译、测试或发布。
+项目不接受 `.cwt` 或其他外部规则 source。不接受任何外部规则参与编译、测试或发布。
 
 `rules/` 是仓库内的 source-of-truth artifact 位置，不是独立分发渠道。面向用户的规则分发只通过编辑器扩展 release 完成。
 
@@ -185,7 +185,7 @@ artifact schema 不兼容时拒绝加载。schema version 只描述存储/API �
 
 ## 已废止：数据库 CRUD
 
-RFC 0015 禁止把 SQLite 作为人工编辑入口。历史提案中的数据库 CRUD 不再实施。所有规则修改必须作用于第一方 source，并通过 compiler validation。
+RFC 0014 禁止把 SQLite 作为人工编辑入口。历史提案中的数据库 CRUD 不再实施。所有规则修改必须作用于第一方 source，并通过 compiler validation。
 
 ## 非目标
 

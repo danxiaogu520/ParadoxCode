@@ -29,3 +29,6 @@ Thumbs.db
 
 # CWTools reference
 /reference/
+
+# Deprecated tests
+/tests/

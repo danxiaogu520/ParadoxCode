@@ -3,10 +3,10 @@
 use crate::{GameInstallDescriptor, PlatformExecutablePaths};
 use pdx_rules::{
     FileCategory, FileMatcher, FileResolutionPolicy, GameProfile, ParserKind,
-    ProfileConditionalDefinitionRule, ProfileDefinitionRule,
-    ProfileMatchMode, ProfileReferenceRule, ProfileRootScopeRule, ProfileScopeCompatibility,
-    ProfileTextMatcher, ProfileTokenDefinitionRule, ProfileValueDefinitionRule, RuleSet,
-    RulesModel, SymbolDescriptor, SymbolResolutionPolicy,
+    ProfileConditionalDefinitionRule, ProfileDefinitionRule, ProfileMatchMode,
+    ProfileReferenceRule, ProfileRootScopeRule, ProfileScopeCompatibility, ProfileTextMatcher,
+    ProfileTokenDefinitionRule, ProfileValueDefinitionRule, RuleSet, RulesModel, SymbolDescriptor,
+    SymbolResolutionPolicy,
 };
 
 const FIRST_PARTY_RULES: &[u8] = include_bytes!("../../../rules/eu4.pdxrules");
@@ -212,7 +212,12 @@ pub fn profile() -> GameProfile {
         value_definition("save_global_event_target_as", None, "global_event_target"),
         value_definition("set_saved_name", None, "saved_name"),
     ];
-    for parent in ["set_variable", "change_variable", "new_variable", "new_variables"] {
+    for parent in [
+        "set_variable",
+        "change_variable",
+        "new_variable",
+        "new_variables",
+    ] {
         value_definitions.push(value_definition("which", Some(parent), "variable"));
     }
     GameProfile {
@@ -224,10 +229,18 @@ pub fn profile() -> GameProfile {
             reference(ProfileMatchMode::Exact, "event_id", "event"),
             reference(ProfileMatchMode::Exact, "trigger_event", "event"),
             reference(ProfileMatchMode::Suffix, "_event", "event"),
-            reference(ProfileMatchMode::Contains, "scripted_effect", "scripted_effect"),
+            reference(
+                ProfileMatchMode::Contains,
+                "scripted_effect",
+                "scripted_effect",
+            ),
             reference(ProfileMatchMode::Exact, "call_effect", "scripted_effect"),
             reference(ProfileMatchMode::Suffix, "_effect", "scripted_effect"),
-            reference(ProfileMatchMode::Contains, "scripted_trigger", "scripted_trigger"),
+            reference(
+                ProfileMatchMode::Contains,
+                "scripted_trigger",
+                "scripted_trigger",
+            ),
             reference(ProfileMatchMode::Exact, "call_trigger", "scripted_trigger"),
             reference(ProfileMatchMode::Suffix, "_trigger", "scripted_trigger"),
             reference(ProfileMatchMode::Exact, "localisation", "localisation"),
@@ -297,10 +310,18 @@ pub fn profile() -> GameProfile {
         .into_iter()
         .map(str::to_owned)
         .collect(),
-        scope_completions: ["root", "this", "from", "prev", "country", "province", "trade_node"]
-            .into_iter()
-            .map(str::to_owned)
-            .collect(),
+        scope_completions: [
+            "root",
+            "this",
+            "from",
+            "prev",
+            "country",
+            "province",
+            "trade_node",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect(),
         root_scopes: vec![
             ProfileRootScopeRule {
                 key: matcher(ProfileMatchMode::Exact, "country_event"),
@@ -315,7 +336,10 @@ pub fn profile() -> GameProfile {
             actual: "trade_node".to_owned(),
             expected: "province".to_owned(),
         }],
-        transparent_scope_wrappers: ["AND", "OR", "NOT"].into_iter().map(str::to_owned).collect(),
+        transparent_scope_wrappers: ["AND", "OR", "NOT"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
         member_kind_aliases: [
             ("country_tags", "country_tag"),
             ("country_tag", "country_tag"),
@@ -361,9 +385,15 @@ pub fn profile() -> GameProfile {
             ("cultures", "culture"),
             ("culture", "culture"),
             ("scripted_effect_params", "scripted_effect_param"),
-            ("scripted_effect_params_dollar", "scripted_effect_param_dollar"),
+            (
+                "scripted_effect_params_dollar",
+                "scripted_effect_param_dollar",
+            ),
             ("hardcoded_legacygovernments", "hardcoded_legacy_government"),
-            ("hardcoded_legacy_only_governments", "hardcoded_legacy_government"),
+            (
+                "hardcoded_legacy_only_governments",
+                "hardcoded_legacy_government",
+            ),
             ("modifiers", "static_modifier"),
             ("modifier", "static_modifier"),
         ]
@@ -574,8 +604,20 @@ mod tests {
     fn profile_identity_and_bootstrap_catalog_are_stable() {
         assert_eq!(Eu4Profile.game_id(), GAME_ID);
         let rules = bootstrap_rules();
-        assert!(rules.model().file_categories.iter().any(|category| category.id == "script"));
-        assert!(rules.model().symbol_descriptors.iter().any(|symbol| symbol.kind_id == "event"));
+        assert!(
+            rules
+                .model()
+                .file_categories
+                .iter()
+                .any(|category| category.id == "script")
+        );
+        assert!(
+            rules
+                .model()
+                .symbol_descriptors
+                .iter()
+                .any(|symbol| symbol.kind_id == "event")
+        );
         let profile = profile();
         assert_eq!(profile.game_id, GAME_ID);
         assert_eq!(
@@ -591,7 +633,10 @@ mod tests {
                 .map(|rule| rule.kind.as_str()),
             Some("culture")
         );
-        assert_eq!(profile.value_definition_kind("which", Some("set_variable")), Some("variable"));
+        assert_eq!(
+            profile.value_definition_kind("which", Some("set_variable")),
+            Some("variable")
+        );
         assert!(profile.token_definitions.iter().any(|rule| {
             rule.inner_kind == "scripted_effect_param"
                 && rule.path.matches("common/scripted_effects/example.txt")
@@ -599,8 +644,16 @@ mod tests {
         assert_eq!(profile.root_scope("country_event"), Some("country"));
         assert!(profile.is_scope("capital_scope"));
         assert!(profile.scopes_compatible("trade_node", "province"));
-        assert_eq!(profile.member_kind_alias("COUNTRY_TAGS"), Some("country_tag"));
-        assert!(profile.fallback_keys.iter().any(|key| key == "add_treasury"));
+        assert_eq!(
+            profile.member_kind_alias("COUNTRY_TAGS"),
+            Some("country_tag")
+        );
+        assert!(
+            profile
+                .fallback_keys
+                .iter()
+                .any(|key| key == "add_treasury")
+        );
         assert!(profile.enum_extra_member("scripted_effect_params", "scaled_skill"));
     }
 

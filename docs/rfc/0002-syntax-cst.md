@@ -15,7 +15,7 @@ MVP 保留一个 EU4 Tree-sitter grammar 资产，供 Zed 编辑器侧使用：
 
 EU4 本地化文件由通用 YAML LSP 处理，本项目不提供编辑器端语法高亮。可复用的 Script 和 localisation frontend 属于 syntax 层；具体文件分类由游戏 profile 负责。
 
-规则维护不复用 Script 或任何外部规则语言。`pdx-bake` 只解析 RFC 0015 定义的严格第一方 JSON source；`.cwt` 不是项目支持的语言或输入。
+规则维护不复用 Script 或任何外部规则语言。`pdx-bake` 只解析 RFC 0014 定义的严格第一方 JSON source；`.cwt` 不是项目支持的语言或输入。
 
 ## Script CST
 

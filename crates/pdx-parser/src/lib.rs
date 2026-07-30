@@ -35,13 +35,19 @@ impl SyntaxEdit {
     /// Creates a full-document edit.
     #[must_use]
     pub fn full(replacement: impl Into<String>) -> Self {
-        Self { range: None, replacement: replacement.into() }
+        Self {
+            range: None,
+            replacement: replacement.into(),
+        }
     }
 
     /// Creates a ranged edit.
     #[must_use]
     pub fn ranged(range: TextRange, replacement: impl Into<String>) -> Self {
-        Self { range: Some(range), replacement: replacement.into() }
+        Self {
+            range: Some(range),
+            replacement: replacement.into(),
+        }
     }
 }
 
@@ -56,7 +62,12 @@ impl std::fmt::Display for EditError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidRange(range) => {
-                write!(formatter, "invalid syntax edit range {}..{}", range.start(), range.end())
+                write!(
+                    formatter,
+                    "invalid syntax edit range {}..{}",
+                    range.start(),
+                    range.end()
+                )
             }
         }
     }
@@ -173,7 +184,11 @@ impl ParsedFile {
         } else {
             source = edit.replacement.clone();
         }
-        Ok(parse_with_revision(self.format, &source, self.revision.saturating_add(1)))
+        Ok(parse_with_revision(
+            self.format,
+            &source,
+            self.revision.saturating_add(1),
+        ))
     }
 }
 
@@ -222,7 +237,10 @@ mod tests {
         assert_eq!(parsed.root().children()[1].kind(), CstKind::Property);
         assert_eq!(parsed.root().children()[3].kind(), CstKind::HeaderBlock);
         assert_eq!(parsed.root().children()[4].kind(), CstKind::ParameterBlock);
-        assert_eq!(parsed.text(parsed.root().children()[0].range()), Some("# note"));
+        assert_eq!(
+            parsed.text(parsed.root().children()[0].range()),
+            Some("# note")
+        );
     }
 
     #[test]
@@ -253,9 +271,16 @@ mod tests {
             FileFormat::Localisation,
             "l_english:\nhello:0 \"Hello $NAME$\"\nother:0 text # note\n",
         );
-        assert!(localisation.errors().is_empty(), "errors: {:?}", localisation.errors());
+        assert!(
+            localisation.errors().is_empty(),
+            "errors: {:?}",
+            localisation.errors()
+        );
         assert_eq!(localisation.root().children().len(), 3);
-        assert_eq!(localisation.root().children()[1].kind(), CstKind::LocalisationEntry);
+        assert_eq!(
+            localisation.root().children()[1].kind(),
+            CstKind::LocalisationEntry
+        );
     }
 
     #[test]
@@ -276,5 +301,4 @@ mod tests {
         }
         assert_eq!(current.revision(), 3);
     }
-
 }

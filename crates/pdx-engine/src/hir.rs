@@ -2,11 +2,11 @@
 
 use std::sync::Arc;
 
+use pdx_parser::{CstKind, CstNode, ParsedFile};
 use pdx_rules::{
     GameProfile, KeyMatcher, ProfileDefinitionRule, RuleSet, RuleShape, SemanticRule,
     TypeDescriptor,
 };
-use pdx_parser::{CstKind, CstNode, ParsedFile};
 use pdx_text::{LogicalPath, TextRange, TextSize};
 
 /// A conservative semantic scope value.
@@ -44,7 +44,12 @@ pub struct ScopeState {
 
 impl ScopeState {
     fn initial(scope: ScopeValue) -> Self {
-        Self { root: scope.clone(), current: vec![scope], from: Vec::new(), previous: Vec::new() }
+        Self {
+            root: scope.clone(),
+            current: vec![scope],
+            from: Vec::new(),
+            previous: Vec::new(),
+        }
     }
 }
 
@@ -276,7 +281,9 @@ impl HirFile {
     #[must_use]
     pub fn scope_fact_at(&self, range: TextRange) -> Option<&ScopeFact> {
         let first = self.scope_facts.partition_point(|fact| fact.range < range);
-        self.scope_facts.get(first).filter(|fact| fact.range == range)
+        self.scope_facts
+            .get(first)
+            .filter(|fact| fact.range == range)
     }
 
     /// Returns parser recovery constructs in source order.
@@ -403,8 +410,13 @@ fn lower_shared_impl(
         profile,
     );
     let scope_facts = lower_scope_facts(&properties, logical_path, rules, profile);
-    let (parameter_definitions, parameter_references) =
-        lower_parameters(&syntax, &properties, &parameter_conditionals, logical_path, profile);
+    let (parameter_definitions, parameter_references) = lower_parameters(
+        &syntax,
+        &properties,
+        &parameter_conditionals,
+        logical_path,
+        profile,
+    );
     HirFile {
         syntax,
         scope: Scope::Unknown,
@@ -443,10 +455,14 @@ fn lower_parameters(
     let mut definitions = Vec::new();
     let mut references = Vec::new();
     for rule in &rules {
-        for token in
-            syntax.tokens().iter().filter(|token| token.kind() == pdx_parser::TokenKind::Bare)
+        for token in syntax
+            .tokens()
+            .iter()
+            .filter(|token| token.kind() == pdx_parser::TokenKind::Bare)
         {
-            let Some(raw) = syntax.text(token.range()) else { continue };
+            let Some(raw) = syntax.text(token.range()) else {
+                continue;
+            };
             for (name, range, name_range) in
                 delimited_parameters(raw, token.range(), rule.delimiter)
             {
@@ -519,7 +535,13 @@ fn infer_parameter_definition(
     }) {
         return;
     }
-    definitions.push(HirParameterDefinition { name, range, name_range, owner_range, delimiter });
+    definitions.push(HirParameterDefinition {
+        name,
+        range,
+        name_range,
+        owner_range,
+        delimiter,
+    });
 }
 
 fn delimited_parameters(
@@ -561,11 +583,15 @@ fn lower_scope_facts(
     rules: &RuleSet,
     profile: Option<&GameProfile>,
 ) -> Vec<ScopeFact> {
-    let Some(profile) = profile else { return Vec::new() };
+    let Some(profile) = profile else {
+        return Vec::new();
+    };
     let property_children = property_children(properties);
     let mut facts = Vec::new();
-    for (property_index, property) in
-        properties.iter().enumerate().filter(|(_, property)| property.top_level)
+    for (property_index, property) in properties
+        .iter()
+        .enumerate()
+        .filter(|(_, property)| property.top_level)
     {
         let Some(context) = semantic_root_context(rules, logical_path, &property.key) else {
             continue;
@@ -576,7 +602,11 @@ fn lower_scope_facts(
             context: context.clone(),
             parent_path: Vec::new(),
         });
-        let initial = facts.last().expect("root fact was just inserted").state.clone();
+        let initial = facts
+            .last()
+            .expect("root fact was just inserted")
+            .state
+            .clone();
         let Some(type_name) = context.strip_prefix("type:") else {
             lower_nested_scope_facts(
                 properties,
@@ -591,8 +621,12 @@ fn lower_scope_facts(
             );
             continue;
         };
-        let skip_root =
-            rules.model().semantic.type_descriptors.get(type_name).is_some_and(|descriptor| {
+        let skip_root = rules
+            .model()
+            .semantic
+            .type_descriptors
+            .get(type_name)
+            .is_some_and(|descriptor| {
                 descriptor.skip_root_paths.iter().any(|path| {
                     path.first().is_some_and(|key| {
                         key.eq_ignore_ascii_case("any") || key.eq_ignore_ascii_case(&property.key)
@@ -680,7 +714,8 @@ fn lower_nested_scope_facts(
             .filter(|rule| {
                 (rule.context.eq_ignore_ascii_case(context)
                     || context.strip_prefix("type:").is_some_and(|type_name| {
-                        rule.context.eq_ignore_ascii_case(&format!("root:{type_name}"))
+                        rule.context
+                            .eq_ignore_ascii_case(&format!("root:{type_name}"))
                     }))
                     && paths_equal(&rule.parent_path, parent_path)
                     && matches!(rule.shape, RuleShape::Node | RuleShape::ValueClause)
@@ -782,19 +817,29 @@ fn transition_destination(
 
 fn child_key_may_match(rules: &RuleSet, context: &str, parent_path: &[String], key: &str) -> bool {
     let mut dynamic_matcher = false;
-    let root_context = context.strip_prefix("type:").map(|type_name| format!("root:{type_name}"));
+    let root_context = context
+        .strip_prefix("type:")
+        .map(|type_name| format!("root:{type_name}"));
     for lookup_context in std::iter::once(context).chain(root_context.as_deref()) {
-        for rule in rules.semantic_rules_for_context(lookup_context).filter(|rule| {
-            paths_equal(&rule.parent_path, parent_path)
-                && !matches!(rule.shape, RuleShape::LeafValue)
-        }) {
+        for rule in rules
+            .semantic_rules_for_context(lookup_context)
+            .filter(|rule| {
+                paths_equal(&rule.parent_path, parent_path)
+                    && !matches!(rule.shape, RuleShape::LeafValue)
+            })
+        {
             match &rule.key {
                 KeyMatcher::Exact(expected) if expected.eq_ignore_ascii_case(key) => return true,
                 KeyMatcher::Enum(enum_name) => {
                     let Some(values) =
-                        rules.model().semantic.enum_values.iter().find_map(|(name, values)| {
-                            name.eq_ignore_ascii_case(enum_name).then_some(values)
-                        })
+                        rules
+                            .model()
+                            .semantic
+                            .enum_values
+                            .iter()
+                            .find_map(|(name, values)| {
+                                name.eq_ignore_ascii_case(enum_name).then_some(values)
+                            })
                     else {
                         dynamic_matcher = true;
                         continue;
@@ -814,25 +859,41 @@ fn child_key_may_match(rules: &RuleSet, context: &str, parent_path: &[String], k
 
 fn equivalent_transition<'rule>(matching: &[&'rule SemanticRule]) -> Option<&'rule SemanticRule> {
     let first = *matching.first()?;
-    matching.iter().all(|candidate| transition_signature_matches(first, candidate)).then_some(first)
+    matching
+        .iter()
+        .all(|candidate| transition_signature_matches(first, candidate))
+        .then_some(first)
 }
 
 fn transition_signature_matches(left: &SemanticRule, right: &SemanticRule) -> bool {
-    optional_text_matches(left.child_context.as_deref(), right.child_context.as_deref())
-        && optional_text_matches(left.push_scope.as_deref(), right.push_scope.as_deref())
+    optional_text_matches(
+        left.child_context.as_deref(),
+        right.child_context.as_deref(),
+    ) && optional_text_matches(left.push_scope.as_deref(), right.push_scope.as_deref())
         && left.replace_scope.len() == right.replace_scope.len()
-        && left.replace_scope.iter().all(|(left_register, left_scope)| {
-            right.replace_scope.iter().any(|(right_register, right_scope)| {
-                left_register.eq_ignore_ascii_case(right_register)
-                    && left_scope.eq_ignore_ascii_case(right_scope)
+        && left
+            .replace_scope
+            .iter()
+            .all(|(left_register, left_scope)| {
+                right
+                    .replace_scope
+                    .iter()
+                    .any(|(right_register, right_scope)| {
+                        left_register.eq_ignore_ascii_case(right_register)
+                            && left_scope.eq_ignore_ascii_case(right_scope)
+                    })
             })
-        })
-        && right.replace_scope.iter().all(|(right_register, right_scope)| {
-            left.replace_scope.iter().any(|(left_register, left_scope)| {
-                left_register.eq_ignore_ascii_case(right_register)
-                    && left_scope.eq_ignore_ascii_case(right_scope)
+        && right
+            .replace_scope
+            .iter()
+            .all(|(right_register, right_scope)| {
+                left.replace_scope
+                    .iter()
+                    .any(|(left_register, left_scope)| {
+                        left_register.eq_ignore_ascii_case(right_register)
+                            && left_scope.eq_ignore_ascii_case(right_scope)
+                    })
             })
-        })
 }
 
 fn optional_text_matches(left: Option<&str>, right: Option<&str>) -> bool {
@@ -845,14 +906,19 @@ fn optional_text_matches(left: Option<&str>, right: Option<&str>) -> bool {
 
 fn paths_equal(left: &[String], right: &[String]) -> bool {
     left.len() == right.len()
-        && left.iter().zip(right).all(|(left, right)| left.eq_ignore_ascii_case(right))
+        && left
+            .iter()
+            .zip(right)
+            .all(|(left, right)| left.eq_ignore_ascii_case(right))
 }
 
 fn scope_allows(profile: &GameProfile, state: &ScopeState, rule: &SemanticRule) -> bool {
     rule.allowed_scopes.is_empty()
         || state.current.first().is_none_or(|current| match current {
             ScopeValue::Known(scopes) => rule.allowed_scopes.iter().any(|expected| {
-                scopes.iter().any(|actual| profile.scopes_compatible(actual, expected))
+                scopes
+                    .iter()
+                    .any(|actual| profile.scopes_compatible(actual, expected))
             }),
             ScopeValue::Unknown => true,
             ScopeValue::Invalid => false,
@@ -872,7 +938,9 @@ fn child_scope_state(
         if let Some(current) = child.current.first().cloned() {
             child.previous.insert(0, current);
         }
-        child.current.insert(0, ScopeValue::Known(vec![push_scope.to_owned()]));
+        child
+            .current
+            .insert(0, ScopeValue::Known(vec![push_scope.to_owned()]));
     }
     for (register, value) in &rule.replace_scope {
         let value = resolve_scope_expression(&child, value, rules, profile);
@@ -920,15 +988,27 @@ fn resolve_scope_expression(
         return state.root.clone();
     }
     if lowered == "this" {
-        return state.current.first().cloned().unwrap_or(ScopeValue::Unknown);
+        return state
+            .current
+            .first()
+            .cloned()
+            .unwrap_or(ScopeValue::Unknown);
     }
     if let Some(depth) = repeated_scope_register_depth(&lowered, "from") {
-        return state.from.get(depth).cloned().unwrap_or(ScopeValue::Unknown);
+        return state
+            .from
+            .get(depth)
+            .cloned()
+            .unwrap_or(ScopeValue::Unknown);
     }
     if let Some(depth) = repeated_scope_register_depth(&lowered, "previous")
         .or_else(|| repeated_scope_register_depth(&lowered, "prev"))
     {
-        return state.previous.get(depth).cloned().unwrap_or(ScopeValue::Unknown);
+        return state
+            .previous
+            .get(depth)
+            .cloned()
+            .unwrap_or(ScopeValue::Unknown);
     }
 
     let current = state.current.first().unwrap_or(&ScopeValue::Unknown);
@@ -955,28 +1035,39 @@ fn resolve_scope_link(
     let mut link_expression = false;
     if let ScopeValue::Known(actual_scopes) = current {
         for rule in rules.exact_semantic_rules(expression) {
-            if !matches!(rule.context.to_ascii_lowercase().as_str(), "effect" | "trigger") {
+            if !matches!(
+                rule.context.to_ascii_lowercase().as_str(),
+                "effect" | "trigger"
+            ) {
                 continue;
             }
             link_expression = true;
             let allowed = rule.allowed_scopes.is_empty()
                 || rule.allowed_scopes.iter().any(|expected| {
-                    actual_scopes.iter().any(|actual| profile.scopes_compatible(actual, expected))
+                    actual_scopes
+                        .iter()
+                        .any(|actual| profile.scopes_compatible(actual, expected))
                 });
             if !allowed {
                 continue;
             }
-            if let Some(target) =
-                rule.push_scope.as_deref().filter(|target| !target.eq_ignore_ascii_case("any"))
-                && !targets.iter().any(|known: &String| known.eq_ignore_ascii_case(target))
+            if let Some(target) = rule
+                .push_scope
+                .as_deref()
+                .filter(|target| !target.eq_ignore_ascii_case("any"))
+                && !targets
+                    .iter()
+                    .any(|known: &String| known.eq_ignore_ascii_case(target))
             {
                 targets.push(target.to_owned());
             }
         }
     } else {
         link_expression = rules.exact_semantic_rules(expression).any(|rule| {
-            matches!(rule.context.to_ascii_lowercase().as_str(), "effect" | "trigger")
-                && rule.push_scope.is_some()
+            matches!(
+                rule.context.to_ascii_lowercase().as_str(),
+                "effect" | "trigger"
+            ) && rule.push_scope.is_some()
         });
     }
     if !targets.is_empty() {
@@ -988,7 +1079,11 @@ fn resolve_scope_link(
 
 fn repeated_scope_register_depth(value: &str, token: &str) -> Option<usize> {
     let count = value.len().checked_div(token.len())?;
-    if count > 0 && token.repeat(count) == value { Some(count - 1) } else { None }
+    if count > 0 && token.repeat(count) == value {
+        Some(count - 1)
+    } else {
+        None
+    }
 }
 
 fn set_scope_register(registers: &mut Vec<ScopeValue>, depth: usize, value: ScopeValue) {
@@ -1014,7 +1109,9 @@ fn initial_scope_state(
                 .map(|(_, scope)| scope.as_str())
         })
         .or_else(|| profile.root_scope(root_key))
-        .map_or(ScopeValue::Unknown, |scope| ScopeValue::Known(vec![scope.to_owned()]));
+        .map_or(ScopeValue::Unknown, |scope| {
+            ScopeValue::Known(vec![scope.to_owned()])
+        });
     ScopeState::initial(scope)
 }
 
@@ -1041,17 +1138,18 @@ pub fn semantic_root_context(
             (roots.iter().any(|root| root.eq_ignore_ascii_case(key))
                 || descriptor.is_some_and(|descriptor| {
                     descriptor.starts_with.as_deref().is_some_and(|prefix| {
-                        key.to_ascii_lowercase().starts_with(&prefix.to_ascii_lowercase())
+                        key.to_ascii_lowercase()
+                            .starts_with(&prefix.to_ascii_lowercase())
                     }) || descriptor.skip_root_paths.iter().any(|path| {
                         path.first().is_some_and(|root| {
                             root.eq_ignore_ascii_case("any") || root.eq_ignore_ascii_case(key)
                         })
                     })
                 }))
-                && semantic
-                    .rules
-                    .iter()
-                    .any(|rule| rule.context.eq_ignore_ascii_case(&format!("root:{type_name}")))
+                && semantic.rules.iter().any(|rule| {
+                    rule.context
+                        .eq_ignore_ascii_case(&format!("root:{type_name}"))
+                })
                 && descriptor
                     .is_none_or(|descriptor| semantic_type_path_matches(descriptor, logical_path))
         })
@@ -1065,7 +1163,8 @@ pub fn semantic_root_context(
                 .iter()
                 .find(|(type_name, descriptor)| {
                     let starts_with = descriptor.starts_with.as_deref().is_some_and(|prefix| {
-                        key.to_ascii_lowercase().starts_with(&prefix.to_ascii_lowercase())
+                        key.to_ascii_lowercase()
+                            .starts_with(&prefix.to_ascii_lowercase())
                     });
                     (starts_with
                         || (!semantic.type_root_keys.contains_key(*type_name)
@@ -1103,8 +1202,13 @@ fn semantic_type_path_matches(
     descriptor: &TypeDescriptor,
     logical_path: Option<&LogicalPath>,
 ) -> bool {
-    let Some(logical_path) = logical_path else { return true };
-    let path = logical_path.as_str().replace('\\', "/").to_ascii_lowercase();
+    let Some(logical_path) = logical_path else {
+        return true;
+    };
+    let path = logical_path
+        .as_str()
+        .replace('\\', "/")
+        .to_ascii_lowercase();
     if !path.contains('/') {
         return true;
     }
@@ -1119,7 +1223,9 @@ fn semantic_type_path_matches(
             return false;
         }
         if descriptor.path_strict
-            && path.strip_prefix(&format!("{prefix}/")).is_some_and(|rest| rest.contains('/'))
+            && path
+                .strip_prefix(&format!("{prefix}/"))
+                .is_some_and(|rest| rest.contains('/'))
         {
             return false;
         }
@@ -1167,8 +1273,10 @@ fn lower_semantics(
                 {
                     definitions.push(definition_from_rule(properties, property, rule));
                 }
-                for rule in
-                    profile.conditional_definitions.iter().filter(|rule| rule.path.matches(path))
+                for rule in profile
+                    .conditional_definitions
+                    .iter()
+                    .filter(|rule| rule.path.matches(path))
                 {
                     if nested_property(properties, property, &rule.required_field)
                         .and_then(|nested| nested.scalar.as_ref())
@@ -1318,14 +1426,20 @@ impl<'syntax> FactCollector<'syntax> {
         parent_path: &[String],
     ) {
         if node.kind() == CstKind::Error {
-            self.unknown_constructs.push(HirUnknownConstruct { range: node.range() });
+            self.unknown_constructs.push(HirUnknownConstruct {
+                range: node.range(),
+            });
         }
         if node.kind() == CstKind::ParameterBlock
-            && let Some(condition) =
-                node.children().iter().find(|child| child.kind() == CstKind::ParameterCondition)
+            && let Some(condition) = node
+                .children()
+                .iter()
+                .find(|child| child.kind() == CstKind::ParameterCondition)
             && let Some(raw) = self.syntax.text(condition.range()).map(str::trim)
         {
-            let (negated, name) = raw.strip_prefix('!').map_or((false, raw), |name| (true, name));
+            let (negated, name) = raw
+                .strip_prefix('!')
+                .map_or((false, raw), |name| (true, name));
             if !name.is_empty() {
                 let raw_text = self.syntax.text(condition.range()).unwrap_or_default();
                 let name_offset = raw_text.find(name).unwrap_or(0);
@@ -1344,8 +1458,10 @@ impl<'syntax> FactCollector<'syntax> {
             }
         }
         if node.kind() == CstKind::LocalisationEntry
-            && let Some(key) =
-                node.children().iter().find(|child| child.kind() == CstKind::LocalisationKey)
+            && let Some(key) = node
+                .children()
+                .iter()
+                .find(|child| child.kind() == CstKind::LocalisationKey)
             && let Some(name) = self.syntax.text(key.range())
         {
             self.localisation_entries.push(HirLocalisationEntry {
@@ -1356,16 +1472,27 @@ impl<'syntax> FactCollector<'syntax> {
         }
         if node.kind() == CstKind::BareValue
             && !inside_key
-            && let Some(value) =
-                self.syntax.text(node.range()).map(str::trim).filter(|value| !value.is_empty())
+            && let Some(value) = self
+                .syntax
+                .text(node.range())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
         {
-            self.bare_values.push(HirScalar { value: value.to_owned(), range: node.range() });
+            self.bare_values.push(HirScalar {
+                value: value.to_owned(),
+                range: node.range(),
+            });
         }
         if node.kind() == CstKind::Property
-            && let Some(key_node) =
-                node.children().iter().find(|child| child.kind() == CstKind::Key)
-            && let Some(key) =
-                self.syntax.text(key_node.range()).map(str::trim).filter(|key| !key.is_empty())
+            && let Some(key_node) = node
+                .children()
+                .iter()
+                .find(|child| child.kind() == CstKind::Key)
+            && let Some(key) = self
+                .syntax
+                .text(key_node.range())
+                .map(str::trim)
+                .filter(|key| !key.is_empty())
         {
             let mut path = parent_path.to_vec();
             path.push(key.to_owned());
@@ -1383,7 +1510,12 @@ impl<'syntax> FactCollector<'syntax> {
                 scalar: direct_scalar(self.syntax, node),
             });
             for child in node.children() {
-                self.collect(child, false, inside_key || node.kind() == CstKind::Key, &path);
+                self.collect(
+                    child,
+                    false,
+                    inside_key || node.kind() == CstKind::Key,
+                    &path,
+                );
             }
             return;
         }
@@ -1399,15 +1531,24 @@ impl<'syntax> FactCollector<'syntax> {
 }
 
 fn direct_scalar(syntax: &ParsedFile, node: &CstNode) -> Option<HirScalar> {
-    let value = node.children().iter().find(|child| child.kind() == CstKind::Value)?;
+    let value = node
+        .children()
+        .iter()
+        .find(|child| child.kind() == CstKind::Value)?;
     let scalar = value
         .children()
         .iter()
         .find(|child| matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString))?;
     let raw = syntax.text(scalar.range())?.trim();
-    let value =
-        raw.strip_prefix('"').and_then(|value| value.strip_suffix('"')).unwrap_or(raw).to_owned();
-    Some(HirScalar { value, range: scalar.range() })
+    let value = raw
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+        .unwrap_or(raw)
+        .to_owned();
+    Some(HirScalar {
+        value,
+        range: scalar.range(),
+    })
 }
 
 #[cfg(test)]
@@ -1417,14 +1558,16 @@ mod tests {
         property_children, resolve_scope_expression,
     };
     use pdx_game::eu4::{bootstrap_rules, first_party_rules, profile};
-    use pdx_rules::{GameProfile, RuleSet, RuleShape};
     use pdx_parser::{FileFormat, parse};
+    use pdx_rules::{GameProfile, RuleSet, RuleShape};
     use pdx_text::LogicalPath;
 
     #[test]
     fn lowering_retains_property_paths_scalars_and_top_level_identity() {
-        let parsed =
-            parse(FileFormat::Script, "root = { child = \"value\" nested = { leaf = yes } }\n");
+        let parsed = parse(
+            FileFormat::Script,
+            "root = { child = \"value\" nested = { leaf = yes } }\n",
+        );
         let hir = lower(parsed, &RuleSet::empty());
 
         assert_eq!(hir.properties().len(), 4);
@@ -1432,10 +1575,20 @@ mod tests {
         assert_eq!(hir.properties()[0].path, ["root"]);
         assert_eq!(hir.properties()[1].path, ["root", "child"]);
         assert!(hir.properties()[1].value_range.is_some());
-        assert_eq!(hir.properties()[1].scalar.as_ref().expect("child scalar").value, "value");
+        assert_eq!(
+            hir.properties()[1]
+                .scalar
+                .as_ref()
+                .expect("child scalar")
+                .value,
+            "value"
+        );
         assert_eq!(hir.properties()[3].path, ["root", "nested", "leaf"]);
         assert_eq!(
-            hir.bare_values().iter().map(|value| value.value.as_str()).collect::<Vec<_>>(),
+            hir.bare_values()
+                .iter()
+                .map(|value| value.value.as_str())
+                .collect::<Vec<_>>(),
             ["yes"]
         );
     }
@@ -1480,7 +1633,10 @@ mod tests {
 
     #[test]
     fn lowering_retains_localisation_definition_ranges() {
-        let parsed = parse(FileFormat::Localisation, "l_english:\n example_key:0 \"Example\"\n");
+        let parsed = parse(
+            FileFormat::Localisation,
+            "l_english:\n example_key:0 \"Example\"\n",
+        );
         let hir = lower(parsed, &RuleSet::empty());
 
         assert_eq!(hir.localisation_entries().len(), 1);
@@ -1500,7 +1656,11 @@ mod tests {
         assert!(hir.unknown_constructs().iter().all(|unknown| {
             unknown.range.end() <= u32::try_from(source.len()).unwrap_or(u32::MAX)
         }));
-        assert!(hir.properties().iter().any(|property| property.key == "good"));
+        assert!(
+            hir.properties()
+                .iter()
+                .any(|property| property.key == "good")
+        );
     }
 
     #[test]
@@ -1564,7 +1724,8 @@ mod tests {
         let optional_position =
             u32::try_from(source.find("optional").expect("optional parameter")).expect("position");
         assert_eq!(
-            hir.parameter_reference_at(optional_position).map(|reference| reference.name.as_str()),
+            hir.parameter_reference_at(optional_position)
+                .map(|reference| reference.name.as_str()),
             Some("optional")
         );
         assert!(hir.parameter_reference_at(first_owner.end()).is_none());
@@ -1604,7 +1765,11 @@ mod tests {
         let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile);
 
         assert!(hir.definitions().is_empty());
-        assert!(!hir.references().iter().any(|reference| reference.kind == "localisation"));
+        assert!(
+            !hir.references()
+                .iter()
+                .any(|reference| reference.kind == "localisation")
+        );
     }
 
     #[test]
@@ -1623,8 +1788,14 @@ mod tests {
 
         let fact = hir.scope_facts().first().expect("semantic root scope fact");
         assert_eq!(fact.context, "type:event");
-        assert_eq!(fact.state.root, ScopeValue::Known(vec!["country".to_owned()]));
-        assert_eq!(fact.state.current, vec![ScopeValue::Known(vec!["country".to_owned()])]);
+        assert_eq!(
+            fact.state.root,
+            ScopeValue::Known(vec!["country".to_owned()])
+        );
+        assert_eq!(
+            fact.state.current,
+            vec![ScopeValue::Known(vec!["country".to_owned()])]
+        );
         assert_eq!(hir.scope_fact(fact.range, "TYPE:EVENT"), Some(fact));
         let tax = hir
             .properties()
@@ -1680,7 +1851,10 @@ mod tests {
         );
 
         let conflicting = lower_with_profile(
-            parse(FileFormat::Script, "country_event = { mean_time_to_happen = { days = 30 } }\n"),
+            parse(
+                FileFormat::Script,
+                "country_event = { mean_time_to_happen = { days = 30 } }\n",
+            ),
             &path,
             &rules,
             &profile(),
@@ -1728,7 +1902,10 @@ mod tests {
         assert!(modifier_fact.parent_path.is_empty());
 
         let empty = lower_with_profile(
-            parse(FileFormat::Script, "country_event = { mean_time_to_happen = { } }\n"),
+            parse(
+                FileFormat::Script,
+                "country_event = { mean_time_to_happen = { } }\n",
+            ),
             &path,
             &rules,
             &profile(),
@@ -1814,22 +1991,34 @@ mod tests {
             .find(|property| property.key == "int")
             .expect("random event entry");
         assert!(
-            hir.scope_facts().iter().any(|fact| fact.range == event.key_range),
+            hir.scope_facts()
+                .iter()
+                .any(|fact| fact.range == event.key_range),
             "skip-root lowering must recurse below the selected semantic root"
         );
     }
 
     #[test]
     fn replace_scope_resolves_static_links_into_register_values() {
-        assert_eq!(super::repeated_scope_register_depth("fromfrom", "from"), Some(1));
-        assert_eq!(super::repeated_scope_register_depth("previous_owner", "previous"), None);
+        assert_eq!(
+            super::repeated_scope_register_depth("fromfrom", "from"),
+            Some(1)
+        );
+        assert_eq!(
+            super::repeated_scope_register_depth("previous_owner", "previous"),
+            None
+        );
 
         let rules = first_party_rules().expect("embedded rules");
         let path = LogicalPath::parse("common/buildings/scope_hir.txt").expect("logical path");
         let hir = lower_with_profile(
             parse(
                 FileFormat::Script,
-                concat!("test_building = { ", "on_built = { cossack_infantry = FROM }", " }\n",),
+                concat!(
+                    "test_building = { ",
+                    "on_built = { cossack_infantry = FROM }",
+                    " }\n",
+                ),
             ),
             &path,
             &rules,
@@ -1841,12 +2030,17 @@ mod tests {
             .iter()
             .find(|property| property.key == "cossack_infantry")
             .expect("nested effect");
-        let fact = hir.scope_fact(command.key_range, "effect").expect("effect scope fact");
+        let fact = hir
+            .scope_fact(command.key_range, "effect")
+            .expect("effect scope fact");
         assert_eq!(
             fact.state.current.first(),
             Some(&ScopeValue::Known(vec!["province".to_owned()]))
         );
-        assert_eq!(fact.state.from.first(), Some(&ScopeValue::Known(vec!["country".to_owned()])));
+        assert_eq!(
+            fact.state.from.first(),
+            Some(&ScopeValue::Known(vec!["country".to_owned()]))
+        );
 
         let province = ScopeValue::Known(vec!["province".to_owned()]);
         let state = ScopeState::initial(province.clone());

@@ -38,8 +38,7 @@ The runtime parser is implemented in Rust and does not link Tree-sitter C. Tree-
 ## Project status
 
 The repository currently contains an EU4 alpha rather than a production release. The main language
-features and real JSON-RPC integration tests exist; the remaining release-critical work is tracked
-in [the implementation plan](plan.md) and [the MVP definition](docs/mvp.md).
+features and real JSON-RPC integration tests exist.
 
 Current release blockers include:
 
@@ -65,7 +64,7 @@ source text
 The engine/profile boundary keeps workspace, indexing, analysis, LSP, and release infrastructure
 game-neutral while EU4 paths, scopes, commands, symbols, and special semantics remain in the EU4
 profile. See [the architecture guide](docs/architecture.md) and
-[RFC 0013](docs/rfc/0013-generic-engine-eu4-first.md) for the accepted design.
+[RFC 0012](docs/rfc/0012-generic-engine-eu4-first.md) for the accepted design.
 
 ## Building from source
 
@@ -99,7 +98,7 @@ cargo run -p pdx-bake -- build --source rules/eu4 --output rules/eu4.pdxrules --
 ## Development setup
 
 The current alpha can launch `pdx-ls` from a configured path or from `PATH`. Workspace source roots
-are configured through `.pdx/project.toml`; see [workspace configuration](docs/configuration.md).
+are configured through `.pdx/project.toml`.
 The documented setup is for contributors and is not the final installation experience.
 
 Let ParadoxCode discover, validate, index, and remember the local EU4 installation:
@@ -135,14 +134,10 @@ The CLI and language server use the embedded first-party EU4 rules and reject ex
 | `fuzz/` | Parser, edit, and formatter fuzz targets |
 | `scripts/` | Reproducible project quality checks |
 
-## Contributing and security
+## Security
 
-Contributions are welcome once they follow the project's architecture, test, provenance, and
-copyright boundaries. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the
-[Code of Conduct](CODE_OF_CONDUCT.md).
-
-Please do not report security vulnerabilities through public issues. Follow
-[SECURITY.md](SECURITY.md) instead.
+Please do not report security vulnerabilities through public issues.
+Contact the maintainer directly.
 
 ## License
 

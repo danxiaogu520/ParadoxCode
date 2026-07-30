@@ -48,7 +48,10 @@ pub fn format(file: &ParsedFile) -> FormatResult {
     }
     let formatted = canonical_text(file);
     if formatted == file.source() {
-        return FormatResult { edits: Vec::new(), skipped: None };
+        return FormatResult {
+            edits: Vec::new(),
+            skipped: None,
+        };
     }
 
     let reparsed = parse(file.format(), &formatted);
@@ -62,11 +65,17 @@ pub fn format(file: &ParsedFile) -> FormatResult {
     let Some(edits) = minimal_edits(file, &reparsed) else {
         return skipped(FormatSkipReason::SafetyValidationFailed);
     };
-    FormatResult { edits, skipped: None }
+    FormatResult {
+        edits,
+        skipped: None,
+    }
 }
 
 fn skipped(reason: FormatSkipReason) -> FormatResult {
-    FormatResult { edits: Vec::new(), skipped: Some(reason) }
+    FormatResult {
+        edits: Vec::new(),
+        skipped: Some(reason),
+    }
 }
 
 fn canonical_text(file: &ParsedFile) -> String {
@@ -78,17 +87,30 @@ fn canonical_text(file: &ParsedFile) -> String {
 
 #[derive(Clone, Debug)]
 enum ValueLayout {
-    Inline { text: String, width_sensitive: bool },
-    Expanded { opener: String, body: Vec<String>, closer: String },
+    Inline {
+        text: String,
+        width_sensitive: bool,
+    },
+    Expanded {
+        opener: String,
+        body: Vec<String>,
+        closer: String,
+    },
 }
 
 impl ValueLayout {
     fn inline(text: impl Into<String>) -> Self {
-        Self::Inline { text: text.into(), width_sensitive: false }
+        Self::Inline {
+            text: text.into(),
+            width_sensitive: false,
+        }
     }
 
     fn width_sensitive(text: impl Into<String>) -> Self {
-        Self::Inline { text: text.into(), width_sensitive: true }
+        Self::Inline {
+            text: text.into(),
+            width_sensitive: true,
+        }
     }
 }
 
@@ -99,7 +121,10 @@ struct PdxFormatter<'file> {
 
 impl<'file> PdxFormatter<'file> {
     fn new(file: &'file ParsedFile, quoted_script_depth: usize) -> Self {
-        Self { file, quoted_script_depth }
+        Self {
+            file,
+            quoted_script_depth,
+        }
     }
 
     fn document(&self) -> String {
@@ -114,7 +139,9 @@ impl<'file> PdxFormatter<'file> {
 
     fn document_lines(&self) -> Vec<String> {
         let children = self.file.root().children();
-        let has_bom = children.first().is_some_and(|node| node.kind() == CstKind::Bom);
+        let has_bom = children
+            .first()
+            .is_some_and(|node| node.kind() == CstKind::Bom);
         let children = if has_bom { &children[1..] } else { children };
         let mut lines = self.sequence(children, 0);
         if has_bom {
@@ -167,7 +194,11 @@ impl<'file> PdxFormatter<'file> {
             CstKind::BareValue | CstKind::QuotedString => {
                 match self.value(node, depth, false, false) {
                     ValueLayout::Inline { text, .. } => vec![format!("{}{}", indent(depth), text)],
-                    ValueLayout::Expanded { opener, body, closer } => {
+                    ValueLayout::Expanded {
+                        opener,
+                        body,
+                        closer,
+                    } => {
                         let mut lines = vec![format!("{}{}", indent(depth), opener)];
                         lines.extend(body);
                         lines.push(closer);
@@ -176,9 +207,10 @@ impl<'file> PdxFormatter<'file> {
                 }
             }
             CstKind::Comment => vec![format!("{}{}", indent(depth), self.text(node))],
-            CstKind::Value => {
-                node.children().first().map_or_else(Vec::new, |child| self.item(child, depth))
-            }
+            CstKind::Value => node
+                .children()
+                .first()
+                .map_or_else(Vec::new, |child| self.item(child, depth)),
             _ => vec![format!("{}{}", indent(depth), self.text(node).trim())],
         }
     }
@@ -187,9 +219,17 @@ impl<'file> PdxFormatter<'file> {
         let Some((key, operator, value)) = property_parts(node) else {
             return vec![format!("{}{}", indent(depth), self.text(node).trim())];
         };
-        let prefix = format!("{}{} {} ", indent(depth), self.text(key), self.text(operator).trim());
+        let prefix = format!(
+            "{}{} {} ",
+            indent(depth),
+            self.text(key),
+            self.text(operator).trim()
+        );
         let mut layout = self.value(value, depth, false, false);
-        if let ValueLayout::Inline { text, width_sensitive: true } = &layout
+        if let ValueLayout::Inline {
+            text,
+            width_sensitive: true,
+        } = &layout
             && !fits_line(&format!("{prefix}{text}"))
         {
             layout = self.value(value, depth, false, true);
@@ -203,7 +243,10 @@ impl<'file> PdxFormatter<'file> {
         };
         let prefix = format!("{}{} ", indent(depth), self.text(header));
         let mut layout = self.block(block, depth, false, false);
-        if let ValueLayout::Inline { text, width_sensitive: true } = &layout
+        if let ValueLayout::Inline {
+            text,
+            width_sensitive: true,
+        } = &layout
             && !fits_line(&format!("{prefix}{text}"))
         {
             layout = self.block(block, depth, false, true);
@@ -214,7 +257,11 @@ impl<'file> PdxFormatter<'file> {
     fn parameter_item(&self, node: &CstNode, depth: usize) -> Vec<String> {
         match self.parameter(node, depth, false) {
             ValueLayout::Inline { text, .. } => vec![format!("{}{}", indent(depth), text)],
-            ValueLayout::Expanded { opener, body, closer } => {
+            ValueLayout::Expanded {
+                opener,
+                body,
+                closer,
+            } => {
                 let mut lines = vec![format!("{}{}", indent(depth), opener)];
                 lines.extend(body);
                 lines.push(closer);
@@ -257,12 +304,22 @@ impl<'file> PdxFormatter<'file> {
         };
         let header = self.text(header);
         match self.block(block, depth, compact, force_expand) {
-            ValueLayout::Inline { text, width_sensitive } => {
-                ValueLayout::Inline { text: format!("{header} {text}"), width_sensitive }
-            }
-            ValueLayout::Expanded { opener, body, closer } => {
-                ValueLayout::Expanded { opener: format!("{header} {opener}"), body, closer }
-            }
+            ValueLayout::Inline {
+                text,
+                width_sensitive,
+            } => ValueLayout::Inline {
+                text: format!("{header} {text}"),
+                width_sensitive,
+            },
+            ValueLayout::Expanded {
+                opener,
+                body,
+                closer,
+            } => ValueLayout::Expanded {
+                opener: format!("{header} {opener}"),
+                body,
+                closer,
+            },
         }
     }
 
@@ -289,7 +346,9 @@ impl<'file> PdxFormatter<'file> {
             }
         }
 
-        let has_comment = children.iter().any(|child| child.kind() == CstKind::Comment);
+        let has_comment = children
+            .iter()
+            .any(|child| child.kind() == CstKind::Comment);
         if !force_expand && !has_comment {
             if children.is_empty() {
                 return ValueLayout::inline("{ }");
@@ -310,10 +369,18 @@ impl<'file> PdxFormatter<'file> {
             }
         }
 
-        let header_comment = children.first().filter(|node| node.kind() == CstKind::Comment);
-        let body_children = if header_comment.is_some() { &children[1..] } else { children };
-        let opener = header_comment
-            .map_or_else(|| "{".to_owned(), |comment| format!("{{ {}", self.text(comment)));
+        let header_comment = children
+            .first()
+            .filter(|node| node.kind() == CstKind::Comment);
+        let body_children = if header_comment.is_some() {
+            &children[1..]
+        } else {
+            children
+        };
+        let opener = header_comment.map_or_else(
+            || "{".to_owned(),
+            |comment| format!("{{ {}", self.text(comment)),
+        );
         ValueLayout::Expanded {
             opener,
             body: self.sequence(body_children, depth.saturating_add(1)),
@@ -374,7 +441,11 @@ impl<'file> PdxFormatter<'file> {
                     ValueLayout::Inline { text, .. } => text,
                     _ => return None,
                 };
-                Some(format!("{} {} {value}", self.text(key), self.text(operator).trim()))
+                Some(format!(
+                    "{} {} {value}",
+                    self.text(key),
+                    self.text(operator).trim()
+                ))
             }
             CstKind::HeaderBlock => {
                 let (header, block) = header_parts(node)?;
@@ -397,8 +468,10 @@ impl<'file> PdxFormatter<'file> {
     }
 
     fn parameter(&self, node: &CstNode, depth: usize, compact: bool) -> ValueLayout {
-        let Some(condition) =
-            node.children().first().filter(|node| node.kind() == CstKind::ParameterCondition)
+        let Some(condition) = node
+            .children()
+            .first()
+            .filter(|node| node.kind() == CstKind::ParameterCondition)
         else {
             return ValueLayout::inline(self.text(node).trim());
         };
@@ -443,7 +516,13 @@ impl<'file> PdxFormatter<'file> {
             opener: "\"".to_owned(),
             body: lines
                 .into_iter()
-                .map(|line| format!("{}{}", indent(depth.saturating_add(1)), encode_payload(&line)))
+                .map(|line| {
+                    format!(
+                        "{}{}",
+                        indent(depth.saturating_add(1)),
+                        encode_payload(&line)
+                    )
+                })
                 .collect(),
             closer: format!("{}\"", indent(depth)),
         }
@@ -467,7 +546,11 @@ impl<'file> PdxFormatter<'file> {
 fn compose(prefix: String, layout: ValueLayout) -> Vec<String> {
     match layout {
         ValueLayout::Inline { text, .. } => vec![format!("{prefix}{text}")],
-        ValueLayout::Expanded { opener, body, closer } => {
+        ValueLayout::Expanded {
+            opener,
+            body,
+            closer,
+        } => {
             let mut lines = vec![format!("{prefix}{opener}")];
             lines.extend(body);
             lines.push(closer);
@@ -479,15 +562,21 @@ fn compose(prefix: String, layout: ValueLayout) -> Vec<String> {
 fn property_parts(node: &CstNode) -> Option<(&CstNode, &CstNode, &CstNode)> {
     let children = node.children();
     let key = children.iter().find(|child| child.kind() == CstKind::Key)?;
-    let operator = children.iter().find(|child| child.kind() == CstKind::Operator)?;
-    let value = children.iter().find(|child| child.kind() == CstKind::Value)?;
+    let operator = children
+        .iter()
+        .find(|child| child.kind() == CstKind::Operator)?;
+    let value = children
+        .iter()
+        .find(|child| child.kind() == CstKind::Value)?;
     Some((key, operator, value))
 }
 
 fn header_parts(node: &CstNode) -> Option<(&CstNode, &CstNode)> {
     let children = node.children();
     let header = children.first()?;
-    let block = children.iter().find(|child| child.kind() == CstKind::Block)?;
+    let block = children
+        .iter()
+        .find(|child| child.kind() == CstKind::Block)?;
     Some((header, block))
 }
 
@@ -518,7 +607,10 @@ fn quoted_script(source: &str, depth: usize) -> Option<QuotedScript> {
 
 fn has_semantic_item(root: &CstNode) -> bool {
     root.children().iter().any(|node| {
-        matches!(node.kind(), CstKind::Property | CstKind::HeaderBlock | CstKind::ParameterBlock)
+        matches!(
+            node.kind(),
+            CstKind::Property | CstKind::HeaderBlock | CstKind::ParameterBlock
+        )
     })
 }
 
@@ -566,7 +658,10 @@ fn format_localisation(file: &ParsedFile) -> String {
             CstKind::Bom => bom = true,
             CstKind::Comment => lines.push(file.text(node.range()).unwrap_or("").to_owned()),
             CstKind::LanguageHeader => {
-                let key = node.children().first().and_then(|child| file.text(child.range()));
+                let key = node
+                    .children()
+                    .first()
+                    .and_then(|child| file.text(child.range()));
                 if let Some(key) = key {
                     lines.push(format!("{key}:"));
                 }
@@ -584,7 +679,11 @@ fn format_localisation(file: &ParsedFile) -> String {
             lines.push("\u{feff}".to_owned());
         }
     }
-    if lines.is_empty() { String::new() } else { format!("{}\n", lines.join("\n")) }
+    if lines.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n", lines.join("\n"))
+    }
 }
 
 fn format_localisation_entry(file: &ParsedFile, node: &CstNode) -> String {
@@ -598,10 +697,15 @@ fn format_localisation_entry(file: &ParsedFile, node: &CstNode) -> String {
         .iter()
         .find(|child| child.kind() == CstKind::Version)
         .and_then(|child| file.text(child.range()));
-    let value_node = children
-        .iter()
-        .find(|child| matches!(child.kind(), CstKind::LocalisationString | CstKind::UnquotedValue));
-    let value = value_node.and_then(|child| file.text(child.range())).unwrap_or("");
+    let value_node = children.iter().find(|child| {
+        matches!(
+            child.kind(),
+            CstKind::LocalisationString | CstKind::UnquotedValue
+        )
+    });
+    let value = value_node
+        .and_then(|child| file.text(child.range()))
+        .unwrap_or("");
     let has_colon = value_node.is_some_and(|value_node| {
         let range = TextRange::new(
             children
@@ -618,7 +722,10 @@ fn format_localisation_entry(file: &ParsedFile, node: &CstNode) -> String {
     } else {
         format!("{key} {value}")
     };
-    if let Some(comment) = children.iter().find(|child| child.kind() == CstKind::Comment) {
+    if let Some(comment) = children
+        .iter()
+        .find(|child| child.kind() == CstKind::Comment)
+    {
         line.push(' ');
         line.push_str(file.text(comment.range()).unwrap_or(""));
     }
@@ -633,27 +740,36 @@ fn equivalent(original: &ParsedFile, formatted: &ParsedFile, depth: usize) -> bo
     {
         return false;
     }
-    original.tokens().iter().zip(formatted.tokens()).all(|(before, after)| {
-        if before.kind() != after.kind() {
-            return false;
-        }
-        let Some(before_text) = original.text(before.range()) else {
-            return false;
-        };
-        let Some(after_text) = formatted.text(after.range()) else {
-            return false;
-        };
-        if before.kind() == TokenKind::Quoted
-            && let Some(before_script) = quoted_script(before_text, depth)
-        {
-            let Some(after_payload) = quoted_payload(after_text).and_then(decode_payload) else {
+    original
+        .tokens()
+        .iter()
+        .zip(formatted.tokens())
+        .all(|(before, after)| {
+            if before.kind() != after.kind() {
+                return false;
+            }
+            let Some(before_text) = original.text(before.range()) else {
                 return false;
             };
-            let after_script = parse(FileFormat::Script, &after_payload);
-            return equivalent(&before_script.parsed, &after_script, depth.saturating_add(1));
-        }
-        before_text == after_text
-    })
+            let Some(after_text) = formatted.text(after.range()) else {
+                return false;
+            };
+            if before.kind() == TokenKind::Quoted
+                && let Some(before_script) = quoted_script(before_text, depth)
+            {
+                let Some(after_payload) = quoted_payload(after_text).and_then(decode_payload)
+                else {
+                    return false;
+                };
+                let after_script = parse(FileFormat::Script, &after_payload);
+                return equivalent(
+                    &before_script.parsed,
+                    &after_script,
+                    depth.saturating_add(1),
+                );
+            }
+            before_text == after_text
+        })
 }
 
 fn same_tree_shape(left: &CstNode, right: &CstNode) -> bool {
@@ -718,7 +834,10 @@ fn push_changed_range(
     if source.get(start..end)? == replacement {
         return Some(());
     }
-    edits.push(TextEdit { range: text_range(start, end)?, replacement: replacement.to_owned() });
+    edits.push(TextEdit {
+        range: text_range(start, end)?,
+        replacement: replacement.to_owned(),
+    });
     Some(())
 }
 
@@ -728,8 +847,11 @@ fn push_minimal_token_edit(
     after: &str,
     absolute_start: usize,
 ) -> Option<()> {
-    let mut prefix =
-        before.bytes().zip(after.bytes()).take_while(|(left, right)| left == right).count();
+    let mut prefix = before
+        .bytes()
+        .zip(after.bytes())
+        .take_while(|(left, right)| left == right)
+        .count();
     while prefix > 0 && (!before.is_char_boundary(prefix) || !after.is_char_boundary(prefix)) {
         prefix -= 1;
     }
@@ -835,9 +957,15 @@ mod tests {
     #[test]
     fn parameter_blocks_are_compact_unless_they_contain_comments() {
         let compact = "[[name]\na=1\nb={x=1 y=2}\n]\n";
-        assert_eq!(formatted(FileFormat::Script, compact), "[[name]a = 1 b = { x = 1 y = 2 }]\n");
+        assert_eq!(
+            formatted(FileFormat::Script, compact),
+            "[[name]a = 1 b = { x = 1 y = 2 }]\n"
+        );
         let commented = "[[name]\n# note\na=1\n]\n";
-        assert_eq!(formatted(FileFormat::Script, commented), "[[name]\n\t# note\n\ta = 1\n]\n");
+        assert_eq!(
+            formatted(FileFormat::Script, commented),
+            "[[name]\n\t# note\n\ta = 1\n]\n"
+        );
     }
 
     #[test]
@@ -868,7 +996,10 @@ mod tests {
     #[test]
     fn formatting_uses_tabs_lf_no_blank_lines_and_one_final_newline() {
         let source = "\u{feff}root = {\r\n  child = yes\r\n\r\n}\r\n\r\n";
-        assert_eq!(formatted(FileFormat::Script, source), "\u{feff}root = { child = yes }\n");
+        assert_eq!(
+            formatted(FileFormat::Script, source),
+            "\u{feff}root = { child = yes }\n"
+        );
     }
 
     #[test]
@@ -876,7 +1007,10 @@ mod tests {
         let long_key = "界".repeat(58);
         let property_source = format!("root = {{ {long_key} = yes }}\n");
         let property_expected = format!("root = {{\n\t{long_key} = yes\n}}\n");
-        assert_eq!(formatted(FileFormat::Script, &property_source), property_expected);
+        assert_eq!(
+            formatted(FileFormat::Script, &property_source),
+            property_expected
+        );
 
         let scalar = "value".repeat(30);
         let scalar_source = format!("list = {{\n{scalar}\n}}\n");
@@ -906,7 +1040,10 @@ mod tests {
     fn unsafe_syntax_does_not_generate_edits() {
         let parsed = parse(FileFormat::Script, "broken = \"unfinished");
         assert!(
-            parsed.errors().iter().any(|error| error.kind == SyntaxErrorKind::UnterminatedString)
+            parsed
+                .errors()
+                .iter()
+                .any(|error| error.kind == SyntaxErrorKind::UnterminatedString)
         );
         let result = format(&parsed);
         assert!(result.edits.is_empty());
@@ -920,7 +1057,15 @@ mod tests {
         let result = format(&parsed);
         assert!(result.skipped.is_none());
         assert!(result.edits.len() > 1);
-        assert!(result.edits.windows(2).all(|pair| pair[0].range.end() <= pair[1].range.start()));
-        assert_eq!(apply(source, &result.edits), "root = {\n\ta = 1\n\tb = 2\n}\n");
+        assert!(
+            result
+                .edits
+                .windows(2)
+                .all(|pair| pair[0].range.end() <= pair[1].range.start())
+        );
+        assert_eq!(
+            apply(source, &result.edits),
+            "root = {\n\ta = 1\n\tb = 2\n}\n"
+        );
     }
 }

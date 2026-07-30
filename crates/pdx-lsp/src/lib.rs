@@ -4,7 +4,9 @@
 //! conversion, and result freshness checks. Parser and language-feature logic remains in the
 //! editor-neutral workspace and analysis crates.
 
+pub mod check;
 pub mod cli;
+pub mod release;
 
 pub use pdx_game::eu4::{INSTALL_DESCRIPTOR, first_party_rules, profile};
 
@@ -40,18 +42,18 @@ use pdx_analysis::{
     document_symbols_with_cancellation, hover_with_cancellation, prepare_rename_with_cancellation,
     references_with_cancellation, rename_with_cancellation, workspace_symbols_with_cancellation,
 };
-use pdx_parser::format::format;
-use pdx_game::{
-    DiscoveryOptions, DiscoveryOutcome, DiscoveryToken, GameInstallDescriptor, UserConfiguration,
-    UserPaths, discover_installations,
-};
-use pdx_rules::{GameProfile, RuleSet, RulesError};
-use pdx_text::{LineIndex, Position, TextRange};
 use pdx_engine::{
     AnalysisHost, AnalysisSnapshot, DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId,
     DocumentSource, ParsedSource, PreparedDocument, SourceRoot, SourceRootId, SourceRootKind,
     VanillaCacheError, VanillaIndexCache, WorkspaceChange, WorkspaceError, WorkspaceScanToken,
 };
+use pdx_game::{
+    DiscoveryOptions, DiscoveryOutcome, DiscoveryToken, GameInstallDescriptor, UserConfiguration,
+    UserPaths, discover_installations,
+};
+use pdx_parser::format::format;
+use pdx_rules::{GameProfile, RuleSet, RulesError};
+use pdx_text::{LineIndex, Position, TextRange};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -200,7 +202,10 @@ impl RequestId {
         if let Some(string) = value.as_str() {
             return Ok(Self::String(string.to_owned()));
         }
-        Err(RpcError::new(INVALID_REQUEST, "request id must be a string or integer"))
+        Err(RpcError::new(
+            INVALID_REQUEST,
+            "request id must be a string or integer",
+        ))
     }
 }
 
@@ -289,7 +294,10 @@ struct VanillaSetupCancellation {
 
 impl VanillaSetupCancellation {
     fn new() -> Self {
-        Self { discovery: DiscoveryToken::new(), workspace: WorkspaceScanToken::new() }
+        Self {
+            discovery: DiscoveryToken::new(),
+            workspace: WorkspaceScanToken::new(),
+        }
     }
 
     fn cancel(&self) {
@@ -330,7 +338,10 @@ enum TransportEvent {
 
 impl RpcError {
     fn new(code: i64, message: impl Into<String>) -> Self {
-        Self { code, message: message.into() }
+        Self {
+            code,
+            message: message.into(),
+        }
     }
 
     fn response(&self, id: Value) -> Value {
@@ -638,7 +649,9 @@ impl LspServer {
                         if !current {
                             continue;
                         }
-                        let task = in_flight_initialize.take().expect("checked initialize task");
+                        let task = in_flight_initialize
+                            .take()
+                            .expect("checked initialize task");
                         self.cancelled.remove(&result.request_id);
                         let (response, warnings, auto_vanilla) = match result.result {
                             Ok(prepared) if !task.cancellation.is_cancelled() => {
@@ -782,7 +795,9 @@ impl LspServer {
                         if !current {
                             continue;
                         }
-                        let task = in_flight_disk_changes.take().expect("checked disk change task");
+                        let task = in_flight_disk_changes
+                            .take()
+                            .expect("checked disk change task");
                         if task.cancellation.is_cancelled() {
                             continue;
                         }
@@ -853,16 +868,24 @@ impl LspServer {
         if self.state != ServerState::Initialized {
             return false;
         }
-        let Some(object) = message.as_object() else { return false };
+        let Some(object) = message.as_object() else {
+            return false;
+        };
         if object.get("jsonrpc").and_then(Value::as_str) != Some(JSON_RPC_VERSION) {
             return false;
         }
-        let Some(method) = object.get("method").and_then(Value::as_str) else { return false };
+        let Some(method) = object.get("method").and_then(Value::as_str) else {
+            return false;
+        };
         if !is_snapshot_request(method) {
             return false;
         }
-        let Some(id) = object.get("id").filter(|id| !id.is_null()) else { return false };
-        let Ok(request_id) = RequestId::parse(id) else { return false };
+        let Some(id) = object.get("id").filter(|id| !id.is_null()) else {
+            return false;
+        };
+        let Ok(request_id) = RequestId::parse(id) else {
+            return false;
+        };
         if in_flight.contains_key(&request_id) {
             return false;
         }
@@ -876,8 +899,12 @@ impl LspServer {
         let params = object.get("params").cloned();
         let id = id.clone();
         let sender = event_sender.clone();
-        in_flight
-            .insert(request_id.clone(), InFlightRequest { cancellation: cancellation.clone() });
+        in_flight.insert(
+            request_id.clone(),
+            InFlightRequest {
+                cancellation: cancellation.clone(),
+            },
+        );
         scope.spawn(move || {
             let result = if cancellation.is_cancelled() {
                 Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"))
@@ -886,7 +913,10 @@ impl LspServer {
                     context.dispatch(&method, params.as_ref())
                 }))
                 .unwrap_or_else(|_| {
-                    Err(RpcError::new(INTERNAL_ERROR, "request worker failed unexpectedly"))
+                    Err(RpcError::new(
+                        INTERNAL_ERROR,
+                        "request worker failed unexpectedly",
+                    ))
                 });
                 if cancellation.is_cancelled() {
                     Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"))
@@ -913,14 +943,20 @@ impl LspServer {
         if self.state != ServerState::Uninitialized || in_flight.is_some() {
             return false;
         }
-        let Some(object) = message.as_object() else { return false };
+        let Some(object) = message.as_object() else {
+            return false;
+        };
         if object.get("jsonrpc").and_then(Value::as_str) != Some(JSON_RPC_VERSION)
             || object.get("method").and_then(Value::as_str) != Some("initialize")
         {
             return false;
         }
-        let Some(id) = object.get("id").filter(|id| !id.is_null()) else { return false };
-        let Ok(request_id) = RequestId::parse(id) else { return false };
+        let Some(id) = object.get("id").filter(|id| !id.is_null()) else {
+            return false;
+        };
+        let Ok(request_id) = RequestId::parse(id) else {
+            return false;
+        };
         let Ok(params) = typed_params::<InitializeParams>(object.get("params"), "initialize")
         else {
             return false;
@@ -951,7 +987,10 @@ impl LspServer {
                 )
             }))
             .unwrap_or_else(|_| {
-                Err(RpcError::new(INTERNAL_ERROR, "initialize worker failed unexpectedly"))
+                Err(RpcError::new(
+                    INTERNAL_ERROR,
+                    "initialize worker failed unexpectedly",
+                ))
             });
             let _ = sender.send(TransportEvent::Initialize(Box::new(InitializeTaskResult {
                 request_id,
@@ -968,8 +1007,10 @@ impl LspServer {
         event_sender: &mpsc::Sender<TransportEvent>,
         in_flight: &mut Option<InFlightDiskChanges>,
     ) {
-        if !matches!(self.state, ServerState::Initialized | ServerState::ShuttingDown)
-            || in_flight.is_some()
+        if !matches!(
+            self.state,
+            ServerState::Initialized | ServerState::ShuttingDown
+        ) || in_flight.is_some()
             || self.pending_disk_changes.is_empty()
         {
             return;
@@ -984,7 +1025,10 @@ impl LspServer {
         let worker_changes = changes.clone();
         let mut candidate = self.host.clone();
         let sender = event_sender.clone();
-        *in_flight = Some(InFlightDiskChanges { base_revision, cancellation });
+        *in_flight = Some(InFlightDiskChanges {
+            base_revision,
+            cancellation,
+        });
         scope.spawn(move || {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 candidate
@@ -1006,7 +1050,9 @@ impl LspServer {
 
     fn requeue_disk_changes(&mut self, changes: Vec<DiskFileChange>) {
         for change in changes {
-            self.pending_disk_changes.entry(change.path).or_insert(change.kind);
+            self.pending_disk_changes
+                .entry(change.path)
+                .or_insert(change.kind);
         }
     }
 
@@ -1026,9 +1072,13 @@ impl LspServer {
     fn cancel_stale_parses(&self, in_flight: &BTreeMap<DocumentId, InFlightParse>) {
         let snapshot = self.host.snapshot();
         for (id, task) in in_flight {
-            let current_version = snapshot.document(id).and_then(|document| document.version());
-            let superseded =
-                self.pending_parses.get(id).is_some_and(|pending| pending.version != task.version);
+            let current_version = snapshot
+                .document(id)
+                .and_then(|document| document.version());
+            let superseded = self
+                .pending_parses
+                .get(id)
+                .is_some_and(|pending| pending.version != task.version);
             if current_version != Some(task.version) || superseded {
                 task.cancelled.store(true, Ordering::Release);
             }
@@ -1048,13 +1098,18 @@ impl LspServer {
             .cloned()
             .collect::<Vec<_>>();
         for id in ready {
-            let Some(pending) = self.pending_parses.remove(&id) else { continue };
+            let Some(pending) = self.pending_parses.remove(&id) else {
+                continue;
+            };
             let snapshot = self.host.snapshot();
             let sender = event_sender.clone();
             let cancelled = Arc::new(AtomicBool::new(false));
             in_flight.insert(
                 id.clone(),
-                InFlightParse { version: pending.version, cancelled: Arc::clone(&cancelled) },
+                InFlightParse {
+                    version: pending.version,
+                    cancelled: Arc::clone(&cancelled),
+                },
             );
             scope.spawn(move || {
                 let prepared = if cancelled.load(Ordering::Acquire) {
@@ -1087,7 +1142,11 @@ impl LspServer {
         if let Some(version) = version {
             self.pending_diagnostics.insert(
                 id,
-                PendingDiagnostics { uri: uri.to_owned(), version, due: Instant::now() + delay },
+                PendingDiagnostics {
+                    uri: uri.to_owned(),
+                    version,
+                    due: Instant::now() + delay,
+                },
             );
         }
     }
@@ -1106,7 +1165,9 @@ impl LspServer {
     fn cancel_stale_diagnostics(&self, in_flight: &BTreeMap<DocumentId, InFlightDiagnostics>) {
         let snapshot = self.host.snapshot();
         for (id, task) in in_flight {
-            let current_version = snapshot.document(id).and_then(|document| document.version());
+            let current_version = snapshot
+                .document(id)
+                .and_then(|document| document.version());
             let superseded = self
                 .pending_diagnostics
                 .get(id)
@@ -1144,7 +1205,9 @@ impl LspServer {
             .map(|(id, _)| id.clone())
             .collect::<Vec<_>>();
         for id in ready {
-            let Some(pending) = self.pending_diagnostics.remove(&id) else { continue };
+            let Some(pending) = self.pending_diagnostics.remove(&id) else {
+                continue;
+            };
             let snapshot = self.host.snapshot();
             let sender = event_sender.clone();
             let cancellation = CancellationToken::new();
@@ -1216,9 +1279,9 @@ impl LspServer {
 
         let result = self.dispatch_method(method, object.get("params"), request_id.as_ref());
         match (id_value, result) {
-            (Some(id), Ok(value)) => {
-                Ok(vec![json!({"jsonrpc": JSON_RPC_VERSION, "id": id, "result": value})])
-            }
+            (Some(id), Ok(value)) => Ok(vec![
+                json!({"jsonrpc": JSON_RPC_VERSION, "id": id, "result": value}),
+            ]),
             (Some(id), Err(error)) => Ok(vec![error.response(id)]),
             (None, Ok(value)) if value != Value::Null => Ok(vec![value]),
             (None, _) => Ok(Vec::new()),
@@ -1238,7 +1301,10 @@ impl LspServer {
         }
         if method == "initialize" {
             if self.state != ServerState::Uninitialized {
-                return Err(RpcError::new(INVALID_REQUEST, "server is already initialized"));
+                return Err(RpcError::new(
+                    INVALID_REQUEST,
+                    "server is already initialized",
+                ));
             }
             return self.handle_initialize(params);
         }
@@ -1247,11 +1313,20 @@ impl LspServer {
         {
             return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
         }
-        if matches!(self.state, ServerState::Uninitialized | ServerState::Initializing) {
-            return Err(RpcError::new(SERVER_NOT_INITIALIZED, "server is not initialized"));
+        if matches!(
+            self.state,
+            ServerState::Uninitialized | ServerState::Initializing
+        ) {
+            return Err(RpcError::new(
+                SERVER_NOT_INITIALIZED,
+                "server is not initialized",
+            ));
         }
         if self.state == ServerState::ShuttingDown {
-            return Err(RpcError::new(SERVER_NOT_INITIALIZED, "server is shutting down"));
+            return Err(RpcError::new(
+                SERVER_NOT_INITIALIZED,
+                "server is shutting down",
+            ));
         }
 
         match method {
@@ -1350,7 +1425,9 @@ impl LspServer {
             apply_text_change(&mut text, range, &change.text)?;
             line_index = LineIndex::new(&text);
         }
-        self.host.stage_document_text(&id, version, text).map_err(document_error)?;
+        self.host
+            .stage_document_text(&id, version, text)
+            .map_err(document_error)?;
         Ok(uri)
     }
 
@@ -1404,7 +1481,10 @@ fn prepare_initialize_candidate(
     let initialization_options = params.initialization_options.clone();
     #[allow(deprecated)]
     let root_uri = params.root_uri;
-    let root = root_uri.as_ref().map(|uri| parse_file_uri_str(uri.as_str())).transpose()?;
+    let root = root_uri
+        .as_ref()
+        .map(|uri| parse_file_uri_str(uri.as_str()))
+        .transpose()?;
     let workspace_root = params
         .workspace_folders
         .as_ref()
@@ -1429,7 +1509,8 @@ fn prepare_initialize_candidate(
     host.apply_change(WorkspaceChange::SetWorkspaceRoot(resolved.workspace_root));
     host.apply_change(WorkspaceChange::SetSourceRoots(resolved.roots.clone()));
     if scan_workspace && !resolved.roots.is_empty() {
-        host.refresh_source_roots_cancellable(cancellation).map_err(workspace_scan_error)?;
+        host.refresh_source_roots_cancellable(cancellation)
+            .map_err(workspace_scan_error)?;
     }
     if let Some(path) = resolved.vanilla_cache {
         if !scan_workspace {
@@ -1510,7 +1591,13 @@ fn prepare_initialize_candidate(
         code: INTERNAL_ERROR,
         message: format!("failed to serialize initialize result: {error}"),
     })?;
-    Ok(PreparedInitialize { host, result, warnings, auto_vanilla, watcher_registration })
+    Ok(PreparedInitialize {
+        host,
+        result,
+        warnings,
+        auto_vanilla,
+        watcher_registration,
+    })
 }
 
 fn watched_files_registration(
@@ -1524,7 +1611,12 @@ fn watched_files_registration(
     };
     let live_roots = roots
         .iter()
-        .filter(|root| matches!(root.kind, SourceRootKind::CurrentMod | SourceRootKind::Dependency))
+        .filter(|root| {
+            matches!(
+                root.kind,
+                SourceRootKind::CurrentMod | SourceRootKind::Dependency
+            )
+        })
         .collect::<Vec<_>>();
     if live_roots.is_empty() {
         return Ok(None);
@@ -1641,7 +1733,10 @@ fn run_auto_vanilla_setup_with_options(
         UserConfiguration::load(&auto_vanilla.user_paths.config_file).map_err(|error| {
             format!("automatic Vanilla discovery could not load user configuration: {error}")
         })?;
-    if configuration.games.get(descriptor.game_id).is_some_and(|game| game.auto_discovery_attempted)
+    if configuration
+        .games
+        .get(descriptor.game_id)
+        .is_some_and(|game| game.auto_discovery_attempted)
     {
         return Err(format!(
             "automatic {} discovery was skipped because it was already attempted",
@@ -1650,7 +1745,10 @@ fn run_auto_vanilla_setup_with_options(
     }
     let report = discover_installations(&descriptor, discovery_options, &cancellation.discovery);
     if report.cancelled {
-        return Err(format!("automatic {} discovery was cancelled", descriptor.display_name));
+        return Err(format!(
+            "automatic {} discovery was cancelled",
+            descriptor.display_name
+        ));
     }
     let source = match report.installations.as_slice() {
         [source] => source.clone(),
@@ -1705,16 +1803,21 @@ fn run_auto_vanilla_setup_with_options(
     })();
     match setup {
         Ok((cache, cache_path)) => {
-            let game = configuration.games.entry(descriptor.game_id.to_owned()).or_default();
+            let game = configuration
+                .games
+                .entry(descriptor.game_id.to_owned())
+                .or_default();
             game.auto_discovery_attempted = true;
             game.discovery_outcome = Some(DiscoveryOutcome::Configured);
             game.vanilla_source = Some(source.clone());
             game.vanilla_cache = Some(cache_path.clone());
-            configuration.save(&auto_vanilla.user_paths.config_file).map_err(|error| {
-                format!(
-                    "Vanilla cache was built but user configuration could not be saved: {error}"
-                )
-            })?;
+            configuration
+                .save(&auto_vanilla.user_paths.config_file)
+                .map_err(|error| {
+                    format!(
+                        "Vanilla cache was built but user configuration could not be saved: {error}"
+                    )
+                })?;
             Ok((
                 cache,
                 format!(
@@ -1726,17 +1829,25 @@ fn run_auto_vanilla_setup_with_options(
         }
         Err(error) => {
             if cancellation.discovery.is_cancelled() || cancellation.workspace.is_cancelled() {
-                return Err(format!("automatic {} setup was cancelled", descriptor.display_name));
+                return Err(format!(
+                    "automatic {} setup was cancelled",
+                    descriptor.display_name
+                ));
             }
-            let game = configuration.games.entry(descriptor.game_id.to_owned()).or_default();
+            let game = configuration
+                .games
+                .entry(descriptor.game_id.to_owned())
+                .or_default();
             game.auto_discovery_attempted = true;
             game.discovery_outcome = Some(DiscoveryOutcome::Failed);
             game.vanilla_source = Some(source);
-            let save_error = configuration.save(&auto_vanilla.user_paths.config_file).err();
+            let save_error = configuration
+                .save(&auto_vanilla.user_paths.config_file)
+                .err();
             match save_error {
-                Some(save_error) => {
-                    Err(format!("{error}; failed to record the attempt: {save_error}"))
-                }
+                Some(save_error) => Err(format!(
+                    "{error}; failed to record the attempt: {save_error}"
+                )),
                 None => Err(error),
             }
         }
@@ -1766,7 +1877,10 @@ fn resolve_source_roots(
         || Ok(WorkspaceInitializationOptions::default()),
         |value| {
             serde_json::from_value::<WorkspaceInitializationOptions>(value).map_err(|error| {
-                RpcError::new(INVALID_PARAMS, format!("invalid initializationOptions: {error}"))
+                RpcError::new(
+                    INVALID_PARAMS,
+                    format!("invalid initializationOptions: {error}"),
+                )
             })
         },
     )?;
@@ -1789,17 +1903,22 @@ fn resolve_source_roots(
             )
         })?;
         let mut text = String::new();
-        file.take(PROJECT_CONFIG_MAX_BYTES + 1).read_to_string(&mut text).map_err(|error| {
-            RpcError::new(
-                INVALID_PARAMS,
-                format!("cannot read projectConfig {}: {error}", path.display()),
-            )
-        })?;
+        file.take(PROJECT_CONFIG_MAX_BYTES + 1)
+            .read_to_string(&mut text)
+            .map_err(|error| {
+                RpcError::new(
+                    INVALID_PARAMS,
+                    format!("cannot read projectConfig {}: {error}", path.display()),
+                )
+            })?;
         if text.len() as u64 > PROJECT_CONFIG_MAX_BYTES {
             return Err(RpcError::new(INVALID_PARAMS, "projectConfig exceeds 1 MiB"));
         }
         toml::from_str::<ProjectConfiguration>(&text).map_err(|error| {
-            RpcError::new(INVALID_PARAMS, format!("invalid projectConfig TOML: {error}"))
+            RpcError::new(
+                INVALID_PARAMS,
+                format!("invalid projectConfig TOML: {error}"),
+            )
         })?
     } else {
         ProjectConfiguration::default()
@@ -1822,27 +1941,39 @@ fn resolve_source_roots(
 
     let current_mod = match project.mod_directory.as_deref() {
         Some(path) => Some(resolve_directory(path, base.as_deref(), "modDirectory")?),
-        None => {
-            client_root.filter(|path| path.is_dir()).map(fs::canonicalize).transpose().map_err(
-                |error| {
-                    RpcError::new(INVALID_PARAMS, format!("cannot resolve workspace root: {error}"))
-                },
-            )?
-        }
+        None => client_root
+            .filter(|path| path.is_dir())
+            .map(fs::canonicalize)
+            .transpose()
+            .map_err(|error| {
+                RpcError::new(
+                    INVALID_PARAMS,
+                    format!("cannot resolve workspace root: {error}"),
+                )
+            })?,
     };
     let mut configured = Vec::<(String, PathBuf)>::new();
     let mut root_ids = BTreeMap::<u32, String>::new();
     for dependency in project.dependencies.unwrap_or_default() {
         if dependency.id.trim().is_empty() {
-            return Err(RpcError::new(INVALID_PARAMS, "dependency id must not be empty"));
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                "dependency id must not be empty",
+            ));
         }
         if dependency.id != dependency.id.trim() {
             return Err(RpcError::new(
                 INVALID_PARAMS,
-                format!("dependency id must not have surrounding whitespace: {}", dependency.id),
+                format!(
+                    "dependency id must not have surrounding whitespace: {}",
+                    dependency.id
+                ),
             ));
         }
-        if configured.iter().any(|(id, _)| id.eq_ignore_ascii_case(&dependency.id)) {
+        if configured
+            .iter()
+            .any(|(id, _)| id.eq_ignore_ascii_case(&dependency.id))
+        {
             return Err(RpcError::new(
                 INVALID_PARAMS,
                 format!("duplicate dependency id: {}", dependency.id),
@@ -1853,7 +1984,10 @@ fn resolve_source_roots(
         if let Some(previous) = root_ids.insert(root_id, dependency.id.clone()) {
             return Err(RpcError::new(
                 INVALID_PARAMS,
-                format!("dependency root id collision between {previous} and {}", dependency.id),
+                format!(
+                    "dependency root id collision between {previous} and {}",
+                    dependency.id
+                ),
             ));
         }
         configured.push((dependency.id, path));
@@ -1886,12 +2020,19 @@ fn resolve_source_roots(
             path,
         );
         root.order = u32::try_from(order).map_err(|_| {
-            RpcError::new(INVALID_PARAMS, "too many dependency roots to assign stable order")
+            RpcError::new(
+                INVALID_PARAMS,
+                "too many dependency roots to assign stable order",
+            )
         })?;
         roots.push(root);
     }
     if let Some(path) = current_mod.clone() {
-        roots.push(SourceRoot::new(SourceRootId::new(u32::MAX), SourceRootKind::CurrentMod, path));
+        roots.push(SourceRoot::new(
+            SourceRootId::new(u32::MAX),
+            SourceRootKind::CurrentMod,
+            path,
+        ));
     }
     Ok(ResolvedSourceRoots {
         workspace_root: current_mod.or(base),
@@ -1910,7 +2051,10 @@ fn resolve_configured_path(
         return Ok(path.to_owned());
     }
     let base = base.ok_or_else(|| {
-        RpcError::new(INVALID_PARAMS, format!("relative {field} requires a workspace root"))
+        RpcError::new(
+            INVALID_PARAMS,
+            format!("relative {field} requires a workspace root"),
+        )
     })?;
     Ok(base.join(path))
 }
@@ -1939,7 +2083,10 @@ fn resolve_path(
         path.to_owned()
     } else {
         let base = base.ok_or_else(|| {
-            RpcError::new(INVALID_PARAMS, format!("relative {field} requires a workspace root"))
+            RpcError::new(
+                INVALID_PARAMS,
+                format!("relative {field} requires a workspace root"),
+            )
         })?;
         base.join(path)
     };
@@ -1956,7 +2103,11 @@ fn stable_dependency_root_id(id: &str) -> u32 {
     for byte in id.bytes().map(|byte| byte.to_ascii_lowercase()) {
         value = (value ^ u32::from(byte)).wrapping_mul(0x0100_0193);
     }
-    if matches!(value, 0 | u32::MAX) { value ^ 0x8000_0000 } else { value }
+    if matches!(value, 0 | u32::MAX) {
+        value ^ 0x8000_0000
+    } else {
+        value
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1967,7 +2118,10 @@ struct SnapshotRequestContext {
 
 impl SnapshotRequestContext {
     fn new(snapshot: AnalysisSnapshot, cancellation: CancellationToken) -> Self {
-        Self { snapshot, cancellation }
+        Self {
+            snapshot,
+            cancellation,
+        }
     }
 
     fn dispatch(&self, method: &str, params: Option<&Value>) -> Result<Value, RpcError> {
@@ -2027,7 +2181,10 @@ impl SnapshotRequestContext {
             .collect::<Vec<_>>();
         self.ensure_active()?;
         typed_value(
-            CompletionResponse::List(CompletionList { is_incomplete, items }),
+            CompletionResponse::List(CompletionList {
+                is_incomplete,
+                items,
+            }),
             "completion response",
         )
     }
@@ -2127,10 +2284,10 @@ impl SnapshotRequestContext {
             let location = location_to_lsp(&self.snapshot, &edit.location).ok_or_else(|| {
                 RpcError::new(INVALID_PARAMS, "rename target has no client-visible URI")
             })?;
-            changes
-                .entry(location.uri)
-                .or_default()
-                .push(TextEdit { range: location.range, new_text: edit.new_text });
+            changes.entry(location.uri).or_default().push(TextEdit {
+                range: location.range,
+                new_text: edit.new_text,
+            });
         }
         typed_value(WorkspaceEdit::new(changes), "rename response")
     }
@@ -2210,7 +2367,11 @@ impl SnapshotRequestContext {
     }
 
     fn ensure_active(&self) -> Result<(), RpcError> {
-        if self.cancellation.is_cancelled() { Err(cancelled_error(Cancelled)) } else { Ok(()) }
+        if self.cancellation.is_cancelled() {
+            Err(cancelled_error(Cancelled))
+        } else {
+            Ok(())
+        }
     }
 
     fn document_position(&self, params: Option<&Value>) -> Result<(DocumentId, u32), RpcError> {
@@ -2286,7 +2447,9 @@ fn cancel_request_from_notification(
     message: &Value,
     in_flight: &HashMap<RequestId, InFlightRequest>,
 ) {
-    let Some(object) = message.as_object() else { return };
+    let Some(object) = message.as_object() else {
+        return;
+    };
     if object.get("method").and_then(Value::as_str) != Some("$/cancelRequest") {
         return;
     }
@@ -2301,7 +2464,9 @@ fn cancel_request_from_notification(
 
 fn cancel_initialize_from_notification(message: &Value, in_flight: Option<&InFlightInitialize>) {
     let Some(in_flight) = in_flight else { return };
-    let Some(object) = message.as_object() else { return };
+    let Some(object) = message.as_object() else {
+        return;
+    };
     if object.get("method").and_then(Value::as_str) != Some("$/cancelRequest") {
         return;
     }
@@ -2319,8 +2484,9 @@ fn diagnostic_values(
     cancellation: &CancellationToken,
 ) -> Option<Value> {
     let values = snapshot.document(id).map_or_else(Vec::new, |document| {
-        let diagnostics =
-            diagnostics_with_cancellation(snapshot, id, cancellation).ok().unwrap_or_default();
+        let diagnostics = diagnostics_with_cancellation(snapshot, id, cancellation)
+            .ok()
+            .unwrap_or_default();
         let (retained, omitted) =
             diagnostic_result_counts(diagnostics.len(), MAX_PUBLISHED_DIAGNOSTICS);
         let mut values = diagnostics
@@ -2348,7 +2514,9 @@ fn diagnostic_values(
             values.push(LspDiagnostic::new(
                 LspRange::default(),
                 Some(DiagnosticSeverity::INFORMATION),
-                Some(NumberOrString::String("pdx-diagnostics-truncated".to_owned())),
+                Some(NumberOrString::String(
+                    "pdx-diagnostics-truncated".to_owned(),
+                )),
                 Some("pdx-lsp".to_owned()),
                 format!("{omitted} additional diagnostics were omitted"),
                 None,
@@ -2369,7 +2537,10 @@ fn diagnostics_notification(uri: &str, values: Value) -> Value {
 }
 
 fn show_warning_notification(message: String) -> Value {
-    let params = ShowMessageParams { typ: MessageType::WARNING, message };
+    let params = ShowMessageParams {
+        typ: MessageType::WARNING,
+        message,
+    };
     json!({
         "jsonrpc": JSON_RPC_VERSION,
         "method": "window/showMessage",
@@ -2378,7 +2549,10 @@ fn show_warning_notification(message: String) -> Value {
 }
 
 fn show_info_notification(message: String) -> Value {
-    let params = ShowMessageParams { typ: MessageType::INFO, message };
+    let params = ShowMessageParams {
+        typ: MessageType::INFO,
+        message,
+    };
     json!({
         "jsonrpc": JSON_RPC_VERSION,
         "method": "window/showMessage",
@@ -2446,28 +2620,46 @@ fn range_to_lsp_for_location(
 fn location_to_lsp(snapshot: &AnalysisSnapshot, location: &Location) -> Option<LspLocation> {
     let uri = if let Some(document) = location.document.as_ref() {
         document.as_str().parse::<Uri>().ok()?
-    } else if let Some(file) = location.file.and_then(|file| snapshot.source_files().get(&file)) {
+    } else if let Some(file) = location
+        .file
+        .and_then(|file| snapshot.source_files().get(&file))
+    {
         path_to_uri(&file.physical_path).parse::<Uri>().ok()?
     } else if let (Some(root), Some(path)) = (snapshot.workspace_root(), location.path.as_ref()) {
         path_to_uri(&root.join(path.as_str())).parse::<Uri>().ok()?
     } else {
         return None;
     };
-    Some(LspLocation::new(uri, location_range_to_lsp(snapshot, location)))
+    Some(LspLocation::new(
+        uri,
+        location_range_to_lsp(snapshot, location),
+    ))
 }
 
 fn document_error(error: DocumentError) -> RpcError {
-    RpcError { code: INVALID_PARAMS, message: error.to_string() }
+    RpcError {
+        code: INVALID_PARAMS,
+        message: error.to_string(),
+    }
 }
 
 fn workspace_scan_error(error: WorkspaceError) -> RpcError {
-    let code =
-        if matches!(error, WorkspaceError::Cancelled) { REQUEST_CANCELLED } else { INVALID_PARAMS };
-    RpcError { code, message: error.to_string() }
+    let code = if matches!(error, WorkspaceError::Cancelled) {
+        REQUEST_CANCELLED
+    } else {
+        INVALID_PARAMS
+    };
+    RpcError {
+        code,
+        message: error.to_string(),
+    }
 }
 
 fn rename_error(error: RenameError) -> RpcError {
-    RpcError { code: INVALID_PARAMS, message: format!("rename unavailable: {error}") }
+    RpcError {
+        code: INVALID_PARAMS,
+        message: format!("rename unavailable: {error}"),
+    }
 }
 
 fn cancelled_error(_: Cancelled) -> RpcError {
@@ -2518,7 +2710,9 @@ fn normalize_workspace_path(path: PathBuf) -> PathBuf {
     let mut missing = Vec::new();
     while let Some(name) = ancestor.file_name() {
         missing.push(name.to_owned());
-        let Some(parent) = ancestor.parent() else { break };
+        let Some(parent) = ancestor.parent() else {
+            break;
+        };
         ancestor = parent;
         if let Ok(mut canonical) = fs::canonicalize(ancestor) {
             for component in missing.iter().rev() {
@@ -2558,7 +2752,10 @@ fn apply_text_change(
         let end = usize::try_from(range.end())
             .map_err(|_| RpcError::new(INVALID_PARAMS, "range is too large"))?;
         if text.get(start..end).is_none() {
-            return Err(RpcError::new(INVALID_PARAMS, "range is outside the document"));
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                "range is outside the document",
+            ));
         }
         text.replace_range(start..end, replacement);
     } else {
@@ -2573,8 +2770,9 @@ fn changed_document_len(
     range: Option<TextRange>,
     replacement_len: usize,
 ) -> Result<usize, RpcError> {
-    let removed =
-        range.map_or(current_len, |range| usize::try_from(range.len()).unwrap_or(usize::MAX));
+    let removed = range.map_or(current_len, |range| {
+        usize::try_from(range.len()).unwrap_or(usize::MAX)
+    });
     let next = current_len
         .checked_sub(removed)
         .and_then(|length| length.checked_add(replacement_len))
@@ -2703,19 +2901,29 @@ fn read_message<R: BufRead>(reader: &mut R) -> Result<Option<Value>, LspError> {
     loop {
         let remaining = MAX_LSP_HEADER_BYTES.saturating_sub(header_bytes);
         if remaining == 0 {
-            return Err(LspError::Protocol("LSP headers exceed the safety limit".to_owned()));
+            return Err(LspError::Protocol(
+                "LSP headers exceed the safety limit".to_owned(),
+            ));
         }
         let mut line = String::new();
         let bytes = (&mut *reader)
-            .take(u64::try_from(remaining).unwrap_or(u64::MAX).saturating_add(1))
+            .take(
+                u64::try_from(remaining)
+                    .unwrap_or(u64::MAX)
+                    .saturating_add(1),
+            )
             .read_line(&mut line)?;
         header_bytes = header_bytes.saturating_add(bytes);
         if header_bytes > MAX_LSP_HEADER_BYTES {
-            return Err(LspError::Protocol("LSP headers exceed the safety limit".to_owned()));
+            return Err(LspError::Protocol(
+                "LSP headers exceed the safety limit".to_owned(),
+            ));
         }
         if bytes == 0 {
             if saw_header {
-                return Err(LspError::Protocol("unexpected EOF in LSP headers".to_owned()));
+                return Err(LspError::Protocol(
+                    "unexpected EOF in LSP headers".to_owned(),
+                ));
             }
             return Ok(None);
         }
@@ -2780,13 +2988,13 @@ mod tests {
         CompletionResponse, Diagnostic, DocumentSymbol, Hover, Location, PrepareRenameResponse,
         SymbolInformation, SymbolKind, WorkspaceEdit,
     };
-    use pdx_game::{DiscoveryOptions, DiscoveryOutcome, UserConfiguration, UserPaths};
-    use pdx_rules::{RuleSet, RulesError, RulesModel};
-    use pdx_text::{LineIndex, Position, TextRange};
     use pdx_engine::{
         AnalysisHost, SourceRoot, SourceRootId, SourceRootKind, TextChange, VanillaIndexCache,
         WorkspaceChange,
     };
+    use pdx_game::{DiscoveryOptions, DiscoveryOutcome, UserConfiguration, UserPaths};
+    use pdx_rules::{RuleSet, RulesError, RulesModel};
+    use pdx_text::{LineIndex, Position, TextRange};
     use serde::de::DeserializeOwned;
     use serde_json::{Value, json};
 
@@ -2815,8 +3023,11 @@ mod tests {
         let (root, root_uri) = temp_workspace_dir();
         fs::create_dir_all(root.join("common/country_tags")).expect("country tags directory");
         fs::create_dir_all(root.join("missions")).expect("missions directory");
-        fs::write(root.join("common/country_tags/00_tags.txt"), "KTP = \"countries/KTP.txt\"\n")
-            .expect("country tag source");
+        fs::write(
+            root.join("common/country_tags/00_tags.txt"),
+            "KTP = \"countries/KTP.txt\"\n",
+        )
+        .expect("country tag source");
         let mission = root.join("missions/test_missions.txt");
         fs::write(&mission, "country_event = { id = test.1 }\n").expect("mission source");
         let mission_uri = canonical_uri(&mission);
@@ -2829,8 +3040,16 @@ mod tests {
         ]);
         let mut output = Vec::new();
         let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-        server.run_transport(Cursor::new(input), &mut output).expect("transport");
-        assert!(server.snapshot().index().active_definition("country_tag", "KTP").is_some());
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
+        assert!(
+            server
+                .snapshot()
+                .index()
+                .active_definition("country_tag", "KTP")
+                .is_some()
+        );
         fs::remove_dir_all(root).expect("cleanup");
     }
 
@@ -2862,9 +3081,14 @@ mod tests {
         ]);
         let mut output = Vec::new();
         let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
         let responses = decode_frames(&output);
-        let hover = responses.iter().find(|value| value["id"] == 2).expect("hover response");
+        let hover = responses
+            .iter()
+            .find(|value| value["id"] == 2)
+            .expect("hover response");
         assert!(
             hover["result"]["contents"]["value"]
                 .as_str()
@@ -2895,8 +3119,10 @@ mod tests {
 
     #[test]
     fn transport_framing_rejects_oversized_and_ambiguous_headers() {
-        let oversized =
-            format!("Content-Length: {}\r\n\r\n", MAX_LSP_MESSAGE_BYTES.saturating_add(1));
+        let oversized = format!(
+            "Content-Length: {}\r\n\r\n",
+            MAX_LSP_MESSAGE_BYTES.saturating_add(1)
+        );
         assert!(matches!(
             read_message(&mut Cursor::new(oversized)),
             Err(LspError::Protocol(message)) if message.contains("safety limit")
@@ -2954,7 +3180,10 @@ mod tests {
     impl ScriptedReader {
         fn new(steps: impl IntoIterator<Item = (Value, ReadAction)>) -> Self {
             Self {
-                steps: steps.into_iter().map(|(value, action)| (frame(value), action)).collect(),
+                steps: steps
+                    .into_iter()
+                    .map(|(value, action)| (frame(value), action))
+                    .collect(),
                 current: Cursor::new(Vec::new()),
             }
         }
@@ -3015,7 +3244,10 @@ mod tests {
                 }),
                 None,
             ),
-            (json!({"jsonrpc":"2.0","method":"initialized","params":{}}), None),
+            (
+                json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+                None,
+            ),
             (
                 json!({
                     "jsonrpc":"2.0",
@@ -3023,8 +3255,11 @@ mod tests {
                     "params":{"changes":[{"uri":definition_uri,"type":2}]}
                 }),
                 Some(Box::new(move || {
-                    fs::write(changed_definition, "country_event = { id = watched-new.1 }\n")
-                        .expect("write watched definition");
+                    fs::write(
+                        changed_definition,
+                        "country_event = { id = watched-new.1 }\n",
+                    )
+                    .expect("write watched definition");
                 }) as Box<dyn FnOnce() + Send>),
             ),
             (
@@ -3036,7 +3271,10 @@ mod tests {
                 }),
                 None,
             ),
-            (json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}), None),
+            (
+                json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+                None,
+            ),
             (json!({"jsonrpc":"2.0","method":"exit"}), None),
         ]);
         let mut output = Vec::new();
@@ -3056,8 +3294,20 @@ mod tests {
         let symbols = typed_result::<Vec<SymbolInformation>>(&responses, 2);
         assert_eq!(symbols.len(), 1);
         assert_eq!(symbols[0].name, "watched-new.1");
-        assert!(server.snapshot().index().active_definition("event", "old.1").is_none());
-        assert!(server.snapshot().index().active_definition("event", "watched-new.1").is_some());
+        assert!(
+            server
+                .snapshot()
+                .index()
+                .active_definition("event", "old.1")
+                .is_none()
+        );
+        assert!(
+            server
+                .snapshot()
+                .index()
+                .active_definition("event", "watched-new.1")
+                .is_some()
+        );
         fs::remove_dir_all(root).expect("cleanup");
     }
 
@@ -3133,23 +3383,47 @@ mod tests {
         let mut output = Vec::new();
         let mut server =
             eu4_server(InitializeOptions).expect("syntax-only server should initialize");
-        server.run_transport(Cursor::new(input), &mut output).expect("transport should finish");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport should finish");
 
         let responses = decode_frames(&output);
-        let before_initialize =
-            responses.iter().find(|value| value["id"] == 1).expect("pre-init response");
+        let before_initialize = responses
+            .iter()
+            .find(|value| value["id"] == 1)
+            .expect("pre-init response");
         assert_eq!(before_initialize["error"]["code"], -32002);
-        let initialize =
-            responses.iter().find(|value| value["id"] == 2).expect("initialize response");
-        assert_eq!(initialize["result"]["capabilities"]["textDocumentSync"]["change"], 2);
-        assert_eq!(initialize["result"]["capabilities"]["renameProvider"]["prepareProvider"], true);
-        assert_eq!(initialize["result"]["capabilities"]["documentFormattingProvider"], true);
-        let cancelled =
-            responses.iter().find(|value| value["id"] == 99).expect("cancelled response");
+        let initialize = responses
+            .iter()
+            .find(|value| value["id"] == 2)
+            .expect("initialize response");
+        assert_eq!(
+            initialize["result"]["capabilities"]["textDocumentSync"]["change"],
+            2
+        );
+        assert_eq!(
+            initialize["result"]["capabilities"]["renameProvider"]["prepareProvider"],
+            true
+        );
+        assert_eq!(
+            initialize["result"]["capabilities"]["documentFormattingProvider"],
+            true
+        );
+        let cancelled = responses
+            .iter()
+            .find(|value| value["id"] == 99)
+            .expect("cancelled response");
         assert_eq!(cancelled["error"]["code"], -32800);
-        let shutdown = responses.iter().find(|value| value["id"] == 4).expect("shutdown response");
+        let shutdown = responses
+            .iter()
+            .find(|value| value["id"] == 4)
+            .expect("shutdown response");
         assert_eq!(shutdown["result"], Value::Null);
-        assert!(responses.iter().any(|value| value["method"] == "textDocument/publishDiagnostics"));
+        assert!(
+            responses
+                .iter()
+                .any(|value| value["method"] == "textDocument/publishDiagnostics")
+        );
         let snapshot = server.snapshot();
         let document = snapshot
             .document(&pdx_engine::DocumentId::new(uri.clone()))
@@ -3173,11 +3447,15 @@ mod tests {
         let mut output = Vec::new();
         let mut server = eu4_server(InitializeOptions).expect("server");
 
-        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
 
         let responses = decode_frames(&output);
-        let malformed_initialize =
-            responses.iter().find(|value| value["id"] == 1).expect("invalid initialize");
+        let malformed_initialize = responses
+            .iter()
+            .find(|value| value["id"] == 1)
+            .expect("invalid initialize");
         assert_eq!(malformed_initialize["error"]["code"], INVALID_PARAMS);
         assert!(
             malformed_initialize["error"]["message"]
@@ -3190,8 +3468,10 @@ mod tests {
                 .find(|value| value["id"] == 2)
                 .is_some_and(|value| value["result"]["capabilities"].is_object())
         );
-        let malformed_hover =
-            responses.iter().find(|value| value["id"] == 3).expect("invalid hover");
+        let malformed_hover = responses
+            .iter()
+            .find(|value| value["id"] == 3)
+            .expect("invalid hover");
         assert_eq!(malformed_hover["error"]["code"], INVALID_PARAMS);
         assert_eq!(server.state(), ServerState::Exited);
     }
@@ -3223,11 +3503,19 @@ mod tests {
         let mut output = Vec::new();
         let mut server =
             eu4_server(InitializeOptions).expect("syntax-only server should initialize");
-        server.run_transport(Cursor::new(input), &mut output).expect("transport should finish");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport should finish");
         let responses = decode_frames(&output);
-        let completion =
-            responses.iter().find(|value| value["id"] == 2).expect("completion response");
-        assert!(completion["result"]["items"].as_array().is_some_and(|items| !items.is_empty()));
+        let completion = responses
+            .iter()
+            .find(|value| value["id"] == 2)
+            .expect("completion response");
+        assert!(
+            completion["result"]["items"]
+                .as_array()
+                .is_some_and(|items| !items.is_empty())
+        );
         assert!(
             responses
                 .iter()
@@ -3235,13 +3523,19 @@ mod tests {
                 .is_some_and(|value| value["result"]["contents"].is_object())
         );
         assert_eq!(
-            responses.iter().find(|value| value["id"] == 4).expect("definition")["result"]
+            responses
+                .iter()
+                .find(|value| value["id"] == 4)
+                .expect("definition")["result"]
                 .as_array()
                 .map(Vec::len),
             Some(1)
         );
         assert_eq!(
-            responses.iter().find(|value| value["id"] == 5).expect("references")["result"]
+            responses
+                .iter()
+                .find(|value| value["id"] == 5)
+                .expect("references")["result"]
                 .as_array()
                 .map(Vec::len),
             Some(2)
@@ -3249,20 +3543,37 @@ mod tests {
         // With embedded EU4 rules, top-level keys (country_event, event, scope) all
         // produce document symbols — richer than the identity-only baseline.
         assert!(
-            responses.iter().find(|value| value["id"] == 6).expect("document symbols")["result"]
+            responses
+                .iter()
+                .find(|value| value["id"] == 6)
+                .expect("document symbols")["result"]
                 .as_array()
                 .is_some_and(|symbols| !symbols.is_empty())
         );
         assert_eq!(
-            responses.iter().find(|value| value["id"] == 7).expect("workspace symbols")["result"]
+            responses
+                .iter()
+                .find(|value| value["id"] == 7)
+                .expect("workspace symbols")["result"]
                 .as_array()
                 .map(Vec::len),
             Some(1)
         );
-        let prepare = responses.iter().find(|value| value["id"] == 9).expect("prepare rename");
+        let prepare = responses
+            .iter()
+            .find(|value| value["id"] == 9)
+            .expect("prepare rename");
         assert_eq!(prepare["result"]["placeholder"], "test.1");
-        let rename = responses.iter().find(|value| value["id"] == 10).expect("rename");
-        assert_eq!(rename["result"]["changes"][uri.clone()].as_array().map(Vec::len), Some(2));
+        let rename = responses
+            .iter()
+            .find(|value| value["id"] == 10)
+            .expect("rename");
+        assert_eq!(
+            rename["result"]["changes"][uri.clone()]
+                .as_array()
+                .map(Vec::len),
+            Some(2)
+        );
         assert!(
             rename["result"]["changes"][uri]
                 .as_array()
@@ -3273,9 +3584,11 @@ mod tests {
             .find(|value| value["method"] == "textDocument/publishDiagnostics")
             .expect("diagnostic notification");
         assert!(
-            diagnostics["params"]["diagnostics"].as_array().is_some_and(|items| {
-                items.iter().any(|item| item["code"] == "pdx-unknown-scope")
-            })
+            diagnostics["params"]["diagnostics"]
+                .as_array()
+                .is_some_and(|items| {
+                    items.iter().any(|item| item["code"] == "pdx-unknown-scope")
+                })
         );
 
         let _: CompletionResponse = typed_result(&responses, 2);
@@ -3321,30 +3634,46 @@ mod tests {
         ]);
         let mut output = Vec::new();
         let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
         let responses = decode_frames(&output);
-        let completion =
-            responses.iter().find(|value| value["id"] == 2).expect("completion response");
+        let completion = responses
+            .iter()
+            .find(|value| value["id"] == 2)
+            .expect("completion response");
         let labels = completion["result"]["items"]
             .as_array()
             .expect("completion items")
             .iter()
             .filter_map(|item| item["label"].as_str())
             .collect::<Vec<_>>();
-        assert!(labels.contains(&"factor"), "missing structural completion: {labels:?}");
-        assert!(labels.contains(&"always"), "missing trigger completion: {labels:?}");
+        assert!(
+            labels.contains(&"factor"),
+            "missing structural completion: {labels:?}"
+        );
+        assert!(
+            labels.contains(&"always"),
+            "missing trigger completion: {labels:?}"
+        );
 
         let diagnostics = responses
             .iter()
             .find(|value| value["method"] == "textDocument/publishDiagnostics")
             .expect("diagnostic notification");
-        let diagnostics = diagnostics["params"]["diagnostics"].as_array().expect("diagnostics");
+        let diagnostics = diagnostics["params"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics");
         assert!(
-            diagnostics.iter().all(|item| item["code"] != "pdx-unknown-key"),
+            diagnostics
+                .iter()
+                .all(|item| item["code"] != "pdx-unknown-key"),
             "known mixed-context keys were rejected: {diagnostics:?}"
         );
         assert!(
-            diagnostics.iter().any(|item| item["code"] == "pdx-invalid-value"),
+            diagnostics
+                .iter()
+                .any(|item| item["code"] == "pdx-invalid-value"),
             "invalid trigger value was not diagnosed: {diagnostics:?}"
         );
         fs::remove_dir_all(root_dir).expect("cleanup");
@@ -3370,7 +3699,9 @@ mod tests {
         ]);
         let mut output = Vec::new();
         let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
         let responses = decode_frames(&output);
 
         let symbols: Vec<DocumentSymbol> = typed_result(&responses, 2);
@@ -3387,7 +3718,11 @@ mod tests {
         assert!(amount.selection_range.end.character < amount.range.end.character);
 
         let workspace: Vec<SymbolInformation> = typed_result(&responses, 3);
-        assert!(workspace.iter().all(|symbol| !symbol.name.eq_ignore_ascii_case("amount")));
+        assert!(
+            workspace
+                .iter()
+                .all(|symbol| !symbol.name.eq_ignore_ascii_case("amount"))
+        );
         fs::remove_dir_all(root_dir).expect("cleanup");
     }
 
@@ -3407,7 +3742,9 @@ mod tests {
         ]);
         let mut output = Vec::new();
         let mut server = eu4_server(InitializeOptions).expect("server");
-        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
         let responses = decode_frames(&output);
 
         let edits = typed_result::<Vec<lsp_types::TextEdit>>(&responses, 2);
@@ -3416,10 +3753,16 @@ mod tests {
         let mut formatted = source.to_owned();
         for edit in edits.iter().rev() {
             let start = line_index
-                .offset(source, Position::new(edit.range.start.line, edit.range.start.character))
+                .offset(
+                    source,
+                    Position::new(edit.range.start.line, edit.range.start.character),
+                )
                 .expect("format edit start");
             let end = line_index
-                .offset(source, Position::new(edit.range.end.line, edit.range.end.character))
+                .offset(
+                    source,
+                    Position::new(edit.range.end.line, edit.range.end.character),
+                )
                 .expect("format edit end");
             formatted.replace_range(start as usize..end as usize, &edit.new_text);
         }
@@ -3450,13 +3793,32 @@ mod tests {
         ]);
         let mut output = Vec::new();
         let mut server = eu4_server(InitializeOptions).expect("bundled rules should load");
-        server.run_transport(Cursor::new(input), &mut output).expect("transport should finish");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport should finish");
         let responses = decode_frames(&output);
-        let rename = responses.iter().find(|value| value["id"] == 2).expect("rename response");
+        let rename = responses
+            .iter()
+            .find(|value| value["id"] == 2)
+            .expect("rename response");
         assert!(rename["error"].is_null(), "rename response={rename}");
-        let changes = rename["result"]["changes"].as_object().expect("workspace changes");
-        assert_eq!(changes.get(&target_uri).and_then(Value::as_array).map(Vec::len), Some(1));
-        assert_eq!(changes.get(&references_uri).and_then(Value::as_array).map(Vec::len), Some(1));
+        let changes = rename["result"]["changes"]
+            .as_object()
+            .expect("workspace changes");
+        assert_eq!(
+            changes
+                .get(&target_uri)
+                .and_then(Value::as_array)
+                .map(Vec::len),
+            Some(1)
+        );
+        assert_eq!(
+            changes
+                .get(&references_uri)
+                .and_then(Value::as_array)
+                .map(Vec::len),
+            Some(1)
+        );
         assert!(changes.values().all(|edits| {
             edits
                 .as_array()
@@ -3524,11 +3886,15 @@ mod tests {
             SourceRootKind::Vanilla,
             fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
         )]));
-        vanilla_host.refresh_source_roots().expect("scan Vanilla once");
+        vanilla_host
+            .refresh_source_roots()
+            .expect("scan Vanilla once");
         let vanilla_cache = VanillaIndexCache::from_snapshot(&vanilla_host.snapshot())
             .expect("build Vanilla cache");
         let vanilla_cache_path = config_dir.join("vanilla.pdxindex");
-        vanilla_cache.save(&vanilla_cache_path).expect("save Vanilla cache");
+        vanilla_cache
+            .save(&vanilla_cache_path)
+            .expect("save Vanilla cache");
         fs::rename(&vanilla, root.join("vanilla-moved"))
             .expect("make Vanilla source unavailable after caching");
         fs::write(
@@ -3580,7 +3946,9 @@ path = "dependencies/high"
         ]);
         let mut output = Vec::new();
         let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
         let responses = decode_frames(&output);
 
         let snapshot = server.snapshot();
@@ -3625,7 +3993,10 @@ path = "dependencies/high"
                 .root_id,
             SourceRootId::new(0)
         );
-        let rename = responses.iter().find(|value| value["id"] == 2).expect("rename response");
+        let rename = responses
+            .iter()
+            .find(|value| value["id"] == 2)
+            .expect("rename response");
         assert_eq!(rename["error"]["code"], INVALID_PARAMS);
         assert!(
             rename["error"]["message"]
@@ -3651,10 +4022,16 @@ path = "dependencies/high"
         ]);
         let mut output = Vec::new();
         let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
         let responses = decode_frames(&output);
 
-        assert!(responses.iter().any(|value| value["id"] == 1 && value.get("result").is_some()));
+        assert!(
+            responses
+                .iter()
+                .any(|value| value["id"] == 1 && value.get("result").is_some())
+        );
         let warning = responses
             .iter()
             .find(|value| value["method"] == "window/showMessage")
@@ -3685,13 +4062,22 @@ path = "dependencies/high"
             .apply_document_changes(
                 &id,
                 2,
-                &[TextChange::ranged(TextRange::new(0, 3).expect("range"), "new")],
+                &[TextChange::ranged(
+                    TextRange::new(0, 3).expect("range"),
+                    "new",
+                )],
             )
             .expect("change should succeed");
         assert!(!server.commit_diagnostics(uri, 1, json!([{"message":"stale"}])));
-        assert_eq!(server.diagnostics(uri).expect("old result remains")[0]["message"], "old");
+        assert_eq!(
+            server.diagnostics(uri).expect("old result remains")[0]["message"],
+            "old"
+        );
         assert!(server.commit_diagnostics(uri, 2, json!([{"message":"new"}])));
-        assert_eq!(server.diagnostics(uri).expect("new result accepted")[0]["message"], "new");
+        assert_eq!(
+            server.diagnostics(uri).expect("new result accepted")[0]["message"],
+            "new"
+        );
     }
 
     #[test]
@@ -3708,7 +4094,9 @@ path = "dependencies/high"
         let mut output = Vec::new();
         let mut server = eu4_server(InitializeOptions).expect("server");
 
-        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
 
         let responses = decode_frames(&output);
         let published = responses
@@ -3725,7 +4113,9 @@ path = "dependencies/high"
                 .is_some_and(|items| items.iter().all(|item| item["code"] != "pdx-unknown-scope"))
         );
         let snapshot = server.snapshot();
-        let document = snapshot.document(&DocumentId::new(uri)).expect("latest overlay");
+        let document = snapshot
+            .document(&DocumentId::new(uri))
+            .expect("latest overlay");
         assert_eq!(document.version(), Some(2));
         assert_eq!(document.text(), "scope = country\n");
         assert!(document.parsed().is_some());
@@ -3738,7 +4128,9 @@ path = "dependencies/high"
         let cancellation = CancellationToken::new();
         let in_flight = HashMap::from([(
             request_id.clone(),
-            InFlightRequest { cancellation: cancellation.clone() },
+            InFlightRequest {
+                cancellation: cancellation.clone(),
+            },
         )]);
 
         cancel_request_from_notification(
@@ -3782,12 +4174,16 @@ path = "dependencies/high"
         ]);
         let mut output = Vec::new();
         let mut server = eu4_server(InitializeOptions).expect("server");
-        server.run_transport(Cursor::new(input), &mut output).expect("transport");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
         let responses = decode_frames(&output);
 
         assert_eq!(
-            responses.iter().find(|value| value["id"] == 1).expect("cancelled initialize")["error"]
-                ["code"],
+            responses
+                .iter()
+                .find(|value| value["id"] == 1)
+                .expect("cancelled initialize")["error"]["code"],
             super::REQUEST_CANCELLED
         );
         assert!(
@@ -3877,7 +4273,9 @@ path = "dependencies/high"
         game.auto_discovery_attempted = true;
         game.discovery_outcome = Some(DiscoveryOutcome::Configured);
         game.vanilla_cache = Some(root.join("user/cache/eu4/vanilla.pdxindex"));
-        configuration.save(&automatic.user_paths.config_file).expect("save user configuration");
+        configuration
+            .save(&automatic.user_paths.config_file)
+            .expect("save user configuration");
 
         let project_cache = root.join("project/vanilla.pdxindex");
         let mut resolved = ResolvedSourceRoots {

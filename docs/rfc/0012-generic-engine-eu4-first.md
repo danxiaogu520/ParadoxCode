@@ -1,9 +1,9 @@
-# RFC 0013：通用 PDX 语言引擎与 EU4-first 产品策略
+# RFC 0012：通用 PDX 语言引擎与 EU4-first 产品策略
 
 - 状态：Accepted
 - 日期：2026-07-20
 - 当前交付目标：EU4 alpha → EU4 v0.1
-- 取代：[EU4-only 架构决策](../decision-eu4-only.md)
+- 取代：EU4-only 架构决策（原 `decision-eu4-only.md`，已删除）
 
 ## 背景
 
@@ -49,11 +49,8 @@ pdx-game-eu4
 pdx-bake
   strict first-party rule source compiler; emits the EU4 rule artifact
 
-pdx-hir
-  CST + RuleSet + game profile -> semantic file
-
 pdx-engine
-  VFS / roots / overlays / per-file state / snapshots / index shards
+  VFS / roots / overlays / HIR lowering / per-file state / snapshots / index shards
 
 pdx-analysis
   editor-neutral queries over snapshots

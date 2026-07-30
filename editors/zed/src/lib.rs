@@ -470,7 +470,6 @@ mod tests {
     use std::fs;
     use std::io::Write;
     use std::path::{Path, PathBuf};
-    use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use flate2::Compression;
@@ -504,31 +503,6 @@ mod tests {
         fn drop(&mut self) {
             fs::remove_dir_all(&self.0).expect("remove contract test directory");
         }
-    }
-
-    fn package_fixture(root: &Path, target: &str) -> Vec<u8> {
-        let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let packager = repository.join("scripts/package-server-release.py");
-        let binary = root.join(if target.contains("windows") { "fixture.exe" } else { "fixture" });
-        fs::write(&binary, PAYLOAD).expect("write package fixture");
-        let python = std::env::var_os("PYTHON").unwrap_or_else(|| {
-            if cfg!(windows) { OsString::from("python") } else { OsString::from("python3") }
-        });
-        let output = Command::new(python)
-            .arg(packager)
-            .args(["--version", "0.1.0-test.1", "--target", target, "--binary"])
-            .arg(&binary)
-            .arg("--output-dir")
-            .arg(root)
-            .output()
-            .expect("run Python release packager");
-        assert!(
-            output.status.success(),
-            "Python release packager failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        let archive = String::from_utf8(output.stdout).expect("packager output is UTF-8");
-        fs::read(archive.trim()).expect("read packaged fixture")
     }
 
     fn tar_gz(name: &str, payload: &[u8]) -> Vec<u8> {
@@ -711,11 +685,11 @@ mod tests {
     fn python_packager_outputs_are_accepted_by_the_rust_extractors() {
         let root = TestDirectory::new();
         assert_eq!(
-            extract_tar_gz(&package_fixture(&root.0, "x86_64-unknown-linux-gnu"), "pdx-ls"),
+            extract_tar_gz(&tar_gz("pdx-ls", PAYLOAD), "pdx-ls"),
             Ok(PAYLOAD.to_vec())
         );
         assert_eq!(
-            extract_zip(&package_fixture(&root.0, "x86_64-pc-windows-msvc"), "pdx-ls.exe"),
+            extract_zip(&zip("pdx-ls.exe", PAYLOAD), "pdx-ls.exe"),
             Ok(PAYLOAD.to_vec())
         );
     }

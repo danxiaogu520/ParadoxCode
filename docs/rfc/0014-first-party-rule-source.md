@@ -1,9 +1,9 @@
-# RFC 0015: First-party rule source and compiler
+# RFC 0014: First-party rule source and compiler
 
 - Status: Accepted
 - Date: 2026-07-22
 - MVP: EU4 v0.1
-- Supersedes: RFC 0012 and the authority/maintenance decisions in RFC 0004 and RFC 0014
+- Supersedes: CWT importer (removed) and the authority/maintenance decisions in RFC 0004 and RFC 0013
 
 ## Decision
 

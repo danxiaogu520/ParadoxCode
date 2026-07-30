@@ -27,5 +27,5 @@ for grammar in \
     )
 done
 
-python3 "$root/scripts/check-phase1-grammar-deletions.py"
-echo "Phase 1 grammar checks passed."
+cargo run --manifest-path "$root/Cargo.toml" --bin pdx -- check grammar-fuzz --root "$root"
+echo "Grammar checks passed."

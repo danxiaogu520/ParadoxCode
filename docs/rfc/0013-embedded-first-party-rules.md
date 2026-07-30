@@ -1,9 +1,9 @@
-# RFC 0014: Embedded first-party rules and release ownership
+# RFC 0013: Embedded first-party rules and release ownership
 
 - Status: Accepted
 - Date: 2026-07-21
 - MVP: EU4 v0.1
-- Supersedes: the runtime/distribution decisions in RFC 0001, 0004, 0009, 0010, and 0012
+- Supersedes: the runtime/distribution decisions in RFC 0001, 0004, 0009, and 0010
 
 ## Context
 
@@ -60,7 +60,7 @@ The following remain mandatory:
 The original CWT corpus remains a local, one-time maintenance input and is never embedded or
 distributed. EU4 Vanilla files and user caches remain excluded from source and releases.
 
-This maintenance-input exception was removed by RFC 0015 on 2026-07-22. The embedded artifact is
+This maintenance-input exception was removed by RFC 0014 on 2026-07-22. The embedded artifact is
 now compiled exclusively from `rules/eu4/`; no CWT input is permitted.
 
 ## Distribution

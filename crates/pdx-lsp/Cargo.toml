@@ -18,10 +18,14 @@ pdx-rules = { path = "../pdx-rules" }
 pdx-analysis = { path = "../pdx-analysis" }
 pdx-text = { path = "../pdx-text" }
 pdx-engine = { path = "../pdx-engine" }
+flate2 = "1"
 lsp-types = "0.97.0"
 serde = "1.0"
 serde_json = "1.0"
+sha2 = "0.10"
+tar = "0.4"
 toml = "1.1.3"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 tempfile = "3"

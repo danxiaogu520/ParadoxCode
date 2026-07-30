@@ -1,11 +1,17 @@
 fn main() -> Result<(), pdx_lsp::LspError> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.iter().any(|argument| argument == "--version" || argument == "-V") {
+    if args
+        .iter()
+        .any(|argument| argument == "--version" || argument == "-V")
+    {
         println!("pdx-ls 0.1.0");
         return Ok(());
     }
     if !args.is_empty() {
-        return Err(pdx_lsp::LspError::Protocol(format!("unknown pdx-ls argument: {}", args[0])));
+        return Err(pdx_lsp::LspError::Protocol(format!(
+            "unknown pdx-ls argument: {}",
+            args[0]
+        )));
     }
     let rules = pdx_lsp::first_party_rules()?;
     let profile = pdx_lsp::profile();
