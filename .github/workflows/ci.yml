@@ -63,7 +63,7 @@ jobs:
       - run: cargo check --workspace --all-targets --all-features
       - run: cargo test --workspace --all-targets --all-features
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - run: cargo build --release -p pdx-cli --bin pdx --bin pdx-ls
+      - run: cargo build --release -p pdx-lsp --bin pdx --bin pdx-ls
 
   tree-sitter:
     name: Tree-sitter and Zed language assets

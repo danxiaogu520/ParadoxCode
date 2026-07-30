@@ -49,7 +49,7 @@ jobs:
           key: release-${{ matrix.target }}
       - name: Build server
         shell: bash
-        run: cargo build --locked --release -p pdx-cli --bin pdx-ls --target "${{ matrix.target }}"
+        run: cargo build --locked --release -p pdx-lsp --bin pdx-ls --target "${{ matrix.target }}"
       - name: Verify release version
         shell: bash
         run: |

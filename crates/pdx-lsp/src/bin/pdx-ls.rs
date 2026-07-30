@@ -7,15 +7,15 @@ fn main() -> Result<(), pdx_lsp::LspError> {
     if !args.is_empty() {
         return Err(pdx_lsp::LspError::Protocol(format!("unknown pdx-ls argument: {}", args[0])));
     }
-    let rules = pdx_game_eu4::first_party_rules()?;
-    let profile = pdx_game_eu4::profile();
+    let rules = pdx_lsp::first_party_rules()?;
+    let profile = pdx_lsp::profile();
     match pdx_game::UserPaths::platform() {
         Ok(user_paths) => pdx_lsp::LspServer::run_stdio_with_profile_and_auto_vanilla(
             pdx_lsp::InitializeOptions,
             rules,
             profile,
             pdx_lsp::AutoVanillaConfiguration {
-                descriptor: pdx_game_eu4::INSTALL_DESCRIPTOR,
+                descriptor: pdx_lsp::INSTALL_DESCRIPTOR,
                 user_paths,
             },
         ),

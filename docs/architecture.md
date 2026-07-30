@@ -108,7 +108,7 @@ pdx-workspace -> pdx-text + pdx-syntax + pdx-rules + pdx-hir
 pdx-analysis  -> pdx-workspace + pdx-hir + pdx-rules
 pdx-format    -> pdx-text + pdx-syntax
 pdx-lsp       -> pdx-analysis + pdx-format
-pdx-cli       -> pdx-lsp + selected runtime crates
+pdx-lsp       -> engine, analysis, parser, rules, game crates (includes CLI binaries)
 ```
 
 实际约束：

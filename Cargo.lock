@@ -251,18 +251,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pdx-cli"
-version = "0.1.0"
-dependencies = [
- "pdx-game",
- "pdx-game-eu4",
- "pdx-lsp",
- "pdx-rules",
- "pdx-workspace",
- "tempfile",
-]
-
-[[package]]
 name = "pdx-format"
 version = "0.1.0"
 dependencies = [
@@ -312,6 +300,7 @@ dependencies = [
  "pdx-workspace",
  "serde",
  "serde_json",
+ "tempfile",
  "toml",
 ]
 

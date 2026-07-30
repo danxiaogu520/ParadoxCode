@@ -4,6 +4,10 @@
 //! conversion, and result freshness checks. Parser and language-feature logic remains in the
 //! editor-neutral workspace and analysis crates.
 
+pub mod cli;
+
+pub use pdx_game_eu4::{INSTALL_DESCRIPTOR, first_party_rules, profile};
+
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::fs;

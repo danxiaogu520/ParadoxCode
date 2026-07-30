@@ -31,9 +31,7 @@ Rust workspace 初始包含：
 | `pdx-analysis` | diagnostics、completion、navigation、rename 查询 |
 | `pdx-format` | 编辑器无关格式化 |
 | `pdx-lsp` | LSP transport 和协议适配 |
-| `pdx-cli` | `pdx` 与 `pdx-ls` binary 入口；`pdx-rulec` 是独立维护者 binary |
-
-`pdx-cli` 可以提供两个 binary target，也可以在实现 spike 后拆为独立 binary crate；这不改变核心边界。
+| `pdx-lsp` | `pdx` 与 `pdx-ls` binary 入口、LSP transport 和协议适配；`pdx-rulec` 是独立维护者 binary |
 
 ## 依赖约束
 

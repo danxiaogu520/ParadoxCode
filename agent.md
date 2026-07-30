@@ -76,7 +76,7 @@
 ```text
 pdx-text
   -> pdx-syntax -> pdx-hir -> pdx-workspace -> pdx-analysis -> pdx-lsp
-  -> pdx-format                                      -> pdx-cli
+  -> pdx-format
 pdx-game -> pdx-game-eu4
 pdx-rules -> pdx-rulec
 pdx-rules + pdx-game-eu4 -> pdx-hir / pdx-workspace / pdx-analysis
