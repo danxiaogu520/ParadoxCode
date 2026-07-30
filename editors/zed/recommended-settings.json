@@ -8,14 +8,6 @@
       "history/**/*.txt",
       "interface/**/*.gui",
       "interface/**/*.gfx"
-    ],
-    "EU4 Localisation": ["localisation/**/*.yml"],
-    "EU4 CSV": [
-      "common/**/*.csv",
-      "events/**/*.csv",
-      "history/**/*.csv",
-      "interface/**/*.csv",
-      "map/**/*.csv"
     ]
   }
 }

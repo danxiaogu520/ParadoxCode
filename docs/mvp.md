@@ -60,7 +60,6 @@ Event、Scripted Effect、Scripted Trigger 和 Localisation Key 仍是必须通�
 交付：
 
 - `tree-sitter-eu4`
-- `tree-sitter-pdx-eu4-localisation`
 - grammar corpus tests
 - Zed `highlights.scm`、`brackets.scm`、`indents.scm`、`outline.scm`
 - Zed dev extension

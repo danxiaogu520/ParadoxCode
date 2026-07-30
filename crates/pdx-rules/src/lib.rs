@@ -77,8 +77,6 @@ pub enum ParserKind {
     Script,
     /// Paradox localisation files.
     Localisation,
-    /// A delimited table with an explicit dialect.
-    Csv(CsvDialect),
     /// A file consumed by an asset provider rather than a parser.
     Asset,
     /// A file where only syntax diagnostics are useful.
@@ -90,7 +88,6 @@ impl ParserKind {
         match self {
             Self::Script => "script".to_owned(),
             Self::Localisation => "localisation".to_owned(),
-            Self::Csv(dialect) => format!("csv-{}", dialect.as_str()),
             Self::Asset => "asset".to_owned(),
             Self::SyntaxOnly => "syntax-only".to_owned(),
         }
@@ -100,35 +97,14 @@ impl ParserKind {
         Ok(match value {
             "script" => Self::Script,
             "localisation" => Self::Localisation,
-            "csv-comma" => Self::Csv(CsvDialect::Comma),
-            "csv-tab" => Self::Csv(CsvDialect::Tab),
-            "csv-semicolon" => Self::Csv(CsvDialect::Semicolon),
+            // Legacy CSV dialects are mapped to syntax-only so that compiled
+            // rule artifacts from earlier versions remain loadable without
+            // requiring a full rule rebuild.
+            "csv-comma" | "csv-tab" | "csv-semicolon" => Self::SyntaxOnly,
             "asset" => Self::Asset,
             "syntax-only" => Self::SyntaxOnly,
             other => return Err(RulesError::InvalidParser(other.to_owned())),
         })
-    }
-}
-
-/// Delimiters used by game CSV assets.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum CsvDialect {
-    /// Comma-separated values.
-    Comma,
-    /// Tab-separated values.
-    Tab,
-    /// Semicolon-separated values.
-    Semicolon,
-}
-
-impl CsvDialect {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Comma => "comma",
-            Self::Tab => "tab",
-            Self::Semicolon => "semicolon",
-        }
     }
 }
 
@@ -418,19 +394,6 @@ pub struct ProfileConditionalDefinitionRule {
     pub absent_field: String,
 }
 
-/// One CSV column whose cells declare workspace symbols.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProfileCsvDefinitionRule {
-    /// Logical-path selector.
-    pub path: ProfileTextMatcher,
-    /// Zero-based CSV column.
-    pub column: usize,
-    /// Stable declared symbol kind.
-    pub kind: String,
-    /// Whether non-unsigned-integer cells are ignored.
-    pub unsigned_integer_only: bool,
-}
-
 /// One delimited identifier embedded in parser tokens.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProfileTokenDefinitionRule {
@@ -477,8 +440,6 @@ pub struct GameProfile {
     pub container_definitions: Vec<ProfileContainerDefinitionRule>,
     /// Additional definitions gated by nested fields.
     pub conditional_definitions: Vec<ProfileConditionalDefinitionRule>,
-    /// CSV columns that declare symbols.
-    pub csv_definitions: Vec<ProfileCsvDefinitionRule>,
     /// Delimited identifiers embedded in parser tokens.
     pub token_definitions: Vec<ProfileTokenDefinitionRule>,
     /// Known concrete scopes and scope expressions.
@@ -513,7 +474,6 @@ impl GameProfile {
             value_definitions: Vec::new(),
             container_definitions: Vec::new(),
             conditional_definitions: Vec::new(),
-            csv_definitions: Vec::new(),
             token_definitions: Vec::new(),
             scope_names: Vec::new(),
             scope_completions: Vec::new(),

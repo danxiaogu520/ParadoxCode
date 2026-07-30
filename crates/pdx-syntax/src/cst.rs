@@ -45,12 +45,6 @@ pub enum CstKind {
     LocalisationString,
     /// A recoverable unquoted localisation value.
     UnquotedValue,
-    /// Root node for a CSV document.
-    CsvDocument,
-    /// A CSV record.
-    CsvRecord,
-    /// A CSV cell.
-    CsvCell,
     /// A parser recovery node.
     Error,
 }
@@ -167,8 +161,6 @@ pub enum SyntaxErrorKind {
     InvalidLocalisationEntry,
     /// A localisation string has no closing quote.
     UnterminatedLocalisationString,
-    /// A recoverable CSV parser error.
-    CsvRecoverable,
 }
 
 impl SyntaxErrorKind {
@@ -183,7 +175,6 @@ impl SyntaxErrorKind {
             Self::UnterminatedParameterBlock => "pdx-syntax-unterminated-parameter-block",
             Self::InvalidLocalisationEntry => "pdx-localisation-invalid-entry",
             Self::UnterminatedLocalisationString => "pdx-localisation-unterminated-string",
-            Self::CsvRecoverable => "pdx-csv-recoverable-error",
         }
     }
 }

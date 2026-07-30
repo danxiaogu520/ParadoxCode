@@ -22,8 +22,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 GRAMMARS = (
     ROOT / "grammars" / "tree-sitter-eu4",
-    ROOT / "grammars" / "tree-sitter-pdx-eu4-localisation",
-    ROOT / "grammars" / "tree-sitter-pdx-eu4-csv",
 )
 CASE_RE = re.compile(
     r"^={18}\n[^\n]*\n={18}\n(?P<input>.*?)\n---\n",

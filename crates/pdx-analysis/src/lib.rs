@@ -17,7 +17,7 @@ use pdx_hir::{
     semantic_root_context as hir_semantic_root_context,
 };
 use pdx_rules::{GameProfile, KeyMatcher, RuleShape, SymbolResolutionPolicy, ValueMatcher};
-use pdx_syntax::{CstKind, CstNode, CsvParsedFile, FileFormat, ParsedFile, SyntaxError};
+use pdx_syntax::{CstKind, CstNode, FileFormat, ParsedFile, SyntaxError};
 use pdx_text::{LogicalPath, TextRange, TextSize};
 use pdx_workspace::{
     AnalysisSnapshot, Definition, DocumentId, DocumentSource, ParsedSource, SourceFileId,
@@ -588,7 +588,7 @@ fn semantic_completion_context(
     input: &ParsedInput,
     position: TextSize,
 ) -> Option<SemanticCompletionContext> {
-    let ParsedContent::Text(parsed) = &input.parsed else { return None };
+    let ParsedContent::Text(parsed) = &input.parsed;
     for root in script_properties(input, parsed.root()) {
         let Some(context) = semantic_root_context(snapshot, &root.key, input.path.as_ref()) else {
             continue;
@@ -1810,7 +1810,6 @@ struct ParsedInput {
 #[derive(Clone, Debug)]
 enum ParsedContent {
     Text(Arc<ParsedFile>),
-    Csv(Arc<CsvParsedFile>),
 }
 
 impl ParsedInput {
@@ -1908,7 +1907,6 @@ fn input_for_document(snapshot: &AnalysisSnapshot, id: &DocumentId) -> Option<Pa
     let format = parsed.format();
     let parsed = match parsed {
         ParsedSource::Text(parsed) => ParsedContent::Text(Arc::clone(parsed)),
-        ParsedSource::Csv(parsed) => ParsedContent::Csv(Arc::clone(parsed)),
     };
     let hir = document.hir_handle();
     let profile = snapshot.game_profile_handle();
@@ -1929,7 +1927,6 @@ fn input_for_source_file(snapshot: &AnalysisSnapshot, id: SourceFileId) -> Optio
     let state = snapshot.file_state(id)?;
     let parsed = match state.parsed()? {
         ParsedSource::Text(parsed) => ParsedContent::Text(Arc::clone(parsed)),
-        ParsedSource::Csv(parsed) => ParsedContent::Csv(Arc::clone(parsed)),
     };
     Some(ParsedInput {
         document: None,
@@ -2076,7 +2073,7 @@ fn semantic_rule_diagnostics(
     if input.format != FileFormat::Script || snapshot.rules().model().semantic.rules.is_empty() {
         return Ok(Vec::new());
     }
-    let ParsedContent::Text(parsed) = &input.parsed else { return Ok(Vec::new()) };
+    let ParsedContent::Text(parsed) = &input.parsed;
     let roots = script_properties(input, parsed.root());
     cancellation.checkpoint()?;
     let mut diagnostics = Vec::new();
@@ -3188,7 +3185,6 @@ fn scope_member(scope: Option<&str>, member: &str, context: &ScopeContext) -> bo
 fn syntax_diagnostics(input: &ParsedInput) -> Vec<Diagnostic> {
     match &input.parsed {
         ParsedContent::Text(parsed) => parsed.errors().iter().map(diagnostic_from_syntax).collect(),
-        ParsedContent::Csv(parsed) => parsed.errors().iter().map(diagnostic_from_syntax).collect(),
     }
 }
 
@@ -4860,40 +4856,6 @@ mod tests {
         .expect("open");
         let results = diagnostics(&host.snapshot(), &id);
         assert!(results.iter().all(|item| item.code != DiagnosticCode::InvalidValue));
-        fs::remove_dir_all(root).expect("cleanup");
-    }
-
-    #[test]
-    fn eu4_province_definition_csv_feeds_province_id_matcher() {
-        use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
-        use std::fs;
-
-        let root =
-            std::env::temp_dir().join(format!("pdx-analysis-cwt-province-{}", std::process::id()));
-        fs::create_dir_all(root.join("map")).expect("map directory");
-        fs::write(root.join("map/definition.csv"), "1;0;0;0;0;0\n").expect("province definition");
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
-        let mut host = eu4_host(rules);
-        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
-            id: SourceRootId::new(1),
-            kind: SourceRootKind::CurrentMod,
-            path: root.clone(),
-            order: 0,
-            writable: true,
-        }]));
-        host.refresh_source_roots().expect("scan province definition");
-        let id = DocumentId::new("file:///tmp/events/province.txt");
-        host.open_document(
-            id.clone(),
-            1,
-            "country_event = { trigger = { capital = 1 } }\n".to_owned(),
-            None,
-        )
-        .expect("open");
-        assert!(diagnostics(&host.snapshot(), &id).iter().all(|item| !matches!(
-            item.code,
-            DiagnosticCode::InvalidValue | DiagnosticCode::UnknownKey
-        )));
         fs::remove_dir_all(root).expect("cleanup");
     }
 

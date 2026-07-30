@@ -22,9 +22,7 @@
     },
     {
       "id": "csv",
-      "parser": {
-        "csv": "semicolon"
-      },
+      "parser": "syntax-only",
       "resolution": "replace-by-relative-path",
       "matcher": {
         "path_prefix": null,

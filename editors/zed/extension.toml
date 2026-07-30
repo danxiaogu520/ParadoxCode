@@ -16,16 +16,6 @@ repository = "https://github.com/danxiaogu520/ParadoxCode.git"
 rev = "f0c4d252e4bf14dd1e438338f87e6466248d9228"
 path = "grammars/tree-sitter-eu4"
 
-[grammars.pdx_eu4_localisation]
-repository = "https://github.com/danxiaogu520/ParadoxCode.git"
-rev = "f0c4d252e4bf14dd1e438338f87e6466248d9228"
-path = "grammars/tree-sitter-pdx-eu4-localisation"
-
-[grammars.pdx_eu4_csv]
-repository = "https://github.com/danxiaogu520/ParadoxCode.git"
-rev = "f0c4d252e4bf14dd1e438338f87e6466248d9228"
-path = "grammars/tree-sitter-pdx-eu4-csv"
-
 [language_servers.pdx-ls]
 name = "ParadoxCode Language Server"
-languages = ["Europa Universalis IV", "EU4 Localisation", "EU4 CSV"]
+languages = ["Europa Universalis IV"]

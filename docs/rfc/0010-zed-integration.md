@@ -25,17 +25,10 @@ editors/zed/
       brackets.scm
       indents.scm
       outline.scm
-    pdx-eu4-localisation/
-      config.toml
-      highlights.scm
-      outline.scm
-    pdx-eu4-csv/
-      config.toml
 ```
 
 extension 将主脚本 grammar 注册为用户可见的 `Europa Universalis IV`（机器标识 `eu4`），
-并注册 EU4 Localisation、EU4 CSV 和一个 `pdx-ls`。所有文本语言连接同一个 server；
-CSV 由 server 的独立 parser 分析，不伪装成 Script CST。
+并注册一个 `pdx-ls`。本地化文件由通用 YAML LSP 处理。
 
 ## 文件识别冲突
 
@@ -44,10 +37,9 @@ Script 使用 `.txt`、`.gui`、`.gfx` 等多个共享扩展，EU4 localisation 
 MVP 策略：
 
 1. 不全局声明宽泛 `.txt` 关联，或只提供明确需用户确认的关联。
-2. localisation 使用 `l_<language>:` 首行模式作为辅助，但它不能识别缺少/错误语言头的文件。
-3. `pdx init --editor zed` 从 EU4 `RuleSet` 的完整 file matcher catalog 生成项目级 `.zed/settings.json` fragment，使用 `file_types` glob 将全部可支持 EU4 文件关联到相应语言。
-4. 用户可以手动选择语言。
-5. `pdx-ls` 始终根据 logical path 再分类，绝不信任 language id 决定语义。
+2. `pdx init --editor zed` 从 EU4 `RuleSet` 的完整 file matcher catalog 生成项目级 `.zed/settings.json` fragment，使用 `file_types` glob 将全部可支持 EU4 文件关联到相应语言。
+3. 用户可以手动选择语言。
+4. `pdx-ls` 始终根据 logical path 再分类，绝不信任 language id 决定语义。
 
 生成设置的缩略示意：
 
@@ -62,8 +54,7 @@ MVP 策略：
       "history/**/*.txt",
       "interface/**/*.gui",
       "interface/**/*.gfx"
-    ],
-    "EU4 Localisation": ["localisation/**/*.yml"]
+    ]
   }
 }
 ```
@@ -77,7 +68,6 @@ Zed grammar registration 引用 repository 与固定 revision。当前 monorepo 
 若不支持，采用 CI split mirror：
 
 - `grammars/tree-sitter-eu4` 发布到独立只读镜像仓库。
-- `grammars/tree-sitter-pdx-eu4-localisation` 同理。
 - source of truth 仍在 ParadoxCode monorepo。
 - extension pin 镜像 revision（Zed manifest 的 `rev`），不追踪 branch。
 

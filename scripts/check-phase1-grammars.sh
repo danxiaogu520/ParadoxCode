@@ -8,9 +8,7 @@ trap 'rm -r -- "$tree_sitter_home"' EXIT
 mkdir -p "$tree_sitter_config"
 
 for grammar in \
-    "$root/grammars/tree-sitter-eu4" \
-    "$root/grammars/tree-sitter-pdx-eu4-localisation" \
-    "$root/grammars/tree-sitter-pdx-eu4-csv"; do
+    "$root/grammars/tree-sitter-eu4"; do
     (
         cd "$grammar"
         if [[ -x "$grammar/node_modules/.bin/tree-sitter" ]]; then

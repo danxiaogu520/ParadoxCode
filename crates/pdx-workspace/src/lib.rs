@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use pdx_hir::{HirFile, lower_shared, lower_shared_with_profile};
 use pdx_rules::{FileResolutionPolicy, GameProfile, ParserKind, RuleSet, SymbolResolutionPolicy};
-use pdx_syntax::{CstKind, CstNode, FileFormat, ParsedFile, parse, parse_csv_file};
+use pdx_syntax::{CstKind, CstNode, FileFormat, ParsedFile, parse};
 use pdx_text::{LineIndex, LogicalPath, TextRange};
 
 mod vanilla_cache;
@@ -340,8 +340,6 @@ pub struct FileIndexShard {
 pub enum ParsedSource {
     /// Paradox script or localisation CST.
     Text(Arc<ParsedFile>),
-    /// Structured CSV parse.
-    Csv(Arc<pdx_syntax::CsvParsedFile>),
 }
 
 impl ParsedSource {
@@ -350,7 +348,6 @@ impl ParsedSource {
     pub fn format(&self) -> FileFormat {
         match self {
             Self::Text(parsed) => parsed.format(),
-            Self::Csv(_) => FileFormat::Csv,
         }
     }
 }
@@ -1247,16 +1244,6 @@ fn parse_source(
             ));
             (Some(ParsedSource::Text(parsed)), Some(hir))
         }
-        ParserKind::Csv(dialect) => {
-            #[cfg(test)]
-            record_pipeline_parse();
-            let dialect = match dialect {
-                pdx_rules::CsvDialect::Comma => pdx_syntax::csv::CsvDialect::Comma,
-                pdx_rules::CsvDialect::Tab => pdx_syntax::csv::CsvDialect::Tab,
-                pdx_rules::CsvDialect::Semicolon => pdx_syntax::csv::CsvDialect::Semicolon,
-            };
-            (Some(ParsedSource::Csv(Arc::new(parse_csv_file(source, dialect)))), None)
-        }
         ParserKind::Asset | ParserKind::SyntaxOnly => (None, None),
     }
 }
@@ -1295,7 +1282,6 @@ fn parser_for_document(
         })?;
     let parser = match extension.as_str() {
         "yml" | "yaml" => ParserKind::Localisation,
-        "csv" => ParserKind::Csv(pdx_rules::CsvDialect::Semicolon),
         "txt" | "gui" | "gfx" | "asset" | "sfx" => ParserKind::Script,
         _ => return None,
     };
@@ -1379,15 +1365,6 @@ fn build_file_state(
             references: Vec::new(),
             syntax_error_count: parsed.errors().len(),
         },
-        (Some(ParsedSource::Csv(parsed)), _) => {
-            let definitions = collect_profile_csv_definitions(file, parsed, profile);
-            FileIndexShard {
-                file_id: file.id,
-                definitions,
-                references: Vec::new(),
-                syntax_error_count: parsed.errors().len(),
-            }
-        }
         (None, _) => FileIndexShard {
             file_id: file.id,
             definitions: Vec::new(),
@@ -1425,37 +1402,6 @@ fn shard_from_parsed(
         references,
         syntax_error_count: parsed.errors().len(),
     }
-}
-
-fn collect_profile_csv_definitions(
-    file: &SourceFile,
-    parsed: &pdx_syntax::CsvParsedFile,
-    profile: &GameProfile,
-) -> Vec<Definition> {
-    profile
-        .csv_definitions
-        .iter()
-        .filter(|rule| rule.path.matches(file.logical_path.as_str()))
-        .flat_map(|rule| {
-            parsed.parse().records.iter().filter_map(move |record| {
-                let cell = record.cells.get(rule.column)?;
-                let name = parsed.source()[usize::try_from(cell.value_range.start()).ok()?
-                    ..usize::try_from(cell.value_range.end()).ok()?]
-                    .trim()
-                    .to_owned();
-                if rule.unsigned_integer_only && name.parse::<u32>().is_err() {
-                    return None;
-                }
-                Some(Definition {
-                    kind: rule.kind.clone(),
-                    name,
-                    file_id: file.id,
-                    range: cell.value_range,
-                    active: true,
-                })
-            })
-        })
-        .collect()
 }
 
 /// Collects workspace members declared by semantic `type[...]` definitions.
@@ -2598,8 +2544,7 @@ mod tests {
         let root = std::env::temp_dir().join(format!("pdx-workspace-generic-profile-{nonce}"));
         let cultures = root.join("common/cultures");
         let scripted_effects = root.join("common/scripted_effects");
-        let map = root.join("map");
-        for directory in [&cultures, &scripted_effects, &map] {
+        for directory in [&cultures, &scripted_effects] {
             fs::create_dir_all(directory).expect("fixture directory");
         }
         fs::write(
@@ -2609,7 +2554,6 @@ mod tests {
         .expect("culture fixture");
         fs::write(scripted_effects.join("effects.txt"), "example = { value = $AMOUNT$ }\n")
             .expect("scripted effect fixture");
-        fs::write(map.join("definition.csv"), "1;1;2;3;generic;x\n").expect("province fixture");
 
         let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -2623,7 +2567,6 @@ mod tests {
         assert!(snapshot.index().definitions("culture", "germanic").is_empty());
         assert!(snapshot.index().definitions("country_flag", "generic_flag").is_empty());
         assert!(snapshot.index().definitions("scripted_effect_param", "AMOUNT").is_empty());
-        assert!(snapshot.index().definitions("province_id", "1").is_empty());
         fs::remove_dir_all(root).expect("cleanup");
     }
 

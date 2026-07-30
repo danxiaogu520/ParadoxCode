@@ -9,14 +9,11 @@
 
 ## 文本前端
 
-MVP 保留两个直接服务 EU4 的 Tree-sitter grammar 资产，供 Zed 编辑器侧使用：
+MVP 保留一个 EU4 Tree-sitter grammar 资产，供 Zed 编辑器侧使用：
 
 - `tree-sitter-eu4`
-- `tree-sitter-pdx-eu4-localisation`
 
-二者共享测试约定，但不强行共享 grammar。Localisation 的语言头、BOM、entry 和内嵌替换文本与 Script 不同。
-
-受支持的 EU4 CSV 使用独立的记录式 parser facade，不强行进入 Tree-sitter Script CST。parser 必须保存 cell range、delimiter、行号和错误恢复信息，供索引和诊断使用。可复用的 Script、localisation 和 CSV frontend 属于 syntax 层；具体文件分类由游戏 profile 负责。
+EU4 本地化文件由通用 YAML LSP 处理，本项目不提供编辑器端语法高亮。可复用的 Script 和 localisation frontend 属于 syntax 层；具体文件分类由游戏 profile 负责。
 
 规则维护不复用 Script 或任何外部规则语言。`pdx-rulec` 只解析 RFC 0015 定义的严格第一方 JSON source；`.cwt` 不是项目支持的语言或输入。
 

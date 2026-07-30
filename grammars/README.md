@@ -1,9 +1,8 @@
 # Tree-sitter grammars
 
-The Europa Universalis IV and localisation directories below are the monorepo source-of-truth
-locations for the Phase 1 semantic-neutral grammars. The CSV directory is an editor-only
-presentation grammar; the authoritative CSV parser facade lives in `crates/pdx-syntax`.
+The Europa Universalis IV directory below is the monorepo source-of-truth
+location for the Phase 1 semantic-neutral script grammar. Localisation files
+are edited with a generic YAML LSP; the authoritative Rust localisation parser
+lives in `crates/pdx-syntax`.
 
 - `tree-sitter-eu4`
-- `tree-sitter-pdx-eu4-localisation`
-- `tree-sitter-pdx-eu4-csv`

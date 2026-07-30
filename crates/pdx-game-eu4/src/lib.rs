@@ -2,8 +2,8 @@
 
 use pdx_game::{GameInstallDescriptor, PlatformExecutablePaths};
 use pdx_rules::{
-    CsvDialect, FileCategory, FileMatcher, FileResolutionPolicy, GameProfile, ParserKind,
-    ProfileConditionalDefinitionRule, ProfileCsvDefinitionRule, ProfileDefinitionRule,
+    FileCategory, FileMatcher, FileResolutionPolicy, GameProfile, ParserKind,
+    ProfileConditionalDefinitionRule, ProfileDefinitionRule,
     ProfileMatchMode, ProfileReferenceRule, ProfileRootScopeRule, ProfileScopeCompatibility,
     ProfileTextMatcher, ProfileTokenDefinitionRule, ProfileValueDefinitionRule, RuleSet,
     RulesModel, SymbolDescriptor, SymbolResolutionPolicy,
@@ -246,12 +246,6 @@ pub fn profile() -> GameProfile {
             required_field: "legacy_government".to_owned(),
             required_value: "yes".to_owned(),
             absent_field: "legacy_equivalent".to_owned(),
-        }],
-        csv_definitions: vec![ProfileCsvDefinitionRule {
-            path: matcher(ProfileMatchMode::Exact, "map/definition.csv"),
-            column: 0,
-            kind: "province_id".to_owned(),
-            unsigned_integer_only: true,
         }],
         token_definitions: vec![
             ProfileTokenDefinitionRule {
@@ -508,17 +502,6 @@ pub fn bootstrap_model() -> RulesModel {
                 },
             },
             FileCategory {
-                id: "csv".to_owned(),
-                parser: ParserKind::Csv(CsvDialect::Semicolon),
-                resolution: FileResolutionPolicy::ReplaceByRelativePath,
-                matcher: FileMatcher {
-                    path_prefix: None,
-                    extensions: vec!["csv".to_owned()],
-                    path_suffix: None,
-                    case_sensitive: false,
-                },
-            },
-            FileCategory {
                 id: "asset".to_owned(),
                 parser: ParserKind::Asset,
                 resolution: FileResolutionPolicy::ReplaceByRelativePath,
@@ -609,12 +592,6 @@ mod tests {
             Some("culture")
         );
         assert_eq!(profile.value_definition_kind("which", Some("set_variable")), Some("variable"));
-        assert!(
-            profile
-                .csv_definitions
-                .iter()
-                .any(|rule| rule.kind == "province_id" && rule.path.matches("map/definition.csv"))
-        );
         assert!(profile.token_definitions.iter().any(|rule| {
             rule.inner_kind == "scripted_effect_param"
                 && rule.path.matches("common/scripted_effects/example.txt")

@@ -77,8 +77,6 @@ jobs:
           cache: npm
           cache-dependency-path: |
             grammars/tree-sitter-eu4/package-lock.json
-            grammars/tree-sitter-pdx-eu4-localisation/package-lock.json
-            grammars/tree-sitter-pdx-eu4-csv/package-lock.json
       - run: bash scripts/check-phase1-grammars.sh
       - run: python3 scripts/prepare-zed-dev-manifest.py
       - run: python3 scripts/check-zed-extension.py

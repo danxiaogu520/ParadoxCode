@@ -18,8 +18,6 @@ const MAX_QUOTED_SCRIPT_DEPTH: usize = 64;
 pub enum FormatSkipReason {
     /// The parser reported an error, so a rewrite cannot be proven safe.
     UnsafeSyntax,
-    /// CSV and binary/resource files do not have a generic full-document formatter.
-    UnsupportedFormat,
     /// The canonical output failed structural, token, or idempotence validation.
     SafetyValidationFailed,
 }
@@ -48,10 +46,6 @@ pub fn format(file: &ParsedFile) -> FormatResult {
     if !file.errors().is_empty() {
         return skipped(FormatSkipReason::UnsafeSyntax);
     }
-    if file.format() == FileFormat::Csv {
-        return skipped(FormatSkipReason::UnsupportedFormat);
-    }
-
     let formatted = canonical_text(file);
     if formatted == file.source() {
         return FormatResult { edits: Vec::new(), skipped: None };
@@ -79,7 +73,6 @@ fn canonical_text(file: &ParsedFile) -> String {
     match file.format() {
         FileFormat::Script => PdxFormatter::new(file, 0).document(),
         FileFormat::Localisation => format_localisation(file),
-        FileFormat::Csv => file.source().to_owned(),
     }
 }
 
@@ -918,14 +911,6 @@ mod tests {
         let result = format(&parsed);
         assert!(result.edits.is_empty());
         assert_eq!(result.skipped, Some(FormatSkipReason::UnsafeSyntax));
-    }
-
-    #[test]
-    fn csv_formatter_is_explicitly_unsupported() {
-        let parsed = parse(FileFormat::Csv, "a,b\n1,2\n");
-        let result = format(&parsed);
-        assert!(result.edits.is_empty());
-        assert_eq!(result.skipped, Some(FormatSkipReason::UnsupportedFormat));
     }
 
     #[test]
