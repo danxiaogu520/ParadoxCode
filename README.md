@@ -68,8 +68,8 @@ profile. See [the architecture guide](docs/architecture.md) and
 
 ## Building from source
 
-ParadoxCode currently requires Rust 1.88 or newer, Python 3.11 or newer for repository/release
-checks, and Node.js 22 for the Tree-sitter corpus checks.
+ParadoxCode currently requires Rust 1.97 or newer and Node.js 24 LTS for the
+Tree-sitter corpus checks.
 
 ```bash
 git clone https://github.com/danxiaogu520/ParadoxCode.git
