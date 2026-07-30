@@ -258,6 +258,28 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
                 rule.id
             )));
         }
+        if rule.required && rule.min_occurs.is_some_and(|minimum| minimum == 0) {
+            return Err(CompileError::Validation(format!(
+                "semantic rule {} marks a zero-minimum field as required",
+                rule.id
+            )));
+        }
+        if rule.required && rule.max_occurs.is_some_and(|maximum| maximum == 0) {
+            return Err(CompileError::Validation(format!(
+                "semantic rule {} marks a zero-maximum field as required",
+                rule.id
+            )));
+        }
+        if rule.context.eq_ignore_ascii_case("trigger")
+            && matches!(rule.shape, crate::RuleShape::Node)
+            && matches!(&rule.key, crate::KeyMatcher::Exact(key)
+                if ["area", "region", "continent"].iter().any(|name| key.eq_ignore_ascii_case(name)))
+        {
+            return Err(CompileError::Validation(format!(
+                "semantic rule {} models a province collection predicate as a trigger node",
+                rule.id
+            )));
+        }
     }
     for (identity, descriptor) in &model.semantic.type_descriptors {
         if identity != &descriptor.name {

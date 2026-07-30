@@ -185174,34 +185174,6 @@
     "line": 6629
   },
   {
-    "id": "scope_links:352:alias:trigger:area",
-    "context": "trigger",
-    "parent_path": [],
-    "key": {
-      "exact": "area"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "node",
-    "child_context": "trigger",
-    "alternative_id": "scope_links:352:alias:trigger:area",
-    "severity": null,
-    "required": false,
-    "documentation": [
-      "Refers to the area that the current province scope is in."
-    ],
-    "allowed_scopes": [
-      "province"
-    ],
-    "push_scope": "province",
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 6630
-  },
-  {
     "id": "scope_links:354:alias:trigger:province_group",
     "context": "trigger",
     "parent_path": [],
@@ -185228,34 +185200,6 @@
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6631
-  },
-  {
-    "id": "scope_links:356:alias:trigger:region",
-    "context": "trigger",
-    "parent_path": [],
-    "key": {
-      "exact": "region"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "node",
-    "child_context": "trigger",
-    "alternative_id": "scope_links:356:alias:trigger:region",
-    "severity": null,
-    "required": false,
-    "documentation": [
-      "Refers to the region that the current province scope is in."
-    ],
-    "allowed_scopes": [
-      "province"
-    ],
-    "push_scope": "province",
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 6632
   },
   {
     "id": "scope_links:358:alias:trigger:most_province_trade_power",

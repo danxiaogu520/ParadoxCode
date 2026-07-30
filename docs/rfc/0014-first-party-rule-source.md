@@ -8,8 +8,11 @@
 ## Decision
 
 ParadoxCode owns and maintains one strict, versioned EU4 rule source under `rules/eu4/`. This
-source tree is the sole authority for file classification, semantic matching, scopes,
-cardinality, symbols, references, documentation, and resolution policies.
+source tree is the sole authority for static file classification, semantic matching, cardinality,
+symbol/reference metadata, documentation, and resolution policies. The selected game profile
+remains the authority for algorithmic interpretation of those rows and runtime-derived facts such
+as workspace symbols, scope-link evaluation, control-flow/iterator interpretation, and parser token
+extraction. A profile must not duplicate a static rule row when the artifact provides it.
 
 `.cwt` files are prohibited as rule inputs. The repository does not provide a CWT parser,
 importer, fallback, synchronization command, or runtime compatibility mode. CWTools material may

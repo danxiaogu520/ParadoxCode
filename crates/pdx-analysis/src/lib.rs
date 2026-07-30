@@ -672,9 +672,10 @@ fn semantic_completion_container(
         if !contains(block_range, position) {
             continue;
         }
-        let transparent_wrapper = snapshot
-            .game_profile()
-            .is_transparent_scope_wrapper(&property.key);
+        let transparent_wrapper = context.eq_ignore_ascii_case("trigger")
+            && snapshot
+                .game_profile()
+                .is_transparent_scope_wrapper(&property.key);
         let cached_child_fact = property
             .block
             .iter()
@@ -2456,9 +2457,10 @@ fn validate_semantic_container(
         let key = property.key.to_ascii_lowercase();
         let count = counts.entry(key).or_default();
         *count = count.saturating_add(1);
-        let transparent_wrapper = snapshot
-            .game_profile()
-            .is_transparent_scope_wrapper(&property.key);
+        let transparent_wrapper = context.eq_ignore_ascii_case("trigger")
+            && snapshot
+                .game_profile()
+                .is_transparent_scope_wrapper(&property.key);
         let matching = rules
             .iter()
             .filter(|rule| {
@@ -2495,8 +2497,10 @@ fn validate_semantic_container(
                     ),
                     range: property.key_range,
                     message: format!(
-                        "`{}` is not available in game scope `{}`",
-                        property.key, scope.current
+                        "`{}` is not available in game scope `{}` ({})",
+                        property.key,
+                        scope.current,
+                        semantic_rule_provenance(matching[0])
                     ),
                 });
             }
@@ -2520,8 +2524,9 @@ fn validate_semantic_container(
                         .as_ref()
                         .map_or(property.key_range, |(_, range)| *range),
                     message: format!(
-                        "value of `{}` does not match the semantic rule",
-                        property.key
+                        "value of `{}` does not match the semantic rule ({})",
+                        property.key,
+                        semantic_rule_provenance(applicable[0])
                     ),
                 });
             }
@@ -2541,8 +2546,11 @@ fn validate_semantic_container(
                     severity: 2,
                     range: property.key_range,
                     message: format!(
-                        "`{}` occurs {} times, but rule cardinality allows at most {}",
-                        property.key, count, max_occurs
+                        "`{}` occurs {} times, but rule cardinality allows at most {} ({})",
+                        property.key,
+                        count,
+                        max_occurs,
+                        semantic_rule_provenance(applicable[0])
                     ),
                 });
             }
@@ -2712,7 +2720,7 @@ fn validate_semantic_container(
                 .filter(|(value, _)| semantic_leaf_value_matches(snapshot, rule, value, scope))
                 .count();
             let count = u32::try_from(count).unwrap_or(u32::MAX);
-            if let Some(min_occurs) = rule.min_occurs
+            if let Some(min_occurs) = semantic_min_occurs(rule)
                 && count < min_occurs
             {
                 diagnostics.push(Diagnostic {
@@ -2720,8 +2728,9 @@ fn validate_semantic_container(
                     severity: semantic_min_cardinality_severity(rule),
                     range: empty_range,
                     message: format!(
-                        "semantic rule value clause requires at least {min_occurs} value(s), but `{}` occurs {count} times",
-                        semantic_value_matcher_label(&rule.value)
+                        "semantic rule value clause requires at least {min_occurs} value(s), but `{}` occurs {count} times ({})",
+                        semantic_value_matcher_label(&rule.value),
+                        semantic_rule_provenance(rule)
                     ),
                 });
             }
@@ -2733,13 +2742,14 @@ fn validate_semantic_container(
                     severity: 2,
                     range: bare_values.first().map_or(empty_range, |(_, range)| *range),
                     message: format!(
-                        "semantic rule value clause allows at most {max_occurs} value(s), but found {count}"
+                        "semantic rule value clause allows at most {max_occurs} value(s), but found {count} ({})",
+                        semantic_rule_provenance(rule)
                     ),
                 });
             }
             continue;
         }
-        let Some(min_occurs) = rule.min_occurs else {
+        let Some(min_occurs) = semantic_min_occurs(rule) else {
             continue;
         };
         let count = properties
@@ -2756,8 +2766,9 @@ fn validate_semantic_container(
                 severity: semantic_min_cardinality_severity(rule),
                 range: empty_range,
                 message: format!(
-                    "semantic rule requires at least {min_occurs} occurrence(s), but `{}` occurs {count} times",
-                    semantic_matcher_label(&rule.key)
+                    "semantic rule requires at least {min_occurs} occurrence(s), but `{}` occurs {count} times ({})",
+                    semantic_matcher_label(&rule.key),
+                    semantic_rule_provenance(rule)
                 ),
             });
         }
@@ -2769,6 +2780,13 @@ fn semantic_rule_is_selected(rule: &pdx_rules::SemanticRule, selected: Option<&s
     rule.alternative_id
         .as_deref()
         .is_none_or(|alternative| selected == Some(alternative))
+}
+
+/// `required` is the declarative shorthand for one minimum occurrence.  Explicit cardinality
+/// remains authoritative when both fields are present, which keeps generated rules backwards
+/// compatible while making a standalone required field executable.
+fn semantic_min_occurs(rule: &pdx_rules::SemanticRule) -> Option<u32> {
+    rule.min_occurs.or(rule.required.then_some(1))
 }
 
 /// Alias-definition cardinality describes the fields inside one invocation. It must not be
@@ -3014,6 +3032,10 @@ fn semantic_value_matcher_label(matcher: &ValueMatcher) -> String {
         ValueMatcher::DynamicSet(value) => format!("value_set[{value}]"),
         ValueMatcher::Opaque(value) => value.clone(),
     }
+}
+
+fn semantic_rule_provenance(rule: &pdx_rules::SemanticRule) -> String {
+    format!("rule {}:{}", rule.source_file, rule.line)
 }
 
 fn semantic_matcher_label(matcher: &KeyMatcher) -> String {
@@ -4387,7 +4409,7 @@ mod tests {
             child_context: None,
             alternative_id: None,
             severity,
-            required: false,
+            required: min_occurs.is_none() && max_occurs.is_none(),
             documentation: Vec::new(),
             allowed_scopes: Vec::new(),
             push_scope: None,
@@ -4403,6 +4425,18 @@ mod tests {
         host.open_document(id.clone(), 1, text.to_owned(), None)
             .expect("open");
         (host, id)
+    }
+
+    #[test]
+    fn required_rule_without_explicit_minimum_reports_missing_property() {
+        let (host, id) = semantic_snapshot_with_constraints("trigger = { }\n", None, None, None);
+        let results = diagnostics(&host.snapshot(), &id);
+        assert!(
+            results
+                .iter()
+                .any(|item| item.code == DiagnosticCode::Cardinality),
+            "required must imply one minimum occurrence"
+        );
     }
 
     #[test]
@@ -4747,6 +4781,7 @@ mod tests {
             .find(|item| item.code == DiagnosticCode::InvalidValue)
             .expect("invalid semantic rules value diagnostic");
         assert_eq!(invalid_value.severity, 2);
+        assert!(invalid_value.message.contains("rule fixture.semantic:1"));
     }
 
     #[test]

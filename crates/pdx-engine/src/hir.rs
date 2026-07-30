@@ -728,7 +728,8 @@ fn lower_nested_scope_facts(
             parent_path: parent_path.to_vec(),
             state: state.clone(),
         });
-        let transparent = profile.is_transparent_scope_wrapper(&property.key);
+        let transparent = context.eq_ignore_ascii_case("trigger")
+            && profile.is_transparent_scope_wrapper(&property.key);
         let Some(rule) = statically_selected_transition(
             &matching,
             properties,

@@ -433,6 +433,7 @@ struct DefinitionPointer {
 pub struct WorkspaceIndex {
     shards: BTreeMap<SourceFileId, FileIndexShard>,
     definitions: BTreeMap<(String, String), Vec<DefinitionPointer>>,
+    case_sensitive_kinds: BTreeSet<String>,
 }
 
 impl WorkspaceIndex {
@@ -440,6 +441,22 @@ impl WorkspaceIndex {
     #[must_use]
     pub fn empty() -> Self {
         Self::default()
+    }
+
+    /// Applies symbol-name case policies from the immutable rule set and rebuilds lookup maps.
+    ///
+    /// The index historically lower-cased every symbol name.  Keeping the policy on the index
+    /// makes the lookup identity explicit while preserving the cheap bucketed queries used by
+    /// analysis.
+    pub fn configure_case_sensitivity(&mut self, rules: &RuleSet) {
+        self.case_sensitive_kinds = rules
+            .model()
+            .symbol_descriptors
+            .iter()
+            .filter(|descriptor| descriptor.case_sensitive)
+            .map(|descriptor| descriptor.kind_id.to_ascii_lowercase())
+            .collect();
+        self.rebuild_maps();
     }
 
     /// Builds an index from a complete set of file shards and derives lookup maps once.
@@ -471,7 +488,7 @@ impl WorkspaceIndex {
     #[must_use]
     pub fn definitions(&self, kind: &str, name: &str) -> Vec<&Definition> {
         self.definitions
-            .get(&(kind.to_owned(), name.to_ascii_lowercase()))
+            .get(&(kind.to_owned(), self.lookup_name(kind, name)))
             .into_iter()
             .flatten()
             .filter_map(|pointer| self.definition_at(*pointer))
@@ -605,7 +622,7 @@ impl WorkspaceIndex {
         let file_id = shard.file_id;
         let mut affected = self.remove_shard_entries(file_id);
         for (ordinal, definition) in shard.definitions.iter().enumerate() {
-            let key = definition_key(definition);
+            let key = self.definition_key(definition);
             self.definitions
                 .entry(key.clone())
                 .or_default()
@@ -626,7 +643,7 @@ impl WorkspaceIndex {
         let mut affected = previous
             .definitions
             .iter()
-            .map(definition_key)
+            .map(|definition| self.definition_key(definition))
             .collect::<Vec<_>>();
         affected.sort();
         affected.dedup();
@@ -699,6 +716,14 @@ impl WorkspaceIndex {
         }
     }
 
+    fn rebuild_maps(&mut self) {
+        match self.rebuild_maps_cancellable(&WorkspaceScanToken::new()) {
+            Ok(()) => {}
+            Err(WorkspaceError::Cancelled) => unreachable!("a fresh index rebuild cannot cancel"),
+            Err(_) => unreachable!("index rebuild has no other fallible operation"),
+        }
+    }
+
     fn rebuild_maps_cancellable(
         &mut self,
         cancellation: &WorkspaceScanToken,
@@ -711,7 +736,7 @@ impl WorkspaceIndex {
                 self.definitions
                     .entry((
                         definition.kind.clone(),
-                        definition.name.to_ascii_lowercase(),
+                        self.lookup_name(&definition.kind, &definition.name),
                     ))
                     .or_default()
                     .push(DefinitionPointer {
@@ -736,11 +761,26 @@ impl WorkspaceIndex {
     }
 }
 
-fn definition_key(definition: &Definition) -> (String, String) {
-    (
-        definition.kind.clone(),
-        definition.name.to_ascii_lowercase(),
-    )
+impl WorkspaceIndex {
+    fn is_case_sensitive(&self, kind: &str) -> bool {
+        self.case_sensitive_kinds
+            .contains(&kind.to_ascii_lowercase())
+    }
+
+    fn lookup_name(&self, kind: &str, name: &str) -> String {
+        if self.is_case_sensitive(kind) {
+            name.to_owned()
+        } else {
+            name.to_ascii_lowercase()
+        }
+    }
+
+    fn definition_key(&self, definition: &Definition) -> (String, String) {
+        (
+            definition.kind.clone(),
+            self.lookup_name(&definition.kind, &definition.name),
+        )
+    }
 }
 
 /// Stable identity for an editor document during one server lifetime.
@@ -1935,6 +1975,7 @@ impl AnalysisHost {
         roots.push(vanilla.clone());
         roots.extend(self.roots.iter().cloned());
         let mut index = WorkspaceIndex::from_shards(shards);
+        index.configure_case_sensitivity(self.rules.as_ref());
         let priorities = source_priorities(&roots, &files);
         index.resolve_priorities(&priorities, self.rules.as_ref());
 
@@ -2087,6 +2128,7 @@ impl AnalysisHost {
             );
         }
         let mut index = WorkspaceIndex::from_shards_cancellable(shards, cancellation)?;
+        index.configure_case_sensitivity(self.rules.as_ref());
         let priorities = source_priorities(&self.roots, &files);
         index.resolve_priorities_cancellable(&priorities, self.rules.as_ref(), cancellation)?;
         cancellation.checkpoint()?;
@@ -2653,7 +2695,7 @@ mod tests {
         WorkspaceIndex, WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanToken,
         pipeline_counts, reset_pipeline_counts,
     };
-    use pdx_rules::RuleSet;
+    use pdx_rules::{RuleSet, RulesModel, SymbolDescriptor, SymbolResolutionPolicy};
     use pdx_text::{LogicalPath, TextRange};
 
     fn eu4_host() -> AnalysisHost {
@@ -2697,6 +2739,45 @@ mod tests {
         assert!(index.shard(first_file).is_some());
         assert!(index.shard(second_file).is_some());
         assert_eq!(index.definitions("event", "SHARED.1").len(), 2);
+    }
+
+    #[test]
+    fn symbol_case_policy_controls_definition_lookup_identity() {
+        let file_id = SourceFileId::new(9);
+        let range = TextRange::new(0, 3).expect("range");
+        let mut model = RulesModel {
+            game_id: "test".to_owned(),
+            ..RulesModel::default()
+        };
+        model.symbol_descriptors.push(SymbolDescriptor {
+            kind_id: "case_sensitive_kind".to_owned(),
+            resolution: SymbolResolutionPolicy::ReplaceBySymbol,
+            case_sensitive: true,
+        });
+        let rules = RuleSet::from_model(model);
+        let mut index = WorkspaceIndex::from_shards([FileIndexShard {
+            file_id,
+            definitions: vec![Definition {
+                kind: "case_sensitive_kind".to_owned(),
+                name: "MixedName".to_owned(),
+                file_id,
+                range,
+                active: true,
+            }],
+            references: Vec::new(),
+            syntax_error_count: 0,
+        }]);
+        index.configure_case_sensitivity(&rules);
+
+        assert_eq!(
+            index.definitions("case_sensitive_kind", "MixedName").len(),
+            1
+        );
+        assert!(
+            index
+                .definitions("case_sensitive_kind", "mixedname")
+                .is_empty()
+        );
     }
 
     #[test]
