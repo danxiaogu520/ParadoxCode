@@ -3,7 +3,7 @@ use std::hint::black_box;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use pdx_workspace::{
+use pdx_engine::{
     AnalysisHost, DocumentId, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
 };
 
@@ -20,7 +20,7 @@ impl SyntheticWorkspace {
             .expect("system clock should follow the Unix epoch")
             .as_nanos();
         let root = std::env::temp_dir()
-            .join(format!("pdx-workspace-benchmark-{}-{nonce}", std::process::id()));
+            .join(format!("pdx-engine-benchmark-{}-{nonce}", std::process::id()));
         let events = root.join("events");
         fs::create_dir_all(&events).expect("create synthetic event directory");
         for index in 0..file_count {

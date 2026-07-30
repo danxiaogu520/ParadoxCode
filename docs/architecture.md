@@ -78,7 +78,7 @@ Zed extension 只负责：
 
 ### 工作区层
 
-`pdx-workspace` 维护 VFS、open document overlay、source roots、parse/HIR cache 和 index shards。可变状态只存在于 `AnalysisHost`；请求使用不可变 snapshot。
+`pdx-engine` 维护 VFS、open document overlay、source roots、parse/HIR cache 和 index shards。可变状态只存在于 `AnalysisHost`；请求使用不可变 snapshot。
 
 LSP initialize 将 client 打开的 root 与类型化 `initializationOptions` 解析成 source roots；可选 `.pdx/project.toml` 描述 Current Mod 和从低到高排列的 Dependency Mods，inline 字段可覆盖 TOML。相对路径以打开的 worktree 为基准，目录会 canonicalize 并拒绝重叠。配置入口和示例见 [Workspace configuration](configuration.md)。这属于 adapter 配置解析；优先级、只读属性和索引仍由 editor-neutral workspace 模型执行。
 
@@ -103,8 +103,8 @@ pdx-rules     -> pdx-text
 pdx-game      -> pdx-rules
 pdx-rulec     -> pdx-rules
 pdx-hir       -> pdx-text + pdx-parser + pdx-rules
-pdx-workspace -> pdx-text + pdx-parser + pdx-rules + pdx-hir
-pdx-analysis  -> pdx-workspace + pdx-hir + pdx-rules
+pdx-engine -> pdx-text + pdx-parser + pdx-rules + pdx-hir
+pdx-analysis  -> pdx-engine + pdx-hir + pdx-rules
 pdx-lsp       -> pdx-analysis + pdx-parser
 pdx-lsp       -> engine, analysis, parser, rules, game crates (includes CLI binaries)
 ```
@@ -117,7 +117,7 @@ pdx-lsp       -> engine, analysis, parser, rules, game crates (includes CLI bina
 - `pdx-game` 包含安装发现和 EU4 profile（`eu4` 模块）。
 - `pdx-rulec` 是维护者工具，只把第一方规则源码编译成经过完整校验的 artifact；它不是 runtime dependency。
 - `pdx-hir` 通过稳定的 typed CST API lowering；结构/recovery/conditional-parameter facts 与 `RuleSet`/显式 profile 驱动的 definition/reference facts 已被 workspace shard 和 analysis 查询共享。profile/category 引用在 HIR 中保留来源，parser recovery 保留为 `UnknownConstruct`；parameter definition/reference 按 occurrence range 排序并按所属顶层 scripted definition 隔离，HIR 暴露 position/owner 有序查询，analysis definition/references/hover/rename 直接做 owner-local 解析，并将 inferred parameter 作为 document-local symbol 暴露而不注入 workspace symbol，唯一 active invocation 也通过 definition file/range 回到 HIR owner 做精确参数校验/补全，同时向 workspace 动态 enum 作 unresolved/ambiguous 兼容投影；scope lowering 以一次线性 stack pass 从 source-order properties 建直接子项邻接表，semantic root context/parent path、初始 `ScopeState`、`skip_root` 后代、register intrinsic、多段 exact scope-link expression、无冲突 command transition，以及能由直接子 key 静态排除其他 signature 的冲突 transition 已缓存为按 range 排序、可 logarithmic lookup 的 HIR facts。diagnostics 与已有子项的 nested completion traversal 复用这些 facts；结构 parent fields 与 child context 共存的 block 会被分区校验并合并补全，空 block completion 合并所有静态可能 destination。依赖 workspace 的动态 transition与仍不能静态消歧的 diagnostics alternative 待补齐。
-- `pdx-workspace` 不依赖 LSP 类型。
+- `pdx-engine` 不依赖 LSP 类型。
 - `pdx-analysis` 不依赖任何 editor API。
 - `pdx-lsp` 是唯一允许依赖 LSP protocol types 的核心 crate。
 - `editors/zed` 不属于 Rust workspace 的核心依赖图。

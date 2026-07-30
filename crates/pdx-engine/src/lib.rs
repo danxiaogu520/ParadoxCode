@@ -1,10 +1,12 @@
-//! Workspace state and immutable snapshot boundary.
+//! Semantic engine: HIR lowering, workspace state, and immutable snapshot boundary.
 //!
 //! `AnalysisHost` is the mutable owner. Queries later consume `AnalysisSnapshot` values and
 //! must not depend on editor protocol types.
 
 #[cfg(test)]
 use std::cell::Cell;
+pub mod hir;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs;
@@ -15,7 +17,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use pdx_hir::{HirFile, lower_shared, lower_shared_with_profile};
+use crate::hir::{HirFile, lower_shared, lower_shared_with_profile};
 use pdx_rules::{FileResolutionPolicy, GameProfile, ParserKind, RuleSet, SymbolResolutionPolicy};
 use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile, parse};
 use pdx_text::{LineIndex, LogicalPath, TextRange};
@@ -2541,7 +2543,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("pdx-workspace-generic-profile-{nonce}"));
+        let root = std::env::temp_dir().join(format!("pdx-engine-generic-profile-{nonce}"));
         let cultures = root.join("common/cultures");
         let scripted_effects = root.join("common/scripted_effects");
         for directory in [&cultures, &scripted_effects] {
@@ -2731,7 +2733,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("pdx-workspace-targeted-disk-{nonce}"));
+        let root = std::env::temp_dir().join(format!("pdx-engine-targeted-disk-{nonce}"));
         let events = root.join("common/events");
         fs::create_dir_all(&events).expect("fixture directory");
         let changed_path = events.join("changed.txt");
@@ -2825,7 +2827,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("pdx-workspace-stable-ids-{nonce}"));
+        let root = std::env::temp_dir().join(format!("pdx-engine-stable-ids-{nonce}"));
         let events = root.join("events");
         fs::create_dir_all(&events).expect("event directory");
         fs::write(events.join("b.txt"), "country_event = { id = stable.b }\n").expect("b event");
@@ -2879,7 +2881,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("pdx-workspace-file-state-{nonce}"));
+        let root = std::env::temp_dir().join(format!("pdx-engine-file-state-{nonce}"));
         let events = root.join("events");
         fs::create_dir_all(&events).expect("event directory");
         fs::write(events.join("a.txt"), "country_event = { id = state.a }\n").expect("a event");
@@ -2953,7 +2955,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("pdx-workspace-pipeline-count-{nonce}"));
+        let root = std::env::temp_dir().join(format!("pdx-engine-pipeline-count-{nonce}"));
         let events = root.join("events");
         fs::create_dir_all(&events).expect("event directory");
         for index in 0..64 {
@@ -3044,7 +3046,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("pdx-workspace-isolation-{nonce}"));
+        let root = std::env::temp_dir().join(format!("pdx-engine-isolation-{nonce}"));
         let events = root.join("events");
         fs::create_dir_all(&events).expect("event directory");
         fs::write(events.join("good.txt"), "country_event = { id = safe.1 }\n")
@@ -3085,7 +3087,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("pdx-workspace-depth-{nonce}"));
+        let root = std::env::temp_dir().join(format!("pdx-engine-depth-{nonce}"));
         let events = root.join("events");
         fs::create_dir_all(&events).expect("event directory");
         fs::write(events.join("deep.txt"), "country_event = { id = deep.1 }\n")
@@ -3120,7 +3122,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("pdx-workspace-file-limit-{nonce}"));
+        let root = std::env::temp_dir().join(format!("pdx-engine-file-limit-{nonce}"));
         let events = root.join("events");
         fs::create_dir_all(&events).expect("event directory");
         fs::write(events.join("a.txt"), "country_event = { id = limit.a }\n").expect("a event");
@@ -3155,7 +3157,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("pdx-workspace-cancel-scan-{nonce}"));
+        let root = std::env::temp_dir().join(format!("pdx-engine-cancel-scan-{nonce}"));
         let events = root.join("events");
         fs::create_dir_all(&events).expect("event directory");
         fs::write(events.join("baseline.txt"), "country_event = { id = baseline.1 }\n")
@@ -3203,8 +3205,8 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("pdx-workspace-symlink-root-{nonce}"));
-        let outside = std::env::temp_dir().join(format!("pdx-workspace-symlink-outside-{nonce}"));
+        let root = std::env::temp_dir().join(format!("pdx-engine-symlink-root-{nonce}"));
+        let outside = std::env::temp_dir().join(format!("pdx-engine-symlink-outside-{nonce}"));
         fs::create_dir_all(&root).expect("source root");
         fs::create_dir_all(&outside).expect("outside directory");
         fs::write(outside.join("leak.txt"), "country_event = { id = leak.1 }\n")
@@ -3234,7 +3236,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("pdx-workspace-ignored-tools-{nonce}"));
+        let root = std::env::temp_dir().join(format!("pdx-engine-ignored-tools-{nonce}"));
         let events = root.join("events");
         let generated_events = root.join("target/debug/events");
         fs::create_dir_all(&events).expect("events directory");
@@ -3325,7 +3327,7 @@ mod tests {
 
     #[test]
     fn close_restores_the_backing_disk_candidate() {
-        let path = std::env::temp_dir().join(format!("pdx-workspace-{}.txt", std::process::id()));
+        let path = std::env::temp_dir().join(format!("pdx-engine-{}.txt", std::process::id()));
         fs::write(&path, "disk").expect("write fixture");
         let mut host = AnalysisHost::new(RuleSet::empty());
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -3333,7 +3335,7 @@ mod tests {
             SourceRootKind::CurrentMod,
             path.parent().expect("temp parent").to_owned(),
         )]));
-        let id = DocumentId::new("file:///tmp/pdx-workspace.txt");
+        let id = DocumentId::new("file:///tmp/pdx-engine.txt");
         host.open_document(id.clone(), 1, "overlay".to_owned(), Some(path.clone()))
             .expect("open should succeed");
         host.close_document(&id).expect("close should succeed");
@@ -3351,7 +3353,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("pdx-workspace-phase4-{nonce}"));
+        let root = std::env::temp_dir().join(format!("pdx-engine-phase4-{nonce}"));
         let vanilla = root.join("vanilla");
         let dependency = root.join("dependency");
         let current = root.join("current");
@@ -3448,7 +3450,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("pdx-workspace-vanilla-cache-{nonce}"));
+        let root = std::env::temp_dir().join(format!("pdx-engine-vanilla-cache-{nonce}"));
         let vanilla = root.join("vanilla");
         let current = root.join("current");
         fs::create_dir_all(vanilla.join("common/events")).expect("Vanilla fixture directory");

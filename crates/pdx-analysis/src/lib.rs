@@ -12,14 +12,14 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use pdx_hir::{
+use pdx_engine::hir::{
     HirFile, HirReferenceOrigin, Scope, ScopeState, ScopeValue,
     semantic_root_context as hir_semantic_root_context,
 };
 use pdx_rules::{GameProfile, KeyMatcher, RuleShape, SymbolResolutionPolicy, ValueMatcher};
 use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile, SyntaxError};
 use pdx_text::{LogicalPath, TextRange, TextSize};
-use pdx_workspace::{
+use pdx_engine::{
     AnalysisSnapshot, Definition, DocumentId, DocumentSource, ParsedSource, SourceFileId,
 };
 
@@ -3570,9 +3570,9 @@ fn definition_priority(snapshot: &AnalysisSnapshot, definition: &DefinitionInfo)
         return 0;
     };
     match root.kind {
-        pdx_workspace::SourceRootKind::Vanilla => 0,
-        pdx_workspace::SourceRootKind::Dependency => 1_000 + u64::from(root.order),
-        pdx_workspace::SourceRootKind::CurrentMod => 10_000 + u64::from(root.order),
+        pdx_engine::SourceRootKind::Vanilla => 0,
+        pdx_engine::SourceRootKind::Dependency => 1_000 + u64::from(root.order),
+        pdx_engine::SourceRootKind::CurrentMod => 10_000 + u64::from(root.order),
     }
 }
 
@@ -3620,9 +3620,9 @@ fn definition_priority_for_file(snapshot: &AnalysisSnapshot, id: SourceFileId) -
         return 0;
     };
     match root.kind {
-        pdx_workspace::SourceRootKind::Vanilla => 0,
-        pdx_workspace::SourceRootKind::Dependency => 1_000 + u64::from(root.order),
-        pdx_workspace::SourceRootKind::CurrentMod => 10_000 + u64::from(root.order),
+        pdx_engine::SourceRootKind::Vanilla => 0,
+        pdx_engine::SourceRootKind::Dependency => 1_000 + u64::from(root.order),
+        pdx_engine::SourceRootKind::CurrentMod => 10_000 + u64::from(root.order),
     }
 }
 
@@ -3648,7 +3648,7 @@ fn symbol_at(
 fn local_parameter_target(
     input: &ParsedInput,
     position: TextSize,
-) -> Option<(&pdx_hir::HirParameterDefinition, &pdx_hir::HirParameterReference)> {
+) -> Option<(&pdx_engine::hir::HirParameterDefinition, &pdx_engine::hir::HirParameterReference)> {
     let hir = input.hir.as_deref()?;
     let reference = hir.parameter_reference_at(position)?;
     let definition = hir
@@ -3881,7 +3881,7 @@ fn writable_location(snapshot: &AnalysisSnapshot, location: &Location) -> bool {
             .source_roots()
             .iter()
             .find(|root| root.id == source_file.root_id)
-            .is_some_and(|root| matches!(root.kind, pdx_workspace::SourceRootKind::CurrentMod));
+            .is_some_and(|root| matches!(root.kind, pdx_engine::SourceRootKind::CurrentMod));
     }
     if let Some(document_id) = location.document.as_ref()
         && let Some(document) = snapshot.document(document_id)
@@ -3891,7 +3891,7 @@ fn writable_location(snapshot: &AnalysisSnapshot, location: &Location) -> bool {
         }
         return document.path().is_none_or(|path| {
             root_for_path(snapshot, path)
-                .is_some_and(|root| matches!(root.kind, pdx_workspace::SourceRootKind::CurrentMod))
+                .is_some_and(|root| matches!(root.kind, pdx_engine::SourceRootKind::CurrentMod))
         });
     }
     false
@@ -3900,7 +3900,7 @@ fn writable_location(snapshot: &AnalysisSnapshot, location: &Location) -> bool {
 fn root_for_path<'a>(
     snapshot: &'a AnalysisSnapshot,
     path: &Path,
-) -> Option<&'a pdx_workspace::SourceRoot> {
+) -> Option<&'a pdx_engine::SourceRoot> {
     snapshot
         .source_roots()
         .iter()
@@ -3950,7 +3950,7 @@ mod tests {
     };
     use pdx_rules::{KeyMatcher, RuleSet, RuleShape, SemanticRule, ValueMatcher};
     use pdx_text::{LogicalPath, TextRange};
-    use pdx_workspace::{AnalysisHost, DocumentId};
+    use pdx_engine::{AnalysisHost, DocumentId};
 
     fn eu4_host(rules: RuleSet) -> AnalysisHost {
         AnalysisHost::with_profile(rules, pdx_game::eu4::profile())
@@ -4227,13 +4227,13 @@ mod tests {
 
     #[test]
     fn multiple_hir_scope_candidates_remain_conservative_in_analysis() {
-        let state = pdx_hir::ScopeState {
-            root: pdx_hir::ScopeValue::Known(vec!["country".to_owned(), "province".to_owned()]),
-            current: vec![pdx_hir::ScopeValue::Known(vec![
+        let state = pdx_engine::hir::ScopeState {
+            root: pdx_engine::hir::ScopeValue::Known(vec!["country".to_owned(), "province".to_owned()]),
+            current: vec![pdx_engine::hir::ScopeValue::Known(vec![
                 "country".to_owned(),
                 "province".to_owned(),
             ])],
-            from: vec![pdx_hir::ScopeValue::Known(vec!["country".to_owned()])],
+            from: vec![pdx_engine::hir::ScopeValue::Known(vec!["country".to_owned()])],
             previous: Vec::new(),
         };
         let context =
@@ -4455,7 +4455,7 @@ mod tests {
 
     #[test]
     fn eu4_normal_type_selector_applies_mission_rules_to_custom_root_names() {
-        use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
         use std::fs;
 
         let root = std::env::temp_dir().join(format!(
@@ -4650,7 +4650,7 @@ mod tests {
 
     #[test]
     fn workspace_type_child_key_selects_only_one_transition() {
-        use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
         use std::fs;
 
         let root = std::env::temp_dir()
@@ -4775,7 +4775,7 @@ mod tests {
 
     #[test]
     fn eu4_replace_scope_links_populate_from_intrinsics() {
-        use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
         use std::fs;
 
         assert_eq!(super::repeated_scope_register_depth("prevprev", "prev"), Some(1));
@@ -4828,7 +4828,7 @@ mod tests {
 
     #[test]
     fn eu4_dynamic_culture_definition_is_used_by_semantic_type_matcher() {
-        use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
         use std::fs;
 
         let root =
@@ -4861,7 +4861,7 @@ mod tests {
 
     #[test]
     fn eu4_country_tag_definition_feeds_dynamic_enum_matcher() {
-        use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
         use std::fs;
 
         let root =
@@ -4897,7 +4897,7 @@ mod tests {
 
     #[test]
     fn eu4_flag_definition_feeds_dynamic_value_matcher() {
-        use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
         use std::fs;
 
         let root =
@@ -4936,7 +4936,7 @@ mod tests {
 
     #[test]
     fn eu4_scripted_effect_params_are_owner_qualified() {
-        use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
         use std::fs;
 
         let root =
@@ -5031,7 +5031,7 @@ mod tests {
 
     #[test]
     fn local_parameter_navigation_stays_within_its_scripted_definition() {
-        use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
         use std::fs;
 
         let nonce = std::time::SystemTime::now()
@@ -5140,7 +5140,7 @@ mod tests {
 
     #[test]
     fn eu4_legacy_governments_use_eu4_reform_semantics() {
-        use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
         use std::fs;
 
         let root =
@@ -5231,7 +5231,7 @@ mod tests {
             let end = usize::try_from(edit.location.range.end()).expect("end");
             changed.replace_range(start..end, &edit.new_text);
         }
-        host.apply_document_changes(&id, 2, &[pdx_workspace::TextChange::full(changed)])
+        host.apply_document_changes(&id, 2, &[pdx_engine::TextChange::full(changed)])
             .expect("apply rename");
         assert!(diagnostics(&host.snapshot(), &id).iter().all(|item| {
             item.code != DiagnosticCode::UnknownSymbol
@@ -5268,7 +5268,7 @@ mod tests {
 
     #[test]
     fn rename_rejects_dependency_and_vanilla_definitions() {
-        use pdx_workspace::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
         use std::fs;
 
         let nonce = std::process::id();

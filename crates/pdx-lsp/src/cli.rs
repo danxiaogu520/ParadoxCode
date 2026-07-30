@@ -8,7 +8,7 @@ use pdx_game::{
     DiscoveryDepth, DiscoveryOptions, DiscoveryOutcome, DiscoveryToken, GameInstallDescriptor,
     UserConfigError, UserConfiguration, UserPaths, discover_installations, validate_installation,
 };
-use pdx_workspace::{
+use pdx_engine::{
     AnalysisHost, SourceRoot, SourceRootId, SourceRootKind, VanillaCacheError, VanillaIndexCache,
     WorkspaceChange, WorkspaceError,
 };
@@ -380,7 +380,7 @@ mod tests {
     use std::fs;
 
     use pdx_game::{DiscoveryOutcome, UserConfiguration, UserPaths};
-    use pdx_workspace::VanillaIndexCache;
+    use pdx_engine::VanillaIndexCache;
 
     use super::{CliError, execute_pdx, setup_vanilla};
 

@@ -14,7 +14,7 @@
 - `pdx-rules`：SQLite schema、只读加载、immutability、派生查询 index、canonical logical hash
 - `pdx-rulec`：strict source decoding、stable identity、invariant、artifact round-trip 和 manifest
 - `pdx-hir`：context lowering、scope transition
-- `pdx-workspace`：root order、overlay、shard replacement
+- `pdx-engine`：root order、overlay、shard replacement
 - `pdx-analysis`：feature query
 - `pdx-parser`：trivia safety、idempotence
 
@@ -97,10 +97,10 @@ MVP 至少包含：
 
 benchmark 结果用于发现回退，不在 MVP 早期设不现实的绝对吞吐承诺。
 
-当前可再分发基准位于 `crates/pdx-workspace/benches/synthetic_workspace.rs`，默认生成 2,000 个原创 EU4 event 文件并分别测量 cold scan/index、无变化全量刷新、单磁盘文件变化刷新和单 overlay 编辑。运行：
+当前可再分发基准位于 `crates/pdx-engine/benches/synthetic_workspace.rs`，默认生成 2,000 个原创 EU4 event 文件并分别测量 cold scan/index、无变化全量刷新、单磁盘文件变化刷新和单 overlay 编辑。运行：
 
 ```bash
-cargo bench -p pdx-workspace --bench synthetic_workspace
+cargo bench -p pdx-engine --bench synthetic_workspace
 ```
 
 可用 `PDX_BENCH_FILES` 调整文件数。2026-07-20 的开发机基线为 23.769 ms、14.222 ms、12.891 ms 和 0.004 ms；这些数字只用于同机趋势比较，不是跨机器验收阈值。计数回归另行断言一次 overlay 编辑恰好 parse/lower 各一次、stage/commit 不重复语义工作，并且全部磁盘 `FileState` 保持共享。

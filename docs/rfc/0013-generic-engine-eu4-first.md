@@ -52,7 +52,7 @@ pdx-rulec
 pdx-hir
   CST + RuleSet + game profile -> semantic file
 
-pdx-workspace
+pdx-engine
   VFS / roots / overlays / per-file state / snapshots / index shards
 
 pdx-analysis
@@ -91,7 +91,7 @@ pdx-lsp
 
 本决策完成迁移时应满足：
 
-1. `pdx-lsp`、`pdx-workspace` 和通用 index 类型中没有 EU4 command/name/path 白名单；
+1. `pdx-lsp`、`pdx-engine` 和通用 index 类型中没有 EU4 command/name/path 白名单；
 2. 规则 artifact 声明 `game_id`，runtime 校验 artifact 与 profile 一致；
 3. EU4 专有行为可以从明确的 EU4 crate/module 定位；
 4. 添加第二个 profile 不需要重写 LSP transport、snapshot 或 WorkspaceIndex；

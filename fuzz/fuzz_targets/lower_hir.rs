@@ -3,7 +3,7 @@
 use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
-use pdx_hir::{HirFile, lower, lower_with_profile};
+use pdx_engine::hir::{HirFile, lower, lower_with_profile};
 use pdx_rules::{GameProfile, RuleSet};
 use pdx_parser::{FileFormat, parse};
 use pdx_text::LogicalPath;

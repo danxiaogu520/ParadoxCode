@@ -1,5 +1,5 @@
 [package]
-name = "pdx-workspace"
+name = "pdx-engine"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,7 +12,6 @@ readme.workspace = true
 publish = false
 
 [dependencies]
-pdx-hir = { path = "../pdx-hir" }
 pdx-rules = { path = "../pdx-rules" }
 pdx-parser = { path = "../pdx-parser" }
 pdx-text = { path = "../pdx-text" }

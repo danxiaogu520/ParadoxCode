@@ -47,7 +47,7 @@ use pdx_game::{
 };
 use pdx_rules::{GameProfile, RuleSet, RulesError};
 use pdx_text::{LineIndex, Position, TextRange};
-use pdx_workspace::{
+use pdx_engine::{
     AnalysisHost, AnalysisSnapshot, DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId,
     DocumentSource, ParsedSource, PreparedDocument, SourceRoot, SourceRootId, SourceRootKind,
     VanillaCacheError, VanillaIndexCache, WorkspaceChange, WorkspaceError, WorkspaceScanToken,
@@ -2783,7 +2783,7 @@ mod tests {
     use pdx_game::{DiscoveryOptions, DiscoveryOutcome, UserConfiguration, UserPaths};
     use pdx_rules::{RuleSet, RulesError, RulesModel};
     use pdx_text::{LineIndex, Position, TextRange};
-    use pdx_workspace::{
+    use pdx_engine::{
         AnalysisHost, SourceRoot, SourceRootId, SourceRootKind, TextChange, VanillaIndexCache,
         WorkspaceChange,
     };
@@ -3152,7 +3152,7 @@ mod tests {
         assert!(responses.iter().any(|value| value["method"] == "textDocument/publishDiagnostics"));
         let snapshot = server.snapshot();
         let document = snapshot
-            .document(&pdx_workspace::DocumentId::new(uri.clone()))
+            .document(&pdx_engine::DocumentId::new(uri.clone()))
             .expect("close restores disk candidate");
         assert_eq!(document.text(), "disk");
         assert_eq!(document.version(), None);
@@ -3495,7 +3495,7 @@ mod tests {
                     {"id": "high", "path": "dependencies/high"}
                 ]
             })),
-            &pdx_workspace::WorkspaceScanToken::new(),
+            &pdx_engine::WorkspaceScanToken::new(),
         )
         .expect("inline initializationOptions");
         assert_eq!(inline.roots.len(), 3);
@@ -3505,7 +3505,7 @@ mod tests {
                 "modDirectory": "mod",
                 "dependencies": [{"id": "nested", "path": "mod/common"}]
             })),
-            &pdx_workspace::WorkspaceScanToken::new(),
+            &pdx_engine::WorkspaceScanToken::new(),
         )
         .expect_err("nested source roots must be rejected");
         assert_eq!(overlap.code, INVALID_PARAMS);
@@ -3586,12 +3586,12 @@ path = "dependencies/high"
         let snapshot = server.snapshot();
         let roots = snapshot.source_roots();
         assert_eq!(roots.len(), 4);
-        assert_eq!(roots[0].kind, pdx_workspace::SourceRootKind::Vanilla);
-        assert_eq!(roots[1].kind, pdx_workspace::SourceRootKind::Dependency);
+        assert_eq!(roots[0].kind, pdx_engine::SourceRootKind::Vanilla);
+        assert_eq!(roots[1].kind, pdx_engine::SourceRootKind::Dependency);
         assert_eq!(roots[1].order, 0);
-        assert_eq!(roots[2].kind, pdx_workspace::SourceRootKind::Dependency);
+        assert_eq!(roots[2].kind, pdx_engine::SourceRootKind::Dependency);
         assert_eq!(roots[2].order, 1);
-        assert_eq!(roots[3].kind, pdx_workspace::SourceRootKind::CurrentMod);
+        assert_eq!(roots[3].kind, pdx_engine::SourceRootKind::CurrentMod);
         assert!(roots[3].writable);
         let active = snapshot
             .index()
@@ -3674,7 +3674,7 @@ path = "dependencies/high"
         let mut server =
             eu4_server(InitializeOptions).expect("syntax-only server should initialize");
         let uri = "file:///tmp/diagnostics.txt";
-        let id = pdx_workspace::DocumentId::new(uri);
+        let id = pdx_engine::DocumentId::new(uri);
         server
             .host
             .open_document(id.clone(), 1, "key = value".to_owned(), None)
@@ -3757,7 +3757,7 @@ path = "dependencies/high"
     #[test]
     fn initialize_cancellation_is_forwarded_and_a_retry_can_succeed() {
         let request_id = RequestId::Number(1);
-        let scan_cancellation = pdx_workspace::WorkspaceScanToken::new();
+        let scan_cancellation = pdx_engine::WorkspaceScanToken::new();
         let in_flight = InFlightInitialize {
             request_id: request_id.clone(),
             cancellation: scan_cancellation.clone(),

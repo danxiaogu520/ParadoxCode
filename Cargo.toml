@@ -6,8 +6,7 @@ members = [
     "crates/pdx-rules",
     "crates/pdx-game",
     "crates/pdx-rulec",
-    "crates/pdx-hir",
-    "crates/pdx-workspace",
+    "crates/pdx-engine",
     "crates/pdx-analysis",
     "crates/pdx-lsp",
 ]

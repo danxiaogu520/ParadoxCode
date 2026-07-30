@@ -242,12 +242,23 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 name = "pdx-analysis"
 version = "0.1.0"
 dependencies = [
+ "pdx-engine",
  "pdx-game",
- "pdx-hir",
  "pdx-parser",
  "pdx-rules",
  "pdx-text",
- "pdx-workspace",
+]
+
+[[package]]
+name = "pdx-engine"
+version = "0.1.0"
+dependencies = [
+ "pdx-game",
+ "pdx-parser",
+ "pdx-rules",
+ "pdx-text",
+ "rusqlite",
+ "sha2",
 ]
 
 [[package]]
@@ -261,26 +272,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "pdx-hir"
-version = "0.1.0"
-dependencies = [
- "pdx-game",
- "pdx-parser",
- "pdx-rules",
- "pdx-text",
-]
-
-[[package]]
 name = "pdx-lsp"
 version = "0.1.0"
 dependencies = [
  "lsp-types",
  "pdx-analysis",
+ "pdx-engine",
  "pdx-game",
  "pdx-parser",
  "pdx-rules",
  "pdx-text",
- "pdx-workspace",
  "serde",
  "serde_json",
  "tempfile",
@@ -319,19 +320,6 @@ dependencies = [
 [[package]]
 name = "pdx-text"
 version = "0.1.0"
-
-[[package]]
-name = "pdx-workspace"
-version = "0.1.0"
-dependencies = [
- "pdx-game",
- "pdx-hir",
- "pdx-parser",
- "pdx-rules",
- "pdx-text",
- "rusqlite",
- "sha2",
-]
 
 [[package]]
 name = "pkg-config"
