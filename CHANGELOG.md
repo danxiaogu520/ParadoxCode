@@ -15,7 +15,7 @@ established.
 - Conservative document formatting over LSP.
 - Current Mod, ordered dependency, overlay, and persistent Vanilla index support.
 - Thin Zed extension with editor-only Tree-sitter grammars.
-- Strict developer-maintained EU4 rule source and reproducible `pdx-rulec` compiler.
+- Strict developer-maintained EU4 rule source and reproducible `pdx-bake` compiler.
 - Exact-version Zed server installation and a deterministic five-target native release workflow
   with SHA-256 sidecars and complete-matrix verification.
 

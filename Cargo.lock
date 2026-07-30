@@ -297,16 +297,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pdx-rulec"
-version = "0.1.0"
-dependencies = [
- "pdx-rules",
- "serde",
- "serde_json",
- "sha2",
-]
-
-[[package]]
 name = "pdx-rules"
 version = "0.1.0"
 dependencies = [

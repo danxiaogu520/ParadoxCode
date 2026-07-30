@@ -26,3 +26,6 @@ Thumbs.db
 # The audited EU4 artifact is the only pdxrules file kept in source control.
 /rules/*.pdxrules
 !/rules/eu4.pdxrules
+
+# CWTools reference
+/reference/

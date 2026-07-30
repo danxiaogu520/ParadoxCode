@@ -22,7 +22,7 @@ maintenance dependency.
 rules/eu4/*.json (first-party authority)
               |
               v
-       pdx-rulec build
+       pdx-bake build
               |
               +-- strict schema and invariant validation
               +-- canonical logical rule_hash
@@ -33,7 +33,7 @@ rules/eu4/*.json (first-party authority)
    embedded official pdx / pdx-ls
 ```
 
-`pdx-rulec` accepts only the fixed first-party JSON layout. Unknown fields, missing files,
+`pdx-bake` accepts only the fixed first-party JSON layout. Unknown fields, missing files,
 duplicate stable identities, invalid cardinality, invalid severity, mismatched type identities,
 and generated artifact round-trip differences fail compilation.
 

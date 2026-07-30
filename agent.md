@@ -77,7 +77,7 @@
 pdx-text
   -> pdx-parser -> pdx-engine -> pdx-analysis -> pdx-lsp
 pdx-game (with EU4 profile)
-pdx-rules -> pdx-rulec
+pdx-rules -> pdx-bake
 pdx-rules + pdx-game -> pdx-hir / pdx-engine / pdx-analysis
 ```
 
@@ -91,7 +91,7 @@ EU4 bootstrap/profile 已合并到 `pdx-game` 的 `eu4` 模块中。
 | `pdx-parser` | Paradox script、localisation 的 loss-aware CST、增量 parse、syntax error、安全 formatter | 游戏规则数据库、磁盘扫描、LSP 类型 |
 | `pdx-rules` | 通用规则 schema、canonical view、`rule_hash`、只读 runtime API | 具体游戏名称表、外部规则 parser、LSP、动态 Mod symbol |
 | `pdx-game` | 数据驱动安装标志、跨平台发现、最小验证、用户级本机配置、EU4 profile | 语义规则、workspace 索引、编辑器 API |
-| `pdx-rulec` | 严格读取第一方 JSON 规则源码、校验并生成 artifact/manifest | CWT 输入、runtime 依赖、网络同步、用户规则覆盖 |
+| `pdx-bake` | 严格读取第一方 JSON 规则源码、校验并生成 artifact/manifest | CWT 输入、runtime 依赖、网络同步、用户规则覆盖 |
 | `pdx-engine` | HIR lowering、VFS、overlay、source roots、parse cache、index shards、snapshot | LSP protocol types |
 | `pdx-analysis` | 面向 snapshot 的 diagnostics/completion/hover/navigation/rename 查询 | 直接读磁盘、editor client |
 | `pdx-lsp` | 生命周期、capability、协议转换、取消、publish diagnostics | EU4 名称表、业务查询、规则解释 |
@@ -174,7 +174,7 @@ Git checkout 使用仓库版本化的 `.githooks/pre-commit` 作为本地质量�
 - `pdx-text`：offset、line endings、UTF-16、URI/path；
 - `pdx-parser`：typed CST、错误提取、增量编辑、错误恢复、trivia safety、token preservation、idempotence；
 - `pdx-rules`：schema、只读加载、foreign key、hash 稳定性和 runtime invariants；
-- `pdx-rulec`：严格 source schema、stable identity、invariant、deterministic hash、artifact round-trip；
+- `pdx-bake`：严格 source schema、stable identity、invariant、deterministic hash、artifact round-trip；
 - `pdx-engine`：scope transition、unknown context、typed lowering、root order、overlay、覆盖解析、shard replacement、snapshot；
 - `pdx-analysis`：diagnostics、completion、definition、references、hover、rename；
 - `pdx-lsp`：真实 JSON-RPC、capability fallback、版本乱序、取消、stale diagnostics；

@@ -8,7 +8,7 @@
 > 2026-07-21 amendment：artifact 仍是开发期权威数据，但外部 runtime 文件与扩展携带规则的分发方式已由 [RFC 0014](0014-embedded-first-party-rules.md) 取代。
 >
 > 2026-07-22 amendment：SQLite 不再是人工维护的权威源，CWT bootstrap/CRUD 决策已废止。
-> `rules/eu4/*.json` 是唯一权威，`pdx-rulec` 生成并验证 SQLite artifact；详见
+> `rules/eu4/*.json` 是唯一权威，`pdx-bake` 生成并验证 SQLite artifact；详见
 > [RFC 0015](0015-first-party-rule-source.md)。
 
 ## 目标
@@ -42,7 +42,7 @@ editors/zed/
 developer-maintained rules/eu4 source
                  |
                  v
-          pdx-rulec build
+          pdx-bake build
                  |
                  v
      self-owned SQLite eu4.pdxrules

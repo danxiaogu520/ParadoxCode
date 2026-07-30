@@ -19,7 +19,7 @@ versions can drift; and Windows/WSL testing must translate an extra path across 
 
 ## Decision
 
-`rules/eu4/` is the repository's developer-maintained authority. `pdx-rulec` validates it and
+`rules/eu4/` is the repository's developer-maintained authority. `pdx-bake` validates it and
 generates the auditable `rules/eu4.pdxrules` artifact, which is embedded into the official `pdx`
 and `pdx-ls` binaries as a build input.
 

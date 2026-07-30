@@ -89,11 +89,11 @@ After installation, normal `git commit` commands run the complete local quality 
 `bash scripts/check-quality-gates.sh` to run them explicitly or pass `core`, `grammars`, `zed`, or
 `release` to diagnose one group.
 
-Compile the developer-maintained first-party rule source with `pdx-rulec`; no external checkout or
+Compile the developer-maintained first-party rule source with `pdx-bake`; no external checkout or
 rule corpus is required:
 
 ```bash
-cargo run -p pdx-rulec -- build --source rules/eu4 --output rules/eu4.pdxrules --manifest rules/manifest.json
+cargo run -p pdx-bake -- build --source rules/eu4 --output rules/eu4.pdxrules --manifest rules/manifest.json
 ```
 
 ## Development setup

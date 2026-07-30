@@ -16,7 +16,7 @@ The source layout is:
 Compile and validate it with:
 
 ```text
-cargo run -p pdx-rulec -- build \
+cargo run -p pdx-bake -- build \
   --source rules/eu4 \
   --output rules/eu4.pdxrules \
   --manifest rules/manifest.json

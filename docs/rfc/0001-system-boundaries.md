@@ -9,7 +9,7 @@
 > [RFC 0014](0014-embedded-first-party-rules.md) 取代；crate 依赖方向仍然有效。
 >
 > 2026-07-22 amendment：`pdx-cwt` 和所有 CWT 输入已由
-> [RFC 0015](0015-first-party-rule-source.md) 废止；维护者工具现为 `pdx-rulec`。
+> [RFC 0015](0015-first-party-rule-source.md) 废止；维护者工具现为 `pdx-bake`。
 
 ## 问题
 
@@ -25,21 +25,21 @@ Rust workspace 初始包含：
 | `pdx-parser` | 硬编码 EU4 Rust parser、source text、typed CST、syntax errors、canonical formatter |
 | `pdx-rules` | 通用 SQLite schema、canonical hash、只读 runtime model 与查询 API |
 | `pdx-game` | 安装发现、EU4 profile（eu4 模块）、bootstrap catalog |
-| `pdx-rulec` | 第一方规则源码严格校验与 artifact/manifest 编译器 |
+| `pdx-bake` | 第一方规则源码严格校验与 artifact/manifest 编译器 |
 | `pdx-engine` | HIR lowering、VFS、source roots、cache、snapshot、index |
 | `pdx-analysis` | diagnostics、completion、navigation、rename 查询 |
-| `pdx-lsp` | `pdx` 与 `pdx-ls` binary 入口、LSP transport 和协议适配；`pdx-rulec` 是独立维护者 binary |
+| `pdx-lsp` | `pdx` 与 `pdx-ls` binary 入口、LSP transport 和协议适配；`pdx-bake` 是独立维护者 binary |
 
 ## 依赖约束
 
 1. 运行时依赖沿 `text/rules -> parser -> engine -> analysis -> lsp` 方向。
-2. `pdx-rulec` 只依赖 `pdx-rules`，任何 analysis runtime crate 都不反向依赖维护者编译器。
+2. `pdx-bake` 只依赖 `pdx-rules`，任何 analysis runtime crate 都不反向依赖维护者编译器。
 3. 格式化逻辑位于 `pdx-parser` 的 `format` 模块，只依赖 text 和 CST 类型。
 4. 只有 `pdx-lsp` 可以在公开 API 中使用 LSP protocol types。
 5. EU4 规则数据库是由第一方源码生成的 SQLite artifact；通用加载位于 `pdx-rules`，官方 composition root 将其嵌入 binary。
 6. Zed extension 不链接 analysis crate，不携带或传递 semantic rules。
 7. 核心 API 不接受绝对游戏目录作为隐式全局；workspace configuration 显式传入。
-8. 所有 Cargo package/独立模块使用 `pdx-` 前缀；Rust identifier 必须使用下划线时采用 `pdx_*`。binary 固定为 `pdx`、`pdx-ls` 与维护者工具 `pdx-rulec`。
+8. 所有 Cargo package/独立模块使用 `pdx-` 前缀；Rust identifier 必须使用下划线时采用 `pdx_*`。binary 固定为 `pdx`、`pdx-ls` 与维护者工具 `pdx-bake`。
 
 ## 分析门面
 

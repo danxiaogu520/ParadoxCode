@@ -179,7 +179,7 @@ Jomini 的 README 明确指出其 tape writer 不保留注释。其 tape 还会�
 
 1. `pdx-parser` 的 Rust parser 负责 loss-aware、error-tolerant CST；Tree-sitter 只服务 Zed 编辑器侧 grammar/highlighting。
 2. CST block 允许 property 与裸 value 混合。
-3. 第一方规则源码直接表达 type/alias/cardinality/path/scope/reference 等模型，并由 `pdx-rulec` 编译为 SQLite artifact。
+3. 第一方规则源码直接表达 type/alias/cardinality/path/scope/reference 等模型，并由 `pdx-bake` 编译为 SQLite artifact。
 4. Workspace 使用 logical path、显式 source root 和按文件 shard。
 5. HIR 保留 definition/reference/invocation/scope transition，而不是 JSON 对象。
 6. MVP parser corpus 从一开始覆盖 Jomini 暴露的 EU4 特殊语法。

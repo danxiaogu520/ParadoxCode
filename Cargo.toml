@@ -5,7 +5,6 @@ members = [
     "crates/pdx-parser",
     "crates/pdx-rules",
     "crates/pdx-game",
-    "crates/pdx-rulec",
     "crates/pdx-engine",
     "crates/pdx-analysis",
     "crates/pdx-lsp",

@@ -8,7 +8,7 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use pdx_rules::{
+use crate::{
     FileCategory, RuleRecord, RuleSet, RulesError, RulesModel, SemanticModel, SymbolDescriptor,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -306,7 +306,7 @@ fn temporary_path(output: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pdx_rules::{KeyMatcher, RuleShape, SemanticRule, ValueMatcher};
+    use crate::{KeyMatcher, RuleShape, SemanticRule, ValueMatcher};
 
     #[test]
     fn validation_rejects_duplicate_rule_ids_and_invalid_cardinality() {
@@ -346,7 +346,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let directory = std::env::temp_dir().join(format!("pdx-rulec-test-{nonce}"));
+        let directory = std::env::temp_dir().join(format!("pdx-bake-test-{nonce}"));
         fs::create_dir_all(&directory).expect("temporary directory");
         let actual = compile(
             &root.join("rules/eu4"),

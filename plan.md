@@ -79,7 +79,7 @@ verifier 已实现。剩余工作是用真实发布资产证明链路：
 以下工作已经落地并有回归，不再在本计划复制实现细节：
 
 - 通用 `pdx-rules`、`pdx-game` 与 EU4 profile 分层，删除迁移期 `pdx-eu4` facade；
-- 第一方 `rules/eu4/*.json`、严格 `pdx-rulec`、内嵌 `eu4.pdxrules`，删除 CWT 和外部
+- 第一方 `rules/eu4/*.json`、严格 `pdx-bake`、内嵌 `eu4.pdxrules`，删除 CWT 和外部
   `--rules`；
 - per-file `FileState`/HIR cache、共享不可变 snapshot、bulk index 与单 shard replacement；
 - 稳定 `SourceFileId`、symlink 顺序、扫描资源限制和错误隔离；

@@ -17,7 +17,7 @@
 - 保守、幂等的全文格式化
 - 未保存文档、当前 Mod、有序依赖 Mod和 Vanilla 的优先级解析
 - 对权威 EU4 规则数据库声明的全部可支持文件类别提供与格式相称的分析
-- 由开发者维护严格第一方 EU4 规则源码，并用 `pdx-rulec` 生成 SQLite `eu4.pdxrules` 与 `rule_hash`
+- 由开发者维护严格第一方 EU4 规则源码，并用 `pdx-bake` 生成 SQLite `eu4.pdxrules` 与 `rule_hash`
 - 首次建立并持久化本地 Vanilla 索引，之后仅支持用户手动刷新
 
 Event、Scripted Effect、Scripted Trigger 和 Localisation Key 仍是必须通过端到端测试的基准类型，但不再是 symbol 范围上限。数据库中的 type、enum、variable、alias、localisation 与 filepath descriptor 能够表达的 definition/reference 都进入统一索引。
@@ -52,7 +52,7 @@ Event、Scripted Effect、Scripted Trigger 和 Localisation Key 仍是必须通�
 
 - 空 crate 图可以构建且无环。
 - 核心 crate 不依赖 Zed 或具体 EU4 Rust 类型。
-- workspace 中不存在无 `pdx-` 前缀的项目 Cargo package；binary 为用户 CLI `pdx`、server `pdx-ls` 和维护者工具 `pdx-rulec`。
+- workspace 中不存在无 `pdx-` 前缀的项目 Cargo package；binary 为用户 CLI `pdx`、server `pdx-ls` 和维护者工具 `pdx-bake`。
 - grammar 和 server distribution spike 都有书面结论。
 
 ## Phase 1：Zed 与 Tree-sitter
@@ -121,7 +121,7 @@ Event、Scripted Effect、Scripted Trigger 和 Localisation Key 仍是必须通�
 交付：
 
 - 严格、版本化、开发者维护的 `rules/eu4/*.json` 唯一权威源
-- `pdx-rulec` source schema、stable identity 和 invariant 验证
+- `pdx-bake` source schema、stable identity 和 invariant 验证
 - 编译 type/alias/enum/value/cardinality/path/scope/reference/documentation metadata
 - 生成 SQLite `eu4.pdxrules`、规范化 manifest 与唯一 `rule_hash`，并提交生成物
 - 只读加载 SQLite 后冻结为通用 `RuleSet`

@@ -43,7 +43,7 @@ Editor buffer / current mod / dependency mods / Vanilla cache
 Developer-maintained rules/eu4 source tree
                   |
                   v
-        strict pdx-rulec compiler
+        strict pdx-bake compiler
                   |
                   v
       self-owned SQLite eu4.pdxrules
@@ -86,7 +86,7 @@ Vanilla cache 是本机版本化 SQLite artifact，只持久化 source-file loca
 
 ### 规则层
 
-`pdx-rulec` 只接受仓库中的严格第一方 JSON 规则源码，校验稳定身份、cardinality、severity、type descriptor 和 artifact round-trip，然后生成 SQLite `eu4.pdxrules`。项目不提供 CWT importer、fallback 或同步入口。
+`pdx-bake` 只接受仓库中的严格第一方 JSON 规则源码，校验稳定身份、cardinality、severity、type descriptor 和 artifact round-trip，然后生成 SQLite `eu4.pdxrules`。项目不提供 CWT importer、fallback 或同步入口。
 
 `pdx-rules` 定义通用 SQLite artifact schema、规范化逻辑视图、`rule_hash` 算法、只读加载与运行时查询 API，以及不含游戏名称的 data-only `GameProfile` 描述；`pdx-game` 定义数据驱动的安装标志、跨平台发现、最小验证和用户级本机配置，并在 `eu4` 模块中提供 EU4 profile、安装描述与 bootstrap catalog。迁移期 `pdx-eu4` re-export 已在调用方清零后删除。运行时只读加载并冻结 `RuleSet`，同时建立不参与逻辑哈希的 case-insensitive exact-key/context semantic indices，供 scope-link、nested transition lowering、root selection、diagnostics 和 completion 等热点查询跳过无关规则；schema 12 将 `game_id` 纳入 metadata 与 canonical hash。EU4 组合入口在启动服务前校验 profile 身份，并把 profile 显式传入 LSP/host/snapshot。
 
@@ -101,7 +101,7 @@ pdx-text
 pdx-parser    -> pdx-text
 pdx-rules     -> pdx-text
 pdx-game      -> pdx-rules
-pdx-rulec     -> pdx-rules
+pdx-bake     -> pdx-rules
 pdx-hir       -> pdx-text + pdx-parser + pdx-rules
 pdx-engine -> pdx-text + pdx-parser + pdx-rules + pdx-hir
 pdx-analysis  -> pdx-engine + pdx-hir + pdx-rules
@@ -115,7 +115,7 @@ pdx-lsp       -> engine, analysis, parser, rules, game crates (includes CLI bina
 - `pdx-parser` 实现可复用 PDX 文本前端，但不依赖游戏规则数据库、workspace 或 LSP。
 - `pdx-rules` 定义 SQLite schema、hash 与只读 runtime view，不依赖具体游戏名称表、外部规则语言或 LSP。
 - `pdx-game` 包含安装发现和 EU4 profile（`eu4` 模块）。
-- `pdx-rulec` 是维护者工具，只把第一方规则源码编译成经过完整校验的 artifact；它不是 runtime dependency。
+- `pdx-bake` 是维护者工具，只把第一方规则源码编译成经过完整校验的 artifact；它不是 runtime dependency。
 - `pdx-hir` 通过稳定的 typed CST API lowering；结构/recovery/conditional-parameter facts 与 `RuleSet`/显式 profile 驱动的 definition/reference facts 已被 workspace shard 和 analysis 查询共享。profile/category 引用在 HIR 中保留来源，parser recovery 保留为 `UnknownConstruct`；parameter definition/reference 按 occurrence range 排序并按所属顶层 scripted definition 隔离，HIR 暴露 position/owner 有序查询，analysis definition/references/hover/rename 直接做 owner-local 解析，并将 inferred parameter 作为 document-local symbol 暴露而不注入 workspace symbol，唯一 active invocation 也通过 definition file/range 回到 HIR owner 做精确参数校验/补全，同时向 workspace 动态 enum 作 unresolved/ambiguous 兼容投影；scope lowering 以一次线性 stack pass 从 source-order properties 建直接子项邻接表，semantic root context/parent path、初始 `ScopeState`、`skip_root` 后代、register intrinsic、多段 exact scope-link expression、无冲突 command transition，以及能由直接子 key 静态排除其他 signature 的冲突 transition 已缓存为按 range 排序、可 logarithmic lookup 的 HIR facts。diagnostics 与已有子项的 nested completion traversal 复用这些 facts；结构 parent fields 与 child context 共存的 block 会被分区校验并合并补全，空 block completion 合并所有静态可能 destination。依赖 workspace 的动态 transition与仍不能静态消歧的 diagnostics alternative 待补齐。
 - `pdx-engine` 不依赖 LSP 类型。
 - `pdx-analysis` 不依赖任何 editor API。

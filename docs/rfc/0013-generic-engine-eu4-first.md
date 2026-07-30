@@ -46,7 +46,7 @@ pdx-game
 pdx-game-eu4
   EU4 profile / install descriptor / scopes / path semantics / special lowering
 
-pdx-rulec
+pdx-bake
   strict first-party rule source compiler; emits the EU4 rule artifact
 
 pdx-hir

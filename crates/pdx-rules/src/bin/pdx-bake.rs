@@ -14,11 +14,11 @@ fn run() -> Result<(), String> {
         let output = option(&args[1..], "--output")?;
         let manifest = option(&args[1..], "--manifest")?;
         let result =
-            pdx_rulec::compile(&source, &output, &manifest).map_err(|error| error.to_string())?;
+            pdx_rules::rulec::compile(&source, &output, &manifest).map_err(|error| error.to_string())?;
         println!("compiled {} rules (rule_hash={})", result.semantic_rule_count, result.rule_hash);
         return Ok(());
     }
-    Err("usage: pdx-rulec build --source <rules/eu4> --output <rules/eu4.pdxrules> --manifest <rules/manifest.json>".to_owned())
+    Err("usage: pdx-bake build --source <rules/eu4> --output <rules/eu4.pdxrules> --manifest <rules/manifest.json>".to_owned())
 }
 
 fn option(args: &[String], flag: &str) -> Result<PathBuf, String> {

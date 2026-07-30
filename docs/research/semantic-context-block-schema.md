@@ -227,7 +227,7 @@ semantic context、operator、右值形态、直接子项、scope 和 workspace 
 1. 在第一方 source 概念上明确 `SemanticContext` 与 `BlockSchema`；
 2. 将 `child_context: Option<String>` 的领域含义拆成 `None`、`Fixed` 和 `Inherit`；
 3. 将 scope transition 与 body context policy 保持正交；
-4. 让 source 中的多个文件 Schema 引用共享 context，由 `pdx-rulec` 编译成规范化规则；
+4. 让 source 中的多个文件 Schema 引用共享 context，由 `pdx-bake` 编译成规范化规则；
 5. HIR 保留 resolved/ambiguous context 与 scope facts，analysis 查询不重新猜测；
 6. 用原创最小 fixture 重现 option、on_action、AI modifier、scope link、weighted list
    等模式，不复制研究样本。

@@ -1,8 +1,10 @@
-//! Game-independent PDX rules schema and runtime boundary.
+//! Game-independent PDX rules schema, runtime, and first-party compiler.
 //!
-//! The first-party compiler owns construction of the database; this crate owns the normalized runtime
-//! model, read-only loading, validation, and the canonical logical hash. The SQLite layout is
+//! This crate owns the normalized runtime model, read-only loading, validation, the canonical
+//! logical hash, and the first-party rule compiler (`pdx-bake`). The SQLite layout is
 //! deliberately boring so the runtime remains inspectable without an authoring-format parser.
+
+pub mod rulec;
 
 use std::collections::BTreeMap;
 use std::fmt;
