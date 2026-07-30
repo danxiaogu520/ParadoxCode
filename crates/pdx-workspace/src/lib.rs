@@ -2493,7 +2493,7 @@ mod tests {
     use pdx_text::{LogicalPath, TextRange};
 
     fn eu4_host() -> AnalysisHost {
-        AnalysisHost::with_profile(pdx_game_eu4::bootstrap_rules(), pdx_game_eu4::profile())
+        AnalysisHost::with_profile(pdx_game::eu4::bootstrap_rules(), pdx_game::eu4::profile())
     }
 
     #[test]
@@ -2555,7 +2555,7 @@ mod tests {
         fs::write(scripted_effects.join("effects.txt"), "example = { value = $AMOUNT$ }\n")
             .expect("scripted effect fixture");
 
-        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
+        let mut host = AnalysisHost::new(pdx_game::eu4::bootstrap_rules());
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -2649,7 +2649,7 @@ mod tests {
                 syntax_error_count: 0,
             },
         ]);
-        let rules = pdx_game_eu4::bootstrap_rules();
+        let rules = pdx_game::eu4::bootstrap_rules();
         let tied = BTreeMap::from([(first_file, 10), (second_file, 10)]);
         index.resolve_priorities(&tied, &rules);
         assert_eq!(

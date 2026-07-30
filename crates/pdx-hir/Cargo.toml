@@ -20,4 +20,4 @@ pdx-text = { path = "../pdx-text" }
 workspace = true
 
 [dev-dependencies]
-pdx-game-eu4 = { path = "../pdx-game-eu4" }
+pdx-game = { path = "../pdx-game" }

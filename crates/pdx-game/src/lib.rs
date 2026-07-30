@@ -1,7 +1,10 @@
-//! Game-independent installation discovery and user-local configuration.
+//! Game installation discovery, user-local configuration, and EU4 game profile.
 //!
-//! This crate knows how to search for and validate a data-described game installation. It does
-//! not contain semantic rules, game names, workspace indexing, or editor integration.
+//! This crate provides platform-agnostic installation search and the EU4 semantic profile
+//! consumed by the language server. The installation discovery logic is game-agnostic; the
+//! EU4 profile lives in the `eu4` module.
+
+pub mod eu4;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsStr;

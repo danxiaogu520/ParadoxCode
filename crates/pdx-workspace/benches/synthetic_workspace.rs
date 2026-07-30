@@ -75,7 +75,7 @@ fn main() {
     let count = file_count();
     let fixture = SyntheticWorkspace::create(count);
     let mut host =
-        AnalysisHost::with_profile(pdx_game_eu4::bootstrap_rules(), pdx_game_eu4::profile());
+        AnalysisHost::with_profile(pdx_game::eu4::bootstrap_rules(), pdx_game::eu4::profile());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,

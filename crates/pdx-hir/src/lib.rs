@@ -1416,7 +1416,7 @@ mod tests {
         HirParameterReferenceKind, ScopeState, ScopeValue, lower, lower_with_profile,
         property_children, resolve_scope_expression,
     };
-    use pdx_game_eu4::{bootstrap_rules, first_party_rules, profile};
+    use pdx_game::eu4::{bootstrap_rules, first_party_rules, profile};
     use pdx_rules::{GameProfile, RuleSet, RuleShape};
     use pdx_syntax::{FileFormat, parse};
     use pdx_text::LogicalPath;

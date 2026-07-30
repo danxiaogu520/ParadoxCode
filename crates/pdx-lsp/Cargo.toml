@@ -13,7 +13,6 @@ publish = false
 
 [dependencies]
 pdx-game = { path = "../pdx-game" }
-pdx-game-eu4 = { path = "../pdx-game-eu4" }
 pdx-rules = { path = "../pdx-rules" }
 pdx-analysis = { path = "../pdx-analysis" }
 pdx-format = { path = "../pdx-format" }

@@ -3953,11 +3953,11 @@ mod tests {
     use pdx_workspace::{AnalysisHost, DocumentId};
 
     fn eu4_host(rules: RuleSet) -> AnalysisHost {
-        AnalysisHost::with_profile(rules, pdx_game_eu4::profile())
+        AnalysisHost::with_profile(rules, pdx_game::eu4::profile())
     }
 
     fn snapshot(text: &str) -> (AnalysisHost, DocumentId) {
-        let mut host = eu4_host(pdx_game_eu4::bootstrap_rules());
+        let mut host = eu4_host(pdx_game::eu4::bootstrap_rules());
         let id = DocumentId::new("file:///tmp/common/events/test.txt");
         host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
         (host, id)
@@ -3980,7 +3980,7 @@ mod tests {
         min_occurs: Option<u32>,
         max_occurs: Option<u32>,
     ) -> (AnalysisHost, DocumentId) {
-        let mut model = pdx_game_eu4::bootstrap_model();
+        let mut model = pdx_game::eu4::bootstrap_model();
         model.semantic.rules.push(SemanticRule {
             id: "fixture:trigger:foo".to_owned(),
             context: "trigger".to_owned(),
@@ -4057,7 +4057,7 @@ mod tests {
             "modifier = { factor = 0.5 always = maybe }",
             " } }\n",
         );
-        let mut host = eu4_host(pdx_game_eu4::first_party_rules().expect("first-party rules"));
+        let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
         let id = DocumentId::new("file:///tmp/events/completion-fast-path.txt");
         host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
         let snapshot = host.snapshot();
@@ -4104,7 +4104,7 @@ mod tests {
             "modifier = { factor = 0.5 always = maybe }",
             " } }\n",
         );
-        let mut host = eu4_host(pdx_game_eu4::first_party_rules().expect("first-party rules"));
+        let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
         let id = DocumentId::new("file:///tmp/events/completion_scope.txt");
         host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
         let snapshot = host.snapshot();
@@ -4160,7 +4160,7 @@ mod tests {
             "  }\n",
             "}\n",
         );
-        let mut host = eu4_host(pdx_game_eu4::first_party_rules().expect("first-party rules"));
+        let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
         let id = DocumentId::new("file:///tmp/events/empty-scope-completion.txt");
         host.open_document(id.clone(), 1, text.to_owned(), None).expect("open");
         let snapshot = host.snapshot();
@@ -4195,7 +4195,7 @@ mod tests {
 
     #[test]
     fn identity_only_host_does_not_guess_eu4_semantics_from_game_id() {
-        let mut host = AnalysisHost::new(pdx_game_eu4::bootstrap_rules());
+        let mut host = AnalysisHost::new(pdx_game::eu4::bootstrap_rules());
         let id = DocumentId::new("file:///tmp/common/events/generic.txt");
         host.open_document(
             id.clone(),
@@ -4237,7 +4237,7 @@ mod tests {
             previous: Vec::new(),
         };
         let context =
-            super::scope_context_from_hir(std::sync::Arc::new(pdx_game_eu4::profile()), &state);
+            super::scope_context_from_hir(std::sync::Arc::new(pdx_game::eu4::profile()), &state);
         assert_eq!(context.root, "any");
         assert_eq!(context.current, "any");
         assert_eq!(context.from, ["country"]);
@@ -4322,7 +4322,7 @@ mod tests {
 
     #[test]
     fn alias_definition_cardinality_does_not_limit_repeated_effect_commands() {
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/events/repeated-tooltip.txt");
         host.open_document(
@@ -4349,7 +4349,7 @@ mod tests {
 
     #[test]
     fn semantic_value_clause_validates_bare_values_and_cardinality() {
-        let mut model = pdx_game_eu4::bootstrap_model();
+        let mut model = pdx_game::eu4::bootstrap_model();
         model.semantic.rules.push(SemanticRule {
             id: "fixture:terrain:color".to_owned(),
             context: "terrain".to_owned(),
@@ -4416,7 +4416,7 @@ mod tests {
 
     #[test]
     fn embedded_first_party_rules_drive_runtime_value_diagnostics() {
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         assert!(!rules.model().semantic.rules.is_empty());
         assert!(rules.model().semantic.rules.iter().any(|rule| rule.severity == Some(2)));
         assert!(rules.model().semantic.rules.iter().any(|rule| rule.min_occurs == Some(1)));
@@ -4436,7 +4436,7 @@ mod tests {
 
     #[test]
     fn semantic_type_selector_applies_event_rules_to_country_event() {
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/events/test.txt");
         host.open_document(
@@ -4466,7 +4466,7 @@ mod tests {
                 .as_nanos()
         ));
         fs::create_dir_all(root.join("missions")).expect("missions directory");
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
@@ -4501,7 +4501,7 @@ mod tests {
 
     #[test]
     fn eu4_starts_with_type_selector_applies_on_action_rules() {
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/common/on_actions/test.txt");
         host.open_document(
@@ -4520,7 +4520,7 @@ mod tests {
 
     #[test]
     fn eu4_starts_with_type_selector_still_requires_a_matching_path() {
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let host = eu4_host(rules);
         let snapshot = host.snapshot();
         let valid_path =
@@ -4541,7 +4541,7 @@ mod tests {
 
     #[test]
     fn eu4_scope_links_switch_effect_context_and_scope() {
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/events/scope.txt");
         host.open_document(
@@ -4561,10 +4561,10 @@ mod tests {
 
     #[test]
     fn eu4_scope_link_chains_are_resolved_segment_by_segment() {
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let host = eu4_host(rules);
         let snapshot = host.snapshot();
-        let mut context = super::ScopeContext::new(std::sync::Arc::new(pdx_game_eu4::profile()));
+        let mut context = super::ScopeContext::new(std::sync::Arc::new(pdx_game::eu4::profile()));
         context.root = "province".to_owned();
         context.current = "province".to_owned();
 
@@ -4590,7 +4590,7 @@ mod tests {
 
     #[test]
     fn eu4_alias_alternatives_do_not_cross_report_cardinality() {
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/events/alternatives.txt");
         host.open_document(
@@ -4609,7 +4609,7 @@ mod tests {
 
     #[test]
     fn semantic_alternative_selection_refuses_equal_scores() {
-        let host = eu4_host(pdx_game_eu4::first_party_rules().expect("first-party rules"));
+        let host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
         let snapshot = host.snapshot();
         let mut left = snapshot.rules().model().semantic.rules[0].clone();
         left.id = "fixture:left".to_owned();
@@ -4625,7 +4625,7 @@ mod tests {
         right.key = KeyMatcher::Exact("right".to_owned());
         right.alternative_id = Some("right-alternative".to_owned());
         let rules = [&left, &right];
-        let scope = super::ScopeContext::new(std::sync::Arc::new(pdx_game_eu4::profile()));
+        let scope = super::ScopeContext::new(std::sync::Arc::new(pdx_game::eu4::profile()));
         assert_eq!(
             super::semantic_selected_alternative(&snapshot, &rules, &[], &[], &[], &scope),
             None
@@ -4660,7 +4660,7 @@ mod tests {
             .expect("country tag definition");
 
         let mut model =
-            pdx_game_eu4::first_party_rules().expect("load first-party rules").model().clone();
+            pdx_game::eu4::first_party_rules().expect("load first-party rules").model().clone();
         let mut country_transition = model.semantic.rules[0].clone();
         country_transition.id = "fixture:country-transition".to_owned();
         country_transition.context = "fixture".to_owned();
@@ -4704,7 +4704,7 @@ mod tests {
         }]));
         host.refresh_source_roots().expect("scan country tag definition");
         let snapshot = host.snapshot();
-        let scope = super::ScopeContext::new(std::sync::Arc::new(pdx_game_eu4::profile()));
+        let scope = super::ScopeContext::new(std::sync::Arc::new(pdx_game::eu4::profile()));
         let mut property = super::ScriptProperty {
             key: "choose".to_owned(),
             key_range: TextRange::empty(0),
@@ -4758,7 +4758,7 @@ mod tests {
 
     #[test]
     fn eu4_common_links_allow_owner_to_push_province_scope_to_country() {
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         let id = DocumentId::new("file:///tmp/events/owner.txt");
         host.open_document(
@@ -4788,7 +4788,7 @@ mod tests {
         let root = std::env::temp_dir().join(format!("pdx-analysis-scope-intrinsics-{nonce}"));
         let directory = root.join("common/buildings");
         fs::create_dir_all(&directory).expect("building directory");
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
@@ -4836,7 +4836,7 @@ mod tests {
         fs::create_dir_all(root.join("common/cultures")).expect("culture directory");
         fs::write(root.join("common/cultures/00_test.txt"), "french = { }\n")
             .expect("culture definition");
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -4869,7 +4869,7 @@ mod tests {
         fs::create_dir_all(root.join("common/country_tags")).expect("country tag directory");
         fs::write(root.join("common/country_tags/00_test.txt"), "FRA = \"countries/France.txt\"\n")
             .expect("country tag definition");
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -4908,7 +4908,7 @@ mod tests {
             "country_event = { immediate = { set_country_flag = known_flag } }\n",
         )
         .expect("flag definition");
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -4952,7 +4952,7 @@ mod tests {
             ),
         )
         .expect("scripted effect definition");
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -5047,7 +5047,7 @@ mod tests {
             "[[optional] enabled = yes ] }\n",
             "second = { value = $amount$ }\n",
         );
-        let mut host = eu4_host(pdx_game_eu4::bootstrap_rules());
+        let mut host = eu4_host(pdx_game::eu4::bootstrap_rules());
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(1),
             SourceRootKind::CurrentMod,
@@ -5116,7 +5116,7 @@ mod tests {
         assert_eq!(second_target.len(), 1);
         assert!(second_target[0].range.start() > first_name.end());
 
-        let mut read_only = eu4_host(pdx_game_eu4::bootstrap_rules());
+        let mut read_only = eu4_host(pdx_game::eu4::bootstrap_rules());
         read_only.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(2),
             SourceRootKind::Dependency,
@@ -5151,7 +5151,7 @@ mod tests {
             "reform_a = { legacy_government = yes }\n",
         )
         .expect("legacy reform definition");
-        let rules = pdx_game_eu4::first_party_rules().expect("load first-party rules");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
@@ -5179,7 +5179,7 @@ mod tests {
 
     #[test]
     fn localisation_values_offer_indexed_localisation_symbols() {
-        let mut host = eu4_host(pdx_game_eu4::bootstrap_rules());
+        let mut host = eu4_host(pdx_game::eu4::bootstrap_rules());
         let id = DocumentId::new("file:///tmp/localisation/test.yml");
         host.open_document(
             id.clone(),
@@ -5278,7 +5278,7 @@ mod tests {
         let path = dependency.join("events.txt");
         fs::write(&path, "country_event = { id = read_only.1 }\n").expect("dependency event");
 
-        let mut host = eu4_host(pdx_game_eu4::bootstrap_rules());
+        let mut host = eu4_host(pdx_game::eu4::bootstrap_rules());
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
             id: SourceRootId::new(1),
             kind: SourceRootKind::Dependency,

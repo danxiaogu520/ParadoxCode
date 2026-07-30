@@ -6,7 +6,7 @@
 
 pub mod cli;
 
-pub use pdx_game_eu4::{INSTALL_DESCRIPTOR, first_party_rules, profile};
+pub use pdx_game::eu4::{INSTALL_DESCRIPTOR, first_party_rules, profile};
 
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::fmt;
@@ -2877,8 +2877,8 @@ mod tests {
     fn eu4_server(options: InitializeOptions) -> Result<LspServer, LspError> {
         LspServer::try_new_with_rules(
             options,
-            pdx_game_eu4::first_party_rules()?,
-            pdx_game_eu4::profile(),
+            pdx_game::eu4::first_party_rules()?,
+            pdx_game::eu4::profile(),
         )
     }
 
@@ -3086,7 +3086,7 @@ mod tests {
         });
 
         let error =
-            LspServer::try_new_with_rules(InitializeOptions, rules, pdx_game_eu4::profile())
+            LspServer::try_new_with_rules(InitializeOptions, rules, pdx_game::eu4::profile())
                 .expect_err("mismatched game must be rejected");
         assert!(matches!(
             error,
@@ -3516,8 +3516,8 @@ mod tests {
         )
         .expect("Vanilla definition");
         let mut vanilla_host = AnalysisHost::with_profile(
-            pdx_game_eu4::first_party_rules().expect("rules for Vanilla cache"),
-            pdx_game_eu4::profile(),
+            pdx_game::eu4::first_party_rules().expect("rules for Vanilla cache"),
+            pdx_game::eu4::profile(),
         );
         vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(0),
@@ -3803,7 +3803,7 @@ path = "dependencies/high"
     fn automatic_vanilla_setup_builds_cache_and_records_single_attempt() {
         let (root, _) = temp_workspace_dir();
         let source = root.join("library/Europa Universalis IV");
-        for directory in pdx_game_eu4::INSTALL_DESCRIPTOR.validation_directories {
+        for directory in pdx_game::eu4::INSTALL_DESCRIPTOR.validation_directories {
             fs::create_dir_all(source.join(directory)).expect("validation directory");
         }
         #[cfg(target_os = "windows")]
@@ -3822,7 +3822,7 @@ path = "dependencies/high"
         )
         .expect("fixture source");
         let automatic = AutoVanillaConfiguration {
-            descriptor: pdx_game_eu4::INSTALL_DESCRIPTOR,
+            descriptor: pdx_game::eu4::INSTALL_DESCRIPTOR,
             user_paths: UserPaths {
                 config_file: root.join("user/config.toml"),
                 cache_root: root.join("user/cache"),
@@ -3835,8 +3835,8 @@ path = "dependencies/high"
         };
         let (cache, message) = run_auto_vanilla_setup_with_options(
             &automatic,
-            pdx_game_eu4::first_party_rules().expect("rules"),
-            pdx_game_eu4::profile(),
+            pdx_game::eu4::first_party_rules().expect("rules"),
+            pdx_game::eu4::profile(),
             &VanillaSetupCancellation::new(),
             &options,
         )
@@ -3852,8 +3852,8 @@ path = "dependencies/high"
 
         let repeated = run_auto_vanilla_setup_with_options(
             &automatic,
-            pdx_game_eu4::first_party_rules().expect("rules"),
-            pdx_game_eu4::profile(),
+            pdx_game::eu4::first_party_rules().expect("rules"),
+            pdx_game::eu4::profile(),
             &VanillaSetupCancellation::new(),
             &options,
         )
@@ -3866,7 +3866,7 @@ path = "dependencies/high"
     fn explicit_project_cache_precedes_user_discovery_configuration() {
         let (root, _) = temp_workspace_dir();
         let automatic = AutoVanillaConfiguration {
-            descriptor: pdx_game_eu4::INSTALL_DESCRIPTOR,
+            descriptor: pdx_game::eu4::INSTALL_DESCRIPTOR,
             user_paths: UserPaths {
                 config_file: root.join("user/config.toml"),
                 cache_root: root.join("user/cache"),
@@ -3899,7 +3899,7 @@ path = "dependencies/high"
     fn unsuccessful_automatic_discovery_is_recorded_and_not_repeated() {
         let (root, _) = temp_workspace_dir();
         let automatic = AutoVanillaConfiguration {
-            descriptor: pdx_game_eu4::INSTALL_DESCRIPTOR,
+            descriptor: pdx_game::eu4::INSTALL_DESCRIPTOR,
             user_paths: UserPaths {
                 config_file: root.join("user/config.toml"),
                 cache_root: root.join("user/cache"),
@@ -3912,8 +3912,8 @@ path = "dependencies/high"
         };
         let first = run_auto_vanilla_setup_with_options(
             &automatic,
-            pdx_game_eu4::first_party_rules().expect("rules"),
-            pdx_game_eu4::profile(),
+            pdx_game::eu4::first_party_rules().expect("rules"),
+            pdx_game::eu4::profile(),
             &VanillaSetupCancellation::new(),
             &options,
         )
@@ -3927,8 +3927,8 @@ path = "dependencies/high"
 
         let second = run_auto_vanilla_setup_with_options(
             &automatic,
-            pdx_game_eu4::first_party_rules().expect("rules"),
-            pdx_game_eu4::profile(),
+            pdx_game::eu4::first_party_rules().expect("rules"),
+            pdx_game::eu4::profile(),
             &VanillaSetupCancellation::new(),
             &options,
         )

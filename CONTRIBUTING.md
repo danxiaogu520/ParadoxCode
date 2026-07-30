@@ -50,7 +50,7 @@ check cannot be run, say so in the pull request and explain why.
 
 - Keep editor protocol types in `pdx-lsp`; analysis APIs remain editor-neutral.
 - Keep mutable workspace ownership in `AnalysisHost`; queries read immutable snapshots.
-- Keep EU4 paths, scopes, commands, and special semantics in `pdx-game-eu4` or rule data.
+- Keep EU4 paths, scopes, commands, and special semantics in `pdx-game` (eu4 module) or rule data.
 - Preserve source priority: unsaved overlay, current Mod, ordered dependencies, then Vanilla.
 - Treat unknown or incomplete input as recoverable data, not a reason to panic.
 - Do not introduce runtime CWT parsing, arbitrary configuration execution, or implicit game-path

@@ -17,8 +17,8 @@ fuzz_target!(|data: &[u8]| {
 
         let (rules, profile, path) = PROFILE_INPUTS.get_or_init(|| {
             (
-                pdx_game_eu4::bootstrap_rules(),
-                pdx_game_eu4::profile(),
+                pdx_game::eu4::bootstrap_rules(),
+                pdx_game::eu4::profile(),
                 LogicalPath::parse("common/scripted_effects/fuzz.txt")
                     .expect("static fuzz path is valid"),
             )

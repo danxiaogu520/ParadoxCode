@@ -242,7 +242,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 name = "pdx-analysis"
 version = "0.1.0"
 dependencies = [
- "pdx-game-eu4",
+ "pdx-game",
  "pdx-hir",
  "pdx-rules",
  "pdx-syntax",
@@ -263,24 +263,17 @@ dependencies = [
 name = "pdx-game"
 version = "0.1.0"
 dependencies = [
+ "pdx-rules",
  "serde",
  "tempfile",
  "toml",
 ]
 
 [[package]]
-name = "pdx-game-eu4"
-version = "0.1.0"
-dependencies = [
- "pdx-game",
- "pdx-rules",
-]
-
-[[package]]
 name = "pdx-hir"
 version = "0.1.0"
 dependencies = [
- "pdx-game-eu4",
+ "pdx-game",
  "pdx-rules",
  "pdx-syntax",
  "pdx-text",
@@ -294,7 +287,6 @@ dependencies = [
  "pdx-analysis",
  "pdx-format",
  "pdx-game",
- "pdx-game-eu4",
  "pdx-rules",
  "pdx-text",
  "pdx-workspace",
@@ -340,7 +332,7 @@ version = "0.1.0"
 name = "pdx-workspace"
 version = "0.1.0"
 dependencies = [
- "pdx-game-eu4",
+ "pdx-game",
  "pdx-hir",
  "pdx-rules",
  "pdx-syntax",

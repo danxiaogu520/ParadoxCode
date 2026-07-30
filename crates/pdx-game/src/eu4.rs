@@ -1,6 +1,6 @@
 //! EU4 profile data layered on the game-independent rules runtime.
 
-use pdx_game::{GameInstallDescriptor, PlatformExecutablePaths};
+use crate::{GameInstallDescriptor, PlatformExecutablePaths};
 use pdx_rules::{
     FileCategory, FileMatcher, FileResolutionPolicy, GameProfile, ParserKind,
     ProfileConditionalDefinitionRule, ProfileDefinitionRule,

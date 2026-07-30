@@ -14,7 +14,7 @@ use pdx_workspace::{
 };
 
 const USAGE: &str = "usage:\n  pdx --version\n  pdx index vanilla --source <EU4 directory> --output <cache.pdxindex>\n  pdx setup vanilla [--game eu4] [--deep] [--root <directory>]... [--source <game directory>]";
-const SUPPORTED_GAME_INSTALLATIONS: &[GameInstallDescriptor] = &[pdx_game_eu4::INSTALL_DESCRIPTOR];
+const SUPPORTED_GAME_INSTALLATIONS: &[GameInstallDescriptor] = &[pdx_game::eu4::INSTALL_DESCRIPTOR];
 
 /// Executes one `pdx` command and returns text intended for stdout.
 pub fn execute_pdx(args: &[String]) -> Result<String, CliError> {
@@ -258,8 +258,8 @@ fn index_vanilla(args: &[String]) -> Result<String, CliError> {
 }
 
 fn build_eu4_cache(source: &std::path::Path, output: &std::path::Path) -> Result<String, CliError> {
-    let rules = pdx_game_eu4::first_party_rules()?;
-    let mut host = AnalysisHost::with_profile(rules, pdx_game_eu4::profile());
+    let rules = pdx_game::eu4::first_party_rules()?;
+    let mut host = AnalysisHost::with_profile(rules, pdx_game::eu4::profile());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
@@ -434,7 +434,7 @@ mod tests {
     fn setup_vanilla_validates_indexes_and_persists_user_configuration() {
         let temporary = tempfile::tempdir().expect("temporary directory");
         let source = temporary.path().join("Europa Universalis IV");
-        for directory in pdx_game_eu4::INSTALL_DESCRIPTOR.validation_directories {
+        for directory in pdx_game::eu4::INSTALL_DESCRIPTOR.validation_directories {
             fs::create_dir_all(source.join(directory)).expect("validation directory");
         }
         #[cfg(target_os = "windows")]
@@ -502,7 +502,7 @@ mod tests {
     fn setup_vanilla_retains_a_discovered_source_when_indexing_fails() {
         let temporary = tempfile::tempdir().expect("temporary directory");
         let source = temporary.path().join("Europa Universalis IV");
-        for directory in pdx_game_eu4::INSTALL_DESCRIPTOR.validation_directories {
+        for directory in pdx_game::eu4::INSTALL_DESCRIPTOR.validation_directories {
             fs::create_dir_all(source.join(directory)).expect("validation directory");
         }
         #[cfg(target_os = "windows")]
