@@ -13,7 +13,7 @@ publish = false
 
 [dependencies]
 pdx-rules = { path = "../pdx-rules" }
-pdx-syntax = { path = "../pdx-syntax" }
+pdx-parser = { path = "../pdx-parser" }
 pdx-text = { path = "../pdx-text" }
 
 [lints]

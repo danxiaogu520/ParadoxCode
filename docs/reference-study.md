@@ -173,11 +173,11 @@ Jomini 的主要目标是快速读取存档和游戏数据，而 Language Server
 - 错误节点与恢复边界
 - 安全地产生最小 TextEdit
 
-Jomini 的 README 明确指出其 tape writer 不保留注释。其 tape 还会规范化输入并跳过部分“ghost object”。因此它非常适合作为语法行为参考和未来批处理 CLI 的可选技术，但不作为 `pdx-syntax` 的主 CST。
+Jomini 的 README 明确指出其 tape writer 不保留注释。其 tape 还会规范化输入并跳过部分“ghost object”。因此它非常适合作为语法行为参考和未来批处理 CLI 的可选技术，但不作为 `pdx-parser` 的主 CST。
 
 ## 对 ParadoxCode 的最终影响
 
-1. `pdx-syntax` 的 Rust parser 负责 loss-aware、error-tolerant CST；Tree-sitter 只服务 Zed 编辑器侧 grammar/highlighting。
+1. `pdx-parser` 的 Rust parser 负责 loss-aware、error-tolerant CST；Tree-sitter 只服务 Zed 编辑器侧 grammar/highlighting。
 2. CST block 允许 property 与裸 value 混合。
 3. 第一方规则源码直接表达 type/alias/cardinality/path/scope/reference 等模型，并由 `pdx-rulec` 编译为 SQLite artifact。
 4. Workspace 使用 logical path、显式 source root 和按文件 shard。

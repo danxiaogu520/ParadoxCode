@@ -34,7 +34,7 @@ EU4 v0.1 不要求用户显式选择游戏。官方 binary 内嵌携带 `game_id
 pdx-text
   range / line index / UTF-8 / UTF-16 / logical path
 
-pdx-syntax
+pdx-parser
   Script / localisation / CSV loss-aware frontends
 
 pdx-rules

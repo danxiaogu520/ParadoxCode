@@ -17,7 +17,7 @@ use pdx_hir::{
     semantic_root_context as hir_semantic_root_context,
 };
 use pdx_rules::{GameProfile, KeyMatcher, RuleShape, SymbolResolutionPolicy, ValueMatcher};
-use pdx_syntax::{CstKind, CstNode, FileFormat, ParsedFile, SyntaxError};
+use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile, SyntaxError};
 use pdx_text::{LogicalPath, TextRange, TextSize};
 use pdx_workspace::{
     AnalysisSnapshot, Definition, DocumentId, DocumentSource, ParsedSource, SourceFileId,
@@ -122,7 +122,7 @@ impl DiagnosticCode {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Syntax => "pdx-syntax",
+            Self::Syntax => "pdx-parser",
             Self::UnknownKey => "pdx-unknown-key",
             Self::UnknownSymbol => "pdx-unknown-symbol",
             Self::AmbiguousSymbol => "pdx-ambiguous-symbol",

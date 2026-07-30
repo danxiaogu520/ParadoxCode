@@ -168,11 +168,11 @@ impl SyntaxErrorKind {
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
-            Self::UnexpectedToken => "pdx-syntax-unexpected-token",
-            Self::MissingValue => "pdx-syntax-missing-value",
-            Self::UnterminatedString => "pdx-syntax-unterminated-string",
-            Self::UnterminatedBlock => "pdx-syntax-unterminated-block",
-            Self::UnterminatedParameterBlock => "pdx-syntax-unterminated-parameter-block",
+            Self::UnexpectedToken => "pdx-parser-unexpected-token",
+            Self::MissingValue => "pdx-parser-missing-value",
+            Self::UnterminatedString => "pdx-parser-unterminated-string",
+            Self::UnterminatedBlock => "pdx-parser-unterminated-block",
+            Self::UnterminatedParameterBlock => "pdx-parser-unterminated-parameter-block",
             Self::InvalidLocalisationEntry => "pdx-localisation-invalid-entry",
             Self::UnterminatedLocalisationString => "pdx-localisation-unterminated-string",
         }

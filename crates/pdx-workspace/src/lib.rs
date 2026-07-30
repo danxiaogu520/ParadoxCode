@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use pdx_hir::{HirFile, lower_shared, lower_shared_with_profile};
 use pdx_rules::{FileResolutionPolicy, GameProfile, ParserKind, RuleSet, SymbolResolutionPolicy};
-use pdx_syntax::{CstKind, CstNode, FileFormat, ParsedFile, parse};
+use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile, parse};
 use pdx_text::{LineIndex, LogicalPath, TextRange};
 
 mod vanilla_cache;

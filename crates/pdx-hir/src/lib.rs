@@ -6,7 +6,7 @@ use pdx_rules::{
     GameProfile, KeyMatcher, ProfileDefinitionRule, RuleSet, RuleShape, SemanticRule,
     TypeDescriptor,
 };
-use pdx_syntax::{CstKind, CstNode, ParsedFile};
+use pdx_parser::{CstKind, CstNode, ParsedFile};
 use pdx_text::{LogicalPath, TextRange, TextSize};
 
 /// A conservative semantic scope value.
@@ -444,7 +444,7 @@ fn lower_parameters(
     let mut references = Vec::new();
     for rule in &rules {
         for token in
-            syntax.tokens().iter().filter(|token| token.kind() == pdx_syntax::TokenKind::Bare)
+            syntax.tokens().iter().filter(|token| token.kind() == pdx_parser::TokenKind::Bare)
         {
             let Some(raw) = syntax.text(token.range()) else { continue };
             for (name, range, name_range) in
@@ -1418,7 +1418,7 @@ mod tests {
     };
     use pdx_game::eu4::{bootstrap_rules, first_party_rules, profile};
     use pdx_rules::{GameProfile, RuleSet, RuleShape};
-    use pdx_syntax::{FileFormat, parse};
+    use pdx_parser::{FileFormat, parse};
     use pdx_text::LogicalPath;
 
     #[test]

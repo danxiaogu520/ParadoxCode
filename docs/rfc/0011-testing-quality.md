@@ -10,13 +10,13 @@
 每个 crate 测试自己的不变量：
 
 - `pdx-text`：offset、UTF-16、line endings、URI/path
-- `pdx-syntax`：typed CST、error extraction、revision-safe edit update
+- `pdx-parser`：typed CST、error extraction、revision-safe edit update
 - `pdx-rules`：SQLite schema、只读加载、immutability、派生查询 index、canonical logical hash
 - `pdx-rulec`：strict source decoding、stable identity、invariant、artifact round-trip 和 manifest
 - `pdx-hir`：context lowering、scope transition
 - `pdx-workspace`：root order、overlay、shard replacement
 - `pdx-analysis`：feature query
-- `pdx-format`：trivia safety、idempotence
+- `pdx-parser`：trivia safety、idempotence
 
 ### Grammar corpus
 

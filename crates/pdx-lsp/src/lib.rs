@@ -40,7 +40,7 @@ use pdx_analysis::{
     document_symbols_with_cancellation, hover_with_cancellation, prepare_rename_with_cancellation,
     references_with_cancellation, rename_with_cancellation, workspace_symbols_with_cancellation,
 };
-use pdx_format::format;
+use pdx_parser::format::format;
 use pdx_game::{
     DiscoveryOptions, DiscoveryOutcome, DiscoveryToken, GameInstallDescriptor, UserConfiguration,
     UserPaths, discover_installations,

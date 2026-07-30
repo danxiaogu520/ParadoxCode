@@ -13,7 +13,7 @@
 
 ## 目标
 
-EU4 的文件分类、types、aliases、enums、commands、scopes、symbols、documentation、reference semantics 与覆盖策略全部存入项目自有的 `eu4.pdxrules`。核心分析只消费 EU4 schema；不提供游戏选择器、通用游戏适配接口或其他游戏适配。EU4 语法本身由 `pdx-syntax` 直接实现。
+EU4 的文件分类、types、aliases、enums、commands、scopes、symbols、documentation、reference semantics 与覆盖策略全部存入项目自有的 `eu4.pdxrules`。核心分析只消费 EU4 schema；不提供游戏选择器、通用游戏适配接口或其他游戏适配。EU4 语法本身由 `pdx-parser` 直接实现。
 
 EU4 profile 当前只服务项目选定的 EU4 规则基线。规则数据库可以由项目维护者继续修订；每次逻辑修订产生新的 `rule_hash`。未来其他游戏或版本的策略不由本 RFC 定义。
 

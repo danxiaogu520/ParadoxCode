@@ -1,7 +1,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use pdx_syntax::{CstNode, FileFormat, parse};
+use pdx_parser::{CstNode, FileFormat, parse};
 
 fn walk(node: &CstNode, source_len: u32) {
     assert!(node.range().end() <= source_len);

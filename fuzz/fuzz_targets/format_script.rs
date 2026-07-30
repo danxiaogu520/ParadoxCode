@@ -1,8 +1,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use pdx_format::format;
-use pdx_syntax::{FileFormat, TokenKind, parse};
+use pdx_parser::{FileFormat, TokenKind, format, parse};
 
 fuzz_target!(|data: &[u8]| {
     let Ok(source) = std::str::from_utf8(data) else { return };

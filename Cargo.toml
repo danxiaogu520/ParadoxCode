@@ -2,14 +2,13 @@
 resolver = "2"
 members = [
     "crates/pdx-text",
-    "crates/pdx-syntax",
+    "crates/pdx-parser",
     "crates/pdx-rules",
     "crates/pdx-game",
     "crates/pdx-rulec",
     "crates/pdx-hir",
     "crates/pdx-workspace",
     "crates/pdx-analysis",
-    "crates/pdx-format",
     "crates/pdx-lsp",
 ]
 

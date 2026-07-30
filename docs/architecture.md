@@ -66,7 +66,7 @@ Zed extension 只负责：
 - 首次启动时允许 server 在后台执行一次快速 Vanilla 发现；复杂选择和深度扫描交给 `pdx setup vanilla`
 
 不得在扩展内实现 symbol 提取、scope 推导或诊断。Tree-sitter grammar/query 只属于这一层；
-`pdx-syntax` 核心运行时使用纯 Rust parser，不链接 Tree-sitter C。
+`pdx-parser` 核心运行时使用纯 Rust parser，不链接 Tree-sitter C。
 
 ### LSP 层
 
@@ -98,22 +98,21 @@ Vanilla cache 是本机版本化 SQLite artifact，只持久化 source-file loca
 
 ```text
 pdx-text
-pdx-syntax    -> pdx-text
+pdx-parser    -> pdx-text
 pdx-rules     -> pdx-text
 pdx-game      -> pdx-rules
 pdx-rulec     -> pdx-rules
-pdx-hir       -> pdx-text + pdx-syntax + pdx-rules
-pdx-workspace -> pdx-text + pdx-syntax + pdx-rules + pdx-hir
+pdx-hir       -> pdx-text + pdx-parser + pdx-rules
+pdx-workspace -> pdx-text + pdx-parser + pdx-rules + pdx-hir
 pdx-analysis  -> pdx-workspace + pdx-hir + pdx-rules
-pdx-format    -> pdx-text + pdx-syntax
-pdx-lsp       -> pdx-analysis + pdx-format
+pdx-lsp       -> pdx-analysis + pdx-parser
 pdx-lsp       -> engine, analysis, parser, rules, game crates (includes CLI binaries)
 ```
 
 实际约束：
 
 - `pdx-text` 不依赖其他 workspace crate。
-- `pdx-syntax` 实现可复用 PDX 文本前端，但不依赖游戏规则数据库、workspace 或 LSP。
+- `pdx-parser` 实现可复用 PDX 文本前端，但不依赖游戏规则数据库、workspace 或 LSP。
 - `pdx-rules` 定义 SQLite schema、hash 与只读 runtime view，不依赖具体游戏名称表、外部规则语言或 LSP。
 - `pdx-game` 包含安装发现和 EU4 profile（`eu4` 模块）。
 - `pdx-rulec` 是维护者工具，只把第一方规则源码编译成经过完整校验的 artifact；它不是 runtime dependency。

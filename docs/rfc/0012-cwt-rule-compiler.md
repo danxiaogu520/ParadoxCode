@@ -74,7 +74,7 @@ pdx-rules
   read-only runtime loader and query API
 ```
 
-`pdx-analysis`、`pdx-workspace`、`pdx-lsp` 和 `pdx-ls` 不依赖 `pdx-cwt`。Importer 自己拥有 CWT parsing 模块；它可以借鉴 `pdx-syntax`，但不应迫使 runtime grammar 公开 CWT-specific API。
+`pdx-analysis`、`pdx-workspace`、`pdx-lsp` 和 `pdx-ls` 不依赖 `pdx-cwt`。Importer 自己拥有 CWT parsing 模块；它可以借鉴 `pdx-parser`，但不应迫使 runtime grammar 公开 CWT-specific API。
 
 ## Bootstrap 输入
 

@@ -13,9 +13,9 @@ publish = false
 
 [dependencies]
 pdx-game = { path = "../pdx-game" }
+pdx-parser = { path = "../pdx-parser" }
 pdx-rules = { path = "../pdx-rules" }
 pdx-analysis = { path = "../pdx-analysis" }
-pdx-format = { path = "../pdx-format" }
 pdx-text = { path = "../pdx-text" }
 pdx-workspace = { path = "../pdx-workspace" }
 lsp-types = "0.97.0"

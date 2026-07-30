@@ -7,6 +7,7 @@
 use pdx_text::TextRange;
 
 mod cst;
+pub mod format;
 mod localisation;
 mod script;
 
@@ -229,7 +230,7 @@ mod tests {
         let parsed = parse(FileFormat::Script, "key = { value = \"unfinished");
         assert!(parsed.errors().iter().any(|error| {
             error.kind == SyntaxErrorKind::UnterminatedString
-                && error.code() == "pdx-syntax-unterminated-string"
+                && error.code() == "pdx-parser-unterminated-string"
         }));
         assert!(parsed.errors().iter().all(|error| {
             parsed.text(error.range).is_some()
@@ -242,7 +243,7 @@ mod tests {
         let parsed = parse(FileFormat::Script, "\"top_level_string\"");
         assert!(parsed.errors().iter().any(|error| {
             error.kind == SyntaxErrorKind::UnexpectedToken
-                && error.code() == "pdx-syntax-unexpected-token"
+                && error.code() == "pdx-parser-unexpected-token"
         }));
     }
 

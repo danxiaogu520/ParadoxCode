@@ -1,10 +1,10 @@
 [package]
-name = "pdx-format"
+name = "pdx-parser"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Safe editor-neutral formatter boundary for ParadoxCode."
+description = "Loss-aware parser and canonical formatter for ParadoxCode."
 authors.workspace = true
 homepage.workspace = true
 repository.workspace = true
@@ -12,9 +12,11 @@ readme.workspace = true
 publish = false
 
 [dependencies]
-pdx-syntax = { path = "../pdx-syntax" }
 pdx-text = { path = "../pdx-text" }
 unicode-width = "0.2"
 
-[lints]
-workspace = true
+[lints.rust]
+unsafe_code = "allow"
+
+[lints.clippy]
+all = "warn"

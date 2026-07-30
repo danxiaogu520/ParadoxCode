@@ -14,7 +14,7 @@ publish = false
 [dependencies]
 pdx-hir = { path = "../pdx-hir" }
 pdx-rules = { path = "../pdx-rules" }
-pdx-syntax = { path = "../pdx-syntax" }
+pdx-parser = { path = "../pdx-parser" }
 pdx-text = { path = "../pdx-text" }
 pdx-workspace = { path = "../pdx-workspace" }
 

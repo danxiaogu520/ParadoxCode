@@ -5,7 +5,7 @@
 //! multiline quoted strings are formatted recursively only when their decoded payload is
 //! demonstrably valid, non-empty Script.
 
-use pdx_syntax::{CstKind, CstNode, FileFormat, ParsedFile, TokenKind, parse};
+use crate::{CstKind, CstNode, FileFormat, ParsedFile, TokenKind, parse};
 use pdx_text::TextRange;
 use unicode_width::UnicodeWidthChar;
 
@@ -787,7 +787,7 @@ fn contains_line_break(text: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use pdx_syntax::{FileFormat, SyntaxErrorKind, parse};
+    use crate::{FileFormat, SyntaxErrorKind, parse};
 
     use super::{FormatSkipReason, TextEdit, format};
 

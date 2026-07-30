@@ -244,19 +244,10 @@ version = "0.1.0"
 dependencies = [
  "pdx-game",
  "pdx-hir",
+ "pdx-parser",
  "pdx-rules",
- "pdx-syntax",
  "pdx-text",
  "pdx-workspace",
-]
-
-[[package]]
-name = "pdx-format"
-version = "0.1.0"
-dependencies = [
- "pdx-syntax",
- "pdx-text",
- "unicode-width",
 ]
 
 [[package]]
@@ -274,8 +265,8 @@ name = "pdx-hir"
 version = "0.1.0"
 dependencies = [
  "pdx-game",
+ "pdx-parser",
  "pdx-rules",
- "pdx-syntax",
  "pdx-text",
 ]
 
@@ -285,8 +276,8 @@ version = "0.1.0"
 dependencies = [
  "lsp-types",
  "pdx-analysis",
- "pdx-format",
  "pdx-game",
+ "pdx-parser",
  "pdx-rules",
  "pdx-text",
  "pdx-workspace",
@@ -294,6 +285,14 @@ dependencies = [
  "serde_json",
  "tempfile",
  "toml",
+]
+
+[[package]]
+name = "pdx-parser"
+version = "0.1.0"
+dependencies = [
+ "pdx-text",
+ "unicode-width",
 ]
 
 [[package]]
@@ -318,13 +317,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pdx-syntax"
-version = "0.1.0"
-dependencies = [
- "pdx-text",
-]
-
-[[package]]
 name = "pdx-text"
 version = "0.1.0"
 
@@ -334,8 +326,8 @@ version = "0.1.0"
 dependencies = [
  "pdx-game",
  "pdx-hir",
+ "pdx-parser",
  "pdx-rules",
- "pdx-syntax",
  "pdx-text",
  "rusqlite",
  "sha2",

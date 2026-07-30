@@ -1,7 +1,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use pdx_syntax::{FileFormat, SyntaxEdit, parse};
+use pdx_parser::{FileFormat, SyntaxEdit, parse};
 use pdx_text::TextRange;
 
 fuzz_target!(|data: &[u8]| {

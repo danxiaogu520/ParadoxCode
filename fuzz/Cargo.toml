@@ -8,11 +8,10 @@ publish = false
 
 [dependencies]
 libfuzzer-sys = "0.4"
-pdx-format = { path = "../crates/pdx-format" }
 pdx-game = { path = "../crates/pdx-game" }
 pdx-hir = { path = "../crates/pdx-hir" }
 pdx-rules = { path = "../crates/pdx-rules" }
-pdx-syntax = { path = "../crates/pdx-syntax" }
+pdx-parser = { path = "../crates/pdx-parser" }
 pdx-text = { path = "../crates/pdx-text" }
 
 [[bin]]
