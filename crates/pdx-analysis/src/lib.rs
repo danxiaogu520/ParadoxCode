@@ -2884,6 +2884,8 @@ fn validate_semantic_container(
             let structural_rules =
                 semantic_rules_for_container(snapshot, context, &structural_path, scope);
             if !structural_rules.is_empty() {
+                // Clauses such as `limit` are evaluated after the enclosing scope link has
+                // moved to its target, so structural and transitioned children share next_scope.
                 let (structural_properties, transition_properties): (Vec<_>, Vec<_>) =
                     property.block.iter().cloned().partition(|child| {
                         structural_rules.iter().any(|rule| {
@@ -2903,7 +2905,7 @@ fn validate_semantic_container(
                     .partition(|(value, _)| {
                         structural_rules.iter().any(|rule| {
                             matches!(rule.shape, RuleShape::LeafValue)
-                                && semantic_leaf_value_matches(snapshot, rule, value, scope)
+                                && semantic_leaf_value_matches(snapshot, rule, value, &next_scope)
                         })
                     });
                 validate_semantic_container(
@@ -2912,7 +2914,7 @@ fn validate_semantic_container(
                     &structural_path,
                     &structural_properties,
                     &structural_values,
-                    scope,
+                    &next_scope,
                     hir,
                     diagnostics,
                     cancellation,
@@ -4877,7 +4879,10 @@ mod tests {
         semantic_root_context, workspace_symbols, workspace_symbols_with_cancellation,
     };
     use pdx_engine::{AnalysisHost, DocumentId};
-    use pdx_rules::{KeyMatcher, RuleSet, RuleShape, SemanticRule, ValueMatcher};
+    use pdx_rules::{
+        KeyMatcher, ProfileDefinitionRule, ProfileMatchMode, ProfileTextMatcher, RuleSet,
+        RuleShape, SemanticRule, ValueMatcher,
+    };
     use pdx_text::{LogicalPath, TextRange};
 
     fn eu4_host(rules: RuleSet) -> AnalysisHost {
@@ -5731,6 +5736,72 @@ mod tests {
                 .iter()
                 .any(|item| item.code == DiagnosticCode::UnknownKey)
         );
+    }
+
+    #[test]
+    fn area_scope_transition_keeps_province_trigger_valid() {
+        use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use std::fs;
+
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
+        let mut profile = pdx_game::eu4::profile();
+        profile.definitions.push(ProfileDefinitionRule {
+            path: ProfileTextMatcher::insensitive(ProfileMatchMode::Exact, "map/area.txt"),
+            key: ProfileTextMatcher::any(),
+            kind: "area".to_owned(),
+            name_field: None,
+            requires_value: false,
+        });
+        let mut host = AnalysisHost::with_profile(rules, profile);
+        let root = std::env::temp_dir().join(format!(
+            "pdx-analysis-area-scope-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        let area_path = root.join("map/area.txt");
+        let event_path = root.join("events/EDG_KTPEvents.txt");
+        fs::create_dir_all(area_path.parent().expect("area parent")).expect("area directory");
+        fs::create_dir_all(event_path.parent().expect("event parent")).expect("event directory");
+        fs::write(&area_path, "tripolitania_area = { 1 2 }\n").expect("area source");
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        host.refresh_source_roots().expect("index area definitions");
+        let id = DocumentId::new("file:///tmp/events/EDG_KTPEvents.txt");
+        let text = concat!(
+            "country_event = {\n",
+            "  immediate = {\n",
+            "    tripolitania_area = {\n",
+            "      limit = { country_or_non_sovereign_subject_holds = ROOT }\n",
+            "    }\n",
+            "  }\n",
+            "}\n",
+        );
+        host.open_document(id.clone(), 1, text.to_owned(), Some(event_path))
+            .expect("open");
+
+        let results = diagnostics(&host.snapshot(), &id);
+        assert!(
+            !results.iter().any(|item| {
+                item.code == DiagnosticCode::UnknownKey
+                    && item.message.contains("`tripolitania_area`")
+            }),
+            "area name was not accepted as a dynamic area key: {results:?}"
+        );
+        assert!(
+            !results.iter().any(|item| {
+                item.code == DiagnosticCode::WrongScope
+                    && item
+                        .message
+                        .contains("`country_or_non_sovereign_subject_holds`")
+            }),
+            "province trigger was diagnosed in the parent country scope: {results:?}"
+        );
+        fs::remove_dir_all(root).expect("cleanup");
     }
 
     #[test]
