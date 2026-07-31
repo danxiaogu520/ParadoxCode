@@ -1507,7 +1507,9 @@ fn semantic_rule_documentation_for_rule(rule: &pdx_rules::SemanticRule) -> Optio
     if !rule.allowed_scopes.is_empty() {
         lines.push(format!("scopes: {}", rule.allowed_scopes.join(", ")));
     }
-    (!lines.is_empty()).then(|| lines.join("\n"))
+    // LSP hover contents are Markdown. A single newline is normally collapsed into a space by
+    // Markdown renderers, so use an explicit hard break for each rule detail.
+    (!lines.is_empty()).then(|| lines.join("  \n"))
 }
 
 /// Resolves the symbol at a position. Ambiguous and unresolved references deliberately return no
@@ -4918,6 +4920,42 @@ mod tests {
         assert!(result.items.iter().any(|item| item.label == "yes"));
         let hover = hover(&snapshot, &id, 18).expect("semantic hover");
         assert!(hover.contents.contains("foo") || hover.contents.contains("PDX"));
+    }
+
+    #[test]
+    fn semantic_hover_preserves_rule_detail_line_breaks() {
+        let mut model = pdx_game::eu4::bootstrap_model();
+        model.semantic.rules.push(SemanticRule {
+            id: "fixture:trigger:documented".to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("documented".to_owned()),
+            operator: None,
+            value: ValueMatcher::Bool,
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            documentation: vec!["first line".to_owned(), "second line".to_owned()],
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: Some(1),
+            source_file: "fixture.semantic".to_owned(),
+            line: 1,
+        });
+        let mut host = eu4_host(RuleSet::from_model(model));
+        let id = DocumentId::new("file:///tmp/documented.txt");
+        let text = "trigger = { documented = yes }\n";
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open documented fixture");
+        let position = u32::try_from(text.find("documented").expect("documented key") + 2)
+            .expect("hover position");
+        let hover = hover(&host.snapshot(), &id, position).expect("documented hover");
+        assert!(hover.contents.contains("first line  \nsecond line"));
     }
 
     #[test]
