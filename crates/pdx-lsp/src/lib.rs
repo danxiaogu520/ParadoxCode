@@ -3098,6 +3098,50 @@ mod tests {
         fs::remove_dir_all(container).expect("cleanup");
     }
 
+    #[test]
+    fn memory_transport_hover_returns_semantic_value_and_null_for_unknown_text() {
+        let (root, root_uri) = temp_workspace_dir();
+        let directory = root.join("common/decrees");
+        fs::create_dir_all(&directory).expect("decrees directory");
+        let file = directory.join("test.txt");
+        let uri = canonical_uri(&file);
+        let text = "my_decree = { cost = 50 unknown = yes }\n";
+        fs::write(&file, text).expect("decree source");
+        let cost = text.find("cost").expect("cost") + 1;
+        let unknown = text.find("unknown").expect("unknown") + 1;
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":cost}}}),
+            json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":unknown}}}),
+            json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
+        let responses = decode_frames(&output);
+        let semantic_hover = responses
+            .iter()
+            .find(|value| value["id"] == 2)
+            .expect("semantic hover response");
+        let contents = semantic_hover["result"]["contents"]["value"]
+            .as_str()
+            .expect("semantic hover markdown");
+        assert!(contents.contains("PDX property `cost`"));
+        assert!(contents.contains("rule:"));
+        let unknown_hover = responses
+            .iter()
+            .find(|value| value["id"] == 3)
+            .expect("unknown hover response");
+        assert_eq!(unknown_hover["result"], Value::Null);
+        let _: Hover = typed_result(&responses, 2);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
     fn eu4_server(options: InitializeOptions) -> Result<LspServer, LspError> {
         LspServer::try_new_with_rules(
             options,

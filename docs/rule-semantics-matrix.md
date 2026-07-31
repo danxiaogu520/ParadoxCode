@@ -37,10 +37,10 @@ profile 之间的语义责任。它是当前实现的审计基线；不是第二
 | `semantic-rules.replace_scope` | ROOT/THIS/FROM/PREV 等 scope register 更新 | HIR、analysis scope context | 已接入；scope expression 链接采用静态唯一目标解析 |
 | `semantic-rules.min_occurs`/`max_occurs` | cardinality | analysis diagnostics、hover | 已接入 |
 | `semantic-rules.strict_min` | 最小 cardinality 的严格程度 | minimum cardinality severity | 已接入 |
-| `semantic-rules.required` | required 标记 | completion 排序、文档展示 | 字段已保留，但当前源没有 `required=true`；尚未形成独立缺失字段诊断语义 |
+| `semantic-rules.required` | required 标记 | completion 排序、hover、文档展示 | 字段已保留，但当前源没有 `required=true`；尚未形成独立缺失字段诊断语义 |
 | `semantic-rules.alternative_id` | alias/alternative 分组 | alternative selection、cardinality、transition | 已接入；不确定时拒绝任意选择 |
 | `semantic-rules.documentation` | 规则说明 | hover、completion documentation | 已接入 |
-| `semantic-rules.source_file`/`line` | 规则 provenance | runtime model、artifact、semantic diagnostics | 已接入 semantic diagnostics message；尚未提供独立结构化 related information |
+| `semantic-rules.source_file`/`line` | 规则 provenance | runtime model、artifact、semantic diagnostics、hover | 已接入 semantic diagnostics message 和 hover 文本；尚未提供独立结构化 related information |
 | `enum-values.json` | 静态 enum 成员 | enum validation、completion | 已接入，并与 workspace member/profile extra member 合并 |
 | `type-root-keys.json` | type root selector | HIR root context selection | 已接入 |
 | `type-root-scopes.json` | type root 初始 scope | HIR initial scope | 已接入 |

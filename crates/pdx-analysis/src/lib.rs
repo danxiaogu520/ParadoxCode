@@ -1376,10 +1376,50 @@ pub fn hover_with_cancellation(
         return Ok(None);
     };
     if let Some((definition, reference)) = local_parameter_target(&input, position) {
+        let owner_name = input
+            .hir
+            .as_deref()
+            .and_then(|_| {
+                semantic_data(&input)
+                    .definitions
+                    .into_iter()
+                    .find(|candidate| candidate.symbol.range == definition.owner_range)
+            })
+            .map(|definition| definition.name);
+        let occurrences = input
+            .hir
+            .as_deref()
+            .map(|hir| {
+                hir.parameter_references_for_owner(definition.owner_range)
+                    .filter(|reference| reference.name.eq_ignore_ascii_case(&definition.name))
+                    .count()
+            })
+            .unwrap_or(0);
+        let optional = input.hir.as_deref().is_some_and(|hir| {
+            hir.parameter_conditionals().iter().any(|conditional| {
+                !conditional.negated
+                    && conditional.name.eq_ignore_ascii_case(&definition.name)
+                    && conditional.range.start() >= definition.owner_range.start()
+                    && conditional.range.end() <= definition.owner_range.end()
+            })
+        });
+        let syntax = match reference.kind {
+            pdx_engine::hir::HirParameterReferenceKind::Substitution => "substitution",
+            pdx_engine::hir::HirParameterReferenceKind::Conditional => "conditional",
+        };
+        let owner = owner_name.map_or_else(
+            || "scripted definition".to_owned(),
+            |name| format!("scripted definition `{name}`"),
+        );
         return Ok(Some(Hover {
             contents: format!(
-                "parameter `{}`\n\nLocal to this scripted definition; inferred from its first use",
-                definition.name
+                "parameter `{}`\n\nLocal to {owner}; inferred from its first use\nArity: `{}`\nSyntax: `{syntax}`\nOccurrences in owner: {occurrences}",
+                definition.name,
+                if optional {
+                    "optional"
+                } else {
+                    "required/inferred"
+                },
             ),
             range: Some(reference.name_range),
         }));
@@ -1394,52 +1434,299 @@ pub fn hover_with_cancellation(
     if word.is_empty() {
         return Ok(None);
     }
-    let all = all_semantics(snapshot, cancellation)?;
-    if let Some(reference) = all.references.iter().find(|reference| {
+    let semantic = semantic_data(&input);
+    if let Some(reference) = semantic.references.iter().find(|reference| {
         reference.document.as_ref() == Some(document) && contains(reference.range, position)
     }) {
         return Ok(Some(hover_for_symbol(
             snapshot,
-            &all,
             &reference.kind,
             &reference.name,
             range,
-        )));
+            cancellation,
+        )?));
     }
-    if let Some(definition) = all.definitions.iter().find(|definition| {
+    if let Some(definition) = semantic.definitions.iter().find(|definition| {
         definition.document.as_ref() == Some(document)
             && contains(definition.symbol.selection_range, position)
     }) {
         return Ok(Some(hover_for_symbol(
             snapshot,
-            &all,
             &definition.kind,
             &definition.name,
             range,
-        )));
+            cancellation,
+        )?));
     }
     cancellation.checkpoint()?;
-    if let Some(details) = semantic_rule_documentation_at(snapshot, &input, position) {
+    if let Some(details) = semantic_rule_hover_at(snapshot, &input, position) {
         return Ok(Some(Hover {
             contents: format!("PDX property `{word}`\n\n{details}"),
             range: Some(range),
         }));
     }
-    let known = known_keys(snapshot);
-    if known.contains(&word) {
-        let contents = semantic_rule_documentation(snapshot, &word).map_or_else(
-            || format!("PDX property `{word}`"),
-            |details| format!("PDX property `{word}`\n\n{details}"),
-        );
+    if let Some(details) = semantic_value_hover_at(snapshot, &input, position) {
         return Ok(Some(Hover {
-            contents,
+            contents: format!("PDX value `{word}`\n\n{details}"),
             range: Some(range),
         }));
     }
-    Ok(Some(Hover {
-        contents: format!("PDX value `{word}`"),
-        range: Some(range),
-    }))
+    if is_property_key_at(&input, position) {
+        let known = known_keys(snapshot);
+        if known.iter().any(|key| key.eq_ignore_ascii_case(&word)) {
+            let contents = semantic_rule_documentation(snapshot, &word).map_or_else(
+                || format!("PDX property `{word}`"),
+                |details| format!("PDX property `{word}`\n\n{details}"),
+            );
+            return Ok(Some(Hover {
+                contents,
+                range: Some(range),
+            }));
+        }
+    }
+    // Do not manufacture a tooltip for every bare word in a script or comment.  A hover is only
+    // useful when the parser/HIR/rules have established a semantic role for the token.
+    Ok(None)
+}
+
+fn is_property_key_at(input: &ParsedInput, position: TextSize) -> bool {
+    input.hir.as_deref().is_some_and(|hir| {
+        hir.properties()
+            .iter()
+            .any(|property| contains(property.key_range, position))
+    })
+}
+
+fn semantic_rule_hover_at(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
+) -> Option<String> {
+    let context = semantic_completion_context(snapshot, input, position)?;
+    let property = context.property.as_ref()?;
+    if !contains(property.key_range, position) {
+        return None;
+    }
+    let candidates = semantic_rules_for_completion(snapshot, &context)
+        .into_iter()
+        .filter(|candidate| {
+            !matches!(candidate.rule.shape, RuleShape::LeafValue)
+                && semantic_rule_key_matches(
+                    snapshot,
+                    candidate.rule,
+                    candidate.parent_path,
+                    &property.key,
+                )
+        })
+        .collect::<Vec<_>>();
+    (!candidates.is_empty()).then(|| semantic_rule_hover_for_candidates(snapshot, &candidates))
+}
+
+fn semantic_value_hover_at(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
+) -> Option<String> {
+    let context = semantic_completion_context(snapshot, input, position)?;
+    let property = context.property.as_ref()?;
+    let (value, value_range) = property.scalar.as_ref()?;
+    if !contains(*value_range, position) {
+        return None;
+    }
+    let candidates = semantic_rules_for_completion(snapshot, &context)
+        .into_iter()
+        .filter(|candidate| {
+            matches!(candidate.rule.shape, RuleShape::Leaf)
+                && semantic_rule_key_matches(
+                    snapshot,
+                    candidate.rule,
+                    candidate.parent_path,
+                    &property.key,
+                )
+                && candidate
+                    .rule
+                    .operator
+                    .as_deref()
+                    .is_none_or(|operator| property.operator.as_deref() == Some(operator))
+        })
+        .collect::<Vec<_>>();
+    if candidates.is_empty() {
+        return None;
+    }
+    let accepted = candidates.iter().any(|candidate| {
+        semantic_scope_allows(candidate.rule, candidate.scope)
+            && semantic_property_matches(snapshot, candidate.rule, property, candidate.scope)
+    });
+    Some(format!(
+        "property: `{}`\nvalue: `{}`\nvalidation: `{}`\n\n{}",
+        property.key,
+        value,
+        if accepted {
+            "accepted"
+        } else {
+            "does not match"
+        },
+        semantic_rule_hover_for_candidates(snapshot, &candidates)
+    ))
+}
+
+fn semantic_rule_hover_for_candidates(
+    snapshot: &AnalysisSnapshot,
+    candidates: &[SemanticCompletionRule<'_, '_>],
+) -> String {
+    let mut sections = Vec::new();
+    if candidates.len() > 1 {
+        sections.push(format!("{} possible semantic meanings", candidates.len()));
+    }
+    for (index, candidate) in candidates.iter().enumerate() {
+        let rule = candidate.rule;
+        let mut lines = Vec::new();
+        if candidates.len() > 1 {
+            lines.push(format!("candidate {}", index + 1));
+        }
+        lines.push(format!("context: `{}`", rule.context));
+        if !candidate.parent_path.is_empty() {
+            lines.push(format!("parent: `{}`", candidate.parent_path.join(".")));
+        }
+        lines.push(format!(
+            "shape: `{}`",
+            semantic_rule_shape_label(rule.shape)
+        ));
+        lines.push(format!(
+            "value: `{}`",
+            semantic_value_hover_label(&rule.value)
+        ));
+        if let Some(operator) = rule.operator.as_deref() {
+            lines.push(format!("operator: `{operator}`"));
+        }
+        let child_scope = (rule.push_scope.is_some() || !rule.replace_scope.is_empty())
+            .then(|| semantic_child_scope(snapshot, candidate.scope, rule));
+        if !rule.allowed_scopes.is_empty() {
+            let allowed = rule
+                .allowed_scopes
+                .iter()
+                .map(|scope| format!("`{scope}`"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let status = if semantic_scope_allows(rule, candidate.scope) {
+                "allowed"
+            } else {
+                "not allowed"
+            };
+            lines.push(format!("allowed scopes: {allowed}"));
+            lines.push(format!(
+                "current scope: `{}` ({status})",
+                candidate.scope.current
+            ));
+        }
+        if rule.required {
+            lines.push("required".to_owned());
+        }
+        if let Some(min) = rule.min_occurs {
+            lines.push(format!("minimum occurrences: {min}"));
+        }
+        if let Some(max) = rule.max_occurs {
+            lines.push(format!("maximum occurrences: {max}"));
+        }
+        if let Some(child_context) = rule.child_context.as_deref() {
+            lines.push(format!("child context: `{child_context}`"));
+        }
+        if !rule.allowed_scopes.is_empty() || child_scope.is_some() {
+            lines.push(format!(
+                "scope registers: {}",
+                semantic_scope_register_summary(candidate.scope)
+            ));
+        }
+        if let Some(child_scope) = child_scope.as_ref() {
+            lines.push(format!(
+                "scope transition: `{}` → `{}`",
+                candidate.scope.current, child_scope.current
+            ));
+            for (register, value) in &rule.replace_scope {
+                let resolved = resolve_scope_expression_context(snapshot, candidate.scope, value);
+                lines.push(format!(
+                    "scope register: `{register}` = `{value}` → `{resolved}`"
+                ));
+            }
+            lines.push(format!(
+                "scope registers after: {}",
+                semantic_scope_register_summary(child_scope)
+            ));
+        }
+        if !rule.source_file.is_empty() && rule.line > 0 {
+            lines.push(format!("rule: `{}:{}`", rule.source_file, rule.line));
+        }
+        if !rule.documentation.is_empty() {
+            lines.extend(rule.documentation.iter().cloned());
+        }
+        sections.push(lines.join("  \n"));
+    }
+    sections.join("\n\n")
+}
+
+fn semantic_scope_register_summary(scope: &ScopeContext) -> String {
+    let mut registers = vec![
+        format!("ROOT=`{}`", scope.root),
+        format!("THIS=`{}`", scope.current),
+    ];
+    for (depth, value) in scope.from.iter().enumerate() {
+        registers.push(format!("{}=`{value}`", "FROM".repeat(depth + 1)));
+    }
+    for (depth, value) in scope.previous.iter().enumerate() {
+        registers.push(format!("{}=`{value}`", "PREV".repeat(depth + 1)));
+    }
+    registers.join(", ")
+}
+
+fn semantic_rule_shape_label(shape: RuleShape) -> &'static str {
+    match shape {
+        RuleShape::Node => "block",
+        RuleShape::Leaf => "scalar",
+        RuleShape::LeafValue => "bare value",
+        RuleShape::ValueClause => "value clause",
+    }
+}
+
+fn semantic_value_hover_label(matcher: &ValueMatcher) -> String {
+    match matcher {
+        ValueMatcher::AnyScalar => "any scalar".to_owned(),
+        ValueMatcher::Exact(value) => format!("exact `{value}`"),
+        ValueMatcher::Bool => "bool (`yes` / `no`)".to_owned(),
+        ValueMatcher::Int { min, max } => semantic_numeric_hover_label("integer", *min, *max),
+        ValueMatcher::Float { min, max } => {
+            let bounds = match (min.as_deref(), max.as_deref()) {
+                (Some(min), Some(max)) => format!(" in [{min}, {max}]"),
+                (Some(min), None) => format!(" >= {min}"),
+                (None, Some(max)) => format!(" <= {max}"),
+                (None, None) => String::new(),
+            };
+            format!("float{bounds}")
+        }
+        ValueMatcher::Type(value) => format!("symbol type `{value}`"),
+        ValueMatcher::Enum(value) => format!("enum `{value}`"),
+        ValueMatcher::Scope(value) => value
+            .as_deref()
+            .map_or_else(|| "scope".to_owned(), |value| format!("scope `{value}`")),
+        ValueMatcher::Localisation => "localisation key".to_owned(),
+        ValueMatcher::Filepath => "filepath".to_owned(),
+        ValueMatcher::Dynamic(value) => format!("dynamic value `{value}`"),
+        ValueMatcher::DynamicSet(value) => format!("dynamic value set `{value}`"),
+        ValueMatcher::Opaque(value) => format!("opaque `{value}`"),
+    }
+}
+
+fn semantic_numeric_hover_label<T: std::fmt::Display>(
+    kind: &str,
+    min: Option<T>,
+    max: Option<T>,
+) -> String {
+    let bounds = match (min, max) {
+        (Some(min), Some(max)) => format!(" in [{min}, {max}]"),
+        (Some(min), None) => format!(" >= {min}"),
+        (None, Some(max)) => format!(" <= {max}"),
+        (None, None) => String::new(),
+    };
+    format!("{kind}{bounds}")
 }
 
 fn semantic_rule_documentation(snapshot: &AnalysisSnapshot, key: &str) -> Option<String> {
@@ -1465,34 +1752,6 @@ fn semantic_rule_documentation(snapshot: &AnalysisSnapshot, key: &str) -> Option
     semantic_rule_documentation_for_rule(rule)
 }
 
-fn semantic_rule_documentation_at(
-    snapshot: &AnalysisSnapshot,
-    input: &ParsedInput,
-    position: TextSize,
-) -> Option<String> {
-    let context = semantic_completion_context(snapshot, input, position)?;
-    let property = context.property.as_ref()?;
-    let mut rules = semantic_rules_for_completion(snapshot, &context)
-        .into_iter()
-        .filter(|candidate| {
-            let rule = candidate.rule;
-            !matches!(rule.shape, RuleShape::LeafValue)
-                && semantic_rule_key_matches(snapshot, rule, candidate.parent_path, &property.key)
-                && semantic_scope_allows(rule, candidate.scope)
-        })
-        .collect::<Vec<_>>();
-    rules.sort_by_key(|candidate| {
-        (
-            &candidate.rule.context,
-            &candidate.rule.parent_path,
-            &candidate.rule.id,
-        )
-    });
-    rules
-        .into_iter()
-        .find_map(|candidate| semantic_rule_documentation_for_rule(candidate.rule))
-}
-
 fn semantic_rule_documentation_for_rule(rule: &pdx_rules::SemanticRule) -> Option<String> {
     let mut lines = rule.documentation.clone();
     if rule.required {
@@ -1506,6 +1765,9 @@ fn semantic_rule_documentation_for_rule(rule: &pdx_rules::SemanticRule) -> Optio
     }
     if !rule.allowed_scopes.is_empty() {
         lines.push(format!("scopes: {}", rule.allowed_scopes.join(", ")));
+    }
+    if !rule.source_file.is_empty() && rule.line > 0 {
+        lines.push(format!("rule: {}:{}", rule.source_file, rule.line));
     }
     // LSP hover contents are Markdown. A single newline is normally collapsed into a space by
     // Markdown renderers, so use an explicit hard break for each rule detail.
@@ -3741,6 +4003,40 @@ fn resolve_symbol(
     kind: &str,
     name: &str,
 ) -> Resolution {
+    let mut candidates = symbol_candidates(snapshot, all, kind, name);
+    if candidates.is_empty() {
+        return Resolution::Missing;
+    }
+    let policy = symbol_resolution_policy(snapshot, kind);
+    if matches!(
+        policy,
+        SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique
+    ) {
+        return if candidates.len() == 1 {
+            Resolution::Unique(candidates.remove(0))
+        } else {
+            Resolution::Ambiguous
+        };
+    }
+    let highest = candidates
+        .iter()
+        .map(|candidate| candidate.priority)
+        .max()
+        .unwrap_or(0);
+    candidates.retain(|candidate| candidate.priority == highest);
+    if candidates.len() == 1 {
+        Resolution::Unique(candidates.remove(0))
+    } else {
+        Resolution::Ambiguous
+    }
+}
+
+fn symbol_candidates(
+    snapshot: &AnalysisSnapshot,
+    all: &SemanticWorkspace,
+    kind: &str,
+    name: &str,
+) -> Vec<ResolutionDefinition> {
     let overlay_files = snapshot
         .documents()
         .values()
@@ -3776,10 +4072,67 @@ fn resolve_symbol(
             candidates.push(index_definition(snapshot, definition));
         }
     }
-    if candidates.is_empty() {
-        return Resolution::Missing;
+    candidates.sort_by(|left, right| {
+        right.priority.cmp(&left.priority).then_with(|| {
+            symbol_location_sort_key(&left.location).cmp(&symbol_location_sort_key(&right.location))
+        })
+    });
+    candidates.dedup_by(|left, right| {
+        left.location == right.location && left.selection_range == right.selection_range
+    });
+    candidates
+}
+
+fn symbol_candidates_for_hover(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    name: &str,
+    cancellation: &CancellationToken,
+) -> Result<Vec<ResolutionDefinition>, Cancelled> {
+    let overlay_files = overlay_file_ids(snapshot);
+    let mut candidates = Vec::new();
+    for document in snapshot
+        .documents()
+        .values()
+        .filter(|document| document.source() == DocumentSource::Overlay)
+    {
+        cancellation.checkpoint()?;
+        let Some(input) = input_for_document(snapshot, document.id()) else {
+            continue;
+        };
+        for definition in semantic_data(&input).definitions {
+            cancellation.checkpoint()?;
+            if definition.kind != kind || !same_name(&definition.name, name) {
+                continue;
+            }
+            let priority = definition_priority(snapshot, &definition);
+            candidates.push(ResolutionDefinition {
+                location: definition.symbol.location,
+                selection_range: definition.symbol.selection_range,
+                priority,
+            });
+        }
     }
-    let policy = snapshot
+    for definition in snapshot.index().definitions(kind, name) {
+        cancellation.checkpoint()?;
+        if overlay_files.contains(&definition.file_id) {
+            continue;
+        }
+        candidates.push(index_definition(snapshot, definition));
+    }
+    candidates.sort_by(|left, right| {
+        right.priority.cmp(&left.priority).then_with(|| {
+            symbol_location_sort_key(&left.location).cmp(&symbol_location_sort_key(&right.location))
+        })
+    });
+    candidates.dedup_by(|left, right| {
+        left.location == right.location && left.selection_range == right.selection_range
+    });
+    Ok(candidates)
+}
+
+fn symbol_resolution_policy(snapshot: &AnalysisSnapshot, kind: &str) -> SymbolResolutionPolicy {
+    snapshot
         .rules()
         .model()
         .symbol_descriptors
@@ -3787,28 +4140,18 @@ fn resolve_symbol(
         .find(|descriptor| descriptor.kind_id.eq_ignore_ascii_case(kind))
         .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| {
             descriptor.resolution
-        });
-    if matches!(
-        policy,
-        SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique
-    ) {
-        return if candidates.len() == 1 {
-            Resolution::Unique(candidates.remove(0))
-        } else {
-            Resolution::Ambiguous
-        };
-    }
-    let highest = candidates
-        .iter()
-        .map(|candidate| candidate.priority)
-        .max()
-        .unwrap_or(0);
-    candidates.retain(|candidate| candidate.priority == highest);
-    if candidates.len() == 1 {
-        Resolution::Unique(candidates.remove(0))
-    } else {
-        Resolution::Ambiguous
-    }
+        })
+}
+
+fn symbol_location_sort_key(location: &Location) -> (String, u32, u32) {
+    (
+        location
+            .path
+            .as_ref()
+            .map_or_else(String::new, |path| path.as_str().to_owned()),
+        location.range.start(),
+        location.range.end(),
+    )
 }
 
 struct DirectResolutionContext<'snapshot> {
@@ -4045,25 +4388,192 @@ fn local_location(input: &ParsedInput, range: TextRange) -> Location {
 
 fn hover_for_symbol(
     snapshot: &AnalysisSnapshot,
-    all: &SemanticWorkspace,
     kind: &str,
     name: &str,
     range: TextRange,
-) -> Hover {
-    let contents = match resolve_symbol(snapshot, all, kind, name) {
-        Resolution::Unique(definition) => {
-            let path = definition.location.path.as_ref().map_or_else(
-                || "<open document>".to_owned(),
-                |path| path.as_str().to_owned(),
-            );
-            format!("{} `{}`\n\nDefined in `{}`", kind, name, path)
+    cancellation: &CancellationToken,
+) -> Result<Hover, Cancelled> {
+    let candidates = symbol_candidates_for_hover(snapshot, kind, name, cancellation)?;
+    let policy = symbol_resolution_policy(snapshot, kind);
+    let mut contents = format!("{} `{}`", kind, name);
+    if candidates.is_empty() {
+        contents.push_str(&format!("\n\nunresolved {kind} symbol"));
+    } else {
+        let highest = candidates
+            .iter()
+            .map(|candidate| candidate.priority)
+            .max()
+            .unwrap_or(0);
+        let active = match policy {
+            SymbolResolutionPolicy::ReplaceBySymbol => candidates
+                .iter()
+                .filter(|candidate| candidate.priority == highest)
+                .collect::<Vec<_>>(),
+            SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique => {
+                if candidates.len() == 1 {
+                    vec![&candidates[0]]
+                } else {
+                    Vec::new()
+                }
+            }
+        };
+        if active.len() == 1 {
+            let definition = active[0];
+            contents.push_str("\n\nResolved definition");
+            contents.push_str(&format!(
+                "\nSource root: {}\nDefined in: `{}`",
+                symbol_source_root(snapshot, &definition.location),
+                symbol_location_path(&definition.location),
+            ));
+            let shadowed = candidates
+                .iter()
+                .filter(|candidate| {
+                    !same_location(&candidate.location, &definition.location)
+                        && candidate.priority < definition.priority
+                })
+                .collect::<Vec<_>>();
+            if !shadowed.is_empty() {
+                contents.push_str("\n\nShadowed definitions:");
+                for candidate in shadowed {
+                    contents.push_str(&format!(
+                        "\n- {}: `{}`",
+                        symbol_source_root(snapshot, &candidate.location),
+                        symbol_location_path(&candidate.location),
+                    ));
+                }
+            }
+            if kind.eq_ignore_ascii_case("localisation")
+                && let Some((language, value)) = localisation_preview(snapshot, definition)
+            {
+                contents.push_str(&format!(
+                    "\n\nLocalisation{}: \"{}\"",
+                    language
+                        .as_deref()
+                        .map_or_else(String::new, |language| format!(" ({language})")),
+                    value
+                ));
+            }
+        } else {
+            contents.push_str(&format!("\n\nambiguous {kind} symbol"));
+            contents.push_str("\n\nCandidates:");
+            for candidate in &candidates {
+                contents.push_str(&format!(
+                    "\n- {}: `{}`",
+                    symbol_source_root(snapshot, &candidate.location),
+                    symbol_location_path(&candidate.location),
+                ));
+            }
         }
-        Resolution::Ambiguous => format!("ambiguous {} `{}`", kind, name),
-        Resolution::Missing => format!("unresolved {} `{}`", kind, name),
-    };
-    Hover {
+    }
+    Ok(Hover {
         contents,
         range: Some(range),
+    })
+}
+
+fn localisation_preview(
+    snapshot: &AnalysisSnapshot,
+    definition: &ResolutionDefinition,
+) -> Option<(Option<String>, String)> {
+    let input = definition
+        .location
+        .document
+        .as_ref()
+        .and_then(|document| input_for_document(snapshot, document))
+        .or_else(|| {
+            definition
+                .location
+                .file
+                .and_then(|file| input_for_source_file(snapshot, file))
+        })?;
+    let ParsedContent::Text(parsed) = &input.parsed;
+    let entry = find_cst_node(
+        parsed.root(),
+        CstKind::LocalisationEntry,
+        definition.location.range,
+    )?;
+    let value_node = entry.children().iter().find(|child| {
+        matches!(
+            child.kind(),
+            CstKind::LocalisationString | CstKind::UnquotedValue
+        )
+    })?;
+    let raw = parsed.text(value_node.range())?.trim();
+    let value = raw
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+        .unwrap_or(raw);
+    let value = truncate_hover_text(value);
+    if value.is_empty() {
+        return None;
+    }
+    let mut language = None;
+    for node in parsed.root().children() {
+        if node.range().start() > entry.range().start() {
+            break;
+        }
+        if node.kind() == CstKind::LanguageHeader
+            && let Some(value) = node
+                .children()
+                .iter()
+                .find(|child| child.kind() == CstKind::LocalisationKey)
+                .and_then(|child| parsed.text(child.range()))
+        {
+            language = Some(value.trim().to_owned());
+        }
+    }
+    Some((language, value))
+}
+
+fn find_cst_node(node: &CstNode, kind: CstKind, range: TextRange) -> Option<&CstNode> {
+    if node.kind() == kind && node.range() == range {
+        return Some(node);
+    }
+    node.children()
+        .iter()
+        .find_map(|child| find_cst_node(child, kind, range))
+}
+
+fn truncate_hover_text(value: &str) -> String {
+    const MAX_CHARS: usize = 240;
+    let mut truncated = value.chars().take(MAX_CHARS).collect::<String>();
+    if value.chars().count() > MAX_CHARS {
+        truncated.push('…');
+    }
+    truncated
+}
+
+fn symbol_location_path(location: &Location) -> String {
+    location.path.as_ref().map_or_else(
+        || "<open document>".to_owned(),
+        |path| path.as_str().to_owned(),
+    )
+}
+
+fn symbol_source_root(snapshot: &AnalysisSnapshot, location: &Location) -> String {
+    let root = location
+        .file
+        .and_then(|file_id| snapshot.source_files().get(&file_id))
+        .and_then(|file| {
+            snapshot
+                .source_roots()
+                .iter()
+                .find(|root| root.id == file.root_id)
+        })
+        .or_else(|| {
+            location
+                .document
+                .as_ref()
+                .and_then(|document_id| snapshot.document(document_id))
+                .and_then(|document| document.path())
+                .and_then(|path| root_for_path(snapshot, path))
+        });
+    match root.map(|root| root.kind) {
+        Some(pdx_engine::SourceRootKind::Vanilla) => "Vanilla".to_owned(),
+        Some(pdx_engine::SourceRootKind::Dependency) => "Dependency".to_owned(),
+        Some(pdx_engine::SourceRootKind::CurrentMod) => "Current Mod".to_owned(),
+        None if location.document.is_some() => "Open overlay".to_owned(),
+        None => "Unknown source root".to_owned(),
     }
 }
 
@@ -4515,6 +5025,25 @@ mod tests {
     }
 
     #[test]
+    fn symbol_hover_does_not_materialize_the_full_workspace() {
+        let (host, id) = snapshot("country_event = { id = hover.1 }\nevent = hover.1\n");
+        let snapshot = host.snapshot();
+        let position = u32::try_from("country_event = { id = hover.1 }\nevent = ".len() + 1)
+            .expect("reference offset");
+
+        super::ALL_SEMANTICS_CALLS.with(|calls| calls.set(0));
+        let hover = hover(&snapshot, &id, position).expect("symbol hover");
+        assert!(hover.contents.contains("Resolved definition"));
+        super::ALL_SEMANTICS_CALLS.with(|calls| {
+            assert_eq!(
+                calls.get(),
+                0,
+                "symbol hover must query the current file and symbol bucket directly"
+            );
+        });
+    }
+
+    #[test]
     fn semantic_diagnostics_do_not_materialize_the_full_workspace() {
         let (host, id) = snapshot(
             "country_event = { id = direct.1 title = missing_title immediate = { always = yes } }\n",
@@ -4721,6 +5250,93 @@ mod tests {
                 .any(|item| item.code == DiagnosticCode::AmbiguousSymbol)
         );
         assert!(definition(&snapshot, &id, 80).is_empty());
+        let reference = u32::try_from(
+            "country_event = { id = duplicate.1 }\ncountry_event = { id = duplicate.1 }\nevent = "
+                .len()
+                + 1,
+        )
+        .expect("reference offset");
+        let hover = hover(&snapshot, &id, reference).expect("ambiguous hover");
+        assert!(hover.contents.contains("ambiguous event symbol"));
+        assert!(hover.contents.contains("Candidates:"));
+    }
+
+    #[test]
+    fn symbol_hover_explains_active_and_shadowed_source_roots() {
+        use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use std::fs;
+
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-analysis-hover-sources-{nonce}"));
+        let vanilla = root.join("vanilla");
+        let current = root.join("current");
+        fs::create_dir_all(vanilla.join("common/events")).expect("Vanilla directory");
+        fs::create_dir_all(current.join("common/events")).expect("current directory");
+        for source_root in [&vanilla, &current] {
+            fs::write(
+                source_root.join("common/events/definitions.txt"),
+                "country_event = { id = shared.1 }\n",
+            )
+            .expect("event definition");
+        }
+
+        let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot {
+                id: SourceRootId::new(1),
+                kind: SourceRootKind::Vanilla,
+                path: vanilla,
+                order: 0,
+                writable: false,
+            },
+            SourceRoot {
+                id: SourceRootId::new(2),
+                kind: SourceRootKind::CurrentMod,
+                path: current,
+                order: 0,
+                writable: true,
+            },
+        ]));
+        host.refresh_source_roots().expect("scan source roots");
+        let id = DocumentId::new("file:///tmp/events/reference.txt");
+        let text = "event = shared.1\n";
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open reference");
+        let position =
+            u32::try_from(text.find("shared.1").expect("reference") + 1).expect("position");
+        let hover = hover(&host.snapshot(), &id, position).expect("source hover");
+        assert!(hover.contents.contains("Source root: Current Mod"));
+        assert!(hover.contents.contains("Shadowed definitions:"));
+        assert!(hover.contents.contains("Vanilla"));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn semantic_hover_explains_scope_transition() {
+        let (host, id) = {
+            let mut host =
+                eu4_host(pdx_game::eu4::first_party_rules().expect("load first-party rules"));
+            let id = DocumentId::new("file:///tmp/events/scope-hover.txt");
+            host.open_document(
+                id.clone(),
+                1,
+                "country_event = { immediate = { capital_scope = { } } }\n".to_owned(),
+                None,
+            )
+            .expect("open scope fixture");
+            (host, id)
+        };
+        let text = "country_event = { immediate = { capital_scope = { } } }\n";
+        let position =
+            u32::try_from(text.find("capital_scope").expect("scope link") + 1).expect("position");
+        let hover = hover(&host.snapshot(), &id, position).expect("scope hover");
+        assert!(hover.contents.contains("scope transition:"));
+        assert!(hover.contents.contains("scope registers: ROOT=`"));
+        assert!(hover.contents.contains("scope registers after:"));
+        assert!(hover.contents.contains("child context:") || hover.contents.contains("context:"));
     }
 
     #[test]
@@ -4918,8 +5534,106 @@ mod tests {
         let value = u32::try_from("trigger = { foo = ".len()).expect("offset");
         let result = complete(&snapshot, &id, value);
         assert!(result.items.iter().any(|item| item.label == "yes"));
-        let hover = hover(&snapshot, &id, 18).expect("semantic hover");
-        assert!(hover.contents.contains("foo") || hover.contents.contains("PDX"));
+        let property = u32::try_from("trigger = { ".len() + 1).expect("offset");
+        let property_hover = hover(&snapshot, &id, property).expect("semantic hover");
+        assert!(property_hover.contents.contains("PDX property `foo`"));
+        assert!(property_hover.contents.contains("context: `trigger`"));
+        assert!(property_hover.contents.contains("shape: `scalar`"));
+        assert!(
+            property_hover
+                .contents
+                .contains("value: `bool (`yes` / `no`)`")
+        );
+        assert!(
+            property_hover
+                .contents
+                .contains("rule: `fixture.semantic:1`")
+        );
+
+        let value_position = u32::try_from("trigger = { foo = yes".find("yes").expect("value") + 1)
+            .expect("value offset");
+        let value_hover = hover(&snapshot, &id, value_position).expect("value hover");
+        assert!(value_hover.contents.contains("PDX value `yes`"));
+        assert!(value_hover.contents.contains("validation: `accepted`"));
+
+        let (invalid_host, invalid_id) = semantic_snapshot("trigger = { foo = maybe }\n");
+        let invalid_text = "trigger = { foo = maybe }\n";
+        let invalid_position =
+            u32::try_from(invalid_text.find("maybe").expect("invalid value") + 1)
+                .expect("invalid offset");
+        let invalid_hover = hover(&invalid_host.snapshot(), &invalid_id, invalid_position)
+            .expect("invalid value hover");
+        assert!(
+            invalid_hover
+                .contents
+                .contains("validation: `does not match`")
+        );
+    }
+
+    #[test]
+    fn hover_ignores_unknown_property_and_plain_text() {
+        let (host, id) = semantic_snapshot("trigger = { unknown_property = yes }\n");
+        let analysis_snapshot = host.snapshot();
+        let property = u32::try_from("trigger = { ".len() + 2).expect("offset");
+        assert!(hover(&analysis_snapshot, &id, property).is_none());
+
+        let (host, id) = snapshot("# ordinary comment text\n");
+        assert!(
+            hover(
+                &host.snapshot(),
+                &id,
+                u32::try_from("# ordinary ".len()).expect("offset")
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn semantic_hover_keeps_multiple_matching_rule_meanings() {
+        let mut model = pdx_game::eu4::bootstrap_model();
+        for (id, value) in [
+            ("fixture:trigger:choice-bool", ValueMatcher::Bool),
+            (
+                "fixture:trigger:choice-int",
+                ValueMatcher::Int {
+                    min: Some(1),
+                    max: Some(3),
+                },
+            ),
+        ] {
+            model.semantic.rules.push(SemanticRule {
+                id: id.to_owned(),
+                context: "trigger".to_owned(),
+                parent_path: Vec::new(),
+                key: KeyMatcher::Exact("choice".to_owned()),
+                operator: Some("=".to_owned()),
+                value,
+                shape: RuleShape::Leaf,
+                child_context: None,
+                alternative_id: None,
+                severity: None,
+                required: false,
+                documentation: Vec::new(),
+                allowed_scopes: Vec::new(),
+                push_scope: None,
+                replace_scope: Vec::new(),
+                min_occurs: None,
+                strict_min: true,
+                max_occurs: Some(1),
+                source_file: "fixture.semantic".to_owned(),
+                line: 1,
+            });
+        }
+        let mut host = eu4_host(RuleSet::from_model(model));
+        let id = DocumentId::new("file:///tmp/choice.txt");
+        let text = "trigger = { choice = yes }\n";
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open ambiguous rule fixture");
+        let position = u32::try_from(text.find("choice").expect("choice") + 1).expect("position");
+        let hover = hover(&host.snapshot(), &id, position).expect("ambiguous rule hover");
+        assert!(hover.contents.contains("2 possible semantic meanings"));
+        assert!(hover.contents.contains("value: `bool (`yes` / `no`)`"));
+        assert!(hover.contents.contains("value: `integer in [1, 3]`"));
     }
 
     #[test]
@@ -5713,6 +6427,7 @@ mod tests {
             u32::try_from(text.find("optional").expect("conditional parameter")).expect("offset");
         let hover = hover(&snapshot, &id, optional).expect("parameter hover");
         assert!(hover.contents.contains("parameter `optional`"));
+        assert!(hover.contents.contains("Arity: `optional`"));
 
         let preparation = prepare_rename(&snapshot, &id, second_use).expect("prepare local rename");
         assert_eq!(preparation.placeholder, "amount");
@@ -5845,6 +6560,19 @@ mod tests {
                 .iter()
                 .any(|item| item.label == "foo_name" && item.kind == CompletionKind::Localisation)
         );
+    }
+
+    #[test]
+    fn localisation_hover_shows_the_resolved_short_text() {
+        let mut host = eu4_host(pdx_game::eu4::bootstrap_rules());
+        let id = DocumentId::new("file:///tmp/localisation/test.yml");
+        let text = "l_english:\nfoo_name:0 \"Foo\"\n";
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open localisation");
+        let position =
+            u32::try_from(text.find("foo_name").expect("localisation key") + 2).expect("position");
+        let hover = hover(&host.snapshot(), &id, position).expect("localisation hover");
+        assert!(hover.contents.contains("Localisation (l_english): \"Foo\""));
     }
 
     #[test]

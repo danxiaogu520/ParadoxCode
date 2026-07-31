@@ -11,6 +11,9 @@
 # Machine-local tool and editor configuration
 /.cargo/
 /.zed/
+/.agents/
+/.codex/
+
 .DS_Store
 Thumbs.db
 
@@ -29,6 +32,3 @@ Thumbs.db
 
 # CWTools reference
 /reference/
-
-# Deprecated tests
-/tests/
