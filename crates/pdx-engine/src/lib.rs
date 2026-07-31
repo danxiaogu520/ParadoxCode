@@ -20,7 +20,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crate::hir::{HirFile, lower_shared, lower_shared_with_profile};
 use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile, parse};
 use pdx_rules::{FileResolutionPolicy, GameProfile, ParserKind, RuleSet, SymbolResolutionPolicy};
-use pdx_text::{LineIndex, LogicalPath, TextRange};
+use pdx_text::{LineIndex, LogicalPath, PositionRange, TextRange};
 
 mod vanilla_cache;
 
@@ -434,6 +434,8 @@ pub struct WorkspaceIndex {
     shards: BTreeMap<SourceFileId, FileIndexShard>,
     definitions: BTreeMap<(String, String), Vec<DefinitionPointer>>,
     case_sensitive_kinds: BTreeSet<String>,
+    /// Cached UTF-16 positions for files whose source text is not retained, such as Vanilla.
+    position_ranges: BTreeMap<(SourceFileId, TextRange), PositionRange>,
 }
 
 impl WorkspaceIndex {
@@ -556,6 +558,47 @@ impl WorkspaceIndex {
             .flat_map(|shard| shard.references.iter())
     }
 
+    /// Returns a cached editor position for one indexed byte range, if available.
+    #[must_use]
+    pub fn position_for(&self, file_id: SourceFileId, range: TextRange) -> Option<PositionRange> {
+        self.position_ranges.get(&(file_id, range)).copied()
+    }
+
+    /// Returns all cached editor positions retained by this index.
+    #[must_use]
+    pub fn position_ranges(&self) -> &BTreeMap<(SourceFileId, TextRange), PositionRange> {
+        &self.position_ranges
+    }
+
+    /// Replaces cached editor positions for one source file.
+    pub fn replace_position_ranges(
+        &mut self,
+        file_id: SourceFileId,
+        positions: impl IntoIterator<Item = (TextRange, PositionRange)>,
+    ) {
+        self.position_ranges
+            .retain(|(candidate, _), _| *candidate != file_id);
+        self.position_ranges.extend(
+            positions
+                .into_iter()
+                .map(|(range, position)| ((file_id, range), position)),
+        );
+    }
+
+    /// Replaces all cached editor positions.
+    pub fn replace_all_position_ranges(
+        &mut self,
+        positions: BTreeMap<(SourceFileId, TextRange), PositionRange>,
+    ) {
+        self.position_ranges = positions;
+    }
+
+    /// Removes cached editor positions for one source file.
+    pub fn remove_position_ranges(&mut self, file_id: SourceFileId) {
+        self.position_ranges
+            .retain(|(candidate, _), _| *candidate != file_id);
+    }
+
     fn definition_at(&self, pointer: DefinitionPointer) -> Option<&Definition> {
         self.shards
             .get(&pointer.file_id)?
@@ -637,6 +680,7 @@ impl WorkspaceIndex {
     }
 
     fn remove_shard_entries(&mut self, file_id: SourceFileId) -> Vec<(String, String)> {
+        self.remove_position_ranges(file_id);
         let Some(previous) = self.shards.remove(&file_id) else {
             return Vec::new();
         };
@@ -1525,6 +1569,51 @@ fn build_file_state(
     }
 }
 
+fn position_ranges_for_state(state: &FileState) -> Vec<(TextRange, PositionRange)> {
+    let line_index = LineIndex::new(state.source());
+    let hir_selection_ranges = state
+        .hir()
+        .map(|hir| {
+            hir.definitions()
+                .iter()
+                .map(|definition| {
+                    (
+                        (
+                            definition.kind.clone(),
+                            definition.name.clone(),
+                            definition.range,
+                        ),
+                        definition.selection_range,
+                    )
+                })
+                .collect::<BTreeMap<_, _>>()
+        })
+        .unwrap_or_default();
+    state
+        .shard()
+        .definitions
+        .iter()
+        .filter_map(|definition| {
+            let selection_range = hir_selection_ranges
+                .get(&(
+                    definition.kind.clone(),
+                    definition.name.clone(),
+                    definition.range,
+                ))
+                .copied()
+                .unwrap_or(definition.range);
+            line_index
+                .position_range(state.source(), selection_range)
+                .map(|position| (definition.range, position))
+        })
+        .chain(state.shard().references.iter().filter_map(|reference| {
+            line_index
+                .position_range(state.source(), reference.range)
+                .map(|position| (reference.range, position))
+        }))
+        .collect()
+}
+
 fn shard_from_parsed(
     file: &SourceFile,
     parsed: &ParsedFile,
@@ -1959,7 +2048,7 @@ impl AnalysisHost {
             }
         }
 
-        let (_, vanilla, mut files, cached_index) = cache.into_parts();
+        let (_, vanilla, mut files, cached_index, cached_positions) = cache.into_parts();
         for (id, file) in self.source_files.iter() {
             if let Some(cached) = files.insert(*id, file.clone()) {
                 return Err(VanillaCacheError::InvalidData(format!(
@@ -1975,6 +2064,10 @@ impl AnalysisHost {
         roots.push(vanilla.clone());
         roots.extend(self.roots.iter().cloned());
         let mut index = WorkspaceIndex::from_shards(shards);
+        index.replace_all_position_ranges(cached_positions);
+        for (file_id, state) in self.file_states.iter() {
+            index.replace_position_ranges(*file_id, position_ranges_for_state(state));
+        }
         index.configure_case_sensitivity(self.rules.as_ref());
         let priorities = source_priorities(&roots, &files);
         index.resolve_priorities(&priorities, self.rules.as_ref());
@@ -2128,6 +2221,10 @@ impl AnalysisHost {
             );
         }
         let mut index = WorkspaceIndex::from_shards_cancellable(shards, cancellation)?;
+        index.replace_all_position_ranges(self.index.position_ranges().clone());
+        for (file_id, state) in &file_states {
+            index.replace_position_ranges(*file_id, position_ranges_for_state(state));
+        }
         index.configure_case_sensitivity(self.rules.as_ref());
         let priorities = source_priorities(&self.roots, &files);
         index.resolve_priorities_cancellable(&priorities, self.rules.as_ref(), cancellation)?;
@@ -2221,6 +2318,7 @@ impl AnalysisHost {
                     file_states.remove(&id);
                     let priorities = source_priorities(&self.roots, &files);
                     index.remove_shard_resolved(id, &priorities, self.rules.as_ref());
+                    index.remove_position_ranges(id);
                     changed = true;
                 }
                 continue;
@@ -2271,6 +2369,7 @@ impl AnalysisHost {
             file_states.insert(id, Arc::clone(&state));
             let priorities = source_priorities(&self.roots, &files);
             index.replace_shard_resolved(state.shard().clone(), &priorities, self.rules.as_ref());
+            index.replace_position_ranges(id, position_ranges_for_state(&state));
             report.indexed_files = report.indexed_files.saturating_add(1);
             changed = true;
         }
@@ -2295,9 +2394,12 @@ impl AnalysisHost {
             &priorities,
             self.rules.as_ref(),
         );
+        Arc::make_mut(&mut self.index).remove_position_ranges(file_id);
         if let Some(previous) = self.file_states.get(&file_id) {
             let mut replacement = previous.as_ref().clone();
             replacement.shard = Arc::new(shard);
+            Arc::make_mut(&mut self.index)
+                .replace_position_ranges(file_id, position_ranges_for_state(&replacement));
             Arc::make_mut(&mut self.file_states).insert(file_id, Arc::new(replacement));
         }
         self.revision = self.revision.saturating_add(1);

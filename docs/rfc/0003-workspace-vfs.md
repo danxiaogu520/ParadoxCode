@@ -145,6 +145,8 @@ path = "dependencies/content-extension" # later = higher priority
 - 只有用户在扩展设置/命令中显式触发“刷新 Vanilla 索引”才重建。
 - 扩展升级和 `rule_hash` 变化不自动删除、迁移或重建缓存。
 - cache metadata 记录创建时间、源目录指纹和当时的 `rule_hash`，只用于可观察性与手动决策。
+- 缓存为 definition/reference 保存对应的 UTF-16 编辑器位置（definition 使用名称 selection range），因此源文本不可读时跳转仍返回准确范围。
+- 缓存不保存源码、CST 或 HIR。
 - 缓存位于用户本机，不提交、不打包、不再分发 Vanilla 内容。
 
 ## 按文件增量更新

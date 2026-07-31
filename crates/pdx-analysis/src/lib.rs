@@ -1809,7 +1809,7 @@ pub fn definition_with_cancellation(
         return Ok(Vec::new());
     };
     Ok(match resolve_symbol(snapshot, &all, &kind, &name) {
-        Resolution::Unique(definition) => vec![definition.location],
+        Resolution::Unique(definition) => vec![definition_selection_location(&definition)],
         Resolution::Ambiguous | Resolution::Missing => Vec::new(),
     })
 }
@@ -1870,7 +1870,7 @@ pub fn references_with_cancellation(
     };
     let mut result = Vec::new();
     if include_declaration {
-        result.push(target.location.clone());
+        result.push(definition_selection_location(&target));
     }
     for reference in &all.references {
         cancellation.checkpoint()?;
@@ -4216,11 +4216,7 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
                 .definitions(kind, name)
                 .into_iter()
                 .filter(|definition| !self.overlay_files.contains(&definition.file_id))
-                .map(|definition| ResolutionDefinition {
-                    location: index_definition(self.snapshot, definition).location,
-                    selection_range: definition.range,
-                    priority: definition_priority_for_file(self.snapshot, definition.file_id),
-                }),
+                .map(|definition| index_definition(self.snapshot, definition)),
         );
         if candidates.is_empty() {
             return Resolution::Missing;
@@ -4296,12 +4292,13 @@ fn index_definition(snapshot: &AnalysisSnapshot, definition: &Definition) -> Res
             path,
             range: definition.range,
         },
-        selection_range: definition.range,
+        selection_range: indexed_definition_selection_range(snapshot, definition),
         priority: definition_priority_for_file(snapshot, definition.file_id),
     }
 }
 
 fn index_definition_info(snapshot: &AnalysisSnapshot, definition: &Definition) -> DefinitionInfo {
+    let selection_range = indexed_definition_selection_range(snapshot, definition);
     let path = snapshot
         .source_files()
         .get(&definition.file_id)
@@ -4319,12 +4316,38 @@ fn index_definition_info(snapshot: &AnalysisSnapshot, definition: &Definition) -
             name: definition.name.clone(),
             kind: definition.kind.clone(),
             range: definition.range,
-            selection_range: definition.range,
+            selection_range,
             location,
         },
         document: None,
         file: Some(definition.file_id),
     }
+}
+
+fn indexed_definition_selection_range(
+    snapshot: &AnalysisSnapshot,
+    definition: &Definition,
+) -> TextRange {
+    snapshot
+        .file_state(definition.file_id)
+        .and_then(|state| state.hir())
+        .and_then(|hir| {
+            hir.definitions()
+                .iter()
+                .find(|candidate| {
+                    candidate.kind.eq_ignore_ascii_case(&definition.kind)
+                        && candidate.name.eq_ignore_ascii_case(&definition.name)
+                        && candidate.range == definition.range
+                })
+                .map(|candidate| candidate.selection_range)
+        })
+        .unwrap_or(definition.range)
+}
+
+fn definition_selection_location(definition: &ResolutionDefinition) -> Location {
+    let mut location = definition.location.clone();
+    location.range = definition.selection_range;
+    location
 }
 
 fn definition_priority_for_file(snapshot: &AnalysisSnapshot, id: SourceFileId) -> u64 {
@@ -6655,10 +6678,67 @@ mod tests {
         assert_eq!(symbols.len(), 1);
         let definition_location = definition(&snapshot, &id, 40);
         assert_eq!(definition_location.len(), 1);
+        let definition_name_start =
+            u32::try_from(text.find("test.1").expect("definition name")).expect("offset");
+        assert_eq!(
+            definition_location[0].range,
+            TextRange::new(definition_name_start, definition_name_start + 6)
+                .expect("definition name range")
+        );
         assert!(hover(&snapshot, &id, 40).is_some());
-        assert_eq!(references(&snapshot, &id, 40, true).len(), 2);
+        let references = references(&snapshot, &id, 40, true);
+        assert_eq!(references.len(), 2);
+        assert!(references.iter().any(|location| {
+            location.range
+                == TextRange::new(definition_name_start, definition_name_start + 6)
+                    .expect("definition name range")
+        }));
         assert!(!workspace_symbols(&snapshot, "test").is_empty());
         assert!(TextRange::new(0, 1).is_some());
+    }
+
+    #[test]
+    fn navigation_targets_the_name_in_an_indexed_definition() {
+        use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use std::fs;
+
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-analysis-navigation-{nonce}"));
+        let definitions = root.join("common/events");
+        fs::create_dir_all(&definitions).expect("event directory");
+        let definition_path = definitions.join("definitions.txt");
+        let definition_text = "country_event = { id = indexed.1 }\n";
+        fs::write(&definition_path, definition_text).expect("event definition");
+
+        let mut host = eu4_host(pdx_game::eu4::bootstrap_rules());
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        host.refresh_source_roots().expect("scan event definition");
+
+        let id = DocumentId::new("file:///tmp/events/use.txt");
+        let use_text = "event = indexed.1\n";
+        let position =
+            u32::try_from(use_text.find("indexed.1").expect("event reference")).expect("offset");
+        host.open_document(id.clone(), 1, use_text.to_owned(), None)
+            .expect("open event reference");
+
+        let location = definition(&host.snapshot(), &id, position)
+            .into_iter()
+            .next()
+            .expect("indexed definition location");
+        let name_start = u32::try_from(definition_text.find("indexed.1").expect("definition name"))
+            .expect("offset");
+        assert_eq!(
+            location.range,
+            TextRange::new(name_start, name_start + 9).expect("definition name range")
+        );
+        fs::remove_dir_all(root).expect("cleanup");
     }
 
     #[test]

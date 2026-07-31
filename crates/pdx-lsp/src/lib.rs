@@ -53,7 +53,7 @@ use pdx_game::{
 };
 use pdx_parser::format::format;
 use pdx_rules::{GameProfile, RuleSet, RulesError};
-use pdx_text::{LineIndex, Position, TextRange};
+use pdx_text::{LineIndex, Position, PositionRange, TextRange};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -2587,6 +2587,13 @@ fn range_to_lsp(index: &LineIndex, text: &str, range: TextRange) -> LspRange {
     )
 }
 
+fn cached_position_range_to_lsp(range: PositionRange) -> LspRange {
+    LspRange::new(
+        LspPosition::new(range.start.line, range.start.character),
+        LspPosition::new(range.end.line, range.end.character),
+    )
+}
+
 fn location_range_to_lsp(snapshot: &AnalysisSnapshot, location: &Location) -> LspRange {
     if let Some(document) = location.document.as_ref()
         && let Some(document) = snapshot.document(document)
@@ -2596,6 +2603,11 @@ fn location_range_to_lsp(snapshot: &AnalysisSnapshot, location: &Location) -> Ls
     if let Some(file) = location.file.and_then(|file| snapshot.source_text(file)) {
         let index = LineIndex::new(file);
         return range_to_lsp(&index, file, location.range);
+    }
+    if let Some(file) = location.file
+        && let Some(range) = snapshot.index().position_for(file, location.range)
+    {
+        return cached_position_range_to_lsp(range);
     }
     LspRange::default()
 }
@@ -2613,6 +2625,11 @@ fn range_to_lsp_for_location(
     if let Some(file) = location.file.and_then(|file| snapshot.source_text(file)) {
         let index = LineIndex::new(file);
         return range_to_lsp(&index, file, range);
+    }
+    if let Some(file) = location.file
+        && let Some(position_range) = snapshot.index().position_for(file, range)
+    {
+        return cached_position_range_to_lsp(position_range);
     }
     LspRange::default()
 }
@@ -3566,15 +3583,14 @@ mod tests {
                 .find(|value| value["id"] == 3)
                 .is_some_and(|value| value["result"]["contents"].is_object())
         );
-        assert_eq!(
-            responses
-                .iter()
-                .find(|value| value["id"] == 4)
-                .expect("definition")["result"]
-                .as_array()
-                .map(Vec::len),
-            Some(1)
-        );
+        let definition = responses
+            .iter()
+            .find(|value| value["id"] == 4)
+            .expect("definition");
+        assert_eq!(definition["result"].as_array().map(Vec::len), Some(1));
+        assert_eq!(definition["result"][0]["range"]["start"]["line"], 0);
+        assert_eq!(definition["result"][0]["range"]["start"]["character"], 23);
+        assert_eq!(definition["result"][0]["range"]["end"]["character"], 29);
         assert_eq!(
             responses
                 .iter()
@@ -3976,15 +3992,17 @@ path = "dependencies/high"
         )
         .expect("current mod");
         let reference_path = current.join("common/events/reference.txt");
-        fs::write(&reference_path, "event = dependency.1\n").expect("current reference");
+        fs::write(&reference_path, "event = dependency.1\nevent = vanilla.1\n")
+            .expect("current reference");
 
         let reference_uri = canonical_uri(&reference_path);
         let root_uri = canonical_uri(&canonical_root);
         let input = frames([
             json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{},"initializationOptions":{"projectConfig":".pdx/project.toml"}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"eu4","version":1,"text":"event = dependency.1\n"}}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"eu4","version":1,"text":"event = dependency.1\nevent = vanilla.1\n"}}}),
             json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":reference_uri},"position":{"line":0,"character":10},"newName":"renamed.1"}}),
+            json!({"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":reference_uri},"position":{"line":1,"character":8}}}),
             json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
@@ -4036,6 +4054,18 @@ path = "dependencies/high"
                 .expect("cached source metadata")
                 .root_id,
             SourceRootId::new(0)
+        );
+        let vanilla_definition_response = responses
+            .iter()
+            .find(|value| value["id"] == 4)
+            .expect("Vanilla definition response");
+        assert_eq!(vanilla_definition_response["error"], Value::Null);
+        assert_eq!(
+            vanilla_definition_response["result"][0]["range"],
+            json!({
+                "start": {"line": 0, "character": 23},
+                "end": {"line": 0, "character": 32}
+            })
         );
         let rename = responses
             .iter()

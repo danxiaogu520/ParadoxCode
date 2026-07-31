@@ -77,6 +77,23 @@ impl Position {
     }
 }
 
+/// A half-open editor position range measured in UTF-16 code units.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct PositionRange {
+    /// Start position.
+    pub start: Position,
+    /// End position.
+    pub end: Position,
+}
+
+impl PositionRange {
+    /// Creates a position range.
+    #[must_use]
+    pub const fn new(start: Position, end: Position) -> Self {
+        Self { start, end }
+    }
+}
+
 /// Converts between UTF-8 byte offsets and UTF-16 editor positions.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LineIndex {
@@ -147,6 +164,15 @@ impl LineIndex {
             sum.checked_add(u32::try_from(character.len_utf16()).ok()?)
         })?;
         Some(Position::new(u32::try_from(line).ok()?, character))
+    }
+
+    /// Returns the UTF-16 editor range corresponding to a UTF-8 byte range.
+    #[must_use]
+    pub fn position_range(&self, text: &str, range: TextRange) -> Option<PositionRange> {
+        Some(PositionRange::new(
+            self.position(text, range.start())?,
+            self.position(text, range.end())?,
+        ))
     }
 
     /// Returns the number of indexed lines.
@@ -267,6 +293,21 @@ mod tests {
         assert!(
             index.offset(text, Position::new(1, 2)).is_none(),
             "must reject half an emoji"
+        );
+    }
+
+    #[test]
+    fn line_index_converts_ranges_to_utf16_positions() {
+        let text = "head\r\n汉😀e\u{301}\r\ntail";
+        let index = LineIndex::new(text);
+        let start = u32::try_from(text.find("😀").expect("emoji")).expect("offset");
+        let range = TextRange::new(start, start + 4).expect("emoji range");
+        assert_eq!(
+            index.position_range(text, range),
+            Some(super::PositionRange::new(
+                Position::new(1, 1),
+                Position::new(1, 3),
+            ))
         );
     }
 

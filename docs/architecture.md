@@ -82,7 +82,7 @@ Zed extension 只负责：
 
 LSP initialize 将 client 打开的 root 与类型化 `initializationOptions` 解析成 source roots；可选 `.pdx/project.toml` 描述 Current Mod 和从低到高排列的 Dependency Mods，inline 字段可覆盖 TOML。相对路径以打开的 worktree 为基准，目录会 canonicalize 并拒绝重叠。这属于 adapter 配置解析；优先级、只读属性和索引仍由 editor-neutral workspace 模型执行。
 
-Vanilla cache 是本机版本化 SQLite artifact，只持久化 source-file location metadata 和 semantic shards，不持久化源码、CST 或 HIR。`pdx index vanilla` 保留为显式低层建库入口；`pdx setup vanilla` 负责发现、验证、建库和用户级配置。首次 LSP 启动在没有项目覆盖和历史尝试记录时只后台执行一次快速发现；唯一候选完整建库后通过 event loop 原子安装，零候选或多候选记录结果并提示用户手动深度扫描。正常启动只读、可取消地加载 cache，并与实时 Current Mod/Dependency shards 合并；后续 workspace refresh 会跳过 Vanilla root。cache `game_id` 必须匹配，`rule_hash` 只用于可观察性和手动刷新决策。
+Vanilla cache 是本机版本化 SQLite artifact，只持久化 source-file location metadata（包括 definition/reference 的 UTF-16 导航位置）和 semantic shards，不持久化源码、CST 或 HIR。这样即使 Vanilla 源目录当前不可读，definition/reference 仍可返回可用的编辑器范围。`pdx index vanilla` 保留为显式低层建库入口；`pdx setup vanilla` 负责发现、验证、建库和用户级配置。首次 LSP 启动在没有项目覆盖和历史尝试记录时只后台执行一次快速发现；唯一候选完整建库后通过 event loop 原子安装，零候选或多候选记录结果并提示用户手动深度扫描。正常启动只读、可取消地加载 cache，并与实时 Current Mod/Dependency shards 合并；后续 workspace refresh 会跳过 Vanilla root。cache `game_id` 必须匹配，`rule_hash` 只用于可观察性和手动刷新决策。
 
 ### 规则层
 

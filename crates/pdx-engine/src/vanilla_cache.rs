@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use pdx_rules::FileResolutionPolicy;
-use pdx_text::{LogicalPath, TextRange};
+use pdx_text::{LogicalPath, Position, PositionRange, TextRange};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction, params};
 use sha2::{Digest, Sha256};
 
@@ -17,7 +17,7 @@ use super::{
 };
 
 /// Current on-disk Vanilla cache schema.
-pub const CURRENT_VANILLA_CACHE_SCHEMA_VERSION: u32 = 1;
+pub const CURRENT_VANILLA_CACHE_SCHEMA_VERSION: u32 = 2;
 
 const APPLICATION_ID: i32 = 0x5044_5856;
 const MAX_CACHE_BYTES: u64 = 1024 * 1024 * 1024;
@@ -25,6 +25,20 @@ const MAX_CACHE_FILES: usize = 100_000;
 const MAX_CACHE_SYMBOLS: usize = 5_000_000;
 const MAX_TEXT_FIELD_BYTES: usize = 1024 * 1024;
 const VANILLA_ROOT_ID: SourceRootId = SourceRootId::new(0);
+
+type VanillaIndexParts = (
+    VanillaIndexCacheMetadata,
+    SourceRoot,
+    BTreeMap<SourceFileId, SourceFile>,
+    WorkspaceIndex,
+    BTreeMap<(SourceFileId, TextRange), PositionRange>,
+);
+
+type LoadedIndex = (
+    BTreeMap<SourceFileId, SourceFile>,
+    WorkspaceIndex,
+    BTreeMap<(SourceFileId, TextRange), PositionRange>,
+);
 
 /// Observable metadata recorded when a Vanilla cache is built manually.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -56,15 +70,15 @@ pub struct VanillaIndexCache {
 
 impl VanillaIndexCache {
     /// Consumes a validated cache so installation can move its large semantic index.
-    pub(crate) fn into_parts(
-        self,
-    ) -> (
-        VanillaIndexCacheMetadata,
-        SourceRoot,
-        BTreeMap<SourceFileId, SourceFile>,
-        WorkspaceIndex,
-    ) {
-        (self.metadata, self.root, self.source_files, self.index)
+    pub(crate) fn into_parts(self) -> VanillaIndexParts {
+        let positions = self.index.position_ranges().clone();
+        (
+            self.metadata,
+            self.root,
+            self.source_files,
+            self.index,
+            positions,
+        )
     }
 
     /// Builds a cache from a dedicated Vanilla-only workspace snapshot.
@@ -195,13 +209,15 @@ impl VanillaIndexCache {
         let indexed_files = metadata_text(connection, "indexed_files")?
             .parse::<usize>()
             .map_err(|_| VanillaCacheError::InvalidMetadata("indexed_files"))?;
-        let (source_files, index) = load_index(connection, &source_root)?;
+        let (source_files, index, positions) = load_index(connection, &source_root)?;
         if indexed_files != source_files.len() {
             return Err(VanillaCacheError::InvalidData(format!(
                 "metadata records {indexed_files} files but cache contains {}",
                 source_files.len()
             )));
         }
+        let mut index = index;
+        index.replace_all_position_ranges(positions);
         Ok(Self {
             metadata: VanillaIndexCacheMetadata {
                 schema_version,
@@ -421,10 +437,15 @@ fn validate_table_limits(connection: &Connection) -> Result<(), VanillaCacheErro
     validate_count(connection, "source_files", MAX_CACHE_FILES)?;
     validate_count(connection, "definitions", MAX_CACHE_SYMBOLS)?;
     validate_count(connection, "symbol_references", MAX_CACHE_SYMBOLS)?;
+    validate_count(connection, "navigation_positions", MAX_CACHE_SYMBOLS)?;
     for (table, fields) in [
         ("source_files", "logical_path, category_id, resolution"),
         ("definitions", "kind, name"),
         ("symbol_references", "kind, name"),
+        (
+            "navigation_positions",
+            "range_start, range_end, start_line, start_character, end_line, end_character",
+        ),
     ] {
         let query = format!(
             "SELECT COALESCE(MAX(max_length), 0) FROM (SELECT max({}) AS max_length FROM {table})",
@@ -465,6 +486,7 @@ fn write_cache(
 ) -> Result<(), VanillaCacheError> {
     transaction.execute_batch(
         "DROP TABLE IF EXISTS symbol_references;
+         DROP TABLE IF EXISTS navigation_positions;
          DROP TABLE IF EXISTS definitions;
          DROP TABLE IF EXISTS source_files;
          DROP TABLE IF EXISTS metadata;
@@ -494,6 +516,16 @@ fn write_cache(
              range_start INTEGER NOT NULL,
              range_end INTEGER NOT NULL,
              PRIMARY KEY(file_id, ordinal)
+         );
+         CREATE TABLE navigation_positions(
+             file_id BLOB NOT NULL REFERENCES source_files(file_id),
+             range_start INTEGER NOT NULL,
+             range_end INTEGER NOT NULL,
+             start_line INTEGER NOT NULL CHECK(start_line >= 0),
+             start_character INTEGER NOT NULL CHECK(start_character >= 0),
+             end_line INTEGER NOT NULL CHECK(end_line >= 0),
+             end_character INTEGER NOT NULL CHECK(end_character >= 0),
+             PRIMARY KEY(file_id, range_start, range_end)
          );",
     )?;
     transaction.pragma_update(None, "application_id", APPLICATION_ID)?;
@@ -580,13 +612,34 @@ fn write_cache(
             )?;
         }
     }
+    for ((file_id, range), position) in cache.index.position_ranges() {
+        if !cache.source_files.contains_key(file_id) {
+            return Err(VanillaCacheError::InvalidData(format!(
+                "navigation position references unknown file {}",
+                file_id.get()
+            )));
+        }
+        transaction.execute(
+            "INSERT INTO navigation_positions(file_id, range_start, range_end, start_line, start_character, end_line, end_character)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                encode_file_id(*file_id),
+                i64::from(range.start()),
+                i64::from(range.end()),
+                i64::from(position.start.line),
+                i64::from(position.start.character),
+                i64::from(position.end.line),
+                i64::from(position.end.character),
+            ],
+        )?;
+    }
     Ok(())
 }
 
 fn load_index(
     connection: &Connection,
     source_root: &Path,
-) -> Result<(BTreeMap<SourceFileId, SourceFile>, WorkspaceIndex), VanillaCacheError> {
+) -> Result<LoadedIndex, VanillaCacheError> {
     let mut source_files = BTreeMap::new();
     let mut shards = BTreeMap::new();
     let mut statement = connection.prepare(
@@ -642,9 +695,39 @@ fn load_index(
     }
     load_definitions(connection, &mut shards)?;
     load_references(connection, &mut shards)?;
+    let positions = load_navigation_positions(connection)?;
+    for ((file_id, range), position) in &positions {
+        let Some(shard) = shards.get(file_id) else {
+            return Err(VanillaCacheError::InvalidData(format!(
+                "navigation position references unknown file {}",
+                file_id.get()
+            )));
+        };
+        let known_range = shard
+            .definitions
+            .iter()
+            .any(|definition| definition.range == *range)
+            || shard
+                .references
+                .iter()
+                .any(|reference| reference.range == *range);
+        if !known_range {
+            return Err(VanillaCacheError::InvalidData(format!(
+                "navigation position references unknown range {}..{}",
+                range.start(),
+                range.end()
+            )));
+        }
+        if position.start > position.end {
+            return Err(VanillaCacheError::InvalidData(
+                "navigation position end precedes start".to_owned(),
+            ));
+        }
+    }
     Ok((
         source_files,
         WorkspaceIndex::from_shards(shards.into_values()),
+        positions,
     ))
 }
 
@@ -739,6 +822,46 @@ fn load_references(
     Ok(())
 }
 
+fn load_navigation_positions(
+    connection: &Connection,
+) -> Result<BTreeMap<(SourceFileId, TextRange), PositionRange>, VanillaCacheError> {
+    let mut statement = connection.prepare(
+        "SELECT file_id, range_start, range_end, start_line, start_character, end_line, end_character
+         FROM navigation_positions ORDER BY file_id, range_start, range_end",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, Vec<u8>>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, i64>(2)?,
+            row.get::<_, i64>(3)?,
+            row.get::<_, i64>(4)?,
+            row.get::<_, i64>(5)?,
+            row.get::<_, i64>(6)?,
+        ))
+    })?;
+    let mut positions = BTreeMap::new();
+    for row in rows {
+        let (file_id, start, end, start_line, start_character, end_line, end_character) = row?;
+        let file_id = decode_file_id(&file_id)?;
+        let range = decode_range(start, end)?;
+        let start_line = decode_position_component(start_line, "start line")?;
+        let start_character = decode_position_component(start_character, "start character")?;
+        let end_line = decode_position_component(end_line, "end line")?;
+        let end_character = decode_position_component(end_character, "end character")?;
+        let position = PositionRange::new(
+            Position::new(start_line, start_character),
+            Position::new(end_line, end_character),
+        );
+        if positions.insert((file_id, range), position).is_some() {
+            return Err(VanillaCacheError::InvalidData(
+                "duplicate navigation position".to_owned(),
+            ));
+        }
+    }
+    Ok(positions)
+}
+
 fn decode_range(start: i64, end: i64) -> Result<TextRange, VanillaCacheError> {
     let start = u32::try_from(start)
         .map_err(|_| VanillaCacheError::InvalidData("range start exceeds u32".to_owned()))?;
@@ -746,6 +869,10 @@ fn decode_range(start: i64, end: i64) -> Result<TextRange, VanillaCacheError> {
         .map_err(|_| VanillaCacheError::InvalidData("range end exceeds u32".to_owned()))?;
     TextRange::new(start, end)
         .ok_or_else(|| VanillaCacheError::InvalidData("range end precedes start".to_owned()))
+}
+
+fn decode_position_component(value: i64, label: &str) -> Result<u32, VanillaCacheError> {
+    u32::try_from(value).map_err(|_| VanillaCacheError::InvalidData(format!("{label} exceeds u32")))
 }
 
 fn encode_file_id(id: SourceFileId) -> Vec<u8> {
