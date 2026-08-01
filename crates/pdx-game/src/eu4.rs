@@ -27,6 +27,111 @@ pub const INSTALL_DESCRIPTOR: GameInstallDescriptor = GameInstallDescriptor {
     installation_directory_names: &["Europa Universalis IV"],
 };
 
+/// CWTools-compatible EU4 source directory whitelist.
+///
+/// The `common` entry intentionally covers the more specific `common/*` entries as well. The
+/// complete list is retained as profile data to match CWTools' `scriptFolders` contract; the
+/// engine collapses nested entries before walking the filesystem.
+pub const SCRIPT_FOLDERS: &[&str] = &[
+    "common/advisortypes",
+    "common/ages",
+    "common/ai_attitudes",
+    "common/ai_personalities",
+    "common/bookmarks",
+    "common/buildings",
+    "common/cb_types",
+    "common/centers_of_trade",
+    "common/church_aspects",
+    "common/client_states",
+    "common/colonial_regions",
+    "common/countries",
+    "common/country_colors",
+    "common/country_tags",
+    "common/cultures",
+    "common/custom_country_colors",
+    "common/custom_ideas",
+    "common/decrees",
+    "common/defines",
+    "common/diplomatic_actions",
+    "common/disasters",
+    "common/dynasty_colors",
+    "common/estates",
+    "common/event_modifiers",
+    "common/factions",
+    "common/fervor",
+    "common/fetishist_cults",
+    "common/governments",
+    "common/government_names",
+    "common/government_ranks",
+    "common/government_reforms",
+    "common/great_projects",
+    "common/ideas",
+    "common/imperial_reforms",
+    "common/incidents",
+    "common/institutions",
+    "common/insults",
+    "common/isolationism",
+    "common/leader_personalities",
+    "common/natives",
+    "common/native_advancement",
+    "common/naval_doctrines",
+    "common/new_diplomatic_actions",
+    "common/on_actions",
+    "common/opinion_modifiers",
+    "common/parliament_bribes",
+    "common/parliament_issues",
+    "common/peace_treaties",
+    "common/personal_deities",
+    "common/policies",
+    "common/powerprojection",
+    "common/prices",
+    "common/professionalism",
+    "common/province_names",
+    "common/province_triggered_modifiers",
+    "common/rebel_types",
+    "common/region_colors",
+    "common/religions",
+    "common/religious_conversions",
+    "common/religious_reforms",
+    "common/revolt_triggers",
+    "common/ruler_personalities",
+    "common/scripted_effects",
+    "common/scripted_functions",
+    "common/scripted_triggers",
+    "common/state_edicts",
+    "common/static_modifiers",
+    "common/subject_types",
+    "common/technologies",
+    "common/timed_modifiers",
+    "common/tradecompany_investments",
+    "common/tradegoods",
+    "common/tradenodes",
+    "common/trade_companies",
+    "common/trading_policies",
+    "common/triggered_modifiers",
+    "common/units",
+    "common/units_display",
+    "common/wargoal_types",
+    "common",
+    "customizable_localization",
+    "decisions",
+    "events",
+    "hints",
+    "history/advisors",
+    "history/countries",
+    "history/diplomacy",
+    "history/provinces",
+    "history/wars",
+    "map",
+    "music",
+    "missions",
+    "sound",
+    "tutorial",
+    "gfx",
+    "interface",
+    "localisation",
+];
+
 /// Loads the immutable first-party EU4 rules embedded in the official binary.
 ///
 /// No path, environment variable, initialization option, or project setting can replace these
@@ -222,6 +327,10 @@ pub fn profile() -> GameProfile {
     }
     GameProfile {
         game_id: GAME_ID.to_owned(),
+        scan_roots: SCRIPT_FOLDERS
+            .iter()
+            .map(|folder| (*folder).to_owned())
+            .collect(),
         definitions,
         references: vec![
             reference(ProfileMatchMode::Exact, "event", "event"),
@@ -598,7 +707,7 @@ pub fn bootstrap_rules() -> RuleSet {
 
 #[cfg(test)]
 mod tests {
-    use super::{Eu4Profile, GAME_ID, bootstrap_rules, first_party_rules, profile};
+    use super::{Eu4Profile, GAME_ID, SCRIPT_FOLDERS, bootstrap_rules, first_party_rules, profile};
 
     #[test]
     fn profile_identity_and_bootstrap_catalog_are_stable() {
@@ -620,6 +729,14 @@ mod tests {
         );
         let profile = profile();
         assert_eq!(profile.game_id, GAME_ID);
+        assert_eq!(profile.scan_roots().len(), SCRIPT_FOLDERS.len());
+        assert!(profile.scan_roots().iter().any(|root| root == "common"));
+        assert!(
+            profile
+                .scan_roots()
+                .iter()
+                .any(|root| root == "localisation")
+        );
         assert_eq!(
             profile
                 .definition("common/events/example.txt", "country_event")

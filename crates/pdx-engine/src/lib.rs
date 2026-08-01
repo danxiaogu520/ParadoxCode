@@ -7,15 +7,16 @@
 use std::cell::Cell;
 pub mod hir;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 #[cfg(test)]
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 use crate::hir::{HirFile, lower_shared, lower_shared_with_profile};
 use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile, parse};
@@ -1145,23 +1146,135 @@ fn record_scan_issue(
     }
 }
 
-fn collect_disk_files(
+fn collect_whitelisted_files(
     root: &std::path::Path,
-    current: &std::path::Path,
-    depth: usize,
+    scan_roots: &[String],
     limits: WorkspaceScanLimits,
     report: &mut WorkspaceScanReport,
     output: &mut Vec<(LogicalPath, PathBuf)>,
     cancellation: &WorkspaceScanToken,
 ) -> Result<(), WorkspaceError> {
-    cancellation.checkpoint()?;
+    let root_metadata = fs::metadata(root).map_err(WorkspaceError::Io)?;
+    if !root_metadata.is_dir() {
+        return Err(WorkspaceError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotADirectory,
+            format!(
+                "workspace source root is not a directory: {}",
+                root.display()
+            ),
+        )));
+    }
+
+    let mut roots = scan_roots
+        .iter()
+        .map(|scan_root| {
+            LogicalPath::parse(scan_root)
+                .map_err(|_| WorkspaceError::InvalidLogicalPath(PathBuf::from(scan_root)))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    roots.sort();
+    roots.dedup();
+    let mut collapsed_roots = Vec::with_capacity(roots.len());
+    for scan_root in roots {
+        if collapsed_roots.iter().any(|parent: &LogicalPath| {
+            parent.as_str() == scan_root.as_str()
+                || scan_root
+                    .as_str()
+                    .strip_prefix(parent.as_str())
+                    .is_some_and(|remainder| remainder.starts_with('/'))
+        }) {
+            continue;
+        }
+        collapsed_roots.push(scan_root);
+    }
+
+    let mut seen = BTreeSet::new();
+    let mut scan = DiskScanContext {
+        limits,
+        report,
+        output,
+        seen: &mut seen,
+        cancellation,
+    };
+    for scan_root in collapsed_roots {
+        scan.cancellation.checkpoint()?;
+        let depth = scan_root
+            .as_str()
+            .split('/')
+            .filter(|component| !component.is_empty())
+            .count();
+        let current = if scan_root.as_str().is_empty() {
+            root.to_owned()
+        } else {
+            root.join(scan_root.as_str())
+        };
+        if depth > limits.max_depth {
+            record_scan_issue(
+                scan.report,
+                scan.limits,
+                WorkspaceScanIssueKind::DepthLimitExceeded,
+                current,
+                format!(
+                    "whitelisted directory depth exceeds the configured limit of {}",
+                    limits.max_depth
+                ),
+            );
+            continue;
+        }
+        let metadata = match fs::symlink_metadata(&current) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                record_scan_issue(
+                    scan.report,
+                    scan.limits,
+                    WorkspaceScanIssueKind::DirectoryUnreadable,
+                    current,
+                    error.to_string(),
+                );
+                continue;
+            }
+        };
+        if metadata.file_type().is_symlink() {
+            record_scan_issue(
+                scan.report,
+                scan.limits,
+                WorkspaceScanIssueKind::SymlinkSkipped,
+                current,
+                "symbolic links are not followed during workspace discovery".to_owned(),
+            );
+            continue;
+        }
+        if !metadata.is_dir() {
+            continue;
+        }
+        collect_disk_files(root, &current, depth, &mut scan)?;
+    }
+    Ok(())
+}
+
+struct DiskScanContext<'a> {
+    limits: WorkspaceScanLimits,
+    report: &'a mut WorkspaceScanReport,
+    output: &'a mut Vec<(LogicalPath, PathBuf)>,
+    seen: &'a mut BTreeSet<LogicalPath>,
+    cancellation: &'a WorkspaceScanToken,
+}
+
+fn collect_disk_files(
+    root: &std::path::Path,
+    current: &std::path::Path,
+    depth: usize,
+    scan: &mut DiskScanContext<'_>,
+) -> Result<(), WorkspaceError> {
+    scan.cancellation.checkpoint()?;
     let entries = match fs::read_dir(current) {
         Ok(entries) => entries,
         Err(error) if depth == 0 => return Err(WorkspaceError::Io(error)),
         Err(error) => {
             record_scan_issue(
-                report,
-                limits,
+                scan.report,
+                scan.limits,
                 WorkspaceScanIssueKind::DirectoryUnreadable,
                 current.to_owned(),
                 error.to_string(),
@@ -1174,8 +1287,8 @@ fn collect_disk_files(
             Ok(entry) => Some(entry),
             Err(error) => {
                 record_scan_issue(
-                    report,
-                    limits,
+                    scan.report,
+                    scan.limits,
                     WorkspaceScanIssueKind::DirectoryEntryUnreadable,
                     current.to_owned(),
                     error.to_string(),
@@ -1186,14 +1299,14 @@ fn collect_disk_files(
         .collect::<Vec<_>>();
     entries.sort_by_key(|entry| entry.file_name());
     for entry in entries {
-        cancellation.checkpoint()?;
+        scan.cancellation.checkpoint()?;
         let path = entry.path();
         let file_type = match entry.file_type() {
             Ok(file_type) => file_type,
             Err(error) => {
                 record_scan_issue(
-                    report,
-                    limits,
+                    scan.report,
+                    scan.limits,
                     WorkspaceScanIssueKind::DirectoryEntryUnreadable,
                     path,
                     error.to_string(),
@@ -1203,8 +1316,8 @@ fn collect_disk_files(
         };
         if file_type.is_symlink() {
             record_scan_issue(
-                report,
-                limits,
+                scan.report,
+                scan.limits,
                 WorkspaceScanIssueKind::SymlinkSkipped,
                 path,
                 "symbolic links are not followed during workspace discovery".to_owned(),
@@ -1215,31 +1328,31 @@ fn collect_disk_files(
             if ignored_workspace_directory(&entry.file_name()) {
                 continue;
             }
-            if depth >= limits.max_depth {
+            if depth >= scan.limits.max_depth {
                 record_scan_issue(
-                    report,
-                    limits,
+                    scan.report,
+                    scan.limits,
                     WorkspaceScanIssueKind::DepthLimitExceeded,
                     path,
                     format!(
                         "directory nesting exceeds the configured limit of {}",
-                        limits.max_depth
+                        scan.limits.max_depth
                     ),
                 );
                 continue;
             }
-            collect_disk_files(root, &path, depth + 1, limits, report, output, cancellation)?;
+            collect_disk_files(root, &path, depth + 1, scan)?;
             continue;
         }
         if !file_type.is_file() {
             continue;
         }
-        if report.discovered_files >= limits.max_files {
+        if scan.report.discovered_files >= scan.limits.max_files {
             return Err(WorkspaceError::FileLimitExceeded {
-                limit: limits.max_files,
+                limit: scan.limits.max_files,
             });
         }
-        report.discovered_files = report.discovered_files.saturating_add(1);
+        scan.report.discovered_files = scan.report.discovered_files.saturating_add(1);
         let relative = path
             .strip_prefix(root)
             .map_err(|_| WorkspaceError::InvalidLogicalPath(path.clone()))?
@@ -1247,7 +1360,10 @@ fn collect_disk_files(
             .replace('\\', "/");
         let logical = LogicalPath::parse(&relative)
             .map_err(|_| WorkspaceError::InvalidLogicalPath(path.clone()))?;
-        output.push((logical, path));
+        if !scan.seen.insert(logical.clone()) {
+            continue;
+        }
+        scan.output.push((logical, path));
     }
     Ok(())
 }
@@ -1518,6 +1634,177 @@ fn staged_overlay_document(
     unparsed_document(id, Some(version), text, DocumentSource::Overlay, path)
 }
 
+const MAX_SOURCE_WORKERS: usize = 8;
+const PARALLEL_SOURCE_THRESHOLD: usize = 32;
+
+struct SourceReadJob {
+    file: SourceFile,
+    physical_path: PathBuf,
+}
+
+struct SourceReadResult {
+    file: SourceFile,
+    state: Option<Arc<FileState>>,
+    report: WorkspaceScanReport,
+}
+
+struct SourceLoadContext<'a> {
+    limits: WorkspaceScanLimits,
+    previous_files: &'a BTreeMap<SourceFileId, SourceFile>,
+    previous_states: &'a BTreeMap<SourceFileId, Arc<FileState>>,
+    rules: &'a RuleSet,
+    profile: &'a GameProfile,
+    cancellation: &'a WorkspaceScanToken,
+}
+
+fn load_source_files(
+    jobs: Vec<SourceReadJob>,
+    files: &mut BTreeMap<SourceFileId, SourceFile>,
+    file_states: &mut BTreeMap<SourceFileId, Arc<FileState>>,
+    report: &mut WorkspaceScanReport,
+    context: &SourceLoadContext<'_>,
+) -> Result<(), WorkspaceError> {
+    let worker_count = thread::available_parallelism()
+        .map_or(1, |parallelism| parallelism.get())
+        .min(MAX_SOURCE_WORKERS)
+        .min(jobs.len());
+    let results = if jobs.len() < PARALLEL_SOURCE_THRESHOLD || worker_count < 2 {
+        let mut results = Vec::with_capacity(jobs.len());
+        for job in jobs {
+            context.cancellation.checkpoint()?;
+            results.push(load_source_file_job(job, context)?);
+        }
+        results
+    } else {
+        let queue = Arc::new(Mutex::new(
+            jobs.into_iter().enumerate().collect::<VecDeque<_>>(),
+        ));
+        let mut results = BTreeMap::new();
+        thread::scope(|scope| -> Result<(), WorkspaceError> {
+            let mut workers = Vec::with_capacity(worker_count);
+            for _ in 0..worker_count {
+                let queue = Arc::clone(&queue);
+                workers.push(scope.spawn(move || {
+                    let mut results = Vec::new();
+                    loop {
+                        let job = match queue.lock() {
+                            Ok(mut queue) => queue.pop_front(),
+                            Err(_) => {
+                                return Err(WorkspaceError::Io(std::io::Error::other(
+                                    "workspace source worker queue was poisoned",
+                                )));
+                            }
+                        };
+                        let Some((index, job)) = job else {
+                            break;
+                        };
+                        let result = load_source_file_job(job, context)?;
+                        results.push((index, result));
+                    }
+                    Ok(results)
+                }));
+            }
+            let mut first_error = None;
+            for worker in workers {
+                match worker.join() {
+                    Ok(Ok(worker_results)) => {
+                        for (index, result) in worker_results {
+                            results.insert(index, result);
+                        }
+                    }
+                    Ok(Err(error)) => {
+                        if first_error.is_none() {
+                            first_error = Some(error);
+                        }
+                    }
+                    Err(_) => {
+                        if first_error.is_none() {
+                            first_error = Some(WorkspaceError::Io(std::io::Error::other(
+                                "workspace source worker panicked",
+                            )));
+                        }
+                    }
+                }
+            }
+            if let Some(error) = first_error {
+                return Err(error);
+            }
+            Ok(())
+        })?;
+        results.into_values().collect::<Vec<_>>()
+    };
+
+    for result in results {
+        context.cancellation.checkpoint()?;
+        merge_scan_report(report, result.report, context.limits);
+        let Some(state) = result.state else {
+            continue;
+        };
+        if let Some(existing) = files.insert(result.file.id, result.file.clone()) {
+            return Err(WorkspaceError::FileIdCollision {
+                first: existing.physical_path,
+                second: result.file.physical_path,
+            });
+        }
+        file_states.insert(result.file.id, state);
+        report.indexed_files = report.indexed_files.saturating_add(1);
+    }
+    Ok(())
+}
+
+fn load_source_file_job(
+    job: SourceReadJob,
+    context: &SourceLoadContext<'_>,
+) -> Result<SourceReadResult, WorkspaceError> {
+    let mut report = WorkspaceScanReport::default();
+    let text = read_source_file_cancellable(
+        &job.physical_path,
+        context.limits,
+        &mut report,
+        context.cancellation,
+    )?;
+    let state = text.map(|text| {
+        let previous = context.previous_states.get(&job.file.id);
+        if let Some(previous) = previous
+            && context.previous_files.get(&job.file.id) == Some(&job.file)
+            && previous.source() == text
+        {
+            return Arc::clone(previous);
+        }
+        let file_revision = previous.map_or(0, |state| state.revision().saturating_add(1));
+        Arc::new(build_file_state(
+            &job.file,
+            text,
+            file_revision,
+            context.rules,
+            context.profile,
+        ))
+    });
+    Ok(SourceReadResult {
+        file: job.file,
+        state,
+        report,
+    })
+}
+
+fn merge_scan_report(
+    report: &mut WorkspaceScanReport,
+    partial: WorkspaceScanReport,
+    limits: WorkspaceScanLimits,
+) {
+    report.skipped_entries = report
+        .skipped_entries
+        .saturating_add(partial.skipped_entries);
+    report.omitted_issues = report.omitted_issues.saturating_add(partial.omitted_issues);
+    for issue in partial.issues {
+        if report.issues.len() < limits.max_reported_issues {
+            report.issues.push(issue);
+        } else {
+            report.omitted_issues = report.omitted_issues.saturating_add(1);
+        }
+    }
+}
+
 fn build_file_state(
     file: &SourceFile,
     source: String,
@@ -1578,6 +1865,21 @@ fn build_file_state(
         parsed,
         hir,
         shard: Arc::new(shard),
+    }
+}
+
+fn empty_file_state(file: &SourceFile, revision: u64) -> FileState {
+    FileState {
+        revision,
+        source: Arc::from(""),
+        parsed: None,
+        hir: None,
+        shard: Arc::new(FileIndexShard {
+            file_id: file.id,
+            definitions: Vec::new(),
+            references: Vec::new(),
+            syntax_error_count: 0,
+        }),
     }
 }
 
@@ -2062,6 +2364,16 @@ impl AnalysisHost {
                 });
             }
         }
+        if let Some(file) = cache
+            .source_files()
+            .values()
+            .find(|file| !self.profile.allows_scan_path(file.logical_path.as_str()))
+        {
+            return Err(VanillaCacheError::InvalidData(format!(
+                "Vanilla cache file {} is outside the active profile scan whitelist",
+                file.logical_path.as_str()
+            )));
+        }
 
         let (_, vanilla, mut files, cached_index, cached_positions, cached_previews) =
             cache.into_parts();
@@ -2129,7 +2441,8 @@ impl AnalysisHost {
     ) -> Result<WorkspaceScanReport, WorkspaceError> {
         cancellation.checkpoint()?;
         let mut files: BTreeMap<SourceFileId, SourceFile> = BTreeMap::new();
-        let mut texts = BTreeMap::new();
+        let mut file_states: BTreeMap<SourceFileId, Arc<FileState>> = BTreeMap::new();
+        let mut source_jobs = Vec::new();
         let mut report = WorkspaceScanReport::default();
         for root in self.roots.iter() {
             cancellation.checkpoint()?;
@@ -2141,10 +2454,9 @@ impl AnalysisHost {
                 continue;
             }
             let mut paths = Vec::new();
-            collect_disk_files(
+            collect_whitelisted_files(
                 &root.path,
-                &root.path,
-                0,
+                self.profile.scan_roots(),
                 limits,
                 &mut report,
                 &mut paths,
@@ -2157,56 +2469,63 @@ impl AnalysisHost {
                 let Some(category) = self.rules.classify(&logical) else {
                     continue;
                 };
-                let Some(text) =
-                    read_source_file_cancellable(&physical, limits, &mut report, cancellation)?
-                else {
-                    continue;
-                };
-                if let Some(existing) = files.get(&id) {
-                    return Err(WorkspaceError::FileIdCollision {
-                        first: existing.physical_path.clone(),
-                        second: physical,
-                    });
-                }
                 let source_file = SourceFile {
                     id,
                     root_id: root.id,
-                    physical_path: physical,
+                    physical_path: physical.clone(),
                     logical_path: logical,
                     category_id: Some(category.id.clone()),
                     resolution: category.resolution,
                 };
-                files.insert(id, source_file);
-                texts.insert(id, text);
-                report.indexed_files = report.indexed_files.saturating_add(1);
+                // Opaque resources participate in path/overlay resolution, but have no
+                // text parser or semantic state. In particular, do not read binary assets as
+                // UTF-8 just to manufacture an empty shard for them.
+                if matches!(&category.parser, ParserKind::Asset) {
+                    let file_for_state = source_file.clone();
+                    if let Some(existing) = files.insert(id, source_file) {
+                        return Err(WorkspaceError::FileIdCollision {
+                            first: existing.physical_path,
+                            second: physical,
+                        });
+                    }
+                    let file_revision = self
+                        .file_states
+                        .get(&id)
+                        .map_or(0, |state| state.revision().saturating_add(1));
+                    let state = match self.file_states.get(&id) {
+                        Some(previous)
+                            if self.source_files.get(&id) == Some(&file_for_state)
+                                && previous.source().is_empty() =>
+                        {
+                            Arc::clone(previous)
+                        }
+                        _ => Arc::new(empty_file_state(&file_for_state, file_revision)),
+                    };
+                    file_states.insert(id, state);
+                    report.indexed_files = report.indexed_files.saturating_add(1);
+                    continue;
+                }
+                source_jobs.push(SourceReadJob {
+                    file: source_file,
+                    physical_path: physical,
+                });
             }
         }
-        let mut file_states = BTreeMap::new();
-        for (id, file) in &files {
-            cancellation.checkpoint()?;
-            let Some(text) = texts.remove(id) else {
-                continue;
-            };
-            let state = match self.file_states.get(id) {
-                Some(previous)
-                    if self.source_files.get(id) == Some(file) && previous.source() == text =>
-                {
-                    Arc::clone(previous)
-                }
-                previous => {
-                    let file_revision =
-                        previous.map_or(0, |state| state.revision().saturating_add(1));
-                    Arc::new(build_file_state(
-                        file,
-                        text,
-                        file_revision,
-                        self.rules.as_ref(),
-                        self.profile.as_ref(),
-                    ))
-                }
-            };
-            file_states.insert(*id, state);
-        }
+        let source_context = SourceLoadContext {
+            limits,
+            previous_files: self.source_files.as_ref(),
+            previous_states: self.file_states.as_ref(),
+            rules: self.rules.as_ref(),
+            profile: self.profile.as_ref(),
+            cancellation,
+        };
+        load_source_files(
+            source_jobs,
+            &mut files,
+            &mut file_states,
+            &mut report,
+            &source_context,
+        )?;
         cancellation.checkpoint()?;
         let mut shards = file_states
             .values()
@@ -2303,6 +2622,9 @@ impl AnalysisHost {
                 .replace('\\', "/");
             let logical = LogicalPath::parse(&relative)
                 .map_err(|_| WorkspaceError::InvalidLogicalPath(change.path.clone()))?;
+            if !self.profile.allows_scan_path(logical.as_str()) {
+                continue;
+            }
             let id = SourceFileId::new(stable_file_id(root.id, &logical));
             report.discovered_files = report.discovered_files.saturating_add(1);
 
@@ -2344,11 +2666,6 @@ impl AnalysisHost {
             let Some(category) = self.rules.classify(&logical) else {
                 continue;
             };
-            let Some(text) =
-                read_source_file_cancellable(&change.path, limits, &mut report, cancellation)?
-            else {
-                continue;
-            };
             let source_file = SourceFile {
                 id,
                 root_id: root.id,
@@ -2365,23 +2682,36 @@ impl AnalysisHost {
                     second: source_file.physical_path,
                 });
             }
+            let text = if matches!(&category.parser, ParserKind::Asset) {
+                None
+            } else {
+                let Some(text) =
+                    read_source_file_cancellable(&change.path, limits, &mut report, cancellation)?
+                else {
+                    continue;
+                };
+                Some(text)
+            };
             if files.get(&id) == Some(&source_file)
                 && file_states
                     .get(&id)
-                    .is_some_and(|state| state.source() == text)
+                    .is_some_and(|state| text.as_deref().is_none_or(|text| state.source() == text))
             {
                 continue;
             }
             let file_revision = file_states
                 .get(&id)
                 .map_or(0, |state| state.revision().saturating_add(1));
-            let state = Arc::new(build_file_state(
-                &source_file,
-                text,
-                file_revision,
-                self.rules.as_ref(),
-                self.profile.as_ref(),
-            ));
+            let state = Arc::new(match text {
+                Some(text) => build_file_state(
+                    &source_file,
+                    text,
+                    file_revision,
+                    self.rules.as_ref(),
+                    self.profile.as_ref(),
+                ),
+                None => empty_file_state(&source_file, file_revision),
+            });
             files.insert(id, source_file);
             file_states.insert(id, Arc::clone(&state));
             let priorities = source_priorities(&self.roots, &files);
@@ -2870,6 +3200,42 @@ mod tests {
         assert!(index.shard(first_file).is_some());
         assert!(index.shard(second_file).is_some());
         assert_eq!(index.definitions("event", "SHARED.1").len(), 2);
+    }
+
+    #[test]
+    fn parallel_file_state_materialization_is_deterministic() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-engine-parallel-{nonce}"));
+        let events = root.join("events");
+        fs::create_dir_all(&events).expect("event directory");
+        for index in 0..64 {
+            fs::write(
+                events.join(format!("event-{index:02}.txt")),
+                format!("country_event = {{ id = parallel.{index} }}\n"),
+            )
+            .expect("event fixture");
+        }
+
+        let mut host = eu4_host();
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
+        let report = host.refresh_source_roots().expect("parallel scan");
+        assert_eq!(report.indexed_files, 64);
+        let first = host.snapshot();
+        assert_eq!(first.index().definitions("event", "parallel.63").len(), 1);
+
+        host.refresh_source_roots()
+            .expect("unchanged parallel scan");
+        assert_eq!(host.snapshot().index(), first.index());
+        fs::remove_dir_all(root).expect("cleanup");
     }
 
     #[test]
@@ -3715,6 +4081,144 @@ mod tests {
         assert!(Arc::ptr_eq(&after.index, &before.index));
         assert!(Arc::ptr_eq(&after.scan_report, &before.scan_report));
         assert!(after.index().definitions("event", "cancelled.0").is_empty());
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn opaque_binary_assets_are_indexed_without_reading_them_as_utf8() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-engine-opaque-asset-{nonce}"));
+        fs::create_dir_all(root.join("gfx")).expect("asset directory");
+        fs::write(root.join("gfx/icon.png"), [0_u8, 159, 146, 150]).expect("binary asset");
+
+        let mut host = eu4_host();
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
+        let report = host.refresh_source_roots().expect("scan asset");
+
+        assert_eq!(report.discovered_files, 1);
+        assert_eq!(report.indexed_files, 1);
+        assert!(
+            !report
+                .issues
+                .iter()
+                .any(|issue| issue.kind == WorkspaceScanIssueKind::InvalidUtf8)
+        );
+        let snapshot = host.snapshot();
+        let file = snapshot
+            .source_files()
+            .values()
+            .next()
+            .expect("asset source file");
+        assert_eq!(file.logical_path.as_str(), "gfx/icon.png");
+        assert!(snapshot.index().shard(file.id).is_some());
+        assert!(snapshot.file_state(file.id).is_some_and(|state| {
+            state.parsed().is_none() && state.shard().definitions.is_empty()
+        }));
+
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn eu4_scan_uses_the_cwtools_script_folder_whitelist() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-engine-whitelist-{nonce}"));
+        fs::create_dir_all(root.join("events")).expect("events directory");
+        fs::create_dir_all(root.join("common/custom_unknown")).expect("common directory");
+        fs::create_dir_all(root.join("gfx")).expect("gfx directory");
+        fs::create_dir_all(root.join("ignored")).expect("ignored directory");
+        fs::write(
+            root.join("events/allowed.txt"),
+            "country_event = { id = whitelist.event }\n",
+        )
+        .expect("event fixture");
+        fs::write(
+            root.join("common/custom_unknown/allowed.txt"),
+            "country_event = { id = whitelist.common }\n",
+        )
+        .expect("common fixture");
+        fs::write(root.join("gfx/icon.png"), [0_u8, 159, 146, 150]).expect("asset fixture");
+        fs::write(
+            root.join("ignored/not_scanned.txt"),
+            "country_event = { id = whitelist.ignored }\n",
+        )
+        .expect("ignored fixture");
+        fs::write(
+            root.join("root_level.txt"),
+            "country_event = { id = whitelist.root }\n",
+        )
+        .expect("root-level fixture");
+
+        let mut host = eu4_host();
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
+        let report = host.refresh_source_roots().expect("whitelist scan");
+        assert_eq!(report.discovered_files, 3);
+        assert_eq!(report.indexed_files, 3);
+        let snapshot = host.snapshot();
+        assert!(
+            snapshot
+                .index()
+                .active_definition("event", "whitelist.event")
+                .is_some()
+        );
+        assert!(
+            snapshot
+                .index()
+                .active_definition("event", "whitelist.common")
+                .is_some()
+        );
+        assert!(
+            snapshot
+                .index()
+                .active_definition("event", "whitelist.ignored")
+                .is_none()
+        );
+        assert!(
+            snapshot
+                .index()
+                .active_definition("event", "whitelist.root")
+                .is_none()
+        );
+        assert!(
+            snapshot
+                .source_files()
+                .values()
+                .any(|file| { file.logical_path.as_str() == "gfx/icon.png" })
+        );
+        let ignored_change = root.join("ignored/created_after_scan.txt");
+        fs::write(
+            &ignored_change,
+            "country_event = { id = whitelist.watched_ignored }\n",
+        )
+        .expect("ignored watched fixture");
+        host.apply_disk_file_changes(&[DiskFileChange::new(
+            ignored_change,
+            DiskFileChangeKind::Created,
+        )])
+        .expect("ignored watched change");
+        assert!(
+            host.snapshot()
+                .index()
+                .active_definition("event", "whitelist.watched_ignored")
+                .is_none()
+        );
         fs::remove_dir_all(root).expect("cleanup");
     }
 

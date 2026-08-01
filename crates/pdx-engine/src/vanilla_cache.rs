@@ -56,7 +56,8 @@ pub struct VanillaIndexCacheMetadata {
     pub rule_hash: String,
     /// Human-readable source directory identity.
     pub source_identity: String,
-    /// SHA-256 over indexed logical paths and source bytes at build time.
+    /// SHA-256 over indexed logical paths and materialized source text at build time. Opaque
+    /// assets intentionally contribute no source bytes because they are never read by indexing.
     pub source_fingerprint: String,
     /// Cache creation time as Unix seconds.
     pub created_unix_seconds: u64,
@@ -105,6 +106,16 @@ impl VanillaIndexCache {
             return Err(VanillaCacheError::InvalidData(format!(
                 "the Vanilla source root must use reserved id {}",
                 VANILLA_ROOT_ID.get()
+            )));
+        }
+        if let Some(file) = snapshot.source_files().values().find(|file| {
+            !snapshot
+                .game_profile()
+                .allows_scan_path(file.logical_path.as_str())
+        }) {
+            return Err(VanillaCacheError::InvalidData(format!(
+                "Vanilla file {} is outside the active profile scan whitelist",
+                file.logical_path.as_str()
             )));
         }
         if snapshot.source_files().len() > MAX_CACHE_FILES {

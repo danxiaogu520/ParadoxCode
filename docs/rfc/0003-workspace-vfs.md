@@ -6,6 +6,10 @@
 > 实现进度（2026-07-25）：Current Mod/Dependency 的类型化 LSP 与项目 TOML 配置已接入；`pdx index vanilla` 建立版本化本地 SQLite cache，LSP 可取消地只读加载并在后续 refresh 中跳过 Vanilla 目录。cache 不保存源码，缺失/损坏/错 game 降级 warning，旧 `rule_hash` 仅提示手动刷新。Current Mod/Dependency 的 watched-file 事件通过后台 worker 定向替换单文件状态和 shard，打开 overlay 保持优先，Vanilla 不注册 watcher。
 >
 > 设计修订（2026-08-01）：为支持不打开 Vanilla `.yml` 文件时的 Hover，cache schema 3 额外保存每个本地化 definition 的有限长度派生预览（语言头和最多 240 个字符的值）。这不是源码、CST 或 HIR；正常启动仍只读 cache，原 Vanilla 目录仍不扫描、不读取。空值不生成预览，schema 不兼容时仍要求用户显式刷新。
+>
+> 性能修订（2026-08-01）：大于 32 个可读源文件时，受限读取、parse 和 lower 在最多 8 个可取消 worker 中执行，结果按稳定任务顺序合并；未变更文件状态直接复用。Asset 资源只登记路径，不按 UTF-8 读取，也不进入文本解析队列。
+>
+> 扫描修订（2026-08-01）：source root 的目录发现改由 `GameProfile.scan_roots` 白名单控制。EU4 profile 完整复用 CWTools 的 `scriptFolders`；重叠目录在实际遍历前折叠，白名单外的文件不会进入全量扫描或 watched-file 定向更新。
 
 ## 目标
 
@@ -57,7 +61,7 @@ Vanilla < Dependency Mods（配置顺序）< Current Mod < Open Document Overlay
 
 ## 扫描安全与错误隔离
 
-工作区发现必须有明确的资源边界，当前默认值为：source root 以下最多递归 64 层、所有 roots 合计最多检查 100,000 个普通文件、单个会被规则分类的源文件最多读取 16 MiB。详细问题报告最多保留 256 条，更多问题只累计数量，防止错误本身耗尽内存。
+工作区发现必须有明确的资源边界，目录范围由 `GameProfile.scan_roots` 白名单给出，当前默认值为：白名单目录以下最多递归 64 层、所有 roots 合计最多检查 100,000 个普通文件、单个会被规则分类的源文件最多读取 16 MiB。缺失的白名单目录按 CWTools 语义跳过；详细问题报告最多保留 256 条，更多问题只累计数量，防止错误本身耗尽内存。
 
 目录内的符号链接一律不跟随，避免逻辑 root 之外的路径逃逸和目录环。显式配置的 source root 自身可以是用户选择的路径，但 root 内部仍按上述规则扫描。
 
@@ -67,7 +71,7 @@ Vanilla < Dependency Mods（配置顺序）< Current Mod < Open Document Overlay
 
 ## 文件分类
 
-文件 matcher 完全来自第一方 Eu4Rules source，包括 `path`、`path_strict`、`path_file`、`path_extension`、`type_per_file` 等规范化约束。Event、scripted effect、scripted trigger 和 localisation 是强制回归类别，但不是分类白名单。
+文件 matcher 完全来自第一方 Eu4Rules source，包括 `path`、`path_strict`、`path_file`、`path_extension`、`type_per_file` 等规范化约束。目录扫描白名单与文件分类是两个边界：前者决定是否遍历 filesystem，后者决定已发现文件的 parser 和 resolution。Event、scripted effect、scripted trigger 和 localisation 是强制回归类别。
 
 Eu4Rules 为每个 logical path 返回：
 

@@ -190,32 +190,35 @@ impl FileMatcher {
     /// Matches a validated logical path.
     #[must_use]
     pub fn matches(&self, path: &LogicalPath) -> bool {
-        let candidate = if self.case_sensitive {
-            path.as_str().to_owned()
-        } else {
-            path.as_str().to_ascii_lowercase()
-        };
+        let candidate = path.as_str();
         if let Some(prefix) = &self.path_prefix {
-            let prefix = if self.case_sensitive {
-                prefix.clone()
+            let is_directory_prefix = if self.case_sensitive {
+                candidate == prefix
+                    || candidate
+                        .strip_prefix(prefix)
+                        .is_some_and(|remainder| remainder.starts_with('/'))
             } else {
-                prefix.to_ascii_lowercase()
+                candidate.len() == prefix.len() && candidate.eq_ignore_ascii_case(prefix)
+                    || candidate.len() > prefix.len()
+                        && candidate
+                            .get(..prefix.len())
+                            .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+                        && candidate.as_bytes().get(prefix.len()) == Some(&b'/')
             };
-            let is_directory_prefix = candidate == prefix
-                || candidate
-                    .strip_prefix(&prefix)
-                    .is_some_and(|remainder| remainder.starts_with('/'));
             if !is_directory_prefix {
                 return false;
             }
         }
         if let Some(suffix) = &self.path_suffix {
-            let suffix = if self.case_sensitive {
-                suffix.clone()
+            let matches_suffix = if self.case_sensitive {
+                candidate.ends_with(suffix)
             } else {
-                suffix.to_ascii_lowercase()
+                candidate.len() >= suffix.len()
+                    && candidate
+                        .get(candidate.len() - suffix.len()..)
+                        .is_some_and(|tail| tail.eq_ignore_ascii_case(suffix))
             };
-            if !candidate.ends_with(&suffix) {
+            if !matches_suffix {
                 return false;
             }
         }
@@ -448,6 +451,11 @@ pub struct ProfileScopeCompatibility {
 pub struct GameProfile {
     /// Stable identity shared with the selected rules artifact.
     pub game_id: String,
+    /// Logical directory whitelist used for source-root discovery.
+    ///
+    /// An empty whitelist means that the profile does not authorize disk discovery. This keeps
+    /// the generic engine conservative until a game profile supplies its resource roots.
+    pub scan_roots: Vec<String>,
     /// Ordered top-level definition rules; the first match wins.
     pub definitions: Vec<ProfileDefinitionRule>,
     /// Ordered scalar-reference rules; the first match wins.
@@ -487,6 +495,7 @@ impl GameProfile {
     pub fn empty(game_id: impl Into<String>) -> Self {
         Self {
             game_id: game_id.into(),
+            scan_roots: Vec::new(),
             definitions: Vec::new(),
             references: Vec::new(),
             value_definitions: Vec::new(),
@@ -502,6 +511,24 @@ impl GameProfile {
             fallback_keys: Vec::new(),
             enum_extra_members: BTreeMap::new(),
         }
+    }
+
+    /// Returns the logical directory whitelist used for source-root discovery.
+    #[must_use]
+    pub fn scan_roots(&self) -> &[String] {
+        &self.scan_roots
+    }
+
+    /// Returns whether a logical file path belongs to a whitelisted scan directory.
+    #[must_use]
+    pub fn allows_scan_path(&self, logical_path: &str) -> bool {
+        self.scan_roots.iter().any(|root| {
+            root.is_empty()
+                || logical_path == root
+                || logical_path
+                    .strip_prefix(root)
+                    .is_some_and(|remainder| remainder.starts_with('/'))
+        })
     }
 
     /// Returns the first matching top-level definition rule.
@@ -2080,8 +2107,8 @@ fn decode_semantic_value(
 #[cfg(test)]
 mod tests {
     use super::{
-        CURRENT_SCHEMA_VERSION, FileMatcher, KeyMatcher, ProfileMatchMode, ProfileTextMatcher,
-        RuleRecord, RuleSet, RuleShape, RulesModel, SemanticRule, ValueMatcher,
+        CURRENT_SCHEMA_VERSION, FileMatcher, GameProfile, KeyMatcher, ProfileMatchMode,
+        ProfileTextMatcher, RuleRecord, RuleSet, RuleShape, RulesModel, SemanticRule, ValueMatcher,
     };
     use pdx_text::LogicalPath;
     use std::collections::BTreeMap;
@@ -2121,8 +2148,20 @@ mod tests {
 
         assert!(matcher.matches(&LogicalPath::new("localisation/main.yml")));
         assert!(matcher.matches(&LogicalPath::new("localisation/events/main.yml")));
+        assert!(matcher.matches(&LogicalPath::new("LOCALISATION/events/MAIN.YML")));
         assert!(!matcher.matches(&LogicalPath::new("localisation_extra/main.yml")));
         assert!(!matcher.matches(&LogicalPath::new("common/main.yml")));
+    }
+
+    #[test]
+    fn profile_scan_roots_are_directory_bounded() {
+        let mut profile = GameProfile::empty("test");
+        profile.scan_roots = vec!["common".to_owned(), "events".to_owned()];
+
+        assert!(profile.allows_scan_path("common/events/example.txt"));
+        assert!(profile.allows_scan_path("events/example.txt"));
+        assert!(!profile.allows_scan_path("common_extra/example.txt"));
+        assert!(!profile.allows_scan_path("root_level.txt"));
     }
 
     #[test]
