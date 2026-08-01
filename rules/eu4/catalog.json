@@ -1481,7 +1481,7 @@
       "parser": "localisation",
       "resolution": "replace-by-relative-path",
       "matcher": {
-        "path_prefix": null,
+        "path_prefix": "localisation",
         "extensions": [
           "yml",
           "yaml"

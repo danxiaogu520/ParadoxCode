@@ -508,7 +508,7 @@ pub fn bootstrap_model() -> RulesModel {
                 parser: ParserKind::Localisation,
                 resolution: FileResolutionPolicy::ReplaceByRelativePath,
                 matcher: FileMatcher {
-                    path_prefix: None,
+                    path_prefix: Some("localisation".to_owned()),
                     extensions: vec!["yml".to_owned(), "yaml".to_owned()],
                     path_suffix: None,
                     case_sensitive: false,

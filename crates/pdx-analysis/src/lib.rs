@@ -4500,6 +4500,12 @@ fn localisation_preview(
     snapshot: &AnalysisSnapshot,
     definition: &ResolutionDefinition,
 ) -> Option<(Option<String>, String)> {
+    if let Some(file) = definition.location.file
+        && let Some(preview) =
+            snapshot.vanilla_localisation_preview(file, definition.location.range)
+    {
+        return Some((preview.language.clone(), preview.value.clone()));
+    }
     let input = definition
         .location
         .document
@@ -4901,7 +4907,10 @@ mod tests {
         references, rename, rename_with_cancellation, semantic_completion_context,
         semantic_root_context, workspace_symbols, workspace_symbols_with_cancellation,
     };
-    use pdx_engine::{AnalysisHost, DocumentId};
+    use pdx_engine::{
+        AnalysisHost, DocumentId, SourceRoot, SourceRootId, SourceRootKind, VanillaIndexCache,
+        WorkspaceChange,
+    };
     use pdx_rules::{
         KeyMatcher, ProfileDefinitionRule, ProfileMatchMode, ProfileTextMatcher, RuleSet,
         RuleShape, SemanticRule, ValueMatcher,
@@ -6667,6 +6676,70 @@ mod tests {
             u32::try_from(text.find("foo_name").expect("localisation key") + 2).expect("position");
         let hover = hover(&host.snapshot(), &id, position).expect("localisation hover");
         assert!(hover.contents.contains("Localisation (l_english): \"Foo\""));
+    }
+
+    #[test]
+    fn vanilla_cache_localisation_hover_shows_derived_text_without_source_state() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-analysis-vanilla-hover-{nonce}"));
+        let vanilla = root.join("vanilla");
+        let current = root.join("current");
+        std::fs::create_dir_all(vanilla.join("localisation/nested")).expect("Vanilla directory");
+        std::fs::create_dir_all(current.join("events")).expect("current directory");
+        std::fs::write(
+            vanilla.join("localisation/nested/test_l_english.yml"),
+            "l_english:\ncached_name:0 \"Cached Vanilla text\"\n",
+        )
+        .expect("Vanilla localisation");
+
+        let mut vanilla_host = eu4_host(pdx_game::eu4::bootstrap_rules());
+        vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            vanilla.clone(),
+        )]));
+        vanilla_host
+            .refresh_source_roots()
+            .expect("scan Vanilla for cache");
+        let cache = VanillaIndexCache::from_snapshot(&vanilla_host.snapshot())
+            .expect("build Vanilla cache");
+        let localisation_file = cache
+            .index()
+            .active_definition("localisation", "cached_name")
+            .expect("cached localisation definition")
+            .file_id;
+
+        let mut host = eu4_host(pdx_game::eu4::bootstrap_rules());
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            current.clone(),
+        )]));
+        host.install_vanilla_cache(cache)
+            .expect("install Vanilla cache");
+        let document = DocumentId::new("file:///current/events/hover.txt");
+        let text = "country_event = { title = cached_name }\n";
+        host.open_document(
+            document.clone(),
+            1,
+            text.to_owned(),
+            Some(current.join("events/hover.txt")),
+        )
+        .expect("open current script");
+        let position = u32::try_from(text.find("cached_name").expect("localisation reference"))
+            .expect("position");
+        let hover =
+            hover(&host.snapshot(), &document, position).expect("cached localisation hover");
+        assert!(
+            hover
+                .contents
+                .contains("Localisation (l_english): \"Cached Vanilla text\"")
+        );
+        assert!(host.snapshot().file_state(localisation_file).is_none());
+        std::fs::remove_dir_all(root).expect("cleanup");
     }
 
     #[test]

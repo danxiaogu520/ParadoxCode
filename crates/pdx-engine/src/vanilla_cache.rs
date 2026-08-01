@@ -6,24 +6,27 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use pdx_parser::{CstKind, FileFormat};
 use pdx_rules::FileResolutionPolicy;
 use pdx_text::{LogicalPath, Position, PositionRange, TextRange};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction, params};
 use sha2::{Digest, Sha256};
 
 use super::{
-    AnalysisSnapshot, Definition, FileIndexShard, Reference, SourceFile, SourceFileId, SourceRoot,
-    SourceRootId, SourceRootKind, WorkspaceIndex, WorkspaceScanToken, stable_file_id,
+    AnalysisSnapshot, Definition, FileIndexShard, LocalisationPreview, ParsedSource, Reference,
+    SourceFile, SourceFileId, SourceRoot, SourceRootId, SourceRootKind, WorkspaceIndex,
+    WorkspaceScanToken, stable_file_id,
 };
 
 /// Current on-disk Vanilla cache schema.
-pub const CURRENT_VANILLA_CACHE_SCHEMA_VERSION: u32 = 2;
+pub const CURRENT_VANILLA_CACHE_SCHEMA_VERSION: u32 = 3;
 
 const APPLICATION_ID: i32 = 0x5044_5856;
 const MAX_CACHE_BYTES: u64 = 1024 * 1024 * 1024;
 const MAX_CACHE_FILES: usize = 100_000;
 const MAX_CACHE_SYMBOLS: usize = 5_000_000;
 const MAX_TEXT_FIELD_BYTES: usize = 1024 * 1024;
+const MAX_LOCALISATION_PREVIEW_CHARS: usize = 240;
 const VANILLA_ROOT_ID: SourceRootId = SourceRootId::new(0);
 
 type VanillaIndexParts = (
@@ -32,12 +35,14 @@ type VanillaIndexParts = (
     BTreeMap<SourceFileId, SourceFile>,
     WorkspaceIndex,
     BTreeMap<(SourceFileId, TextRange), PositionRange>,
+    BTreeMap<(SourceFileId, TextRange), LocalisationPreview>,
 );
 
 type LoadedIndex = (
     BTreeMap<SourceFileId, SourceFile>,
     WorkspaceIndex,
     BTreeMap<(SourceFileId, TextRange), PositionRange>,
+    BTreeMap<(SourceFileId, TextRange), LocalisationPreview>,
 );
 
 /// Observable metadata recorded when a Vanilla cache is built manually.
@@ -59,13 +64,15 @@ pub struct VanillaIndexCacheMetadata {
     pub indexed_files: usize,
 }
 
-/// A validated local Vanilla cache containing metadata and semantic shards, but no source text.
+/// A validated local Vanilla cache containing metadata, semantic shards, and bounded derived
+/// localisation previews, but no source text.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VanillaIndexCache {
     metadata: VanillaIndexCacheMetadata,
     root: SourceRoot,
     source_files: BTreeMap<SourceFileId, SourceFile>,
     index: WorkspaceIndex,
+    localisation_previews: BTreeMap<(SourceFileId, TextRange), LocalisationPreview>,
 }
 
 impl VanillaIndexCache {
@@ -78,6 +85,7 @@ impl VanillaIndexCache {
             self.source_files,
             self.index,
             positions,
+            self.localisation_previews,
         )
     }
 
@@ -133,6 +141,7 @@ impl VanillaIndexCache {
             put_fingerprint_field(&mut hasher, state.source().as_bytes());
         }
         let source_fingerprint = format!("{:x}", hasher.finalize());
+        let localisation_previews = collect_localisation_previews(snapshot)?;
         let created_unix_seconds = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|error| VanillaCacheError::InvalidData(error.to_string()))?
@@ -151,6 +160,7 @@ impl VanillaIndexCache {
             root: root.clone(),
             source_files: snapshot.source_files().clone(),
             index: snapshot.index().clone(),
+            localisation_previews,
         })
     }
 
@@ -209,7 +219,8 @@ impl VanillaIndexCache {
         let indexed_files = metadata_text(connection, "indexed_files")?
             .parse::<usize>()
             .map_err(|_| VanillaCacheError::InvalidMetadata("indexed_files"))?;
-        let (source_files, index, positions) = load_index(connection, &source_root)?;
+        let (source_files, index, positions, localisation_previews) =
+            load_index(connection, &source_root)?;
         if indexed_files != source_files.len() {
             return Err(VanillaCacheError::InvalidData(format!(
                 "metadata records {indexed_files} files but cache contains {}",
@@ -231,6 +242,7 @@ impl VanillaIndexCache {
             root: SourceRoot::new(VANILLA_ROOT_ID, SourceRootKind::Vanilla, source_root),
             source_files,
             index,
+            localisation_previews,
         })
     }
 
@@ -282,6 +294,14 @@ impl VanillaIndexCache {
     #[must_use]
     pub const fn index(&self) -> &WorkspaceIndex {
         &self.index
+    }
+
+    /// Returns bounded derived localisation text retained for Hover.
+    #[must_use]
+    pub const fn localisation_previews(
+        &self,
+    ) -> &BTreeMap<(SourceFileId, TextRange), LocalisationPreview> {
+        &self.localisation_previews
     }
 }
 
@@ -396,6 +416,89 @@ fn put_fingerprint_field(hasher: &mut Sha256, value: &[u8]) {
     hasher.update(value);
 }
 
+fn collect_localisation_previews(
+    snapshot: &AnalysisSnapshot,
+) -> Result<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>, VanillaCacheError> {
+    let mut previews = BTreeMap::new();
+    for (file_id, file) in snapshot.source_files() {
+        let state = snapshot.file_state(*file_id).ok_or_else(|| {
+            VanillaCacheError::InvalidData(format!(
+                "Vanilla file {} has no materialized file state",
+                file.logical_path.as_str()
+            ))
+        })?;
+        let Some(ParsedSource::Text(parsed)) = state.parsed() else {
+            continue;
+        };
+        if parsed.format() != FileFormat::Localisation {
+            continue;
+        }
+        let mut language = None;
+        for node in parsed.root().children() {
+            match node.kind() {
+                CstKind::LanguageHeader => {
+                    language = node
+                        .children()
+                        .iter()
+                        .find(|child| child.kind() == CstKind::LocalisationKey)
+                        .and_then(|child| parsed.text(child.range()))
+                        .map(|value| value.trim().to_owned())
+                        .filter(|value| !value.is_empty());
+                }
+                CstKind::LocalisationEntry => {
+                    let Some(value_node) = node.children().iter().find(|child| {
+                        matches!(
+                            child.kind(),
+                            CstKind::LocalisationString | CstKind::UnquotedValue
+                        )
+                    }) else {
+                        continue;
+                    };
+                    let Some(raw) = parsed.text(value_node.range()).map(str::trim) else {
+                        continue;
+                    };
+                    let value = raw
+                        .strip_prefix('"')
+                        .and_then(|value| value.strip_suffix('"'))
+                        .unwrap_or(raw);
+                    let value = truncate_localisation_preview(value);
+                    if value.is_empty() {
+                        continue;
+                    }
+                    if previews
+                        .insert(
+                            (*file_id, node.range()),
+                            LocalisationPreview {
+                                language: language.clone(),
+                                value,
+                            },
+                        )
+                        .is_some()
+                    {
+                        return Err(VanillaCacheError::InvalidData(format!(
+                            "duplicate localisation preview in {}",
+                            file.logical_path.as_str()
+                        )));
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    Ok(previews)
+}
+
+fn truncate_localisation_preview(value: &str) -> String {
+    let mut truncated = value
+        .chars()
+        .take(MAX_LOCALISATION_PREVIEW_CHARS)
+        .collect::<String>();
+    if value.chars().count() > MAX_LOCALISATION_PREVIEW_CHARS {
+        truncated.push('…');
+    }
+    truncated
+}
+
 fn validate_database_identity(connection: &Connection) -> Result<(), VanillaCacheError> {
     let application_id =
         connection.pragma_query_value(None, "application_id", |row| row.get::<_, i32>(0))?;
@@ -438,6 +541,7 @@ fn validate_table_limits(connection: &Connection) -> Result<(), VanillaCacheErro
     validate_count(connection, "definitions", MAX_CACHE_SYMBOLS)?;
     validate_count(connection, "symbol_references", MAX_CACHE_SYMBOLS)?;
     validate_count(connection, "navigation_positions", MAX_CACHE_SYMBOLS)?;
+    validate_count(connection, "localisation_previews", MAX_CACHE_SYMBOLS)?;
     for (table, fields) in [
         ("source_files", "logical_path, category_id, resolution"),
         ("definitions", "kind, name"),
@@ -445,6 +549,10 @@ fn validate_table_limits(connection: &Connection) -> Result<(), VanillaCacheErro
         (
             "navigation_positions",
             "range_start, range_end, start_line, start_character, end_line, end_character",
+        ),
+        (
+            "localisation_previews",
+            "range_start, range_end, language, value",
         ),
     ] {
         let query = format!(
@@ -488,6 +596,7 @@ fn write_cache(
         "DROP TABLE IF EXISTS symbol_references;
          DROP TABLE IF EXISTS navigation_positions;
          DROP TABLE IF EXISTS definitions;
+         DROP TABLE IF EXISTS localisation_previews;
          DROP TABLE IF EXISTS source_files;
          DROP TABLE IF EXISTS metadata;
          CREATE TABLE metadata(key TEXT PRIMARY KEY, value BLOB NOT NULL);
@@ -525,6 +634,14 @@ fn write_cache(
              start_character INTEGER NOT NULL CHECK(start_character >= 0),
              end_line INTEGER NOT NULL CHECK(end_line >= 0),
              end_character INTEGER NOT NULL CHECK(end_character >= 0),
+             PRIMARY KEY(file_id, range_start, range_end)
+         );
+         CREATE TABLE localisation_previews(
+             file_id BLOB NOT NULL REFERENCES source_files(file_id),
+             range_start INTEGER NOT NULL,
+             range_end INTEGER NOT NULL,
+             language TEXT,
+             value TEXT NOT NULL,
              PRIMARY KEY(file_id, range_start, range_end)
          );",
     )?;
@@ -633,6 +750,40 @@ fn write_cache(
             ],
         )?;
     }
+    for ((file_id, range), preview) in &cache.localisation_previews {
+        let Some(file) = cache.source_files.get(file_id) else {
+            return Err(VanillaCacheError::InvalidData(format!(
+                "localisation preview references unknown file {}",
+                file_id.get()
+            )));
+        };
+        let Some(shard) = cache.index.shard(*file_id) else {
+            return Err(VanillaCacheError::InvalidData(format!(
+                "localisation preview file {} has no index shard",
+                file.logical_path.as_str()
+            )));
+        };
+        if !shard.definitions.iter().any(|definition| {
+            definition.range == *range && definition.kind.eq_ignore_ascii_case("localisation")
+        }) {
+            return Err(VanillaCacheError::InvalidData(format!(
+                "localisation preview range {}..{} is not a localisation definition",
+                range.start(),
+                range.end()
+            )));
+        }
+        transaction.execute(
+            "INSERT INTO localisation_previews(file_id, range_start, range_end, language, value)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                encode_file_id(*file_id),
+                i64::from(range.start()),
+                i64::from(range.end()),
+                preview.language,
+                preview.value,
+            ],
+        )?;
+    }
     Ok(())
 }
 
@@ -695,6 +846,7 @@ fn load_index(
     }
     load_definitions(connection, &mut shards)?;
     load_references(connection, &mut shards)?;
+    let localisation_previews = load_localisation_previews(connection, &shards)?;
     let positions = load_navigation_positions(connection)?;
     for ((file_id, range), position) in &positions {
         let Some(shard) = shards.get(file_id) else {
@@ -728,7 +880,62 @@ fn load_index(
         source_files,
         WorkspaceIndex::from_shards(shards.into_values()),
         positions,
+        localisation_previews,
     ))
+}
+
+fn load_localisation_previews(
+    connection: &Connection,
+    shards: &BTreeMap<SourceFileId, FileIndexShard>,
+) -> Result<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>, VanillaCacheError> {
+    let mut statement = connection.prepare(
+        "SELECT file_id, range_start, range_end, language, value
+         FROM localisation_previews ORDER BY file_id, range_start, range_end",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, Vec<u8>>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, i64>(2)?,
+            row.get::<_, Option<String>>(3)?,
+            row.get::<_, String>(4)?,
+        ))
+    })?;
+    let mut previews = BTreeMap::new();
+    for row in rows {
+        let (file_id, start, end, language, value) = row?;
+        let file_id = decode_file_id(&file_id)?;
+        let range = decode_range(start, end)?;
+        let Some(shard) = shards.get(&file_id) else {
+            return Err(VanillaCacheError::InvalidData(format!(
+                "localisation preview references unknown file {}",
+                file_id.get()
+            )));
+        };
+        if !shard.definitions.iter().any(|definition| {
+            definition.range == range && definition.kind.eq_ignore_ascii_case("localisation")
+        }) {
+            return Err(VanillaCacheError::InvalidData(format!(
+                "localisation preview range {}..{} is not a localisation definition",
+                range.start(),
+                range.end()
+            )));
+        }
+        if value.is_empty() {
+            return Err(VanillaCacheError::InvalidData(
+                "localisation preview value is empty".to_owned(),
+            ));
+        }
+        if previews
+            .insert((file_id, range), LocalisationPreview { language, value })
+            .is_some()
+        {
+            return Err(VanillaCacheError::InvalidData(
+                "duplicate localisation preview".to_owned(),
+            ));
+        }
+    }
+    Ok(previews)
 }
 
 fn load_definitions(

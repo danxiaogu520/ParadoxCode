@@ -351,6 +351,18 @@ pub struct FileIndexShard {
     pub syntax_error_count: usize,
 }
 
+/// Bounded, derived text retained for a localisation Hover result.
+///
+/// This is intentionally not source text: Vanilla caches persist only this small preview so
+/// normal startup can answer Hover without reopening the Vanilla installation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LocalisationPreview {
+    /// The most recent language header preceding the entry, when one was present.
+    pub language: Option<String>,
+    /// The bounded display value.
+    pub value: String,
+}
+
 /// Parsed frontend retained by one immutable file state.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParsedSource {
@@ -1949,6 +1961,7 @@ pub struct AnalysisHost {
     index: Arc<WorkspaceIndex>,
     scan_report: Arc<WorkspaceScanReport>,
     vanilla_root: Option<SourceRoot>,
+    vanilla_localisation_previews: Arc<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>>,
 }
 
 impl AnalysisHost {
@@ -1980,6 +1993,7 @@ impl AnalysisHost {
             index: Arc::new(WorkspaceIndex::empty()),
             scan_report: Arc::new(WorkspaceScanReport::default()),
             vanilla_root: None,
+            vanilla_localisation_previews: Arc::new(BTreeMap::new()),
         }
     }
 
@@ -2005,6 +2019,7 @@ impl AnalysisHost {
             WorkspaceChange::SetSourceRoots(roots) => {
                 self.roots = Arc::from(roots);
                 self.vanilla_root = None;
+                self.vanilla_localisation_previews = Arc::new(BTreeMap::new());
             }
             WorkspaceChange::SetWorkspaceRoot(root) => self.workspace_root = root,
         }
@@ -2048,7 +2063,8 @@ impl AnalysisHost {
             }
         }
 
-        let (_, vanilla, mut files, cached_index, cached_positions) = cache.into_parts();
+        let (_, vanilla, mut files, cached_index, cached_positions, cached_previews) =
+            cache.into_parts();
         for (id, file) in self.source_files.iter() {
             if let Some(cached) = files.insert(*id, file.clone()) {
                 return Err(VanillaCacheError::InvalidData(format!(
@@ -2076,6 +2092,7 @@ impl AnalysisHost {
         self.source_files = Arc::new(files);
         self.index = Arc::new(index);
         self.vanilla_root = Some(vanilla);
+        self.vanilla_localisation_previews = Arc::new(cached_previews);
         self.revision = self.revision.saturating_add(1);
         Ok(())
     }
@@ -2600,6 +2617,7 @@ impl AnalysisHost {
             file_states: Arc::clone(&self.file_states),
             index: Arc::clone(&self.index),
             scan_report: Arc::clone(&self.scan_report),
+            vanilla_localisation_previews: Arc::clone(&self.vanilla_localisation_previews),
         }
     }
 }
@@ -2617,6 +2635,7 @@ pub struct AnalysisSnapshot {
     file_states: Arc<BTreeMap<SourceFileId, Arc<FileState>>>,
     index: Arc<WorkspaceIndex>,
     scan_report: Arc<WorkspaceScanReport>,
+    vanilla_localisation_previews: Arc<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>>,
 }
 
 impl AnalysisSnapshot {
@@ -2781,6 +2800,16 @@ impl AnalysisSnapshot {
     #[must_use]
     pub fn source_text(&self, file_id: SourceFileId) -> Option<&str> {
         self.file_state(file_id).map(FileState::source)
+    }
+
+    /// Returns a cached Vanilla localisation preview without reading the Vanilla source file.
+    #[must_use]
+    pub fn vanilla_localisation_preview(
+        &self,
+        file_id: SourceFileId,
+        range: TextRange,
+    ) -> Option<&LocalisationPreview> {
+        self.vanilla_localisation_previews.get(&(file_id, range))
     }
 }
 
@@ -3909,7 +3938,7 @@ mod tests {
             dependency.join("common/scripted_effects"),
             current.join("common/events"),
             current.join("common/scripted_triggers"),
-            current.join("localisation"),
+            current.join("localisation/nested/deeper"),
         ] {
             fs::create_dir_all(directory).expect("fixture directory");
         }
@@ -3936,10 +3965,15 @@ mod tests {
         )
         .expect("trigger");
         fs::write(
-            current.join("localisation/test_l_english.yml"),
+            current.join("localisation/nested/deeper/test_l_english.yml"),
             "l_english:\n foo_name:0 \"Foo\"\n",
         )
         .expect("localisation");
+        fs::write(
+            current.join("outside.yml"),
+            "l_english:\n ignored_name:0 \"Ignored\"\n",
+        )
+        .expect("outside localisation");
 
         let mut host = eu4_host();
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
@@ -3998,6 +4032,12 @@ mod tests {
                 .len(),
             1
         );
+        assert!(
+            snapshot
+                .index()
+                .definitions("localisation", "ignored_name")
+                .is_empty()
+        );
 
         let logical = LogicalPath::new("common/events/foo.txt");
         assert_eq!(
@@ -4037,12 +4077,19 @@ mod tests {
         let vanilla = root.join("vanilla");
         let current = root.join("current");
         fs::create_dir_all(vanilla.join("common/events")).expect("Vanilla fixture directory");
+        fs::create_dir_all(vanilla.join("localisation/nested/deeper"))
+            .expect("Vanilla localisation fixture directory");
         fs::create_dir_all(current.join("common/events")).expect("current fixture directory");
         fs::write(
             vanilla.join("common/events/definitions.txt"),
             "country_event = { id = shared.1 }\ncountry_event = { id = vanilla.1 }\n",
         )
         .expect("Vanilla definitions");
+        fs::write(
+            vanilla.join("localisation/nested/deeper/test_l_english.yml"),
+            "l_english:\nvanilla_name:0 \"Vanilla text\"\n",
+        )
+        .expect("Vanilla localisation");
         fs::write(
             current.join("common/events/definitions.txt"),
             "country_event = { id = shared.1 }\n",
@@ -4074,6 +4121,10 @@ mod tests {
         assert_eq!(loaded.metadata(), cache.metadata());
         assert_eq!(loaded.source_files(), cache.source_files());
         assert_eq!(loaded.index(), cache.index());
+        assert_eq!(
+            loaded.localisation_previews(),
+            cache.localisation_previews()
+        );
 
         let foreign_path = root.join("foreign.sqlite");
         let foreign = rusqlite::Connection::open(&foreign_path).expect("foreign database");
@@ -4137,6 +4188,16 @@ mod tests {
             SourceRootId::new(0)
         );
         assert!(snapshot.file_state(vanilla_definition.file_id).is_none());
+        let vanilla_localisation = snapshot
+            .index()
+            .active_definition("localisation", "vanilla_name")
+            .expect("cached Vanilla localisation remains available");
+        let preview = snapshot
+            .vanilla_localisation_preview(vanilla_localisation.file_id, vanilla_localisation.range)
+            .expect("cached Vanilla localisation preview");
+        assert_eq!(preview.language.as_deref(), Some("l_english"));
+        assert_eq!(preview.value, "Vanilla text");
+        assert!(snapshot.file_state(vanilla_localisation.file_id).is_none());
         fs::remove_dir_all(root).expect("cleanup");
     }
 }

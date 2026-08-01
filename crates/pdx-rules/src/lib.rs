@@ -201,7 +201,11 @@ impl FileMatcher {
             } else {
                 prefix.to_ascii_lowercase()
             };
-            if !candidate.starts_with(&prefix) {
+            let is_directory_prefix = candidate == prefix
+                || candidate
+                    .strip_prefix(&prefix)
+                    .is_some_and(|remainder| remainder.starts_with('/'));
+            if !is_directory_prefix {
                 return false;
             }
         }
@@ -2076,9 +2080,10 @@ fn decode_semantic_value(
 #[cfg(test)]
 mod tests {
     use super::{
-        CURRENT_SCHEMA_VERSION, KeyMatcher, ProfileMatchMode, ProfileTextMatcher, RuleRecord,
-        RuleSet, RuleShape, RulesModel, SemanticRule, ValueMatcher,
+        CURRENT_SCHEMA_VERSION, FileMatcher, KeyMatcher, ProfileMatchMode, ProfileTextMatcher,
+        RuleRecord, RuleSet, RuleShape, RulesModel, SemanticRule, ValueMatcher,
     };
+    use pdx_text::LogicalPath;
     use std::collections::BTreeMap;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -2103,6 +2108,21 @@ mod tests {
         assert!(directory.matches("COMMON/CULTURES/example.txt"));
         assert!(!directory.matches("common/cultures/nested/example.txt"));
         assert!(ProfileTextMatcher::any().matches("anything"));
+    }
+
+    #[test]
+    fn file_matcher_path_prefix_is_directory_bounded() {
+        let matcher = FileMatcher {
+            path_prefix: Some("localisation".to_owned()),
+            extensions: vec!["yml".to_owned()],
+            path_suffix: None,
+            case_sensitive: false,
+        };
+
+        assert!(matcher.matches(&LogicalPath::new("localisation/main.yml")));
+        assert!(matcher.matches(&LogicalPath::new("localisation/events/main.yml")));
+        assert!(!matcher.matches(&LogicalPath::new("localisation_extra/main.yml")));
+        assert!(!matcher.matches(&LogicalPath::new("common/main.yml")));
     }
 
     #[test]

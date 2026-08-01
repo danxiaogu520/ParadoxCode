@@ -4,6 +4,8 @@
 - MVP：EU4 v0.1
 
 > 实现进度（2026-07-25）：Current Mod/Dependency 的类型化 LSP 与项目 TOML 配置已接入；`pdx index vanilla` 建立版本化本地 SQLite cache，LSP 可取消地只读加载并在后续 refresh 中跳过 Vanilla 目录。cache 不保存源码，缺失/损坏/错 game 降级 warning，旧 `rule_hash` 仅提示手动刷新。Current Mod/Dependency 的 watched-file 事件通过后台 worker 定向替换单文件状态和 shard，打开 overlay 保持优先，Vanilla 不注册 watcher。
+>
+> 设计修订（2026-08-01）：为支持不打开 Vanilla `.yml` 文件时的 Hover，cache schema 3 额外保存每个本地化 definition 的有限长度派生预览（语言头和最多 240 个字符的值）。这不是源码、CST 或 HIR；正常启动仍只读 cache，原 Vanilla 目录仍不扫描、不读取。空值不生成预览，schema 不兼容时仍要求用户显式刷新。
 
 ## 目标
 
@@ -146,7 +148,7 @@ path = "dependencies/content-extension" # later = higher priority
 - 扩展升级和 `rule_hash` 变化不自动删除、迁移或重建缓存。
 - cache metadata 记录创建时间、源目录指纹和当时的 `rule_hash`，只用于可观察性与手动决策。
 - 缓存为 definition/reference 保存对应的 UTF-16 编辑器位置（definition 使用名称 selection range），因此源文本不可读时跳转仍返回准确范围。
-- 缓存不保存源码、CST 或 HIR。
+- 缓存不保存源码、CST 或 HIR；本地化 definition 可以额外保存有限长度的派生 Hover 预览，以便源目录不可读时显示文本。
 - 缓存位于用户本机，不提交、不打包、不再分发 Vanilla 内容。
 
 ## 按文件增量更新

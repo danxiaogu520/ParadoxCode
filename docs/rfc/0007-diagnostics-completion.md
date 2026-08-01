@@ -171,6 +171,6 @@ hover 组合：
 - scalar value hover 展示所属 property、实际值和 accepted/does not match 校验结果；
 - 同一个 property 仍有多个可行 rule alternative 时，必须稳定地展示全部候选，不能按遍历顺序选一个；
 - symbol hover 展示 resolved/unresolved/ambiguous 状态、source root、logical path 和 shadowed definitions；symbol 查询使用当前文件和 symbol bucket 的定向路径，不构造完整 workspace semantic 列表；
-- localisation symbol 只展示当前解析到的单条短文本，不展示完整源文件或 Vanilla 文件内容；
+- localisation symbol 只展示当前解析到的单条短文本；Vanilla 可从 cache 的有限长度派生预览展示该文本，但不展示完整源文件或 Vanilla 文件内容；
 - scripted definition 的局部参数 hover 展示 owner、inferred optional/required arity、语法形式和当前 owner 内的 occurrence 数量；
 - semantic rule provenance 以 `source_file:line` 形式展示，便于维护第一方规则源。
