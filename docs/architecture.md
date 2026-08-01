@@ -8,7 +8,7 @@ ParadoxCode 提供通用 PDX Mod 语言引擎。EU4 是当前唯一有完整交�
 
 Vanilla setup 只为生成持久 cache 保留 source text、index shard、UTF-16 位置和本地化预览；完整 CST/HIR 在每个文件完成 shard 后即释放，不跨 setup 阶段继续占用 host 内存。
 
-MVP 不以少数语义类别为边界；目录发现由选定 `GameProfile` 的 source-root 白名单控制，EU4 profile 遵循 CWTools 的 `scriptFolders`。白名单目录下凡是权威 EU4 规则数据库能够分类的文件类别，都进入与其格式相称的分析范围。Script 与 localisation 使用独立 parser；CSV、媒体、字体、音频、贴图等资源作为 opaque resource 参与路径和覆盖解析，不做内容分析。省份 ID 等脚本语义从 `positions.txt` 等可解析的权威游戏文件提取。存档和二进制数据不做内容解析。
+MVP 不以少数语义类别为边界；目录发现由选定 `GameProfile` 的 source-root 白名单控制，EU4 profile 遵循 CWTools 的 `scriptFolders`，并只把 `.txt`、`.gfx`、`.yml` 文件交给规则分类和索引。Script 与 localisation 使用独立 parser；其他扩展、媒体、字体、音频、贴图等资源不进入 Vanilla/工作区磁盘索引。显式打开的文档仍可按规则分类以提供编辑器级语法能力。省份 ID 等脚本语义从 `positions.txt` 等可解析的权威游戏文件提取。存档和二进制数据不做内容解析。
 
 当前 EU4 profile 服务项目选定的 EU4 规则基线。规则数据库可以继续由项目维护者修订，每次逻辑修订产生新的 `rule_hash`。通用引擎不假定所有游戏都只有一个版本；版本策略属于各游戏 profile 和规则 artifact metadata。
 

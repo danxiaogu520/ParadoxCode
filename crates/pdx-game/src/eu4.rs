@@ -331,6 +331,10 @@ pub fn profile() -> GameProfile {
             .iter()
             .map(|folder| (*folder).to_owned())
             .collect(),
+        scan_extensions: ["txt", "gfx", "yml"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
         definitions,
         references: vec![
             reference(ProfileMatchMode::Exact, "event", "event"),
@@ -731,6 +735,7 @@ mod tests {
         assert_eq!(profile.game_id, GAME_ID);
         assert_eq!(profile.scan_roots().len(), SCRIPT_FOLDERS.len());
         assert!(profile.scan_roots().iter().any(|root| root == "common"));
+        assert_eq!(profile.scan_extensions(), ["txt", "gfx", "yml"]);
         assert!(
             profile
                 .scan_roots()

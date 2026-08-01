@@ -111,7 +111,7 @@ impl VanillaIndexCache {
         if let Some(file) = snapshot.source_files().values().find(|file| {
             !snapshot
                 .game_profile()
-                .allows_scan_path(file.logical_path.as_str())
+                .allows_scan_file(file.logical_path.as_str())
         }) {
             return Err(VanillaCacheError::InvalidData(format!(
                 "Vanilla file {} is outside the active profile scan whitelist",

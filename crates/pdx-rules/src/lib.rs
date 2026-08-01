@@ -456,6 +456,11 @@ pub struct GameProfile {
     /// An empty whitelist means that the profile does not authorize disk discovery. This keeps
     /// the generic engine conservative until a game profile supplies its resource roots.
     pub scan_roots: Vec<String>,
+    /// Optional file-extension whitelist used after directory discovery.
+    ///
+    /// Entries omit the leading dot and are compared case-insensitively. An empty list keeps
+    /// every extension, preserving the generic profile behavior.
+    pub scan_extensions: Vec<String>,
     /// Ordered top-level definition rules; the first match wins.
     pub definitions: Vec<ProfileDefinitionRule>,
     /// Ordered scalar-reference rules; the first match wins.
@@ -496,6 +501,7 @@ impl GameProfile {
         Self {
             game_id: game_id.into(),
             scan_roots: Vec::new(),
+            scan_extensions: Vec::new(),
             definitions: Vec::new(),
             references: Vec::new(),
             value_definitions: Vec::new(),
@@ -519,6 +525,12 @@ impl GameProfile {
         &self.scan_roots
     }
 
+    /// Returns the optional file-extension whitelist used during source discovery.
+    #[must_use]
+    pub fn scan_extensions(&self) -> &[String] {
+        &self.scan_extensions
+    }
+
     /// Returns whether a logical file path belongs to a whitelisted scan directory.
     #[must_use]
     pub fn allows_scan_path(&self, logical_path: &str) -> bool {
@@ -528,6 +540,25 @@ impl GameProfile {
                 || logical_path
                     .strip_prefix(root)
                     .is_some_and(|remainder| remainder.starts_with('/'))
+        })
+    }
+
+    /// Returns whether a logical file path belongs to the directory and extension whitelists.
+    #[must_use]
+    pub fn allows_scan_file(&self, logical_path: &str) -> bool {
+        if !self.allows_scan_path(logical_path) || self.scan_extensions.is_empty() {
+            return self.allows_scan_path(logical_path);
+        }
+        let Some(extension) = logical_path
+            .rsplit('/')
+            .next()
+            .and_then(|name| name.rsplit_once('.'))
+            .map(|(_, extension)| extension)
+        else {
+            return false;
+        };
+        self.scan_extensions.iter().any(|allowed| {
+            extension.eq_ignore_ascii_case(allowed.strip_prefix('.').unwrap_or(allowed))
         })
     }
 
@@ -2162,6 +2193,21 @@ mod tests {
         assert!(profile.allows_scan_path("events/example.txt"));
         assert!(!profile.allows_scan_path("common_extra/example.txt"));
         assert!(!profile.allows_scan_path("root_level.txt"));
+    }
+
+    #[test]
+    fn profile_scan_extensions_are_case_insensitive_and_directory_bounded() {
+        let mut profile = GameProfile::empty("test");
+        profile.scan_roots = vec!["events".to_owned()];
+        profile.scan_extensions = vec!["txt".to_owned(), "gfx".to_owned(), "yml".to_owned()];
+
+        assert!(profile.allows_scan_file("events/example.TXT"));
+        assert!(profile.allows_scan_file("events/example.gfx"));
+        assert!(profile.allows_scan_file("events/example.yml"));
+        assert!(!profile.allows_scan_file("events/example.gui"));
+        assert!(!profile.allows_scan_file("events/example.txt.bak"));
+        assert!(!profile.allows_scan_file("events_extra/example.txt"));
+        assert!(!profile.allows_scan_file("root_level.txt"));
     }
 
     #[test]

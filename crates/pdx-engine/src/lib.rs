@@ -1262,7 +1262,7 @@ fn record_scan_issue(
 
 fn collect_whitelisted_files(
     root: &std::path::Path,
-    scan_roots: &[String],
+    profile: &GameProfile,
     limits: WorkspaceScanLimits,
     report: &mut WorkspaceScanReport,
     output: &mut Vec<(LogicalPath, PathBuf)>,
@@ -1279,7 +1279,8 @@ fn collect_whitelisted_files(
         )));
     }
 
-    let mut roots = scan_roots
+    let mut roots = profile
+        .scan_roots()
         .iter()
         .map(|scan_root| {
             LogicalPath::parse(scan_root)
@@ -1305,6 +1306,7 @@ fn collect_whitelisted_files(
     let mut seen = BTreeSet::new();
     let mut scan = DiskScanContext {
         limits,
+        profile,
         report,
         output,
         seen: &mut seen,
@@ -1369,6 +1371,7 @@ fn collect_whitelisted_files(
 
 struct DiskScanContext<'a> {
     limits: WorkspaceScanLimits,
+    profile: &'a GameProfile,
     report: &'a mut WorkspaceScanReport,
     output: &'a mut Vec<(LogicalPath, PathBuf)>,
     seen: &'a mut BTreeSet<LogicalPath>,
@@ -1472,6 +1475,9 @@ fn collect_disk_files(
             .map_err(|_| WorkspaceError::InvalidLogicalPath(path.clone()))?
             .to_string_lossy()
             .replace('\\', "/");
+        if !scan.profile.allows_scan_file(&relative) {
+            continue;
+        }
         let logical = LogicalPath::parse(&relative)
             .map_err(|_| WorkspaceError::InvalidLogicalPath(path.clone()))?;
         if !scan.seen.insert(logical.clone()) {
@@ -2502,7 +2508,7 @@ impl AnalysisHost {
         if let Some(file) = cache
             .source_files()
             .values()
-            .find(|file| !self.profile.allows_scan_path(file.logical_path.as_str()))
+            .find(|file| !self.profile.allows_scan_file(file.logical_path.as_str()))
         {
             return Err(VanillaCacheError::InvalidData(format!(
                 "Vanilla cache file {} is outside the active profile scan whitelist",
@@ -2591,7 +2597,7 @@ impl AnalysisHost {
             let mut paths = Vec::new();
             collect_whitelisted_files(
                 &root.path,
-                self.profile.scan_roots(),
+                self.profile.as_ref(),
                 limits,
                 &mut report,
                 &mut paths,
@@ -2758,7 +2764,7 @@ impl AnalysisHost {
                 .replace('\\', "/");
             let logical = LogicalPath::parse(&relative)
                 .map_err(|_| WorkspaceError::InvalidLogicalPath(change.path.clone()))?;
-            if !self.profile.allows_scan_path(logical.as_str()) {
+            if !self.profile.allows_scan_file(logical.as_str()) {
                 continue;
             }
             let id = SourceFileId::new(stable_file_id(root.id, &logical));
@@ -4230,7 +4236,9 @@ mod tests {
         fs::create_dir_all(root.join("gfx")).expect("asset directory");
         fs::write(root.join("gfx/icon.png"), [0_u8, 159, 146, 150]).expect("binary asset");
 
-        let mut host = eu4_host();
+        let mut profile = pdx_game::eu4::profile();
+        profile.scan_extensions.clear();
+        let mut host = AnalysisHost::with_profile(pdx_game::eu4::bootstrap_rules(), profile);
         host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
             SourceRoot::new(
                 SourceRootId::new(1),
@@ -4284,6 +4292,11 @@ mod tests {
             "country_event = { id = whitelist.common }\n",
         )
         .expect("common fixture");
+        fs::write(
+            root.join("gfx/icon.gfx"),
+            "spriteType = { name = whitelist.gfx }\n",
+        )
+        .expect("gfx fixture");
         fs::write(root.join("gfx/icon.png"), [0_u8, 159, 146, 150]).expect("asset fixture");
         fs::write(
             root.join("ignored/not_scanned.txt"),
@@ -4305,7 +4318,7 @@ mod tests {
             ),
         ]));
         let report = host.refresh_source_roots().expect("whitelist scan");
-        assert_eq!(report.discovered_files, 3);
+        assert_eq!(report.discovered_files, 4);
         assert_eq!(report.indexed_files, 3);
         let snapshot = host.snapshot();
         assert!(
@@ -4336,7 +4349,13 @@ mod tests {
             snapshot
                 .source_files()
                 .values()
-                .any(|file| { file.logical_path.as_str() == "gfx/icon.png" })
+                .any(|file| file.logical_path.as_str() == "gfx/icon.gfx")
+        );
+        assert!(
+            snapshot
+                .source_files()
+                .values()
+                .all(|file| file.logical_path.as_str() != "gfx/icon.png")
         );
         let ignored_change = root.join("ignored/created_after_scan.txt");
         fs::write(
@@ -4354,6 +4373,20 @@ mod tests {
                 .index()
                 .active_definition("event", "whitelist.watched_ignored")
                 .is_none()
+        );
+        let ignored_extension_change = root.join("events/created_after_scan.png");
+        fs::write(&ignored_extension_change, [0_u8, 159, 146, 150])
+            .expect("ignored extension fixture");
+        host.apply_disk_file_changes(&[DiskFileChange::new(
+            ignored_extension_change,
+            DiskFileChangeKind::Created,
+        )])
+        .expect("ignored extension change");
+        assert!(
+            host.snapshot()
+                .source_files()
+                .values()
+                .all(|file| { file.logical_path.as_str() != "events/created_after_scan.png" })
         );
         fs::remove_dir_all(root).expect("cleanup");
     }

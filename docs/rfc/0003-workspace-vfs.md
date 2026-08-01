@@ -12,6 +12,8 @@
 > Vanilla setup 修订（2026-08-01）：Vanilla cache 构建完成每个文件的 shard、UTF-16 位置和本地化预览后，不再把 CST/HIR 保留在 setup host 中；cache 写入复用 SQLite prepared statements。Vanilla cache 的持久化结果不变，setup 的峰值内存和写盘耗时下降。
 >
 > 扫描修订（2026-08-01）：source root 的目录发现改由 `GameProfile.scan_roots` 白名单控制。EU4 profile 完整复用 CWTools 的 `scriptFolders`；重叠目录在实际遍历前折叠，白名单外的文件不会进入全量扫描或 watched-file 定向更新。
+>
+> 文件筛选修订（2026-08-01）：EU4 profile 在目录白名单之后再应用 `scan_extensions = ["txt", "gfx", "yml"]`；其他扩展在规则分类和 `SourceFile` 建立之前被丢弃。Vanilla cache 校验和定向 watched-file 更新复用同一扩展白名单，显式打开的文档仍可按规则分类以提供编辑器级语法能力。
 
 ## 目标
 
