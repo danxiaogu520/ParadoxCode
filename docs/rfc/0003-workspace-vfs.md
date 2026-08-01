@@ -9,6 +9,8 @@
 >
 > 性能修订（2026-08-01）：大于 32 个可读源文件时，受限读取、parse 和 lower 在最多 8 个可取消 worker 中执行，结果按稳定任务顺序合并；未变更文件状态直接复用。Asset 资源只登记路径，不按 UTF-8 读取，也不进入文本解析队列。
 >
+> Vanilla setup 修订（2026-08-01）：Vanilla cache 构建完成每个文件的 shard、UTF-16 位置和本地化预览后，不再把 CST/HIR 保留在 setup host 中；cache 写入复用 SQLite prepared statements。Vanilla cache 的持久化结果不变，setup 的峰值内存和写盘耗时下降。
+>
 > 扫描修订（2026-08-01）：source root 的目录发现改由 `GameProfile.scan_roots` 白名单控制。EU4 profile 完整复用 CWTools 的 `scriptFolders`；重叠目录在实际遍历前折叠，白名单外的文件不会进入全量扫描或 watched-file 定向更新。
 
 ## 目标

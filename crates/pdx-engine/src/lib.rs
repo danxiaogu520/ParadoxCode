@@ -364,6 +364,65 @@ pub struct LocalisationPreview {
     pub value: String,
 }
 
+const MAX_LOCALISATION_PREVIEW_CHARS: usize = 240;
+
+fn localisation_previews_from_parsed(parsed: &ParsedFile) -> Vec<(TextRange, LocalisationPreview)> {
+    if parsed.format() != FileFormat::Localisation {
+        return Vec::new();
+    }
+    let mut previews = Vec::new();
+    let mut language = None;
+    for node in parsed.root().children() {
+        match node.kind() {
+            CstKind::LanguageHeader => {
+                language = node
+                    .children()
+                    .iter()
+                    .find(|child| child.kind() == CstKind::LocalisationKey)
+                    .and_then(|child| parsed.text(child.range()))
+                    .map(|value| value.trim().to_owned())
+                    .filter(|value| !value.is_empty());
+            }
+            CstKind::LocalisationEntry => {
+                let Some(value_node) = node.children().iter().find(|child| {
+                    matches!(
+                        child.kind(),
+                        CstKind::LocalisationString | CstKind::UnquotedValue
+                    )
+                }) else {
+                    continue;
+                };
+                let Some(raw) = parsed.text(value_node.range()).map(str::trim) else {
+                    continue;
+                };
+                let value = raw
+                    .strip_prefix('"')
+                    .and_then(|value| value.strip_suffix('"'))
+                    .unwrap_or(raw);
+                let truncated = value.chars().count() > MAX_LOCALISATION_PREVIEW_CHARS;
+                let mut value = value
+                    .chars()
+                    .take(MAX_LOCALISATION_PREVIEW_CHARS)
+                    .collect::<String>();
+                if truncated {
+                    value.push('…');
+                }
+                if !value.is_empty() {
+                    previews.push((
+                        node.range(),
+                        LocalisationPreview {
+                            language: language.clone(),
+                            value,
+                        },
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+    previews
+}
+
 /// Parsed frontend retained by one immutable file state.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParsedSource {
@@ -389,6 +448,8 @@ pub struct FileState {
     parsed: Option<ParsedSource>,
     hir: Option<Arc<HirFile>>,
     shard: Arc<FileIndexShard>,
+    cached_positions: Option<Arc<Vec<(TextRange, PositionRange)>>>,
+    cached_localisation_previews: Option<Arc<Vec<(TextRange, LocalisationPreview)>>>,
 }
 
 impl FileState {
@@ -432,6 +493,59 @@ impl FileState {
     #[must_use]
     pub fn shard(&self) -> &FileIndexShard {
         &self.shard
+    }
+
+    fn cache_only(mut self, positions: Vec<(TextRange, PositionRange)>) -> Self {
+        let cached_localisation_previews =
+            self.cached_localisation_previews
+                .take()
+                .or_else(|| match self.parsed.as_ref() {
+                    Some(ParsedSource::Text(parsed)) => {
+                        let previews = localisation_previews_from_parsed(parsed);
+                        (!previews.is_empty()).then(|| Arc::new(previews))
+                    }
+                    None => None,
+                });
+        Self {
+            revision: self.revision,
+            source: self.source,
+            parsed: None,
+            hir: None,
+            shard: self.shard,
+            cached_positions: Some(Arc::new(positions)),
+            cached_localisation_previews,
+        }
+    }
+
+    fn cache_only_from_existing(&self, positions: Vec<(TextRange, PositionRange)>) -> Self {
+        let cached_localisation_previews = self
+            .cached_localisation_previews
+            .as_ref()
+            .map(Arc::clone)
+            .or_else(|| match self.parsed.as_ref() {
+                Some(ParsedSource::Text(parsed)) => {
+                    let previews = localisation_previews_from_parsed(parsed);
+                    (!previews.is_empty()).then(|| Arc::new(previews))
+                }
+                None => None,
+            });
+        Self {
+            revision: self.revision,
+            source: Arc::clone(&self.source),
+            parsed: None,
+            hir: None,
+            shard: Arc::clone(&self.shard),
+            cached_positions: Some(Arc::new(positions)),
+            cached_localisation_previews,
+        }
+    }
+
+    pub(crate) fn cached_localisation_previews(
+        &self,
+    ) -> Option<&[(TextRange, LocalisationPreview)]> {
+        self.cached_localisation_previews
+            .as_deref()
+            .map(Vec::as_slice)
     }
 }
 
@@ -1640,6 +1754,7 @@ const PARALLEL_SOURCE_THRESHOLD: usize = 32;
 struct SourceReadJob {
     file: SourceFile,
     physical_path: PathBuf,
+    retain_frontend: bool,
 }
 
 struct SourceReadResult {
@@ -1769,16 +1884,27 @@ fn load_source_file_job(
             && context.previous_files.get(&job.file.id) == Some(&job.file)
             && previous.source() == text
         {
-            return Arc::clone(previous);
+            if job.retain_frontend || previous.parsed().is_none() {
+                return Arc::clone(previous);
+            }
+            return Arc::new(
+                previous.cache_only_from_existing(position_ranges_for_state(previous)),
+            );
         }
         let file_revision = previous.map_or(0, |state| state.revision().saturating_add(1));
-        Arc::new(build_file_state(
+        let state = build_file_state(
             &job.file,
             text,
             file_revision,
             context.rules,
             context.profile,
-        ))
+        );
+        if job.retain_frontend {
+            Arc::new(state)
+        } else {
+            let positions = position_ranges_for_state(&state);
+            Arc::new(state.cache_only(positions))
+        }
     });
     Ok(SourceReadResult {
         file: job.file,
@@ -1824,6 +1950,8 @@ fn build_file_state(
                 references: Vec::new(),
                 syntax_error_count: 0,
             }),
+            cached_positions: None,
+            cached_localisation_previews: None,
         };
     };
     let (parsed, hir) = parse_source(
@@ -1865,6 +1993,8 @@ fn build_file_state(
         parsed,
         hir,
         shard: Arc::new(shard),
+        cached_positions: None,
+        cached_localisation_previews: None,
     }
 }
 
@@ -1880,10 +2010,15 @@ fn empty_file_state(file: &SourceFile, revision: u64) -> FileState {
             references: Vec::new(),
             syntax_error_count: 0,
         }),
+        cached_positions: None,
+        cached_localisation_previews: None,
     }
 }
 
 fn position_ranges_for_state(state: &FileState) -> Vec<(TextRange, PositionRange)> {
+    if let Some(cached) = state.cached_positions.as_deref() {
+        return cached.clone();
+    }
     let line_index = LineIndex::new(state.source());
     let hir_selection_ranges = state
         .hir()
@@ -2508,6 +2643,7 @@ impl AnalysisHost {
                 source_jobs.push(SourceReadJob {
                     file: source_file,
                     physical_path: physical,
+                    retain_frontend: root.kind != SourceRootKind::Vanilla,
                 });
             }
         }
@@ -4611,6 +4747,12 @@ mod tests {
         vanilla_host
             .refresh_source_roots()
             .expect("scan Vanilla once");
+        let vanilla_snapshot = vanilla_host.snapshot();
+        assert!(vanilla_snapshot.source_files().keys().all(|file_id| {
+            vanilla_snapshot
+                .file_state(*file_id)
+                .is_some_and(|state| state.parsed().is_none() && state.hir().is_none())
+        }));
         let cache =
             VanillaIndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
         let cache_path = root.join("cache/vanilla.pdxindex");

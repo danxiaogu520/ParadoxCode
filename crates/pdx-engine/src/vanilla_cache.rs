@@ -438,6 +438,20 @@ fn collect_localisation_previews(
                 file.logical_path.as_str()
             ))
         })?;
+        if let Some(cached) = state.cached_localisation_previews() {
+            for (range, preview) in cached {
+                if previews
+                    .insert((*file_id, *range), preview.clone())
+                    .is_some()
+                {
+                    return Err(VanillaCacheError::InvalidData(format!(
+                        "duplicate localisation preview in {}",
+                        file.logical_path.as_str()
+                    )));
+                }
+            }
+            continue;
+        }
         let Some(ParsedSource::Text(parsed)) = state.parsed() else {
             continue;
         };
@@ -690,6 +704,18 @@ fn write_cache(
             params![key, value],
         )?;
     }
+    let mut insert_source_file = transaction.prepare(
+        "INSERT INTO source_files(file_id, logical_path, category_id, resolution, syntax_error_count)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+    )?;
+    let mut insert_definition = transaction.prepare(
+        "INSERT INTO definitions(file_id, ordinal, kind, name, range_start, range_end, active)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+    )?;
+    let mut insert_reference = transaction.prepare(
+        "INSERT INTO symbol_references(file_id, ordinal, kind, name, range_start, range_end)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+    )?;
     for (id, file) in &cache.source_files {
         let shard = cache.index.shard(*id).ok_or_else(|| {
             VanillaCacheError::InvalidData(format!(
@@ -697,49 +723,44 @@ fn write_cache(
                 file.logical_path.as_str()
             ))
         })?;
-        transaction.execute(
-            "INSERT INTO source_files(file_id, logical_path, category_id, resolution, syntax_error_count)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![
-                encode_file_id(*id),
-                file.logical_path.as_str(),
-                file.category_id,
-                resolution_name(file.resolution),
-                i64::try_from(shard.syntax_error_count).map_err(|_| {
-                    VanillaCacheError::InvalidData("syntax error count exceeds SQLite range".into())
-                })?
-            ],
-        )?;
+        insert_source_file.execute(params![
+            encode_file_id(*id),
+            file.logical_path.as_str(),
+            file.category_id,
+            resolution_name(file.resolution),
+            i64::try_from(shard.syntax_error_count).map_err(|_| {
+                VanillaCacheError::InvalidData("syntax error count exceeds SQLite range".into())
+            })?
+        ])?;
         for (ordinal, definition) in shard.definitions.iter().enumerate() {
-            transaction.execute(
-                "INSERT INTO definitions(file_id, ordinal, kind, name, range_start, range_end, active)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                params![
-                    encode_file_id(*id),
-                    i64::try_from(ordinal).unwrap_or(i64::MAX),
-                    definition.kind,
-                    definition.name,
-                    i64::from(definition.range.start()),
-                    i64::from(definition.range.end()),
-                    i64::from(definition.active)
-                ],
-            )?;
+            insert_definition.execute(params![
+                encode_file_id(*id),
+                i64::try_from(ordinal).unwrap_or(i64::MAX),
+                definition.kind,
+                definition.name,
+                i64::from(definition.range.start()),
+                i64::from(definition.range.end()),
+                i64::from(definition.active)
+            ])?;
         }
         for (ordinal, reference) in shard.references.iter().enumerate() {
-            transaction.execute(
-                "INSERT INTO symbol_references(file_id, ordinal, kind, name, range_start, range_end)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![
-                    encode_file_id(*id),
-                    i64::try_from(ordinal).unwrap_or(i64::MAX),
-                    reference.kind,
-                    reference.name,
-                    i64::from(reference.range.start()),
-                    i64::from(reference.range.end())
-                ],
-            )?;
+            insert_reference.execute(params![
+                encode_file_id(*id),
+                i64::try_from(ordinal).unwrap_or(i64::MAX),
+                reference.kind,
+                reference.name,
+                i64::from(reference.range.start()),
+                i64::from(reference.range.end())
+            ])?;
         }
     }
+    drop(insert_source_file);
+    drop(insert_definition);
+    drop(insert_reference);
+    let mut insert_position = transaction.prepare(
+        "INSERT INTO navigation_positions(file_id, range_start, range_end, start_line, start_character, end_line, end_character)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+    )?;
     for ((file_id, range), position) in cache.index.position_ranges() {
         if !cache.source_files.contains_key(file_id) {
             return Err(VanillaCacheError::InvalidData(format!(
@@ -747,20 +768,21 @@ fn write_cache(
                 file_id.get()
             )));
         }
-        transaction.execute(
-            "INSERT INTO navigation_positions(file_id, range_start, range_end, start_line, start_character, end_line, end_character)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![
-                encode_file_id(*file_id),
-                i64::from(range.start()),
-                i64::from(range.end()),
-                i64::from(position.start.line),
-                i64::from(position.start.character),
-                i64::from(position.end.line),
-                i64::from(position.end.character),
-            ],
-        )?;
+        insert_position.execute(params![
+            encode_file_id(*file_id),
+            i64::from(range.start()),
+            i64::from(range.end()),
+            i64::from(position.start.line),
+            i64::from(position.start.character),
+            i64::from(position.end.line),
+            i64::from(position.end.character),
+        ])?;
     }
+    drop(insert_position);
+    let mut insert_preview = transaction.prepare(
+        "INSERT INTO localisation_previews(file_id, range_start, range_end, language, value)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+    )?;
     for ((file_id, range), preview) in &cache.localisation_previews {
         let Some(file) = cache.source_files.get(file_id) else {
             return Err(VanillaCacheError::InvalidData(format!(
@@ -783,17 +805,13 @@ fn write_cache(
                 range.end()
             )));
         }
-        transaction.execute(
-            "INSERT INTO localisation_previews(file_id, range_start, range_end, language, value)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![
-                encode_file_id(*file_id),
-                i64::from(range.start()),
-                i64::from(range.end()),
-                preview.language,
-                preview.value,
-            ],
-        )?;
+        insert_preview.execute(params![
+            encode_file_id(*file_id),
+            i64::from(range.start()),
+            i64::from(range.end()),
+            preview.language,
+            preview.value,
+        ])?;
     }
     Ok(())
 }
