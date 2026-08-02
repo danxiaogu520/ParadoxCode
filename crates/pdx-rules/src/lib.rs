@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// The first runtime schema version reserved for the generated rule database.
-pub const CURRENT_SCHEMA_VERSION: u32 = 13;
+pub const CURRENT_SCHEMA_VERSION: u32 = 15;
 
 static EMBEDDED_LOAD_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -830,6 +830,54 @@ pub struct TypeDescriptor {
     pub type_key_filter: Option<(Vec<String>, bool)>,
 }
 
+/// One type-instance to localisation-key mapping from the first-party rule source.
+///
+/// A template contains exactly one `$` placeholder, which is replaced by the concrete
+/// definition name. An explicit field mapping has no generated template; its value is
+/// validated by the ordinary semantic localisation rules instead.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct LocalisationBinding {
+    /// Semantic type whose instances own this mapping.
+    #[serde(rename = "type")]
+    pub type_name: String,
+    /// Descriptive source field name, retained for diagnostics and stable identity.
+    pub field: String,
+    /// Generated key template, when this is not an explicit field mapping.
+    pub template: Option<String>,
+    /// Whether the generated key must exist.
+    #[serde(default)]
+    pub required: bool,
+    /// Whether the generated key is an optional game convention.
+    #[serde(default)]
+    pub optional: bool,
+    /// Subtype condition under which the mapping applies.
+    #[serde(default)]
+    pub subtype: Option<String>,
+    /// Structural condition that selects the subtype, when it is not represented by a
+    /// same-named child field.
+    #[serde(default)]
+    pub condition: Option<LocalisationBindingCondition>,
+    /// Explicit source field whose value is the localisation key.
+    #[serde(default)]
+    pub explicit_field: Option<String>,
+}
+
+/// Data-driven structural selector for one localisation binding subtype.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct LocalisationBindingCondition {
+    /// Direct child field whose presence/value selects the subtype.
+    #[serde(default)]
+    pub field: Option<String>,
+    /// Optional scalar value required for `field`.
+    #[serde(default)]
+    pub value: Option<String>,
+    /// Prefix applied to the concrete type-instance name.
+    #[serde(default)]
+    pub key_prefix: Option<String>,
+}
+
 impl RuleShape {
     fn as_str(self) -> &'static str {
         match self {
@@ -911,6 +959,8 @@ pub struct SemanticModel {
     pub type_root_scopes: BTreeMap<String, BTreeMap<String, String>>,
     /// File/root metadata declared by semantic type blocks.
     pub type_descriptors: BTreeMap<String, TypeDescriptor>,
+    /// Type-instance to localisation-key mappings.
+    pub localisation_bindings: Vec<LocalisationBinding>,
 }
 
 /// Normalized logical contents of one game rule database.
@@ -1051,6 +1101,7 @@ impl RuleSet {
                     type_root_keys: BTreeMap::new(),
                     type_root_scopes: BTreeMap::new(),
                     type_descriptors: BTreeMap::new(),
+                    localisation_bindings: Vec::new(),
                 },
             },
             exact_semantic_rules: BTreeMap::new(),
@@ -1078,6 +1129,20 @@ impl RuleSet {
             .semantic
             .rules
             .sort_by(|left, right| left.id.cmp(&right.id));
+        model.semantic.localisation_bindings.sort_by(|left, right| {
+            (
+                left.type_name.as_str(),
+                left.subtype.as_deref().unwrap_or_default(),
+                left.field.as_str(),
+                left.template.as_deref().unwrap_or_default(),
+            )
+                .cmp(&(
+                    right.type_name.as_str(),
+                    right.subtype.as_deref().unwrap_or_default(),
+                    right.field.as_str(),
+                    right.template.as_deref().unwrap_or_default(),
+                ))
+        });
         for values in model.semantic.enum_values.values_mut() {
             values.sort();
             values.dedup();
@@ -1460,6 +1525,40 @@ fn canonical_hash(model: &RulesModel) -> RuleHash {
             None => bytes.push(0),
         }
     }
+    let mut localisation_bindings = model.semantic.localisation_bindings.clone();
+    localisation_bindings.sort_by(|left, right| {
+        (
+            left.type_name.as_str(),
+            left.subtype.as_deref().unwrap_or_default(),
+            left.field.as_str(),
+            left.template.as_deref().unwrap_or_default(),
+        )
+            .cmp(&(
+                right.type_name.as_str(),
+                right.subtype.as_deref().unwrap_or_default(),
+                right.field.as_str(),
+                right.template.as_deref().unwrap_or_default(),
+            ))
+    });
+    put_len(&mut bytes, localisation_bindings.len());
+    for binding in localisation_bindings {
+        put_str(&mut bytes, &binding.type_name);
+        put_str(&mut bytes, &binding.field);
+        put_opt_str(&mut bytes, binding.template.as_deref());
+        bytes.push(u8::from(binding.required));
+        bytes.push(u8::from(binding.optional));
+        put_opt_str(&mut bytes, binding.subtype.as_deref());
+        if let Some(condition) = &binding.condition {
+            put_opt_str(&mut bytes, condition.field.as_deref());
+            put_opt_str(&mut bytes, condition.value.as_deref());
+            put_opt_str(&mut bytes, condition.key_prefix.as_deref());
+        } else {
+            put_opt_str(&mut bytes, None);
+            put_opt_str(&mut bytes, None);
+            put_opt_str(&mut bytes, None);
+        }
+        put_opt_str(&mut bytes, binding.explicit_field.as_deref());
+    }
     let digest = Sha256::digest(bytes);
     let mut result = [0_u8; 32];
     result.copy_from_slice(&digest);
@@ -1629,6 +1728,19 @@ fn schema(connection: &Connection) -> Result<(), RulesError> {
             type_key_filter TEXT NOT NULL DEFAULT '',
             type_key_filter_negate INTEGER NOT NULL DEFAULT 0
         );
+        CREATE TABLE IF NOT EXISTS localisation_bindings (
+            type_name TEXT NOT NULL,
+            field TEXT NOT NULL,
+            template TEXT,
+            required INTEGER NOT NULL DEFAULT 0,
+            optional INTEGER NOT NULL DEFAULT 0,
+            subtype TEXT,
+            condition_field TEXT,
+            condition_value TEXT,
+            condition_key_prefix TEXT,
+            explicit_field TEXT,
+            PRIMARY KEY(type_name, field, subtype)
+        );
         CREATE TABLE IF NOT EXISTS import_provenance (
             source_path TEXT PRIMARY KEY NOT NULL, source_sha256 TEXT NOT NULL, importer_version TEXT NOT NULL
         );")?;
@@ -1684,7 +1796,7 @@ fn ensure_semantic_columns(connection: &Connection) -> Result<(), RulesError> {
 fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), RulesError> {
     schema(connection)?;
     let transaction = connection.transaction()?;
-    transaction.execute_batch("DELETE FROM metadata; DELETE FROM interned_names; DELETE FROM file_categories; DELETE FROM symbol_descriptors; DELETE FROM enum_values; DELETE FROM type_root_keys; DELETE FROM type_root_scopes; DELETE FROM type_descriptors; DELETE FROM semantic_rules; DELETE FROM rule_fields; DELETE FROM rule_records;")?;
+    transaction.execute_batch("DELETE FROM metadata; DELETE FROM interned_names; DELETE FROM file_categories; DELETE FROM symbol_descriptors; DELETE FROM enum_values; DELETE FROM type_root_keys; DELETE FROM type_root_scopes; DELETE FROM type_descriptors; DELETE FROM localisation_bindings; DELETE FROM semantic_rules; DELETE FROM rule_fields; DELETE FROM rule_records;")?;
     transaction.execute(
         "INSERT INTO metadata(key, value) VALUES ('schema_version', ?1), ('rule_hash', ?2), ('game_id', ?3)",
         params![rules.schema_version.to_string(), rules.rule_hash.to_hex(), rules.game_id()],
@@ -1787,6 +1899,23 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
                 i64::from(
                     descriptor.type_key_filter.as_ref().is_some_and(|(_, negate)| *negate),
                 ),
+            ],
+        )?;
+    }
+    for binding in &rules.model.semantic.localisation_bindings {
+        transaction.execute(
+            "INSERT INTO localisation_bindings(type_name, field, template, required, optional, subtype, condition_field, condition_value, condition_key_prefix, explicit_field) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                binding.type_name,
+                binding.field,
+                binding.template,
+                i64::from(binding.required),
+                i64::from(binding.optional),
+                binding.subtype,
+                binding.condition.as_ref().and_then(|condition| condition.field.as_deref()),
+                binding.condition.as_ref().and_then(|condition| condition.value.as_deref()),
+                binding.condition.as_ref().and_then(|condition| condition.key_prefix.as_deref()),
+                binding.explicit_field,
             ],
         )?;
     }
@@ -2094,12 +2223,42 @@ fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesEr
         let descriptor = row?;
         type_descriptors.insert(descriptor.name.clone(), descriptor);
     }
+    let mut localisation_bindings = Vec::new();
+    let mut statement = connection.prepare(
+        "SELECT type_name, field, template, required, optional, subtype, condition_field, condition_value, condition_key_prefix, explicit_field FROM localisation_bindings ORDER BY type_name, subtype, field",
+    )?;
+    let rows = statement.query_map([], |row| {
+        let condition_field: Option<String> = row.get(6)?;
+        let condition_value: Option<String> = row.get(7)?;
+        let condition_key_prefix: Option<String> = row.get(8)?;
+        Ok(LocalisationBinding {
+            type_name: row.get(0)?,
+            field: row.get(1)?,
+            template: row.get(2)?,
+            required: row.get::<_, i64>(3)? != 0,
+            optional: row.get::<_, i64>(4)? != 0,
+            subtype: row.get(5)?,
+            condition: (condition_field.is_some()
+                || condition_value.is_some()
+                || condition_key_prefix.is_some())
+            .then_some(LocalisationBindingCondition {
+                field: condition_field,
+                value: condition_value,
+                key_prefix: condition_key_prefix,
+            }),
+            explicit_field: row.get(9)?,
+        })
+    })?;
+    for row in rows {
+        localisation_bindings.push(row?);
+    }
     Ok(SemanticModel {
         rules,
         enum_values,
         type_root_keys,
         type_root_scopes,
         type_descriptors,
+        localisation_bindings,
     })
 }
 

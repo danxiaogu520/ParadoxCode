@@ -3,7 +3,7 @@
 //! This crate deliberately has no external rule-language parser or compatibility layer. Its only
 //! accepted input is the versioned source tree owned and reviewed in this repository.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 
 /// Current version of the developer-maintained source layout.
-pub const SOURCE_FORMAT_VERSION: u32 = 2;
+pub const SOURCE_FORMAT_VERSION: u32 = 4;
 
 const SOURCE_MANIFEST: &str = "manifest.json";
 const CATALOG: &str = "catalog.json";
@@ -24,6 +24,7 @@ const ENUM_VALUES: &str = "enum-values.json";
 const TYPE_ROOT_KEYS: &str = "type-root-keys.json";
 const TYPE_ROOT_SCOPES: &str = "type-root-scopes.json";
 const TYPE_DESCRIPTORS: &str = "type-descriptors.json";
+const LOCALISATION_BINDINGS: &str = "localisation-bindings.json";
 
 /// Identity and compatibility metadata maintained with the rule source.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -43,6 +44,34 @@ struct CatalogSource {
     file_categories: Vec<FileCategory>,
     symbol_descriptors: Vec<SymbolDescriptor>,
     records: Vec<RuleRecord>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LocalisationBindingSource {
+    field: String,
+    template: Option<String>,
+    #[serde(default)]
+    required: bool,
+    #[serde(default)]
+    optional: bool,
+    #[serde(default)]
+    subtype: Option<String>,
+    #[serde(default)]
+    condition: Option<LocalisationBindingConditionSource>,
+    #[serde(default)]
+    explicit_field: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LocalisationBindingConditionSource {
+    #[serde(default)]
+    field: Option<String>,
+    #[serde(default)]
+    value: Option<String>,
+    #[serde(default)]
+    key_prefix: Option<String>,
 }
 
 /// Release manifest generated from validated first-party source.
@@ -141,12 +170,14 @@ pub fn load_source(source: &Path) -> Result<(SourceManifest, RulesModel), Compil
     }
 
     let catalog: CatalogSource = read_json(&source.join(CATALOG))?;
+    let localisation_bindings = read_localisation_bindings(&source.join(LOCALISATION_BINDINGS))?;
     let semantic = SemanticModel {
         rules: read_json(&source.join(SEMANTIC_RULES))?,
         enum_values: read_json(&source.join(ENUM_VALUES))?,
         type_root_keys: read_json(&source.join(TYPE_ROOT_KEYS))?,
         type_root_scopes: read_json(&source.join(TYPE_ROOT_SCOPES))?,
         type_descriptors: read_json(&source.join(TYPE_DESCRIPTORS))?,
+        localisation_bindings,
     };
     let model = RulesModel {
         game_id: manifest.game_id.clone(),
@@ -157,6 +188,35 @@ pub fn load_source(source: &Path) -> Result<(SourceManifest, RulesModel), Compil
     };
     validate_model(&model)?;
     Ok((manifest, model))
+}
+
+fn read_localisation_bindings(
+    path: &Path,
+) -> Result<Vec<crate::LocalisationBinding>, CompileError> {
+    let source: BTreeMap<String, Vec<LocalisationBindingSource>> = read_json(path)?;
+    Ok(source
+        .into_iter()
+        .flat_map(|(type_name, bindings)| {
+            bindings
+                .into_iter()
+                .map(move |binding| crate::LocalisationBinding {
+                    type_name: type_name.clone(),
+                    field: binding.field,
+                    template: binding.template,
+                    required: binding.required,
+                    optional: binding.optional,
+                    subtype: binding.subtype,
+                    condition: binding.condition.map(|condition| {
+                        crate::LocalisationBindingCondition {
+                            field: condition.field,
+                            value: condition.value,
+                            key_prefix: condition.key_prefix,
+                        }
+                    }),
+                    explicit_field: binding.explicit_field,
+                })
+        })
+        .collect())
 }
 
 /// Compiles source into a validated SQLite artifact and release manifest.
@@ -289,6 +349,102 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
             )));
         }
     }
+    let mut binding_ids = BTreeSet::new();
+    for binding in &model.semantic.localisation_bindings {
+        if binding.type_name.trim().is_empty() || binding.field.trim().is_empty() {
+            return Err(CompileError::Validation(
+                "localisation binding type and field must not be empty".to_owned(),
+            ));
+        }
+        if !model
+            .semantic
+            .type_descriptors
+            .contains_key(&binding.type_name)
+        {
+            return Err(CompileError::Validation(format!(
+                "localisation binding {}.{} refers to unknown type {}",
+                binding.type_name, binding.field, binding.type_name
+            )));
+        }
+        if binding.required && binding.optional {
+            return Err(CompileError::Validation(format!(
+                "localisation binding {}.{} cannot be both required and optional",
+                binding.type_name, binding.field
+            )));
+        }
+        if binding
+            .subtype
+            .as_deref()
+            .is_some_and(|subtype| subtype.trim().is_empty())
+        {
+            return Err(CompileError::Validation(format!(
+                "localisation binding {}.{} has an empty subtype",
+                binding.type_name, binding.field
+            )));
+        }
+        if let Some(condition) = &binding.condition {
+            if condition
+                .field
+                .as_deref()
+                .is_some_and(|field| field.trim().is_empty())
+                || condition
+                    .key_prefix
+                    .as_deref()
+                    .is_some_and(|prefix| prefix.trim().is_empty())
+            {
+                return Err(CompileError::Validation(format!(
+                    "localisation binding {}.{} condition contains an empty selector",
+                    binding.type_name, binding.field
+                )));
+            }
+            let has_field = condition
+                .field
+                .as_deref()
+                .is_some_and(|field| !field.trim().is_empty());
+            let has_key_prefix = condition
+                .key_prefix
+                .as_deref()
+                .is_some_and(|prefix| !prefix.trim().is_empty());
+            if has_field == has_key_prefix {
+                return Err(CompileError::Validation(format!(
+                    "localisation binding {}.{} condition must select one field or key_prefix",
+                    binding.type_name, binding.field
+                )));
+            }
+            if condition.value.is_some() && !has_field {
+                return Err(CompileError::Validation(format!(
+                    "localisation binding {}.{} condition value requires field",
+                    binding.type_name, binding.field
+                )));
+            }
+        }
+        if binding.explicit_field.is_some() != binding.template.is_none() {
+            return Err(CompileError::Validation(format!(
+                "localisation binding {}.{} must use either template or explicit_field",
+                binding.type_name, binding.field
+            )));
+        }
+        if let Some(template) = binding.template.as_deref()
+            && (template.matches('$').count() != 1 || template.trim().is_empty())
+        {
+            return Err(CompileError::Validation(format!(
+                "localisation binding {}.{} template must contain exactly one `$`",
+                binding.type_name, binding.field
+            )));
+        }
+        let identity = format!(
+            "{}\u{1f}{}\u{1f}{}",
+            binding.type_name,
+            binding.subtype.as_deref().unwrap_or_default(),
+            binding.field
+        );
+        if !binding_ids.insert(identity) {
+            return Err(CompileError::Validation(format!(
+                "duplicate localisation binding {}.{}",
+                binding.type_name, binding.field
+            )));
+        }
+    }
     Ok(())
 }
 
@@ -301,6 +457,7 @@ fn validate_source_layout(source: &Path) -> Result<(), CompileError> {
         TYPE_ROOT_KEYS,
         TYPE_ROOT_SCOPES,
         TYPE_DESCRIPTORS,
+        LOCALISATION_BINDINGS,
     ]);
     let entries = fs::read_dir(source).map_err(|error| CompileError::Io {
         path: source.to_owned(),
@@ -436,6 +593,8 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let expected: ArtifactManifest =
             read_json(&root.join("rules/manifest.json")).expect("committed manifest");
+        let (_, source_model) = load_source(&root.join("rules/eu4")).expect("source model");
+        assert_eq!(source_model.semantic.localisation_bindings.len(), 191);
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")

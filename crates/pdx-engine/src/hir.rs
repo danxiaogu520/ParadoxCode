@@ -197,6 +197,10 @@ pub struct HirParameterReference {
 pub enum HirReferenceOrigin {
     /// A precise property matcher from the selected game profile.
     Profile,
+    /// A localisation value selected by a first-party semantic rule.
+    Semantic,
+    /// A required type-instance localisation mapping expanded from a first-party template.
+    DerivedLocalisation,
     /// A conservative bare value associated with the file category.
     Category,
 }
@@ -401,15 +405,30 @@ fn lower_shared_impl(
             collector.parameter_conditionals,
         )
     };
-    let (definitions, references) = lower_semantics(
+    let scope_facts = lower_scope_facts(&properties, logical_path, rules, profile);
+    let (definitions, mut references) = lower_semantics(
         &properties,
         &localisation_entries,
         &bare_values,
         logical_path,
         rules,
         profile,
+        &scope_facts,
     );
-    let scope_facts = lower_scope_facts(&properties, logical_path, rules, profile);
+    references.extend(derived_localisation_references(
+        &properties,
+        syntax.root().range(),
+        logical_path,
+        rules,
+    ));
+    let mut seen_references = std::collections::BTreeSet::new();
+    references.retain(|reference| {
+        seen_references.insert((
+            reference.kind.to_ascii_lowercase(),
+            reference.name.clone(),
+            reference.range,
+        ))
+    });
     let (parameter_definitions, parameter_references) = lower_parameters(
         &syntax,
         &properties,
@@ -1252,6 +1271,7 @@ fn lower_semantics(
     logical_path: Option<&LogicalPath>,
     rules: &RuleSet,
     profile: Option<&GameProfile>,
+    scope_facts: &[ScopeFact],
 ) -> (Vec<HirDefinition>, Vec<HirReference>) {
     let mut definitions = localisation_entries
         .iter()
@@ -1334,6 +1354,28 @@ fn lower_semantics(
         }
     }
 
+    let enum_localisation_rules = rules
+        .model()
+        .semantic
+        .rules
+        .iter()
+        .filter(|rule| {
+            matches!(rule.key, pdx_rules::KeyMatcher::Enum(_))
+                && matches!(rule.value, pdx_rules::ValueMatcher::Localisation)
+        })
+        .collect::<Vec<_>>();
+    for property in properties {
+        if let Some(reference) = semantic_localisation_reference(
+            property,
+            scope_facts,
+            logical_path,
+            rules,
+            &enum_localisation_rules,
+        ) {
+            references.push(reference);
+        }
+    }
+
     if let Some(category) = logical_path.and_then(|path| rules.classify(path)) {
         references.extend(bare_values.iter().map(|value| HirReference {
             kind: category.id.clone(),
@@ -1343,6 +1385,308 @@ fn lower_semantics(
         }));
     }
     (definitions, references)
+}
+
+fn semantic_localisation_reference(
+    property: &HirProperty,
+    scope_facts: &[ScopeFact],
+    logical_path: Option<&LogicalPath>,
+    rules: &RuleSet,
+    enum_localisation_rules: &[&pdx_rules::SemanticRule],
+) -> Option<HirReference> {
+    let scalar = property.scalar.as_ref()?;
+    let fact = scope_facts
+        .iter()
+        .find(|fact| fact.range == property.key_range);
+    let root_context = semantic_root_context(
+        rules,
+        logical_path,
+        property
+            .path
+            .first()
+            .map(String::as_str)
+            .unwrap_or_default(),
+    );
+    let property_parent_path = property
+        .path
+        .get(1..property.path.len().saturating_sub(1))
+        .unwrap_or_default();
+    let actual_parent_path = fact
+        .as_ref()
+        .map_or(property_parent_path, |fact| fact.parent_path.as_slice());
+    let context = fact.as_ref().map(|fact| fact.context.as_str());
+    let matches_rule = |rule: &pdx_rules::SemanticRule| {
+        (context.is_some_and(|context| rule.context.eq_ignore_ascii_case(context))
+            || root_context.as_deref().is_some_and(|context| {
+                rule.context.eq_ignore_ascii_case(context)
+                    || context.strip_prefix("type:").is_some_and(|type_name| {
+                        rule.context
+                            .eq_ignore_ascii_case(&format!("root:{type_name}"))
+                    })
+            }))
+            && localisation_parent_path_matches(rules, &rule.parent_path, actual_parent_path)
+            && matches!(rule.shape, RuleShape::Leaf | RuleShape::LeafValue)
+            && matches!(rule.value, pdx_rules::ValueMatcher::Localisation)
+            && semantic_localisation_key_matches(rules, &rule.key, &property.key)
+    };
+    let matches = rules.exact_semantic_rules(&property.key).any(matches_rule)
+        || enum_localisation_rules.iter().copied().any(matches_rule);
+    matches.then_some(HirReference {
+        kind: "localisation".to_owned(),
+        name: scalar.value.clone(),
+        range: scalar.range,
+        origin: HirReferenceOrigin::Semantic,
+    })
+}
+
+fn localisation_parent_path_matches(
+    rules: &RuleSet,
+    expected: &[String],
+    actual: &[String],
+) -> bool {
+    expected.len() == actual.len()
+        && expected.iter().zip(actual).all(|(expected, actual)| {
+            if expected.starts_with('<') && expected.ends_with('>') {
+                !actual.is_empty()
+            } else if let Some(enum_name) = expected
+                .strip_prefix("enum[")
+                .and_then(|value| value.strip_suffix(']'))
+            {
+                rules
+                    .model()
+                    .semantic
+                    .enum_values
+                    .get(enum_name)
+                    .is_some_and(|values| {
+                        values
+                            .iter()
+                            .any(|value| value.eq_ignore_ascii_case(actual))
+                    })
+            } else {
+                expected.eq_ignore_ascii_case(actual)
+            }
+        })
+}
+
+fn semantic_localisation_key_matches(
+    rules: &RuleSet,
+    matcher: &pdx_rules::KeyMatcher,
+    key: &str,
+) -> bool {
+    match matcher {
+        pdx_rules::KeyMatcher::Exact(expected) => expected.eq_ignore_ascii_case(key),
+        pdx_rules::KeyMatcher::Enum(name) => rules
+            .model()
+            .semantic
+            .enum_values
+            .get(name)
+            .is_some_and(|values| values.iter().any(|value| value.eq_ignore_ascii_case(key))),
+        _ => false,
+    }
+}
+
+fn derived_localisation_references(
+    properties: &[HirProperty],
+    root_range: TextRange,
+    logical_path: Option<&LogicalPath>,
+    rules: &RuleSet,
+) -> Vec<HirReference> {
+    if !logical_path.is_some_and(|path| path.as_str().contains('/')) {
+        return Vec::new();
+    }
+    let mut references = Vec::new();
+    for descriptor in rules.model().semantic.type_descriptors.values() {
+        if !semantic_type_path_matches(descriptor, logical_path) {
+            continue;
+        }
+        let instances =
+            localisation_type_instances(properties, root_range, logical_path, descriptor);
+        for (name, range, instance_range) in instances {
+            if name.contains('.') {
+                continue;
+            }
+            for binding in rules
+                .model()
+                .semantic
+                .localisation_bindings
+                .iter()
+                .filter(|binding| binding.type_name.eq_ignore_ascii_case(&descriptor.name))
+                .filter(|binding| binding.required)
+                .filter(|binding| {
+                    localisation_subtype_applies(
+                        properties,
+                        instance_range,
+                        &name,
+                        binding.subtype.as_deref(),
+                        binding.condition.as_ref(),
+                    )
+                })
+            {
+                let Some(template) = binding.template.as_deref() else {
+                    continue;
+                };
+                references.push(HirReference {
+                    kind: "localisation".to_owned(),
+                    name: template.replace('$', &name),
+                    range,
+                    origin: HirReferenceOrigin::DerivedLocalisation,
+                });
+            }
+        }
+    }
+    references
+}
+
+fn localisation_type_instances(
+    properties: &[HirProperty],
+    root_range: TextRange,
+    logical_path: Option<&LogicalPath>,
+    descriptor: &TypeDescriptor,
+) -> Vec<(String, TextRange, TextRange)> {
+    if descriptor.type_per_file {
+        let Some(path) = logical_path else {
+            return Vec::new();
+        };
+        let Some(file_name) = path.as_str().rsplit('/').next() else {
+            return Vec::new();
+        };
+        let name = file_name
+            .rsplit_once('.')
+            .map_or(file_name, |(stem, _)| stem);
+        return (!name.is_empty())
+            .then_some((name.to_owned(), root_range, root_range))
+            .into_iter()
+            .collect();
+    }
+
+    let candidates = if descriptor.skip_root_paths.is_empty() {
+        properties
+            .iter()
+            .filter(|property| property.top_level)
+            .collect::<Vec<_>>()
+    } else {
+        descriptor
+            .skip_root_paths
+            .iter()
+            .flat_map(|skip_path| {
+                properties.iter().filter(move |property| {
+                    property.path.len() == skip_path.len().saturating_add(1)
+                        && property
+                            .path
+                            .iter()
+                            .zip(skip_path)
+                            .all(|(actual, expected)| {
+                                expected.eq_ignore_ascii_case("any")
+                                    || actual.eq_ignore_ascii_case(expected)
+                            })
+                })
+            })
+            .collect::<Vec<_>>()
+    };
+
+    let mut instances = Vec::<(String, TextRange, TextRange)>::new();
+    for property in candidates {
+        if !property_key_matches_type(descriptor, &property.key) {
+            continue;
+        }
+        let (name, reference_range) = descriptor
+            .name_field
+            .as_deref()
+            .and_then(|field| nested_property(properties, property, field))
+            .and_then(|nested| {
+                nested
+                    .scalar
+                    .as_ref()
+                    .map(|scalar| (scalar.value.clone(), scalar.range))
+            })
+            .unwrap_or_else(|| (property.key.clone(), property.key_range));
+        if name.is_empty() {
+            continue;
+        }
+        if !instances.iter().any(|(existing, existing_range, _)| {
+            existing.eq_ignore_ascii_case(&name) && *existing_range == reference_range
+        }) {
+            instances.push((name, reference_range, property.range));
+        }
+    }
+    instances
+}
+
+fn property_key_matches_type(descriptor: &TypeDescriptor, key: &str) -> bool {
+    descriptor
+        .type_key_filter
+        .as_ref()
+        .is_none_or(|(values, negate)| {
+            (values.iter().any(|value| value.eq_ignore_ascii_case(key))) != *negate
+        })
+}
+
+fn localisation_subtype_applies(
+    properties: &[HirProperty],
+    instance_range: TextRange,
+    instance_name: &str,
+    subtype: Option<&str>,
+    condition: Option<&pdx_rules::LocalisationBindingCondition>,
+) -> bool {
+    if let Some(condition) = condition {
+        if let Some(prefix) = condition.key_prefix.as_deref() {
+            return instance_name
+                .to_ascii_lowercase()
+                .starts_with(&prefix.to_ascii_lowercase());
+        }
+        let Some(field) = condition.field.as_deref() else {
+            return false;
+        };
+        let Some(instance) = properties
+            .iter()
+            .find(|property| property.range == instance_range)
+        else {
+            return false;
+        };
+        let direct = properties.iter().find(|property| {
+            property.path.len() == instance.path.len().saturating_add(1)
+                && property
+                    .path
+                    .iter()
+                    .zip(&instance.path)
+                    .all(|(actual, expected)| actual.eq_ignore_ascii_case(expected))
+                && range_within(property.range, instance_range)
+                && property.key.eq_ignore_ascii_case(field)
+        });
+        return condition.value.as_deref().is_none_or(|expected| {
+            direct
+                .and_then(|property| property.scalar.as_ref())
+                .is_some_and(|scalar| scalar.value.eq_ignore_ascii_case(expected))
+        }) && direct.is_some();
+    }
+    let Some(subtype) = subtype else {
+        return true;
+    };
+    let (negated, key) = subtype.strip_prefix('!').map_or_else(
+        || {
+            (
+                subtype.starts_with("not_"),
+                subtype.strip_prefix("not_").unwrap_or(subtype),
+            )
+        },
+        |key| (true, key),
+    );
+    let present = properties
+        .iter()
+        .find(|property| property.range == instance_range)
+        .is_some_and(|instance| {
+            properties.iter().any(|property| {
+                property.path.len() == instance.path.len().saturating_add(1)
+                    && property
+                        .path
+                        .iter()
+                        .zip(&instance.path)
+                        .all(|(actual, expected)| actual.eq_ignore_ascii_case(expected))
+                    && range_within(property.range, instance_range)
+                    && property.key.eq_ignore_ascii_case(key)
+            })
+        });
+    if negated { !present } else { present }
 }
 
 fn definition_from_rule(
@@ -1555,8 +1899,8 @@ fn direct_scalar(syntax: &ParsedFile, node: &CstNode) -> Option<HirScalar> {
 #[cfg(test)]
 mod tests {
     use super::{
-        HirParameterReferenceKind, ScopeState, ScopeValue, lower, lower_with_profile,
-        property_children, resolve_scope_expression,
+        HirParameterReferenceKind, HirReferenceOrigin, ScopeState, ScopeValue, lower,
+        lower_with_profile, property_children, resolve_scope_expression,
     };
     use pdx_game::eu4::{bootstrap_rules, first_party_rules, profile};
     use pdx_parser::{FileFormat, parse};
@@ -1645,6 +1989,50 @@ mod tests {
         let entry = &hir.localisation_entries()[0];
         assert!(entry.range.start() <= entry.name_range.start());
         assert!(entry.name_range.end() <= entry.range.end());
+    }
+
+    #[test]
+    fn required_type_localisation_templates_expand_from_dynamic_members() {
+        let path = LogicalPath::parse("missions/test.txt").expect("logical path");
+        let hir = lower_with_profile(
+            parse(
+                FileFormat::Script,
+                "series = { mission_one = { potential = { always = yes } } }\n",
+            ),
+            &path,
+            &first_party_rules().expect("first-party rules"),
+            &profile(),
+        );
+        let derived = hir
+            .references()
+            .iter()
+            .filter(|reference| reference.origin == HirReferenceOrigin::DerivedLocalisation)
+            .map(|reference| reference.name.as_str())
+            .collect::<Vec<_>>();
+        assert!(derived.contains(&"mission_one_title"));
+        assert!(derived.contains(&"mission_one_desc"));
+    }
+
+    #[test]
+    fn subtype_conditions_gate_type_localisation_templates() {
+        let path = LogicalPath::parse("common/ideas/subtypes.txt").expect("logical path");
+        let hir = lower_with_profile(
+            parse(
+                FileFormat::Script,
+                "country_idea = { free = yes }\nother_idea = { free = no }\n",
+            ),
+            &path,
+            &first_party_rules().expect("first-party rules"),
+            &profile(),
+        );
+        let derived = hir
+            .references()
+            .iter()
+            .filter(|reference| reference.origin == HirReferenceOrigin::DerivedLocalisation)
+            .map(|reference| reference.name.as_str())
+            .collect::<Vec<_>>();
+        assert!(derived.contains(&"country_idea_start"));
+        assert!(!derived.contains(&"other_idea_start"));
     }
 
     #[test]
@@ -1753,6 +2141,27 @@ mod tests {
         );
         assert!(hir.references().iter().any(|reference| {
             reference.kind == "localisation" && reference.name == "profile_title"
+        }));
+    }
+
+    #[test]
+    fn first_party_semantic_localisation_rules_produce_references_without_profile_shorthand() {
+        let rules = first_party_rules().expect("first-party rules");
+        let path = LogicalPath::parse("events/semantic_hir.txt").expect("logical path");
+        let hir = lower_with_profile(
+            parse(
+                FileFormat::Script,
+                "country_event = { id = semantic.1 title = semantic_title }\n",
+            ),
+            &path,
+            &rules,
+            &GameProfile::empty(rules.game_id()),
+        );
+
+        assert!(hir.references().iter().any(|reference| {
+            reference.origin == HirReferenceOrigin::Semantic
+                && reference.kind == "localisation"
+                && reference.name == "semantic_title"
         }));
     }
 

@@ -787,5 +787,10 @@ mod tests {
         let rules = first_party_rules().expect("embedded EU4 rules");
         assert_eq!(rules.game_id(), GAME_ID);
         assert!(!rules.model().semantic.rules.is_empty());
+        assert_eq!(
+            rules.model().semantic.localisation_bindings.len(),
+            191,
+            "the embedded artifact must carry the complete first-party type localisation map"
+        );
     }
 }

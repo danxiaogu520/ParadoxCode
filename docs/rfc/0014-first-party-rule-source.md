@@ -48,15 +48,18 @@ and generated artifact round-trip differences fail compilation.
 - `enum-values.json`: static enum members;
 - `type-root-keys.json`: type root selectors;
 - `type-root-scopes.json`: initial scopes by type and root;
-- `type-descriptors.json`: path, wrapper, name, and type-selection metadata.
+- `type-descriptors.json`: path, wrapper, name, and type-selection metadata;
+- `localisation-bindings.json`: type-instance localisation key templates and explicit-field
+  mappings, including required/optional, subtype, and data-driven subtype-condition metadata.
 
 Source format changes require a version increment and an explicit migration. Stable identities
 must not be regenerated merely because files are reordered. Generated artifacts are never edited
 by hand.
 
-Source format 2 renames the generic key/value parser identity from `pdx-script` to `script`.
-This is a naming-only migration: EU4 file category identities, matchers, resolution policies, and
-semantic rules otherwise retain their stable identities.
+Source format 2 renamed the generic key/value parser identity from `pdx-script` to `script`.
+Source format 3 added the first-party type-instance localisation binding source. Source format 4
+adds data-driven subtype conditions for those bindings. These migrations do not change existing
+EU4 file category identities, matchers, resolution policies, or semantic rule identities.
 
 ## Runtime authority
 

@@ -13,6 +13,8 @@ profile 之间的语义责任。它是当前实现的审计基线；不是第二
 - 13810 个 catalog record；
 - 8535 条 semantic rule；
 - 161 个 semantic context。
+- 97 个 type localisation；
+- 191 条 type-instance localisation mapping（153 required、23 optional、1 explicit-field）。
 
 规则源能够成功编译、SQLite round-trip，并由嵌入式 artifact 加载。当前测试证明了
 主要静态 matcher、cardinality、scope transition、动态 workspace member 和 LSP 查询
@@ -45,6 +47,7 @@ profile 之间的语义责任。它是当前实现的审计基线；不是第二
 | `type-root-keys.json` | type root selector | HIR root context selection | 已接入 |
 | `type-root-scopes.json` | type root 初始 scope | HIR initial scope | 已接入 |
 | `type-descriptors.json` | 路径、文件、root skip、name/type selector | engine type member extraction、HIR root selection | 已接入；动态成员仍来自 WorkspaceIndex |
+| `localisation-bindings.json` | type 实例到 loc key 的模板、required/optional、subtype、subtype condition、explicit field | HIR derived localisation references、analysis resolution/diagnostics | 已接入；required 模板生成缺失 key 检查，optional 仅作为完整映射保留，explicit field 由 semantic localisation 规则执行 |
 
 ## JSON 之外的 EU4 语义
 

@@ -3780,11 +3780,14 @@ fn semantic_data(input: &ParsedInput) -> SemanticFile {
             definition.selection_range,
         ));
     }
-    for reference in hir
-        .references()
-        .iter()
-        .filter(|reference| reference.origin == HirReferenceOrigin::Profile)
-    {
+    for reference in hir.references().iter().filter(|reference| {
+        matches!(
+            reference.origin,
+            HirReferenceOrigin::Profile
+                | HirReferenceOrigin::Semantic
+                | HirReferenceOrigin::DerivedLocalisation
+        )
+    }) {
         data.references.push(ReferenceInternal {
             kind: reference.kind.clone(),
             name: reference.name.clone(),
@@ -6676,6 +6679,40 @@ mod tests {
             u32::try_from(text.find("foo_name").expect("localisation key") + 2).expect("position");
         let hover = hover(&host.snapshot(), &id, position).expect("localisation hover");
         assert!(hover.contents.contains("Localisation (l_english): \"Foo\""));
+    }
+
+    #[test]
+    fn required_type_localisation_keys_report_missing_derived_keys() {
+        let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            std::path::PathBuf::from("/tmp"),
+        )]));
+        let id = DocumentId::new("file:///tmp/missions/test.txt");
+        host.open_document(
+            id.clone(),
+            1,
+            "series = { mission_one = { potential = { always = yes } } }\n".to_owned(),
+            Some(std::path::PathBuf::from("/tmp/missions/test.txt")),
+        )
+        .expect("open mission");
+
+        let messages = diagnostics(&host.snapshot(), &id)
+            .into_iter()
+            .filter(|diagnostic| diagnostic.code == DiagnosticCode::UnknownSymbol)
+            .map(|diagnostic| diagnostic.message)
+            .collect::<Vec<_>>();
+        assert!(
+            messages
+                .iter()
+                .any(|message| message.contains("mission_one_title"))
+        );
+        assert!(
+            messages
+                .iter()
+                .any(|message| message.contains("mission_one_desc"))
+        );
     }
 
     #[test]
