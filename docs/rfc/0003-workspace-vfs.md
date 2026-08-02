@@ -7,7 +7,7 @@
 >
 > 设计修订（2026-08-01）：为支持不打开 Vanilla `.yml` 文件时的 Hover，cache schema 3 额外保存每个本地化 definition 的有限长度派生预览（语言头和最多 240 个字符的值）。这不是源码、CST 或 HIR；正常启动仍只读 cache，原 Vanilla 目录仍不扫描、不读取。空值不生成预览，schema 不兼容时仍要求用户显式刷新。
 >
-> 性能修订（2026-08-01）：大于 32 个可读源文件时，受限读取、parse 和 lower 在最多 8 个可取消 worker 中执行，结果按稳定任务顺序合并；未变更文件状态直接复用。Asset 资源只登记路径，不按 UTF-8 读取，也不进入文本解析队列。
+> 性能修订（2026-08-02）：大于 32 个可读源文件时，受限读取、parse 和 lower 在最多 12 个可取消 worker 中执行，结果按稳定任务顺序合并；未变更文件状态直接复用。Asset 资源只登记路径，不按 UTF-8 读取，也不进入文本解析队列。读取文本时先打开文件并从句柄获取 metadata，按已知大小预分配缓冲，避免在每个文件上重复进行路径 metadata 查询；全量 refresh 一次批量替换导航位置，避免逐文件扫描累计位置表。
 >
 > Vanilla setup 修订（2026-08-01）：Vanilla cache 构建完成每个文件的 shard、UTF-16 位置和本地化预览后，不再把 CST/HIR 保留在 setup host 中；cache 写入复用 SQLite prepared statements。Vanilla cache 的持久化结果不变，setup 的峰值内存和写盘耗时下降。
 >

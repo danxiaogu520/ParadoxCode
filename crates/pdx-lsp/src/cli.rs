@@ -12,6 +12,7 @@ use pdx_engine::{
 use pdx_game::{
     DiscoveryDepth, DiscoveryOptions, DiscoveryOutcome, DiscoveryToken, GameInstallDescriptor,
     UserConfigError, UserConfiguration, UserPaths, discover_installations, validate_installation,
+    validate_installation_for_source,
 };
 
 const USAGE: &str = "usage:\n  pdx --version\n  pdx index vanilla --source <EU4 directory> --output <cache.pdxindex>\n  pdx setup vanilla [--game eu4] [--deep] [--root <directory>]... [--source <game directory>]\n  pdx check policy|zed|release|grammar-fuzz|all [--root <repository root>]\n  pdx release package --version <semver> --target <target> --binary <path> --output-dir <path> [--root <repository root>]\n  pdx release verify --version <semver> --directory <path> [--root <repository root>]\n  pdx dev prepare-manifest [--root <repository root>]";
@@ -143,7 +144,7 @@ fn setup_game(
             path: source,
             error,
         })?;
-        if !validate_installation(&source, &descriptor) {
+        if !validate_installation_for_source(&source, &descriptor) {
             return Err(CliError::Discovery(format!(
                 "{} is not a valid {} installation; expected an executable and common, events, missions, decisions, and localisation directories",
                 source.display(),

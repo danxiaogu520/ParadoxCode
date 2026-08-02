@@ -137,12 +137,37 @@ pub struct DiscoveryReport {
 /// Validates the agreed minimal installation shape without executing or hashing game files.
 #[must_use]
 pub fn validate_installation(root: &Path, descriptor: &GameInstallDescriptor) -> bool {
+    validate_installation_with_executables(
+        root,
+        descriptor,
+        descriptor.executable_paths.current().iter(),
+    )
+}
+
+/// Validates an explicitly supplied source directory using any platform's executable marker.
+///
+/// Vanilla source data is platform-independent, and an explicit path may point to a mounted
+/// installation from another platform (for example, a Windows Steam library mounted in WSL).
+/// Automatic discovery intentionally continues to use [`validate_installation`] so it does not
+/// select foreign-platform installations from generic search locations.
+#[must_use]
+pub fn validate_installation_for_source(root: &Path, descriptor: &GameInstallDescriptor) -> bool {
+    let executables = descriptor
+        .executable_paths
+        .windows
+        .iter()
+        .chain(descriptor.executable_paths.linux)
+        .chain(descriptor.executable_paths.macos);
+    validate_installation_with_executables(root, descriptor, executables)
+}
+
+fn validate_installation_with_executables<'a>(
+    root: &Path,
+    descriptor: &GameInstallDescriptor,
+    mut executables: impl Iterator<Item = &'a &'static str>,
+) -> bool {
     root.is_dir()
-        && descriptor
-            .executable_paths
-            .current()
-            .iter()
-            .any(|relative| join_portable(root, relative).is_file())
+        && executables.any(|relative| join_portable(root, relative).is_file())
         && descriptor
             .validation_directories
             .iter()
@@ -752,7 +777,7 @@ mod tests {
     use super::{
         DiscoveryDepth, DiscoveryOptions, DiscoveryOutcome, DiscoveryToken, GameInstallDescriptor,
         PlatformExecutablePaths, UserConfiguration, UserPaths, discover_installations,
-        validate_installation,
+        validate_installation, validate_installation_for_source,
     };
 
     const TEST_GAME: GameInstallDescriptor = GameInstallDescriptor {
@@ -794,6 +819,19 @@ mod tests {
         assert!(validate_installation(&root, &TEST_GAME));
         fs::remove_dir_all(root.join("missions")).expect("remove required directory");
         assert!(!validate_installation(&root, &TEST_GAME));
+    }
+
+    #[test]
+    fn explicit_source_validation_accepts_a_foreign_platform_marker() {
+        let temporary = tempfile::tempdir().expect("temporary directory");
+        let root = temporary.path().join("foreign-platform");
+        for directory in TEST_GAME.validation_directories {
+            fs::create_dir_all(root.join(directory)).expect("validation directory");
+        }
+        fs::write(root.join("test-game.exe"), b"fixture").expect("Windows executable marker");
+
+        assert!(!validate_installation(&root, &TEST_GAME));
+        assert!(validate_installation_for_source(&root, &TEST_GAME));
     }
 
     #[test]

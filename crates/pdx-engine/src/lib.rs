@@ -1512,7 +1512,20 @@ fn read_source_file_cancellable(
     cancellation: &WorkspaceScanToken,
 ) -> Result<Option<String>, WorkspaceError> {
     cancellation.checkpoint()?;
-    let metadata = match fs::metadata(path) {
+    let file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) => {
+            record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::FileUnreadable,
+                path.to_owned(),
+                error.to_string(),
+            );
+            return Ok(None);
+        }
+    };
+    let metadata = match file.metadata() {
         Ok(metadata) => metadata,
         Err(error) => {
             record_scan_issue(
@@ -1525,6 +1538,16 @@ fn read_source_file_cancellable(
             return Ok(None);
         }
     };
+    if !metadata.is_file() {
+        record_scan_issue(
+            report,
+            limits,
+            WorkspaceScanIssueKind::FileUnreadable,
+            path.to_owned(),
+            "source path is not a regular file".to_owned(),
+        );
+        return Ok(None);
+    }
     if metadata.len() > limits.max_file_size {
         record_scan_issue(
             report,
@@ -1539,20 +1562,7 @@ fn read_source_file_cancellable(
         );
         return Ok(None);
     }
-    let file = match fs::File::open(path) {
-        Ok(file) => file,
-        Err(error) => {
-            record_scan_issue(
-                report,
-                limits,
-                WorkspaceScanIssueKind::FileUnreadable,
-                path.to_owned(),
-                error.to_string(),
-            );
-            return Ok(None);
-        }
-    };
-    let mut bytes = Vec::new();
+    let mut bytes = Vec::with_capacity(usize::try_from(metadata.len()).unwrap_or(0));
     if let Err(error) = file
         .take(limits.max_file_size.saturating_add(1))
         .read_to_end(&mut bytes)
@@ -1754,7 +1764,7 @@ fn staged_overlay_document(
     unparsed_document(id, Some(version), text, DocumentSource::Overlay, path)
 }
 
-const MAX_SOURCE_WORKERS: usize = 8;
+const MAX_SOURCE_WORKERS: usize = 12;
 const PARALLEL_SOURCE_THRESHOLD: usize = 32;
 
 struct SourceReadJob {
@@ -2699,10 +2709,18 @@ impl AnalysisHost {
             );
         }
         let mut index = WorkspaceIndex::from_shards_cancellable(shards, cancellation)?;
-        index.replace_all_position_ranges(self.index.position_ranges().clone());
+        let mut position_ranges = self.index.position_ranges().clone();
+        position_ranges.retain(|(file_id, _), _| {
+            files.contains_key(file_id) && !file_states.contains_key(file_id)
+        });
         for (file_id, state) in &file_states {
-            index.replace_position_ranges(*file_id, position_ranges_for_state(state));
+            position_ranges.extend(
+                position_ranges_for_state(state)
+                    .into_iter()
+                    .map(|(range, position)| ((*file_id, range), position)),
+            );
         }
+        index.replace_all_position_ranges(position_ranges);
         index.configure_case_sensitivity(self.rules.as_ref());
         let priorities = source_priorities(&self.roots, &files);
         index.resolve_priorities_cancellable(&priorities, self.rules.as_ref(), cancellation)?;
@@ -3890,6 +3908,12 @@ mod tests {
             first.file_states.get(&b).expect("first b state"),
             second.file_states.get(&b).expect("second b state")
         ));
+        let old_range = second
+            .index()
+            .active_definition("event", "state.b")
+            .expect("old b definition")
+            .range;
+        assert!(second.index().position_for(b, old_range).is_some());
 
         fs::write(
             events.join("b.txt"),
@@ -3915,6 +3939,13 @@ mod tests {
                 .saturating_add(1)
         );
         assert_eq!(third.index().definitions("event", "state.changed").len(), 1);
+        let new_range = third
+            .index()
+            .active_definition("event", "state.changed")
+            .expect("new b definition")
+            .range;
+        assert!(third.index().position_for(b, old_range).is_none());
+        assert!(third.index().position_for(b, new_range).is_some());
         fs::remove_dir_all(root).expect("cleanup");
     }
 
