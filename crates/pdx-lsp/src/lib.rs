@@ -45,7 +45,7 @@ use pdx_analysis::{
 use pdx_engine::{
     AnalysisHost, AnalysisSnapshot, DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId,
     DocumentSource, ParsedSource, PreparedDocument, SourceRoot, SourceRootId, SourceRootKind,
-    VanillaCacheError, VanillaIndexCache, WorkspaceChange, WorkspaceError, WorkspaceScanToken,
+    VanillaIndexCache, WorkspaceChange, WorkspaceError, WorkspaceScanToken,
 };
 use pdx_game::{
     DiscoveryOptions, DiscoveryOutcome, DiscoveryToken, GameInstallDescriptor, UserConfiguration,
@@ -278,6 +278,7 @@ struct PreparedInitialize {
     result: Value,
     warnings: Vec<String>,
     auto_vanilla: Option<AutoVanillaConfiguration>,
+    vanilla_cache: Option<PathBuf>,
     watcher_registration: Option<Value>,
 }
 
@@ -516,6 +517,7 @@ impl LspServer {
             let mut in_flight_requests = HashMap::<RequestId, InFlightRequest>::new();
             let mut in_flight_initialize = None::<InFlightInitialize>;
             let mut in_flight_vanilla = None::<VanillaSetupCancellation>;
+            let mut vanilla_cache_in_flight = false;
             let mut in_flight_disk_changes = None::<InFlightDiskChanges>;
             let mut deferred_messages = VecDeque::<Value>::new();
 
@@ -534,9 +536,11 @@ impl LspServer {
                 let initialize_busy = in_flight_initialize.is_some();
                 let disk_changes_busy =
                     !self.pending_disk_changes.is_empty() || in_flight_disk_changes.is_some();
+                let vanilla_cache_busy = vanilla_cache_in_flight && in_flight_vanilla.is_some();
                 let deferred_ready = !parse_busy
                     && !initialize_busy
                     && !disk_changes_busy
+                    && !vanilla_cache_busy
                     && !deferred_messages.is_empty();
                 let (event, from_reader) = if deferred_ready {
                     let message = deferred_messages.pop_front().expect("checked non-empty");
@@ -581,9 +585,12 @@ impl LspServer {
                         let initialize_busy = in_flight_initialize.is_some();
                         let disk_changes_busy = !self.pending_disk_changes.is_empty()
                             || in_flight_disk_changes.is_some();
+                        let vanilla_cache_busy =
+                            vanilla_cache_in_flight && in_flight_vanilla.is_some();
                         if from_reader
                             && (((parse_busy || disk_changes_busy)
                                 && is_snapshot_request_message(&message))
+                                || (vanilla_cache_busy && is_snapshot_request_message(&message))
                                 || (initialize_busy && !is_initialize_control_message(&message)))
                         {
                             deferred_messages.push_back(message);
@@ -653,7 +660,8 @@ impl LspServer {
                             .take()
                             .expect("checked initialize task");
                         self.cancelled.remove(&result.request_id);
-                        let (response, warnings, auto_vanilla) = match result.result {
+                        let (response, warnings, auto_vanilla, vanilla_cache) = match result.result
+                        {
                             Ok(prepared) if !task.cancellation.is_cancelled() => {
                                 self.host = prepared.host;
                                 self.state = ServerState::Initialized;
@@ -666,6 +674,7 @@ impl LspServer {
                                     }),
                                     prepared.warnings,
                                     prepared.auto_vanilla,
+                                    prepared.vanilla_cache,
                                 )
                             }
                             Ok(_) => {
@@ -675,24 +684,39 @@ impl LspServer {
                                         .response(result.id),
                                     Vec::new(),
                                     None,
+                                    None,
                                 )
                             }
                             Err(error) => {
                                 self.state = ServerState::Uninitialized;
-                                (error.response(result.id), Vec::new(), None)
+                                (error.response(result.id), Vec::new(), None, None)
                             }
                         };
                         write_message(&mut output, &response)?;
                         for warning in warnings {
                             write_message(&mut output, &show_warning_notification(warning))?;
                         }
-                        if let Some(configuration) = auto_vanilla {
+                        if let Some(path) = vanilla_cache {
+                            let cancellation = VanillaSetupCancellation::new();
+                            let sender = event_sender.clone();
+                            let worker_cancellation = cancellation.clone();
+                            in_flight_vanilla = Some(cancellation);
+                            vanilla_cache_in_flight = true;
+                            scope.spawn(move || {
+                                let result = run_vanilla_cache_load(&path, &worker_cancellation);
+                                let _ =
+                                    sender.send(TransportEvent::VanillaSetup(VanillaSetupResult {
+                                        result,
+                                    }));
+                            });
+                        } else if let Some(configuration) = auto_vanilla {
                             let cancellation = VanillaSetupCancellation::new();
                             let sender = event_sender.clone();
                             let rules = self.host.snapshot().rules().clone();
                             let profile = self.host.snapshot().game_profile().clone();
                             let worker_cancellation = cancellation.clone();
                             in_flight_vanilla = Some(cancellation);
+                            vanilla_cache_in_flight = false;
                             scope.spawn(move || {
                                 let result = run_auto_vanilla_setup(
                                     &configuration,
@@ -755,34 +779,54 @@ impl LspServer {
                     }
                     TransportEvent::VanillaSetup(result) => {
                         in_flight_vanilla = None;
+                        vanilla_cache_in_flight = false;
                         match result.result {
-                            Ok((cache, message)) => match self.host.install_vanilla_cache(cache) {
-                                Ok(()) => {
-                                    write_message(&mut output, &show_info_notification(message))?;
-                                    let open = self
-                                        .host
-                                        .snapshot()
-                                        .documents()
-                                        .iter()
-                                        .filter_map(|(id, document)| {
-                                            document.version().map(|version| (id.clone(), version))
-                                        })
-                                        .collect::<Vec<_>>();
-                                    for (id, version) in open {
-                                        self.schedule_diagnostics_for_document(
-                                            id,
-                                            version,
-                                            DIAGNOSTIC_DEBOUNCE,
-                                        );
+                            Ok((cache, message)) => {
+                                let cache_rule_hash = cache.metadata().rule_hash.clone();
+                                let current_rule_hash =
+                                    self.host.snapshot().rules().rule_hash().to_hex();
+                                match self.host.install_vanilla_cache(cache) {
+                                    Ok(()) => {
+                                        if cache_rule_hash != current_rule_hash {
+                                            write_message(
+                                                &mut output,
+                                                &show_warning_notification(format!(
+                                                    "{message}; it was built with rules hash {cache_rule_hash}, but the active rules hash is {current_rule_hash}; refresh it explicitly if needed"
+                                                )),
+                                            )?;
+                                        } else {
+                                            write_message(
+                                                &mut output,
+                                                &show_info_notification(message),
+                                            )?;
+                                        }
+                                        let open = self
+                                            .host
+                                            .snapshot()
+                                            .documents()
+                                            .iter()
+                                            .filter_map(|(id, document)| {
+                                                document
+                                                    .version()
+                                                    .map(|version| (id.clone(), version))
+                                            })
+                                            .collect::<Vec<_>>();
+                                        for (id, version) in open {
+                                            self.schedule_diagnostics_for_document(
+                                                id,
+                                                version,
+                                                DIAGNOSTIC_DEBOUNCE,
+                                            );
+                                        }
                                     }
+                                    Err(error) => write_message(
+                                        &mut output,
+                                        &show_warning_notification(format!(
+                                            "Vanilla cache was built but could not be enabled in this workspace: {error}"
+                                        )),
+                                    )?,
                                 }
-                                Err(error) => write_message(
-                                    &mut output,
-                                    &show_warning_notification(format!(
-                                        "Vanilla cache was built but could not be enabled in this workspace: {error}"
-                                    )),
-                                )?,
-                            },
+                            }
                             Err(message) => {
                                 write_message(&mut output, &show_warning_notification(message))?;
                             }
@@ -1512,46 +1556,24 @@ fn prepare_initialize_candidate(
         host.refresh_source_roots_cancellable(cancellation)
             .map_err(workspace_scan_error)?;
     }
-    if let Some(path) = resolved.vanilla_cache {
-        if !scan_workspace {
+    let vanilla_cache = match resolved.vanilla_cache.take() {
+        None => None,
+        Some(path) if !scan_workspace => {
             warnings.push(format!(
                 "Vanilla cache {} was not loaded because no validated rules artifact is active",
                 path.display()
             ));
-        } else if !path.is_file() {
+            None
+        }
+        Some(path) if !path.is_file() => {
             warnings.push(format!(
                 "Vanilla cache {} does not exist; continuing without Vanilla symbols",
                 path.display()
             ));
-        } else {
-            match VanillaIndexCache::load_cancellable(&path, cancellation) {
-                Err(VanillaCacheError::Cancelled) => {
-                    return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
-                }
-                Err(error) => warnings.push(format!(
-                    "Vanilla cache {} could not be loaded; continuing without Vanilla symbols: {error}",
-                    path.display()
-                )),
-                Ok(cache) => {
-                    let cache_rule_hash = cache.metadata().rule_hash.clone();
-                    let current_rule_hash = host.snapshot().rules().rule_hash().to_hex();
-                    match host.install_vanilla_cache(cache) {
-                        Ok(()) => {
-                            if cache_rule_hash != current_rule_hash {
-                                warnings.push(format!(
-                                    "Vanilla cache was built with rules hash {cache_rule_hash}, but the active rules hash is {current_rule_hash}; the cache remains loaded until you refresh it explicitly"
-                                ));
-                            }
-                        }
-                        Err(error) => warnings.push(format!(
-                            "Vanilla cache {} is incompatible with this workspace; continuing without Vanilla symbols: {error}",
-                            path.display()
-                        )),
-                    }
-                }
-            }
+            None
         }
-    }
+        Some(path) => Some(path),
+    };
     if cancellation.is_cancelled() {
         return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
     }
@@ -1596,8 +1618,26 @@ fn prepare_initialize_candidate(
         result,
         warnings,
         auto_vanilla,
+        vanilla_cache,
         watcher_registration,
     })
+}
+
+fn run_vanilla_cache_load(
+    path: &Path,
+    cancellation: &VanillaSetupCancellation,
+) -> Result<(VanillaIndexCache, String), String> {
+    let cache =
+        VanillaIndexCache::load_cancellable(path, &cancellation.workspace).map_err(|error| {
+            format!(
+                "Vanilla cache {} could not be loaded; continuing without Vanilla symbols: {error}",
+                path.display()
+            )
+        })?;
+    Ok((
+        cache,
+        format!("Vanilla symbols loaded from {}", path.display()),
+    ))
 }
 
 fn watched_files_registration(
@@ -2999,7 +3039,8 @@ mod tests {
         ResolvedSourceRoots, ServerState, VanillaSetupCancellation,
         apply_user_vanilla_configuration, bounded_results, cancel_initialize_from_notification,
         cancel_request_from_notification, changed_document_len, diagnostic_result_counts,
-        path_to_uri, read_message, run_auto_vanilla_setup_with_options, uri_to_path,
+        path_to_uri, prepare_initialize_candidate, read_message,
+        run_auto_vanilla_setup_with_options, uri_to_path,
     };
     use lsp_types::{
         CompletionResponse, Diagnostic, DocumentSymbol, Hover, Location, PrepareRenameResponse,
@@ -4118,6 +4159,63 @@ path = "dependencies/high"
         );
         assert_eq!(server.snapshot().source_roots().len(), 1);
         fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn initialize_defers_an_existing_vanilla_cache() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let container = std::env::temp_dir().join(format!("pdx-lsp-deferred-cache-{nonce}"));
+        let workspace = container.join("workspace");
+        let vanilla = container.join("vanilla");
+        fs::create_dir_all(&workspace).expect("workspace directory");
+        fs::create_dir_all(&vanilla).expect("Vanilla directory");
+        let vanilla = fs::canonicalize(&vanilla).expect("canonical Vanilla directory");
+        let cache_path = container.join("vanilla.pdxindex");
+
+        let mut vanilla_host = AnalysisHost::with_profile(
+            pdx_game::eu4::first_party_rules().expect("embedded rules"),
+            pdx_game::eu4::profile(),
+        );
+        vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            vanilla,
+        )]));
+        let cache = VanillaIndexCache::from_snapshot(&vanilla_host.snapshot())
+            .expect("empty Vanilla cache");
+        cache.save(&cache_path).expect("save Vanilla cache");
+
+        let params = serde_json::from_value(json!({
+            "rootUri": path_to_uri(&workspace),
+            "capabilities": {},
+            "initializationOptions": {"vanillaIndexCache": cache_path}
+        }))
+        .expect("initialize params");
+        let candidate = prepare_initialize_candidate(
+            AnalysisHost::with_profile(
+                pdx_game::eu4::first_party_rules().expect("embedded rules"),
+                pdx_game::eu4::profile(),
+            ),
+            params,
+            true,
+            None,
+            &pdx_engine::WorkspaceScanToken::new(),
+        )
+        .expect("prepare initialize candidate");
+
+        assert_eq!(candidate.vanilla_cache, Some(cache_path.clone()));
+        assert!(
+            candidate
+                .host
+                .snapshot()
+                .source_roots()
+                .iter()
+                .all(|root| root.kind != SourceRootKind::Vanilla)
+        );
+        fs::remove_dir_all(container).expect("cleanup");
     }
 
     #[test]
