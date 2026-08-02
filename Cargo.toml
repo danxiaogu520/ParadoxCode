@@ -10,6 +10,12 @@ members = [
     "crates/pdx-lsp",
 ]
 
+# `pdx setup vanilla` is commonly exercised through `target/debug/pdx.exe` during development.
+# Keep debug symbols and assertions, but optimize the cache-building hot path so the debug
+# executable has representative performance instead of a 3x-4x unoptimized scan penalty.
+[profile.dev]
+opt-level = 3
+
 [workspace.package]
 version = "0.1.0"
 edition = "2024"

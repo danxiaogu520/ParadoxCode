@@ -7,7 +7,7 @@
 >
 > 设计修订（2026-08-01）：为支持不打开 Vanilla `.yml` 文件时的 Hover，cache schema 3 额外保存每个本地化 definition 的有限长度派生预览（语言头和最多 240 个字符的值）。这不是源码、CST 或 HIR；正常启动仍只读 cache，原 Vanilla 目录仍不扫描、不读取。空值不生成预览，schema 不兼容时仍要求用户显式刷新。
 >
-> 性能修订（2026-08-02）：大于 32 个可读源文件时，受限读取、parse 和 lower 在最多 12 个可取消 worker 中执行，结果按稳定任务顺序合并；未变更文件状态直接复用。Asset 资源只登记路径，不按 UTF-8 读取，也不进入文本解析队列。读取文本时先打开文件并从句柄获取 metadata，按已知大小预分配缓冲，避免在每个文件上重复进行路径 metadata 查询；全量 refresh 一次批量替换导航位置，避免逐文件扫描累计位置表。
+> 性能修订（2026-08-02）：大于 32 个可读源文件时，受限读取、parse 和 lower 在最多 12 个可取消 worker 中执行，结果按稳定任务顺序合并；未变更文件状态直接复用。Asset 资源只登记路径，不按 UTF-8 读取，也不进入文本解析队列。读取文本时先打开文件并从句柄获取 metadata，按已知大小预分配缓冲，避免在每个文件上重复进行路径 metadata 查询；全量 refresh 一次批量替换导航位置，避免逐文件扫描累计位置表。workspace 的 Debug profile 保留调试信息和断言但使用 `opt-level = 3`，保证用户常用的 `target/debug/pdx.exe setup vanilla` 性能测试不会落入未优化代码路径。
 
 > 编码修订（2026-08-02）：通用 profile 默认严格要求 UTF-8；EU4 profile 对脚本和 localisation 等文本先尝试 UTF-8，再将符合文本结构、不含 NUL 且 Windows-1252 解码没有替换错误的 legacy ANSI 字节安全转为内部 UTF-8 后解析。无法安全识别的二进制、其他编码或 Windows-1252 未定义字节仍按可恢复的 `InvalidUtf8` 跳过，并在 `WorkspaceScanReport.legacy_encoded_files` 中统计成功转码的文件数。`pdx setup vanilla` 同时报告扫描/解析、cache materialization、SQLite 写入和总耗时，便于定位建库回归。
 >
