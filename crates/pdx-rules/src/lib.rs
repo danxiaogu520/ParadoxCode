@@ -71,6 +71,16 @@ impl fmt::Debug for RuleHash {
     }
 }
 
+/// Text encoding policy selected by a game profile for source files.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SourceEncoding {
+    /// Strict UTF-8 source, which is the generic engine default.
+    #[default]
+    Utf8,
+    /// Legacy Windows-1252 source decoded to UTF-8 before parsing.
+    Windows1252,
+}
+
 /// Parser families understood by the workspace.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Ord, PartialOrd, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -451,6 +461,8 @@ pub struct ProfileScopeCompatibility {
 pub struct GameProfile {
     /// Stable identity shared with the selected rules artifact.
     pub game_id: String,
+    /// Source text encoding policy used before parser input is materialized.
+    pub source_encoding: SourceEncoding,
     /// Logical directory whitelist used for source-root discovery.
     ///
     /// An empty whitelist means that the profile does not authorize disk discovery. This keeps
@@ -500,6 +512,7 @@ impl GameProfile {
     pub fn empty(game_id: impl Into<String>) -> Self {
         Self {
             game_id: game_id.into(),
+            source_encoding: SourceEncoding::Utf8,
             scan_roots: Vec::new(),
             scan_extensions: Vec::new(),
             definitions: Vec::new(),

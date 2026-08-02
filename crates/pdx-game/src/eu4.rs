@@ -5,8 +5,8 @@ use pdx_rules::{
     FileCategory, FileMatcher, FileResolutionPolicy, GameProfile, ParserKind,
     ProfileConditionalDefinitionRule, ProfileDefinitionRule, ProfileMatchMode,
     ProfileReferenceRule, ProfileRootScopeRule, ProfileScopeCompatibility, ProfileTextMatcher,
-    ProfileTokenDefinitionRule, ProfileValueDefinitionRule, RuleSet, RulesModel, SymbolDescriptor,
-    SymbolResolutionPolicy,
+    ProfileTokenDefinitionRule, ProfileValueDefinitionRule, RuleSet, RulesModel, SourceEncoding,
+    SymbolDescriptor, SymbolResolutionPolicy,
 };
 
 const FIRST_PARTY_RULES: &[u8] = include_bytes!("../../../rules/eu4.pdxrules");
@@ -327,6 +327,7 @@ pub fn profile() -> GameProfile {
     }
     GameProfile {
         game_id: GAME_ID.to_owned(),
+        source_encoding: SourceEncoding::Windows1252,
         scan_roots: SCRIPT_FOLDERS
             .iter()
             .map(|folder| (*folder).to_owned())
@@ -712,6 +713,7 @@ pub fn bootstrap_rules() -> RuleSet {
 #[cfg(test)]
 mod tests {
     use super::{Eu4Profile, GAME_ID, SCRIPT_FOLDERS, bootstrap_rules, first_party_rules, profile};
+    use pdx_rules::SourceEncoding;
 
     #[test]
     fn profile_identity_and_bootstrap_catalog_are_stable() {
@@ -733,6 +735,7 @@ mod tests {
         );
         let profile = profile();
         assert_eq!(profile.game_id, GAME_ID);
+        assert_eq!(profile.source_encoding, SourceEncoding::Windows1252);
         assert_eq!(profile.scan_roots().len(), SCRIPT_FOLDERS.len());
         assert!(profile.scan_roots().iter().any(|root| root == "common"));
         assert_eq!(profile.scan_extensions(), ["txt", "gfx", "yml"]);

@@ -8,6 +8,8 @@
 > 设计修订（2026-08-01）：为支持不打开 Vanilla `.yml` 文件时的 Hover，cache schema 3 额外保存每个本地化 definition 的有限长度派生预览（语言头和最多 240 个字符的值）。这不是源码、CST 或 HIR；正常启动仍只读 cache，原 Vanilla 目录仍不扫描、不读取。空值不生成预览，schema 不兼容时仍要求用户显式刷新。
 >
 > 性能修订（2026-08-02）：大于 32 个可读源文件时，受限读取、parse 和 lower 在最多 12 个可取消 worker 中执行，结果按稳定任务顺序合并；未变更文件状态直接复用。Asset 资源只登记路径，不按 UTF-8 读取，也不进入文本解析队列。读取文本时先打开文件并从句柄获取 metadata，按已知大小预分配缓冲，避免在每个文件上重复进行路径 metadata 查询；全量 refresh 一次批量替换导航位置，避免逐文件扫描累计位置表。
+
+> 编码修订（2026-08-02）：通用 profile 默认严格要求 UTF-8；EU4 profile 对脚本和 localisation 等文本先尝试 UTF-8，再将符合文本结构且不含 NUL 的 Windows-1252/legacy ANSI 字节安全转为内部 UTF-8 后解析。无法安全识别的二进制或其他编码仍按可恢复的 `InvalidUtf8` 跳过，并在 `WorkspaceScanReport.legacy_encoded_files` 中统计成功转码的文件数。`pdx setup vanilla` 同时报告扫描/解析、cache materialization、SQLite 写入和总耗时，便于定位建库回归。
 >
 > Vanilla setup 修订（2026-08-01）：Vanilla cache 构建完成每个文件的 shard、UTF-16 位置和本地化预览后，不再把 CST/HIR 保留在 setup host 中；cache 写入复用 SQLite prepared statements。Vanilla cache 的持久化结果不变，setup 的峰值内存和写盘耗时下降。
 >
@@ -69,7 +71,7 @@ Vanilla < Dependency Mods（配置顺序）< Current Mod < Open Document Overlay
 
 目录内的符号链接一律不跟随，避免逻辑 root 之外的路径逃逸和目录环。显式配置的 source root 自身可以是用户选择的路径，但 root 内部仍按上述规则扫描。
 
-根目录不可读、文件总数越界和稳定 ID 冲突属于 workspace-level error，失败刷新不得替换上一个有效 snapshot。单个嵌套目录或文件不可读、文件过大、文件不是 UTF-8 等属于可恢复问题：跳过该项、保留有界 `WorkspaceScanReport`，其余文件继续进入索引。读取分类后的文件时仍使用有界 reader，避免文件在 metadata 检查后增长造成无界分配。
+根目录不可读、文件总数越界和稳定 ID 冲突属于 workspace-level error，失败刷新不得替换上一个有效 snapshot。单个嵌套目录或文件不可读、文件过大、无法按 profile 兼容编码解码等属于可恢复问题：跳过该项、保留有界 `WorkspaceScanReport`，其余文件继续进入索引；兼容的 legacy Windows-1252 文件会先转为内部 UTF-8，不计入 skipped entries。读取分类后的文件时仍使用有界 reader，避免文件在 metadata 检查后增长造成无界分配。
 
 目录发现、受限读取、逐文件 parse/lower、bulk index 和 priority resolution 共用 `WorkspaceScanToken` 检查点。取消与 workspace-level error 一样在提交前退出，必须保留旧 revision、source files、`FileState`、index 和 scan report；LSP 初始化扫描迁入 worker 后直接使用该接口。
 

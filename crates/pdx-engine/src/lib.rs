@@ -19,8 +19,11 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use crate::hir::{HirFile, lower_shared, lower_shared_with_profile};
+use encoding_rs::WINDOWS_1252;
 use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile, parse};
-use pdx_rules::{FileResolutionPolicy, GameProfile, ParserKind, RuleSet, SymbolResolutionPolicy};
+use pdx_rules::{
+    FileResolutionPolicy, GameProfile, ParserKind, RuleSet, SourceEncoding, SymbolResolutionPolicy,
+};
 use pdx_text::{LineIndex, LogicalPath, PositionRange, TextRange};
 
 mod vanilla_cache;
@@ -264,7 +267,7 @@ pub enum WorkspaceScanIssueKind {
     FileTooLarge,
     /// A file disappeared or otherwise could not be read after discovery.
     FileUnreadable,
-    /// Source bytes were not valid UTF-8.
+    /// Source bytes were not valid UTF-8 or the selected profile encoding.
     InvalidUtf8,
 }
 
@@ -284,8 +287,10 @@ pub struct WorkspaceScanIssue {
 pub struct WorkspaceScanReport {
     /// Regular files examined before rules classification.
     pub discovered_files: usize,
-    /// Classified, readable UTF-8 files added to the workspace.
+    /// Classified, readable files added to the workspace after decoding.
     pub indexed_files: usize,
+    /// Source files decoded from the selected profile's legacy encoding.
+    pub legacy_encoded_files: usize,
     /// Entries or subtrees skipped for a recoverable reason.
     pub skipped_entries: usize,
     /// Retained issue details, bounded by [`WorkspaceScanLimits::max_reported_issues`].
@@ -605,6 +610,27 @@ impl WorkspaceIndex {
         cancellation: &WorkspaceScanToken,
     ) -> Result<Self, WorkspaceError> {
         let mut index = Self::empty();
+        for shard in shards {
+            cancellation.checkpoint()?;
+            index.shards.insert(shard.file_id, shard);
+        }
+        index.rebuild_maps_cancellable(cancellation)?;
+        Ok(index)
+    }
+
+    fn from_shards_cancellable_with_rules(
+        shards: impl IntoIterator<Item = FileIndexShard>,
+        rules: &RuleSet,
+        cancellation: &WorkspaceScanToken,
+    ) -> Result<Self, WorkspaceError> {
+        let mut index = Self::empty();
+        index.case_sensitive_kinds = rules
+            .model()
+            .symbol_descriptors
+            .iter()
+            .filter(|descriptor| descriptor.case_sensitive)
+            .map(|descriptor| descriptor.kind_id.to_ascii_lowercase())
+            .collect();
         for shard in shards {
             cancellation.checkpoint()?;
             index.shards.insert(shard.file_id, shard);
@@ -1499,10 +1525,17 @@ fn read_source_file(
     path: &std::path::Path,
     limits: WorkspaceScanLimits,
     report: &mut WorkspaceScanReport,
+    source_encoding: SourceEncoding,
 ) -> Option<String> {
-    read_source_file_cancellable(path, limits, report, &WorkspaceScanToken::new())
-        .ok()
-        .flatten()
+    read_source_file_cancellable(
+        path,
+        limits,
+        report,
+        &WorkspaceScanToken::new(),
+        source_encoding,
+    )
+    .ok()
+    .flatten()
 }
 
 fn read_source_file_cancellable(
@@ -1510,6 +1543,7 @@ fn read_source_file_cancellable(
     limits: WorkspaceScanLimits,
     report: &mut WorkspaceScanReport,
     cancellation: &WorkspaceScanToken,
+    source_encoding: SourceEncoding,
 ) -> Result<Option<String>, WorkspaceError> {
     cancellation.checkpoint()?;
     let file = match fs::File::open(path) {
@@ -1593,16 +1627,30 @@ fn read_source_file_cancellable(
     match String::from_utf8(bytes) {
         Ok(text) => Ok(Some(text)),
         Err(error) => {
+            let detail = error.to_string();
+            let bytes = error.into_bytes();
+            if source_encoding == SourceEncoding::Windows1252 && looks_like_legacy_text(&bytes) {
+                let (text, _) = WINDOWS_1252.decode_without_bom_handling(&bytes);
+                report.legacy_encoded_files = report.legacy_encoded_files.saturating_add(1);
+                return Ok(Some(text.into_owned()));
+            }
             record_scan_issue(
                 report,
                 limits,
                 WorkspaceScanIssueKind::InvalidUtf8,
                 path.to_owned(),
-                error.to_string(),
+                detail,
             );
             Ok(None)
         }
     }
+}
+
+fn looks_like_legacy_text(bytes: &[u8]) -> bool {
+    !bytes.contains(&0)
+        && bytes
+            .iter()
+            .any(|byte| matches!(*byte, b'=' | b'{' | b'}' | b'#' | b'\n' | b':'))
 }
 
 fn stable_file_id(root: SourceRootId, logical: &LogicalPath) -> u64 {
@@ -1893,6 +1941,7 @@ fn load_source_file_job(
         context.limits,
         &mut report,
         context.cancellation,
+        context.profile.source_encoding,
     )?;
     let state = text.map(|text| {
         let previous = context.previous_states.get(&job.file.id);
@@ -1937,6 +1986,9 @@ fn merge_scan_report(
     report.skipped_entries = report
         .skipped_entries
         .saturating_add(partial.skipped_entries);
+    report.legacy_encoded_files = report
+        .legacy_encoded_files
+        .saturating_add(partial.legacy_encoded_files);
     report.omitted_issues = report.omitted_issues.saturating_add(partial.omitted_issues);
     for issue in partial.issues {
         if report.issues.len() < limits.max_reported_issues {
@@ -2708,7 +2760,11 @@ impl AnalysisHost {
                     .map(|(_, shard)| shard.clone()),
             );
         }
-        let mut index = WorkspaceIndex::from_shards_cancellable(shards, cancellation)?;
+        let mut index = WorkspaceIndex::from_shards_cancellable_with_rules(
+            shards,
+            self.rules.as_ref(),
+            cancellation,
+        )?;
         let mut position_ranges = self.index.position_ranges().clone();
         position_ranges.retain(|(file_id, _), _| {
             files.contains_key(file_id) && !file_states.contains_key(file_id)
@@ -2721,9 +2777,16 @@ impl AnalysisHost {
             );
         }
         index.replace_all_position_ranges(position_ranges);
-        index.configure_case_sensitivity(self.rules.as_ref());
         let priorities = source_priorities(&self.roots, &files);
-        index.resolve_priorities_cancellable(&priorities, self.rules.as_ref(), cancellation)?;
+        let has_multiple_source_roots = self
+            .roots
+            .iter()
+            .filter(|root| files.values().any(|file| file.root_id == root.id))
+            .nth(1)
+            .is_some();
+        if self.vanilla_root.is_some() || has_multiple_source_roots {
+            index.resolve_priorities_cancellable(&priorities, self.rules.as_ref(), cancellation)?;
+        }
         cancellation.checkpoint()?;
         self.source_files = Arc::new(files);
         self.file_states = Arc::new(file_states);
@@ -2845,8 +2908,13 @@ impl AnalysisHost {
             let text = if matches!(&category.parser, ParserKind::Asset) {
                 None
             } else {
-                let Some(text) =
-                    read_source_file_cancellable(&change.path, limits, &mut report, cancellation)?
+                let Some(text) = read_source_file_cancellable(
+                    &change.path,
+                    limits,
+                    &mut report,
+                    cancellation,
+                    self.profile.source_encoding,
+                )?
                 else {
                     continue;
                 };
@@ -3077,8 +3145,12 @@ impl AnalysisHost {
         Arc::make_mut(&mut self.documents).remove(id);
         if let Some(path) = path {
             let mut report = WorkspaceScanReport::default();
-            if let Some(text) = read_source_file(&path, WorkspaceScanLimits::default(), &mut report)
-            {
+            if let Some(text) = read_source_file(
+                &path,
+                WorkspaceScanLimits::default(),
+                &mut report,
+                self.profile.source_encoding,
+            ) {
                 let document = self.document_snapshot(
                     id.clone(),
                     None,
@@ -4127,6 +4199,55 @@ mod tests {
         );
         assert_eq!(host.snapshot().scan_report(), &report);
         assert_eq!(host.snapshot().source_files().len(), 1);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn eu4_legacy_windows1252_text_is_decoded_before_indexing() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-engine-windows1252-{nonce}"));
+        let events = root.join("events");
+        fs::create_dir_all(&events).expect("event directory");
+        fs::write(
+            events.join("legacy.txt"),
+            b"country_event = { id = legacy.1 }\n# caf\xe9\n",
+        )
+        .expect("legacy event");
+
+        let mut host = eu4_host();
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
+        let report = host.refresh_source_roots().expect("legacy scan");
+
+        assert_eq!(report.indexed_files, 1);
+        assert_eq!(report.legacy_encoded_files, 1);
+        assert_eq!(report.skipped_entries, 0);
+        let file_id = host
+            .snapshot()
+            .source_files()
+            .values()
+            .find(|file| file.logical_path.as_str() == "events/legacy.txt")
+            .expect("legacy source file")
+            .id;
+        assert_eq!(
+            host.snapshot().source_text(file_id),
+            Some("country_event = { id = legacy.1 }\n# café\n")
+        );
+        assert_eq!(
+            host.snapshot()
+                .index()
+                .definitions("event", "legacy.1")
+                .len(),
+            1
+        );
         fs::remove_dir_all(root).expect("cleanup");
     }
 

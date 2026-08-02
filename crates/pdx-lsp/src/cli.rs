@@ -4,6 +4,7 @@ use std::fmt;
 use std::fs;
 use std::io::{self, IsTerminal, Write};
 use std::path::PathBuf;
+use std::time::Instant;
 
 use pdx_engine::{
     AnalysisHost, SourceRoot, SourceRootId, SourceRootKind, VanillaCacheError, VanillaIndexCache,
@@ -305,6 +306,7 @@ fn index_vanilla(args: &[String]) -> Result<String, CliError> {
 }
 
 fn build_eu4_cache(source: &std::path::Path, output: &std::path::Path) -> Result<String, CliError> {
+    let started = Instant::now();
     let rules = pdx_game::eu4::first_party_rules()?;
     let mut host = AnalysisHost::with_profile(rules, pdx_game::eu4::profile());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -312,14 +314,25 @@ fn build_eu4_cache(source: &std::path::Path, output: &std::path::Path) -> Result
         SourceRootKind::Vanilla,
         source.to_owned(),
     )]));
+    let scan_started = Instant::now();
     let report = host.refresh_source_roots()?;
+    let scan_elapsed = scan_started.elapsed();
+    let cache_started = Instant::now();
     let cache = VanillaIndexCache::from_snapshot(&host.snapshot())?;
+    let cache_elapsed = cache_started.elapsed();
+    let save_started = Instant::now();
     cache.save(output)?;
+    let save_elapsed = save_started.elapsed();
     Ok(format!(
-        "Vanilla cache written to {}\nindexed files: {}\nskipped entries: {}\nsource fingerprint: {}\nrules hash: {}",
+        "Vanilla cache written to {}\nindexed files: {}\nlegacy encoded files: {}\nskipped entries: {}\nscan time: {} ms\ncache materialization: {} ms\ncache save: {} ms\ntotal time: {} ms\nsource fingerprint: {}\nrules hash: {}",
         output.display(),
         cache.metadata().indexed_files,
+        report.legacy_encoded_files,
         report.skipped_entries,
+        scan_elapsed.as_millis(),
+        cache_elapsed.as_millis(),
+        save_elapsed.as_millis(),
+        started.elapsed().as_millis(),
         cache.metadata().source_fingerprint,
         cache.metadata().rule_hash
     ))
