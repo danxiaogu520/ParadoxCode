@@ -9,7 +9,7 @@
 >
 > 性能修订（2026-08-02）：大于 32 个可读源文件时，受限读取、parse 和 lower 在最多 12 个可取消 worker 中执行，结果按稳定任务顺序合并；未变更文件状态直接复用。Asset 资源只登记路径，不按 UTF-8 读取，也不进入文本解析队列。读取文本时先打开文件并从句柄获取 metadata，按已知大小预分配缓冲，避免在每个文件上重复进行路径 metadata 查询；全量 refresh 一次批量替换导航位置，避免逐文件扫描累计位置表。
 
-> 编码修订（2026-08-02）：通用 profile 默认严格要求 UTF-8；EU4 profile 对脚本和 localisation 等文本先尝试 UTF-8，再将符合文本结构且不含 NUL 的 Windows-1252/legacy ANSI 字节安全转为内部 UTF-8 后解析。无法安全识别的二进制或其他编码仍按可恢复的 `InvalidUtf8` 跳过，并在 `WorkspaceScanReport.legacy_encoded_files` 中统计成功转码的文件数。`pdx setup vanilla` 同时报告扫描/解析、cache materialization、SQLite 写入和总耗时，便于定位建库回归。
+> 编码修订（2026-08-02）：通用 profile 默认严格要求 UTF-8；EU4 profile 对脚本和 localisation 等文本先尝试 UTF-8，再将符合文本结构、不含 NUL 且 Windows-1252 解码没有替换错误的 legacy ANSI 字节安全转为内部 UTF-8 后解析。无法安全识别的二进制、其他编码或 Windows-1252 未定义字节仍按可恢复的 `InvalidUtf8` 跳过，并在 `WorkspaceScanReport.legacy_encoded_files` 中统计成功转码的文件数。`pdx setup vanilla` 同时报告扫描/解析、cache materialization、SQLite 写入和总耗时，便于定位建库回归。
 >
 > Vanilla setup 修订（2026-08-01）：Vanilla cache 构建完成每个文件的 shard、UTF-16 位置和本地化预览后，不再把 CST/HIR 保留在 setup host 中；cache 写入复用 SQLite prepared statements。Vanilla cache 的持久化结果不变，setup 的峰值内存和写盘耗时下降。
 >

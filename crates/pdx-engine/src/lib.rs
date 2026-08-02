@@ -1629,10 +1629,15 @@ fn read_source_file_cancellable(
         Err(error) => {
             let detail = error.to_string();
             let bytes = error.into_bytes();
-            if source_encoding == SourceEncoding::Windows1252 && looks_like_legacy_text(&bytes) {
-                let (text, _) = WINDOWS_1252.decode_without_bom_handling(&bytes);
-                report.legacy_encoded_files = report.legacy_encoded_files.saturating_add(1);
-                return Ok(Some(text.into_owned()));
+            if source_encoding == SourceEncoding::Windows1252
+                && looks_like_legacy_text(&bytes)
+                && windows1252_has_no_undefined_bytes(&bytes)
+            {
+                let (text, had_errors) = WINDOWS_1252.decode_without_bom_handling(&bytes);
+                if !had_errors {
+                    report.legacy_encoded_files = report.legacy_encoded_files.saturating_add(1);
+                    return Ok(Some(text.into_owned()));
+                }
             }
             record_scan_issue(
                 report,
@@ -1651,6 +1656,12 @@ fn looks_like_legacy_text(bytes: &[u8]) -> bool {
         && bytes
             .iter()
             .any(|byte| matches!(*byte, b'=' | b'{' | b'}' | b'#' | b'\n' | b':'))
+}
+
+fn windows1252_has_no_undefined_bytes(bytes: &[u8]) -> bool {
+    !bytes
+        .iter()
+        .any(|byte| matches!(*byte, 0x81 | 0x8d | 0x8f | 0x90 | 0x9d))
 }
 
 fn stable_file_id(root: SourceRootId, logical: &LogicalPath) -> u64 {
@@ -4165,6 +4176,11 @@ mod tests {
         fs::write(events.join("good.txt"), "country_event = { id = safe.1 }\n")
             .expect("valid event");
         fs::write(events.join("invalid.txt"), [0xff, 0xfe]).expect("invalid UTF-8 event");
+        fs::write(
+            events.join("undefined-windows1252.txt"),
+            b"country_event = { id = invalid.1 }\n# \x81\n",
+        )
+        .expect("invalid Windows-1252 event");
         fs::write(events.join("large.txt"), vec![b'x'; 65]).expect("oversized event");
 
         let mut host = eu4_host();
@@ -4182,9 +4198,9 @@ mod tests {
             })
             .expect("recoverable file failures should not abort scanning");
 
-        assert_eq!(report.discovered_files, 3);
+        assert_eq!(report.discovered_files, 4);
         assert_eq!(report.indexed_files, 1);
-        assert_eq!(report.skipped_entries, 2);
+        assert_eq!(report.skipped_entries, 3);
         assert!(
             report
                 .issues
