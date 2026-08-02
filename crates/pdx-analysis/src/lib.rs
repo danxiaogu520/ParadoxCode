@@ -1413,7 +1413,7 @@ pub fn hover_with_cancellation(
         );
         return Ok(Some(Hover {
             contents: format!(
-                "parameter `{}`\n\nLocal to {owner}; inferred from its first use\nArity: `{}`\nSyntax: `{syntax}`\nOccurrences in owner: {occurrences}",
+                "### parameter `{}`\n\n- Local to {owner}; inferred from its first use\n- Arity: `{}`\n- Syntax: `{syntax}`\n- Occurrences in owner: {occurrences}",
                 definition.name,
                 if optional {
                     "optional"
@@ -1461,13 +1461,13 @@ pub fn hover_with_cancellation(
     cancellation.checkpoint()?;
     if let Some(details) = semantic_rule_hover_at(snapshot, &input, position) {
         return Ok(Some(Hover {
-            contents: format!("PDX property `{word}`\n\n{details}"),
+            contents: format!("### PDX property `{word}`\n\n{details}"),
             range: Some(range),
         }));
     }
     if let Some(details) = semantic_value_hover_at(snapshot, &input, position) {
         return Ok(Some(Hover {
-            contents: format!("PDX value `{word}`\n\n{details}"),
+            contents: format!("### PDX value `{word}`\n\n{details}"),
             range: Some(range),
         }));
     }
@@ -1475,8 +1475,8 @@ pub fn hover_with_cancellation(
         let known = known_keys(snapshot);
         if known.iter().any(|key| key.eq_ignore_ascii_case(&word)) {
             let contents = semantic_rule_documentation(snapshot, &word).map_or_else(
-                || format!("PDX property `{word}`"),
-                |details| format!("PDX property `{word}`\n\n{details}"),
+                || format!("### PDX property `{word}`"),
+                |details| format!("### PDX property `{word}`\n\n{details}"),
             );
             return Ok(Some(Hover {
                 contents,
@@ -1558,7 +1558,7 @@ fn semantic_value_hover_at(
             && semantic_property_matches(snapshot, candidate.rule, property, candidate.scope)
     });
     Some(format!(
-        "property: `{}`\nvalue: `{}`\nvalidation: `{}`\n\n{}",
+        "- property: `{}`\n- value: `{}`\n- validation: `{}`\n\n{}",
         property.key,
         value,
         if accepted {
@@ -1576,31 +1576,38 @@ fn semantic_rule_hover_for_candidates(
 ) -> String {
     let mut sections = Vec::new();
     if candidates.len() > 1 {
-        sections.push(format!("{} possible semantic meanings", candidates.len()));
+        sections.push(format!(
+            "#### {} possible semantic meanings",
+            candidates.len()
+        ));
     }
     for (index, candidate) in candidates.iter().enumerate() {
         let rule = candidate.rule;
-        let mut lines = Vec::new();
-        if candidates.len() > 1 {
-            lines.push(format!("candidate {}", index + 1));
-        }
-        lines.push(format!("context: `{}`", rule.context));
+        let title = if candidates.len() > 1 {
+            format!("##### Candidate {}", index + 1)
+        } else {
+            "#### Rule".to_owned()
+        };
+        let mut details = Vec::new();
+        details.push(format!("- context: `{}`", rule.context));
         if !candidate.parent_path.is_empty() {
-            lines.push(format!("parent: `{}`", candidate.parent_path.join(".")));
+            details.push(format!("- parent: `{}`", candidate.parent_path.join(".")));
         }
-        lines.push(format!(
-            "shape: `{}`",
+        details.push(format!(
+            "- shape: `{}`",
             semantic_rule_shape_label(rule.shape)
         ));
-        lines.push(format!(
-            "value: `{}`",
+        details.push(format!(
+            "- value: `{}`",
             semantic_value_hover_label(&rule.value)
         ));
         if let Some(operator) = rule.operator.as_deref() {
-            lines.push(format!("operator: `{operator}`"));
+            details.push(format!("- operator: `{operator}`"));
         }
         let child_scope = (rule.push_scope.is_some() || !rule.replace_scope.is_empty())
             .then(|| semantic_child_scope(snapshot, candidate.scope, rule));
+
+        let mut scope_details = Vec::new();
         if !rule.allowed_scopes.is_empty() {
             let allowed = rule
                 .allowed_scopes
@@ -1613,53 +1620,71 @@ fn semantic_rule_hover_for_candidates(
             } else {
                 "not allowed"
             };
-            lines.push(format!("allowed scopes: {allowed}"));
-            lines.push(format!(
-                "current scope: `{}` ({status})",
+            scope_details.push(format!("- allowed scopes: {allowed}"));
+            scope_details.push(format!(
+                "- current scope: `{}` ({status})",
                 candidate.scope.current
             ));
         }
-        if rule.required {
-            lines.push("required".to_owned());
-        }
-        if let Some(min) = rule.min_occurs {
-            lines.push(format!("minimum occurrences: {min}"));
-        }
-        if let Some(max) = rule.max_occurs {
-            lines.push(format!("maximum occurrences: {max}"));
-        }
-        if let Some(child_context) = rule.child_context.as_deref() {
-            lines.push(format!("child context: `{child_context}`"));
-        }
         if !rule.allowed_scopes.is_empty() || child_scope.is_some() {
-            lines.push(format!(
-                "scope registers: {}",
+            scope_details.push(format!(
+                "- scope registers: {}",
                 semantic_scope_register_summary(candidate.scope)
             ));
         }
         if let Some(child_scope) = child_scope.as_ref() {
-            lines.push(format!(
-                "scope transition: `{}` → `{}`",
+            scope_details.push(format!(
+                "- scope transition: `{}` → `{}`",
                 candidate.scope.current, child_scope.current
             ));
             for (register, value) in &rule.replace_scope {
                 let resolved = resolve_scope_expression_context(snapshot, candidate.scope, value);
-                lines.push(format!(
-                    "scope register: `{register}` = `{value}` → `{resolved}`"
+                scope_details.push(format!(
+                    "- scope register: `{register}` = `{value}` → `{resolved}`"
                 ));
             }
-            lines.push(format!(
-                "scope registers after: {}",
+            scope_details.push(format!(
+                "- scope registers after: {}",
                 semantic_scope_register_summary(child_scope)
             ));
         }
+
+        let mut cardinality_details = Vec::new();
+        if rule.required {
+            cardinality_details.push("- required".to_owned());
+        }
+        if let Some(min) = rule.min_occurs {
+            cardinality_details.push(format!("- minimum occurrences: {min}"));
+        }
+        if let Some(max) = rule.max_occurs {
+            cardinality_details.push(format!("- maximum occurrences: {max}"));
+        }
+        if let Some(child_context) = rule.child_context.as_deref() {
+            details.push(format!("- child context: `{child_context}`"));
+        }
+        let mut sections_for_rule = vec![title, details.join("\n")];
+        if !scope_details.is_empty() {
+            sections_for_rule.push(format!("#### Scope\n\n{}", scope_details.join("\n")));
+        }
+        if !cardinality_details.is_empty() {
+            sections_for_rule.push(format!(
+                "#### Cardinality\n\n{}",
+                cardinality_details.join("\n")
+            ));
+        }
         if !rule.source_file.is_empty() && rule.line > 0 {
-            lines.push(format!("rule: `{}:{}`", rule.source_file, rule.line));
+            sections_for_rule.push(format!(
+                "#### Provenance\n\n- rule: `{}:{}`",
+                rule.source_file, rule.line
+            ));
         }
         if !rule.documentation.is_empty() {
-            lines.extend(rule.documentation.iter().cloned());
+            sections_for_rule.push(format!(
+                "#### Documentation\n\n{}",
+                rule.documentation.join("  \n")
+            ));
         }
-        sections.push(lines.join("  \n"));
+        sections.push(sections_for_rule.join("\n\n"));
     }
     sections.join("\n\n")
 }
@@ -1675,7 +1700,18 @@ fn semantic_scope_register_summary(scope: &ScopeContext) -> String {
     for (depth, value) in scope.previous.iter().enumerate() {
         registers.push(format!("{}=`{value}`", "PREV".repeat(depth + 1)));
     }
-    registers.join(", ")
+    let mut registers = registers.into_iter();
+    let Some(first) = registers.next() else {
+        return String::new();
+    };
+    let rest = registers
+        .map(|register| format!("  - {register}"))
+        .collect::<Vec<_>>();
+    if rest.is_empty() {
+        first
+    } else {
+        format!("{first}\n{}", rest.join("\n"))
+    }
 }
 
 fn semantic_rule_shape_label(shape: RuleShape) -> &'static str {
@@ -1753,25 +1789,44 @@ fn semantic_rule_documentation(snapshot: &AnalysisSnapshot, key: &str) -> Option
 }
 
 fn semantic_rule_documentation_for_rule(rule: &pdx_rules::SemanticRule) -> Option<String> {
-    let mut lines = rule.documentation.clone();
+    let mut sections = Vec::new();
+    if !rule.documentation.is_empty() {
+        sections.push(format!(
+            "#### Documentation\n\n{}",
+            rule.documentation.join("  \n")
+        ));
+    }
+
+    let mut constraints = Vec::new();
     if rule.required {
-        lines.push("required".to_owned());
+        constraints.push("- required".to_owned());
     }
     if let Some(min) = rule.min_occurs {
-        lines.push(format!("minimum occurrences: {min}"));
+        constraints.push(format!("- minimum occurrences: {min}"));
     }
     if let Some(max) = rule.max_occurs {
-        lines.push(format!("maximum occurrences: {max}"));
+        constraints.push(format!("- maximum occurrences: {max}"));
     }
     if !rule.allowed_scopes.is_empty() {
-        lines.push(format!("scopes: {}", rule.allowed_scopes.join(", ")));
+        constraints.push(format!(
+            "- scopes: {}",
+            rule.allowed_scopes
+                .iter()
+                .map(|scope| format!("`{scope}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+    if !constraints.is_empty() {
+        sections.push(format!("#### Constraints\n\n{}", constraints.join("\n")));
     }
     if !rule.source_file.is_empty() && rule.line > 0 {
-        lines.push(format!("rule: {}:{}", rule.source_file, rule.line));
+        sections.push(format!(
+            "#### Provenance\n\n- rule: `{}:{}`",
+            rule.source_file, rule.line
+        ));
     }
-    // LSP hover contents are Markdown. A single newline is normally collapsed into a space by
-    // Markdown renderers, so use an explicit hard break for each rule detail.
-    (!lines.is_empty()).then(|| lines.join("  \n"))
+    (!sections.is_empty()).then(|| sections.join("\n\n"))
 }
 
 /// Resolves the symbol at a position. Ambiguous and unresolved references deliberately return no
@@ -4423,9 +4478,9 @@ fn hover_for_symbol(
 ) -> Result<Hover, Cancelled> {
     let candidates = symbol_candidates_for_hover(snapshot, kind, name, cancellation)?;
     let policy = symbol_resolution_policy(snapshot, kind);
-    let mut contents = format!("{} `{}`", kind, name);
+    let mut sections = vec![format!("### {} `{}`", kind, name)];
     if candidates.is_empty() {
-        contents.push_str(&format!("\n\nunresolved {kind} symbol"));
+        sections.push(format!("#### unresolved {kind} symbol"));
     } else {
         let highest = candidates
             .iter()
@@ -4447,9 +4502,8 @@ fn hover_for_symbol(
         };
         if active.len() == 1 {
             let definition = active[0];
-            contents.push_str("\n\nResolved definition");
-            contents.push_str(&format!(
-                "\nSource root: {}\nDefined in: `{}`",
+            sections.push(format!(
+                "#### Resolved definition\n\n- Source root: {}\n- Defined in: `{}`",
                 symbol_source_root(snapshot, &definition.location),
                 symbol_location_path(&definition.location),
             ));
@@ -4461,20 +4515,24 @@ fn hover_for_symbol(
                 })
                 .collect::<Vec<_>>();
             if !shadowed.is_empty() {
-                contents.push_str("\n\nShadowed definitions:");
-                for candidate in shadowed {
-                    contents.push_str(&format!(
-                        "\n- {}: `{}`",
-                        symbol_source_root(snapshot, &candidate.location),
-                        symbol_location_path(&candidate.location),
-                    ));
-                }
+                sections.push(format!(
+                    "#### Shadowed definitions:\n\n{}",
+                    shadowed
+                        .into_iter()
+                        .map(|candidate| format!(
+                            "- {}: `{}`",
+                            symbol_source_root(snapshot, &candidate.location),
+                            symbol_location_path(&candidate.location),
+                        ))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                ));
             }
             if kind.eq_ignore_ascii_case("localisation")
                 && let Some((language, value)) = localisation_preview(snapshot, definition)
             {
-                contents.push_str(&format!(
-                    "\n\nLocalisation{}: \"{}\"",
+                sections.push(format!(
+                    "#### Localisation preview\n\n- Localisation{}: \"{}\"",
                     language
                         .as_deref()
                         .map_or_else(String::new, |language| format!(" ({language})")),
@@ -4482,19 +4540,23 @@ fn hover_for_symbol(
                 ));
             }
         } else {
-            contents.push_str(&format!("\n\nambiguous {kind} symbol"));
-            contents.push_str("\n\nCandidates:");
-            for candidate in &candidates {
-                contents.push_str(&format!(
-                    "\n- {}: `{}`",
-                    symbol_source_root(snapshot, &candidate.location),
-                    symbol_location_path(&candidate.location),
-                ));
-            }
+            sections.push(format!("#### ambiguous {kind} symbol"));
+            sections.push(format!(
+                "#### Candidates:\n\n{}",
+                candidates
+                    .iter()
+                    .map(|candidate| format!(
+                        "- {}: `{}`",
+                        symbol_source_root(snapshot, &candidate.location),
+                        symbol_location_path(&candidate.location),
+                    ))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            ));
         }
     }
     Ok(Hover {
-        contents,
+        contents: sections.join("\n\n"),
         range: Some(range),
     })
 }
@@ -5298,6 +5360,7 @@ mod tests {
         .expect("reference offset");
         let hover = hover(&snapshot, &id, reference).expect("ambiguous hover");
         assert!(hover.contents.contains("ambiguous event symbol"));
+        assert!(hover.contents.contains("#### Candidates:\n\n- "));
         assert!(hover.contents.contains("Candidates:"));
     }
 
@@ -5348,7 +5411,13 @@ mod tests {
         let position =
             u32::try_from(text.find("shared.1").expect("reference") + 1).expect("position");
         let hover = hover(&host.snapshot(), &id, position).expect("source hover");
+        assert!(
+            hover
+                .contents
+                .contains("#### Resolved definition\n\n- Source root:")
+        );
         assert!(hover.contents.contains("Source root: Current Mod"));
+        assert!(hover.contents.contains("#### Shadowed definitions:"));
         assert!(hover.contents.contains("Shadowed definitions:"));
         assert!(hover.contents.contains("Vanilla"));
         fs::remove_dir_all(root).expect("cleanup");
@@ -5577,6 +5646,16 @@ mod tests {
         let property = u32::try_from("trigger = { ".len() + 1).expect("offset");
         let property_hover = hover(&snapshot, &id, property).expect("semantic hover");
         assert!(property_hover.contents.contains("PDX property `foo`"));
+        assert!(
+            property_hover
+                .contents
+                .starts_with("### PDX property `foo`")
+        );
+        assert!(
+            property_hover
+                .contents
+                .contains("#### Rule\n\n- context: `trigger`")
+        );
         assert!(property_hover.contents.contains("context: `trigger`"));
         assert!(property_hover.contents.contains("shape: `scalar`"));
         assert!(
@@ -5594,6 +5673,8 @@ mod tests {
             .expect("value offset");
         let value_hover = hover(&snapshot, &id, value_position).expect("value hover");
         assert!(value_hover.contents.contains("PDX value `yes`"));
+        assert!(value_hover.contents.starts_with("### PDX value `yes`"));
+        assert!(value_hover.contents.contains("- validation: `accepted`"));
         assert!(value_hover.contents.contains("validation: `accepted`"));
 
         let (invalid_host, invalid_id) = semantic_snapshot("trigger = { foo = maybe }\n");
@@ -5672,6 +5753,8 @@ mod tests {
         let position = u32::try_from(text.find("choice").expect("choice") + 1).expect("position");
         let hover = hover(&host.snapshot(), &id, position).expect("ambiguous rule hover");
         assert!(hover.contents.contains("2 possible semantic meanings"));
+        assert!(hover.contents.contains("#### 2 possible semantic meanings"));
+        assert!(hover.contents.contains("##### Candidate 1"));
         assert!(hover.contents.contains("value: `bool (`yes` / `no`)`"));
         assert!(hover.contents.contains("value: `integer in [1, 3]`"));
     }
@@ -5709,6 +5792,11 @@ mod tests {
         let position = u32::try_from(text.find("documented").expect("documented key") + 2)
             .expect("hover position");
         let hover = hover(&host.snapshot(), &id, position).expect("documented hover");
+        assert!(
+            hover
+                .contents
+                .contains("#### Documentation\n\nfirst line  \nsecond line")
+        );
         assert!(hover.contents.contains("first line  \nsecond line"));
     }
 
@@ -6532,6 +6620,7 @@ mod tests {
         let optional =
             u32::try_from(text.find("optional").expect("conditional parameter")).expect("offset");
         let hover = hover(&snapshot, &id, optional).expect("parameter hover");
+        assert!(hover.contents.starts_with("### parameter `optional`"));
         assert!(hover.contents.contains("parameter `optional`"));
         assert!(hover.contents.contains("Arity: `optional`"));
 
@@ -6678,6 +6767,11 @@ mod tests {
         let position =
             u32::try_from(text.find("foo_name").expect("localisation key") + 2).expect("position");
         let hover = hover(&host.snapshot(), &id, position).expect("localisation hover");
+        assert!(
+            hover
+                .contents
+                .contains("#### Localisation preview\n\n- Localisation")
+        );
         assert!(hover.contents.contains("Localisation (l_english): \"Foo\""));
     }
 
