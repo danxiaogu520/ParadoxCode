@@ -139,6 +139,15 @@ Layer responsibilities:
 The checkout uses the repository-versioned `.githooks/pre-commit` as the local quality gate. Run
 `bash scripts/install-git-hooks.sh` after the first clone; when an agent discovers that `core.hooksPath` does not point to `.githooks`, it should install them itself. Normal commits run `git commit` directly, letting the hook invoke `scripts/check-quality-gates.sh` — there is no need to manually repeat the full suite of commands before committing. Only run the `core`, `grammars`, `zed`, or `release` groups individually when diagnosing a specific failure; CI continues to be responsible for environment-specific gates such as Windows, MSRV, and dependency policy.
 
+### Git Publishing Convention
+
+- The default publishing target is the repository's `main` branch.
+- When the user asks to commit or push, work directly on local `main` and push with `git push origin main`.
+- Do not create `agent/*` or other temporary branches, and do not open a pull request, unless the user explicitly requests one.
+- Before publishing, inspect the worktree and stage only changes within the requested scope.
+- If remote `main` has commits not present locally, stop and report the divergence; do not switch to a branch or pull-request workflow as a workaround.
+- After publishing, verify that `HEAD` and `origin/main` match and that the worktree is clean.
+
 ### During Implementation
 
 - Keep each change compilable, or at least locally verifiable.
