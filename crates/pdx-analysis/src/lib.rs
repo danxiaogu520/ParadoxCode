@@ -5,7 +5,7 @@
 
 #[cfg(test)]
 use std::cell::Cell;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
 #[cfg(test)]
@@ -13,7 +13,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use pdx_engine::hir::{
-    HirFile, HirReferenceOrigin, Scope, ScopeState, ScopeValue,
+    HirFile, HirReference, HirReferenceOrigin, Scope, ScopeState, ScopeValue,
     semantic_root_context as hir_semantic_root_context,
 };
 use pdx_engine::{
@@ -676,10 +676,25 @@ fn semantic_completion_container(
             && snapshot
                 .game_profile()
                 .is_transparent_scope_wrapper(&property.key);
-        let cached_child_fact = property
-            .block
-            .iter()
-            .find_map(|child| hir.and_then(|hir| hir.scope_fact_at(child.key_range)));
+        let next_rules = semantic_rules_for_container(snapshot, &context, &parent_path, &scope)
+            .into_iter()
+            .filter(|rule| {
+                !matches!(rule.shape, RuleShape::LeafValue)
+                    && semantic_rule_key_matches(snapshot, rule, &parent_path, &property.key)
+                    && semantic_scope_allows(rule, &scope)
+            })
+            .collect::<Vec<_>>();
+        let cached_child_fact = cached_scope_fact_for_property(
+            snapshot,
+            hir,
+            &context,
+            &parent_path,
+            property,
+            &next_rules,
+            None,
+            &scope,
+            transparent_wrapper,
+        );
         if let Some(fact) = cached_child_fact {
             let structural_containers = completion_structural_containers(
                 snapshot,
@@ -704,14 +719,6 @@ fn semantic_completion_container(
                 position,
             );
         }
-        let next_rules = semantic_rules_for_container(snapshot, &context, &parent_path, &scope)
-            .into_iter()
-            .filter(|rule| {
-                !matches!(rule.shape, RuleShape::LeafValue)
-                    && semantic_rule_key_matches(snapshot, rule, &parent_path, &property.key)
-                    && semantic_scope_allows(rule, &scope)
-            })
-            .collect::<Vec<_>>();
         let mut destinations = Vec::<SemanticCompletionContainer>::new();
         for rule in next_rules {
             let (destination_context, destination_path) =
@@ -1380,7 +1387,7 @@ pub fn hover_with_cancellation(
             .hir
             .as_deref()
             .and_then(|_| {
-                semantic_data(&input)
+                semantic_data(snapshot, &input)
                     .definitions
                     .into_iter()
                     .find(|candidate| candidate.symbol.range == definition.owner_range)
@@ -1434,17 +1441,28 @@ pub fn hover_with_cancellation(
     if word.is_empty() {
         return Ok(None);
     }
-    let semantic = semantic_data(&input);
-    if let Some(reference) = semantic.references.iter().find(|reference| {
+    let semantic = semantic_data(snapshot, &input);
+    let mut references = semantic.references.iter().filter(|reference| {
         reference.document.as_ref() == Some(document) && contains(reference.range, position)
-    }) {
-        return Ok(Some(hover_for_symbol(
-            snapshot,
-            &reference.kind,
-            &reference.name,
-            range,
-            cancellation,
-        )?));
+    });
+    if let Some(first) = references.next() {
+        let mut best = hover_for_symbol(snapshot, &first.kind, &first.name, range, cancellation)?;
+        if !best.contents.contains("#### Localisation preview") {
+            for reference in references {
+                let hover = hover_for_symbol(
+                    snapshot,
+                    &reference.kind,
+                    &reference.name,
+                    range,
+                    cancellation,
+                )?;
+                if hover.contents.contains("#### Localisation preview") {
+                    best = hover;
+                    break;
+                }
+            }
+        }
+        return Ok(Some(best));
     }
     if let Some(definition) = semantic.definitions.iter().find(|definition| {
         definition.document.as_ref() == Some(document)
@@ -2170,7 +2188,7 @@ pub fn document_symbols_with_cancellation(
     let Some(input) = input_for_document(snapshot, document) else {
         return Ok(Vec::new());
     };
-    let data = semantic_data(&input);
+    let data = semantic_data(snapshot, &input);
     let parameter_count = input
         .hir
         .as_deref()
@@ -2437,7 +2455,7 @@ fn analyze_input_with_cancellation(
     cancellation: &CancellationToken,
 ) -> Result<FileAnalysis, Cancelled> {
     cancellation.checkpoint()?;
-    let semantic = semantic_data(input);
+    let semantic = semantic_data(snapshot, input);
     cancellation.checkpoint()?;
     let resolution = DirectResolutionContext::new(snapshot);
     let mut diagnostics = syntax_diagnostics(input);
@@ -2741,6 +2759,75 @@ fn script_properties(input: &ParsedInput, parent: &CstNode) -> Vec<ScriptPropert
         .collect()
 }
 
+#[allow(clippy::too_many_arguments)]
+fn cached_scope_fact_for_property<'hir>(
+    snapshot: &AnalysisSnapshot,
+    hir: Option<&'hir HirFile>,
+    context: &str,
+    parent_path: &[String],
+    property: &ScriptProperty,
+    matching: &[&pdx_rules::SemanticRule],
+    selected_alternative: Option<&str>,
+    scope: &ScopeContext,
+    transparent_wrapper: bool,
+) -> Option<&'hir pdx_engine::hir::ScopeFact> {
+    let fact = property
+        .block
+        .iter()
+        .find_map(|child| hir.and_then(|hir| hir.scope_fact_at(child.key_range)))?;
+
+    // HIR cannot inspect the workspace while lowering, so a cached dynamic transition is only
+    // authoritative once analysis confirms the member. A missing index member is accepted only
+    // when the first-party descriptor's negative/positive key filter proves it structurally.
+    let mut transition_matching = matching.to_vec();
+    if transition_matching.is_empty() {
+        transition_matching = semantic_rules_for_container(snapshot, context, parent_path, scope)
+            .into_iter()
+            .filter(|rule| {
+                !matches!(rule.shape, RuleShape::LeafValue)
+                    && semantic_scope_allows(rule, scope)
+                    && match &rule.key {
+                        KeyMatcher::Type(type_name) => {
+                            match workspace_type_member(snapshot, type_name, &property.key) {
+                                WorkspaceTypeMember::Present => true,
+                                WorkspaceTypeMember::Absent => false,
+                                WorkspaceTypeMember::Unknown => {
+                                    type_member_provably_valid(snapshot, type_name, &property.key)
+                                }
+                            }
+                        }
+                        _ => false,
+                    }
+            })
+            .collect();
+    }
+    let selected = semantic_selected_transition(
+        snapshot,
+        &transition_matching,
+        selected_alternative,
+        context,
+        parent_path,
+        property,
+        scope,
+        transparent_wrapper,
+    )?;
+    let (expected_context, expected_path) = semantic_transition_destination(
+        selected,
+        context,
+        parent_path,
+        &property.key,
+        transparent_wrapper,
+    );
+    (fact.context.eq_ignore_ascii_case(&expected_context)
+        && fact.parent_path.len() == expected_path.len()
+        && fact
+            .parent_path
+            .iter()
+            .zip(expected_path)
+            .all(|(actual, expected)| actual.eq_ignore_ascii_case(&expected)))
+    .then_some(fact)
+}
+
 #[allow(clippy::too_many_arguments)] // Recursive validation carries explicit semantic state.
 fn validate_semantic_container(
     snapshot: &AnalysisSnapshot,
@@ -2874,10 +2961,17 @@ fn validate_semantic_container(
                 });
             }
         }
-        let cached_child_fact = property
-            .block
-            .iter()
-            .find_map(|child| hir.and_then(|hir| hir.scope_fact_at(child.key_range)));
+        let cached_child_fact = cached_scope_fact_for_property(
+            snapshot,
+            hir,
+            context,
+            parent_path,
+            property,
+            &matching,
+            selected_alternative.as_deref(),
+            scope,
+            transparent_wrapper,
+        );
         let destination = if let Some(fact) = cached_child_fact {
             Some((
                 fact.context.clone(),
@@ -3671,6 +3765,66 @@ fn semantic_key_matches(snapshot: &AnalysisSnapshot, matcher: &KeyMatcher, key: 
     )
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WorkspaceTypeMember {
+    /// The workspace has a definition for this type member.
+    Present,
+    /// The workspace has definitions for the type, but not this member.
+    Absent,
+    /// No definition for the type is indexed yet; keep the conservative open-world fallback.
+    Unknown,
+}
+
+fn workspace_type_member(
+    snapshot: &AnalysisSnapshot,
+    type_name: &str,
+    member: &str,
+) -> WorkspaceTypeMember {
+    let base = type_name
+        .split_once('.')
+        .map_or(type_name, |(kind, _)| kind);
+    let candidates = [
+        type_name,
+        base,
+        snapshot
+            .game_profile()
+            .member_kind_alias(base)
+            .unwrap_or(base),
+    ];
+    let mut has_members = false;
+    for candidate in candidates {
+        if snapshot
+            .index()
+            .definitions_for_kind(candidate)
+            .next()
+            .is_some()
+        {
+            has_members = true;
+            if !snapshot.index().definitions(candidate, member).is_empty() {
+                return WorkspaceTypeMember::Present;
+            }
+        }
+    }
+    if has_members {
+        WorkspaceTypeMember::Absent
+    } else {
+        WorkspaceTypeMember::Unknown
+    }
+}
+
+fn type_member_provably_valid(snapshot: &AnalysisSnapshot, type_name: &str, key: &str) -> bool {
+    snapshot
+        .rules()
+        .model()
+        .semantic
+        .type_descriptors
+        .get(type_name)
+        .and_then(|descriptor| descriptor.type_key_filter.as_ref())
+        .is_some_and(|(values, negate)| {
+            values.iter().any(|value| value.eq_ignore_ascii_case(key)) != *negate
+        })
+}
+
 fn semantic_property_matches(
     snapshot: &AnalysisSnapshot,
     rule: &pdx_rules::SemanticRule,
@@ -3818,13 +3972,24 @@ fn diagnostic_from_syntax(error: &SyntaxError) -> Diagnostic {
     }
 }
 
-fn semantic_data(input: &ParsedInput) -> SemanticFile {
+fn semantic_data(snapshot: &AnalysisSnapshot, input: &ParsedInput) -> SemanticFile {
     let mut data = SemanticFile {
         definitions: Vec::new(),
         references: Vec::new(),
     };
     let Some(hir) = input.hir.as_deref() else {
         return data;
+    };
+    // The inactive-range set is only consulted for Semantic-origin references; skip building it
+    // entirely when this file has none, keeping semantic_data O(references + definitions).
+    let has_semantic_references = hir
+        .references()
+        .iter()
+        .any(|reference| reference.origin == HirReferenceOrigin::Semantic);
+    let inactive_semantic_references = if has_semantic_references {
+        inactive_semantic_reference_ranges(snapshot, hir)
+    } else {
+        BTreeSet::new()
     };
     for definition in hir.definitions() {
         data.definitions.push(make_definition(
@@ -3835,14 +4000,19 @@ fn semantic_data(input: &ParsedInput) -> SemanticFile {
             definition.selection_range,
         ));
     }
-    for reference in hir.references().iter().filter(|reference| {
-        matches!(
-            reference.origin,
-            HirReferenceOrigin::Profile
-                | HirReferenceOrigin::Semantic
-                | HirReferenceOrigin::DerivedLocalisation
-        )
-    }) {
+    for reference in hir
+        .references()
+        .iter()
+        .filter(|reference| {
+            matches!(
+                reference.origin,
+                HirReferenceOrigin::Profile
+                    | HirReferenceOrigin::Semantic
+                    | HirReferenceOrigin::DerivedLocalisation
+            )
+        })
+        .filter(|reference| semantic_reference_is_active(&inactive_semantic_references, reference))
+    {
         data.references.push(ReferenceInternal {
             kind: reference.kind.clone(),
             name: reference.name.clone(),
@@ -3853,6 +4023,157 @@ fn semantic_data(input: &ParsedInput) -> SemanticFile {
         });
     }
     data
+}
+
+fn inactive_semantic_reference_ranges(
+    snapshot: &AnalysisSnapshot,
+    hir: &HirFile,
+) -> BTreeSet<TextRange> {
+    let mut inactive = BTreeSet::new();
+    let mut invalid_ancestors = Vec::<(Vec<String>, TextRange)>::new();
+    // Container rule sets are identical for every property in one (context, parent_path). Cache
+    // them per context and path so dynamic members (e.g. one container per mission) do not
+    // rebuild and re-filter the container rules for every property.
+    let mut cached_containers =
+        HashMap::<String, HashMap<Vec<String>, ContainerRuleCache<'_>>>::new();
+    for property in hir.properties() {
+        while invalid_ancestors.last().is_some_and(|(path, range)| {
+            !property.path.starts_with(path) || !text_range_within(property.range, *range)
+        }) {
+            invalid_ancestors.pop();
+        }
+        let own_invalid =
+            semantic_type_property_is_invalid(snapshot, hir, property, &mut cached_containers);
+        if (!invalid_ancestors.is_empty() || own_invalid)
+            && let Some(scalar) = property.scalar.as_ref()
+        {
+            inactive.insert(scalar.range);
+        }
+        if own_invalid {
+            invalid_ancestors.push((property.path.clone(), property.range));
+        }
+    }
+    inactive
+}
+
+/// One (context, parent_path) container's rule set, with derived fast-path indexes so the
+/// per-property validity check does not rescan the container rules for every property.
+struct ContainerRuleCache<'a> {
+    rules: Vec<&'a pdx_rules::SemanticRule>,
+    /// Lowercased keys of non-leaf exact rules; a property key in this set is valid by a concrete
+    /// match without scanning `rules`.
+    concrete_keys: HashSet<String>,
+    /// Whether any concrete non-leaf rule uses an `AnyScalar` matcher (matches every key).
+    any_scalar_concrete: bool,
+    /// Whether the container carries concrete non-leaf rules at all (enum/qualified matchers that
+    /// the key set cannot express still need the scan).
+    has_concrete: bool,
+    /// Whether the container carries `Type` matchers, the only rules the workspace check applies
+    /// to.
+    has_type: bool,
+}
+
+fn semantic_type_property_is_invalid<'a>(
+    snapshot: &'a AnalysisSnapshot,
+    hir: &HirFile,
+    property: &pdx_engine::hir::HirProperty,
+    cached_containers: &mut HashMap<String, HashMap<Vec<String>, ContainerRuleCache<'a>>>,
+) -> bool {
+    if property.path.len() <= 1 {
+        return false;
+    }
+    let Some(fact) = hir.scope_fact_at(property.key_range) else {
+        return false;
+    };
+    let by_path = match cached_containers.get_mut(fact.context.as_str()) {
+        Some(by_path) => by_path,
+        None => cached_containers.entry(fact.context.clone()).or_default(),
+    };
+    if !by_path.contains_key(fact.parent_path.as_slice()) {
+        // `semantic_rules_for_container` ignores its scope argument; build it once per container
+        // only so the caller does not allocate a scope context for every property.
+        let scope = scope_context_from_hir(snapshot.game_profile_handle(), &fact.state);
+        let rules =
+            semantic_rules_for_container(snapshot, &fact.context, &fact.parent_path, &scope);
+        let mut concrete_keys = HashSet::new();
+        let mut any_scalar_concrete = false;
+        let mut has_concrete = false;
+        let mut has_type = false;
+        for rule in &rules {
+            match &rule.key {
+                KeyMatcher::Type(_) => has_type = true,
+                KeyMatcher::Dynamic(_) => {}
+                KeyMatcher::Exact(key) if !matches!(rule.shape, RuleShape::LeafValue) => {
+                    has_concrete = true;
+                    concrete_keys.insert(key.to_ascii_lowercase());
+                }
+                KeyMatcher::AnyScalar if !matches!(rule.shape, RuleShape::LeafValue) => {
+                    has_concrete = true;
+                    any_scalar_concrete = true;
+                }
+                KeyMatcher::Exact(_) | KeyMatcher::AnyScalar | KeyMatcher::Enum(_) => {}
+            }
+        }
+        by_path.insert(
+            fact.parent_path.clone(),
+            ContainerRuleCache {
+                rules,
+                concrete_keys,
+                any_scalar_concrete,
+                has_concrete,
+                has_type,
+            },
+        );
+    }
+    let entry = by_path
+        .get(fact.parent_path.as_slice())
+        .expect("filled above");
+    if entry.any_scalar_concrete
+        || entry
+            .concrete_keys
+            .contains(&property.key.to_ascii_lowercase())
+    {
+        return false;
+    }
+    if entry.has_concrete
+        && entry.rules.iter().any(|rule| {
+            !matches!(rule.key, KeyMatcher::Type(_) | KeyMatcher::Dynamic(_))
+                && !matches!(rule.shape, RuleShape::LeafValue)
+                && semantic_rule_key_matches(snapshot, rule, &fact.parent_path, &property.key)
+        })
+    {
+        return false;
+    }
+    // The workspace check below only fires for containers that actually carry Type matchers.
+    if !entry.has_type {
+        return false;
+    }
+    entry.rules.iter().any(|rule| {
+        let KeyMatcher::Type(type_name) = &rule.key else {
+            return false;
+        };
+        match workspace_type_member(snapshot, type_name, &property.key) {
+            WorkspaceTypeMember::Present => false,
+            WorkspaceTypeMember::Absent => true,
+            WorkspaceTypeMember::Unknown => {
+                !type_member_provably_valid(snapshot, type_name, &property.key)
+            }
+        }
+    })
+}
+
+fn semantic_reference_is_active(
+    inactive_semantic_references: &BTreeSet<TextRange>,
+    reference: &HirReference,
+) -> bool {
+    if reference.origin != HirReferenceOrigin::Semantic {
+        return true;
+    }
+    !inactive_semantic_references.contains(&reference.range)
+}
+
+fn text_range_within(inner: TextRange, outer: TextRange) -> bool {
+    outer.start() <= inner.start() && inner.end() <= outer.end()
 }
 
 fn make_definition(
@@ -3962,7 +4283,7 @@ fn all_semantics(
             continue;
         }
         if let Some(input) = input_for_document(snapshot, document.id()) {
-            let semantic = semantic_data(&input);
+            let semantic = semantic_data(snapshot, &input);
             all.definitions.extend(semantic.definitions);
             all.references.extend(semantic.references);
         }
@@ -3994,7 +4315,7 @@ fn completion_definitions(
         }
         if let Some(input) = input_for_document(snapshot, document.id()) {
             definitions.extend(
-                semantic_data(&input)
+                semantic_data(snapshot, &input)
                     .definitions
                     .into_iter()
                     .filter(|definition| starts_with_ignore_ascii_case(&definition.name, prefix))
@@ -4034,7 +4355,7 @@ fn completion_definitions_for_kinds(
         }
         if let Some(input) = input_for_document(snapshot, document.id()) {
             definitions.extend(
-                semantic_data(&input)
+                semantic_data(snapshot, &input)
                     .definitions
                     .into_iter()
                     .filter(|definition| {
@@ -4160,7 +4481,7 @@ fn symbol_candidates_for_hover(
         let Some(input) = input_for_document(snapshot, document.id()) else {
             continue;
         };
-        for definition in semantic_data(&input).definitions {
+        for definition in semantic_data(snapshot, &input).definitions {
             cancellation.checkpoint()?;
             if definition.kind != kind || !same_name(&definition.name, name) {
                 continue;
@@ -4243,7 +4564,7 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
             let Some(input) = input_for_document(snapshot, document.id()) else {
                 continue;
             };
-            for definition in semantic_data(&input).definitions {
+            for definition in semantic_data(snapshot, &input).definitions {
                 let priority = definition_priority(snapshot, &definition);
                 context
                     .overlay_definitions
@@ -6254,6 +6575,128 @@ mod tests {
     }
 
     #[test]
+    fn unresolved_game_age_ability_does_not_descend_cached_scope_fact() {
+        use std::fs;
+
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-analysis-game-age-{nonce}"));
+        let ages = root.join("common/ages");
+        fs::create_dir_all(&ages).expect("ages directory");
+        fs::write(
+            ages.join("00_abilities.txt"),
+            "abilities = { known_ability = { effect = { custom_tooltip = missing_loc } } }\n",
+        )
+        .expect("ability source");
+
+        let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+        let mut host = eu4_host(rules);
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        host.refresh_source_roots().expect("index ability source");
+
+        let id = DocumentId::new("file:///tmp/common/ages/target.txt");
+        let source = concat!(
+            "age_of_discovery = { abilities = { ",
+            "known_ability = { effect = { custom_tooltip = missing_loc } } ",
+            "MISSING = { effect = { custom_tooltip = missing_loc } } ",
+            "} }\n",
+        );
+        host.open_document(
+            id.clone(),
+            1,
+            source.to_owned(),
+            Some(ages.join("target.txt")),
+        )
+        .expect("open target");
+
+        let diagnostics = diagnostics(&host.snapshot(), &id);
+        let missing_loc_ranges = source
+            .match_indices("missing_loc")
+            .map(|(start, _)| {
+                TextRange::new(start as u32, (start + "missing_loc".len()) as u32).expect("range")
+            })
+            .collect::<Vec<_>>();
+        let missing_key = diagnostics.iter().filter(|item| {
+            item.code == DiagnosticCode::UnknownKey && item.message.contains("`MISSING`")
+        });
+        assert_eq!(
+            missing_key.count(),
+            1,
+            "unresolved ability should report one key"
+        );
+        let missing_symbols = diagnostics.iter().filter(|item| {
+            item.code == DiagnosticCode::UnknownSymbol && item.message.contains("`missing_loc`")
+        });
+        assert_eq!(
+            missing_symbols.count(),
+            1,
+            "known ability should still validate its value"
+        );
+        assert!(
+            diagnostics.iter().all(|item| {
+                item.code != DiagnosticCode::UnknownSymbol || item.range != missing_loc_ranges[1]
+            }),
+            "the unresolved ability must not cascade to its missing_loc value"
+        );
+
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn unresolved_game_age_ability_without_index_does_not_descend_cached_scope_fact() {
+        use std::fs;
+
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-analysis-empty-game-age-{nonce}"));
+        let ages = root.join("common/ages");
+        fs::create_dir_all(&ages).expect("ages directory");
+
+        let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+        let mut host = eu4_host(rules);
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        )]));
+        let id = DocumentId::new("file:///tmp/common/ages/empty-target.txt");
+        let source = "age_of_discovery = { abilities = { MISSING = { effect = { custom_tooltip = missing_loc } } } }\n";
+        host.open_document(
+            id.clone(),
+            1,
+            source.to_owned(),
+            Some(ages.join("empty-target.txt")),
+        )
+        .expect("open target");
+
+        let diagnostics = diagnostics(&host.snapshot(), &id);
+        let missing_loc_start = source.find("missing_loc").expect("missing localisation") as u32;
+        assert!(
+            diagnostics.iter().any(|item| {
+                item.code == DiagnosticCode::UnknownKey && item.message.contains("`MISSING`")
+            }),
+            "the unresolved ability should retain its parent key diagnostic: {diagnostics:?}"
+        );
+        assert!(
+            diagnostics.iter().all(|item| {
+                item.code != DiagnosticCode::UnknownSymbol
+                    || item.range.start() != missing_loc_start
+            }),
+            "an empty type index must not cascade into missing_loc: {diagnostics:?}"
+        );
+
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
     fn eu4_common_links_allow_owner_to_push_province_scope_to_country() {
         let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
         let mut host = eu4_host(rules);
@@ -6806,6 +7249,138 @@ mod tests {
             messages
                 .iter()
                 .any(|message| message.contains("mission_one_desc"))
+        );
+    }
+
+    #[test]
+    fn mission_metadata_fields_do_not_derive_localisation_keys() {
+        let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            std::path::PathBuf::from("/tmp"),
+        )]));
+        let id = DocumentId::new("file:///tmp/missions/metadata.txt");
+        host.open_document(
+            id.clone(),
+            1,
+            "series = { slot = 1 generic = no ai = yes has_country_shield = yes mission_one = { potential = { always = yes } } }\n"
+                .to_owned(),
+            Some(std::path::PathBuf::from("/tmp/missions/metadata.txt")),
+        )
+        .expect("open mission");
+
+        let messages = diagnostics(&host.snapshot(), &id)
+            .into_iter()
+            .filter(|diagnostic| diagnostic.code == DiagnosticCode::UnknownSymbol)
+            .map(|diagnostic| diagnostic.message)
+            .collect::<Vec<_>>();
+        for key in [
+            "slot_title",
+            "slot_desc",
+            "generic_title",
+            "generic_desc",
+            "ai_title",
+            "ai_desc",
+            "has_country_shield_title",
+            "has_country_shield_desc",
+        ] {
+            assert!(
+                !messages
+                    .iter()
+                    .any(|message| message.contains(&format!("`{key}`"))),
+                "metadata field {key} must not derive a localisation key: {messages:?}"
+            );
+        }
+        assert!(
+            messages
+                .iter()
+                .any(|message| message.contains("mission_one_title")),
+            "the nested mission still derives its title key: {messages:?}"
+        );
+        assert!(
+            messages
+                .iter()
+                .any(|message| message.contains("mission_one_desc")),
+            "the nested mission still derives its desc key: {messages:?}"
+        );
+    }
+
+    #[test]
+    fn hover_prefers_nonempty_localisation_preview_over_empty_sibling() {
+        let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            std::path::PathBuf::from("/tmp"),
+        )]));
+        let localisation = DocumentId::new("file:///tmp/localisation/test.yml");
+        host.open_document(
+            localisation.clone(),
+            1,
+            "l_english:\nmission_one_title:0 \"Mission One Title\"\nmission_one_desc:0 \"\"\n"
+                .to_owned(),
+            Some(std::path::PathBuf::from("/tmp/localisation/test.yml")),
+        )
+        .expect("open localisation");
+        let mission = DocumentId::new("file:///tmp/missions/test.txt");
+        let source = "series = { mission_one = { potential = { always = yes } } }\n";
+        host.open_document(
+            mission.clone(),
+            1,
+            source.to_owned(),
+            Some(std::path::PathBuf::from("/tmp/missions/test.txt")),
+        )
+        .expect("open mission");
+
+        let position =
+            u32::try_from(source.find("mission_one").expect("mission name") + 4).expect("position");
+        let hover = hover(&host.snapshot(), &mission, position).expect("mission hover");
+        assert!(
+            hover
+                .contents
+                .contains("Localisation (l_english): \"Mission One Title\""),
+            "hover should prefer the non-empty title preview: {}",
+            hover.contents
+        );
+        assert!(!hover.contents.contains("mission_one_desc"));
+    }
+
+    #[test]
+    fn custom_tooltip_hover_shows_localisation_preview_inside_mission_effects() {
+        let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            std::path::PathBuf::from("/tmp"),
+        )]));
+        let localisation = DocumentId::new("file:///tmp/localisation/test.yml");
+        host.open_document(
+            localisation.clone(),
+            1,
+            "l_english:\nEDG_TEST_TT:0 \"My tooltip text\"\n".to_owned(),
+            Some(std::path::PathBuf::from("/tmp/localisation/test.yml")),
+        )
+        .expect("open localisation");
+        let mission = DocumentId::new("file:///tmp/missions/test.txt");
+        let source = "series = { mission_one = { effect = { custom_tooltip = EDG_TEST_TT } } }\n";
+        host.open_document(
+            mission.clone(),
+            1,
+            source.to_owned(),
+            Some(std::path::PathBuf::from("/tmp/missions/test.txt")),
+        )
+        .expect("open mission");
+
+        let position =
+            u32::try_from(source.find("EDG_TEST_TT").expect("tooltip key") + 4).expect("position");
+        let hover = hover(&host.snapshot(), &mission, position).expect("tooltip hover");
+        assert!(
+            hover
+                .contents
+                .contains("Localisation (l_english): \"My tooltip text\""),
+            "custom_tooltip inside a mission effect should resolve to the localisation preview: {}",
+            hover.contents
         );
     }
 

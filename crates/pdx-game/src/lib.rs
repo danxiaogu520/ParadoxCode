@@ -828,7 +828,23 @@ mod tests {
         for directory in TEST_GAME.validation_directories {
             fs::create_dir_all(root.join(directory)).expect("validation directory");
         }
-        fs::write(root.join("test-game.exe"), b"fixture").expect("Windows executable marker");
+        let current = TEST_GAME.executable_paths.current();
+        let foreign = TEST_GAME
+            .executable_paths
+            .windows
+            .iter()
+            .chain(TEST_GAME.executable_paths.linux)
+            .chain(TEST_GAME.executable_paths.macos)
+            .find(|path| !current.iter().any(|current| *path == current))
+            .expect("descriptor has a foreign platform marker");
+        let marker = root.join(foreign);
+        if let Some(parent) = marker
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
+            fs::create_dir_all(parent).expect("marker parent directory");
+        }
+        fs::write(marker, b"fixture").expect("foreign executable marker");
 
         assert!(!validate_installation(&root, &TEST_GAME));
         assert!(validate_installation_for_source(&root, &TEST_GAME));

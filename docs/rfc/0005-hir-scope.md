@@ -11,6 +11,8 @@ key/value completion context 还会优先使用 HIR 的精确 key/scalar range�
 
 依赖 workspace member 的 type matcher transition 已在 analysis diagnostics 回退中完成；声明型 dynamic key 仍按任意非空键保守处理。不能由直接子 key 唯一消歧的冲突 signature 不会再随机选择，但跨 alternative 汇总更精确的共同 diagnostics 尚未完成。ROOT/THIS/repeated FROM/PREV register intrinsic，以及 `replace_scope` 中可由当前 scope 和 exact scope-link 静态求值的单段/多段表达式已经在 HIR/analysis 共用语义下落地；每段都以前一段的目标 scope 校验下一段，任一段 unresolved 时保持 `Unknown`/`any`。唯一解析的 scripted effect/trigger invocation 已按其 definition HIR owner 精确验证并补全参数；无法唯一解析 owner 时仍保守使用兼容的 workspace 动态 member fallback。因此当前完成的是静态 scope/intrinsic、recovery 与 parameter lowering/局部导航/唯一调用解析切片，不能标记为完整 scope evaluator。
 
+> 修订（2026-08-05）：scope fact 递归对 type/dynamic key（`KeyMatcher::Type`/`Dynamic`，如 `<mission>`）不再一律放弃下降。没有具体规则选中属性时，HIR 可按动态 matcher 的 transition 缓存候选，使 mission 等动态 block 内的 `effect`/`trigger` 子项获得 context 候选；存在具体规则（exact/enum/any-scalar）时仍只使用具体规则，避免 `<scripted_effect>` 等通用规则抢占具体 effect 的 transition。analysis 消费这类 cached fact 时必须重新执行 workspace-aware 选择：`Type` key 只有在 `WorkspaceIndex` 中存在，或第一方 type descriptor 的 `type_key_filter` 能静态证明该 key 有效时才能确认 transition；未确认或已证明缺失的 Type 保持 `Unknown`，并过滤其子树中由候选 fact 产生的语义引用，避免级联误报。声明型 `Dynamic` 仍按任意非空 key 保守处理。`paths_equal` 同步支持 `<...>` 通配段匹配规则 parent path 与具体路径。此修订使 mission 内 effect 块的 localisation 值（如 `custom_tooltip`）能生成语义引用，语义引用生成与 hover 预览不再依赖 profile 简写。
+
 ## 问题
 
 CST 只能回答文本结构，无法回答一个 key 是字段、effect、trigger、symbol definition 还是 scope link。语义还依赖 logical path、父 context、通用 `RuleSet`、所选 `GameProfile` 和当前 workspace snapshot。
@@ -161,6 +163,6 @@ HIR cache key：
 SourceFileId + FileRevision + GameId + RuleHash + FileCategory
 ```
 
-活动 `RuleSet` 或游戏 profile 变化会使内存 HIR cache 失效；单文件文本变化只使该文件失效。Vanilla 持久缓存不因 `rule_hash` 自动重建，这是明确的产品决策，用户可手动刷新。
+活动 `RuleSet` 或游戏 profile 变化会使内存 HIR cache 失效；单文件文本变化只使该文件失效。Vanilla 持久缓存不是 HIR cache：LSP 启动加载到可读且 schema/game identity 有效的 cache 后，若记录的 `rule_hash` 与当前内嵌 `RuleSet` 不一致，后台 worker 从 cache metadata 的 Vanilla 源目录以当前内嵌规则重建，并用 SQLite transaction 保存，提交后安装新 cache。重建成功发送 INFO；扫描、重建或事务保存失败则回退安装已加载的旧 cache 并发送 WARNING（含失败原因和两个 hash）。缺失、损坏或 schema/game identity 不兼容继续降级且不隐式扫描 Vanilla；文件内容或 fingerprint 变化不自动刷新，显式用户刷新仍可重建。
 
 结构 property 仍以保留重复 key 的 source-order flat vector 暴露；scope lowering 以一次线性 stack pass 建立直接子项邻接表，再沿子边递归，避免对每个父节点重新扫描全文件。生成的 `ScopeFact` 携带 context、parent path 和 persistent registers，并按 range 排序；analysis 用 exact-range logarithmic lookup。

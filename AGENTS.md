@@ -104,7 +104,7 @@ Layer responsibilities:
 - Do not use CST node pointers as cross-request identities.
 - Each file independently generates and replaces its index shard.
 - Overridden definitions may be retained for explanation but must not become active navigation targets.
-- The Vanilla cache is built or updated only on first configuration or explicit user refresh; it does not auto-refresh on rule hash or file changes.
+- The Vanilla cache is built or updated only on first configuration, explicit user refresh, or an automatic rule-hash mismatch rebuild at LSP startup; it does not auto-refresh on file changes.
 
 ### Error Recovery
 

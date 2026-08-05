@@ -714,6 +714,59 @@ fn property_children(properties: &[HirProperty]) -> Vec<Vec<usize>> {
     children
 }
 
+/// Collects transition rules for one property. Concrete key matches (exact/enum/any-scalar) are
+/// strong; dynamic matchers (`<mission>`, `KeyMatcher::Type`, `KeyMatcher::Dynamic`) only apply
+/// when no concrete rule selects the property, so scope facts descend into dynamic blocks.
+fn scope_transition_rules<'rule>(
+    rules: &'rule RuleSet,
+    context: &str,
+    parent_path: &[String],
+    key: &str,
+    profile: &GameProfile,
+    state: &ScopeState,
+) -> Vec<&'rule SemanticRule> {
+    let root_context = context
+        .strip_prefix("type:")
+        .map(|type_name| format!("root:{type_name}"));
+    let mut strong = Vec::new();
+    let mut weak = Vec::new();
+    for lookup_context in std::iter::once(context).chain(root_context.as_deref()) {
+        for rule in rules.semantic_rules_for_context(lookup_context) {
+            if !paths_equal(&rule.parent_path, parent_path)
+                || !matches!(rule.shape, RuleShape::Node | RuleShape::ValueClause)
+                || !scope_allows(profile, state, rule)
+            {
+                continue;
+            }
+            match &rule.key {
+                KeyMatcher::Exact(expected) if expected.eq_ignore_ascii_case(key) => {
+                    strong.push(rule);
+                }
+                KeyMatcher::Enum(enum_name) => {
+                    let members =
+                        rules
+                            .model()
+                            .semantic
+                            .enum_values
+                            .iter()
+                            .find_map(|(name, values)| {
+                                name.eq_ignore_ascii_case(enum_name).then_some(values)
+                            });
+                    if members.is_some_and(|values| {
+                        values.iter().any(|value| value.eq_ignore_ascii_case(key))
+                    }) {
+                        strong.push(rule);
+                    }
+                }
+                KeyMatcher::AnyScalar => strong.push(rule),
+                KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) => weak.push(rule),
+                KeyMatcher::Exact(_) => {}
+            }
+        }
+    }
+    if strong.is_empty() { weak } else { strong }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn lower_nested_scope_facts(
     properties: &[HirProperty],
@@ -728,19 +781,8 @@ fn lower_nested_scope_facts(
 ) {
     for &property_index in &property_children[parent_index] {
         let property = &properties[property_index];
-        let matching = rules
-            .exact_semantic_rules(&property.key)
-            .filter(|rule| {
-                (rule.context.eq_ignore_ascii_case(context)
-                    || context.strip_prefix("type:").is_some_and(|type_name| {
-                        rule.context
-                            .eq_ignore_ascii_case(&format!("root:{type_name}"))
-                    }))
-                    && paths_equal(&rule.parent_path, parent_path)
-                    && matches!(rule.shape, RuleShape::Node | RuleShape::ValueClause)
-                    && scope_allows(profile, state, rule)
-            })
-            .collect::<Vec<_>>();
+        let matching =
+            scope_transition_rules(rules, context, parent_path, &property.key, profile, state);
         facts.push(ScopeFact {
             range: property.key_range,
             context: context.to_owned(),
@@ -926,10 +968,13 @@ fn optional_text_matches(left: Option<&str>, right: Option<&str>) -> bool {
 
 fn paths_equal(left: &[String], right: &[String]) -> bool {
     left.len() == right.len()
-        && left
-            .iter()
-            .zip(right)
-            .all(|(left, right)| left.eq_ignore_ascii_case(right))
+        && left.iter().zip(right).all(|(left, right)| {
+            if left.starts_with('<') && left.ends_with('>') {
+                !right.is_empty()
+            } else {
+                left.eq_ignore_ascii_case(right)
+            }
+        })
 }
 
 fn scope_allows(profile: &GameProfile, state: &ScopeState, rule: &SemanticRule) -> bool {
@@ -2163,6 +2208,37 @@ mod tests {
                 && reference.kind == "localisation"
                 && reference.name == "semantic_title"
         }));
+    }
+
+    #[test]
+    fn scope_facts_descend_through_dynamic_mission_blocks() {
+        let rules = first_party_rules().expect("embedded rules");
+        let path = LogicalPath::parse("missions/dynamic_scope_hir.txt").expect("logical path");
+        let hir = lower_with_profile(
+            parse(
+                FileFormat::Script,
+                "series = { mission_one = { effect = { custom_tooltip = tt_key } } }\n",
+            ),
+            &path,
+            &rules,
+            &profile(),
+        );
+
+        let tooltip = hir
+            .properties()
+            .iter()
+            .find(|property| property.key == "custom_tooltip")
+            .expect("custom tooltip property");
+        let fact = hir
+            .scope_facts()
+            .iter()
+            .find(|fact| fact.range == tooltip.key_range)
+            .expect("mission effect scope fact");
+        assert_eq!(fact.context, "effect");
+        assert!(
+            fact.parent_path.is_empty(),
+            "the effect child context resets the semantic path"
+        );
     }
 
     #[test]

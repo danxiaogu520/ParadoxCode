@@ -119,4 +119,4 @@ MVP 不 rename：
 
 ## 索引持久化
 
-当前 Mod和依赖 Mod索引在 MVP 中可只驻留内存。Vanilla 是明确例外：首次配置时生成本地持久缓存，之后只由用户手动刷新。缓存除索引和导航位置外，可保存本地化 definition 的有限长度派生 Hover 预览，但不保存源码/CST/HIR。缓存不会因 `rule_hash` 自动失效；格式 schema 不兼容时 server 报告不可读并要求用户手动刷新，不能静默扫描游戏目录。
+当前 Mod和依赖 Mod索引在 MVP 中可只驻留内存。Vanilla 是明确例外：首次配置时生成本地持久缓存，之后由 LSP 启动后台加载；可读且 schema/game identity 有效的 cache 若记录 `rule_hash` 与当前内嵌规则不一致，则从 cache metadata 的 Vanilla 源目录以当前规则重建，并以 SQLite transaction 保存，提交后安装新 cache。重建成功发送 INFO；扫描、重建或事务保存失败则回退安装已加载的旧 cache 并发送 WARNING（含失败原因和两个 hash）。缓存除索引和导航位置外，可保存本地化 definition 的有限长度派生 Hover 预览，但不保存源码/CST/HIR。缺失、损坏或 schema/game identity 不兼容时 server 报告不可读并降级，不能静默扫描游戏目录；文件内容或 fingerprint 变化不自动刷新，显式用户刷新仍可重建。

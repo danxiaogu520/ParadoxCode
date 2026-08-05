@@ -510,9 +510,9 @@ mod tests {
 
     use super::{
         MAX_ARCHIVE_BYTES, MAX_CHECKSUM_BYTES, MAX_EXECUTABLE_BYTES, MAX_TAR_OVERHEAD_BYTES,
-        VERSION, archive_name, cached_server_is_valid, ensure_install_directory, expected_checksum,
-        extract_tar_gz, extract_tar_gz_with_limit, extract_zip, platform_artifact, read_limited,
-        release_version_matches, remove_cache_file,
+        VERSION, archive_name, cached_server_is_valid, expected_checksum, extract_tar_gz,
+        extract_tar_gz_with_limit, extract_zip, platform_artifact, read_limited,
+        release_version_matches,
     };
 
     const PAYLOAD: &[u8] = b"pdx-ls test payload";

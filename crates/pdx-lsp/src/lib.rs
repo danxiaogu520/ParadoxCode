@@ -280,11 +280,17 @@ struct PreparedInitialize {
     auto_vanilla: Option<AutoVanillaConfiguration>,
     vanilla_cache: Option<PathBuf>,
     watcher_registration: Option<Value>,
+    client_work_done_progress: bool,
 }
 
 #[derive(Debug)]
 struct VanillaSetupResult {
     result: Result<(VanillaIndexCache, String), String>,
+}
+
+/// One `$/progress` workDoneProgress payload emitted by the Vanilla background worker.
+struct VanillaProgress {
+    params: Value,
 }
 
 #[derive(Clone, Debug)]
@@ -334,6 +340,7 @@ enum TransportEvent {
     Diagnostics(DiagnosticsResult),
     Request(SnapshotRequestResult),
     VanillaSetup(VanillaSetupResult),
+    VanillaProgress(VanillaProgress),
     DiskChanges(DiskChangesResult),
 }
 
@@ -367,6 +374,9 @@ pub struct LspServer {
     pending_disk_changes: BTreeMap<PathBuf, DiskFileChangeKind>,
     watcher_registration: Option<Value>,
     auto_vanilla: Option<AutoVanillaConfiguration>,
+    /// Whether the client advertises `window.workDoneProgress`, so server-initiated background
+    /// work can be surfaced as a progress bar instead of only start/end messages.
+    client_work_done_progress: bool,
     clean_exit: bool,
 }
 
@@ -396,6 +406,7 @@ impl LspServer {
             pending_disk_changes: BTreeMap::new(),
             watcher_registration: None,
             auto_vanilla: None,
+            client_work_done_progress: false,
             clean_exit: false,
         })
     }
@@ -518,6 +529,7 @@ impl LspServer {
             let mut in_flight_initialize = None::<InFlightInitialize>;
             let mut in_flight_vanilla = None::<VanillaSetupCancellation>;
             let mut vanilla_cache_in_flight = false;
+            let mut vanilla_progress_token = None::<String>;
             let mut in_flight_disk_changes = None::<InFlightDiskChanges>;
             let mut deferred_messages = VecDeque::<Value>::new();
 
@@ -666,6 +678,7 @@ impl LspServer {
                                 self.host = prepared.host;
                                 self.state = ServerState::Initialized;
                                 self.watcher_registration = prepared.watcher_registration;
+                                self.client_work_done_progress = prepared.client_work_done_progress;
                                 (
                                     json!({
                                         "jsonrpc": JSON_RPC_VERSION,
@@ -700,10 +713,55 @@ impl LspServer {
                             let cancellation = VanillaSetupCancellation::new();
                             let sender = event_sender.clone();
                             let worker_cancellation = cancellation.clone();
+                            let rules = self.host.snapshot().rules().clone();
+                            let profile = self.host.snapshot().game_profile().clone();
+                            let current_rule_hash = rules.rule_hash().to_hex();
+                            let progress_token = format!("pdx-vanilla-{}", progress_nonce());
+                            let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
+                                if self.client_work_done_progress {
+                                    write_message(
+                                        &mut output,
+                                        &work_done_progress_create(&progress_token),
+                                    )?;
+                                    write_message(
+                                        &mut output,
+                                        &work_done_progress_begin(
+                                            &progress_token,
+                                            "Loading Vanilla index…",
+                                        ),
+                                    )?;
+                                    Some(Box::new(vanilla_progress_sender(
+                                        sender.clone(),
+                                        progress_token.clone(),
+                                    )))
+                                } else {
+                                    write_message(
+                                        &mut output,
+                                        &show_info_notification(
+                                            "Vanilla index is being loaded in the background…"
+                                                .to_owned(),
+                                        ),
+                                    )?;
+                                    None
+                                };
+                            vanilla_progress_token = if self.client_work_done_progress {
+                                Some(progress_token.clone())
+                            } else {
+                                None
+                            };
                             in_flight_vanilla = Some(cancellation);
                             vanilla_cache_in_flight = true;
                             scope.spawn(move || {
-                                let result = run_vanilla_cache_load(&path, &worker_cancellation);
+                                let result = run_vanilla_cache_load(
+                                    &path,
+                                    rules,
+                                    profile,
+                                    current_rule_hash,
+                                    progress
+                                        .as_deref()
+                                        .map(|callback| callback as &(dyn Fn(usize, usize) + Sync)),
+                                    &worker_cancellation,
+                                );
                                 let _ =
                                     sender.send(TransportEvent::VanillaSetup(VanillaSetupResult {
                                         result,
@@ -715,6 +773,39 @@ impl LspServer {
                             let rules = self.host.snapshot().rules().clone();
                             let profile = self.host.snapshot().game_profile().clone();
                             let worker_cancellation = cancellation.clone();
+                            let progress_token = format!("pdx-vanilla-{}", progress_nonce());
+                            let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
+                                if self.client_work_done_progress {
+                                    write_message(
+                                        &mut output,
+                                        &work_done_progress_create(&progress_token),
+                                    )?;
+                                    write_message(
+                                        &mut output,
+                                        &work_done_progress_begin(
+                                            &progress_token,
+                                            "Building Vanilla index…",
+                                        ),
+                                    )?;
+                                    Some(Box::new(vanilla_progress_sender(
+                                        sender.clone(),
+                                        progress_token.clone(),
+                                    )))
+                                } else {
+                                    write_message(
+                                        &mut output,
+                                        &show_info_notification(
+                                            "Vanilla index is being built in the background…"
+                                                .to_owned(),
+                                        ),
+                                    )?;
+                                    None
+                                };
+                            vanilla_progress_token = if self.client_work_done_progress {
+                                Some(progress_token.clone())
+                            } else {
+                                None
+                            };
                             in_flight_vanilla = Some(cancellation);
                             vanilla_cache_in_flight = false;
                             scope.spawn(move || {
@@ -722,6 +813,9 @@ impl LspServer {
                                     &configuration,
                                     rules,
                                     profile,
+                                    progress
+                                        .as_deref()
+                                        .map(|callback| callback as &(dyn Fn(usize, usize) + Sync)),
                                     &worker_cancellation,
                                 );
                                 let _ =
@@ -777,9 +871,26 @@ impl LspServer {
                         };
                         write_message(&mut output, &response)?;
                     }
+                    TransportEvent::VanillaProgress(result) => {
+                        write_message(
+                            &mut output,
+                            &json!({
+                                "jsonrpc": JSON_RPC_VERSION,
+                                "method": "$/progress",
+                                "params": result.params,
+                            }),
+                        )?;
+                    }
                     TransportEvent::VanillaSetup(result) => {
                         in_flight_vanilla = None;
                         vanilla_cache_in_flight = false;
+                        if let Some(token) = vanilla_progress_token.take() {
+                            let message = match &result.result {
+                                Ok((_, message)) => message.clone(),
+                                Err(message) => message.clone(),
+                            };
+                            write_message(&mut output, &work_done_progress_end(&token, &message))?;
+                        }
                         match result.result {
                             Ok((cache, message)) => {
                                 let cache_rule_hash = cache.metadata().rule_hash.clone();
@@ -791,7 +902,7 @@ impl LspServer {
                                             write_message(
                                                 &mut output,
                                                 &show_warning_notification(format!(
-                                                    "{message}; it was built with rules hash {cache_rule_hash}, but the active rules hash is {current_rule_hash}; refresh it explicitly if needed"
+                                                    "{message}; the installed cache was built with rules hash {cache_rule_hash}, but the active rules hash is {current_rule_hash}"
                                                 )),
                                             )?;
                                         } else {
@@ -1421,6 +1532,12 @@ impl LspServer {
 
     fn handle_initialize(&mut self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<InitializeParams>(params, "initialize")?;
+        self.client_work_done_progress = params
+            .capabilities
+            .window
+            .as_ref()
+            .and_then(|window| window.work_done_progress)
+            .unwrap_or(false);
         let prepared = prepare_initialize_candidate(
             self.host.clone(),
             params,
@@ -1541,6 +1658,12 @@ fn prepare_initialize_candidate(
         .workspace
         .as_ref()
         .and_then(|workspace| workspace.did_change_watched_files.as_ref());
+    let client_work_done_progress = params
+        .capabilities
+        .window
+        .as_ref()
+        .and_then(|window| window.work_done_progress)
+        .unwrap_or(false);
     let mut resolved =
         resolve_source_roots(client_root.as_deref(), initialization_options, cancellation)?;
     let mut warnings = Vec::new();
@@ -1620,24 +1743,133 @@ fn prepare_initialize_candidate(
         auto_vanilla,
         vanilla_cache,
         watcher_registration,
+        client_work_done_progress,
     })
+}
+
+/// Monotonic nonce for work-done-progress tokens and their create-request ids.
+fn progress_nonce() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_nanos())
+}
+
+/// Server-initiated work-done-progress create request; the client's response is ignored.
+fn work_done_progress_create(token: &str) -> Value {
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "id": format!("pdx-progress-{token}"),
+        "method": "window/workDoneProgress/create",
+        "params": {"token": token},
+    })
+}
+
+fn work_done_progress_begin(token: &str, message: &str) -> Value {
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "method": "$/progress",
+        "params": {
+            "token": token,
+            "value": {
+                "kind": "begin",
+                "title": "ParadoxCode",
+                "cancellable": false,
+                "message": message,
+                "percentage": 0,
+            },
+        },
+    })
+}
+
+fn work_done_progress_end(token: &str, message: &str) -> Value {
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "method": "$/progress",
+        "params": {
+            "token": token,
+            "value": {"kind": "end", "message": message},
+        },
+    })
+}
+
+/// Builds the worker progress callback that forwards engine scan progress as `$/progress` reports.
+fn vanilla_progress_sender(
+    sender: mpsc::Sender<TransportEvent>,
+    token: String,
+) -> impl Fn(usize, usize) {
+    move |done, total| {
+        let message = if total == 0 {
+            "Discovering Vanilla files…".to_owned()
+        } else {
+            format!("Indexing Vanilla files ({done}/{total})…")
+        };
+        let mut value = json!({"kind": "report", "message": message});
+        if let Some(percent) = done
+            .checked_mul(100)
+            .and_then(|percent| percent.checked_div(total))
+        {
+            value["percentage"] = json!(u32::try_from(percent).unwrap_or(100));
+        }
+        let _ = sender.send(TransportEvent::VanillaProgress(VanillaProgress {
+            params: json!({"token": token, "value": value}),
+        }));
+    }
 }
 
 fn run_vanilla_cache_load(
     path: &Path,
+    rules: RuleSet,
+    profile: GameProfile,
+    current_rule_hash: String,
+    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &VanillaSetupCancellation,
 ) -> Result<(VanillaIndexCache, String), String> {
-    let cache =
+    let loaded =
         VanillaIndexCache::load_cancellable(path, &cancellation.workspace).map_err(|error| {
             format!(
                 "Vanilla cache {} could not be loaded; continuing without Vanilla symbols: {error}",
                 path.display()
             )
         })?;
-    Ok((
-        cache,
-        format!("Vanilla symbols loaded from {}", path.display()),
-    ))
+    if loaded.metadata().rule_hash == current_rule_hash {
+        return Ok((
+            loaded,
+            format!("Vanilla symbols loaded from {}", path.display()),
+        ));
+    }
+    let stale_hash = loaded.metadata().rule_hash.clone();
+    let source = loaded.source_root().path.clone();
+    let rebuilt = (|| {
+        let mut host = AnalysisHost::with_profile(rules, profile);
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            source.clone(),
+        )]));
+        host.refresh_source_roots_cancellable_with_progress(&cancellation.workspace, progress)
+            .map_err(|error| {
+                format!("Vanilla indexing failed during cache regeneration: {error}")
+            })?;
+        let cache = VanillaIndexCache::from_snapshot(&host.snapshot())
+            .map_err(|error| format!("Vanilla cache regeneration failed: {error}"))?;
+        cache
+            .save(path)
+            .map_err(|error| format!("Vanilla cache regeneration could not be saved: {error}"))?;
+        Ok::<_, String>(cache)
+    })();
+    match rebuilt {
+        Ok(cache) => Ok((
+            cache,
+            format!(
+                "Vanilla cache was regenerated for the active rules hash {current_rule_hash} and loaded from {}",
+                path.display()
+            ),
+        )),
+        Err(error) => Ok((
+            loaded,
+            format!("{error}; using the existing cache built with rules hash {stale_hash}"),
+        )),
+    }
 }
 
 fn watched_files_registration(
@@ -1750,12 +1982,14 @@ fn run_auto_vanilla_setup(
     auto_vanilla: &AutoVanillaConfiguration,
     rules: RuleSet,
     profile: GameProfile,
+    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &VanillaSetupCancellation,
 ) -> Result<(VanillaIndexCache, String), String> {
     run_auto_vanilla_setup_with_options(
         auto_vanilla,
         rules,
         profile,
+        progress,
         cancellation,
         &DiscoveryOptions::default(),
     )
@@ -1765,6 +1999,7 @@ fn run_auto_vanilla_setup_with_options(
     auto_vanilla: &AutoVanillaConfiguration,
     rules: RuleSet,
     profile: GameProfile,
+    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &VanillaSetupCancellation,
     discovery_options: &DiscoveryOptions,
 ) -> Result<(VanillaIndexCache, String), String> {
@@ -1831,7 +2066,7 @@ fn run_auto_vanilla_setup_with_options(
         source.clone(),
     )]));
     let setup = (|| {
-        host.refresh_source_roots_cancellable(&cancellation.workspace)
+        host.refresh_source_roots_cancellable_with_progress(&cancellation.workspace, progress)
             .map_err(|error| format!("Vanilla indexing failed: {error}"))?;
         let cache = VanillaIndexCache::from_snapshot(&host.snapshot())
             .map_err(|error| format!("Vanilla cache creation failed: {error}"))?;
@@ -4218,6 +4453,206 @@ path = "dependencies/high"
         fs::remove_dir_all(container).expect("cleanup");
     }
 
+    fn stale_cache_fixture(container: &std::path::Path) -> std::path::PathBuf {
+        let workspace = container.join("workspace");
+        let vanilla = container.join("vanilla");
+        fs::create_dir_all(&workspace).expect("workspace directory");
+        fs::create_dir_all(&vanilla).expect("Vanilla directory");
+        let vanilla = fs::canonicalize(&vanilla).expect("canonical Vanilla directory");
+        let cache_path = container.join("vanilla.pdxindex");
+
+        let bootstrap_rules = pdx_game::eu4::bootstrap_rules();
+        let mut stale_host = AnalysisHost::with_profile(bootstrap_rules, pdx_game::eu4::profile());
+        stale_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            vanilla,
+        )]));
+        stale_host.refresh_source_roots().expect("scan Vanilla");
+        let stale_cache =
+            VanillaIndexCache::from_snapshot(&stale_host.snapshot()).expect("stale cache");
+        stale_cache.save(&cache_path).expect("save stale cache");
+        cache_path
+    }
+
+    #[test]
+    fn stale_vanilla_cache_is_regenerated_with_an_explicit_notification() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let container = std::env::temp_dir().join(format!("pdx-lsp-regen-cache-{nonce}"));
+        let cache_path = stale_cache_fixture(&container);
+        let first_party_rules = pdx_game::eu4::first_party_rules().expect("embedded rules");
+        assert_ne!(
+            VanillaIndexCache::load(&cache_path)
+                .expect("stale cache reload")
+                .metadata()
+                .rule_hash,
+            first_party_rules.rule_hash().to_hex()
+        );
+
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&container.join("workspace")),"capabilities":{},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
+        let responses = decode_frames(&output);
+
+        responses
+            .iter()
+            .find(|value| {
+                value["method"] == "window/showMessage"
+                    && value["params"]["type"] == 3
+                    && value["params"]["message"]
+                        .as_str()
+                        .is_some_and(|message| message.contains("regenerated"))
+            })
+            .expect("regeneration info notification");
+        assert!(
+            responses
+                .iter()
+                .any(|value| value["method"] == "window/showMessage"
+                    && value["params"]["type"] == 3
+                    && value["params"]["message"]
+                        .as_str()
+                        .is_some_and(|message| message.contains("background"))),
+            "without workDoneProgress the fallback start message keeps the user informed"
+        );
+        assert!(
+            !responses.iter().any(|value| {
+                value["method"] == "window/showMessage" && value["params"]["type"] == 2
+            }),
+            "no stale-cache warning should remain after a successful regeneration"
+        );
+        assert_eq!(
+            VanillaIndexCache::load(&cache_path)
+                .expect("regenerated cache reload")
+                .metadata()
+                .rule_hash,
+            first_party_rules.rule_hash().to_hex(),
+            "the cache file on disk must be replaced with the regenerated hash"
+        );
+        assert_eq!(server.snapshot().source_roots().len(), 2);
+        fs::remove_dir_all(container).expect("cleanup");
+    }
+
+    #[test]
+    fn stale_cache_regeneration_reports_work_done_progress() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let container = std::env::temp_dir().join(format!("pdx-lsp-regen-progress-{nonce}"));
+        let cache_path = stale_cache_fixture(&container);
+        let events = container.join("vanilla/events");
+        fs::create_dir_all(&events).expect("vanilla events directory");
+        for index in 0..4 {
+            fs::write(
+                events.join(format!("probe_{index}.txt")),
+                format!("country_event = {{ id = probe.{index} }}\n"),
+            )
+            .expect("vanilla event");
+        }
+
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&container.join("workspace")),"capabilities":{"window":{"workDoneProgress":true}},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
+        let responses = decode_frames(&output);
+
+        assert!(
+            responses.iter().any(|value| {
+                value["method"] == "window/workDoneProgress/create"
+                    && value["params"]["token"].as_str().is_some()
+            }),
+            "a work-done-progress create request must precede the reports"
+        );
+        assert!(
+            responses.iter().any(|value| {
+                value["method"] == "$/progress"
+                    && value["params"]["value"]["kind"] == "begin"
+                    && value["params"]["value"]["title"] == "ParadoxCode"
+            }),
+            "a begin report must be emitted"
+        );
+        assert!(
+            responses.iter().any(|value| {
+                value["method"] == "$/progress"
+                    && value["params"]["value"]["kind"] == "report"
+                    && value["params"]["value"]["percentage"].is_u64()
+            }),
+            "at least one indexed-files progress report must be emitted"
+        );
+        assert!(
+            responses.iter().any(|value| {
+                value["method"] == "$/progress" && value["params"]["value"]["kind"] == "end"
+            }),
+            "an end report must be emitted once the worker finishes"
+        );
+        assert_eq!(
+            VanillaIndexCache::load(&cache_path)
+                .expect("regenerated cache reload")
+                .metadata()
+                .rule_hash,
+            pdx_game::eu4::first_party_rules()
+                .expect("embedded rules")
+                .rule_hash()
+                .to_hex()
+        );
+        fs::remove_dir_all(container).expect("cleanup");
+    }
+
+    #[test]
+    fn stale_vanilla_cache_reports_regeneration_failure_explicitly() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let container = std::env::temp_dir().join(format!("pdx-lsp-regen-failure-{nonce}"));
+        let cache_path = stale_cache_fixture(&container);
+        fs::remove_dir_all(container.join("vanilla")).expect("remove Vanilla directory");
+
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&container.join("workspace")),"capabilities":{},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
+        let responses = decode_frames(&output);
+
+        let warning = responses
+            .iter()
+            .find(|value| value["method"] == "window/showMessage" && value["params"]["type"] == 2)
+            .expect("regeneration failure warning");
+        let message = warning["params"]["message"]
+            .as_str()
+            .expect("warning message");
+        assert!(
+            message.contains("regeneration") && message.contains("using the existing cache"),
+            "the failure must be explicit and keep the stale cache fallback: {message}"
+        );
+        fs::remove_dir_all(container).expect("cleanup");
+    }
+
     #[test]
     fn stale_diagnostics_do_not_replace_newer_results() {
         let mut server =
@@ -4405,6 +4840,7 @@ path = "dependencies/high"
             &automatic,
             pdx_game::eu4::first_party_rules().expect("rules"),
             pdx_game::eu4::profile(),
+            None,
             &VanillaSetupCancellation::new(),
             &options,
         )
@@ -4422,6 +4858,7 @@ path = "dependencies/high"
             &automatic,
             pdx_game::eu4::first_party_rules().expect("rules"),
             pdx_game::eu4::profile(),
+            None,
             &VanillaSetupCancellation::new(),
             &options,
         )
@@ -4484,6 +4921,7 @@ path = "dependencies/high"
             &automatic,
             pdx_game::eu4::first_party_rules().expect("rules"),
             pdx_game::eu4::profile(),
+            None,
             &VanillaSetupCancellation::new(),
             &options,
         )
@@ -4499,6 +4937,7 @@ path = "dependencies/high"
             &automatic,
             pdx_game::eu4::first_party_rules().expect("rules"),
             pdx_game::eu4::profile(),
+            None,
             &VanillaSetupCancellation::new(),
             &options,
         )

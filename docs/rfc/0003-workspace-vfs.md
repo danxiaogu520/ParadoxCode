@@ -3,13 +3,17 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
-> 实现进度（2026-07-25）：Current Mod/Dependency 的类型化 LSP 与项目 TOML 配置已接入；`pdx index vanilla` 建立版本化本地 SQLite cache，LSP 可取消地只读加载并在后续 refresh 中跳过 Vanilla 目录。cache 不保存源码，缺失/损坏/错 game 降级 warning，旧 `rule_hash` 仅提示手动刷新。Current Mod/Dependency 的 watched-file 事件通过后台 worker 定向替换单文件状态和 shard，打开 overlay 保持优先，Vanilla 不注册 watcher。
+> 实现进度（2026-07-25）：Current Mod/Dependency 的类型化 LSP 与项目 TOML 配置已接入；`pdx index vanilla` 建立版本化本地 SQLite cache，LSP 可取消地只读加载并在后续 refresh 中跳过 Vanilla 目录。cache 不保存源码，缺失/损坏/错 game 降级 warning；可读 cache 的旧 `rule_hash` 按下述后台重建流程处理。Current Mod/Dependency 的 watched-file 事件通过后台 worker 定向替换单文件状态和 shard，打开 overlay 保持优先，Vanilla 不注册 watcher。
 >
-> 设计修订（2026-08-01）：为支持不打开 Vanilla `.yml` 文件时的 Hover，cache schema 3 额外保存每个本地化 definition 的有限长度派生预览（语言头和最多 240 个字符的值）。这不是源码、CST 或 HIR；正常启动仍只读 cache，原 Vanilla 目录仍不扫描、不读取。空值不生成预览，schema 不兼容时仍要求用户显式刷新。
+> 缓存修订（2026-08-05）：LSP 加载到可读且 schema/game identity 有效的 cache 后，若其记录的 `rule_hash` 与当前内嵌规则工件不一致，后台 worker 使用内嵌规则从 cache metadata 记录的 Vanilla 源目录重建。重建结果写回原 cache 路径时使用 SQLite transaction，事务提交后再由 event loop 安装；成功以 `window/showMessage` 的 INFO 显式提示。扫描、重建或事务保存失败时保留并安装已加载的旧 cache，以 WARNING 显式说明失败原因和两个 hash；事务回滚不会留下半成品 cache。缺失、损坏、schema/game identity 无效的 cache 仍降级 warning，且不隐式扫描游戏目录；Vanilla 文件内容或 fingerprint 变化不触发自动刷新，显式用户刷新仍支持。后台加载/重建期间不静默：客户端声明 `window.workDoneProgress` 时，worker 通过 `window/workDoneProgress/create` + `$/progress`（begin/report/end，report 携带已索引文件数与百分比）驱动进度条；否则以开始/结束两条 `window/showMessage` INFO 提示。引擎新增 `refresh_source_roots_cancellable_with_progress`，在文件读取/解析阶段按 `(completed, total)` 回调，由 LSP worker 转发为进度事件。
+>
+> 设计修订（2026-08-01）：为支持不打开 Vanilla `.yml` 文件时的 Hover，cache schema 3 额外保存每个本地化 definition 的有限长度派生预览（语言头和最多 240 个字符的值）。这不是源码、CST 或 HIR；`rule_hash` 相同的正常启动只读 cache，原 Vanilla 目录不扫描、不读取，只有 hash 不一致时按 2026-08-05 修订从记录的 source root 重建。空值不生成预览，schema 不兼容时仍要求用户显式刷新。
 >
 > 性能修订（2026-08-02）：大于 32 个可读源文件时，受限读取、parse 和 lower 在最多 12 个可取消 worker 中执行，结果按稳定任务顺序合并；未变更文件状态直接复用。Asset 资源只登记路径，不按 UTF-8 读取，也不进入文本解析队列。读取文本时先打开文件并从句柄获取 metadata，按已知大小预分配缓冲，避免在每个文件上重复进行路径 metadata 查询；全量 refresh 一次批量替换导航位置，避免逐文件扫描累计位置表。workspace 的 Debug profile 保留调试信息和断言但使用 `opt-level = 3`，保证用户常用的 `target/debug/pdx.exe setup vanilla` 性能测试不会落入未优化代码路径。
 
 > 编码修订（2026-08-02）：通用 profile 默认严格要求 UTF-8；EU4 profile 对脚本和 localisation 等文本先尝试 UTF-8，再将符合文本结构、不含 NUL 且 Windows-1252 解码没有替换错误的 legacy ANSI 字节安全转为内部 UTF-8 后解析。无法安全识别的二进制、其他编码或 Windows-1252 未定义字节仍按可恢复的 `InvalidUtf8` 跳过，并在 `WorkspaceScanReport.legacy_encoded_files` 中统计成功转码的文件数。`pdx setup vanilla` 同时报告扫描/解析、cache materialization、SQLite 写入和总耗时，便于定位建库回归。
+>
+> 编码修订（2026-08-05）：解码成功后仍校验文本可读性——任何解码路径（UTF-8 或 legacy Windows-1252）产出的文本若包含 `\t`/`\r`/`\n` 之外的控制字符，视为仅供游戏读取的特殊转码产物（例如中文模组的双字节补丁 `replace` 文件），按可恢复的 `NonTextContent` 跳过，不进入索引；人类可读的源文件（脚本、`l_english` 等）不含这类控制字符。`legacy_encoded_files` 只在通过可读性校验后统计。
 >
 > Vanilla setup 修订（2026-08-01）：Vanilla cache 构建完成每个文件的 shard、UTF-16 位置和本地化预览后，不再把 CST/HIR 保留在 setup host 中；cache 写入复用 SQLite prepared statements。Vanilla cache 的持久化结果不变，setup 的峰值内存和写盘耗时下降。
 >
@@ -71,7 +75,7 @@ Vanilla < Dependency Mods（配置顺序）< Current Mod < Open Document Overlay
 
 目录内的符号链接一律不跟随，避免逻辑 root 之外的路径逃逸和目录环。显式配置的 source root 自身可以是用户选择的路径，但 root 内部仍按上述规则扫描。
 
-根目录不可读、文件总数越界和稳定 ID 冲突属于 workspace-level error，失败刷新不得替换上一个有效 snapshot。单个嵌套目录或文件不可读、文件过大、无法按 profile 兼容编码解码等属于可恢复问题：跳过该项、保留有界 `WorkspaceScanReport`，其余文件继续进入索引；兼容的 legacy Windows-1252 文件会先转为内部 UTF-8，不计入 skipped entries。读取分类后的文件时仍使用有界 reader，避免文件在 metadata 检查后增长造成无界分配。
+根目录不可读、文件总数越界和稳定 ID 冲突属于 workspace-level error，失败刷新不得替换上一个有效 snapshot。单个嵌套目录或文件不可读、文件过大、无法按 profile 兼容编码解码、解码结果含非制表/换行控制字符（游戏专用转码文本）等属于可恢复问题：跳过该项、保留有界 `WorkspaceScanReport`，其余文件继续进入索引；兼容的 legacy Windows-1252 文件会先转为内部 UTF-8，不计入 skipped entries。读取分类后的文件时仍使用有界 reader，避免文件在 metadata 检查后增长造成无界分配。
 
 目录发现、受限读取、逐文件 parse/lower、bulk index 和 priority resolution 共用 `WorkspaceScanToken` 检查点。取消与 workspace-level error 一样在提交前退出，必须保留旧 revision、source files、`FileState`、index 和 scan report；LSP 初始化扫描迁入 worker 后直接使用该接口。
 
@@ -153,10 +157,11 @@ path = "dependencies/content-extension" # later = higher priority
 
 首次配置扩展时，用户选择 Vanilla 目录并建立本地持久化索引。之后：
 
-- 正常启动直接查询缓存，不持续扫描 Vanilla。
-- 只有用户在扩展设置/命令中显式触发“刷新 Vanilla 索引”才重建。
-- 扩展升级和 `rule_hash` 变化不自动删除、迁移或重建缓存。
-- cache metadata 记录创建时间、源目录指纹和当时的 `rule_hash`，只用于可观察性与手动决策。
+- 正常启动对 `rule_hash` 相同的 cache 直接查询，不持续扫描 Vanilla；加载在 initialize response 之后的后台 worker 中执行。
+- 若可读 cache 的 `rule_hash` 与当前内嵌规则不一致，worker 从 cache metadata 的 `source_root` 读取 Vanilla，使用内嵌规则重建，并通过 SQLite transaction 将完整结果写回原 cache 路径；事务提交后由 event loop 安装新 cache。
+- 规则 hash 不一致的重建成功发送 INFO；扫描、重建或事务保存失败则回退安装已加载的旧 cache，发送 WARNING 并保留失败原因及两个 hash。
+- 缺失、损坏或 schema/game identity 不兼容的 cache 只发送 warning 并降级为不含 Vanilla 的分析，不隐式扫描游戏目录。
+- cache metadata 记录创建时间、源目录指纹和当时的 `rule_hash`；文件内容或 fingerprint 变化本身不触发自动刷新，只有显式用户“刷新 Vanilla 索引”操作才按需重建。
 - 缓存为 definition/reference 保存对应的 UTF-16 编辑器位置（definition 使用名称 selection range），因此源文本不可读时跳转仍返回准确范围。
 - 缓存不保存源码、CST 或 HIR；本地化 definition 可以额外保存有限长度的派生 Hover 预览，以便源目录不可读时显示文本。
 - 缓存位于用户本机，不提交、不打包、不再分发 Vanilla 内容。

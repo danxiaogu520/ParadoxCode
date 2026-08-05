@@ -1250,7 +1250,11 @@
     "type_key_filter": [
       [
         "potential",
-        "potential_on_load"
+        "potential_on_load",
+        "slot",
+        "generic",
+        "ai",
+        "has_country_shield"
       ],
       true
     ]

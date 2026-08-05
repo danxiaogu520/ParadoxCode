@@ -269,6 +269,8 @@ pub enum WorkspaceScanIssueKind {
     FileUnreadable,
     /// Source bytes were not valid UTF-8 or the selected profile encoding.
     InvalidUtf8,
+    /// Decoded text is not human-readable source, likely game-only encoded.
+    NonTextContent,
 }
 
 /// One recoverable problem encountered during source-root discovery.
@@ -1624,8 +1626,9 @@ fn read_source_file_cancellable(
         );
         return Ok(None);
     }
-    match String::from_utf8(bytes) {
-        Ok(text) => Ok(Some(text)),
+    let mut legacy = false;
+    let text = match String::from_utf8(bytes) {
+        Ok(text) => text,
         Err(error) => {
             let detail = error.to_string();
             let bytes = error.into_bytes();
@@ -1635,20 +1638,50 @@ fn read_source_file_cancellable(
             {
                 let (text, had_errors) = WINDOWS_1252.decode_without_bom_handling(&bytes);
                 if !had_errors {
-                    report.legacy_encoded_files = report.legacy_encoded_files.saturating_add(1);
-                    return Ok(Some(text.into_owned()));
+                    legacy = true;
+                    text.into_owned()
+                } else {
+                    record_scan_issue(
+                        report,
+                        limits,
+                        WorkspaceScanIssueKind::InvalidUtf8,
+                        path.to_owned(),
+                        detail,
+                    );
+                    return Ok(None);
                 }
+            } else {
+                record_scan_issue(
+                    report,
+                    limits,
+                    WorkspaceScanIssueKind::InvalidUtf8,
+                    path.to_owned(),
+                    detail,
+                );
+                return Ok(None);
             }
-            record_scan_issue(
-                report,
-                limits,
-                WorkspaceScanIssueKind::InvalidUtf8,
-                path.to_owned(),
-                detail,
-            );
-            Ok(None)
         }
+    };
+    if contains_control_characters(&text) {
+        record_scan_issue(
+            report,
+            limits,
+            WorkspaceScanIssueKind::NonTextContent,
+            path.to_owned(),
+            "decoded text contains control characters and is not human-readable source (likely game-only encoded)"
+                .to_owned(),
+        );
+        return Ok(None);
     }
+    if legacy {
+        report.legacy_encoded_files = report.legacy_encoded_files.saturating_add(1);
+    }
+    Ok(Some(text))
+}
+
+fn contains_control_characters(text: &str) -> bool {
+    text.chars()
+        .any(|character| character.is_control() && !matches!(character, '\t' | '\r' | '\n'))
 }
 
 fn looks_like_legacy_text(bytes: &[u8]) -> bool {
@@ -1845,6 +1878,7 @@ struct SourceLoadContext<'a> {
     rules: &'a RuleSet,
     profile: &'a GameProfile,
     cancellation: &'a WorkspaceScanToken,
+    progress: Option<&'a (dyn Fn(usize, usize) + Sync)>,
 }
 
 fn load_source_files(
@@ -1854,26 +1888,34 @@ fn load_source_files(
     report: &mut WorkspaceScanReport,
     context: &SourceLoadContext<'_>,
 ) -> Result<(), WorkspaceError> {
+    let total = jobs.len();
     let worker_count = thread::available_parallelism()
         .map_or(1, |parallelism| parallelism.get())
         .min(MAX_SOURCE_WORKERS)
         .min(jobs.len());
     let results = if jobs.len() < PARALLEL_SOURCE_THRESHOLD || worker_count < 2 {
         let mut results = Vec::with_capacity(jobs.len());
+        let mut done = 0usize;
         for job in jobs {
             context.cancellation.checkpoint()?;
             results.push(load_source_file_job(job, context)?);
+            done += 1;
+            if let Some(progress) = context.progress {
+                progress(done, total);
+            }
         }
         results
     } else {
         let queue = Arc::new(Mutex::new(
             jobs.into_iter().enumerate().collect::<VecDeque<_>>(),
         ));
+        let completed = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let mut results = BTreeMap::new();
         thread::scope(|scope| -> Result<(), WorkspaceError> {
             let mut workers = Vec::with_capacity(worker_count);
             for _ in 0..worker_count {
                 let queue = Arc::clone(&queue);
+                let completed = Arc::clone(&completed);
                 workers.push(scope.spawn(move || {
                     let mut results = Vec::new();
                     loop {
@@ -1889,6 +1931,10 @@ fn load_source_files(
                             break;
                         };
                         let result = load_source_file_job(job, context)?;
+                        let done = completed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                        if let Some(progress) = context.progress {
+                            progress(done, total);
+                        }
                         results.push((index, result));
                     }
                     Ok(results)
@@ -2636,6 +2682,21 @@ impl AnalysisHost {
         self.refresh_source_roots_with_limits_and_cancellation(
             WorkspaceScanLimits::default(),
             cancellation,
+            None,
+        )
+    }
+
+    /// Scans configured roots while cooperatively observing `cancellation`, invoking `progress`
+    /// with `(completed, total)` source files so long-running background work can be surfaced.
+    pub fn refresh_source_roots_cancellable_with_progress(
+        &mut self,
+        cancellation: &WorkspaceScanToken,
+        progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+    ) -> Result<WorkspaceScanReport, WorkspaceError> {
+        self.refresh_source_roots_with_limits_and_cancellation(
+            WorkspaceScanLimits::default(),
+            cancellation,
+            progress,
         )
     }
 
@@ -2644,7 +2705,11 @@ impl AnalysisHost {
         &mut self,
         limits: WorkspaceScanLimits,
     ) -> Result<WorkspaceScanReport, WorkspaceError> {
-        self.refresh_source_roots_with_limits_and_cancellation(limits, &WorkspaceScanToken::new())
+        self.refresh_source_roots_with_limits_and_cancellation(
+            limits,
+            &WorkspaceScanToken::new(),
+            None,
+        )
     }
 
     /// Scans configured roots with explicit resource limits and cooperative cancellation.
@@ -2652,6 +2717,7 @@ impl AnalysisHost {
         &mut self,
         limits: WorkspaceScanLimits,
         cancellation: &WorkspaceScanToken,
+        progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     ) -> Result<WorkspaceScanReport, WorkspaceError> {
         cancellation.checkpoint()?;
         let mut files: BTreeMap<SourceFileId, SourceFile> = BTreeMap::new();
@@ -2733,6 +2799,7 @@ impl AnalysisHost {
             rules: self.rules.as_ref(),
             profile: self.profile.as_ref(),
             cancellation,
+            progress,
         };
         load_source_files(
             source_jobs,
@@ -4263,6 +4330,52 @@ mod tests {
                 .definitions("event", "legacy.1")
                 .len(),
             1
+        );
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn game_encoded_text_with_control_characters_is_not_loaded() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-engine-non-text-{nonce}"));
+        let events = root.join("events");
+        fs::create_dir_all(&events).expect("event directory");
+        fs::write(
+            events.join("encoded.txt"),
+            b"country_event = { id = encoded.1 }\n# \x0c\x02garbage\n",
+        )
+        .expect("game-encoded event");
+
+        let mut host = eu4_host();
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
+        let report = host.refresh_source_roots().expect("game-encoded scan");
+
+        assert_eq!(report.indexed_files, 0);
+        assert_eq!(report.legacy_encoded_files, 0);
+        assert_eq!(report.skipped_entries, 1);
+        assert!(
+            report.issues.iter().any(|issue| {
+                issue.kind == super::WorkspaceScanIssueKind::NonTextContent
+                    && issue.path.ends_with("events/encoded.txt")
+            }),
+            "expected a NonTextContent issue: {:?}",
+            report.issues
+        );
+        assert_eq!(host.snapshot().source_files().len(), 0);
+        assert!(
+            host.snapshot()
+                .index()
+                .definitions("event", "encoded.1")
+                .is_empty()
         );
         fs::remove_dir_all(root).expect("cleanup");
     }
