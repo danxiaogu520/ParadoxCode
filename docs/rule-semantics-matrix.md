@@ -27,7 +27,7 @@ profile 之间的语义责任。它是当前实现的审计基线；不是第二
 | `manifest.json` | source format、game、目标版本 | `pdx-bake`、artifact loader | 已闭环校验 |
 | `catalog.file_categories` | 路径分类、parser、文件覆盖策略 | `pdx-rules`、`pdx-engine` workspace/VFS | `script`、`localisation`、`asset`、`syntax-only` 已接入；当前数据只使用 `merge` 和 `replace-by-relative-path` |
 | `catalog.symbol_descriptors` | symbol kind、symbol resolution、大小写策略 | `WorkspaceIndex`、analysis resolution | resolution 已接入；当前实现统一按 ASCII 小写索引，`case_sensitive` 尚未形成真正行为差异 |
-| `catalog.records` | 规范化 catalog 字段、来源顺序 | canonical hash、`known_keys()`、completion | 主要作为已知 key/审计数据；没有作为完整 definition/reference/value 规则执行 |
+| `catalog.records` | 规范化 catalog 字段、来源顺序 | canonical hash、`known_keys()`（hover 未知文本判断） | 主要作为已知 key/审计数据；没有作为完整 definition/reference/value 规则执行；completion 不再消费 known_keys（语义上下文不可用时返回空列表） |
 | `semantic-rules.key` | exact/type/enum/dynamic/any-scalar key matcher | HIR transition、unknown-key、completion | 已接入 |
 | `semantic-rules.value` | exact/bool/int/float/type/enum/scope/localisation/dynamic value matcher | HIR/analysis diagnostics、value completion | 已接入；`filepath`/`opaque` 是 runtime 类型，但当前源没有实际样本 |
 | `semantic-rules.operator` | 操作符约束，例如 `=` | semantic property matching、completion | 已接入 |
@@ -40,6 +40,7 @@ profile 之间的语义责任。它是当前实现的审计基线；不是第二
 | `semantic-rules.min_occurs`/`max_occurs` | cardinality | analysis diagnostics、hover | 已接入 |
 | `semantic-rules.strict_min` | 最小 cardinality 的严格程度 | minimum cardinality severity | 已接入 |
 | `semantic-rules.required` | required 标记 | completion 排序、hover、文档展示 | 字段已保留，但当前源没有 `required=true`；尚未形成独立缺失字段诊断语义 |
+| `semantic-rules.deprecated` | deprecated 标记 | completion item `deprecated` 标志与排序降权 | 字段与 SQLite 列/规范哈希已接入（`#[serde(default)]`，默认 `false`）；当前源没有 `deprecated=true` 样本 |
 | `semantic-rules.alternative_id` | alias/alternative 分组 | alternative selection、cardinality、transition | 已接入；不确定时拒绝任意选择 |
 | `semantic-rules.documentation` | 规则说明 | hover、completion documentation | 已接入 |
 | `semantic-rules.source_file`/`line` | 规则 provenance | runtime model、artifact、semantic diagnostics、hover | 已接入 semantic diagnostics message 和 hover 文本；尚未提供独立结构化 related information |

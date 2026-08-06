@@ -217,6 +217,8 @@ pub struct CompletionItem {
     pub sort_score: u32,
     /// Whether the item is deprecated.
     pub deprecated: bool,
+    /// Opaque token used by `completionItem/resolve` to re-derive documentation on demand.
+    pub resolve_data: Option<String>,
 }
 
 /// Broad completion item categories independent of LSP enum values.
@@ -476,6 +478,19 @@ pub fn complete_with_cancellation(
         .unwrap_or_default()
         .to_owned();
     let value_context = completion_value_context(&input, position);
+    if input.format == FileFormat::Localisation {
+        if localisation_language_header(&input, position) {
+            return Ok(CompletionResult {
+                revision: snapshot.revision(),
+                items: Vec::new(),
+            });
+        }
+        return if value_context {
+            localisation_value_completion(snapshot, replacement_range, &prefix, cancellation)
+        } else {
+            localisation_key_completion(snapshot, replacement_range, &prefix, cancellation)
+        };
+    }
     let mut items = Vec::new();
     let mut member_cache = CompletionMemberCache::default();
     let semantic_context = semantic_completion_context(snapshot, &input, position);
@@ -494,6 +509,10 @@ pub fn complete_with_cancellation(
                 );
             }
         } else {
+            let insert_assignment = context
+                .property
+                .as_ref()
+                .is_none_or(|property| property.operator.is_none());
             add_semantic_key_items(
                 snapshot,
                 context,
@@ -501,97 +520,89 @@ pub fn complete_with_cancellation(
                 &mut items,
                 replacement_range,
                 &prefix,
+                insert_assignment,
             );
         }
     }
-    if items.is_empty() && value_context {
-        add_scalar_items(&mut items, replacement_range, &prefix);
-        for (kind_name, definition_name) in completion_definitions(snapshot, &prefix, cancellation)?
-        {
-            cancellation.checkpoint()?;
-            let kind = if kind_name == "localisation" {
-                CompletionKind::Localisation
-            } else {
-                CompletionKind::Symbol
-            };
-            let detail = format!("{kind_name} symbol");
-            push_completion(
-                &mut items,
-                CompletionItem {
-                    label: definition_name.clone(),
-                    kind,
-                    detail,
-                    documentation: None,
-                    replacement_range,
-                    insert_text: definition_name,
-                    sort_score: if kind_name == "localisation" { 20 } else { 30 },
-                    deprecated: false,
-                },
-                &prefix,
-            );
-        }
-    } else if items.is_empty() {
-        for key in known_keys(snapshot) {
-            cancellation.checkpoint()?;
-            push_completion(
-                &mut items,
-                CompletionItem {
-                    label: key.clone(),
-                    kind: CompletionKind::Key,
-                    detail: "PDX property".to_owned(),
-                    documentation: None,
-                    replacement_range,
-                    insert_text: key,
-                    sort_score: 10,
-                    deprecated: false,
-                },
-                &prefix,
-            );
-        }
-        for (kind_name, definition_name) in completion_definitions_for_kinds(
-            snapshot,
-            &prefix,
-            &["scripted_effect", "scripted_trigger"],
-            cancellation,
-        )? {
-            cancellation.checkpoint()?;
-            if matches!(kind_name.as_str(), "scripted_effect" | "scripted_trigger") {
-                push_completion(
-                    &mut items,
-                    CompletionItem {
-                        label: definition_name.clone(),
-                        kind: CompletionKind::Symbol,
-                        detail: format!("{kind_name} command"),
-                        documentation: None,
-                        replacement_range,
-                        insert_text: format!("{definition_name} = {{\n    $0\n}}"),
-                        sort_score: 15,
-                        deprecated: false,
-                    },
-                    &prefix,
-                );
-            }
-        }
+    items.sort_by_key(|item| (item.sort_score, item.label.to_ascii_lowercase()));
+    items.dedup_by(|left, right| left.label == right.label && left.kind == right.kind);
+    cancellation.checkpoint()?;
+    Ok(CompletionResult {
+        revision: snapshot.revision(),
+        items,
+    })
+}
+
+/// Completes localisation entry keys in a localisation document: workspace keys plus keys
+/// already defined in the open file. The value side of an entry is free text; see
+/// `localisation_value_completion`.
+fn localisation_key_completion(
+    snapshot: &AnalysisSnapshot,
+    replacement_range: TextRange,
+    prefix: &str,
+    cancellation: &CancellationToken,
+) -> Result<CompletionResult, Cancelled> {
+    let mut items = Vec::new();
+    for (kind_name, definition_name) in
+        completion_definitions_for_kinds(snapshot, prefix, &["localisation"], cancellation)?
+    {
+        cancellation.checkpoint()?;
+        debug_assert_eq!(kind_name, "localisation");
+        push_completion(
+            &mut items,
+            CompletionItem {
+                label: definition_name.clone(),
+                kind: CompletionKind::Localisation,
+                detail: "localisation".to_owned(),
+                documentation: None,
+                replacement_range,
+                insert_text: definition_name,
+                sort_score: 10,
+                deprecated: false,
+                resolve_data: None,
+            },
+            prefix,
+        );
     }
-    if items.is_empty() {
-        // Recovery nodes and a partially typed new identifier must still expose useful
-        // candidates. An empty filtered set is less useful than a small conservative fallback.
-        add_scalar_items(&mut items, replacement_range, "");
-        if !value_context {
-            for key in known_keys(snapshot).into_iter().take(32) {
-                cancellation.checkpoint()?;
-                items.push(CompletionItem {
-                    label: key.clone(),
-                    kind: CompletionKind::Key,
-                    detail: "PDX property".to_owned(),
-                    documentation: None,
-                    replacement_range,
-                    insert_text: key,
-                    sort_score: 50,
-                    deprecated: false,
-                });
-            }
-        }
+    items.sort_by_key(|item| (item.sort_score, item.label.to_ascii_lowercase()));
+    items.dedup_by(|left, right| left.label == right.label && left.kind == right.kind);
+    cancellation.checkpoint()?;
+    Ok(CompletionResult {
+        revision: snapshot.revision(),
+        items,
+    })
+}
+
+/// Completes localisation keys referenced from the value side of a localisation entry. Only
+/// `localisation` kind members are offered; unrelated workspace definitions and generic scalars
+/// are not candidates here.
+fn localisation_value_completion(
+    snapshot: &AnalysisSnapshot,
+    replacement_range: TextRange,
+    prefix: &str,
+    cancellation: &CancellationToken,
+) -> Result<CompletionResult, Cancelled> {
+    let mut items = Vec::new();
+    for (kind_name, definition_name) in
+        completion_definitions_for_kinds(snapshot, prefix, &["localisation"], cancellation)?
+    {
+        cancellation.checkpoint()?;
+        debug_assert_eq!(kind_name, "localisation");
+        push_completion(
+            &mut items,
+            CompletionItem {
+                label: definition_name.clone(),
+                kind: CompletionKind::Localisation,
+                detail: "localisation".to_owned(),
+                documentation: None,
+                replacement_range,
+                insert_text: definition_name,
+                sort_score: 20,
+                deprecated: false,
+                resolve_data: None,
+            },
+            prefix,
+        );
     }
     items.sort_by_key(|item| (item.sort_score, item.label.to_ascii_lowercase()));
     items.dedup_by(|left, right| left.label == right.label && left.kind == right.kind);
@@ -895,7 +906,7 @@ impl CompletionMemberCache {
                 .into_iter()
                 .flat_map(|kind| snapshot.index().definitions_for_kind(kind))
                 .map(|definition| definition.name.clone())
-                .filter(|name| starts_with_ignore_ascii_case(name, prefix))
+                .filter(|name| completion_matches(name, prefix))
                 .collect::<Vec<_>>();
             names.sort_by_key(|name| name.to_ascii_lowercase());
             names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
@@ -924,7 +935,7 @@ impl CompletionMemberCache {
                     .iter()
                     .cloned(),
             );
-            names.retain(|name| starts_with_ignore_ascii_case(name, prefix));
+            names.retain(|name| completion_matches(name, prefix));
             names.sort_by_key(|name| name.to_ascii_lowercase());
             names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
             self.enums.insert(cache_key.clone(), names);
@@ -1003,6 +1014,7 @@ fn add_semantic_key_items(
     items: &mut Vec<CompletionItem>,
     replacement_range: TextRange,
     prefix: &str,
+    insert_assignment: bool,
 ) {
     for candidate in semantic_rules_for_completion(snapshot, context) {
         let rule = candidate.rule;
@@ -1018,28 +1030,40 @@ fn add_semantic_key_items(
                 CompletionItem {
                     label: label.clone(),
                     kind: CompletionKind::Key,
-                    detail: semantic_rule_detail(rule),
+                    detail: rule_context_detail(rule),
                     documentation,
                     replacement_range,
-                    insert_text: label.clone(),
-                    sort_score: if rule.required { 2 } else { 5 },
-                    deprecated: false,
+                    insert_text: key_insert_text(rule, label, insert_assignment),
+                    sort_score: completion_sort_score(
+                        if rule.required { 2 } else { 5 },
+                        rule.deprecated,
+                    ),
+                    deprecated: rule.deprecated,
+                    resolve_data: Some(format!("rule:{}", rule.id)),
                 },
                 prefix,
             ),
             KeyMatcher::Type(type_name) => {
                 for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
+                    let insert_text = if !insert_assignment {
+                        label.clone()
+                    } else if matches!(type_name.as_str(), "scripted_effect" | "scripted_trigger") {
+                        scripted_definition_snippet(snapshot, type_name, label)
+                    } else {
+                        key_insert_text(rule, label, true)
+                    };
                     push_completion(
                         items,
                         CompletionItem {
                             label: label.clone(),
                             kind: CompletionKind::Key,
-                            detail: format!("semantic type key <{type_name}>"),
+                            detail: type_name.clone(),
                             documentation: documentation.clone(),
                             replacement_range,
-                            insert_text: label.clone(),
-                            sort_score: 8,
-                            deprecated: false,
+                            insert_text,
+                            sort_score: completion_sort_score(8, rule.deprecated),
+                            deprecated: rule.deprecated,
+                            resolve_data: Some(format!("rule:{}", rule.id)),
                         },
                         prefix,
                     );
@@ -1055,12 +1079,13 @@ fn add_semantic_key_items(
                             CompletionItem {
                                 label: label.clone(),
                                 kind: CompletionKind::Key,
-                                detail: format!("semantic enum key enum[{enum_name}]"),
+                                detail: "parameter".to_owned(),
                                 documentation: documentation.clone(),
                                 replacement_range,
-                                insert_text: label,
-                                sort_score: 8,
-                                deprecated: false,
+                                insert_text: key_insert_text(rule, &label, insert_assignment),
+                                sort_score: completion_sort_score(8, rule.deprecated),
+                                deprecated: rule.deprecated,
+                                resolve_data: Some(format!("rule:{}", rule.id)),
                             },
                             prefix,
                         );
@@ -1072,12 +1097,13 @@ fn add_semantic_key_items(
                             CompletionItem {
                                 label: label.clone(),
                                 kind: CompletionKind::Key,
-                                detail: format!("semantic enum key enum[{enum_name}]"),
+                                detail: enum_name.clone(),
                                 documentation: documentation.clone(),
                                 replacement_range,
-                                insert_text: label.clone(),
-                                sort_score: 8,
-                                deprecated: false,
+                                insert_text: key_insert_text(rule, label, insert_assignment),
+                                sort_score: completion_sort_score(8, rule.deprecated),
+                                deprecated: rule.deprecated,
+                                resolve_data: Some(format!("rule:{}", rule.id)),
                             },
                             prefix,
                         );
@@ -1091,12 +1117,13 @@ fn add_semantic_key_items(
                         CompletionItem {
                             label: label.clone(),
                             kind: CompletionKind::Key,
-                            detail: format!("semantic dynamic key value_set[{kind}]"),
+                            detail: kind.clone(),
                             documentation: documentation.clone(),
                             replacement_range,
-                            insert_text: label.clone(),
-                            sort_score: 8,
-                            deprecated: false,
+                            insert_text: key_insert_text(rule, label, insert_assignment),
+                            sort_score: completion_sort_score(8, rule.deprecated),
+                            deprecated: rule.deprecated,
+                            resolve_data: Some(format!("rule:{}", rule.id)),
                         },
                         prefix,
                     );
@@ -1140,6 +1167,7 @@ fn add_semantic_value_items(
                 documentation.clone(),
                 replacement_range,
                 prefix,
+                rule.deprecated,
             ),
             ValueMatcher::Bool => {
                 add_value_completion(
@@ -1149,6 +1177,7 @@ fn add_semantic_value_items(
                     documentation.clone(),
                     replacement_range,
                     prefix,
+                    rule.deprecated,
                 );
                 add_value_completion(
                     items,
@@ -1157,6 +1186,7 @@ fn add_semantic_value_items(
                     documentation.clone(),
                     replacement_range,
                     prefix,
+                    rule.deprecated,
                 );
             }
             ValueMatcher::Int { min, max } => {
@@ -1167,6 +1197,7 @@ fn add_semantic_value_items(
                     documentation.clone(),
                     replacement_range,
                     prefix,
+                    rule.deprecated,
                 );
                 add_numeric_completion(
                     items,
@@ -1175,6 +1206,7 @@ fn add_semantic_value_items(
                     documentation.clone(),
                     replacement_range,
                     prefix,
+                    rule.deprecated,
                 );
             }
             ValueMatcher::Float { min, max } => {
@@ -1185,6 +1217,7 @@ fn add_semantic_value_items(
                     documentation.clone(),
                     replacement_range,
                     prefix,
+                    rule.deprecated,
                 );
                 if min.is_some() || max.is_some() {
                     add_value_completion(
@@ -1194,6 +1227,7 @@ fn add_semantic_value_items(
                         documentation.clone(),
                         replacement_range,
                         prefix,
+                        rule.deprecated,
                     );
                     add_value_completion(
                         items,
@@ -1202,6 +1236,7 @@ fn add_semantic_value_items(
                         documentation.clone(),
                         replacement_range,
                         prefix,
+                        rule.deprecated,
                     );
                 }
             }
@@ -1210,10 +1245,11 @@ fn add_semantic_value_items(
                     add_value_completion(
                         items,
                         label,
-                        &format!("<{type_name}>"),
+                        type_name,
                         documentation.clone(),
                         replacement_range,
                         prefix,
+                        rule.deprecated,
                     );
                 }
             }
@@ -1222,39 +1258,39 @@ fn add_semantic_value_items(
                     add_value_completion(
                         items,
                         label,
-                        &format!("enum[{enum_name}]"),
+                        enum_name,
                         documentation.clone(),
                         replacement_range,
                         prefix,
+                        rule.deprecated,
                     );
                 }
             }
             ValueMatcher::Scope(expected) => {
-                for label in &snapshot.game_profile().scope_completions {
-                    if expected
-                        .as_deref()
-                        .is_none_or(|scope| snapshot.game_profile().scopes_compatible(label, scope))
-                    {
-                        add_value_completion(
-                            items,
-                            label,
-                            "scope",
-                            documentation.clone(),
-                            replacement_range,
-                            prefix,
-                        );
-                    }
+                for (label, detail) in
+                    scope_expression_candidates(snapshot, context, expected.as_deref())
+                {
+                    add_value_completion(
+                        items,
+                        &label,
+                        detail,
+                        documentation.clone(),
+                        replacement_range,
+                        prefix,
+                        rule.deprecated,
+                    );
                 }
             }
             ValueMatcher::Localisation => {
                 for label in member_cache.workspace_member_names(snapshot, "localisation", prefix) {
-                    add_value_completion(
+                    add_localisation_value_completion(
                         items,
                         label,
                         "localisation",
                         documentation.clone(),
                         replacement_range,
                         prefix,
+                        rule.deprecated,
                     );
                 }
             }
@@ -1263,20 +1299,22 @@ fn add_semantic_value_items(
                     add_value_completion(
                         items,
                         label,
-                        &format!("value[{kind}]"),
+                        kind,
                         documentation.clone(),
                         replacement_range,
                         prefix,
+                        rule.deprecated,
                     );
                 }
                 if matches!(kind.as_str(), "variable" | "value") {
                     add_value_completion(
                         items,
                         "$0",
-                        &format!("value[{kind}]"),
+                        kind,
                         documentation.clone(),
                         replacement_range,
                         prefix,
+                        rule.deprecated,
                     );
                 }
             }
@@ -1288,6 +1326,121 @@ fn add_semantic_value_items(
     }
 }
 
+/// Maximum number of multi-segment scope chains offered as completion candidates.
+const SCOPE_CHAIN_LIMIT: usize = 16;
+
+/// Scope expression candidates for a value position: base scope names and intrinsics whose
+/// resolved scope is compatible with the expectation, plus scope links reachable from the
+/// current scope (single links and, when the first hop does not already satisfy, one-hop chains).
+fn scope_expression_candidates(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    expected: Option<&str>,
+) -> Vec<(String, &'static str)> {
+    let profile = snapshot.game_profile();
+    let scope = &context.scope;
+    let mut candidates = Vec::new();
+    let mut seen = HashSet::new();
+    let compatible = |scope_name: &str| -> bool {
+        expected.is_none_or(|expected| profile.scopes_compatible(scope_name, expected))
+    };
+    // Intrinsics with an unknown resolved scope stay visible; they may still be legal here.
+    let intrinsic_compatible = |resolved: &str| -> bool {
+        resolved.eq_ignore_ascii_case("any")
+            || resolved.eq_ignore_ascii_case("invalid")
+            || compatible(resolved)
+    };
+    for label in &profile.scope_completions {
+        let resolved = match label.as_str() {
+            "root" => Some(scope.root.as_str()),
+            "this" => Some(scope.current.as_str()),
+            "from" => scope.from.first().map(String::as_str),
+            "prev" => scope.previous.first().map(String::as_str),
+            _ => None,
+        };
+        let keep = match resolved {
+            Some(resolved) => intrinsic_compatible(resolved),
+            None => compatible(label),
+        };
+        if keep && seen.insert(label.clone()) {
+            candidates.push((label.clone(), "scope"));
+        }
+    }
+    let links = scope_link_rules(snapshot);
+    for (label, allowed, target) in &links {
+        let reachable = allowed.is_empty()
+            || allowed
+                .iter()
+                .any(|allowed| profile.scopes_compatible(&scope.current, allowed));
+        if reachable && compatible(target) && seen.insert(label.clone()) {
+            candidates.push((label.clone(), "scope link"));
+        }
+    }
+    let mut chains = Vec::new();
+    for (label1, allowed1, target1) in &links {
+        let reachable1 = allowed1.is_empty()
+            || allowed1
+                .iter()
+                .any(|allowed| profile.scopes_compatible(&scope.current, allowed));
+        if !reachable1 || compatible(target1) {
+            // The single link already satisfies the expectation; a chain adds no value.
+            continue;
+        }
+        for (label2, allowed2, target2) in &links {
+            if label1 == label2 {
+                continue;
+            }
+            let second_hop = allowed2.is_empty()
+                || allowed2
+                    .iter()
+                    .any(|allowed| profile.scopes_compatible(target1, allowed));
+            if second_hop && compatible(target2) {
+                chains.push(format!("{label1}.{label2}"));
+            }
+        }
+    }
+    chains.sort();
+    chains.dedup();
+    for chain in chains.into_iter().take(SCOPE_CHAIN_LIMIT) {
+        if seen.insert(chain.clone()) {
+            candidates.push((chain, "scope link"));
+        }
+    }
+    candidates
+}
+
+/// Exact-key effect/trigger rules that push a scope: `(label, allowed_scopes, push_scope)`.
+fn scope_link_rules(snapshot: &AnalysisSnapshot) -> Vec<(String, Vec<String>, String)> {
+    let mut links = snapshot
+        .rules()
+        .model()
+        .semantic
+        .rules
+        .iter()
+        .filter(|rule| {
+            matches!(
+                rule.context.to_ascii_lowercase().as_str(),
+                "effect" | "trigger"
+            ) && matches!(&rule.key, KeyMatcher::Exact(label) if !label.contains('.'))
+                && rule.push_scope.is_some()
+        })
+        .map(|rule| {
+            let label = match &rule.key {
+                KeyMatcher::Exact(label) => label.clone(),
+                _ => unreachable!("filtered for exact keys"),
+            };
+            (
+                label,
+                rule.allowed_scopes.clone(),
+                rule.push_scope.clone().expect("filtered for push scope"),
+            )
+        })
+        .collect::<Vec<_>>();
+    links.sort();
+    links.dedup();
+    links
+}
+
 fn add_value_completion(
     items: &mut Vec<CompletionItem>,
     label: &str,
@@ -1295,22 +1448,48 @@ fn add_value_completion(
     documentation: Option<String>,
     replacement_range: TextRange,
     prefix: &str,
+    deprecated: bool,
 ) {
     push_completion(
         items,
         CompletionItem {
             label: label.to_owned(),
-            kind: if detail == "localisation" {
-                CompletionKind::Localisation
-            } else {
-                CompletionKind::Value
-            },
+            kind: CompletionKind::Value,
             detail: detail.to_owned(),
             documentation,
             replacement_range,
             insert_text: label.to_owned(),
-            sort_score: 4,
-            deprecated: false,
+            sort_score: completion_sort_score(4, deprecated),
+            deprecated,
+            resolve_data: None,
+        },
+        prefix,
+    );
+}
+
+/// Value completion for localisation keys, which keeps the `Localisation` kind independent of
+/// the detail text.
+fn add_localisation_value_completion(
+    items: &mut Vec<CompletionItem>,
+    label: &str,
+    detail: &str,
+    documentation: Option<String>,
+    replacement_range: TextRange,
+    prefix: &str,
+    deprecated: bool,
+) {
+    push_completion(
+        items,
+        CompletionItem {
+            label: label.to_owned(),
+            kind: CompletionKind::Localisation,
+            detail: detail.to_owned(),
+            documentation,
+            replacement_range,
+            insert_text: label.to_owned(),
+            sort_score: completion_sort_score(4, deprecated),
+            deprecated,
+            resolve_data: None,
         },
         prefix,
     );
@@ -1323,6 +1502,7 @@ fn add_numeric_completion(
     documentation: Option<String>,
     replacement_range: TextRange,
     prefix: &str,
+    deprecated: bool,
 ) {
     if let Some(label) = label {
         add_value_completion(
@@ -1332,18 +1512,37 @@ fn add_numeric_completion(
             documentation,
             replacement_range,
             prefix,
+            deprecated,
         );
     }
 }
 
-fn semantic_rule_detail(rule: &pdx_rules::SemanticRule) -> String {
-    let shape = match rule.shape {
-        RuleShape::Node => "block",
-        RuleShape::Leaf => "scalar",
-        RuleShape::LeafValue => "bare value",
-        RuleShape::ValueClause => "value clause",
-    };
-    format!("semantic rule {shape}")
+/// Short detail for a rule-backed key: the semantic context the rule belongs to. `effect` and
+/// `trigger` keep their short names; other contexts (including `type:`/`root:` prefixed roots)
+/// are shown by their bare name.
+fn rule_context_detail(rule: &pdx_rules::SemanticRule) -> String {
+    if rule.context.eq_ignore_ascii_case("effect") || rule.context.eq_ignore_ascii_case("trigger") {
+        return rule.context.clone();
+    }
+    rule.context
+        .strip_prefix("type:")
+        .or_else(|| rule.context.strip_prefix("root:"))
+        .unwrap_or(&rule.context)
+        .to_owned()
+}
+
+/// Builds the text inserted for a rule-backed key completion. Scalar and value-clause keys
+/// insert the `=` operator so the cursor lands on the value; block keys insert an empty block
+/// skeleton as a snippet. Existing assignments only replace the key spelling.
+fn key_insert_text(rule: &pdx_rules::SemanticRule, label: &str, insert_assignment: bool) -> String {
+    if !insert_assignment {
+        return label.to_owned();
+    }
+    match rule.shape {
+        RuleShape::Node => format!("{label} = {{\n    $0\n}}"),
+        RuleShape::Leaf | RuleShape::ValueClause => format!("{label} = "),
+        RuleShape::LeafValue => label.to_owned(),
+    }
 }
 
 /// Alias with the noun used by several editor adapters.
@@ -1354,6 +1553,34 @@ pub fn completion(
     position: TextSize,
 ) -> CompletionResult {
     complete(snapshot, document, position)
+}
+
+/// Re-derives the documentation for a completion item that carries `resolve_data` without
+/// re-running the completion query. Items without `resolve_data` resolve to themselves.
+#[must_use]
+pub fn completion_resolve(snapshot: &AnalysisSnapshot, item: &CompletionItem) -> CompletionItem {
+    let Some(id) = item
+        .resolve_data
+        .as_deref()
+        .and_then(|data| data.strip_prefix("rule:"))
+    else {
+        return item.clone();
+    };
+    let Some(rule) = snapshot
+        .rules()
+        .model()
+        .semantic
+        .rules
+        .iter()
+        .find(|rule| rule.id == id)
+    else {
+        return item.clone();
+    };
+    let mut resolved = item.clone();
+    if !rule.documentation.is_empty() {
+        resolved.documentation = Some(rule.documentation.join("\n"));
+    }
+    resolved
 }
 
 /// Computes hover information without reading the full contents of another file.
@@ -3748,13 +3975,34 @@ fn parameter_names_for_owner(
 }
 
 fn parameter_names_in_hir(hir: &HirFile, owner_range: TextRange) -> Vec<String> {
-    let mut names = hir
-        .parameter_definitions_for_owner(owner_range)
-        .map(|definition| definition.name.clone())
-        .collect::<Vec<_>>();
-    names.sort_by_key(|name| name.to_ascii_lowercase());
-    names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+    let mut names = Vec::new();
+    let mut seen = HashSet::new();
+    for definition in hir.parameter_definitions_for_owner(owner_range) {
+        if seen.insert(definition.name.to_ascii_lowercase()) {
+            names.push(definition.name.clone());
+        }
+    }
     names
+}
+
+/// Builds the snippet inserted for a scripted definition invocation. Declared parameters become
+/// sequential tab stops; the final cursor lands on an empty line inside the block.
+fn scripted_definition_snippet(
+    snapshot: &AnalysisSnapshot,
+    kind_name: &str,
+    definition_name: &str,
+) -> String {
+    let Some(parameters) = parameter_names_for_owner(snapshot, kind_name, definition_name) else {
+        return format!("{definition_name} = {{\n    $0\n}}");
+    };
+    if parameters.is_empty() {
+        return format!("{definition_name} = {{\n    $0\n}}");
+    }
+    let mut body = String::new();
+    for (index, parameter) in parameters.iter().enumerate() {
+        body.push_str(&format!("    {parameter} = ${}\n", index + 1));
+    }
+    format!("{definition_name} = {{\n{body}    $0\n}}")
 }
 
 fn semantic_key_matches(snapshot: &AnalysisSnapshot, matcher: &KeyMatcher, key: &str) -> bool {
@@ -4296,43 +4544,6 @@ thread_local! {
     static ALL_SEMANTICS_CALLS: Cell<usize> = const { Cell::new(0) };
 }
 
-fn completion_definitions(
-    snapshot: &AnalysisSnapshot,
-    prefix: &str,
-    cancellation: &CancellationToken,
-) -> Result<Vec<(String, String)>, Cancelled> {
-    let mut definitions = Vec::new();
-    for definition in snapshot.index().definitions_iter() {
-        cancellation.checkpoint()?;
-        if starts_with_ignore_ascii_case(&definition.name, prefix) {
-            definitions.push((definition.kind.clone(), definition.name.clone()));
-        }
-    }
-    for document in snapshot.documents().values() {
-        cancellation.checkpoint()?;
-        if document.source() != DocumentSource::Overlay {
-            continue;
-        }
-        if let Some(input) = input_for_document(snapshot, document.id()) {
-            definitions.extend(
-                semantic_data(snapshot, &input)
-                    .definitions
-                    .into_iter()
-                    .filter(|definition| starts_with_ignore_ascii_case(&definition.name, prefix))
-                    .map(|definition| (definition.kind, definition.name)),
-            );
-        }
-    }
-    definitions.sort_by(|left, right| {
-        (left.0.to_ascii_lowercase(), left.1.to_ascii_lowercase())
-            .cmp(&(right.0.to_ascii_lowercase(), right.1.to_ascii_lowercase()))
-    });
-    definitions.dedup_by(|left, right| {
-        left.0.eq_ignore_ascii_case(&right.0) && left.1.eq_ignore_ascii_case(&right.1)
-    });
-    Ok(definitions)
-}
-
 fn completion_definitions_for_kinds(
     snapshot: &AnalysisSnapshot,
     prefix: &str,
@@ -4343,7 +4554,7 @@ fn completion_definitions_for_kinds(
     for kind in kinds {
         for definition in snapshot.index().definitions_for_kind(kind) {
             cancellation.checkpoint()?;
-            if starts_with_ignore_ascii_case(&definition.name, prefix) {
+            if completion_matches(&definition.name, prefix) {
                 definitions.push((definition.kind.clone(), definition.name.clone()));
             }
         }
@@ -4362,7 +4573,7 @@ fn completion_definitions_for_kinds(
                         kinds
                             .iter()
                             .any(|kind| definition.kind.eq_ignore_ascii_case(kind))
-                            && starts_with_ignore_ascii_case(&definition.name, prefix)
+                            && completion_matches(&definition.name, prefix)
                     })
                     .map(|definition| (definition.kind, definition.name)),
             );
@@ -5050,37 +5261,62 @@ fn completion_value_context(input: &ParsedInput, position: TextSize) -> bool {
     equals.is_some_and(|equals| open.is_none_or(|open| equals > open))
 }
 
-fn add_scalar_items(items: &mut Vec<CompletionItem>, range: TextRange, prefix: &str) {
-    for (label, score) in [
-        ("yes", 0),
-        ("no", 0),
-        ("true", 5),
-        ("false", 5),
-        ("ROOT", 10),
-        ("FROM", 10),
-        ("PREV", 10),
-    ] {
-        push_completion(
-            items,
-            CompletionItem {
-                label: label.to_owned(),
-                kind: CompletionKind::Value,
-                detail: "PDX scalar".to_owned(),
-                documentation: None,
-                replacement_range: range,
-                insert_text: label.to_owned(),
-                sort_score: score,
-                deprecated: false,
-            },
-            prefix,
-        );
+fn localisation_language_header(input: &ParsedInput, position: TextSize) -> bool {
+    if input.format != FileFormat::Localisation {
+        return false;
+    }
+    let offset = usize::try_from(position)
+        .unwrap_or(input.source.len())
+        .min(input.source.len());
+    let line_start = input.source[..offset]
+        .rfind('\n')
+        .map_or(0, |index| index + 1);
+    let line = input.source[line_start..offset].trim();
+    let Some(language) = line.strip_prefix("l_") else {
+        return false;
+    };
+    let Some(language) = language.strip_suffix(':') else {
+        return false;
+    };
+    !language.is_empty()
+        && language
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '_')
+}
+
+/// Sort penalty applied to candidates that match the typed prefix only as a substring, so
+/// exact and prefix matches stay on top of the completion list.
+const FUZZY_MATCH_PENALTY: u32 = 100;
+
+/// Sort penalty applied to deprecated rules so current commands stay on top.
+const DEPRECATED_SORT_PENALTY: u32 = 500;
+
+fn completion_sort_score(score: u32, deprecated: bool) -> u32 {
+    if deprecated {
+        score.saturating_add(DEPRECATED_SORT_PENALTY)
+    } else {
+        score
     }
 }
 
-fn push_completion(items: &mut Vec<CompletionItem>, item: CompletionItem, prefix: &str) {
-    if starts_with_ignore_ascii_case(&item.label, prefix) {
-        items.push(item);
+fn push_completion(items: &mut Vec<CompletionItem>, mut item: CompletionItem, prefix: &str) {
+    if !completion_matches(&item.label, prefix) {
+        return;
     }
+    if !starts_with_ignore_ascii_case(&item.label, prefix) {
+        item.sort_score = item.sort_score.saturating_add(FUZZY_MATCH_PENALTY);
+    }
+    items.push(item);
+}
+
+/// Whether a candidate label matches the typed prefix: case-insensitive prefix or substring.
+fn completion_matches(label: &str, prefix: &str) -> bool {
+    prefix.is_empty()
+        || starts_with_ignore_ascii_case(label, prefix)
+        || label
+            .as_bytes()
+            .windows(prefix.len())
+            .any(|window| window.eq_ignore_ascii_case(prefix.as_bytes()))
 }
 
 fn starts_with_ignore_ascii_case(value: &str, prefix: &str) -> bool {
@@ -5345,6 +5581,7 @@ mod tests {
             alternative_id: None,
             severity,
             required: min_occurs.is_none() && max_occurs.is_none(),
+            deprecated: false,
             documentation: Vec::new(),
             allowed_scopes: Vec::new(),
             push_scope: None,
@@ -5408,15 +5645,26 @@ mod tests {
 
     #[test]
     fn incomplete_input_has_syntax_diagnostics_and_completion() {
-        let (host, id) = snapshot("country_event = { id = test.1\n  un");
+        let text = "country_event = { id = test.1\n  mt";
+        let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+        let id = DocumentId::new("file:///tmp/common/events/test.txt");
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open");
         let snapshot = host.snapshot();
         assert!(
             diagnostics(&snapshot, &id)
                 .iter()
                 .any(|item| item.code == DiagnosticCode::Syntax)
         );
-        let result = complete(&snapshot, &id, 35);
-        assert!(!result.items.is_empty());
+        let result = complete(
+            &snapshot,
+            &id,
+            u32::try_from(text.find("mt").expect("prefix") + 1).expect("position"),
+        );
+        assert!(
+            !result.items.is_empty(),
+            "a partially typed key inside a covered block must still complete"
+        );
     }
 
     #[test]
@@ -5523,6 +5771,7 @@ mod tests {
             &mut all_key_items,
             TextRange::empty(position),
             "",
+            true,
         );
         assert!(all_key_items.iter().any(|item| item.label == "always"));
         assert!(all_key_items.iter().any(|item| item.label == "factor"));
@@ -5900,6 +6149,7 @@ mod tests {
             alternative_id: None,
             severity: None,
             required: false,
+            deprecated: false,
             documentation: vec!["RGB color clause".to_owned()],
             allowed_scopes: Vec::new(),
             push_scope: None,
@@ -5925,6 +6175,7 @@ mod tests {
             alternative_id: None,
             severity: None,
             required: false,
+            deprecated: false,
             documentation: Vec::new(),
             allowed_scopes: Vec::new(),
             push_scope: None,
@@ -6013,6 +6264,568 @@ mod tests {
     }
 
     #[test]
+    fn localisation_key_position_completes_existing_and_workspace_keys() {
+        let mut host = eu4_host(pdx_game::eu4::bootstrap_rules());
+        let id = DocumentId::new("file:///tmp/localisation/test.yml");
+        let text = "l_english:\nfoo_name:0 \"Foo\"\nbar:0 \"\"\nfo";
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open");
+        let header_result = complete(
+            &host.snapshot(),
+            &id,
+            u32::try_from("l_english:".len()).expect("header position"),
+        );
+        assert!(
+            header_result.items.is_empty(),
+            "language headers must not offer localisation entry keys: {:?}",
+            header_result.items
+        );
+        let result = complete(
+            &host.snapshot(),
+            &id,
+            u32::try_from(text.len()).expect("position"),
+        );
+        let labels = result
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>();
+        assert!(
+            labels.contains(&"foo_name"),
+            "a partially typed localisation key must complete: {labels:?}"
+        );
+        assert!(
+            !labels.contains(&"bar"),
+            "non-matching localisation keys must be filtered: {labels:?}"
+        );
+        assert!(
+            result
+                .items
+                .iter()
+                .all(|item| item.kind == CompletionKind::Localisation),
+            "localisation key completion must not offer PDX properties: {:?}",
+            result.items
+        );
+    }
+
+    #[test]
+    fn scripted_definition_completion_snippet_includes_parameters() {
+        use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+        use std::fs;
+
+        let root =
+            std::env::temp_dir().join(format!("pdx-analysis-snippet-{}", std::process::id()));
+        fs::create_dir_all(root.join("common/scripted_effects")).expect("effect directory");
+        fs::write(
+            root.join("common/scripted_effects/00_test.txt"),
+            "apply = { value = $zeta$ [[alpha] enabled = yes ] }\n",
+        )
+        .expect("scripted effect definition");
+        let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
+        let mut host = eu4_host(rules);
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
+            id: SourceRootId::new(1),
+            kind: SourceRootKind::CurrentMod,
+            path: root.clone(),
+            order: 0,
+            writable: true,
+        }]));
+        host.refresh_source_roots().expect("scan effect definition");
+        let id = DocumentId::new("file:///tmp/events/snippet.txt");
+        let text = "country_event = { immediate = { ap";
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open");
+        let position = u32::try_from(text.find("ap").expect("prefix") + 1).expect("position");
+        let completion = complete(&host.snapshot(), &id, position);
+        let snippet = completion
+            .items
+            .iter()
+            .find(|item| item.label == "apply")
+            .expect("scripted effect item");
+        assert_eq!(
+            snippet.insert_text,
+            "apply = {\n    zeta = $1\n    alpha = $2\n    $0\n}"
+        );
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn scope_value_completion_offers_intrinsics_links_and_chains() {
+        let mut model = pdx_game::eu4::bootstrap_model();
+        for (id, key, allowed, push) in [
+            (
+                "fixture:link:owner",
+                "owner",
+                vec!["province".to_owned()],
+                "country",
+            ),
+            (
+                "fixture:link:controller",
+                "controller",
+                vec!["province".to_owned()],
+                "country",
+            ),
+            (
+                "fixture:link:capital_scope",
+                "capital_scope",
+                vec!["country".to_owned()],
+                "province",
+            ),
+            ("fixture:link:emperor", "emperor", Vec::new(), "country"),
+        ] {
+            model.semantic.rules.push(SemanticRule {
+                id: id.to_owned(),
+                context: "effect".to_owned(),
+                parent_path: Vec::new(),
+                key: KeyMatcher::Exact(key.to_owned()),
+                operator: None,
+                value: ValueMatcher::AnyScalar,
+                shape: RuleShape::Node,
+                child_context: Some("effect".to_owned()),
+                alternative_id: None,
+                severity: None,
+                required: false,
+                deprecated: false,
+                documentation: Vec::new(),
+                allowed_scopes: allowed,
+                push_scope: Some(push.to_owned()),
+                replace_scope: Vec::new(),
+                min_occurs: None,
+                strict_min: true,
+                max_occurs: None,
+                source_file: "fixture.semantic".to_owned(),
+                line: 1,
+            });
+        }
+        let host = eu4_host(RuleSet::from_model(model));
+        let snapshot = host.snapshot();
+        let context = super::SemanticCompletionContext {
+            context: "effect".to_owned(),
+            parent_path: Vec::new(),
+            structural_containers: Vec::new(),
+            alternative_containers: Vec::new(),
+            scope: super::ScopeContext {
+                profile: snapshot.game_profile_handle(),
+                root: "province".to_owned(),
+                current: "province".to_owned(),
+                from: Vec::new(),
+                previous: Vec::new(),
+            },
+            property: None,
+        };
+        let labels = super::scope_expression_candidates(&snapshot, &context, Some("province"))
+            .into_iter()
+            .map(|(label, _)| label)
+            .collect::<Vec<_>>();
+        assert!(labels.iter().any(|label| label == "province"), "{labels:?}");
+        assert!(
+            labels.iter().any(|label| label == "this"),
+            "intrinsics must stay visible: {labels:?}"
+        );
+        assert!(
+            !labels.iter().any(|label| label == "owner"),
+            "a single link targeting another scope must not be offered: {labels:?}"
+        );
+        assert!(
+            labels.iter().any(|label| label == "owner.capital_scope"),
+            "a one-hop chain back to the expected scope must be offered: {labels:?}"
+        );
+        assert!(
+            labels
+                .iter()
+                .any(|label| label == "controller.capital_scope"),
+            "{labels:?}"
+        );
+
+        let country_labels =
+            super::scope_expression_candidates(&snapshot, &context, Some("country"))
+                .into_iter()
+                .map(|(label, _)| label)
+                .collect::<Vec<_>>();
+        assert!(
+            country_labels.iter().any(|label| label == "country"),
+            "{country_labels:?}"
+        );
+        assert!(
+            country_labels.iter().any(|label| label == "emperor"),
+            "unrestricted scope links must be offered: {country_labels:?}"
+        );
+        assert!(
+            !country_labels.iter().any(|label| label == "province"),
+            "incompatible concrete scopes must be filtered: {country_labels:?}"
+        );
+        assert!(
+            !country_labels.iter().any(|label| label == "trade_node"),
+            "incompatible concrete scopes must be filtered: {country_labels:?}"
+        );
+    }
+
+    #[test]
+    fn fuzzy_completion_prefers_prefix_over_substring_matches() {
+        let mut host = eu4_host(pdx_game::eu4::bootstrap_rules());
+        let def_id = DocumentId::new("file:///tmp/localisation/fuzzy-defs.yml");
+        host.open_document(
+            def_id.clone(),
+            1,
+            "l_english:\nfuzz_name:0 \"A\"\nrefuse_name:0 \"B\"\n".to_owned(),
+            None,
+        )
+        .expect("open definitions");
+        let id = DocumentId::new("file:///tmp/localisation/fuzzy-use.yml");
+        let text = "l_english:\nfu";
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open use site");
+        let result = complete(
+            &host.snapshot(),
+            &id,
+            u32::try_from(text.len()).expect("position"),
+        );
+        let prefix = result
+            .items
+            .iter()
+            .position(|item| item.label == "fuzz_name")
+            .expect("prefix match");
+        let substring = result
+            .items
+            .iter()
+            .position(|item| item.label == "refuse_name")
+            .expect("substring match");
+        assert!(
+            prefix < substring,
+            "prefix matches must sort before substring matches: {:?}",
+            result.items
+        );
+    }
+
+    #[test]
+    fn semantic_context_unavailable_returns_empty_completion() {
+        let mut host = eu4_host(pdx_game::eu4::bootstrap_rules());
+        let id = DocumentId::new("file:///tmp/common/events/test.txt");
+        let text = "unknown_root = { eve";
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open");
+        let result = complete(
+            &host.snapshot(),
+            &id,
+            u32::try_from(text.len()).expect("position"),
+        );
+        assert!(
+            result.items.is_empty(),
+            "an uncovered context must not fall back to unrelated candidates: {:?}",
+            result.items
+        );
+    }
+
+    #[test]
+    fn completion_detail_uses_bare_categories() {
+        let trigger_text = "trigger = { fo";
+        let (host, id) = semantic_snapshot(trigger_text);
+        let result = complete(
+            &host.snapshot(),
+            &id,
+            u32::try_from(trigger_text.find("fo").expect("prefix") + 1).expect("position"),
+        );
+        let foo = result
+            .items
+            .iter()
+            .find(|item| item.label == "foo")
+            .expect("trigger rule item");
+        assert_eq!(foo.detail, "trigger");
+
+        let mut effect_model = pdx_game::eu4::bootstrap_model();
+        effect_model.semantic.rules.push(SemanticRule {
+            id: "fixture:effect:bar".to_owned(),
+            context: "effect".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("bar".to_owned()),
+            operator: None,
+            value: ValueMatcher::AnyScalar,
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 1,
+        });
+        let effect_text = "effect = { ba";
+        let mut host = eu4_host(RuleSet::from_model(effect_model));
+        let id = DocumentId::new("file:///tmp/common/events/test.txt");
+        host.open_document(id.clone(), 1, effect_text.to_owned(), None)
+            .expect("open");
+        let result = complete(
+            &host.snapshot(),
+            &id,
+            u32::try_from(effect_text.find("ba").expect("prefix") + 1).expect("position"),
+        );
+        let bar = result
+            .items
+            .iter()
+            .find(|item| item.label == "bar")
+            .expect("effect rule item");
+        assert_eq!(bar.detail, "effect");
+
+        let mut root_model = pdx_game::eu4::bootstrap_model();
+        root_model.semantic.rules.push(SemanticRule {
+            id: "fixture:root:baz".to_owned(),
+            context: "root:government_reform".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("baz".to_owned()),
+            operator: None,
+            value: ValueMatcher::AnyScalar,
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 1,
+        });
+        let root_text = "government_reform = { ba";
+        let mut host = eu4_host(RuleSet::from_model(root_model));
+        let id = DocumentId::new("file:///tmp/common/events/test.txt");
+        host.open_document(id.clone(), 1, root_text.to_owned(), None)
+            .expect("open");
+        let result = complete(
+            &host.snapshot(),
+            &id,
+            u32::try_from(root_text.find("ba").expect("prefix") + 1).expect("position"),
+        );
+        let baz = result
+            .items
+            .iter()
+            .find(|item| item.label == "baz")
+            .expect("root rule item");
+        assert_eq!(baz.detail, "government_reform");
+
+        let mut enum_model = pdx_game::eu4::bootstrap_model();
+        enum_model
+            .semantic
+            .enum_values
+            .insert("fixture_enum".to_owned(), vec!["member_a".to_owned()]);
+        enum_model.semantic.rules.push(SemanticRule {
+            id: "fixture:enum:qux".to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Enum("fixture_enum".to_owned()),
+            operator: None,
+            value: ValueMatcher::AnyScalar,
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 1,
+        });
+        let enum_text = "trigger = { ";
+        let mut host = eu4_host(RuleSet::from_model(enum_model));
+        let id = DocumentId::new("file:///tmp/common/events/test.txt");
+        host.open_document(id.clone(), 1, enum_text.to_owned(), None)
+            .expect("open");
+        let result = complete(
+            &host.snapshot(),
+            &id,
+            u32::try_from(enum_text.len().saturating_sub(1)).expect("position"),
+        );
+        let member = result
+            .items
+            .iter()
+            .find(|item| item.label == "member_a")
+            .expect("enum member item");
+        assert_eq!(member.detail, "fixture_enum");
+    }
+
+    #[test]
+    fn deprecated_semantic_rules_are_flagged_and_sorted_below() {
+        let mut model = pdx_game::eu4::bootstrap_model();
+        for (id, key, deprecated) in [
+            ("fixture:trigger:foo", "foo", false),
+            ("fixture:trigger:foobar", "foobar", true),
+        ] {
+            model.semantic.rules.push(SemanticRule {
+                id: id.to_owned(),
+                context: "trigger".to_owned(),
+                parent_path: Vec::new(),
+                key: KeyMatcher::Exact(key.to_owned()),
+                operator: None,
+                value: ValueMatcher::Bool,
+                shape: RuleShape::Leaf,
+                child_context: None,
+                alternative_id: None,
+                severity: None,
+                required: false,
+                deprecated,
+                documentation: Vec::new(),
+                allowed_scopes: Vec::new(),
+                push_scope: None,
+                replace_scope: Vec::new(),
+                min_occurs: None,
+                strict_min: true,
+                max_occurs: None,
+                source_file: "fixture.semantic".to_owned(),
+                line: 1,
+            });
+        }
+        let mut host = eu4_host(RuleSet::from_model(model));
+        let id = DocumentId::new("file:///tmp/common/events/test.txt");
+        let text = "trigger = { foo";
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open");
+        let result = complete(
+            &host.snapshot(),
+            &id,
+            u32::try_from(text.find("foo").expect("prefix") + 1).expect("position"),
+        );
+        let current = result
+            .items
+            .iter()
+            .find(|item| item.label == "foo")
+            .expect("current rule item");
+        assert!(!current.deprecated, "current rules must not be flagged");
+        let deprecated_item = result
+            .items
+            .iter()
+            .find(|item| item.label == "foobar")
+            .expect("deprecated rule item");
+        assert!(
+            deprecated_item.deprecated,
+            "deprecated rules must be flagged"
+        );
+        let current_index = result
+            .items
+            .iter()
+            .position(|item| item.label == "foo")
+            .expect("current index");
+        let deprecated_index = result
+            .items
+            .iter()
+            .position(|item| item.label == "foobar")
+            .expect("deprecated index");
+        assert!(
+            current_index < deprecated_index,
+            "deprecated rules must sort below current rules: {:?}",
+            result.items
+        );
+    }
+
+    #[test]
+    fn key_completion_inserts_equals_for_scalars_and_skeletons_for_blocks() {
+        let mut model = pdx_game::eu4::bootstrap_model();
+        for (id, key, shape) in [
+            ("fixture:trigger:foo", "foo", RuleShape::Leaf),
+            ("fixture:trigger:bar", "bar", RuleShape::Node),
+        ] {
+            model.semantic.rules.push(SemanticRule {
+                id: id.to_owned(),
+                context: "trigger".to_owned(),
+                parent_path: Vec::new(),
+                key: KeyMatcher::Exact(key.to_owned()),
+                operator: None,
+                value: ValueMatcher::AnyScalar,
+                shape,
+                child_context: if shape == RuleShape::Node {
+                    Some("trigger".to_owned())
+                } else {
+                    None
+                },
+                alternative_id: None,
+                severity: None,
+                required: false,
+                deprecated: false,
+                documentation: Vec::new(),
+                allowed_scopes: Vec::new(),
+                push_scope: None,
+                replace_scope: Vec::new(),
+                min_occurs: None,
+                strict_min: true,
+                max_occurs: None,
+                source_file: "fixture.semantic".to_owned(),
+                line: 1,
+            });
+        }
+        let scalar = "trigger = { fo";
+        let (scalar_host, scalar_id) = {
+            let mut host = eu4_host(RuleSet::from_model(model.clone()));
+            let id = DocumentId::new("file:///tmp/common/events/test.txt");
+            host.open_document(id.clone(), 1, scalar.to_owned(), None)
+                .expect("open");
+            (host, id)
+        };
+        let scalar_result = complete(
+            &scalar_host.snapshot(),
+            &scalar_id,
+            u32::try_from(scalar.find("fo").expect("prefix") + 1).expect("position"),
+        );
+        let foo = scalar_result
+            .items
+            .iter()
+            .find(|item| item.label == "foo")
+            .expect("scalar rule item");
+        assert_eq!(foo.insert_text, "foo = ");
+
+        let existing = "trigger = { ba = yes }";
+        let mut existing_host = eu4_host(RuleSet::from_model(model.clone()));
+        let existing_id = DocumentId::new("file:///tmp/common/events/test.txt");
+        existing_host
+            .open_document(existing_id.clone(), 1, existing.to_owned(), None)
+            .expect("open existing assignment");
+        let existing_result = complete(
+            &existing_host.snapshot(),
+            &existing_id,
+            u32::try_from(existing.find("ba").expect("existing key") + 1).expect("position"),
+        );
+        let replacement = existing_result
+            .items
+            .iter()
+            .find(|item| item.label == "bar")
+            .expect("replacement key item");
+        assert_eq!(replacement.insert_text, "bar");
+
+        let block = "trigger = { ba";
+        let mut block_host = eu4_host(RuleSet::from_model(model));
+        let block_id = DocumentId::new("file:///tmp/common/events/test.txt");
+        block_host
+            .open_document(block_id.clone(), 1, block.to_owned(), None)
+            .expect("open");
+        let block_result = complete(
+            &block_host.snapshot(),
+            &block_id,
+            u32::try_from(block.find("ba").expect("prefix") + 1).expect("position"),
+        );
+        let bar = block_result
+            .items
+            .iter()
+            .find(|item| item.label == "bar")
+            .expect("block rule item");
+        assert_eq!(bar.insert_text, "bar = {\n    $0\n}");
+    }
+
+    #[test]
     fn hover_ignores_unknown_property_and_plain_text() {
         let (host, id) = semantic_snapshot("trigger = { unknown_property = yes }\n");
         let analysis_snapshot = host.snapshot();
@@ -6055,6 +6868,7 @@ mod tests {
                 alternative_id: None,
                 severity: None,
                 required: false,
+                deprecated: false,
                 documentation: Vec::new(),
                 allowed_scopes: Vec::new(),
                 push_scope: None,
@@ -6095,6 +6909,7 @@ mod tests {
             alternative_id: None,
             severity: None,
             required: false,
+            deprecated: false,
             documentation: vec!["first line".to_owned(), "second line".to_owned()],
             allowed_scopes: Vec::new(),
             push_scope: None,

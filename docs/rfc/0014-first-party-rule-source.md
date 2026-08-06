@@ -58,8 +58,9 @@ by hand.
 
 Source format 2 renamed the generic key/value parser identity from `pdx-script` to `script`.
 Source format 3 added the first-party type-instance localisation binding source. Source format 4
-adds data-driven subtype conditions for those bindings. These migrations do not change existing
-EU4 file category identities, matchers, resolution policies, or semantic rule identities.
+adds data-driven subtype conditions for those bindings. Source format 5 adds the optional
+`semantic-rules.deprecated` field. These migrations do not change existing EU4 file category
+identities, matchers, resolution policies, or semantic rule identities.
 
 ## Runtime authority
 

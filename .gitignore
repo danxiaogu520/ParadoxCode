@@ -14,6 +14,9 @@
 /.agents/
 /.codex/
 
+# Ignore all dot-directories created by editors and local tools.
+**/.*/
+
 .DS_Store
 Thumbs.db
 
@@ -29,6 +32,9 @@ Thumbs.db
 # The audited EU4 artifact is the only pdxrules file kept in source control.
 /rules/*.pdxrules
 !/rules/eu4.pdxrules
+
+# Temporary local rule-inspection helper
+/rules/find-rule.cjs
 
 # CWTools reference
 /reference/

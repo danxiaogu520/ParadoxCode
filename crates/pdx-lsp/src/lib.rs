@@ -38,9 +38,10 @@ use lsp_types::{
 };
 use pdx_analysis::{
     CancellationToken, Cancelled, CompletionKind, Location, RenameError, RenameFailure,
-    complete_with_cancellation, definition_with_cancellation, diagnostics_with_cancellation,
-    document_symbols_with_cancellation, hover_with_cancellation, prepare_rename_with_cancellation,
-    references_with_cancellation, rename_with_cancellation, workspace_symbols_with_cancellation,
+    complete_with_cancellation, completion_resolve, definition_with_cancellation,
+    diagnostics_with_cancellation, document_symbols_with_cancellation, hover_with_cancellation,
+    prepare_rename_with_cancellation, references_with_cancellation, rename_with_cancellation,
+    workspace_symbols_with_cancellation,
 };
 use pdx_engine::{
     AnalysisHost, AnalysisSnapshot, DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId,
@@ -281,6 +282,7 @@ struct PreparedInitialize {
     vanilla_cache: Option<PathBuf>,
     watcher_registration: Option<Value>,
     client_work_done_progress: bool,
+    client_snippet_support: bool,
 }
 
 #[derive(Debug)]
@@ -377,6 +379,9 @@ pub struct LspServer {
     /// Whether the client advertises `window.workDoneProgress`, so server-initiated background
     /// work can be surfaced as a progress bar instead of only start/end messages.
     client_work_done_progress: bool,
+    /// Whether the client advertises snippet support for completion items. When absent, snippet
+    /// placeholders are stripped so the inserted text stays valid plain text.
+    client_snippet_support: bool,
     clean_exit: bool,
 }
 
@@ -407,6 +412,7 @@ impl LspServer {
             watcher_registration: None,
             auto_vanilla: None,
             client_work_done_progress: false,
+            client_snippet_support: false,
             clean_exit: false,
         })
     }
@@ -679,6 +685,7 @@ impl LspServer {
                                 self.state = ServerState::Initialized;
                                 self.watcher_registration = prepared.watcher_registration;
                                 self.client_work_done_progress = prepared.client_work_done_progress;
+                                self.client_snippet_support = prepared.client_snippet_support;
                                 (
                                     json!({
                                         "jsonrpc": JSON_RPC_VERSION,
@@ -1049,7 +1056,11 @@ impl LspServer {
         if self.cancelled.contains(&request_id) {
             cancellation.cancel();
         }
-        let context = SnapshotRequestContext::new(self.host.snapshot(), cancellation.clone());
+        let context = SnapshotRequestContext::new(
+            self.host.snapshot(),
+            cancellation.clone(),
+            self.client_snippet_support,
+        );
         let method = method.to_owned();
         let params = object.get("params").cloned();
         let id = id.clone();
@@ -1516,10 +1527,12 @@ impl LspServer {
                 self.handle_did_change_watched_files(params)?;
                 Ok(Value::Null)
             }
-            method if is_snapshot_request(method) => {
-                SnapshotRequestContext::new(self.host.snapshot(), CancellationToken::new())
-                    .dispatch(method, params)
-            }
+            method if is_snapshot_request(method) => SnapshotRequestContext::new(
+                self.host.snapshot(),
+                CancellationToken::new(),
+                self.client_snippet_support,
+            )
+            .dispatch(method, params),
             _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
         }
     }
@@ -1537,6 +1550,14 @@ impl LspServer {
             .window
             .as_ref()
             .and_then(|window| window.work_done_progress)
+            .unwrap_or(false);
+        self.client_snippet_support = params
+            .capabilities
+            .text_document
+            .as_ref()
+            .and_then(|text_document| text_document.completion.as_ref())
+            .and_then(|completion| completion.completion_item.as_ref())
+            .and_then(|item| item.snippet_support)
             .unwrap_or(false);
         let prepared = prepare_initialize_candidate(
             self.host.clone(),
@@ -1664,6 +1685,14 @@ fn prepare_initialize_candidate(
         .as_ref()
         .and_then(|window| window.work_done_progress)
         .unwrap_or(false);
+    let client_snippet_support = params
+        .capabilities
+        .text_document
+        .as_ref()
+        .and_then(|text_document| text_document.completion.as_ref())
+        .and_then(|completion| completion.completion_item.as_ref())
+        .and_then(|item| item.snippet_support)
+        .unwrap_or(false);
     let mut resolved =
         resolve_source_roots(client_root.as_deref(), initialization_options, cancellation)?;
     let mut warnings = Vec::new();
@@ -1713,6 +1742,7 @@ fn prepare_initialize_candidate(
             )),
             completion_provider: Some(CompletionOptions {
                 trigger_characters: Some(vec!["=".to_owned(), " ".to_owned(), ":".to_owned()]),
+                resolve_provider: Some(true),
                 ..CompletionOptions::default()
             }),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
@@ -1744,6 +1774,7 @@ fn prepare_initialize_candidate(
         vanilla_cache,
         watcher_registration,
         client_work_done_progress,
+        client_snippet_support,
     })
 }
 
@@ -2389,19 +2420,27 @@ fn stable_dependency_root_id(id: &str) -> u32 {
 struct SnapshotRequestContext {
     snapshot: AnalysisSnapshot,
     cancellation: CancellationToken,
+    /// Whether the client advertises snippet support for completion items.
+    client_snippets: bool,
 }
 
 impl SnapshotRequestContext {
-    fn new(snapshot: AnalysisSnapshot, cancellation: CancellationToken) -> Self {
+    fn new(
+        snapshot: AnalysisSnapshot,
+        cancellation: CancellationToken,
+        client_snippets: bool,
+    ) -> Self {
         Self {
             snapshot,
             cancellation,
+            client_snippets,
         }
     }
 
     fn dispatch(&self, method: &str, params: Option<&Value>) -> Result<Value, RpcError> {
         match method {
             "textDocument/completion" => self.completion(params),
+            "completionItem/resolve" => self.completion_resolve(params),
             "textDocument/hover" => self.hover(params),
             "textDocument/definition" => self.definition(params),
             "textDocument/references" => self.references(params),
@@ -2428,7 +2467,11 @@ impl SnapshotRequestContext {
         let items = completion_items
             .into_iter()
             .map(|item| {
-                let insert_text = item.insert_text;
+                let mut insert_text = item.insert_text;
+                let snippet_supported = self.client_snippets;
+                if !snippet_supported {
+                    insert_text = strip_snippet_placeholders(&insert_text);
+                }
                 CompletionItem {
                     label: item.label,
                     kind: Some(completion_kind(item.kind)),
@@ -2437,11 +2480,12 @@ impl SnapshotRequestContext {
                     deprecated: Some(item.deprecated),
                     sort_text: Some(format!("{:03}", item.sort_score)),
                     insert_text: Some(insert_text.clone()),
-                    insert_text_format: Some(if insert_text.contains("$0") {
+                    insert_text_format: Some(if snippet_supported && insert_text.contains('$') {
                         InsertTextFormat::SNIPPET
                     } else {
                         InsertTextFormat::PLAIN_TEXT
                     }),
+                    data: item.resolve_data.map(Value::String),
                     text_edit: Some(CompletionTextEdit::Edit(TextEdit {
                         range: range_to_lsp(
                             document.line_index(),
@@ -2462,6 +2506,35 @@ impl SnapshotRequestContext {
             }),
             "completion response",
         )
+    }
+
+    fn completion_resolve(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = typed_params::<CompletionItem>(params, "completionItem/resolve")?;
+        self.ensure_active()?;
+        let data = params
+            .data
+            .as_ref()
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
+        let item = pdx_analysis::CompletionItem {
+            label: params.label.clone(),
+            kind: CompletionKind::Key,
+            detail: String::new(),
+            documentation: None,
+            replacement_range: TextRange::empty(0),
+            insert_text: params.label.clone(),
+            sort_score: 0,
+            deprecated: false,
+            resolve_data: (!data.is_empty()).then_some(data),
+        };
+        let mut resolved = completion_resolve(&self.snapshot, &item);
+        if let Some(documentation) = resolved.documentation.take() {
+            let mut result = params;
+            result.documentation = Some(Documentation::String(documentation));
+            return typed_value(result, "completionItem/resolve response");
+        }
+        typed_value(params, "completionItem/resolve response")
     }
 
     fn hover(&self, params: Option<&Value>) -> Result<Value, RpcError> {
@@ -2678,6 +2751,28 @@ fn bounded_results<T>(mut values: Vec<T>, maximum: usize) -> (Vec<T>, bool) {
     (values, incomplete)
 }
 
+/// Removes LSP snippet placeholders (`$0`, `$1`, …) so a snippet-shaped insert text can be
+/// delivered as plain text to clients without snippet support. Placeholder lines left empty by
+/// the removal are dropped so the block skeleton stays tidy.
+fn strip_snippet_placeholders(text: &str) -> String {
+    let mut stripped = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(character) = chars.next() {
+        if character == '$' {
+            while chars.peek().is_some_and(|next| next.is_ascii_digit()) {
+                chars.next();
+            }
+        } else {
+            stripped.push(character);
+        }
+    }
+    stripped
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn diagnostic_result_counts(total: usize, maximum: usize) -> (usize, usize) {
     if total <= maximum {
         (total, 0)
@@ -2691,6 +2786,7 @@ fn is_snapshot_request(method: &str) -> bool {
     matches!(
         method,
         "textDocument/completion"
+            | "completionItem/resolve"
             | "textDocument/hover"
             | "textDocument/definition"
             | "textDocument/references"
@@ -2840,7 +2936,7 @@ fn completion_kind(kind: CompletionKind) -> CompletionItemKind {
         CompletionKind::Key => CompletionItemKind::PROPERTY,
         CompletionKind::Value => CompletionItemKind::VALUE,
         CompletionKind::Symbol => CompletionItemKind::FUNCTION,
-        CompletionKind::Localisation => CompletionItemKind::KEYWORD,
+        CompletionKind::Localisation => CompletionItemKind::REFERENCE,
     }
 }
 
@@ -3275,11 +3371,11 @@ mod tests {
         apply_user_vanilla_configuration, bounded_results, cancel_initialize_from_notification,
         cancel_request_from_notification, changed_document_len, diagnostic_result_counts,
         path_to_uri, prepare_initialize_candidate, read_message,
-        run_auto_vanilla_setup_with_options, uri_to_path,
+        run_auto_vanilla_setup_with_options, strip_snippet_placeholders, uri_to_path,
     };
     use lsp_types::{
-        CompletionResponse, Diagnostic, DocumentSymbol, Hover, Location, PrepareRenameResponse,
-        SymbolInformation, SymbolKind, WorkspaceEdit,
+        CompletionItem, CompletionResponse, Diagnostic, DocumentSymbol, Hover, Location,
+        PrepareRenameResponse, SymbolInformation, SymbolKind, WorkspaceEdit,
     };
     use pdx_engine::{
         AnalysisHost, SourceRoot, SourceRootId, SourceRootKind, TextChange, VanillaIndexCache,
@@ -3826,7 +3922,7 @@ mod tests {
             json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
-            json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":2,"character":8}}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":19}}}),
             json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8}}}),
             json!({"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8}}}),
             json!({"jsonrpc":"2.0","id":5,"method":"textDocument/references","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":8},"context":{"includeDeclaration":true}}}),
@@ -4012,6 +4108,176 @@ mod tests {
                 .any(|item| item["code"] == "pdx-invalid-value"),
             "invalid trigger value was not diagnosed: {diagnostics:?}"
         );
+        fs::remove_dir_all(root_dir).expect("cleanup");
+    }
+
+    #[test]
+    fn snippet_placeholders_are_stripped_for_plain_text_fallbacks() {
+        assert_eq!(
+            strip_snippet_placeholders("name = {\n    $0\n}"),
+            "name = {\n}"
+        );
+        assert_eq!(
+            strip_snippet_placeholders("apply = {\n    amount = $1\n    optional = $2\n    $0\n}"),
+            "apply = {\n    amount = \n    optional = \n}"
+        );
+        assert_eq!(strip_snippet_placeholders("plain"), "plain");
+    }
+
+    #[test]
+    fn memory_transport_negotiates_completion_snippet_support() {
+        let (root_dir, root_uri) = temp_workspace_dir();
+        let effects_dir = root_dir.join("common/scripted_effects");
+        fs::create_dir_all(&effects_dir).expect("create scripted effects directory");
+        fs::write(
+            effects_dir.join("00_test.txt"),
+            "apply = { value = $amount$ }\n",
+        )
+        .expect("scripted effect definition");
+        let events_dir = root_dir.join("events");
+        fs::create_dir_all(&events_dir).expect("create events dir");
+        let file_path = events_dir.join("snippet-use.txt");
+        fs::write(&file_path, "").expect("create placeholder file");
+        let uri = canonical_uri(&file_path);
+        let text = "country_event = { immediate = { ap";
+        let run = |capabilities: Value| {
+            let input = frames([
+                json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri.clone(),"capabilities":capabilities}}),
+                json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+                json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri.clone(),"languageId":"eu4","version":1,"text":text}}}),
+                json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri.clone()},"position":{"line":0,"character":33}}}),
+                json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+                json!({"jsonrpc":"2.0","method":"exit"}),
+            ]);
+            let mut output = Vec::new();
+            let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+            server
+                .run_transport(Cursor::new(input), &mut output)
+                .expect("transport");
+            decode_frames(&output)
+        };
+        let initialize =
+            run(json!({"textDocument":{"completion":{"completionItem":{"snippetSupport":true}}}}));
+        let capabilities = initialize
+            .iter()
+            .find(|value| value["id"] == 1)
+            .expect("initialize response");
+        assert_eq!(
+            capabilities["result"]["capabilities"]["completionProvider"]["resolveProvider"],
+            true
+        );
+        let snippet_items = initialize
+            .iter()
+            .find(|value| value["id"] == 2)
+            .expect("snippet completion");
+        let apply = snippet_items["result"]["items"]
+            .as_array()
+            .expect("completion items")
+            .iter()
+            .find(|item| item["label"] == "apply")
+            .expect("scripted effect item");
+        assert_eq!(apply["insertText"], "apply = {\n    amount = $1\n    $0\n}");
+        assert_eq!(apply["insertTextFormat"], 2, "snippet format");
+
+        let no_snippet = run(json!({}));
+        let plain_items = no_snippet
+            .iter()
+            .find(|value| value["id"] == 2)
+            .expect("plain completion");
+        let apply = plain_items["result"]["items"]
+            .as_array()
+            .expect("completion items")
+            .iter()
+            .find(|item| item["label"] == "apply")
+            .expect("scripted effect item");
+        assert_eq!(apply["insertText"], "apply = {\n    amount = \n}");
+        assert_eq!(apply["insertTextFormat"], 1, "plain text fallback");
+        assert!(
+            apply["insertText"]
+                .as_str()
+                .is_some_and(|text| !text.contains('$')),
+            "plain text fallback must not contain snippet placeholders"
+        );
+        fs::remove_dir_all(root_dir).expect("cleanup");
+    }
+
+    #[test]
+    fn memory_transport_resolves_completion_items_by_data() {
+        let (root_dir, root_uri) = temp_workspace_dir();
+        let events_dir = root_dir.join("events");
+        fs::create_dir_all(&events_dir).expect("create events dir");
+        let file_path = events_dir.join("resolve-completion.txt");
+        fs::write(&file_path, "").expect("create placeholder file");
+        let uri = canonical_uri(&file_path);
+        let text = concat!(
+            "country_event = {\n",
+            "  mean_time_to_happen = {\n",
+            "    modifier = {\n",
+            "      factor = 0.5\n",
+            "      \n",
+            "      always = maybe\n",
+            "    }\n",
+            "  }\n",
+            "}\n",
+        );
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":4,"character":6}}}),
+            json!({"jsonrpc":"2.0","id":8,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
+        let responses = decode_frames(&output);
+        let completion = responses
+            .iter()
+            .find(|value| value["id"] == 2)
+            .expect("completion response");
+        let factor = completion["result"]["items"]
+            .as_array()
+            .expect("completion items")
+            .iter()
+            .find(|item| item["label"] == "factor")
+            .expect("rule item");
+        let data = factor["data"].as_str().expect("resolve data");
+        assert!(
+            data.starts_with("rule:"),
+            "rule-backed items must carry a rule id: {data}"
+        );
+
+        let mut resolve_input = Vec::new();
+        resolve_input.extend(frame(json!({
+            "jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}
+        })));
+        resolve_input.extend(frame(
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        ));
+        resolve_input.extend(frame(json!({
+            "jsonrpc":"2.0","id":3,"method":"completionItem/resolve",
+            "params": factor.clone()
+        })));
+        resolve_input.extend(frame(
+            json!({"jsonrpc":"2.0","id":9,"method":"shutdown","params":{}}),
+        ));
+        resolve_input.extend(frame(json!({"jsonrpc":"2.0","method":"exit"})));
+        let mut resolve_output = Vec::new();
+        let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+        server
+            .run_transport(Cursor::new(resolve_input), &mut resolve_output)
+            .expect("transport");
+        let resolve_responses = decode_frames(&resolve_output);
+        let resolved = resolve_responses
+            .iter()
+            .find(|value| value["id"] == 3)
+            .expect("resolve response");
+        assert_eq!(resolved["result"]["label"], "factor");
+        let _: CompletionItem = serde_json::from_value(resolved["result"].clone())
+            .expect("resolve response must be a standard CompletionItem");
         fs::remove_dir_all(root_dir).expect("cleanup");
     }
 

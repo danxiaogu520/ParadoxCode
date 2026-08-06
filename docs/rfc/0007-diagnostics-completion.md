@@ -135,7 +135,9 @@ UnknownRecovery
 ### Localisation
 
 - 在被规则标为 localisation 的 value 位置补全 key。
-- localisation 文件 entry key 的定义补全不作为 MVP 必需项。
+- localisation 文件 key 补全：`complete()` 对 `FileFormat::Localisation` 非 value 位置返回
+  workspace + 打开文件中的 `localisation` kind definitions；value 位置只补 `localisation`
+  符号（不混入其他 workspace 定义或标量）。
 
 ## Completion item
 
@@ -143,14 +145,45 @@ UnknownRecovery
 
 MVP snippet 保守使用：block command 可插入 `name = {\n    $0\n}`；客户端不支持 snippet 时回退为纯文本。
 
+## 当前实现状态
+
+- **detail 文案**：左值 rule-backed key 显示语义类别裸名——`effect`/`trigger` 命令写
+  `effect`/`trigger`，其他 context 写裸 context 名（`modifier_rule`），type/enum/dynamic
+  成员写裸集合名（`country_tag`/`government_reform`/`custom_attribute`），scripted 参数写
+  `parameter`；右值写值类型裸名（`bool`/`int`/`float`/`scope`/`scope link`/`localisation`/
+  集合名）。无 "semantic rule xxx"/"PDX xxx" 套话。
+- **无兜底**：语义上下文不可用时返回空列表（syntax-only/identity-only 模式补全为空）。
+  `known_keys` 仅保留给 hover 的未知文本判断；scripted effect/trigger 调用在语义路径经
+  `KeyMatcher::Type` 补全，不受影响。
+- **snippet 能力协商**：`client_snippet_support` 在 initialize 时按
+  `textDocument.completion.completionItem.snippetSupport` 捕获（异步路径经
+  `PreparedInitialize` 提交）；不支持的客户端收到纯文本（`$0`/`$N` 占位符被剥除，空行清理）。
+- **rule-backed key insert text**：`add_semantic_key_items` 按 rule shape 生成
+  insert text——新 key 的 Leaf/ValueClause 补 `key = `（光标落在值位），Node 补
+  `key = {\n    $0\n}`（snippet 空块骨架）；替换已有 `key = value` 的 key 时只替换
+  key 拼写，保留现有赋值。
+- **scripted definition snippet**：语义路径的 `Type("scripted_effect")`/`Type("scripted_trigger")`
+  候选把其 HIR owner 参数展开为顺序 tab stop（`param = $1`），`$0` 落在块内空行；参数无法
+  唯一解析时回退固定骨架。
+- **`completionItem/resolve`**：server 声明 `resolveProvider`，rule-backed item 携带
+  `data = "rule:<id>"`；resolve 请求经 `pdx_analysis::completion_resolve` 按 rule id 补
+  documentation，其余 item 原样返回。
+- **fuzzy 匹配**：候选过滤为大小写不敏感 prefix 或 substring；substring 命中加
+  `FUZZY_MATCH_PENALTY` 降权，prefix 命中保持原序。
+- **scope 表达式**：`ValueMatcher::Scope` 位置补全基础 scope 名、intrinsic（`root`/`this`/
+  `from`/`prev`，按解析出的实际 scope 过滤，unknown 时保留），以及从当前 scope 可达的
+  scope link 关键字；单跳不满足期望 scope 时再补一跳链（上限 `SCOPE_CHAIN_LIMIT`）。
+- **deprecated**：`SemanticRule.deprecated` 进入规范哈希与 SQLite 列；completion item
+  透传 `deprecated` 并加 `DEPRECATED_SORT_PENALTY` 降权。
+
 ## 不完整输入
 
 completion 不要求完整 HIR。若 cursor 位于 ERROR node：
 
 1. 使用最近完整父 context。
 2. 读取左侧 token 判断 key/value。
-3. 无法确定 scope 时用 Unknown，不返回空列表。
-4. 只在无法确定任何 semantic context 时退回 syntax-level candidates。
+3. 无法确定 scope 时用 Unknown；scope unknown 时不隐藏候选。
+4. 无法确定任何 semantic context 时返回空列表（不再退回 syntax-level candidates）。
 
 ## Hover
 

@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// The first runtime schema version reserved for the generated rule database.
-pub const CURRENT_SCHEMA_VERSION: u32 = 15;
+pub const CURRENT_SCHEMA_VERSION: u32 = 16;
 
 static EMBEDDED_LOAD_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -925,6 +925,9 @@ pub struct SemanticRule {
     pub severity: Option<u8>,
     /// Whether the first-party declaration explicitly requires this field.
     pub required: bool,
+    /// Whether the first-party declaration marks this rule as deprecated.
+    #[serde(default)]
+    pub deprecated: bool,
     /// Documentation comments attached to the first-party declaration.
     pub documentation: Vec<String>,
     /// Scopes in which this rule is valid. An empty list means `scope = any` or no restriction.
@@ -1377,6 +1380,7 @@ fn canonical_hash(model: &RulesModel) -> RuleHash {
             None => bytes.push(0),
         }
         bytes.push(u8::from(rule.required));
+        bytes.push(u8::from(rule.deprecated));
         put_len(&mut bytes, rule.documentation.len());
         for documentation in &rule.documentation {
             put_str(&mut bytes, documentation);
@@ -1688,6 +1692,7 @@ fn schema(connection: &Connection) -> Result<(), RulesError> {
             alternative_id TEXT,
             severity INTEGER,
             required INTEGER NOT NULL DEFAULT 0,
+            deprecated INTEGER NOT NULL DEFAULT 0,
             documentation TEXT NOT NULL DEFAULT '',
             allowed_scopes TEXT NOT NULL DEFAULT '',
             push_scope TEXT,
@@ -1755,6 +1760,7 @@ fn ensure_semantic_columns(connection: &Connection) -> Result<(), RulesError> {
         ("severity", "INTEGER"),
         ("operator", "TEXT"),
         ("required", "INTEGER NOT NULL DEFAULT 0"),
+        ("deprecated", "INTEGER NOT NULL DEFAULT 0"),
         ("documentation", "TEXT NOT NULL DEFAULT ''"),
         ("allowed_scopes", "TEXT NOT NULL DEFAULT ''"),
         ("push_scope", "TEXT"),
@@ -1820,7 +1826,7 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
         let (key_kind, key_value) = semantic_key_columns(&rule.key);
         let (value_kind, value_arg, value_min, value_max) = semantic_value_columns(&rule.value);
         transaction.execute(
-            "INSERT INTO semantic_rules(id, context, parent_path, key_kind, key_value, operator, value_kind, value_arg, value_min, value_max, shape, child_context, alternative_id, severity, required, documentation, allowed_scopes, push_scope, replace_scope, min_occurs, strict_min, max_occurs, source_file, line) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
+            "INSERT INTO semantic_rules(id, context, parent_path, key_kind, key_value, operator, value_kind, value_arg, value_min, value_max, shape, child_context, alternative_id, severity, required, documentation, allowed_scopes, push_scope, replace_scope, min_occurs, strict_min, max_occurs, source_file, line, deprecated) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)",
             params![
                 rule.id,
                 rule.context,
@@ -1846,6 +1852,7 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
                 rule.max_occurs,
                 rule.source_file,
                 rule.line,
+                i64::from(rule.deprecated),
             ],
         )?;
     }
@@ -2069,7 +2076,7 @@ fn read_model(connection: &Connection) -> Result<RulesModel, RulesError> {
 fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesError> {
     let mut rules = Vec::new();
     let mut statement = connection.prepare(
-        "SELECT id, context, parent_path, key_kind, key_value, operator, value_kind, value_arg, value_min, value_max, shape, child_context, alternative_id, severity, required, documentation, allowed_scopes, push_scope, replace_scope, min_occurs, strict_min, max_occurs, source_file, line FROM semantic_rules ORDER BY id",
+        "SELECT id, context, parent_path, key_kind, key_value, operator, value_kind, value_arg, value_min, value_max, shape, child_context, alternative_id, severity, required, documentation, allowed_scopes, push_scope, replace_scope, min_occurs, strict_min, max_occurs, source_file, line, deprecated FROM semantic_rules ORDER BY id",
     )?;
     let rows = statement.query_map([], |row| {
         let key_kind: String = row.get(3)?;
@@ -2135,6 +2142,7 @@ fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesEr
             max_occurs: row.get(21)?,
             source_file: row.get(22)?,
             line: row.get(23)?,
+            deprecated: row.get::<_, i64>(24)? != 0,
         })
     })?;
     for row in rows {
@@ -2428,6 +2436,7 @@ mod tests {
             alternative_id: None,
             severity: None,
             required: false,
+            deprecated: false,
             documentation: Vec::new(),
             allowed_scopes: Vec::new(),
             push_scope: None,

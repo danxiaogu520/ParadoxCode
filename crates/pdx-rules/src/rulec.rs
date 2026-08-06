@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 
 /// Current version of the developer-maintained source layout.
-pub const SOURCE_FORMAT_VERSION: u32 = 4;
+pub const SOURCE_FORMAT_VERSION: u32 = 5;
 
 const SOURCE_MANIFEST: &str = "manifest.json";
 const CATALOG: &str = "catalog.json";
@@ -570,6 +570,7 @@ mod tests {
             alternative_id: None,
             severity: None,
             required: false,
+            deprecated: false,
             documentation: Vec::new(),
             allowed_scopes: Vec::new(),
             push_scope: None,

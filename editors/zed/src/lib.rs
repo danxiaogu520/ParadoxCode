@@ -71,10 +71,6 @@ fn archive_name(artifact: &Artifact) -> String {
     format!("pdx-ls-v{VERSION}-{}.{extension}", artifact.target)
 }
 
-fn release_version_matches(version: &str) -> bool {
-    version.strip_prefix('v') == Some(VERSION)
-}
-
 fn fetch(url: &str, maximum: usize, label: &str) -> zed::Result<Vec<u8>> {
     let request = zed::http_client::HttpRequest::builder()
         .method(zed::http_client::HttpMethod::Get)
@@ -320,13 +316,13 @@ fn extract(archive: &[u8], artifact: &Artifact) -> zed::Result<Vec<u8>> {
     }
 }
 
-fn asset_url(release: &zed::GithubRelease, name: &str) -> zed::Result<String> {
-    release
-        .assets
-        .iter()
-        .find(|asset| asset.name == name)
-        .map(|asset| asset.download_url.clone())
-        .ok_or_else(|| format!("release asset `{name}` is missing"))
+// Direct `releases/download` URLs avoid the unauthenticated GitHub REST API quota
+// (60 requests/hour/IP) that the tag lookup previously exhausted.
+fn release_asset_url(artifact: &Artifact) -> String {
+    format!(
+        "https://github.com/{REPOSITORY}/releases/download/v{VERSION}/{}",
+        archive_name(artifact)
+    )
 }
 
 fn sha256_file(path: &str) -> std::io::Result<String> {
@@ -414,18 +410,16 @@ fn install_server(language_server_id: &zed::LanguageServerId) -> zed::Result<Str
         &zed::LanguageServerInstallationStatus::Downloading,
     );
     let result = (|| {
-        let tag = format!("v{VERSION}");
-        let release = zed::github_release_by_tag_name(REPOSITORY, &tag)?;
-        if !release_version_matches(&release.version) {
-            return Err("GitHub release version does not match the extension".to_owned());
-        }
         let archive = archive_name(&artifact);
-        let checksum_url = asset_url(&release, &format!("{archive}.sha256"))?;
+        let archive_url = release_asset_url(&artifact);
         let expected = expected_checksum(
-            &fetch(&checksum_url, MAX_CHECKSUM_BYTES, "checksum sidecar")?,
+            &fetch(
+                &format!("{archive_url}.sha256"),
+                MAX_CHECKSUM_BYTES,
+                "checksum sidecar",
+            )?,
             &archive,
         )?;
-        let archive_url = asset_url(&release, &archive)?;
         let bytes = fetch(&archive_url, MAX_ARCHIVE_BYTES, "server archive")?;
         let actual = format!("{:x}", Sha256::digest(&bytes));
         if actual != expected {
@@ -511,8 +505,7 @@ mod tests {
     use super::{
         MAX_ARCHIVE_BYTES, MAX_CHECKSUM_BYTES, MAX_EXECUTABLE_BYTES, MAX_TAR_OVERHEAD_BYTES,
         VERSION, archive_name, cached_server_is_valid, expected_checksum, extract_tar_gz,
-        extract_tar_gz_with_limit, extract_zip, platform_artifact, read_limited,
-        release_version_matches,
+        extract_tar_gz_with_limit, extract_zip, platform_artifact, read_limited, release_asset_url,
     };
 
     const PAYLOAD: &[u8] = b"pdx-ls test payload";
@@ -645,9 +638,33 @@ mod tests {
         assert!(
             expected_checksum(b"aaaaaaaa  another.tar.gz\n", "pdx-ls-v0.1.0-test.tar.gz").is_err()
         );
-        assert!(release_version_matches(&format!("v{VERSION}")));
-        assert!(!release_version_matches(&format!("vv{VERSION}")));
-        assert!(!release_version_matches(VERSION));
+    }
+
+    #[test]
+    fn release_urls_use_direct_download_paths_without_the_github_api() {
+        let artifact = platform_artifact((
+            zed_extension_api::Os::Windows,
+            zed_extension_api::Architecture::X8664,
+        ))
+        .expect("supported platform");
+        let url = release_asset_url(&artifact);
+        assert_eq!(
+            url,
+            format!(
+                "https://github.com/{}/releases/download/v{VERSION}/{}",
+                super::REPOSITORY,
+                archive_name(&artifact)
+            )
+        );
+        assert!(!url.contains("api.github.com"));
+        assert_eq!(
+            format!("{url}.sha256"),
+            format!(
+                "https://github.com/{}/releases/download/v{VERSION}/{}.sha256",
+                super::REPOSITORY,
+                archive_name(&artifact)
+            )
+        );
     }
 
     #[test]
