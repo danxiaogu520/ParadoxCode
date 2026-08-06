@@ -1240,6 +1240,15 @@ fn add_semantic_value_items(
                     );
                 }
             }
+            ValueMatcher::Date => add_value_completion(
+                items,
+                "1444.11.11",
+                "date",
+                documentation.clone(),
+                replacement_range,
+                prefix,
+                rule.deprecated,
+            ),
             ValueMatcher::Type(type_name) => {
                 for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
                     add_value_completion(
@@ -1983,6 +1992,7 @@ fn semantic_value_hover_label(matcher: &ValueMatcher) -> String {
             };
             format!("float{bounds}")
         }
+        ValueMatcher::Date => "date (`YYYY.MM.DD`)".to_owned(),
         ValueMatcher::Type(value) => format!("symbol type `{value}`"),
         ValueMatcher::Enum(value) => format!("enum `{value}`"),
         ValueMatcher::Scope(value) => value
@@ -2846,6 +2856,7 @@ fn semantic_rule_diagnostics(
                     input.hir.as_deref(),
                     &mut diagnostics,
                     cancellation,
+                    child.block_range.is_some(),
                 )?;
             }
             continue;
@@ -2860,6 +2871,7 @@ fn semantic_rule_diagnostics(
             input.hir.as_deref(),
             &mut diagnostics,
             cancellation,
+            property.block_range.is_some(),
         )?;
     }
     Ok(diagnostics)
@@ -3066,6 +3078,7 @@ fn validate_semantic_container(
     hir: Option<&HirFile>,
     diagnostics: &mut Vec<Diagnostic>,
     cancellation: &CancellationToken,
+    block_container: bool,
 ) -> Result<(), Cancelled> {
     cancellation.checkpoint()?;
     let rules = semantic_rules_for_container(snapshot, context, parent_path, scope);
@@ -3246,6 +3259,7 @@ fn validate_semantic_container(
                     hir,
                     diagnostics,
                     cancellation,
+                    property.block_range.is_some(),
                 )?;
             }
             continue;
@@ -3294,6 +3308,7 @@ fn validate_semantic_container(
                     hir,
                     diagnostics,
                     cancellation,
+                    true,
                 )?;
                 validate_semantic_container(
                     snapshot,
@@ -3305,6 +3320,7 @@ fn validate_semantic_container(
                     hir,
                     diagnostics,
                     cancellation,
+                    true,
                 )?;
                 continue;
             }
@@ -3319,6 +3335,7 @@ fn validate_semantic_container(
             hir,
             diagnostics,
             cancellation,
+            property.block_range.is_some(),
         )?;
     }
     for (value, value_range) in bare_values {
@@ -3345,27 +3362,28 @@ fn validate_semantic_container(
     let empty_range = properties
         .first()
         .map_or_else(|| TextRange::empty(0), |property| property.key_range);
-    for rule in rules
-        .iter()
-        .filter(|rule| semantic_scope_allows(rule, scope))
-    {
-        cancellation.checkpoint()?;
-        if !semantic_rule_is_selected(rule, selected_alternative.as_deref()) {
-            continue;
-        }
-        if semantic_rule_is_alias_definition(rule) {
-            continue;
-        }
-        if matches!(rule.shape, RuleShape::LeafValue) {
-            let count = bare_values
-                .iter()
-                .filter(|(value, _)| semantic_leaf_value_matches(snapshot, rule, value, scope))
-                .count();
-            let count = u32::try_from(count).unwrap_or(u32::MAX);
-            if let Some(min_occurs) = semantic_min_occurs(rule)
-                && count < min_occurs
-            {
-                diagnostics.push(Diagnostic {
+    if block_container {
+        for rule in rules
+            .iter()
+            .filter(|rule| semantic_scope_allows(rule, scope))
+        {
+            cancellation.checkpoint()?;
+            if !semantic_rule_is_selected(rule, selected_alternative.as_deref()) {
+                continue;
+            }
+            if semantic_rule_is_alias_definition(rule) {
+                continue;
+            }
+            if matches!(rule.shape, RuleShape::LeafValue) {
+                let count = bare_values
+                    .iter()
+                    .filter(|(value, _)| semantic_leaf_value_matches(snapshot, rule, value, scope))
+                    .count();
+                let count = u32::try_from(count).unwrap_or(u32::MAX);
+                if let Some(min_occurs) = semantic_min_occurs(rule)
+                    && count < min_occurs
+                {
+                    diagnostics.push(Diagnostic {
                     code: DiagnosticCode::Cardinality,
                     severity: semantic_min_cardinality_severity(rule),
                     range: empty_range,
@@ -3375,11 +3393,11 @@ fn validate_semantic_container(
                         semantic_rule_provenance(rule)
                     ),
                 });
-            }
-            if let Some(max_occurs) = rule.max_occurs
-                && count > max_occurs
-            {
-                diagnostics.push(Diagnostic {
+                }
+                if let Some(max_occurs) = rule.max_occurs
+                    && count > max_occurs
+                {
+                    diagnostics.push(Diagnostic {
                     code: DiagnosticCode::Cardinality,
                     severity: 2,
                     range: bare_values.first().map_or(empty_range, |(_, range)| *range),
@@ -3388,22 +3406,22 @@ fn validate_semantic_container(
                         semantic_rule_provenance(rule)
                     ),
                 });
+                }
+                continue;
             }
-            continue;
-        }
-        let Some(min_occurs) = semantic_min_occurs(rule) else {
-            continue;
-        };
-        let count = properties
-            .iter()
-            .filter(|property| {
-                semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
-                    && !matches!(rule.shape, RuleShape::LeafValue)
-            })
-            .count();
-        let count = u32::try_from(count).unwrap_or(u32::MAX);
-        if count < min_occurs {
-            diagnostics.push(Diagnostic {
+            let Some(min_occurs) = semantic_min_occurs(rule) else {
+                continue;
+            };
+            let count = properties
+                .iter()
+                .filter(|property| {
+                    semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
+                        && !matches!(rule.shape, RuleShape::LeafValue)
+                })
+                .count();
+            let count = u32::try_from(count).unwrap_or(u32::MAX);
+            if count < min_occurs {
+                diagnostics.push(Diagnostic {
                 code: DiagnosticCode::Cardinality,
                 severity: semantic_min_cardinality_severity(rule),
                 range: empty_range,
@@ -3413,6 +3431,7 @@ fn validate_semantic_container(
                     semantic_rule_provenance(rule)
                 ),
             });
+            }
         }
     }
     Ok(())
@@ -3452,7 +3471,11 @@ fn semantic_selected_transition<'rule>(
         .iter()
         .copied()
         .filter(|rule| {
-            selected_alternative.is_none() || semantic_rule_is_selected(rule, selected_alternative)
+            // Alias definitions are concrete invocations, not competing alternatives, so
+            // alternative selection must not discard them (e.g. `if` inside an effect).
+            semantic_rule_is_alias_definition(rule)
+                || selected_alternative.is_none()
+                || semantic_rule_is_selected(rule, selected_alternative)
         })
         .filter(|rule| semantic_scope_allows(rule, scope))
         .collect::<Vec<_>>();
@@ -3469,7 +3492,8 @@ fn semantic_selected_transition<'rule>(
     }
     let structural_rules = semantic_rules_for_container(snapshot, context, &structural_path, scope);
     let possible = applicable
-        .into_iter()
+        .iter()
+        .copied()
         .filter(|candidate| {
             let (child_context, child_path) = semantic_transition_destination(
                 candidate,
@@ -3500,7 +3524,13 @@ fn semantic_selected_transition<'rule>(
             })
         })
         .collect::<Vec<_>>();
-    semantic_transitions_equivalent(&possible).then(|| possible[0])
+    if !possible.is_empty() && semantic_transitions_equivalent(&possible) {
+        return possible.first().copied();
+    }
+    // No candidate covers every child. Keep the structural-path fallback so genuinely
+    // unmatched children are reported against the parent context; alias definitions are
+    // already preserved above, which keeps legitimate transitions like `if` selected.
+    None
 }
 
 fn semantic_transition_destination(
@@ -3651,7 +3681,7 @@ fn semantic_leaf_value_matches(
             value,
             |type_name, member| workspace_member(snapshot, type_name, member),
             |enum_name, member| enum_member(snapshot, enum_name, member),
-            |scope_name, member| scope_member(scope_name, member, scope),
+            |scope_name, member| scope_member(snapshot, scope_name, member, scope),
         ),
     }
 }
@@ -3663,6 +3693,7 @@ fn semantic_value_matcher_label(matcher: &ValueMatcher) -> String {
         ValueMatcher::Bool => "bool".to_owned(),
         ValueMatcher::Int { .. } => "int".to_owned(),
         ValueMatcher::Float { .. } => "float".to_owned(),
+        ValueMatcher::Date => "date".to_owned(),
         ValueMatcher::Type(value) => format!("<{value}>"),
         ValueMatcher::Enum(value) => format!("enum[{value}]"),
         ValueMatcher::Scope(value) => value
@@ -4112,8 +4143,11 @@ fn semantic_property_matches(
         value,
         |type_name, member| workspace_member(snapshot, type_name, member),
         |enum_name, member| enum_member(snapshot, enum_name, member),
-        |scope, member| scope_member(scope, member, scope_context),
-    )
+        |scope, member| scope_member(snapshot, scope, member, scope_context),
+    ) || (matches!(
+        rule.value,
+        ValueMatcher::Int { .. } | ValueMatcher::Float { .. }
+    ) && scope_member(snapshot, None, value, scope_context))
 }
 
 fn semantic_dynamic_value_matches(
@@ -4124,7 +4158,7 @@ fn semantic_dynamic_value_matches(
 ) -> bool {
     let kind = kind.to_ascii_lowercase();
     if kind == "scope_field" {
-        return scope_member(None, value, scope_context)
+        return scope_member(snapshot, None, value, scope_context)
             || workspace_member(snapshot, "variable_name", value);
     }
     if kind == "variable" {
@@ -4183,7 +4217,12 @@ fn enum_member(snapshot: &AnalysisSnapshot, enum_name: &str, member: &str) -> bo
         || workspace_member(snapshot, enum_name, member)
 }
 
-fn scope_member(scope: Option<&str>, member: &str, context: &ScopeContext) -> bool {
+fn scope_member(
+    snapshot: &AnalysisSnapshot,
+    scope: Option<&str>,
+    member: &str,
+    context: &ScopeContext,
+) -> bool {
     let lowered = member.to_ascii_lowercase().replace('_', "");
     let resolved = if lowered == "root" {
         Some(context.root.as_str())
@@ -4199,10 +4238,15 @@ fn scope_member(scope: Option<&str>, member: &str, context: &ScopeContext) -> bo
         Some(member)
     };
     let Some(resolved) = resolved else {
-        return false;
+        // FROM/PREV registers are not tracked in every context; an unknown register is
+        // a legitimate scope reference that the analysis cannot disprove.
+        return true;
     };
-    context.profile.is_scope(resolved)
-        && scope.is_none_or(|expected| context.profile.scopes_compatible(resolved, expected))
+    if !context.profile.is_scope(resolved) {
+        // Country tags are valid scope references, e.g. `who = TRP`.
+        return workspace_member(snapshot, "country_tag", member);
+    }
+    scope.is_none_or(|expected| context.profile.scopes_compatible(resolved, expected))
 }
 
 fn syntax_diagnostics(input: &ParsedInput) -> Vec<Diagnostic> {

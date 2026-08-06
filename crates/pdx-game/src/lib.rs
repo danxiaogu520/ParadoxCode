@@ -703,10 +703,16 @@ impl UserPaths {
         }
     }
 
-    /// Returns the stable cache location for one game.
+    /// Returns the stable Vanilla index cache location for one game.
     #[must_use]
     pub fn vanilla_cache(&self, game_id: &str) -> PathBuf {
         self.cache_root.join(game_id).join("vanilla.pdxindex")
+    }
+
+    /// Returns the user-local compiled first-party rules artifact location for one game.
+    #[must_use]
+    pub fn rules_cache(&self, game_id: &str) -> PathBuf {
+        self.cache_root.join(game_id).join("rules.pdxrules")
     }
 }
 

@@ -24,7 +24,7 @@ ParadoxCode 采用“通用引擎、游戏 profile、EU4-first”的结构：
 
 ## 用户体验
 
-EU4 v0.1 不要求用户显式选择游戏。官方 binary 内嵌携带 `game_id = "eu4"` 的第一方 artifact，并在 composition root 选择 EU4 profile；不存在规则路径参数。
+EU4 v0.1 不要求用户显式选择游戏。官方 binary 内嵌携带 `game_id = "eu4"` 的第一方 JSON source bundle，在 composition root 选择 EU4 profile，并在用户 cache 物化 SQLite artifact；不存在规则路径参数。
 
 未来可以增加 workspace 自动识别或显式配置，但 server 不应依赖 binary 名称、编辑器名称或硬编码默认路径来判断游戏。
 
@@ -47,7 +47,7 @@ pdx-game-eu4
   EU4 profile / install descriptor / scopes / path semantics / special lowering
 
 pdx-bake
-  strict first-party rule source compiler; emits the EU4 rule artifact
+  strict first-party rule source compiler CLI; validates/emits temporary EU4 rule artifacts
 
 pdx-engine
   VFS / roots / overlays / HIR lowering / per-file state / snapshots / index shards
@@ -61,7 +61,7 @@ pdx-lsp
 
 ## 迁移策略
 
-> 实现进度（2026-07-30）：步骤 2–6 已完成。`pdx-rules` 持有通用 runtime 和 data-only `GameProfile`，`pdx-game-eu4` 持有 EU4 profile 和内嵌 artifact provider，迁移期 `pdx-eu4` re-export 已删除。schema 13 与第一方 source format 2 已落地；Zed 主脚本语言使用 `Europa Universalis IV`/`eu4`，通用 parser family 使用 `Script`。CLI → LSP → host → snapshot 显式传递并校验 profile。semantic root context、初始 `ScopeState`、静态 nested transition/intrinsic 与多段 exact link lowering 已进入 HIR。
+> 实现进度（2026-08-06）：步骤 2–6 已完成。`pdx-rules` 持有通用 source compiler/runtime 和 data-only `GameProfile`，`pdx-game::eu4` 持有 EU4 profile、内嵌 JSON source bundle 与用户 artifact cache provider，迁移期 `pdx-eu4` re-export 已删除。schema 16 与第一方 source format 5 已落地；Zed 主脚本语言使用 `Europa Universalis IV`/`eu4`，通用 parser family 使用 `Script`。CLI → LSP → host → snapshot 显式传递并校验 profile。semantic root context、初始 `ScopeState`、静态 nested transition/intrinsic 与多段 exact link lowering 已进入 HIR。
 
 原 `pdx-eu4` 同时包含通用规则 runtime 与 EU4 数据；迁移按以下步骤分阶段完成：
 

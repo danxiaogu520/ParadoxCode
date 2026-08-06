@@ -8,7 +8,10 @@ pub mod check;
 pub mod cli;
 pub mod release;
 
-pub use pdx_game::eu4::{INSTALL_DESCRIPTOR, first_party_rules, profile};
+pub use pdx_game::eu4::{
+    INSTALL_DESCRIPTOR, first_party_rules, first_party_rules_cached, first_party_rules_ephemeral,
+    profile,
+};
 
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::fmt;

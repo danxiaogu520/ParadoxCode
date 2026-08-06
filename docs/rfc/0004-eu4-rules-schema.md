@@ -3,17 +3,19 @@
 - 状态：Accepted
 - MVP：EU4 v0.1
 
-> 2026-07-20 amendment：EU4 是当前唯一交付规则包，但通用 artifact/runtime 类型将按 [RFC 0012](0012-generic-engine-eu4-first.md) 迁入 `pdx-rules`，EU4 特有内容进入 EU4 profile。本 RFC 继续定义 `eu4.pdxrules` 的具体语义与发布要求。
+> 2026-07-20 amendment：EU4 是当前唯一交付规则包，但通用 artifact/runtime 类型将按 [RFC 0012](0012-generic-engine-eu4-first.md) 迁入 `pdx-rules`，EU4 特有内容进入 EU4 profile。本 RFC 继续定义 EU4 SQLite runtime artifact 的具体语义与发布要求。
 >
 > 2026-07-21 amendment：artifact 仍是开发期权威数据，但外部 runtime 文件与扩展携带规则的分发方式已由 [RFC 0013](0013-embedded-first-party-rules.md) 取代。
 >
 > 2026-07-22 amendment：SQLite 不再是人工维护的权威源，CWT bootstrap/CRUD 决策已废止。
-> `rules/eu4/*.json` 是唯一权威，`pdx-bake` 生成并验证 SQLite artifact；详见
+> `rules/eu4/*.json` 是唯一权威，`pdx-bake` 和 `pdx-ls` 共享编译核心生成并验证 SQLite artifact；详见
 > [RFC 0014](0014-first-party-rule-source.md)。
+>
+> 2026-08-06 amendment：SQLite artifact 不再提交到 Git 或嵌入 binary，而是在用户本地 cache 中按 source `rule_hash` 生成。
 
 ## 目标
 
-EU4 的文件分类、types、aliases、enums、commands、scopes、symbols、documentation、reference semantics 与覆盖策略全部存入项目自有的 `eu4.pdxrules`。核心分析只消费 EU4 schema；不提供游戏选择器、通用游戏适配接口或其他游戏适配。EU4 语法本身由 `pdx-parser` 直接实现。
+EU4 的文件分类、types、aliases、enums、commands、scopes、symbols、documentation、reference semantics 与覆盖策略全部由第一方 JSON source 声明，并编译进 runtime SQLite artifact。核心分析只消费 EU4 schema；不提供游戏选择器、通用游戏适配接口或其他游戏适配。EU4 语法本身由 `pdx-parser` 直接实现。
 
 EU4 profile 当前只服务项目选定的 EU4 规则基线。规则数据库可以由项目维护者继续修订；每次逻辑修订产生新的 `rule_hash`。未来其他游戏或版本的策略不由本 RFC 定义。
 
@@ -22,38 +24,38 @@ EU4 profile 当前只服务项目选定的 EU4 规则基线。规则数据库可
 ```text
 rules/
   eu4/                  developer-maintained first-party JSON authority
-  eu4.pdxrules          generated SQLite artifact
-  manifest.json         schema、rule_hash、checksum、统计
+  manifest.json         generated source/artifact validation metadata
   tests/
     fixtures/
 
 editors/zed/
   ...
-  bundled-rules/        发布打包时包含 eu4.pdxrules
 ```
 
 项目不接受 `.cwt` 或其他外部规则 source。不接受任何外部规则参与编译、测试或发布。
 
-`rules/` 是仓库内的 source-of-truth artifact 位置，不是独立分发渠道。面向用户的规则分发只通过编辑器扩展 release 完成。
+`rules/` 是仓库内的 first-party JSON source 和验证元数据位置，不是独立分发渠道。面向用户的 source bundle 随官方 server 发布；SQLite artifact 只存在于开发/发布临时目录或用户本机 cache。
 
 ## 权威链路
 
 ```text
 developer-maintained rules/eu4 source
                  |
-                 v
-          pdx-bake build
-                 |
-                 v
-     self-owned SQLite eu4.pdxrules
-                 |
-                 +---- canonical logical view ----> rule_hash
-                 |
-                 v
-       read-only runtime RuleSet + Eu4Profile
+        +--------+--------+
+        |                 |
+        v                 v
+  pdx-bake checks   embedded source bundle
+                          |
+                          v
+                 user-local SQLite cache
+                          |
+                          +---- canonical logical view ----> rule_hash
+                          |
+                          v
+                read-only runtime RuleSet + Eu4Profile
 ```
 
-第一方 JSON source 是唯一权威。SQLite 仅为可复现生成物，不直接人工修订；项目不追踪或兼容 CWTools/CWT。
+第一方 JSON source 是唯一权威。SQLite 仅为可复现生成物，不直接人工修订；项目不追踪或兼容 CWTools/CWT。用户 cache 只有在 schema、game identity 和 source `rule_hash` 均匹配时才可加载。
 
 ## SQLite 逻辑模型
 
@@ -156,9 +158,9 @@ SymbolDescriptor
 
 ## Runtime 不可变性
 
-`pdx-rules` 以 read-only 模式打开 SQLite，校验 schema、foreign keys、逻辑不变量与 `rule_hash`，然后构建只读 runtime view 并通过 `Arc<RuleSet>` 共享；`pdx-game-eu4` 负责确认这是 EU4 profile 可消费的 artifact。
+`pdx-rules` 以 read-only 模式打开 SQLite，校验 schema、foreign keys、逻辑不变量与 `rule_hash`，然后构建只读 runtime view 并通过 `Arc<RuleSet>` 共享；`pdx-game::eu4` 在用户 cache miss 或 hash mismatch 时先从内嵌第一方 JSON source 生成并 round-trip 校验 artifact。
 
-Runtime API 不暴露 `insert`、`update` 或 `delete`。加载失败时 server 降级为 syntax-only，并发布 workspace-level 配置错误；不能部分加载或从网络寻找替代规则。
+Runtime API 不暴露 `insert`、`update` 或 `delete`。规则 cache 不是 authority；加载失败时 server 不能从网络、项目路径或旧 hash 寻找替代规则。内嵌 source 编译失败应作为 server/source distribution 错误明确报告。
 
 ## rule_hash
 
@@ -174,14 +176,17 @@ Runtime API 不暴露 `insert`、`update` 或 `delete`。加载失败时 server 
 
 ## 分发与版本
 
-- `eu4.pdxrules` 是 repository/release 中可审计的生成物，并内嵌到官方 binary。
+- `rules/eu4/*.json` 是 repository 中唯一人工维护的规则源。
+- `pdx-bake` 生成物只用于开发/发布校验；`eu4.pdxrules` 不提交到 repository，也不嵌入官方 binary。
+- 官方 server 内嵌经过 source validation 的第一方 JSON bundle，在用户本地生成并缓存 SQLite artifact。
 - 规则由 server release 拥有；编辑器扩展不携带、不下载、不解释规则。
-- server 版本升级自然携带新的规则和 `rule_hash`。
+- server 版本升级自然携带新的规则 source 和 `rule_hash`。
 - `.pdx/project.toml` 不 pin `rule_hash`。
 - `pdx-ls` 不接受规则路径，不下载或独立更新规则。
 - 需要旧规则时只能使用携带它的旧 server 版本；MVP 不提供 hash registry。
 
-artifact schema 不兼容时拒绝加载。schema version 只描述存储/API 格式，不代表另一个游戏或可切换的游戏版本。
+artifact schema 不兼容或 cache hash 不匹配时必须重新生成；schema version 只描述存储/API
+格式，不代表另一个游戏或可切换的游戏版本。
 
 ## 已废止：数据库 CRUD
 

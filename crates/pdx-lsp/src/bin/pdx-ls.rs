@@ -13,22 +13,27 @@ fn main() -> Result<(), pdx_lsp::LspError> {
             args[0]
         )));
     }
-    let rules = pdx_lsp::first_party_rules()?;
     let profile = pdx_lsp::profile();
     match pdx_game::UserPaths::platform() {
-        Ok(user_paths) => pdx_lsp::LspServer::run_stdio_with_profile_and_auto_vanilla(
-            pdx_lsp::InitializeOptions,
-            rules,
-            profile,
-            pdx_lsp::AutoVanillaConfiguration {
-                descriptor: pdx_lsp::INSTALL_DESCRIPTOR,
-                user_paths,
-            },
-        ),
+        Ok(user_paths) => {
+            let rules = pdx_lsp::first_party_rules_cached(
+                &user_paths.rules_cache(pdx_lsp::INSTALL_DESCRIPTOR.game_id),
+            )?;
+            pdx_lsp::LspServer::run_stdio_with_profile_and_auto_vanilla(
+                pdx_lsp::InitializeOptions,
+                rules,
+                profile,
+                pdx_lsp::AutoVanillaConfiguration {
+                    descriptor: pdx_lsp::INSTALL_DESCRIPTOR,
+                    user_paths,
+                },
+            )
+        }
         Err(error) => {
             eprintln!(
-                "pdx-ls: automatic Vanilla discovery is disabled because user paths could not be resolved: {error}"
+                "pdx-ls: user cache paths could not be resolved; compiled rules will not be persisted: {error}"
             );
+            let rules = pdx_lsp::first_party_rules_ephemeral()?;
             pdx_lsp::LspServer::run_stdio_with_profile(pdx_lsp::InitializeOptions, rules, profile)
         }
     }

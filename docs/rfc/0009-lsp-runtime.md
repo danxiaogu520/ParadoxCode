@@ -5,7 +5,7 @@
 
 > 实现进度（2026-07-25）：stdio reader 与 workspace event loop 已分离；initialize 的 source-root scan 在候选 host worker 中运行，目录/读取/parse/lower/index 全链路可取消且仅在成功后提交；编辑先 stage 最新文本/版本，parse/lower 在 snapshot worker 准备，并通过版本、文本、路径三重提交门拒绝旧结果；依赖语义的请求按消息顺序等待最新 parse。semantic diagnostics 使用 200ms debounce 与版本门，普通语言请求也在 snapshot worker 执行；`$/cancelRequest` 与过期 diagnostics 使用共享的 editor-neutral token，在 workspace semantic 合并、semantic rule 递归及主要结果遍历中协作式中止。当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 与语言功能 response 已迁入 `lsp-types`，JSON-RPC framing 继续保持轻量自有实现。类型化 `initializationOptions`、项目 TOML、Current Mod、有序只读 Dependency roots、持久化只读 Vanilla cache，以及动态注册并在 revision 门后提交的 watched-file worker 均已接入。Vanilla cache 的读取/校验/合并在 initialize response 之后后台执行；依赖 cache 的 snapshot 查询在合并前排队，避免启动阶段被大 cache 同步阻塞。memory transport 回归还覆盖 scope-fact 消歧后的 mixed structural/child-context completion 与相应 publishDiagnostics。
 >
-> 缓存修订（2026-08-05）：initialize response 之后，后台 worker 加载可读且 schema/game identity 有效的 Vanilla cache；若记录的 `rule_hash` 与当前内嵌规则不一致，worker 从 cache metadata 的 Vanilla 源目录以当前内嵌规则重建，并通过 SQLite transaction 保存到原路径，事务提交后由 event loop 安装。重建成功发送 `window/showMessage` INFO；扫描、重建或事务保存失败则回退安装已加载旧 cache，发送 WARNING 并说明失败原因及两个 hash。缺失、损坏或 schema 不兼容仍 warning 降级且不隐式扫描游戏目录；文件内容变化不自动刷新，显式用户刷新仍支持。后台 worker 运行期间不静默：客户端在 initialize 中声明 `window.workDoneProgress` 时，server 先发 `window/workDoneProgress/create`（客户端响应按协议忽略），再以 `$/progress` 发送 begin/report/end（report 转发引擎扫描的已索引文件数）；未声明时以开始/结束两条 INFO `window/showMessage` 提示。该能力在 initialize 响应后由 event loop 从客户端 capabilities 读取。
+> 缓存修订（2026-08-05）：initialize response 之后，后台 worker 加载可读且 schema/game identity 有效的 Vanilla cache；若记录的 `rule_hash` 与当前内嵌 JSON source 编译出的规则不一致，worker 从 cache metadata 的 Vanilla 源目录以当前规则重建，并通过 SQLite transaction 保存到原路径，事务提交后由 event loop 安装。重建成功发送 `window/showMessage` INFO；扫描、重建或事务保存失败则回退安装已加载旧 cache，发送 WARNING 并说明失败原因及两个 hash。缺失、损坏或 schema 不兼容仍 warning 降级且不隐式扫描游戏目录；文件内容变化不自动刷新，显式用户刷新仍支持。后台 worker 运行期间不静默：客户端在 initialize 中声明 `window.workDoneProgress` 时，server 先发 `window/workDoneProgress/create`（客户端响应按协议忽略），再以 `$/progress` 发送 begin/report/end（report 转发引擎扫描的已索引文件数）；未声明时以开始/结束两条 INFO `window/showMessage` 提示。该能力在 initialize 响应后由 event loop 从客户端 capabilities 读取。
 >
 > 2026-07-21 amendment：本 RFC 的 `--rules` runtime 输入已由 [RFC 0013](0013-embedded-first-party-rules.md) 取代；LSP 生命周期和协议边界不变。
 
@@ -39,8 +39,9 @@ Server 使用编译进官方 binary 的第一方规则：
 pdx-ls
 ```
 
-`pdx-ls` 不接受、下载、更新或搜索外部规则文件。启动时校验内嵌 artifact 的 SQLite
-schema、game identity 和 `rule_hash`；失败则保留 syntax-only 能力并报告 workspace error。
+`pdx-ls` 不接受、下载、更新或搜索外部规则文件。启动时校验内嵌 first-party JSON source，计算
+`rule_hash`，再只读加载或生成用户本地 SQLite artifact；cache schema、game identity 或 hash
+不匹配时重新编译，编译失败则报告明确的 server/source error，不能使用旧规则静默继续。
 
 ## Server 状态
 
@@ -142,7 +143,7 @@ Workspace 中未打开文件的全量错误由 `pdx check` 提供；Workspace Di
 
 ## 文件变化
 
-Phase 4 接收 Current Mod和 Dependency 的 client watched-file notification，并保留 server-side scan fallback。来自 watcher 的磁盘变化不能覆盖打开文档 overlay，只更新 backing candidate。Vanilla 不注册持续 watcher；源文件内容或 fingerprint 变化不自动刷新。LSP 启动仅在可读 cache 的 `rule_hash` 与当前内嵌规则不一致时按上述后台流程重建；其他重建仍由显式刷新操作触发。
+Phase 4 接收 Current Mod和 Dependency 的 client watched-file notification，并保留 server-side scan fallback。来自 watcher 的磁盘变化不能覆盖打开文档 overlay，只更新 backing candidate。Vanilla 不注册持续 watcher；源文件内容或 fingerprint 变化不自动刷新。LSP 启动仅在可读 cache 的 `rule_hash` 与当前内嵌 JSON source 编译出的规则不一致时按上述后台流程重建；其他重建仍由显式刷新操作触发。
 
 ## Panic 隔离
 

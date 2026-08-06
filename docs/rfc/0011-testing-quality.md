@@ -112,8 +112,9 @@ cargo bench -p pdx-engine --bench synthetic_workspace
 - clippy，workspace/all targets，warnings denied（第三方生成代码可显式例外）
 - unit/integration/doc tests
 - Tree-sitter corpus tests
-- committed `eu4.pdxrules` schema/invariant validation
-- manifest `rule_hash` 与数据库 canonical logical content 一致
+- first-party JSON source schema/invariant validation and temporary SQLite round-trip
+- manifest `rule_hash` 与生成数据库 canonical logical content 一致
+- user-local rule artifact cache miss/corruption/hash mismatch rebuild smoke
 - logical hash stability：插入顺序、SQLite index、VACUUM 和物理重建不改变 hash
 - runtime loader smoke test
 - Zed extension manifest/build check

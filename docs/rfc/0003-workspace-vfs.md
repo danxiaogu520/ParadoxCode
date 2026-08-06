@@ -5,7 +5,7 @@
 
 > 实现进度（2026-07-25）：Current Mod/Dependency 的类型化 LSP 与项目 TOML 配置已接入；`pdx index vanilla` 建立版本化本地 SQLite cache，LSP 可取消地只读加载并在后续 refresh 中跳过 Vanilla 目录。cache 不保存源码，缺失/损坏/错 game 降级 warning；可读 cache 的旧 `rule_hash` 按下述后台重建流程处理。Current Mod/Dependency 的 watched-file 事件通过后台 worker 定向替换单文件状态和 shard，打开 overlay 保持优先，Vanilla 不注册 watcher。
 >
-> 缓存修订（2026-08-05）：LSP 加载到可读且 schema/game identity 有效的 cache 后，若其记录的 `rule_hash` 与当前内嵌规则工件不一致，后台 worker 使用内嵌规则从 cache metadata 记录的 Vanilla 源目录重建。重建结果写回原 cache 路径时使用 SQLite transaction，事务提交后再由 event loop 安装；成功以 `window/showMessage` 的 INFO 显式提示。扫描、重建或事务保存失败时保留并安装已加载的旧 cache，以 WARNING 显式说明失败原因和两个 hash；事务回滚不会留下半成品 cache。缺失、损坏、schema/game identity 无效的 cache 仍降级 warning，且不隐式扫描游戏目录；Vanilla 文件内容或 fingerprint 变化不触发自动刷新，显式用户刷新仍支持。后台加载/重建期间不静默：客户端声明 `window.workDoneProgress` 时，worker 通过 `window/workDoneProgress/create` + `$/progress`（begin/report/end，report 携带已索引文件数与百分比）驱动进度条；否则以开始/结束两条 `window/showMessage` INFO 提示。引擎新增 `refresh_source_roots_cancellable_with_progress`，在文件读取/解析阶段按 `(completed, total)` 回调，由 LSP worker 转发为进度事件。
+> 缓存修订（2026-08-05）：LSP 加载到可读且 schema/game identity 有效的 cache 后，若其记录的 `rule_hash` 与当前内嵌 JSON source 编译出的规则不一致，后台 worker 使用内嵌规则从 cache metadata 记录的 Vanilla 源目录重建。重建结果写回原 cache 路径时使用 SQLite transaction，事务提交后再由 event loop 安装；成功以 `window/showMessage` 的 INFO 显式提示。扫描、重建或事务保存失败时保留并安装已加载的旧 cache，以 WARNING 显式说明失败原因和两个 hash；事务回滚不会留下半成品 cache。缺失、损坏、schema/game identity 无效的 cache 仍降级 warning，且不隐式扫描游戏目录；Vanilla 文件内容或 fingerprint 变化不触发自动刷新，显式用户刷新仍支持。后台加载/重建期间不静默：客户端声明 `window.workDoneProgress` 时，worker 通过 `window/workDoneProgress/create` + `$/progress`（begin/report/end，report 携带已索引文件数与百分比）驱动进度条；否则以开始/结束两条 `window/showMessage` INFO 提示。引擎新增 `refresh_source_roots_cancellable_with_progress`，在文件读取/解析阶段按 `(completed, total)` 回调，由 LSP worker 转发为进度事件。
 >
 > 设计修订（2026-08-01）：为支持不打开 Vanilla `.yml` 文件时的 Hover，cache schema 3 额外保存每个本地化 definition 的有限长度派生预览（语言头和最多 240 个字符的值）。这不是源码、CST 或 HIR；`rule_hash` 相同的正常启动只读 cache，原 Vanilla 目录不扫描、不读取，只有 hash 不一致时按 2026-08-05 修订从记录的 source root 重建。空值不生成预览，schema 不兼容时仍要求用户显式刷新。
 >
@@ -158,7 +158,7 @@ path = "dependencies/content-extension" # later = higher priority
 首次配置扩展时，用户选择 Vanilla 目录并建立本地持久化索引。之后：
 
 - 正常启动对 `rule_hash` 相同的 cache 直接查询，不持续扫描 Vanilla；加载在 initialize response 之后的后台 worker 中执行。
-- 若可读 cache 的 `rule_hash` 与当前内嵌规则不一致，worker 从 cache metadata 的 `source_root` 读取 Vanilla，使用内嵌规则重建，并通过 SQLite transaction 将完整结果写回原 cache 路径；事务提交后由 event loop 安装新 cache。
+- 若可读 cache 的 `rule_hash` 与当前内嵌 JSON source 编译出的规则不一致，worker 从 cache metadata 的 `source_root` 读取 Vanilla，使用内嵌规则重建，并通过 SQLite transaction 将完整结果写回原 cache 路径；事务提交后由 event loop 安装新 cache。
 - 规则 hash 不一致的重建成功发送 INFO；扫描、重建或事务保存失败则回退安装已加载的旧 cache，发送 WARNING 并保留失败原因及两个 hash。
 - 缺失、损坏或 schema/game identity 不兼容的 cache 只发送 warning 并降级为不含 Vanilla 的分析，不隐式扫描游戏目录。
 - cache metadata 记录创建时间、源目录指纹和当时的 `rule_hash`；文件内容或 fingerprint 变化本身不触发自动刷新，只有显式用户“刷新 Vanilla 索引”操作才按需重建。

@@ -88,12 +88,16 @@ After installation, normal `git commit` commands run the complete local quality 
 `bash scripts/check-quality-gates.sh` to run them explicitly or pass `core`, `grammars`, `zed`, or
 `release` to diagnose one group.
 
-Compile the developer-maintained first-party rule source with `pdx-bake`; no external checkout or
-rule corpus is required:
+Validate and compile the developer-maintained first-party rule source with `pdx-bake`; the output
+can be placed in the ignored build directory for inspection:
 
 ```bash
-cargo run -p pdx-rules --bin pdx-bake -- build --source rules/eu4 --output rules/eu4.pdxrules --manifest rules/manifest.json
+cargo run -p pdx-rules --bin pdx-bake -- build --source rules/eu4 --output target/rules/eu4.pdxrules --manifest target/rules/manifest.json
 ```
+
+Official `pdx-ls` binaries embed the first-party JSON source and generate a validated SQLite rules
+artifact in the user cache on first use or when the source `rule_hash` changes. The generated
+artifact is not committed to the repository.
 
 ## Development setup
 
@@ -120,7 +124,8 @@ pdx index vanilla \
   --output /path/to/vanilla.pdxindex
 ```
 
-The CLI and language server use the embedded first-party EU4 rules and reject external rule inputs.
+The CLI and language server use the embedded first-party EU4 JSON source. `pdx-ls` materializes a
+validated SQLite runtime artifact in the user cache and rejects external rule inputs.
 
 ## Repository layout
 

@@ -21,7 +21,7 @@ fn run() -> Result<(), String> {
         );
         return Ok(());
     }
-    Err("usage: pdx-bake build --source <rules/eu4> --output <rules/eu4.pdxrules> --manifest <rules/manifest.json>".to_owned())
+    Err("usage: pdx-bake build --source <rules/eu4> --output <artifact.pdxrules> --manifest <manifest.json>".to_owned())
 }
 
 fn option(args: &[String], flag: &str) -> Result<PathBuf, String> {

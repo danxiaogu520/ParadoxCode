@@ -26,6 +26,28 @@ const TYPE_ROOT_SCOPES: &str = "type-root-scopes.json";
 const TYPE_DESCRIPTORS: &str = "type-descriptors.json";
 const LOCALISATION_BINDINGS: &str = "localisation-bindings.json";
 
+/// A complete first-party source bundle, either embedded in a runtime binary or supplied by a
+/// developer-side source loader.
+#[derive(Clone, Copy, Debug)]
+pub struct SourceBundle<'a> {
+    /// Source manifest JSON.
+    pub manifest: &'a [u8],
+    /// Normalized catalog JSON.
+    pub catalog: &'a [u8],
+    /// Semantic rule alternatives JSON.
+    pub semantic_rules: &'a [u8],
+    /// Static enum values JSON.
+    pub enum_values: &'a [u8],
+    /// Type root key selectors JSON.
+    pub type_root_keys: &'a [u8],
+    /// Type root scope selectors JSON.
+    pub type_root_scopes: &'a [u8],
+    /// Type descriptor JSON.
+    pub type_descriptors: &'a [u8],
+    /// Type-instance localisation binding JSON.
+    pub localisation_bindings: &'a [u8],
+}
+
 /// Identity and compatibility metadata maintained with the rule source.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -152,6 +174,62 @@ impl From<RulesError> for CompileError {
 pub fn load_source(source: &Path) -> Result<(SourceManifest, RulesModel), CompileError> {
     validate_source_layout(source)?;
     let manifest: SourceManifest = read_json(&source.join(SOURCE_MANIFEST))?;
+    let catalog: CatalogSource = read_json(&source.join(CATALOG))?;
+    let localisation_bindings = read_localisation_bindings(&source.join(LOCALISATION_BINDINGS))?;
+    let semantic = SemanticModel {
+        rules: read_json(&source.join(SEMANTIC_RULES))?,
+        enum_values: read_json(&source.join(ENUM_VALUES))?,
+        type_root_keys: read_json(&source.join(TYPE_ROOT_KEYS))?,
+        type_root_scopes: read_json(&source.join(TYPE_ROOT_SCOPES))?,
+        type_descriptors: read_json(&source.join(TYPE_DESCRIPTORS))?,
+        localisation_bindings,
+    };
+    validate_source_model(manifest, catalog, semantic)
+}
+
+/// Loads and validates an embedded first-party source bundle without materializing its JSON files.
+pub fn load_source_bundle(
+    source: SourceBundle<'_>,
+) -> Result<(SourceManifest, RulesModel), CompileError> {
+    let manifest: SourceManifest =
+        read_json_bytes(PathBuf::from("<embedded>/manifest.json"), source.manifest)?;
+    let catalog: CatalogSource =
+        read_json_bytes(PathBuf::from("<embedded>/catalog.json"), source.catalog)?;
+    let localisation_bindings = read_localisation_bindings_bytes(
+        PathBuf::from("<embedded>/localisation-bindings.json"),
+        source.localisation_bindings,
+    )?;
+    let semantic = SemanticModel {
+        rules: read_json_bytes(
+            PathBuf::from("<embedded>/semantic-rules.json"),
+            source.semantic_rules,
+        )?,
+        enum_values: read_json_bytes(
+            PathBuf::from("<embedded>/enum-values.json"),
+            source.enum_values,
+        )?,
+        type_root_keys: read_json_bytes(
+            PathBuf::from("<embedded>/type-root-keys.json"),
+            source.type_root_keys,
+        )?,
+        type_root_scopes: read_json_bytes(
+            PathBuf::from("<embedded>/type-root-scopes.json"),
+            source.type_root_scopes,
+        )?,
+        type_descriptors: read_json_bytes(
+            PathBuf::from("<embedded>/type-descriptors.json"),
+            source.type_descriptors,
+        )?,
+        localisation_bindings,
+    };
+    validate_source_model(manifest, catalog, semantic)
+}
+
+fn validate_source_model(
+    manifest: SourceManifest,
+    catalog: CatalogSource,
+    semantic: SemanticModel,
+) -> Result<(SourceManifest, RulesModel), CompileError> {
     if manifest.source_format_version != SOURCE_FORMAT_VERSION {
         return Err(CompileError::Validation(format!(
             "unsupported source format version {}; expected {SOURCE_FORMAT_VERSION}",
@@ -168,17 +246,6 @@ pub fn load_source(source: &Path) -> Result<(SourceManifest, RulesModel), Compil
             "target_game_version must not be empty".to_owned(),
         ));
     }
-
-    let catalog: CatalogSource = read_json(&source.join(CATALOG))?;
-    let localisation_bindings = read_localisation_bindings(&source.join(LOCALISATION_BINDINGS))?;
-    let semantic = SemanticModel {
-        rules: read_json(&source.join(SEMANTIC_RULES))?,
-        enum_values: read_json(&source.join(ENUM_VALUES))?,
-        type_root_keys: read_json(&source.join(TYPE_ROOT_KEYS))?,
-        type_root_scopes: read_json(&source.join(TYPE_ROOT_SCOPES))?,
-        type_descriptors: read_json(&source.join(TYPE_DESCRIPTORS))?,
-        localisation_bindings,
-    };
     let model = RulesModel {
         game_id: manifest.game_id.clone(),
         file_categories: catalog.file_categories,
@@ -194,7 +261,21 @@ fn read_localisation_bindings(
     path: &Path,
 ) -> Result<Vec<crate::LocalisationBinding>, CompileError> {
     let source: BTreeMap<String, Vec<LocalisationBindingSource>> = read_json(path)?;
-    Ok(source
+    Ok(decode_localisation_bindings(source))
+}
+
+fn read_localisation_bindings_bytes(
+    path: PathBuf,
+    bytes: &[u8],
+) -> Result<Vec<crate::LocalisationBinding>, CompileError> {
+    let source: BTreeMap<String, Vec<LocalisationBindingSource>> = read_json_bytes(path, bytes)?;
+    Ok(decode_localisation_bindings(source))
+}
+
+fn decode_localisation_bindings(
+    source: BTreeMap<String, Vec<LocalisationBindingSource>>,
+) -> Vec<crate::LocalisationBinding> {
+    source
         .into_iter()
         .flat_map(|(type_name, bindings)| {
             bindings
@@ -216,7 +297,7 @@ fn read_localisation_bindings(
                     explicit_field: binding.explicit_field,
                 })
         })
-        .collect())
+        .collect()
 }
 
 /// Compiles source into a validated SQLite artifact and release manifest.
@@ -519,10 +600,11 @@ fn read_json<T: DeserializeOwned>(path: &Path) -> Result<T, CompileError> {
         path: path.to_owned(),
         source,
     })?;
-    serde_json::from_slice(&bytes).map_err(|source| CompileError::Json {
-        path: path.to_owned(),
-        source,
-    })
+    read_json_bytes(path.to_owned(), &bytes)
+}
+
+fn read_json_bytes<T: DeserializeOwned>(path: PathBuf, bytes: &[u8]) -> Result<T, CompileError> {
+    serde_json::from_slice(bytes).map_err(|source| CompileError::Json { path, source })
 }
 
 fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), CompileError> {

@@ -29,9 +29,8 @@ Thumbs.db
 /rules/vanilla-cache/
 /editors/zed/bundled-rules/*.pdxrules
 
-# The audited EU4 artifact is the only pdxrules file kept in source control.
+# Rule artifacts are generated in user/release caches from the first-party JSON source.
 /rules/*.pdxrules
-!/rules/eu4.pdxrules
 
 # Temporary local rule-inspection helper
 /rules/find-rule.cjs

@@ -43,11 +43,16 @@ Editor buffer / current mod / dependency mods / Vanilla cache
 
 Developer-maintained rules/eu4 source tree
                   |
-                  v
-        strict pdx-bake compiler
+                  +--> strict pdx-bake validation/build (developer/release)
                   |
                   v
-      self-owned SQLite eu4.pdxrules
+       embedded first-party JSON source bundle
+                  |
+                  v
+    pdx-ls first-party artifact cache provider
+                  |
+                  v
+       user-local validated SQLite artifact
                   |
                   v
  canonical logical hashing -> rule_hash
@@ -63,7 +68,7 @@ Zed extension 只负责：
 - 获取或查找 `pdx-ls`
 - 启动 Language Server
 - 传递 workspace 配置
-- 下载、校验、缓存并启动与平台匹配的官方 `pdx-ls`；规则由 binary 内嵌
+- 下载、校验、缓存并启动与平台匹配的官方 `pdx-ls`；第一方 JSON source bundle 由 server 内嵌，SQLite runtime artifact 在用户本机按需生成
 - 首次启动时允许 server 在后台执行一次快速 Vanilla 发现；复杂选择和深度扫描交给 `pdx setup vanilla`
 - 只为 EU4 Script 注册编辑器语言；localisation 由 server 在 workspace 扫描中静默解析，不注册独立 Zed 语言
 
@@ -84,13 +89,13 @@ Zed extension 只负责：
 
 LSP initialize 将 client 打开的 root 与类型化 `initializationOptions` 解析成 source roots；可选 `.pdx/project.toml` 描述 Current Mod 和从低到高排列的 Dependency Mods，inline 字段可覆盖 TOML。相对路径以打开的 worktree 为基准，目录会 canonicalize 并拒绝重叠。这属于 adapter 配置解析；优先级、只读属性和索引仍由 editor-neutral workspace 模型执行。
 
-Vanilla cache 是本机版本化 SQLite artifact，只持久化 source-file location metadata（包括 definition/reference 的 UTF-16 导航位置）、semantic shards，以及本地化 definition 的有限长度派生 Hover 预览；不持久化源码、CST 或 HIR。这样即使 Vanilla 源目录当前不可读，definition/reference 仍可返回可用的编辑器范围，本地化 Hover 仍可显示短文本。`pdx index vanilla` 保留为显式低层建库入口；`pdx setup vanilla` 负责发现、验证、建库和用户级配置。首次 LSP 启动在没有项目覆盖和历史尝试记录时只后台执行一次快速发现；唯一候选完整建库后通过 event loop 原子安装，零候选或多候选记录结果并提示用户手动深度扫描。正常启动先完成 Current Mod/Dependency 的初始化并回复 `initialize`，再在可取消后台 worker 中只读加载 cache，完成后由 event loop 原子合并；在合并完成前，依赖 Vanilla 的 snapshot 查询排队，避免读取半成品索引。后续 workspace refresh 会跳过 Vanilla root。cache `game_id` 必须匹配，`rule_hash` 只用于可观察性和手动刷新决策。
+规则 artifact 是本机版本化 SQLite cache。官方 server 内嵌严格第一方 JSON source bundle，启动时先解析并计算 canonical `rule_hash`；用户 cache 的 schema、game identity 和 hash 匹配时只读加载，否则在临时文件中重新编译、round-trip 校验后原子安装。规则 cache 不接受外部 source path、用户覆盖或旧 hash fallback。Vanilla cache 仍只持久化 source-file location metadata（包括 definition/reference 的 UTF-16 导航位置）、semantic shards，以及本地化 definition 的有限长度派生 Hover 预览；不持久化源码、CST 或 HIR。这样即使 Vanilla 源目录当前不可读，definition/reference 仍可返回可用的编辑器范围，本地化 Hover 仍可显示短文本。`pdx index vanilla` 保留为显式低层建库入口；`pdx setup vanilla` 负责发现、验证、建库和用户级配置。首次 LSP 启动在没有项目覆盖和历史尝试记录时只后台执行一次快速发现；唯一候选完整建库后通过 event loop 原子安装，零候选或多候选记录结果并提示用户手动深度扫描。正常启动先完成 Current Mod/Dependency 的初始化并回复 `initialize`，再在可取消后台 worker 中只读加载 Vanilla cache，完成后由 event loop 原子合并；在合并完成前，依赖 Vanilla 的 snapshot 查询排队，避免读取半成品索引。后续 workspace refresh 会跳过 Vanilla root。Vanilla cache 的 `game_id` 必须匹配，`rule_hash` 不一致时按 RFC 0003 重建 Vanilla index。
 
 ### 规则层
 
-`pdx-bake` 只接受仓库中的严格第一方 JSON 规则源码，校验稳定身份、cardinality、severity、type descriptor、type-instance localisation binding（含 subtype condition）和 artifact round-trip，然后生成 SQLite `eu4.pdxrules`。项目不提供 CWT importer、fallback 或同步入口。
+`pdx-bake` 和 `pdx-ls` 共享 `pdx-rules::rulec` 的严格第一方 JSON source 编译核心。它校验稳定身份、cardinality、severity、type descriptor、type-instance localisation binding（含 subtype condition）和 artifact round-trip；`pdx-bake` 面向开发/发布生成临时 artifact，官方 `pdx-ls` 则在用户本地 cache 中按需生成 SQLite。项目不提供 CWT importer、fallback 或用户规则同步入口。
 
-`pdx-rules` 定义通用 SQLite artifact schema、规范化逻辑视图、`rule_hash` 算法、只读加载与运行时查询 API，以及不含游戏名称的 data-only `GameProfile` 描述；`pdx-game` 定义数据驱动的安装标志、跨平台发现、最小验证和用户级本机配置，并在 `eu4` 模块中提供 EU4 profile、安装描述与 bootstrap catalog。迁移期 `pdx-eu4` re-export 已在调用方清零后删除。运行时只读加载并冻结 `RuleSet`，同时建立不参与逻辑哈希的 case-insensitive exact-key/context semantic indices，供 scope-link、nested transition lowering、root selection、diagnostics 和 completion 等热点查询跳过无关规则；schema 15 已将 `game_id` 纳入 metadata 与 canonical hash，并保存带 subtype condition 的 type-instance localisation bindings；schema 16 在此基础上保存 semantic rule 的 deprecated 标志。EU4 组合入口在启动服务前校验 profile 身份，并把 profile 显式传入 LSP/host/snapshot。
+`pdx-rules` 定义通用 source bundle 解码、SQLite artifact schema、规范化逻辑视图、`rule_hash` 算法、只读加载与运行时查询 API，以及不含游戏名称的 data-only `GameProfile` 描述；`pdx-game` 定义数据驱动的安装标志、跨平台发现、用户级本机配置，并在 `eu4` 模块中提供内嵌 JSON source bundle、EU4 profile、安装描述和 bootstrap catalog。迁移期 `pdx-eu4` re-export 已在调用方清零后删除。运行时只读加载并冻结 `RuleSet`，同时建立不参与逻辑哈希的 case-insensitive exact-key/context semantic indices，供 scope-link、nested transition lowering、root selection、diagnostics 和 completion 等热点查询跳过无关规则；schema 15 已将 `game_id` 纳入 metadata 与 canonical hash，并保存带 subtype condition 的 type-instance localisation bindings；schema 16 在此基础上保存 semantic rule 的 deprecated 标志。EU4 组合入口在启动服务前校验 profile 身份，并把 profile 显式传入 LSP/host/snapshot。
 
 当前 workspace shard 的 symbol/reference 路径，以及 analysis 的 root scope、scope spelling/completion/compatibility、fallback key、semantic member alias 与额外 enum member，都由 EU4 profile 数据驱动。workspace/analysis/LSP 通用生产代码不再按 `game_id` 字符串或 EU4 名称白名单隐式启用这些行为；syntax facade 的历史 `Eu4FileFormat`/`parse_eu4*` 名称也已在未发布边界内收敛为 `FileFormat`/`parse*`，具体 localisation/CSV 行为仍由 EU4 profile 的文件分类选择。
 
@@ -116,7 +121,7 @@ pdx-lsp       -> engine, analysis, parser, rules, game crates (includes CLI bina
 - `pdx-parser` 实现可复用 PDX 文本前端，但不依赖游戏规则数据库、workspace 或 LSP。
 - `pdx-rules` 定义 SQLite schema、hash 与只读 runtime view，不依赖具体游戏名称表、外部规则语言或 LSP。
 - `pdx-game` 包含安装发现和 EU4 profile（`eu4` 模块）。
-- `pdx-bake` 是维护者工具，只把第一方规则源码编译成经过完整校验的 artifact；它不是 runtime dependency。
+- `pdx-bake` 是维护者 CLI；编译核心由 `pdx-rules` 复用，开发/发布检查与 `pdx-ls` 用户 cache 物化使用同一套 source validation 和 artifact round-trip。
 - `pdx-engine`（含 HIR lowering 模块）通过稳定的 typed CST API lowering；结构/recovery/conditional-parameter facts 与 `RuleSet`/显式 profile 驱动的 definition/reference facts 已被 workspace shard 和 analysis 查询共享。不依赖 LSP 类型。
 - `pdx-analysis` 不依赖任何 editor API。
 - `pdx-lsp` 是唯一允许依赖 LSP protocol types 的核心 crate。
@@ -175,5 +180,5 @@ MVP 不立即引入通用增量计算框架。先使用清晰的按文件 cache 
 
 - 不执行 Mod 或规则源码中的任意代码；规则编译器只解析严格 JSON 数据。
 - 限制扫描文件大小和最大嵌套深度相关资源消耗。
-- 不编译、测试或发布任何外部规则输入，包括 `.cwt` 文件。
+- 不编译、测试或发布任何外部规则输入，包括 `.cwt` 文件；正式 `pdx-ls` 只使用内嵌 first-party JSON source bundle。
 - 不提交或再分发 Vanilla 游戏文件；Vanilla 缓存只存在于用户本机。

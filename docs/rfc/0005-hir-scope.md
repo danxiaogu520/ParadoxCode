@@ -163,6 +163,6 @@ HIR cache key：
 SourceFileId + FileRevision + GameId + RuleHash + FileCategory
 ```
 
-活动 `RuleSet` 或游戏 profile 变化会使内存 HIR cache 失效；单文件文本变化只使该文件失效。Vanilla 持久缓存不是 HIR cache：LSP 启动加载到可读且 schema/game identity 有效的 cache 后，若记录的 `rule_hash` 与当前内嵌 `RuleSet` 不一致，后台 worker 从 cache metadata 的 Vanilla 源目录以当前内嵌规则重建，并用 SQLite transaction 保存，提交后安装新 cache。重建成功发送 INFO；扫描、重建或事务保存失败则回退安装已加载的旧 cache 并发送 WARNING（含失败原因和两个 hash）。缺失、损坏或 schema/game identity 不兼容继续降级且不隐式扫描 Vanilla；文件内容或 fingerprint 变化不自动刷新，显式用户刷新仍可重建。
+活动 `RuleSet` 或游戏 profile 变化会使内存 HIR cache 失效；单文件文本变化只使该文件失效。Vanilla 持久缓存不是 HIR cache：LSP 启动加载到可读且 schema/game identity 有效的 cache 后，若记录的 `rule_hash` 与当前内嵌 JSON source 编译出的 `RuleSet` 不一致，后台 worker 从 cache metadata 的 Vanilla 源目录以当前内嵌规则重建，并用 SQLite transaction 保存，提交后安装新 cache。重建成功发送 INFO；扫描、重建或事务保存失败则回退安装已加载的旧 cache 并发送 WARNING（含失败原因和两个 hash）。缺失、损坏或 schema/game identity 不兼容继续降级且不隐式扫描 Vanilla；文件内容或 fingerprint 变化不自动刷新，显式用户刷新仍可重建。
 
 结构 property 仍以保留重复 key 的 source-order flat vector 暴露；scope lowering 以一次线性 stack pass 建立直接子项邻接表，再沿子边递归，避免对每个父节点重新扫描全文件。生成的 `ScopeFact` 携带 context、parent path 和 persistent registers，并按 range 排序；analysis 用 exact-range logarithmic lookup。

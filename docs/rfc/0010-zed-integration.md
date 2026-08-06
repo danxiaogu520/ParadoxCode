@@ -127,7 +127,7 @@ extension 下载/启动仍是发布阻塞项。
 <resolved-pdx-ls>
 ```
 
-开发模式也不能覆盖规则。内嵌规则损坏属于 server build/release defect。
+开发模式也不能覆盖规则。内嵌 JSON source 或其首次编译失败属于 server build/release defect。
 
 ## 配置传递
 

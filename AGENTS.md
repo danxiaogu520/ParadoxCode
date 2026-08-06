@@ -84,9 +84,9 @@ Layer responsibilities:
 | --- | --- | --- |
 | `pdx-text` | offsets, line index, UTF-8/UTF-16, URI/path primitives | EU4 rules, workspace state |
 | `pdx-parser` | loss-aware CST for Paradox script and localisation, incremental parse, syntax errors, safe formatter | game rule database, disk scanning, LSP types |
-| `pdx-rules` | generic rule schema, canonical view, `rule_hash`, read-only runtime API | concrete game name tables, external rule parsers, LSP, dynamic Mod symbols |
+| `pdx-rules` | generic source compiler core, rule schema, canonical view, `rule_hash`, read-only runtime API | concrete game name tables, external rule parsers, LSP, dynamic Mod symbols |
 | `pdx-game` | data-driven install flags, cross-platform discovery, minimal validation, user-level local config, EU4 profile | semantic rules, workspace index, editor API |
-| `pdx-bake` | strict reading of first-party JSON rule source, validation, artifact/manifest generation | CWT input, runtime dependency, network sync, user rule overrides |
+| `pdx-bake` | developer CLI for strict first-party JSON validation and temporary artifact/manifest generation | CWT input, network sync, user rule overrides |
 | `pdx-engine` | HIR lowering, VFS, overlay, source roots, parse cache, index shards, snapshot | LSP protocol types |
 | `pdx-analysis` | snapshot-oriented diagnostics/completion/hover/navigation/rename queries | direct disk reads, editor client |
 | `pdx-lsp` | lifecycle, capability negotiation, protocol conversion, cancellation, publish diagnostics | EU4 name tables, business queries, rule interpretation |
@@ -116,11 +116,12 @@ Layer responsibilities:
 
 ### Rule Database
 
-- `eu4.pdxrules` is the sole authoritative rule artifact during development; it is embedded into the official `pdx`/`pdx-ls` binary at release.
+- `rules/eu4/*.json` is the sole authoritative rule source; generated SQLite artifacts are never hand-maintained.
+- Official `pdx`/`pdx-ls` binaries embed the first-party JSON source and materialize a validated SQLite artifact in the user cache.
 - The official runtime accepts no external rule path, download, search, or user override.
 - The runtime does not read, download, or import any external rule source.
 - `.cwt` files must not serve as input for rule compilation, testing, runtime execution, or updates.
-- `rules/eu4/*.json` is the sole authority; `eu4.pdxrules` and the manifest are generated artifacts.
+- `rule_hash` and release manifests are generated integrity metadata, not a second rule authority.
 - `rule_hash` hashes canonical logical content, not SQLite file bytes.
 - The hash is unaffected by rowids, insertion order, page layout, indexes, VACUUM, timestamps, or import logs.
 - Dynamic scripted effects, triggers, buildings, and similar members come from the `WorkspaceIndex` and must not be hardcoded into core crates or the extension.

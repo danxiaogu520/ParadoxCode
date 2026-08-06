@@ -731,6 +731,8 @@ pub enum ValueMatcher {
         min: Option<String>,
         max: Option<String>,
     },
+    /// Accepts a campaign date such as `1444.11.11`, `1444.11`, or `1444`.
+    Date,
     /// Accepts a member supplied by the workspace index.
     Type(String),
     /// Accepts a member of a named static enum.
@@ -777,6 +779,7 @@ impl ValueMatcher {
                 let upper = max.as_deref().and_then(|max| max.parse::<f64>().ok());
                 lower.is_none_or(|min| value >= min) && upper.is_none_or(|max| value <= max)
             }
+            Self::Date => is_eu4_date(value),
             Self::Type(type_name) => type_members(type_name, value),
             Self::Enum(enum_name) => enum_members(enum_name, value),
             Self::Scope(scope) => scopes(scope.as_deref(), value),
@@ -784,6 +787,25 @@ impl ValueMatcher {
             Self::Filepath | Self::Dynamic(_) | Self::DynamicSet(_) => !value.is_empty(),
         }
     }
+}
+
+/// Tests whether a scalar is a campaign date such as `1444.11.11`, `1444.11`, or `1444`.
+fn is_eu4_date(value: &str) -> bool {
+    let mut parts = value.split('.');
+    let Some(year) = parts.next() else {
+        return false;
+    };
+    if year.is_empty() || year.len() > 4 || !year.bytes().all(|byte| byte.is_ascii_digit()) {
+        return false;
+    }
+    let mut trailing = 0;
+    for part in parts {
+        trailing += 1;
+        if part.is_empty() || part.len() > 2 || !part.bytes().all(|byte| byte.is_ascii_digit()) {
+            return false;
+        }
+    }
+    trailing <= 2
 }
 
 /// Source shape of a semantic rule.
@@ -1024,6 +1046,8 @@ pub enum RulesError {
     GameMismatch { expected: String, actual: String },
     /// An unknown persisted semantic rule shape was found.
     InvalidRuleShape(String),
+    /// The first-party JSON source could not be compiled into a runtime rule set.
+    Source(String),
 }
 
 impl fmt::Display for RulesError {
@@ -1058,6 +1082,7 @@ impl fmt::Display for RulesError {
             Self::InvalidRuleShape(value) => {
                 write!(formatter, "invalid semantic rule shape: {value}")
             }
+            Self::Source(message) => write!(formatter, "first-party rule source error: {message}"),
         }
     }
 }
@@ -1626,6 +1651,7 @@ fn put_semantic_value(bytes: &mut Vec<u8>, matcher: &ValueMatcher) {
             put_opt_str(bytes, min.as_deref());
             put_opt_str(bytes, max.as_deref());
         }
+        ValueMatcher::Date => put_str(bytes, "date"),
         ValueMatcher::Type(value) => {
             put_str(bytes, "type");
             put_str(bytes, value);
@@ -1954,6 +1980,7 @@ fn semantic_value_columns(
             max.map(|value| value.to_string()),
         ),
         ValueMatcher::Float { min, max } => ("float", None, min.clone(), max.clone()),
+        ValueMatcher::Date => ("date", None, None, None),
         ValueMatcher::Type(value) => ("type", Some(value), None, None),
         ValueMatcher::Enum(value) => ("enum", Some(value), None, None),
         ValueMatcher::Scope(value) => ("scope", value.as_deref(), None, None),
@@ -2303,6 +2330,7 @@ fn decode_semantic_value(
             min: min.map(str::to_owned),
             max: max.map(str::to_owned),
         },
+        "date" => ValueMatcher::Date,
         "type" => ValueMatcher::Type(arg.unwrap_or_default().to_owned()),
         "enum" => ValueMatcher::Enum(arg.unwrap_or_default().to_owned()),
         "scope" => ValueMatcher::Scope(arg.map(str::to_owned)),

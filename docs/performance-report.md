@@ -13,7 +13,7 @@
 | 单文件磁盘刷新 | 与初始扫描同量级（~20–115 ms，被目录扫描主导） | 观察项，见 §3 |
 | Overlay 编辑 | 8 µs | 优秀 |
 | `pdx` / `pdx-ls` CLI 启动 | ~3 ms（`--version`/usage） | 优秀 |
-| LSP 冷启动（spawn→initialize） | ~145–162 ms | 良好，主要开销是 21 MB 内嵌规则加载 |
+| LSP 冷启动（spawn→initialize） | ~145–162 ms（历史） | 旧版 artifact 内嵌基线；当前需重新测量首次编译与 cache-hit |
 | 打开文件→首个诊断 | ~210 ms | 符合设计（200 ms 防抖 + ~10 ms 计算） |
 | **Vanilla 缓存后台加载** | **316 MB 缓存约 12.2 s，期间所有快照请求被排队** | **最大 UX 风险，见 §5** |
 | 稳态查询 | hover 0.8 ms / documentSymbol 0.5 ms；**definition ~660–700 ms** | definition 异常偏高，见 §5 |
@@ -48,13 +48,13 @@
 | `pdx.exe` 体积 | 25.1 MB |
 | `pdx-ls.exe` 体积 | 26.4 MB |
 
-体积主要来自内嵌的 `rules/eu4.pdxrules`（21 MB）。启动本身极快；未启用 LTO/strip，但对体积影响有限（规则数据占大头），优先级低。
+这份历史基线测量的是 SQLite artifact 直接内嵌 binary 的版本；当前实现改为内嵌 JSON source、首次启动在用户 cache 生成 SQLite。新的冷启动、首次编译和 cache-hit 数据需要重新测量，不能继续把旧的 21 MB artifact 内嵌结论当作当前基线。
 
 ## 5. LSP 端到端（真实 JSON-RPC，release）
 
 | 指标 | 数值 | 说明 |
 | --- | --- | --- |
-| 冷启动（spawn→initialize 响应） | 145–162 ms | 主导开销为 21 MB 内嵌规则加载与索引准备 |
+| 冷启动（spawn→initialize 响应） | 145–162 ms（历史） | 旧版 SQLite artifact 内嵌基线；当前需分别测量首次规则编译和 cache-hit |
 | didOpen→首个 publishDiagnostics | ~210 ms | 其中 200 ms 是设计内防抖（`DIAGNOSTIC_DEBOUNCE`），实际计算 ~10 ms |
 | **Vanilla 缓存后台加载** | **~12.2 s** | 316 MB 缓存；完成后发送 `window/showMessage` |
 | 首个 hover（受上面阻塞） | ~12.0 s | 快照请求在 Vanilla 加载期间全部被排队（`lib.rs:588-593`） |

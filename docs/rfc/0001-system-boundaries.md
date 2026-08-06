@@ -33,7 +33,7 @@ Rust workspace 初始包含：
 ## 依赖约束
 
 1. 运行时依赖沿 `text/rules -> parser -> engine -> analysis -> lsp` 方向。
-2. `pdx-bake` 只依赖 `pdx-rules`，任何 analysis runtime crate 都不反向依赖维护者编译器。
+2. `pdx-bake` CLI 只依赖 `pdx-rules` 的 source compiler core；analysis 不依赖维护者 CLI，官方 `pdx-ls` 通过 `pdx-rules` 编译 core 物化用户 cache。
 3. 格式化逻辑位于 `pdx-parser` 的 `format` 模块，只依赖 text 和 CST 类型。
 4. 只有 `pdx-lsp` 可以在公开 API 中使用 LSP protocol types。
 5. EU4 规则数据库是由第一方源码生成的 SQLite artifact；通用加载位于 `pdx-rules`，官方 composition root 将其嵌入 binary。
@@ -62,7 +62,7 @@ impl AnalysisHost {
 ```text
 crates/                  `pdx-*` Rust 核心与第一方规则编译器
 grammars/                Zed editor-side Tree-sitter grammars
-rules/                   第一方 JSON source 与生成的 eu4.pdxrules/manifest
+rules/                   第一方 JSON source 与生成的验证 manifest；SQLite artifact 在临时/用户 cache
 editors/                 薄客户端，Cargo package 仍以 `pdx-` 命名
 docs/                    架构与 RFC
 tests/                   跨 crate fixtures/integration

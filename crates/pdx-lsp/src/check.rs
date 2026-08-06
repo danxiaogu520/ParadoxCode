@@ -458,34 +458,30 @@ pub fn check_zed_extension(root: &Path) -> Vec<CheckResult> {
     results
 }
 
-/// Validates the rules artifact (checksum, schema, hash, foreign keys).
+/// Validates first-party source compilation and the generated rule manifest.
 pub fn check_release_artifact(root: &Path) -> Vec<CheckResult> {
     let mut results = Vec::new();
-    let rules_path = root.join("rules/eu4.pdxrules");
+    let source_path = root.join("rules/eu4");
     let manifest_path = root.join("rules/manifest.json");
 
-    if !rules_path.is_file() {
-        results.push(CheckResult::fail(
-            "rules artifact",
-            "rules/eu4.pdxrules is missing",
-        ));
-        return results;
-    }
-    if !manifest_path.is_file() {
+    results.push(check(
+        source_path.is_dir(),
+        "rules source",
+        "rules/eu4 source directory is missing",
+    ));
+    results.push(check(
+        !root.join("rules/eu4.pdxrules").exists(),
+        "no committed rules artifact",
+        "rules/eu4.pdxrules must be generated in a user or release cache, not committed",
+    ));
+    if !source_path.is_dir() || !manifest_path.is_file() {
         results.push(CheckResult::fail(
             "rules manifest",
-            "rules/manifest.json is missing",
+            "rules/manifest.json or rules/eu4 is missing",
         ));
         return results;
     }
 
-    let Ok(rules_bytes) = fs::read(&rules_path) else {
-        results.push(CheckResult::fail(
-            "rules artifact",
-            "cannot read rules/eu4.pdxrules",
-        ));
-        return results;
-    };
     let Ok(manifest_text) = fs::read_to_string(&manifest_path) else {
         results.push(CheckResult::fail(
             "rules manifest",
@@ -493,7 +489,9 @@ pub fn check_release_artifact(root: &Path) -> Vec<CheckResult> {
         ));
         return results;
     };
-    let Ok(manifest) = serde_json::from_str::<serde_json::Value>(&manifest_text) else {
+    let Ok(expected_manifest) =
+        serde_json::from_str::<pdx_rules::rulec::ArtifactManifest>(&manifest_text)
+    else {
         results.push(CheckResult::fail(
             "rules manifest",
             "invalid rules/manifest.json",
@@ -501,60 +499,82 @@ pub fn check_release_artifact(root: &Path) -> Vec<CheckResult> {
         return results;
     };
 
-    // Checksum.
-    let expected_sha = manifest
-        .get("artifact_sha256")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    let actual_sha = format!("{:x}", Sha256::digest(&rules_bytes));
-    results.push(check(
-        expected_sha == actual_sha,
-        "rules artifact checksum",
-        format!("rules artifact checksum mismatch: {actual_sha}"),
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    let temporary_directory = std::env::temp_dir().join(format!(
+        "paradoxcode-release-rules-{}-{nonce}",
+        std::process::id()
     ));
-
-    // SQLite validation via pdx_rules (if the checksum passes, the artifact is intact).
-    match pdx_rules::RuleSet::load(&rules_path) {
-        Ok(rules) => {
-            let schema_version = manifest
-                .get("schema_version")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0) as u32;
+    if let Err(error) = fs::create_dir_all(&temporary_directory) {
+        results.push(CheckResult::fail(
+            "rules source compilation",
+            format!("cannot create temporary validation directory: {error}"),
+        ));
+        return results;
+    }
+    let generated_path = temporary_directory.join("eu4.pdxrules");
+    let generated_manifest_path = temporary_directory.join("manifest.json");
+    match pdx_rules::rulec::compile(&source_path, &generated_path, &generated_manifest_path) {
+        Ok(generated_manifest) => {
+            results.push(CheckResult::pass("rules source compilation"));
             results.push(check(
-                rules.schema_version() == schema_version,
-                "rules schema version",
+                generated_manifest == expected_manifest,
+                "rules manifest reproducibility",
                 format!(
-                    "schema version mismatch: {} vs {schema_version}",
-                    rules.schema_version()
+                    "generated rule manifest differs from rules/manifest.json: generated hash {}",
+                    generated_manifest.rule_hash
                 ),
             ));
-            let hash = manifest
-                .get("rule_hash")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let actual_sha = fs::read(&generated_path)
+                .map(|bytes| format!("{:x}", Sha256::digest(&bytes)))
+                .unwrap_or_default();
             results.push(check(
-                rules.rule_hash().to_hex() == hash,
-                "rules rule_hash",
-                format!(
-                    "rule_hash mismatch: {} vs {hash}",
-                    rules.rule_hash().to_hex()
-                ),
+                actual_sha == generated_manifest.artifact_sha256,
+                "rules artifact checksum",
+                format!("generated rules artifact checksum mismatch: {actual_sha}"),
             ));
-            let game_id = manifest
-                .get("game_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            results.push(check(
-                rules.game_id() == game_id && game_id == "eu4",
-                "rules game_id",
-                format!("game/profile mismatch: {} vs eu4", rules.game_id()),
-            ));
-            results.push(CheckResult::pass("rules foreign keys enabled"));
+            match pdx_rules::RuleSet::load(&generated_path) {
+                Ok(rules) => {
+                    results.push(check(
+                        rules.schema_version() == generated_manifest.schema_version,
+                        "rules schema version",
+                        format!(
+                            "schema version mismatch: {} vs {}",
+                            rules.schema_version(),
+                            generated_manifest.schema_version
+                        ),
+                    ));
+                    results.push(check(
+                        rules.rule_hash().to_hex() == generated_manifest.rule_hash,
+                        "rules rule_hash",
+                        format!(
+                            "rule_hash mismatch: {} vs {}",
+                            rules.rule_hash().to_hex(),
+                            generated_manifest.rule_hash
+                        ),
+                    ));
+                    results.push(check(
+                        rules.game_id() == generated_manifest.game_id && rules.game_id() == "eu4",
+                        "rules game_id",
+                        format!("game/profile mismatch: {} vs eu4", rules.game_id()),
+                    ));
+                    results.push(CheckResult::pass("rules foreign keys enabled"));
+                }
+                Err(error) => {
+                    results.push(CheckResult::fail("rules validation", error.to_string()));
+                }
+            }
         }
         Err(error) => {
-            results.push(CheckResult::fail("rules validation", error.to_string()));
+            results.push(CheckResult::fail(
+                "rules source compilation",
+                error.to_string(),
+            ));
         }
     }
+    let _ = fs::remove_dir_all(&temporary_directory);
 
     // Zed extension: no --rules override.
     let zed_src = root.join("editors/zed/src/lib.rs");

@@ -5,6 +5,10 @@
 - MVP: EU4 v0.1
 - Supersedes: CWT importer (removed) and the authority/maintenance decisions in RFC 0004 and RFC 0013
 
+> 2026-08-06 amendment: `rules/eu4.pdxrules` is no longer a repository or embedded-binary
+> input. The official server embeds the validated first-party JSON source bundle and materializes
+> the SQLite runtime artifact in a user-local cache. The JSON source remains the sole authority.
+
 ## Decision
 
 ParadoxCode owns and maintains one strict, versioned EU4 rule source under `rules/eu4/`. This
@@ -24,21 +28,25 @@ maintenance dependency.
 ```text
 rules/eu4/*.json (first-party authority)
               |
-              v
-       pdx-bake build
-              |
-              +-- strict schema and invariant validation
-              +-- canonical logical rule_hash
-              v
-       rules/eu4.pdxrules (generated)
-              |
-              v
-   embedded official pdx / pdx-ls
+              +--------------------------+
+              |                          |
+              v                          v
+       pdx-bake CLI                embedded source bundle
+   developer/release checks                 |
+              |                            v
+              |                 pdx-ls first-party provider
+              |                            |
+              +-------------> user-local SQLite cache
+                                           |
+                                           v
+                              read-only runtime RuleSet
 ```
 
-`pdx-bake` accepts only the fixed first-party JSON layout. Unknown fields, missing files,
+The shared compiler accepts only the fixed first-party JSON layout. Unknown fields, missing files,
 duplicate stable identities, invalid cardinality, invalid severity, mismatched type identities,
-and generated artifact round-trip differences fail compilation.
+and generated artifact round-trip differences fail compilation. `pdx-bake` writes artifacts to a
+caller-selected developer/release path; `pdx-ls` writes only a validated artifact to its user-local
+cache and never accepts that cache as an authority.
 
 ## Source layout
 
@@ -64,11 +72,16 @@ identities, matchers, resolution policies, or semantic rule identities.
 
 ## Runtime authority
 
-Official binaries embed the generated artifact and construct an immutable `RuleSet`. They reject
-rule arguments and expose no environment variable, initialization option, project setting, search
-path, download, or user override. A malformed embedded artifact is a build/release defect.
+Official binaries embed the first-party JSON source bundle and construct an immutable `RuleSet` from
+a user-local SQLite artifact. On startup the server validates the source, computes its canonical
+`rule_hash`, and accepts a cache only when schema, `game_id`, and logical contents match. A missing,
+malformed, or stale cache is regenerated in a temporary file and installed only after round-trip
+validation. Compilation failure is a server/source distribution defect; the runtime does not fall
+back to an old hash or search for another rule source.
 
-The Zed extension carries no semantic rules. Server and rule versions move together.
+The server accepts no rule arguments, environment variable, initialization option, project setting,
+search path, download, or user override. The Zed extension carries no semantic rules. Server and
+rule source versions move together.
 
 ## Version maintenance
 
@@ -83,10 +96,10 @@ Every rule change must pass:
 1. strict source decoding and source invariants;
 2. deterministic canonical `rule_hash` computation;
 3. generated SQLite round-trip and foreign-key validation;
-4. manifest schema/hash/checksum verification;
-5. embedded provider identity/hash tests;
+4. manifest schema/hash/checksum verification in a temporary artifact directory;
+5. embedded source provider identity/hash and user-cache rebuild tests;
 6. affected analysis and real JSON-RPC regression tests;
-7. a clean server launch without any external rule file.
+7. a clean server launch without any external rule file or committed SQLite artifact.
 
 ## Rejected alternatives
 
@@ -94,5 +107,7 @@ Every rule change must pass:
 - One-time or recurring CWT import: keeps a second authority and makes regeneration depend on an
   external model.
 - Direct manual SQLite editing: is difficult to review and cannot provide a safe source schema.
-- User-supplied rule databases: creates unsupported semantic and security states.
+- User-supplied rule databases or JSON source paths: creates unsupported semantic and security states.
+- Embedding a generated SQLite file: adds a large generated repository/release input without making JSON
+  less authoritative.
 - Hand-maintained Rust tables: couples game data to engine implementation and produces poor diffs.

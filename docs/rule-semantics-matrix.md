@@ -1,7 +1,7 @@
 # 规则声明与运行时语义矩阵
 
-本文记录 `rules/eu4/*.json`、生成的 `eu4.pdxrules`、通用 engine/analysis 和 EU4
-profile 之间的语义责任。它是当前实现的审计基线；不是第二份规则源，也不替代
+本文记录 `rules/eu4/*.json`、用户本地生成的 SQLite runtime artifact、通用 engine/analysis
+和 EU4 profile 之间的语义责任。它是当前实现的审计基线；不是第二份规则源，也不替代
 `docs/rfc/0014-first-party-rule-source.md`。
 
 ## 基线
@@ -102,5 +102,5 @@ profile 之间的语义责任。它是当前实现的审计基线；不是第二
 1. first-party source schema/invariant validation；
 2. artifact round-trip、canonical hash 和 manifest 校验；
 3. 受影响的 HIR、analysis 和真实 JSON-RPC 测试；
-4. embedded artifact server launch；
+4. embedded source bundle server launch and user-cache artifact materialization；
 5. 本矩阵对应字段的正例、反例和动态 workspace fixture。

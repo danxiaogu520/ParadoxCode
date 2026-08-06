@@ -11,21 +11,25 @@ The source layout is:
 - `semantic-rules.json`: executable key/value/scope/cardinality alternatives;
 - `enum-values.json`: static enum members;
 - `type-root-keys.json` and `type-root-scopes.json`: root selection and initial scope;
-- `type-descriptors.json`: path and definition extraction metadata.
+- `type-descriptors.json`: path and definition extraction metadata;
+- `localisation-bindings.json`: type-instance localisation key bindings and subtype conditions.
 
 Compile and validate it with:
 
 ```text
-cargo run -p pdx-bake -- build \
+cargo run -p pdx-rules --bin pdx-bake -- build \
   --source rules/eu4 \
-  --output rules/eu4.pdxrules \
-  --manifest rules/manifest.json
+  --output target/rules/eu4.pdxrules \
+  --manifest target/rules/manifest.json
 ```
 
-`eu4.pdxrules` and the release manifest are generated artifacts. Official `pdx` and `pdx-ls`
-binaries embed that artifact at compile time and expose no rule override. Every source change must
-include an appropriate regression fixture and regenerate both files. `rule_hash` identifies the
-canonical logical model; `artifact_sha256` protects the generated SQLite bytes.
+`eu4.pdxrules` is a generated artifact used in developer/release validation and in the user-local
+runtime cache; it is not committed to the repository. Official `pdx` and `pdx-ls` binaries embed
+the first-party JSON source bundle, compile the artifact on cache miss or hash mismatch, and expose
+no rule override. Every source change must include an appropriate regression fixture and pass the
+source-to-artifact round-trip check. `rule_hash` identifies the canonical logical model;
+`artifact_sha256` protects a generated SQLite artifact when it is materialized.
 
-The current artifact uses schema 13 and source format 2. It contains 8,537 semantic rule
-alternatives and targets EU4 1.37.5.
+The current source uses source format 5 and generates schema 16. It contains 8,535 semantic rule
+alternatives and targets EU4 1.37.5. The generated SQLite artifact is kept in build or user cache
+locations, not in Git.
