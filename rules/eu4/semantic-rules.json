@@ -2688,9 +2688,7 @@
       "exact": "date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -34112,9 +34110,7 @@
       "exact": "historical_start_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -74582,9 +74578,7 @@
       "exact": "date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -130476,9 +130470,7 @@
       "exact": "birth_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "effects:720:alias:effect:define_consort",
@@ -132721,9 +132713,7 @@
       "exact": "birth_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "effects:793:alias:effect:define_heir",
@@ -139813,7 +139803,7 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": null,
     "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
@@ -139861,7 +139851,7 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": null,
     "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
@@ -139885,9 +139875,9 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": null,
     "strict_min": true,
-    "max_occurs": 1,
+    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 4997
   },
@@ -139911,7 +139901,7 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": null,
     "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
@@ -139937,7 +139927,7 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": null,
     "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
@@ -139963,7 +139953,7 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": null,
     "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
@@ -139987,7 +139977,7 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": null,
     "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
@@ -140011,9 +140001,9 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": null,
     "strict_min": true,
-    "max_occurs": 1,
+    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5002
   },
@@ -140243,9 +140233,9 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": null,
     "strict_min": true,
-    "max_occurs": 1,
+    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5011
   },
@@ -140267,7 +140257,7 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": null,
     "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
@@ -140343,7 +140333,7 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": null,
     "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
@@ -140471,7 +140461,7 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": null,
     "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
@@ -140602,7 +140592,7 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": null,
     "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
@@ -140919,7 +140909,7 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": null,
     "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
@@ -141161,7 +141151,7 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": null,
     "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
@@ -145117,9 +145107,7 @@
       "exact": "birth_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -145146,9 +145134,7 @@
       "exact": "death_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -145610,9 +145596,7 @@
       "exact": "birth_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -145640,9 +145624,7 @@
       "exact": "death_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -146192,9 +146174,7 @@
       "exact": "birth_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -146221,9 +146201,7 @@
       "exact": "death_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -146687,9 +146665,7 @@
       "exact": "birth_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -146717,9 +146693,7 @@
       "exact": "death_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -146948,9 +146922,7 @@
       "exact": "birth_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -146977,9 +146949,7 @@
       "exact": "death_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -147404,9 +147374,7 @@
       "exact": "death_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -147734,9 +147702,7 @@
       "exact": "birth_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -147763,9 +147729,7 @@
       "exact": "death_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -148611,9 +148575,7 @@
       "exact": "date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -148637,9 +148599,7 @@
       "exact": "death_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -148747,9 +148707,7 @@
       "exact": "start_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -148775,9 +148733,7 @@
       "exact": "end_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -148883,9 +148839,7 @@
       "exact": "start_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -148911,9 +148865,7 @@
       "exact": "end_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -149047,9 +148999,7 @@
       "exact": "start_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -149075,9 +149025,7 @@
       "exact": "end_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -149211,9 +149159,7 @@
       "exact": "start_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -149239,9 +149185,7 @@
       "exact": "end_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -157020,9 +156964,7 @@
       "exact": "completed_by"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -181360,9 +181302,7 @@
     "parent_path": [
       "random_list"
     ],
-    "key": {
-      "exact": "int"
-    },
+    "key": "any_scalar",
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
@@ -181374,7 +181314,7 @@
     "allowed_scopes": [],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 2,
+    "min_occurs": null,
     "strict_min": true,
     "max_occurs": null,
     "source_file": "semantic-rules.json",
@@ -195124,9 +195064,7 @@
       "exact": "start_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "triggers:1110:alias:trigger:start_date",
@@ -195152,9 +195090,7 @@
       "exact": "is_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "triggers:1111:alias:trigger:is_date",
@@ -195180,9 +195116,7 @@
       "exact": "started_in"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "triggers:1112:alias:trigger:started_in",
@@ -229606,9 +229540,7 @@
       "exact": "start_date"
     },
     "operator": "=",
-    "value": {
-      "exact": "date_field"
-    },
+    "value": "date",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "triggers:663:alias:trigger:is_in_war",
@@ -241249,5 +241181,269 @@
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 8537
+  },
+  {
+    "id": "scope_links:121:rule:effect:scope_switch:from",
+    "context": "effect",
+    "parent_path": [],
+    "key": {"exact":"from"},
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": ["Switches the block's scope to the FROM register; block contents are effects."],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [["this","from"]],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1
+  },
+  {
+    "id": "scope_links:121:rule:effect:scope_switch:root",
+    "context": "effect",
+    "parent_path": [],
+    "key": {"exact":"root"},
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": ["Switches the block's scope to the ROOT register; block contents are effects."],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [["this","root"]],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1
+  },
+  {
+    "id": "scope_links:121:rule:effect:scope_switch:prev",
+    "context": "effect",
+    "parent_path": [],
+    "key": {"exact":"prev"},
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": ["Switches the block's scope to the previous scope; block contents are effects."],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [["this","prev"]],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1
+  },
+  {
+    "id": "scope_links:121:rule:effect:scope_switch:previous",
+    "context": "effect",
+    "parent_path": [],
+    "key": {"exact":"previous"},
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": ["Switches the block's scope to the previous scope; block contents are effects."],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [["this","previous"]],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1
+  },
+  {
+    "id": "scope_links:121:rule:effect:scope_switch:prev_prev",
+    "context": "effect",
+    "parent_path": [],
+    "key": {"exact":"prev_prev"},
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": ["Switches the block's scope to the second-previous scope; block contents are effects."],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [["this","prev_prev"]],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1
+  },
+  {
+    "id": "scope_links:121:rule:effect:scope_switch:this",
+    "context": "effect",
+    "parent_path": [],
+    "key": {"exact":"this"},
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": ["Switches the block's scope to the current scope; block contents are effects."],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1
+  },
+  {
+    "id": "scope_links:121:rule:trigger:scope_switch:from",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {"exact":"from"},
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": ["Switches the block's scope to the FROM register; block contents are triggers."],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [["this","from"]],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1
+  },
+  {
+    "id": "scope_links:121:rule:trigger:scope_switch:root",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {"exact":"root"},
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": ["Switches the block's scope to the ROOT register; block contents are triggers."],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [["this","root"]],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1
+  },
+  {
+    "id": "scope_links:121:rule:trigger:scope_switch:prev",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {"exact":"prev"},
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": ["Switches the block's scope to the previous scope; block contents are triggers."],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [["this","prev"]],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1
+  },
+  {
+    "id": "scope_links:121:rule:trigger:scope_switch:previous",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {"exact":"previous"},
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": ["Switches the block's scope to the previous scope; block contents are triggers."],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [["this","previous"]],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1
+  },
+  {
+    "id": "scope_links:121:rule:trigger:scope_switch:prev_prev",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {"exact":"prev_prev"},
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": ["Switches the block's scope to the second-previous scope; block contents are triggers."],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [["this","prev_prev"]],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1
+  },
+  {
+    "id": "scope_links:121:rule:trigger:scope_switch:this",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {"exact":"this"},
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": ["Switches the block's scope to the current scope; block contents are triggers."],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1
   }
 ]

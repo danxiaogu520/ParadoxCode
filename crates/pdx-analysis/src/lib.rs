@@ -1209,6 +1209,17 @@ fn add_semantic_value_items(
                     rule.deprecated,
                 );
             }
+            ValueMatcher::Date => {
+                add_value_completion(
+                    items,
+                    "1444.11.11",
+                    "date",
+                    documentation.clone(),
+                    replacement_range,
+                    prefix,
+                    rule.deprecated,
+                );
+            }
             ValueMatcher::Float { min, max } => {
                 add_value_completion(
                     items,

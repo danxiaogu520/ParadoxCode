@@ -1768,7 +1768,8 @@
     "type_per_file": false,
     "skip_root_paths": [
       [
-        "any"
+        "any",
+        "religious_schools"
       ]
     ],
     "name_field": null,
