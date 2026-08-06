@@ -1251,15 +1251,6 @@ fn add_semantic_value_items(
                     );
                 }
             }
-            ValueMatcher::Date => add_value_completion(
-                items,
-                "1444.11.11",
-                "date",
-                documentation.clone(),
-                replacement_range,
-                prefix,
-                rule.deprecated,
-            ),
             ValueMatcher::Type(type_name) => {
                 for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
                     add_value_completion(
