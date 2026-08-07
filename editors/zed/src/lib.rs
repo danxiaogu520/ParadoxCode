@@ -508,6 +508,9 @@ mod tests {
         extract_tar_gz_with_limit, extract_zip, platform_artifact, read_limited, release_asset_url,
     };
 
+    #[cfg(unix)]
+    use super::{ensure_install_directory, remove_cache_file};
+
     const PAYLOAD: &[u8] = b"pdx-ls test payload";
 
     struct TestDirectory(PathBuf);
