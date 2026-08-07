@@ -90,7 +90,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
-      - uses: taiki-e/install-action@cargo-fuzz
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
       - uses: Swatinem/rust-cache@v2
       - name: Verify fuzz lockfile
         run: cargo metadata --locked --manifest-path fuzz/Cargo.toml --no-deps --format-version 1
