@@ -5,6 +5,15 @@
 `pdx-rules` 提供游戏无关的规则 schema、规范化运行时模型、SQLite artifact 读写、canonical hash，以及第一方 source compiler。
 规则解释不放在 LSP；运行时使用冻结的 `RuleSet`，而 source authoring 只接受仓库约定的 JSON layout。
 
+## 内部布局
+
+`src/lib.rs` 是公共 facade。规则模型和 matcher 分别位于 `model.rs`、`matcher.rs`、`profile.rs`；
+`runtime.rs` 提供不可变 `RuleSet` 查询，`canonical.rs` 负责逻辑 hash，`sqlite.rs` 负责 schema、
+读写和 round-trip 编解码；`rulec.rs` 仍是固定第一方 JSON source compiler。测试位于 `tests.rs`，
+并与 compiler 测试保持独立。
+
+这些文件拆分只改变 crate 内部组织，`pdx_rules::*` 和 `pdx_rules::rulec::*` 公共路径保持稳定。
+
 ## 主要公开类型与入口
 
 - `CURRENT_SCHEMA_VERSION`：当前 runtime SQLite schema，值为 `16`。

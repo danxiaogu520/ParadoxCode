@@ -2,7 +2,17 @@
 
 ## 模块职责
 
-`pdx-engine` 是规则感知但不绑定编辑器协议的语义引擎边界，负责 source roots、文件读取与资源限制、Script/Localisation 的 parse/HIR 状态、逐文件索引 shard、overlay resolution，以及面向查询的不可变 snapshot。`src/hir.rs` 提供 `HirFile`、scope state、property、definition/reference 和 scripted parameter lowering，公开入口为 `hir::lower`、`lower_shared`、`lower_with_profile`、`lower_shared_with_profile`；`src/vanilla_cache.rs` 提供本地只读 Vanilla index artifact。
+`pdx-engine` 是规则感知但不绑定编辑器协议的语义引擎边界，负责 source roots、文件读取与资源限制、Script/Localisation 的 parse/HIR 状态、逐文件索引 shard、overlay resolution，以及面向查询的不可变 snapshot。`src/hir/` 提供 `HirFile`、scope state、property、definition/reference 和 scripted parameter lowering，公开入口为 `hir::lower`、`lower_shared`、`lower_with_profile`、`lower_shared_with_profile`；`src/vanilla_cache/` 提供本地只读 Vanilla index artifact。
+
+## 内部布局
+
+`src/lib.rs` 是稳定 facade。workspace model、index、扫描、parse/lower pipeline、host 和 snapshot 分别位于
+`model.rs`、`index.rs`、`scan.rs`、`pipeline.rs`、`host.rs` 和 `snapshot.rs`。
+
+HIR 目录按 `model.rs`、`collector.rs`、`parameters.rs`、`scope.rs`、`semantics.rs` 拆分，
+`hir/mod.rs` 保持 `pdx_engine::hir::*` 的公开入口。Vanilla cache 目录将 cache facade、SQLite
+read/write、preview 和稳定 codec 分到 `mod.rs`、`read.rs`、`write.rs`、`preview.rs`、`codec.rs`。
+测试按 index、documents、scan、Vanilla 和 HIR lowering 分组，避免测试组织重新聚合到 facade。
 
 ## 核心公开类型与入口
 

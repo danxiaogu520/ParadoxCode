@@ -1,0 +1,473 @@
+//! Source-root discovery, bounded reads, and source identity helpers.
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::io::Read;
+use std::path::PathBuf;
+
+use encoding_rs::WINDOWS_1252;
+use pdx_rules::{GameProfile, SourceEncoding};
+use pdx_text::LogicalPath;
+
+use crate::model::{
+    SourceFile, SourceFileId, SourceRoot, SourceRootId, SourceRootKind, WorkspaceError,
+    WorkspaceScanIssue, WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanReport,
+    WorkspaceScanToken,
+};
+
+pub(crate) fn record_scan_issue(
+    report: &mut WorkspaceScanReport,
+    limits: WorkspaceScanLimits,
+    kind: WorkspaceScanIssueKind,
+    path: PathBuf,
+    detail: String,
+) {
+    report.skipped_entries = report.skipped_entries.saturating_add(1);
+    if report.issues.len() < limits.max_reported_issues {
+        report
+            .issues
+            .push(WorkspaceScanIssue { kind, path, detail });
+    } else {
+        report.omitted_issues = report.omitted_issues.saturating_add(1);
+    }
+}
+
+pub(crate) fn collect_whitelisted_files(
+    root: &std::path::Path,
+    profile: &GameProfile,
+    limits: WorkspaceScanLimits,
+    report: &mut WorkspaceScanReport,
+    output: &mut Vec<(LogicalPath, PathBuf)>,
+    cancellation: &WorkspaceScanToken,
+) -> Result<(), WorkspaceError> {
+    let root_metadata = fs::metadata(root).map_err(WorkspaceError::Io)?;
+    if !root_metadata.is_dir() {
+        return Err(WorkspaceError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotADirectory,
+            format!(
+                "workspace source root is not a directory: {}",
+                root.display()
+            ),
+        )));
+    }
+
+    let mut roots = profile
+        .scan_roots()
+        .iter()
+        .map(|scan_root| {
+            LogicalPath::parse(scan_root)
+                .map_err(|_| WorkspaceError::InvalidLogicalPath(PathBuf::from(scan_root)))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    roots.sort();
+    roots.dedup();
+    let mut collapsed_roots = Vec::with_capacity(roots.len());
+    for scan_root in roots {
+        if collapsed_roots.iter().any(|parent: &LogicalPath| {
+            parent.as_str() == scan_root.as_str()
+                || scan_root
+                    .as_str()
+                    .strip_prefix(parent.as_str())
+                    .is_some_and(|remainder| remainder.starts_with('/'))
+        }) {
+            continue;
+        }
+        collapsed_roots.push(scan_root);
+    }
+
+    let mut seen = BTreeSet::new();
+    let mut scan = DiskScanContext {
+        limits,
+        profile,
+        report,
+        output,
+        seen: &mut seen,
+        cancellation,
+    };
+    for scan_root in collapsed_roots {
+        scan.cancellation.checkpoint()?;
+        let depth = scan_root
+            .as_str()
+            .split('/')
+            .filter(|component| !component.is_empty())
+            .count();
+        let current = if scan_root.as_str().is_empty() {
+            root.to_owned()
+        } else {
+            root.join(scan_root.as_str())
+        };
+        if depth > limits.max_depth {
+            record_scan_issue(
+                scan.report,
+                scan.limits,
+                WorkspaceScanIssueKind::DepthLimitExceeded,
+                current,
+                format!(
+                    "whitelisted directory depth exceeds the configured limit of {}",
+                    limits.max_depth
+                ),
+            );
+            continue;
+        }
+        let metadata = match fs::symlink_metadata(&current) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                record_scan_issue(
+                    scan.report,
+                    scan.limits,
+                    WorkspaceScanIssueKind::DirectoryUnreadable,
+                    current,
+                    error.to_string(),
+                );
+                continue;
+            }
+        };
+        if metadata.file_type().is_symlink() {
+            record_scan_issue(
+                scan.report,
+                scan.limits,
+                WorkspaceScanIssueKind::SymlinkSkipped,
+                current,
+                "symbolic links are not followed during workspace discovery".to_owned(),
+            );
+            continue;
+        }
+        if !metadata.is_dir() {
+            continue;
+        }
+        collect_disk_files(root, &current, depth, &mut scan)?;
+    }
+    Ok(())
+}
+
+struct DiskScanContext<'a> {
+    limits: WorkspaceScanLimits,
+    profile: &'a GameProfile,
+    report: &'a mut WorkspaceScanReport,
+    output: &'a mut Vec<(LogicalPath, PathBuf)>,
+    seen: &'a mut BTreeSet<LogicalPath>,
+    cancellation: &'a WorkspaceScanToken,
+}
+
+fn collect_disk_files(
+    root: &std::path::Path,
+    current: &std::path::Path,
+    depth: usize,
+    scan: &mut DiskScanContext<'_>,
+) -> Result<(), WorkspaceError> {
+    scan.cancellation.checkpoint()?;
+    let entries = match fs::read_dir(current) {
+        Ok(entries) => entries,
+        Err(error) if depth == 0 => return Err(WorkspaceError::Io(error)),
+        Err(error) => {
+            record_scan_issue(
+                scan.report,
+                scan.limits,
+                WorkspaceScanIssueKind::DirectoryUnreadable,
+                current.to_owned(),
+                error.to_string(),
+            );
+            return Ok(());
+        }
+    };
+    let mut entries = entries
+        .filter_map(|entry| match entry {
+            Ok(entry) => Some(entry),
+            Err(error) => {
+                record_scan_issue(
+                    scan.report,
+                    scan.limits,
+                    WorkspaceScanIssueKind::DirectoryEntryUnreadable,
+                    current.to_owned(),
+                    error.to_string(),
+                );
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        scan.cancellation.checkpoint()?;
+        let path = entry.path();
+        let file_type = match entry.file_type() {
+            Ok(file_type) => file_type,
+            Err(error) => {
+                record_scan_issue(
+                    scan.report,
+                    scan.limits,
+                    WorkspaceScanIssueKind::DirectoryEntryUnreadable,
+                    path,
+                    error.to_string(),
+                );
+                continue;
+            }
+        };
+        if file_type.is_symlink() {
+            record_scan_issue(
+                scan.report,
+                scan.limits,
+                WorkspaceScanIssueKind::SymlinkSkipped,
+                path,
+                "symbolic links are not followed during workspace discovery".to_owned(),
+            );
+            continue;
+        }
+        if file_type.is_dir() {
+            if ignored_workspace_directory(&entry.file_name()) {
+                continue;
+            }
+            if depth >= scan.limits.max_depth {
+                record_scan_issue(
+                    scan.report,
+                    scan.limits,
+                    WorkspaceScanIssueKind::DepthLimitExceeded,
+                    path,
+                    format!(
+                        "directory nesting exceeds the configured limit of {}",
+                        scan.limits.max_depth
+                    ),
+                );
+                continue;
+            }
+            collect_disk_files(root, &path, depth + 1, scan)?;
+            continue;
+        }
+        if !file_type.is_file() {
+            continue;
+        }
+        if scan.report.discovered_files >= scan.limits.max_files {
+            return Err(WorkspaceError::FileLimitExceeded {
+                limit: scan.limits.max_files,
+            });
+        }
+        scan.report.discovered_files = scan.report.discovered_files.saturating_add(1);
+        let relative = path
+            .strip_prefix(root)
+            .map_err(|_| WorkspaceError::InvalidLogicalPath(path.clone()))?
+            .to_string_lossy()
+            .replace('\\', "/");
+        if !scan.profile.allows_scan_file(&relative) {
+            continue;
+        }
+        let logical = LogicalPath::parse(&relative)
+            .map_err(|_| WorkspaceError::InvalidLogicalPath(path.clone()))?;
+        if !scan.seen.insert(logical.clone()) {
+            continue;
+        }
+        scan.output.push((logical, path));
+    }
+    Ok(())
+}
+
+fn ignored_workspace_directory(name: &std::ffi::OsStr) -> bool {
+    matches!(
+        name.to_str(),
+        Some(".git" | ".hg" | ".svn" | "node_modules" | "target")
+    )
+}
+
+pub(crate) fn read_source_file(
+    path: &std::path::Path,
+    limits: WorkspaceScanLimits,
+    report: &mut WorkspaceScanReport,
+    source_encoding: SourceEncoding,
+) -> Option<String> {
+    read_source_file_cancellable(
+        path,
+        limits,
+        report,
+        &WorkspaceScanToken::new(),
+        source_encoding,
+    )
+    .ok()
+    .flatten()
+}
+
+pub(crate) fn read_source_file_cancellable(
+    path: &std::path::Path,
+    limits: WorkspaceScanLimits,
+    report: &mut WorkspaceScanReport,
+    cancellation: &WorkspaceScanToken,
+    source_encoding: SourceEncoding,
+) -> Result<Option<String>, WorkspaceError> {
+    cancellation.checkpoint()?;
+    let file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) => {
+            record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::FileUnreadable,
+                path.to_owned(),
+                error.to_string(),
+            );
+            return Ok(None);
+        }
+    };
+    let metadata = match file.metadata() {
+        Ok(metadata) => metadata,
+        Err(error) => {
+            record_scan_issue(
+                report,
+                limits,
+                WorkspaceScanIssueKind::MetadataUnreadable,
+                path.to_owned(),
+                error.to_string(),
+            );
+            return Ok(None);
+        }
+    };
+    if !metadata.is_file() {
+        record_scan_issue(
+            report,
+            limits,
+            WorkspaceScanIssueKind::FileUnreadable,
+            path.to_owned(),
+            "source path is not a regular file".to_owned(),
+        );
+        return Ok(None);
+    }
+    if metadata.len() > limits.max_file_size {
+        record_scan_issue(
+            report,
+            limits,
+            WorkspaceScanIssueKind::FileTooLarge,
+            path.to_owned(),
+            format!(
+                "file size {} exceeds the configured limit of {} bytes",
+                metadata.len(),
+                limits.max_file_size
+            ),
+        );
+        return Ok(None);
+    }
+    let mut bytes = Vec::with_capacity(usize::try_from(metadata.len()).unwrap_or(0));
+    if let Err(error) = file
+        .take(limits.max_file_size.saturating_add(1))
+        .read_to_end(&mut bytes)
+    {
+        record_scan_issue(
+            report,
+            limits,
+            WorkspaceScanIssueKind::FileUnreadable,
+            path.to_owned(),
+            error.to_string(),
+        );
+        return Ok(None);
+    }
+    cancellation.checkpoint()?;
+    if u64::try_from(bytes.len()).map_or(true, |size| size > limits.max_file_size) {
+        record_scan_issue(
+            report,
+            limits,
+            WorkspaceScanIssueKind::FileTooLarge,
+            path.to_owned(),
+            format!(
+                "file grew beyond the configured limit of {} bytes",
+                limits.max_file_size
+            ),
+        );
+        return Ok(None);
+    }
+    let mut legacy = false;
+    let text = match String::from_utf8(bytes) {
+        Ok(text) => text,
+        Err(error) => {
+            let detail = error.to_string();
+            let bytes = error.into_bytes();
+            if source_encoding == SourceEncoding::Windows1252
+                && looks_like_legacy_text(&bytes)
+                && windows1252_has_no_undefined_bytes(&bytes)
+            {
+                let (text, had_errors) = WINDOWS_1252.decode_without_bom_handling(&bytes);
+                if !had_errors {
+                    legacy = true;
+                    text.into_owned()
+                } else {
+                    record_scan_issue(
+                        report,
+                        limits,
+                        WorkspaceScanIssueKind::InvalidUtf8,
+                        path.to_owned(),
+                        detail,
+                    );
+                    return Ok(None);
+                }
+            } else {
+                record_scan_issue(
+                    report,
+                    limits,
+                    WorkspaceScanIssueKind::InvalidUtf8,
+                    path.to_owned(),
+                    detail,
+                );
+                return Ok(None);
+            }
+        }
+    };
+    if contains_control_characters(&text) {
+        record_scan_issue(
+            report,
+            limits,
+            WorkspaceScanIssueKind::NonTextContent,
+            path.to_owned(),
+            "decoded text contains control characters and is not human-readable source (likely game-only encoded)"
+                .to_owned(),
+        );
+        return Ok(None);
+    }
+    if legacy {
+        report.legacy_encoded_files = report.legacy_encoded_files.saturating_add(1);
+    }
+    Ok(Some(text))
+}
+
+fn contains_control_characters(text: &str) -> bool {
+    text.chars()
+        .any(|character| character.is_control() && !matches!(character, '\t' | '\r' | '\n'))
+}
+
+fn looks_like_legacy_text(bytes: &[u8]) -> bool {
+    !bytes.contains(&0)
+        && bytes
+            .iter()
+            .any(|byte| matches!(*byte, b'=' | b'{' | b'}' | b'#' | b'\n' | b':'))
+}
+
+fn windows1252_has_no_undefined_bytes(bytes: &[u8]) -> bool {
+    !bytes
+        .iter()
+        .any(|byte| matches!(*byte, 0x81 | 0x8d | 0x8f | 0x90 | 0x9d))
+}
+
+pub(crate) fn stable_file_id(root: SourceRootId, logical: &LogicalPath) -> u64 {
+    let mut value = 0xcbf29ce484222325_u64 ^ u64::from(root.get());
+    for byte in logical.as_str().bytes() {
+        value = (value ^ u64::from(byte)).wrapping_mul(0x100000001b3);
+    }
+    value
+}
+
+pub(crate) fn root_priority(root: &SourceRoot) -> u64 {
+    match root.kind {
+        SourceRootKind::Vanilla => 0,
+        SourceRootKind::Dependency => 1_000 + u64::from(root.order),
+        SourceRootKind::CurrentMod => 10_000 + u64::from(root.order),
+    }
+}
+
+pub(crate) fn source_priorities(
+    roots: &[SourceRoot],
+    files: &BTreeMap<SourceFileId, SourceFile>,
+) -> BTreeMap<SourceFileId, u64> {
+    files
+        .values()
+        .filter_map(|file| {
+            roots
+                .iter()
+                .find(|root| root.id == file.root_id)
+                .map(|root| (file.id, root_priority(root)))
+        })
+        .collect()
+}

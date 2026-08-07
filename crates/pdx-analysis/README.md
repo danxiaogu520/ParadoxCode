@@ -4,6 +4,19 @@
 
 `pdx-analysis` 是 editor-neutral 的查询 facade：从 `pdx-engine::AnalysisSnapshot` 读取已解析的 document、HIR、`WorkspaceIndex`、rules/profile，生成诊断、补全、悬停、导航、符号和安全重命名 DTO。它不拥有可变 workspace，也不直接读磁盘；`pdx-lsp` 只负责把这些 DTO 转成协议值。
 
+## 内部布局
+
+`src/lib.rs` 只保留模块声明、稳定的公开 re-export 和 crate facade。实现按查询职责拆分：
+
+- `types.rs`：公共 DTO、diagnostic/completion/hover/rename 类型和取消 token；
+- `support.rs`：解析输入、CST/HIR 输入适配和共享文本辅助；
+- `semantic.rs`：规则上下文、scope transition、semantic matcher 和诊断共享逻辑；
+- `resolution.rs`：workspace semantic 收集、候选和 symbol resolution；
+- `diagnostics.rs`、`completion/`、`hover.rs`、`navigation.rs`：各类 editor-neutral query；
+- `tests/`：按 diagnostics、completion、semantic/scope、hover、navigation、rename 分组的行为测试。
+
+`completion/` 内部再分为 context、candidate generation 和通用 completion support；拆分只改变文件组织，不改变 `pdx_analysis::*` 的调用路径。
+
 ## 核心公开类型与入口
 
 - `CancellationToken` 是可 clone 的共享取消标记；`Cancelled` 是查询提前停止的 marker。

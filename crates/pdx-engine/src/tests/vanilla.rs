@@ -1,0 +1,140 @@
+use super::*;
+
+#[test]
+fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-vanilla-cache-{nonce}"));
+    let vanilla = root.join("vanilla");
+    let current = root.join("current");
+    fs::create_dir_all(vanilla.join("common/events")).expect("Vanilla fixture directory");
+    fs::create_dir_all(vanilla.join("localisation/nested/deeper"))
+        .expect("Vanilla localisation fixture directory");
+    fs::create_dir_all(current.join("common/events")).expect("current fixture directory");
+    fs::write(
+        vanilla.join("common/events/definitions.txt"),
+        "country_event = { id = shared.1 }\ncountry_event = { id = vanilla.1 }\n",
+    )
+    .expect("Vanilla definitions");
+    fs::write(
+        vanilla.join("localisation/nested/deeper/test_l_english.yml"),
+        "l_english:\nvanilla_name:0 \"Vanilla text\"\n",
+    )
+    .expect("Vanilla localisation");
+    fs::write(
+        current.join("common/events/definitions.txt"),
+        "country_event = { id = shared.1 }\n",
+    )
+    .expect("current definition");
+
+    let mut vanilla_host = eu4_host();
+    vanilla_host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+        ),
+    ]));
+    vanilla_host
+        .refresh_source_roots()
+        .expect("scan Vanilla once");
+    let vanilla_snapshot = vanilla_host.snapshot();
+    assert!(vanilla_snapshot.source_files().keys().all(|file_id| {
+        vanilla_snapshot
+            .file_state(*file_id)
+            .is_some_and(|state| state.parsed().is_none() && state.hir().is_none())
+    }));
+    let cache = VanillaIndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
+    let cache_path = root.join("cache/vanilla.pdxindex");
+    cache.save(&cache_path).expect("save cache");
+    let cancelled = WorkspaceScanToken::new();
+    cancelled.cancel();
+    assert!(matches!(
+        VanillaIndexCache::load_cancellable(&cache_path, &cancelled),
+        Err(VanillaCacheError::Cancelled)
+    ));
+    let loaded = VanillaIndexCache::load(&cache_path).expect("load cache");
+    assert_eq!(loaded.metadata(), cache.metadata());
+    assert_eq!(loaded.source_files(), cache.source_files());
+    assert_eq!(loaded.index(), cache.index());
+    assert_eq!(
+        loaded.localisation_previews(),
+        cache.localisation_previews()
+    );
+
+    let foreign_path = root.join("foreign.sqlite");
+    let foreign = rusqlite::Connection::open(&foreign_path).expect("foreign database");
+    foreign
+        .execute("CREATE TABLE marker(value TEXT)", [])
+        .expect("foreign schema");
+    drop(foreign);
+    assert!(matches!(
+        cache.save(&foreign_path),
+        Err(VanillaCacheError::NotVanillaCache)
+    ));
+    let foreign = rusqlite::Connection::open(&foreign_path).expect("reopen foreign database");
+    assert_eq!(
+        foreign
+            .query_row("SELECT count(*) FROM marker", [], |row| row
+                .get::<_, i64>(0))
+            .expect("foreign table remains"),
+        0
+    );
+    drop(foreign);
+
+    fs::rename(&vanilla, root.join("vanilla-moved")).expect("make original source unavailable");
+    let mut host = eu4_host();
+    host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(u32::MAX),
+            SourceRootKind::CurrentMod,
+            fs::canonicalize(&current).expect("canonical current root"),
+        ),
+    ]));
+    host.refresh_source_roots().expect("scan current root");
+    host.install_vanilla_cache(loaded)
+        .expect("install cache without Vanilla source access");
+    host.refresh_source_roots()
+        .expect("refresh must skip unavailable Vanilla root");
+
+    let snapshot = host.snapshot();
+    assert_eq!(snapshot.source_roots()[0].kind, SourceRootKind::Vanilla);
+    let shared = snapshot
+        .index()
+        .active_definition("event", "shared.1")
+        .expect("current definition wins");
+    assert_eq!(
+        snapshot
+            .source_files()
+            .get(&shared.file_id)
+            .expect("shared file")
+            .root_id,
+        SourceRootId::new(u32::MAX)
+    );
+    let vanilla_definition = snapshot
+        .index()
+        .active_definition("event", "vanilla.1")
+        .expect("cached Vanilla-only definition remains available");
+    assert_eq!(
+        snapshot
+            .source_files()
+            .get(&vanilla_definition.file_id)
+            .expect("Vanilla file metadata")
+            .root_id,
+        SourceRootId::new(0)
+    );
+    assert!(snapshot.file_state(vanilla_definition.file_id).is_none());
+    let vanilla_localisation = snapshot
+        .index()
+        .active_definition("localisation", "vanilla_name")
+        .expect("cached Vanilla localisation remains available");
+    let preview = snapshot
+        .vanilla_localisation_preview(vanilla_localisation.file_id, vanilla_localisation.range)
+        .expect("cached Vanilla localisation preview");
+    assert_eq!(preview.language.as_deref(), Some("l_english"));
+    assert_eq!(preview.value, "Vanilla text");
+    assert!(snapshot.file_state(vanilla_localisation.file_id).is_none());
+    fs::remove_dir_all(root).expect("cleanup");
+}

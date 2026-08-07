@@ -84,6 +84,38 @@ pdx-lsp     -> pdx-engine + pdx-analysis + pdx-parser + pdx-rules + pdx-game
 
 `pdx-bake` 是 `pdx-rules` package 中的维护者 binary，不是独立核心 crate。`editors/zed` 和 `fuzz` 是独立 Cargo package/workspace，不属于核心 workspace 依赖图。
 
+## Crate 内部布局
+
+核心 crate 的 `lib.rs` 现在主要承担 facade、模块声明和稳定的公开 re-export；实现按职责分布在内部子模块中。这个布局不改变 crate 依赖方向，也不把 game-specific 语义移入 generic engine 或 LSP。
+
+```text
+pdx-parser/src/format/
+  mod.rs, common.rs, script.rs, localisation.rs, equivalence.rs, tests.rs
+
+pdx-rules/src/
+  model.rs, matcher.rs, profile.rs, runtime.rs, canonical.rs, sqlite.rs, rulec.rs, tests.rs
+
+pdx-engine/src/
+  model.rs, index.rs, scan.rs, pipeline.rs, host.rs, snapshot.rs
+  hir/{mod.rs, model.rs, collector.rs, parameters.rs, scope.rs, semantics.rs, tests.rs}
+  vanilla_cache/{mod.rs, read.rs, write.rs, codec.rs, preview.rs}
+
+pdx-analysis/src/
+  types.rs, support.rs, semantic.rs, resolution.rs, diagnostics.rs, hover.rs, navigation.rs
+  completion/{mod.rs, context.rs, candidates.rs, support.rs}
+  tests/{mod.rs, support.rs, diagnostics.rs, completion.rs, semantic.rs, scope.rs, hover.rs,
+         navigation.rs, rename.rs}
+
+pdx-lsp/src/
+  initialize.rs, workspace.rs, vanilla.rs, requests.rs, protocol.rs, text.rs, transport.rs, uri.rs
+  server/{event_loop.rs, workers.rs, document_events.rs}
+  tests/{support.rs, transport_lifecycle.rs, workspace_vanilla.rs, request_adapter.rs, freshness.rs}
+```
+
+公共 API 仍由各 crate facade 导出，例如 `pdx_engine::hir::*`、`pdx_parser::format::*` 和
+`pdx_lsp::*` 的既有路径保持稳定。测试也按功能域拆开，真实 JSON-RPC、workspace、cache、HIR
+和 analysis 行为仍在对应 crate 内验证。
+
 ## Workspace 与 source roots
 
 `AnalysisHost` 持有可变 workspace；`AnalysisSnapshot` 是查询用的不可变视图。当前 source root 类型为 `Vanilla`、`Dependency` 和 `CurrentMod`，未保存文本以 overlay candidate 覆盖其 backing file：

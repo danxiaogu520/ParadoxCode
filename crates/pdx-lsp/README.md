@@ -4,6 +4,19 @@
 
 `pdx-lsp` 是 JSON-RPC/LSP 适配层：负责 `Content-Length` framing、server lifecycle、document version/event、取消与后台 worker 编排、URI/UTF-16 position 转换，以及把 `pdx-analysis` DTO 序列化为协议结果。语义规则、HIR、symbol resolution 和 workspace index 仍属于 `pdx-rules`、`pdx-engine`、`pdx-analysis`。
 
+## 内部布局
+
+`src/lib.rs` 是 facade，稳定导出 server、URI 和 EU4 composition-root 入口。协议相关实现分布如下：
+
+- `initialize.rs`、`workspace.rs`、`vanilla.rs`：初始化、source-root 配置和 Vanilla setup；
+- `requests.rs`：`SnapshotRequestContext` 及 analysis DTO 到 LSP 结果的适配；
+- `protocol.rs`、`text.rs`、`uri.rs`、`transport.rs`：错误/DTO、UTF-16 text change、URI 和 framing；
+- `server.rs`：`LspServer` 公共状态和构造；`server/` 下的 `event_loop.rs`、`workers.rs`、
+  `document_events.rs` 分别负责 event loop、后台任务和 document/message event；
+- `tests/`：transport/lifecycle、workspace/Vanilla、request adapter 和 freshness 的真实 JSON-RPC 测试。
+
+这些模块保持 `pdx_lsp::*` 的既有公开路径，不在 LSP 层复制 semantic rule 或 analysis 算法。
+
 ## 核心公开类型与入口
 
 - `LspServer` 由 `try_new`（空规则、适合协议测试）或 `try_new_with_rules(InitializeOptions, RuleSet, GameProfile)` 创建；后者先校验 profile 的 `game_id`。

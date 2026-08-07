@@ -1,0 +1,761 @@
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+
+use pdx_engine::hir::{HirFile, HirReference, HirReferenceOrigin};
+use pdx_engine::{AnalysisSnapshot, Definition, DocumentId, DocumentSource, SourceFileId};
+use pdx_rules::{KeyMatcher, RuleShape, SymbolResolutionPolicy};
+use pdx_text::{LogicalPath, TextRange, TextSize};
+#[cfg(test)]
+use std::cell::Cell;
+
+use crate::semantic::*;
+use crate::support::*;
+use crate::types::*;
+
+#[derive(Clone, Debug)]
+pub(crate) struct DefinitionInfo {
+    pub(crate) kind: String,
+    pub(crate) name: String,
+    pub(crate) symbol: Symbol,
+    pub(crate) document: Option<DocumentId>,
+    pub(crate) file: Option<SourceFileId>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ReferenceInternal {
+    pub(crate) kind: String,
+    pub(crate) name: String,
+    pub(crate) range: TextRange,
+    pub(crate) document: Option<DocumentId>,
+    pub(crate) file: Option<SourceFileId>,
+    pub(crate) path: Option<LogicalPath>,
+}
+
+impl ReferenceInternal {
+    pub(crate) fn location(&self) -> Location {
+        Location {
+            document: self.document.clone(),
+            file: self.file,
+            path: self.path.clone(),
+            range: self.range,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct SemanticWorkspace {
+    pub(crate) definitions: Vec<DefinitionInfo>,
+    pub(crate) references: Vec<ReferenceInternal>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct SemanticFile {
+    pub(crate) definitions: Vec<DefinitionInfo>,
+    pub(crate) references: Vec<ReferenceInternal>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ResolutionDefinition {
+    pub(crate) location: Location,
+    pub(crate) selection_range: TextRange,
+    pub(crate) priority: u64,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct RenameTarget {
+    pub(crate) kind: String,
+    pub(crate) name: String,
+    pub(crate) cursor_range: TextRange,
+    pub(crate) definition: ResolutionDefinition,
+}
+
+pub(crate) enum Resolution {
+    Unique(ResolutionDefinition),
+    Ambiguous,
+    Missing,
+}
+
+pub(crate) fn semantic_data(snapshot: &AnalysisSnapshot, input: &ParsedInput) -> SemanticFile {
+    let mut data = SemanticFile {
+        definitions: Vec::new(),
+        references: Vec::new(),
+    };
+    let Some(hir) = input.hir.as_deref() else {
+        return data;
+    };
+    // The inactive-range set is only consulted for Semantic-origin references; skip building it
+    // entirely when this file has none, keeping semantic_data O(references + definitions).
+    let has_semantic_references = hir
+        .references()
+        .iter()
+        .any(|reference| reference.origin == HirReferenceOrigin::Semantic);
+    let inactive_semantic_references = if has_semantic_references {
+        inactive_semantic_reference_ranges(snapshot, hir)
+    } else {
+        BTreeSet::new()
+    };
+    for definition in hir.definitions() {
+        data.definitions.push(make_definition(
+            input,
+            &definition.kind,
+            definition.name.clone(),
+            definition.range,
+            definition.selection_range,
+        ));
+    }
+    for reference in hir
+        .references()
+        .iter()
+        .filter(|reference| {
+            matches!(
+                reference.origin,
+                HirReferenceOrigin::Profile
+                    | HirReferenceOrigin::Semantic
+                    | HirReferenceOrigin::DerivedLocalisation
+            )
+        })
+        .filter(|reference| semantic_reference_is_active(&inactive_semantic_references, reference))
+    {
+        data.references.push(ReferenceInternal {
+            kind: reference.kind.clone(),
+            name: reference.name.clone(),
+            range: reference.range,
+            document: input.document.clone(),
+            file: input.file,
+            path: input.path.clone(),
+        });
+    }
+    data
+}
+
+pub(crate) fn inactive_semantic_reference_ranges(
+    snapshot: &AnalysisSnapshot,
+    hir: &HirFile,
+) -> BTreeSet<TextRange> {
+    let mut inactive = BTreeSet::new();
+    let mut invalid_ancestors = Vec::<(Vec<String>, TextRange)>::new();
+    // Container rule sets are identical for every property in one (context, parent_path). Cache
+    // them per context and path so dynamic members (e.g. one container per mission) do not
+    // rebuild and re-filter the container rules for every property.
+    let mut cached_containers =
+        HashMap::<String, HashMap<Vec<String>, ContainerRuleCache<'_>>>::new();
+    for property in hir.properties() {
+        while invalid_ancestors.last().is_some_and(|(path, range)| {
+            !property.path.starts_with(path) || !text_range_within(property.range, *range)
+        }) {
+            invalid_ancestors.pop();
+        }
+        let own_invalid =
+            semantic_type_property_is_invalid(snapshot, hir, property, &mut cached_containers);
+        if (!invalid_ancestors.is_empty() || own_invalid)
+            && let Some(scalar) = property.scalar.as_ref()
+        {
+            inactive.insert(scalar.range);
+        }
+        if own_invalid {
+            invalid_ancestors.push((property.path.clone(), property.range));
+        }
+    }
+    inactive
+}
+
+/// One (context, parent_path) container's rule set, with derived fast-path indexes so the
+/// per-property validity check does not rescan the container rules for every property.
+pub(crate) struct ContainerRuleCache<'a> {
+    pub(crate) rules: Vec<&'a pdx_rules::SemanticRule>,
+    /// Lowercased keys of non-leaf exact rules; a property key in this set is valid by a concrete
+    /// match without scanning `rules`.
+    pub(crate) concrete_keys: HashSet<String>,
+    /// Whether any concrete non-leaf rule uses an `AnyScalar` matcher (matches every key).
+    pub(crate) any_scalar_concrete: bool,
+    /// Whether the container carries concrete non-leaf rules at all (enum/qualified matchers that
+    /// the key set cannot express still need the scan).
+    pub(crate) has_concrete: bool,
+    /// Whether the container carries `Type` matchers, the only rules the workspace check applies
+    /// to.
+    pub(crate) has_type: bool,
+}
+
+pub(crate) fn semantic_type_property_is_invalid<'a>(
+    snapshot: &'a AnalysisSnapshot,
+    hir: &HirFile,
+    property: &pdx_engine::hir::HirProperty,
+    cached_containers: &mut HashMap<String, HashMap<Vec<String>, ContainerRuleCache<'a>>>,
+) -> bool {
+    if property.path.len() <= 1 {
+        return false;
+    }
+    let Some(fact) = hir.scope_fact_at(property.key_range) else {
+        return false;
+    };
+    let by_path = match cached_containers.get_mut(fact.context.as_str()) {
+        Some(by_path) => by_path,
+        None => cached_containers.entry(fact.context.clone()).or_default(),
+    };
+    if !by_path.contains_key(fact.parent_path.as_slice()) {
+        // `semantic_rules_for_container` ignores its scope argument; build it once per container
+        // only so the caller does not allocate a scope context for every property.
+        let scope = scope_context_from_hir(snapshot.game_profile_handle(), &fact.state);
+        let rules =
+            semantic_rules_for_container(snapshot, &fact.context, &fact.parent_path, &scope);
+        let mut concrete_keys = HashSet::new();
+        let mut any_scalar_concrete = false;
+        let mut has_concrete = false;
+        let mut has_type = false;
+        for rule in &rules {
+            match &rule.key {
+                KeyMatcher::Type(_) => has_type = true,
+                KeyMatcher::Dynamic(_) => {}
+                KeyMatcher::Exact(key) if !matches!(rule.shape, RuleShape::LeafValue) => {
+                    has_concrete = true;
+                    concrete_keys.insert(key.to_ascii_lowercase());
+                }
+                KeyMatcher::AnyScalar if !matches!(rule.shape, RuleShape::LeafValue) => {
+                    has_concrete = true;
+                    any_scalar_concrete = true;
+                }
+                KeyMatcher::Exact(_) | KeyMatcher::AnyScalar | KeyMatcher::Enum(_) => {}
+            }
+        }
+        by_path.insert(
+            fact.parent_path.clone(),
+            ContainerRuleCache {
+                rules,
+                concrete_keys,
+                any_scalar_concrete,
+                has_concrete,
+                has_type,
+            },
+        );
+    }
+    let entry = by_path
+        .get(fact.parent_path.as_slice())
+        .expect("filled above");
+    if entry.any_scalar_concrete
+        || entry
+            .concrete_keys
+            .contains(&property.key.to_ascii_lowercase())
+    {
+        return false;
+    }
+    if entry.has_concrete
+        && entry.rules.iter().any(|rule| {
+            !matches!(rule.key, KeyMatcher::Type(_) | KeyMatcher::Dynamic(_))
+                && !matches!(rule.shape, RuleShape::LeafValue)
+                && semantic_rule_key_matches(snapshot, rule, &fact.parent_path, &property.key)
+        })
+    {
+        return false;
+    }
+    // The workspace check below only fires for containers that actually carry Type matchers.
+    if !entry.has_type {
+        return false;
+    }
+    entry.rules.iter().any(|rule| {
+        let KeyMatcher::Type(type_name) = &rule.key else {
+            return false;
+        };
+        match workspace_type_member(snapshot, type_name, &property.key) {
+            WorkspaceTypeMember::Present => false,
+            WorkspaceTypeMember::Absent => true,
+            WorkspaceTypeMember::Unknown => {
+                !type_member_provably_valid(snapshot, type_name, &property.key)
+            }
+        }
+    })
+}
+
+pub(crate) fn semantic_reference_is_active(
+    inactive_semantic_references: &BTreeSet<TextRange>,
+    reference: &HirReference,
+) -> bool {
+    if reference.origin != HirReferenceOrigin::Semantic {
+        return true;
+    }
+    !inactive_semantic_references.contains(&reference.range)
+}
+
+pub(crate) fn text_range_within(inner: TextRange, outer: TextRange) -> bool {
+    outer.start() <= inner.start() && inner.end() <= outer.end()
+}
+pub(crate) fn make_definition(
+    input: &ParsedInput,
+    kind: &str,
+    name: String,
+    range: TextRange,
+    selection_range: TextRange,
+) -> DefinitionInfo {
+    let location = Location {
+        document: input.document.clone(),
+        file: input.file,
+        path: input.path.clone(),
+        range,
+    };
+    DefinitionInfo {
+        kind: kind.to_owned(),
+        name: name.clone(),
+        symbol: Symbol {
+            name,
+            kind: kind.to_owned(),
+            range,
+            selection_range,
+            location,
+        },
+        document: input.document.clone(),
+        file: input.file,
+    }
+}
+pub(crate) fn all_semantics(
+    snapshot: &AnalysisSnapshot,
+    cancellation: &CancellationToken,
+) -> Result<SemanticWorkspace, Cancelled> {
+    #[cfg(test)]
+    ALL_SEMANTICS_CALLS.with(|calls| calls.set(calls.get().saturating_add(1)));
+    let mut all = SemanticWorkspace::default();
+    for definition in snapshot.index().definitions_iter() {
+        cancellation.checkpoint()?;
+        all.definitions
+            .push(index_definition_info(snapshot, definition));
+    }
+    for reference in snapshot.index().references_iter() {
+        cancellation.checkpoint()?;
+        let path = snapshot
+            .source_files()
+            .get(&reference.file_id)
+            .map(|file| file.logical_path.clone());
+        all.references.push(ReferenceInternal {
+            kind: reference.kind.clone(),
+            name: reference.name.clone(),
+            range: reference.range,
+            document: None,
+            file: Some(reference.file_id),
+            path,
+        });
+    }
+    for document in snapshot.documents().values() {
+        cancellation.checkpoint()?;
+        if document.source() != DocumentSource::Overlay {
+            continue;
+        }
+        if let Some(input) = input_for_document(snapshot, document.id()) {
+            let semantic = semantic_data(snapshot, &input);
+            all.definitions.extend(semantic.definitions);
+            all.references.extend(semantic.references);
+        }
+    }
+    Ok(all)
+}
+
+#[cfg(test)]
+thread_local! {
+    pub(crate) static ALL_SEMANTICS_CALLS: Cell<usize> = const { Cell::new(0) };
+}
+pub(crate) fn resolve_symbol(
+    snapshot: &AnalysisSnapshot,
+    all: &SemanticWorkspace,
+    kind: &str,
+    name: &str,
+) -> Resolution {
+    let mut candidates = symbol_candidates(snapshot, all, kind, name);
+    if candidates.is_empty() {
+        return Resolution::Missing;
+    }
+    let policy = symbol_resolution_policy(snapshot, kind);
+    if matches!(
+        policy,
+        SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique
+    ) {
+        return if candidates.len() == 1 {
+            Resolution::Unique(candidates.remove(0))
+        } else {
+            Resolution::Ambiguous
+        };
+    }
+    let highest = candidates
+        .iter()
+        .map(|candidate| candidate.priority)
+        .max()
+        .unwrap_or(0);
+    candidates.retain(|candidate| candidate.priority == highest);
+    if candidates.len() == 1 {
+        Resolution::Unique(candidates.remove(0))
+    } else {
+        Resolution::Ambiguous
+    }
+}
+
+pub(crate) fn symbol_candidates(
+    snapshot: &AnalysisSnapshot,
+    all: &SemanticWorkspace,
+    kind: &str,
+    name: &str,
+) -> Vec<ResolutionDefinition> {
+    let overlay_files = snapshot
+        .documents()
+        .values()
+        .filter(|document| document.source() == DocumentSource::Overlay)
+        .filter_map(|document| document.path())
+        .filter_map(|path| {
+            snapshot
+                .source_files()
+                .values()
+                .find(|file| file.physical_path == path)
+                .map(|file| file.id)
+        })
+        .collect::<BTreeSet<_>>();
+    let mut candidates = all
+        .definitions
+        .iter()
+        .filter(|definition| definition.kind == kind && same_name(&definition.name, name))
+        .filter(|definition| {
+            definition
+                .file
+                .is_none_or(|file| !overlay_files.contains(&file) || definition.document.is_some())
+        })
+        .map(|definition| ResolutionDefinition {
+            location: definition.symbol.location.clone(),
+            selection_range: definition.symbol.selection_range,
+            priority: definition_priority(snapshot, definition),
+        })
+        .collect::<Vec<_>>();
+    // If a manually injected workspace shard has a definition with no source text, retain it as
+    // a navigation candidate.  Normal scanned files already appear above with exact ranges.
+    if candidates.is_empty() {
+        for definition in snapshot.index().definitions(kind, name) {
+            candidates.push(index_definition(snapshot, definition));
+        }
+    }
+    candidates.sort_by(|left, right| {
+        right.priority.cmp(&left.priority).then_with(|| {
+            symbol_location_sort_key(&left.location).cmp(&symbol_location_sort_key(&right.location))
+        })
+    });
+    candidates.dedup_by(|left, right| {
+        left.location == right.location && left.selection_range == right.selection_range
+    });
+    candidates
+}
+
+pub(crate) fn symbol_candidates_for_hover(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    name: &str,
+    cancellation: &CancellationToken,
+) -> Result<Vec<ResolutionDefinition>, Cancelled> {
+    let overlay_files = overlay_file_ids(snapshot);
+    let mut candidates = Vec::new();
+    for document in snapshot
+        .documents()
+        .values()
+        .filter(|document| document.source() == DocumentSource::Overlay)
+    {
+        cancellation.checkpoint()?;
+        let Some(input) = input_for_document(snapshot, document.id()) else {
+            continue;
+        };
+        for definition in semantic_data(snapshot, &input).definitions {
+            cancellation.checkpoint()?;
+            if definition.kind != kind || !same_name(&definition.name, name) {
+                continue;
+            }
+            let priority = definition_priority(snapshot, &definition);
+            candidates.push(ResolutionDefinition {
+                location: definition.symbol.location,
+                selection_range: definition.symbol.selection_range,
+                priority,
+            });
+        }
+    }
+    for definition in snapshot.index().definitions(kind, name) {
+        cancellation.checkpoint()?;
+        if overlay_files.contains(&definition.file_id) {
+            continue;
+        }
+        candidates.push(index_definition(snapshot, definition));
+    }
+    candidates.sort_by(|left, right| {
+        right.priority.cmp(&left.priority).then_with(|| {
+            symbol_location_sort_key(&left.location).cmp(&symbol_location_sort_key(&right.location))
+        })
+    });
+    candidates.dedup_by(|left, right| {
+        left.location == right.location && left.selection_range == right.selection_range
+    });
+    Ok(candidates)
+}
+
+pub(crate) fn symbol_resolution_policy(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+) -> SymbolResolutionPolicy {
+    snapshot
+        .rules()
+        .model()
+        .symbol_descriptors
+        .iter()
+        .find(|descriptor| descriptor.kind_id.eq_ignore_ascii_case(kind))
+        .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| {
+            descriptor.resolution
+        })
+}
+
+pub(crate) fn symbol_location_sort_key(location: &Location) -> (String, u32, u32) {
+    (
+        location
+            .path
+            .as_ref()
+            .map_or_else(String::new, |path| path.as_str().to_owned()),
+        location.range.start(),
+        location.range.end(),
+    )
+}
+
+pub(crate) struct DirectResolutionContext<'snapshot> {
+    pub(crate) snapshot: &'snapshot AnalysisSnapshot,
+    pub(crate) overlay_files: BTreeSet<SourceFileId>,
+    pub(crate) overlay_definitions: BTreeMap<(String, String), Vec<ResolutionDefinition>>,
+}
+
+impl<'snapshot> DirectResolutionContext<'snapshot> {
+    pub(crate) fn new(snapshot: &'snapshot AnalysisSnapshot) -> Self {
+        let mut context = Self {
+            snapshot,
+            overlay_files: BTreeSet::new(),
+            overlay_definitions: BTreeMap::new(),
+        };
+        for document in snapshot
+            .documents()
+            .values()
+            .filter(|document| document.source() == DocumentSource::Overlay)
+        {
+            if let Some(path) = document.path()
+                && let Some(file) = snapshot
+                    .source_files()
+                    .values()
+                    .find(|file| file.physical_path == path)
+            {
+                context.overlay_files.insert(file.id);
+            }
+            let Some(input) = input_for_document(snapshot, document.id()) else {
+                continue;
+            };
+            for definition in semantic_data(snapshot, &input).definitions {
+                let priority = definition_priority(snapshot, &definition);
+                context
+                    .overlay_definitions
+                    .entry((
+                        definition.kind.to_ascii_lowercase(),
+                        definition.name.to_ascii_lowercase(),
+                    ))
+                    .or_default()
+                    .push(ResolutionDefinition {
+                        location: definition.symbol.location,
+                        selection_range: definition.symbol.selection_range,
+                        priority,
+                    });
+            }
+        }
+        context
+    }
+
+    pub(crate) fn resolve(&self, kind: &str, name: &str) -> Resolution {
+        let mut candidates = self
+            .overlay_definitions
+            .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
+            .cloned()
+            .unwrap_or_default();
+        candidates.extend(
+            self.snapshot
+                .index()
+                .definitions(kind, name)
+                .into_iter()
+                .filter(|definition| !self.overlay_files.contains(&definition.file_id))
+                .map(|definition| index_definition(self.snapshot, definition)),
+        );
+        if candidates.is_empty() {
+            return Resolution::Missing;
+        }
+        let policy = self
+            .snapshot
+            .rules()
+            .model()
+            .symbol_descriptors
+            .iter()
+            .find(|descriptor| descriptor.kind_id.eq_ignore_ascii_case(kind))
+            .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| {
+                descriptor.resolution
+            });
+        if matches!(
+            policy,
+            SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique
+        ) {
+            return if candidates.len() == 1 {
+                Resolution::Unique(candidates.remove(0))
+            } else {
+                Resolution::Ambiguous
+            };
+        }
+        let highest = candidates
+            .iter()
+            .map(|candidate| candidate.priority)
+            .max()
+            .unwrap_or(0);
+        candidates.retain(|candidate| candidate.priority == highest);
+        if candidates.len() == 1 {
+            Resolution::Unique(candidates.remove(0))
+        } else {
+            Resolution::Ambiguous
+        }
+    }
+}
+
+pub(crate) fn definition_priority(snapshot: &AnalysisSnapshot, definition: &DefinitionInfo) -> u64 {
+    if definition.document.is_some() {
+        return 20_000;
+    }
+    let Some(file) = definition
+        .file
+        .and_then(|id| snapshot.source_files().get(&id))
+    else {
+        return 0;
+    };
+    let Some(root) = snapshot
+        .source_roots()
+        .iter()
+        .find(|root| root.id == file.root_id)
+    else {
+        return 0;
+    };
+    match root.kind {
+        pdx_engine::SourceRootKind::Vanilla => 0,
+        pdx_engine::SourceRootKind::Dependency => 1_000 + u64::from(root.order),
+        pdx_engine::SourceRootKind::CurrentMod => 10_000 + u64::from(root.order),
+    }
+}
+
+pub(crate) fn index_definition(
+    snapshot: &AnalysisSnapshot,
+    definition: &Definition,
+) -> ResolutionDefinition {
+    let (path, document) = snapshot
+        .source_files()
+        .get(&definition.file_id)
+        .map(|file| (Some(file.logical_path.clone()), None))
+        .unwrap_or((None, None));
+    ResolutionDefinition {
+        location: Location {
+            document,
+            file: Some(definition.file_id),
+            path,
+            range: definition.range,
+        },
+        selection_range: indexed_definition_selection_range(snapshot, definition),
+        priority: definition_priority_for_file(snapshot, definition.file_id),
+    }
+}
+
+pub(crate) fn index_definition_info(
+    snapshot: &AnalysisSnapshot,
+    definition: &Definition,
+) -> DefinitionInfo {
+    let selection_range = indexed_definition_selection_range(snapshot, definition);
+    let path = snapshot
+        .source_files()
+        .get(&definition.file_id)
+        .map(|file| file.logical_path.clone());
+    let location = Location {
+        document: None,
+        file: Some(definition.file_id),
+        path,
+        range: definition.range,
+    };
+    DefinitionInfo {
+        kind: definition.kind.clone(),
+        name: definition.name.clone(),
+        symbol: Symbol {
+            name: definition.name.clone(),
+            kind: definition.kind.clone(),
+            range: definition.range,
+            selection_range,
+            location,
+        },
+        document: None,
+        file: Some(definition.file_id),
+    }
+}
+
+pub(crate) fn indexed_definition_selection_range(
+    snapshot: &AnalysisSnapshot,
+    definition: &Definition,
+) -> TextRange {
+    snapshot
+        .file_state(definition.file_id)
+        .and_then(|state| state.hir())
+        .and_then(|hir| {
+            hir.definitions()
+                .iter()
+                .find(|candidate| {
+                    candidate.kind.eq_ignore_ascii_case(&definition.kind)
+                        && candidate.name.eq_ignore_ascii_case(&definition.name)
+                        && candidate.range == definition.range
+                })
+                .map(|candidate| candidate.selection_range)
+        })
+        .unwrap_or(definition.range)
+}
+
+pub(crate) fn definition_selection_location(definition: &ResolutionDefinition) -> Location {
+    let mut location = definition.location.clone();
+    location.range = definition.selection_range;
+    location
+}
+
+pub(crate) fn definition_priority_for_file(snapshot: &AnalysisSnapshot, id: SourceFileId) -> u64 {
+    let Some(file) = snapshot.source_files().get(&id) else {
+        return 0;
+    };
+    let Some(root) = snapshot
+        .source_roots()
+        .iter()
+        .find(|root| root.id == file.root_id)
+    else {
+        return 0;
+    };
+    match root.kind {
+        pdx_engine::SourceRootKind::Vanilla => 0,
+        pdx_engine::SourceRootKind::Dependency => 1_000 + u64::from(root.order),
+        pdx_engine::SourceRootKind::CurrentMod => 10_000 + u64::from(root.order),
+    }
+}
+pub(crate) fn symbol_at(
+    all: &SemanticWorkspace,
+    document: &DocumentId,
+    position: TextSize,
+) -> Option<(String, String)> {
+    if let Some(reference) = all.references.iter().find(|reference| {
+        reference.document.as_ref() == Some(document) && contains(reference.range, position)
+    }) {
+        return Some((reference.kind.clone(), reference.name.clone()));
+    }
+    all.definitions
+        .iter()
+        .find(|definition| {
+            definition.document.as_ref() == Some(document)
+                && contains(definition.symbol.selection_range, position)
+        })
+        .map(|definition| (definition.kind.clone(), definition.name.clone()))
+}
+
+pub(crate) fn local_parameter_target(
+    input: &ParsedInput,
+    position: TextSize,
+) -> Option<(
+    &pdx_engine::hir::HirParameterDefinition,
+    &pdx_engine::hir::HirParameterReference,
+)> {
+    let hir = input.hir.as_deref()?;
+    let reference = hir.parameter_reference_at(position)?;
+    let definition = hir
+        .parameter_definitions_for_owner(reference.owner_range)
+        .find(|definition| definition.name.eq_ignore_ascii_case(&reference.name))?;
+    Some((definition, reference))
+}

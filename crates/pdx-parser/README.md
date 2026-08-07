@@ -17,6 +17,13 @@
 - `SyntaxError`、`SyntaxErrorKind`：包含 `kind`、`range`、`message`；`code()` 返回稳定诊断码。
 - `pdx_parser::format::{format, FormatResult, TextEdit, FormatSkipReason}`：执行固定风格的安全格式化。
 
+## 内部布局
+
+`src/format/mod.rs` 保持 `pdx_parser::format::*` facade。公共 formatter 类型、安全检查和基础
+工具位于 `format/common.rs`；Script 与 Localisation formatter 分别位于 `format/script.rs` 和
+`format/localisation.rs`；CST 等价性和最小 edit 生成位于 `format/equivalence.rs`，formatter
+行为测试位于 `format/tests.rs`。这不会改变 formatter 的安全边界或公开路径。
+
 ## 输入、输出与数据流
 
 1. 调用方用 `FileFormat` 和源文本调用 `parse`。
