@@ -1,64 +1,23 @@
 # RFC 0009：LSP Runtime
 
-- 状态：Accepted
-- MVP：EU4 v0.1
+- 状态：Current
+- 适用版本：EU4 v0.1
 
-> 实现进度（2026-07-25）：stdio reader 与 workspace event loop 已分离；initialize 的 source-root scan 在候选 host worker 中运行，目录/读取/parse/lower/index 全链路可取消且仅在成功后提交；编辑先 stage 最新文本/版本，parse/lower 在 snapshot worker 准备，并通过版本、文本、路径三重提交门拒绝旧结果；依赖语义的请求按消息顺序等待最新 parse。semantic diagnostics 使用 200ms debounce 与版本门，普通语言请求也在 snapshot worker 执行；`$/cancelRequest` 与过期 diagnostics 使用共享的 editor-neutral token，在 workspace semantic 合并、semantic rule 递归及主要结果遍历中协作式中止。当前声明能力覆盖的标准 params、initialize result/capabilities、diagnostics 与语言功能 response 已迁入 `lsp-types`，JSON-RPC framing 继续保持轻量自有实现。类型化 `initializationOptions`、项目 TOML、Current Mod、有序只读 Dependency roots、持久化只读 Vanilla cache，以及动态注册并在 revision 门后提交的 watched-file worker 均已接入。Vanilla cache 的读取/校验/合并在 initialize response 之后后台执行；依赖 cache 的 snapshot 查询在合并前排队，避免启动阶段被大 cache 同步阻塞。memory transport 回归还覆盖 scope-fact 消歧后的 mixed structural/child-context completion 与相应 publishDiagnostics。
->
-> 缓存修订（2026-08-05）：initialize response 之后，后台 worker 加载可读且 schema/game identity 有效的 Vanilla cache；若记录的 `rule_hash` 与当前内嵌 JSON source 编译出的规则不一致，worker 从 cache metadata 的 Vanilla 源目录以当前规则重建，并通过 SQLite transaction 保存到原路径，事务提交后由 event loop 安装。重建成功发送 `window/showMessage` INFO；扫描、重建或事务保存失败则回退安装已加载旧 cache，发送 WARNING 并说明失败原因及两个 hash。缺失、损坏或 schema 不兼容仍 warning 降级且不隐式扫描游戏目录；文件内容变化不自动刷新，显式用户刷新仍支持。后台 worker 运行期间不静默：客户端在 initialize 中声明 `window.workDoneProgress` 时，server 先发 `window/workDoneProgress/create`（客户端响应按协议忽略），再以 `$/progress` 发送 begin/report/end（report 转发引擎扫描的已索引文件数）；未声明时以开始/结束两条 INFO `window/showMessage` 提示。该能力在 initialize 响应后由 event loop 从客户端 capabilities 读取。
->
-> 2026-07-21 amendment：本 RFC 的 `--rules` runtime 输入已由 [RFC 0013](0013-embedded-first-party-rules.md) 取代；LSP 生命周期和协议边界不变。
+## 职责
 
-## 边界
+`pdx-lsp` 是协议 adapter，不实现 parser、规则解释或分析算法。它负责 stdio JSON-RPC
+transport、initialize/shutdown/exit 生命周期、client capability negotiation、文档版本、
+取消、URI/position/TextEdit 转换、workspace/config 事件转换，以及 diagnostics 发布。
+分析请求统一调用 `pdx-analysis` 的 immutable snapshot 查询。
 
-`pdx-lsp` 是协议 adapter，不拥有 parser、规则或 feature 算法。它负责：
+## 进程与规则入口
 
-- stdio JSON-RPC transport
-- initialize/shutdown 生命周期
-- client capability negotiation
-- document version 与 cancellation
-- URI、position、TextEdit 转换
-- workspace/config 事件转成 `WorkspaceChange`
-- publish diagnostics
+正式 `pdx-ls` 进程无规则参数。它接受 `--version`/`-V`，其他 process argument（包括
+`--rules`）均返回错误；不存在外部规则文件、规则路径或规则下载入口。启动 composition
+root 从 `pdx-game::eu4` 取得内嵌第一方 JSON source，使用用户本地 SQLite artifact，用户路径
+不可用时才使用不持久化的临时 artifact。规则 authority 与 cache 校验见 [RFC 0014](0014-first-party-rule-source.md)。
 
-## Transport
-
-MVP 只支持 stdio，stdout 专用于协议。日志写 stderr 或 LSP logging channel，并默认不记录完整用户源码。
-自有 framing 在分配 body 前限制总 header 为 8 KiB、单条 JSON-RPC message 为 32 MiB，
-并拒绝重复 `Content-Length`，避免损坏客户端造成无界分配或长度歧义。overlay 文档与
-磁盘扫描共享 16 MiB 单文件边界；增量 change 在修改 String 之前计算结果长度并拒绝越界。
-排序后的 completion 与 workspace symbol response 分别限制为 512/256 项；completion
-截断时设置 `isIncomplete`，客户端可用更具体前缀继续查询。单次 diagnostics publish
-最多 1000 项；超出时最后一项明确报告被省略数量，而不是静默生成无界 response。
-
-优先选用提供 protocol connection 与 types 的低层 Rust 库，避免 analysis API 被 async service trait 绑定。具体依赖版本在 Phase 0 spike 后锁定。
-
-Server 使用编译进官方 binary 的第一方规则：
-
-```text
-pdx-ls
-```
-
-`pdx-ls` 不接受、下载、更新或搜索外部规则文件。启动时校验内嵌 first-party JSON source，计算
-`rule_hash`，再只读加载或生成用户本地 SQLite artifact；cache schema、game identity 或 hash
-不匹配时重新编译，编译失败则报告明确的 server/source error，不能使用旧规则静默继续。
-
-## Server 状态
-
-```text
-Uninitialized
-Initializing
-Initialized
-ShuttingDown
-Exited
-```
-
-- initialize 前除 initialize/exit 外的请求返回 protocol error。
-- shutdown 后停止接受语言请求，但等待 exit。
-- exit without shutdown 使用非零退出码。
-- transport EOF 时安全停止 worker。
-
-## Initialize options
+`initialize` 的当前 options 只描述 workspace：
 
 ```json
 {
@@ -71,94 +30,58 @@ Exited
 }
 ```
 
-`projectConfig` 和其余路径的相对路径均以 client 打开的 workspace root 为基准；inline 字段逐字段覆盖 TOML。`dependencies` 按从低到高优先级解释，ID 大小写不敏感地唯一并产生稳定 root identity；目录必须存在且 root 之间不得相同或嵌套。Current Mod 可写，Dependency 与 Vanilla cache 只读。项目固定为 EU4，不接受 game id、game version 或 DLC source roots。规则路径由 process argument 提供，不在项目配置中 pin `rule_hash`。缺失、损坏或 schema/game identity 无效的 Vanilla cache 通过 `window/showMessage` 警告并降级，不阻止 Current Mod/Dependency 启动，且不隐式扫描游戏目录；可读旧 `rule_hash` cache 在 initialize response 后由后台 worker 按缓存元数据的 Vanilla 源目录重建，保存使用 SQLite transaction，成功后发送 INFO，失败回退旧 cache 并发送 WARNING。
+相对路径以 client workspace root 为基准；inline 字段覆盖 TOML。Dependency 按给定顺序形成
+只读 roots，Current Mod 可写；空路径、重复 ID、root 重叠或嵌套会报 `INVALID_PARAMS`。
+没有配置时使用打开的 workspace 作为 Current Mod，不猜测路径来替代配置。
 
-客户端未提供配置时，server 仍提供 syntax features，并发布 workspace configuration warning；不得猜测 Steam 安装路径后静默扫描。Vanilla cache 缺失时不自动扫描游戏目录。
+initialize 的 Current Mod/Dependency scan 在 worker 中完成并在成功后提交。显式 Vanilla cache
+在 initialize response 后后台加载；规则 hash 不匹配时可按 cache 记录的 Vanilla source 重建，
+失败则以 warning 继续使用已加载的旧 cache。没有显式 cache 时，官方入口可按用户配置执行
+一次后台 EU4 Vanilla discovery/index；进度通过 `window/workDoneProgress` 或提示消息报告。
 
-## 文档同步
+## 生命周期与传输
 
-声明 incremental sync，并实现：
+状态为 `Uninitialized`、`Initializing`、`Initialized`、`ShuttingDown`、`Exited`。initialize
+前只接受 initialize、exit 和取消；shutdown 后只等待 exit；未先 shutdown 的 exit 使用非零
+退出结果。MVP 只支持 stdio，stdout 专用于协议。framing 限制 header 总长度 8 KiB、单条
+JSON-RPC message 32 MiB，并拒绝重复 `Content-Length`；workspace/overlay 单文件上限为
+16 MiB，结果列表也有固定上限。
 
-- `didOpen`：创建 overlay，记录 version 和完整文本。
-- `didChange`：按顺序应用 changes，拒绝陈旧 version。
-- `didClose`：移除 overlay，恢复 backing disk candidate；新建未保存文件则从 workspace 移除。
-- `didSave`：MVP 可接收并触发磁盘 metadata refresh，但不能假定一定发送。
+文档同步使用 incremental sync：`didOpen` 创建 overlay，`didChange` 按顺序应用 changes 并
+拒绝陈旧 version，`didClose` 移除 overlay，`didSave` 可触发磁盘 metadata refresh。内部 range
+使用 UTF-8 byte offset，只在 LSP 边界经 `LineIndex` 转换为 UTF-16 line/character。
 
-内部所有 range 是 UTF-8 byte offset。只在 LSP 边界使用 `LineIndex` 转换 UTF-16 line/character。
+## 已声明并实现的能力
 
-## 请求与优先级
+initialize result 当前声明并由 dispatch 实现：
 
-高优先级：
-
-- completion
+- completion（含 `completionItem/resolve`）
 - hover
 - definition
-- prepare rename
-
-普通优先级：
-
 - references
-- document symbol
-- formatting
-- rename
+- document symbol 与 workspace symbol
+- `prepareRename` 与 rename
+- document formatting
 
-后台：
+同时声明 incremental text sync。Semantic Tokens、Code Action 和 Workspace Diagnostics 当前
+不声明；range formatting 也不作为 LSP capability 提供。
 
-- workspace scan
-- semantic diagnostics
-- workspace symbol 大查询
+## 并发、诊断与文件变化
 
-每个请求捕获 snapshot 和 cancellation token。后台任务不得阻塞 event loop 应用 didChange。
+event loop 是 mutable `AnalysisHost` 的唯一提交者；语言请求在捕获单一 `AnalysisSnapshot` 后
+进入 worker，不持有 host lock。编辑先提交最新文本和 version，再异步 parse/lower；结果必须同时
+匹配当前 document version、文本和路径，否则丢弃。普通请求、parse、workspace scan 和诊断都
+支持协作式取消；`$/cancelRequest` 会取消对应任务。
 
-## Capabilities
+syntax/semantic diagnostics 使用 push publish；semantic diagnostics 默认 debounce 200 ms，
+提交前检查版本，过期结果不发布。单次 publish 最多 1000 项，completion 和 workspace symbol
+结果也有上限。Current Mod/overlay 的诊断会更新，Dependency 和 Vanilla 主要用于索引与查询。
 
-Phase 2 只声明同步能力。对应 feature 实现通过测试后逐步声明：
+当 client 支持动态 watched-file registration 时，server 为 Current Mod 和 Dependency 注册
+create/change/delete watcher；磁盘变化不会覆盖打开文档的 overlay。Vanilla 不注册持续 watcher，
+其 cache 只在显式刷新或规则 hash 不匹配的启动流程中处理。
 
-- completion provider
-- hover provider
-- definition provider
-- references provider
-- document/workspace symbol provider
-- rename provider，含 prepare
-- document formatting provider
+## 当前限制
 
-未实现能力不能提前声明。Semantic Tokens 和 Code Action 在 v0.2 前不声明。
-
-Scripted definition 的 inferred parameter 通过 document symbol provider 以 LSP `VARIABLE`
-返回，selection range 精确覆盖参数名；workspace symbol provider 不返回这些 owner-local
-symbol。真实内存 transport 回归同时锁定这两个边界。
-
-## Diagnostics
-
-MVP 使用 push diagnostics：
-
-- syntax diagnostics 低延迟发布。
-- semantic diagnostics debounce 且可取消。
-- 每次发布完整替换该 URI 的旧结果。
-- close 后发布空 diagnostics，除非 client 生命周期不需要。
-- worker 返回时校验 file revision，过期结果丢弃。
-- 默认只发布当前 Mod与其未保存 overlay 的 diagnostics；Vanilla/Dependency 只参与索引和查询。
-
-Workspace 中未打开文件的全量错误由 `pdx check` 提供；Workspace Diagnostics 是后续能力。
-
-## 文件变化
-
-Phase 4 接收 Current Mod和 Dependency 的 client watched-file notification，并保留 server-side scan fallback。来自 watcher 的磁盘变化不能覆盖打开文档 overlay，只更新 backing candidate。Vanilla 不注册持续 watcher；源文件内容或 fingerprint 变化不自动刷新。LSP 启动仅在可读 cache 的 `rule_hash` 与当前内嵌 JSON source 编译出的规则不一致时按上述后台流程重建；其他重建仍由显式刷新操作触发。
-
-## Panic 隔离
-
-- 单请求 panic 不应破坏协议输出；在 worker 边界捕获并记录内部错误。
-- parser/analysis 对用户输入不得 panic，这是 fuzz/测试门禁。
-- 发生内部错误时返回标准 internal error，不发布伪装成脚本错误的 diagnostic。
-
-## 集成测试
-
-使用内存 connection 驱动完整消息序列，至少覆盖：
-
-- initialize -> open -> changes -> feature -> close -> shutdown -> exit
-- UTF-16 position
-- cancellation
-- stale diagnostics
-- invalid request before initialize
-- change version disorder
-- client 不支持 snippet/related information 时的 capability fallback
+- transport 只有 stdio；没有 TCP 或其他长连接服务端。
+- 当前正式组合入口固定为 EU4 profile，不接受运行时游戏切换或外部规则输入。

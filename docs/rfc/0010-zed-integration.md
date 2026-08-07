@@ -1,48 +1,22 @@
 # RFC 0010：Zed 集成
 
-- 状态：Accepted
-- MVP：EU4 v0.1
+- 状态：Current
+- 适用版本：EU4 v0.1
 
-> 2026-07-21 amendment：扩展携带规则和 `--rules` 启动参数已由
-> [RFC 0013](0013-embedded-first-party-rules.md) 取代。扩展只下载、校验、缓存并启动内嵌
-> 第一方规则的官方 server。
+## 已实现的扩展
 
-## 原则
+扩展位于 `editors/zed`，是 Zed 的薄客户端，包含语言 metadata、Tree-sitter grammar/query
+引用和 `pdx-ls` 的发现、安装、校验、启动代码。`extension.toml` 注册语言
+`Europa Universalis IV`（机器标识由 Zed 生成）和 `pdx-ls` server；语义分析、symbol、scope
+和规则解释全部留在 Rust core，扩展不携带规则表。
 
-Zed extension 是薄客户端。它只包含语言 metadata、Tree-sitter queries、server 安装/启动代码和配置映射，不携带、实现或解释任何 EU4 semantic rule。
+语言配置使用 `grammars/tree-sitter-eu4` 的固定 revision；当前 query 提供 syntax-level 的
+highlight、bracket、indent 和 outline，不把 EU4 command/scope 名称表编入扩展。
+`.txt` 不被全局抢占，`gui`/`gfx` 由语言配置声明。
 
-## Extension 结构
+## 当前静态推荐设置
 
-```text
-editors/zed/
-  extension.toml
-  Cargo.toml
-  src/lib.rs
-  languages/
-    eu4/
-      config.toml
-      highlights.scm
-      brackets.scm
-      indents.scm
-      outline.scm
-```
-
-extension 将主脚本 grammar 注册为用户可见的 `Europa Universalis IV`（机器标识 `eu4`），
-并注册一个 `pdx-ls`。extension 不为 localisation 或 CSV 注册编辑器语言；server 仍会在
-workspace 扫描中静默解析 localisation，以支持跨文件索引和 Script 中的 localisation 引用。
-
-## 文件识别冲突
-
-Script 使用 `.txt`、`.gui`、`.gfx` 等多个共享扩展，EU4 localisation 使用 `.yml`，都与常见语言冲突。Zed language `path_suffixes` 不支持 glob，因此不能在 extension metadata 中安全地全局抢占这些扩展。
-
-MVP 策略：
-
-1. 不全局声明宽泛 `.txt` 关联，或只提供明确需用户确认的关联。
-2. `pdx init --editor zed` 从 EU4 `RuleSet` 的完整 file matcher catalog 生成项目级 `.zed/settings.json` fragment，使用 `file_types` glob 将全部可支持 EU4 文件关联到相应语言。
-3. 用户可以手动选择语言。
-4. `pdx-ls` 始终根据 logical path 再分类，绝不信任 language id 决定语义。
-
-生成设置的缩略示意：
+仓库内 `editors/zed/recommended-settings.json` 是手工维护的静态 fragment，当前内容为：
 
 ```json
 {
@@ -60,122 +34,34 @@ MVP 策略：
 }
 ```
 
-实际列表不得由这段示例维护，而由 EU4 `RuleSet` 生成；其中包括全部数据库 path/type matcher 能够映射到 Zed glob 的类别。无法无损映射的 matcher 必须出现在生成报告中，并提供手动 language selection fallback。最终 key/name 以 Zed 实际 API spike 为准。
+它用于 EU4 Mod workspace 的文件关联，不是规则编译产物，也不会按 `RuleSet` 自动生成。项目
+当前没有 `pdx init --editor zed`；无法由该 fragment 覆盖的文件仍可在 Zed 中手动选择语言。
 
-## Grammar 分发
+## server 获取、校验与启动
 
-Zed grammar registration 引用 repository 与固定 revision。当前 monorepo 把 grammar 放在子目录，Phase 0 必须验证 Zed 构建工具是否支持该布局。
+`language_server_command` 按以下顺序选择 executable：
 
-若不支持，采用 CI split mirror：
+1. Zed `lsp.pdx-ls.binary.path` 的显式路径；
+2. worktree `PATH` 中的 `pdx-ls`；
+3. 与扩展 `CARGO_PKG_VERSION` 相同版本的官方 GitHub Release asset。
 
-- `grammars/tree-sitter-eu4` 发布到独立只读镜像仓库。
-- source of truth 仍在 ParadoxCode monorepo。
-- extension pin 镜像 revision（Zed manifest 的 `rev`），不追踪 branch。
+下载阶段通过 Zed streaming API 限制 body 大小，读取匹配 archive 的 `.sha256` sidecar，并对
+archive bytes 做 SHA-256 校验。Linux/macOS 使用包含单个精确命名 `pdx-ls` 的 `.tar.gz`，
+Windows 使用包含单个 `pdx-ls.exe` 的 `.zip`。reader 校验文件名、路径、压缩方式、CRC、archive
+metadata 和大小上限，拒绝额外成员、目录、symlink/path traversal、未知压缩或损坏 archive。
 
-禁止手工维护两份 grammar。
+解压后 executable 另算 SHA-256，和 binary 一起写入 extension work directory 的版本/target
+cache。重用前会再次检查 regular-file 类型、非空、大小上限和 digest；缺少或被修改的 cache
+会删除并重新下载。成功后非 Windows binary 设为可执行，server 以解析出的 binary 启动；扩展
+不会自动附加 `--rules` 或其他规则路径参数，正式 `pdx-ls` 也拒绝这类输入。Zed settings 中
+配置的 binary arguments 原样传给 server。
 
-## Language Server 获取
+当前发布矩阵包含 Linux x86_64/ARM64、macOS x86_64/ARM64 和 Windows x86_64；扩展不自行编译
+Rust server，也不运行 package-manager 安装脚本。
 
-开发模式：
+## 当前限制
 
-1. 首先读取显式配置的 executable path。
-2. 其次在 worktree/PATH 中查找 `pdx-ls`。
-
-发布模式：
-
-- 根据平台与架构下载 GitHub Release artifact。
-- 校验版本、文件名与 checksum。
-- 缓存在 extension work directory。
-- 下载/解压失败返回可操作错误。
-
-Zed 0.7 adapter 已实现上述顺序：它查询与 extension `CARGO_PKG_VERSION` 完全相同的 tag，
-先读取命名 sidecar，再对 archive bytes 做 SHA-256；校验通过后只接受单个精确命名的
-`pdx-ls`/`pdx-ls.exe`。tar/zip 中的额外成员、目录、data descriptor、加密或未知压缩
-方式都会失败，tar header checksum/USTAR 标识和 ZIP local/central metadata/CRC 也必须
-一致；checksum sidecar、压缩 archive 与解压后 executable 还有独立硬上限。tar reader
-在 executable payload 上限之外只额外允许一个 Python USTAR record 的容器开销，并再次
-按 header size 校验 payload，避免容器开销误伤边界合法产物或反向放宽 executable 上限。
-HTTP body 通过 Zed streaming API 逐 chunk 检查并在扩容前拒绝越界，避免异常 asset 在
-下载、校验或解压阶段耗尽 extension WASM 内存。失败通过 language-server
-installation status 返回可操作错误。native 单测锁定 sidecar、受限 reader 与 extractor，
-并直接把 Python packager 生成的 tar.gz/zip 交给 Rust extractor 做跨实现契约回归；CI
-还逐项核对 Rust 五平台映射与 canonical `server-distribution.json`。CI 另行编译实际
-`wasm32-wasip1` extension，并对 native test targets 执行严格 clippy。
-
-安装完成时 extension 另存解压后 executable 的 SHA-256；命中 version+target cache 时先
-校验文件类型、非零/大小上限与该 digest。旧版本遗留的无 checksum cache、截断文件或被
-修改的 executable 都会被移除并重新下载，不会永久陷入重复启动坏 binary。文件类型
-检查不跟随 symlink，安装目录也必须是实际目录；写入前会清理精确命名的临时文件，因此
-预置 cache/temp symlink 不能把下载内容写出 extension work directory。
-
-extension 不自行构建 Rust server，也不运行 package manager 安装脚本。
-
-仓库内的 `pdx release package` 子命令按上述 target matrix 生成只含一个 executable
-的 deterministic `.tar.gz`/`.zip` 与相邻 `{archive}.sha256`；`cargo test` 用原创 fixture
-同时验证 Linux/macOS archive contract、Windows archive contract、executable mode、checksum
-和重复打包字节稳定性。packager、完整矩阵 verifier 和测试通过共用 `crates/pdx-lsp/src/release.rs`
-读取 `server-distribution.json`，不各自复制 target/filename table；checksum/archive/executable
-大小上限也在该契约中声明，并由 Rust producer/verifier 与 policy
-共同锁定。tag workflow 在五种原生
-runner 上构建并校验 server 版本，汇总后
-必须由完整矩阵 verifier 接受才创建 immutable GitHub Release。发布资产上的 clean-machine
-extension 下载/启动仍是发布阻塞项。
-
-第一方规则内嵌于 server release。extension 启动命令必须为：
-
-```text
-<resolved-pdx-ls>
-```
-
-开发模式也不能覆盖规则。内嵌 JSON source 或其首次编译失败属于 server build/release defect。
-
-## 配置传递
-
-Zed settings 映射为 EU4 initialize options：
-
-- `.pdx/project.toml` 路径
-- Vanilla 本地索引缓存路径
-- dependency mods（标识符和显式顺序，由本机设置解析路径）
-- current mod directory
-
-server 是配置含义的最终解释者。extension 只做 JSON 传递和必要路径发现。
-
-## Vanilla 首次索引与刷新
-
-扩展安装后的首次 EU4 workspace 设置中，如果本地 Vanilla cache 不存在，extension 引导用户选择 Vanilla 目录，并调用核心 CLI/server indexing entry point 建立缓存。扩展设置提供显式“刷新 Vanilla 索引”操作。
-
-核心入口建议为：
-
-```text
-pdx index vanilla \
-  --source <selected-eu4-directory> \
-  --output <extension-local-cache>
-```
-
-首次建立和后续手动刷新使用同一入口；extension 只负责触发和展示结果。
-
-- 正常启动不扫描或监控 Vanilla。
-- extension 更新或 `rule_hash` 变化不自动刷新。
-- cache metadata 中旧 `rule_hash` 只用于展示，不阻止加载。
-- extension 不包含 indexing 逻辑，只发起核心命令并传递路径。
-
-## Tree-sitter queries
-
-Phase 1 提供：
-
-- 基础 key/operator/string/number-like/comment captures
-- block bracket matching
-- block indentation
-- event 和 scripted definition 的 outline（只做 syntax 近似）
-
-高亮不得依赖完整 EU4 command 列表。语义区分 effect/trigger/symbol 留给后续 Semantic Tokens；MVP 的 Tree-sitter 高亮保持通用。
-
-## 验收
-
-- Install Dev Extension 成功。
-- 打开配置过的 EU4 workspace 时只启动一个 `pdx-ls`。
-- 所有注册的文本 language 都能发送 didOpen/change/close。
-- server path 配置和 PATH fallback 可测试。
-- extension 启动命令不含可替换第一方规则的参数。
-- 首次 Vanilla cache 建立和手动刷新有发布前 smoke checklist。
-- extension 源码中搜索不到 effect/trigger 名称表或 scope 规则。
+- 扩展只注册 `Europa Universalis IV`，不注册独立 localisation 或 CSV 语言。
+- 扩展不实现 Vanilla discovery/indexing，也不负责写入 Vanilla cache；相关流程由
+  `pdx setup vanilla`、`pdx index vanilla` 或 `pdx-ls` server 处理。
+- 扩展不提供规则 source、规则 override 或动态文件分类生成。

@@ -19,7 +19,7 @@ Paradox Interactive are trademarks of their respective owners.
 
 ## What it provides
 
-- Error-tolerant parsers for Paradox script, EU4 localisation, and supported EU4 CSV files.
+- Error-tolerant parsers for Paradox script and EU4 localisation; CSV remains a syntax-only/opaque resource without a CSV parser.
 - Syntax and semantic diagnostics driven by a validated EU4 rules database.
 - Completion, hover, go-to-definition, references, and document/workspace symbols.
 - Conflict-aware rename restricted to writable Mod sources.
@@ -63,8 +63,8 @@ source text
 
 The engine/profile boundary keeps workspace, indexing, analysis, LSP, and release infrastructure
 game-neutral while EU4 paths, scopes, commands, symbols, and special semantics remain in the EU4
-profile. See [the architecture guide](docs/architecture.md) and
-[RFC 0012](docs/rfc/0012-generic-engine-eu4-first.md) for the accepted design.
+profile. See the [documentation index](docs/README.md), [architecture guide](docs/architecture.md), and
+[RFC 0012](docs/rfc/0012-generic-engine-eu4-first.md) for the current design.
 
 ## Building from source
 
@@ -74,8 +74,8 @@ Tree-sitter corpus checks.
 ```bash
 git clone https://github.com/danxiaogu520/ParadoxCode.git
 cd ParadoxCode
-cargo build --workspace
-cargo test --workspace --all-targets
+cargo build --locked --workspace
+cargo test --locked --workspace --all-targets
 ```
 
 Install the repository Git hooks once:
@@ -135,8 +135,8 @@ validated SQLite runtime artifact in the user cache and rejects external rule in
 | `editors/zed/` | Thin Zed extension, language metadata, and queries |
 | `grammars/` | Editor-only Tree-sitter grammars and corpus tests |
 | `rules/` | Authoritative first-party EU4 source and generated artifact/manifest |
-| `docs/` | Architecture, accepted RFCs, configuration, and release criteria |
-| `fuzz/` | Parser, edit, and formatter fuzz targets |
+| `docs/` | Current architecture, RFCs, rule matrix, and performance reproduction guide |
+| `fuzz/` | Parser, edit, formatter, and HIR fuzz targets |
 | `scripts/` | Reproducible project quality checks |
 
 ## Security

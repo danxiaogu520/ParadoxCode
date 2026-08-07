@@ -1,113 +1,55 @@
-# RFC 0014: First-party rule source and compiler
+# RFC 0014：First-party rule source and compiler
 
-- Status: Accepted
-- Date: 2026-07-22
-- MVP: EU4 v0.1
-- Supersedes: CWT importer (removed) and the authority/maintenance decisions in RFC 0004 and RFC 0013
+- 状态：Current
+- 适用版本：EU4 v0.1
+- 规范地位：当前规则 authority 的唯一规范
 
-> 2026-08-06 amendment: `rules/eu4.pdxrules` is no longer a repository or embedded-binary
-> input. The official server embeds the validated first-party JSON source bundle and materializes
-> the SQLite runtime artifact in a user-local cache. The JSON source remains the sole authority.
+## Authority
 
-## Decision
+`rules/eu4/` 是静态 EU4 规则的唯一 source authority。当前 source format 为 `5`，manifest
+记录 `game_id = "eu4"` 和目标游戏版本。source bundle 由以下 JSON 组成：
 
-ParadoxCode owns and maintains one strict, versioned EU4 rule source under `rules/eu4/`. This
-source tree is the sole authority for static file classification, semantic matching, cardinality,
-symbol/reference metadata, documentation, and resolution policies. The selected game profile
-remains the authority for algorithmic interpretation of those rows and runtime-derived facts such
-as workspace symbols, scope-link evaluation, control-flow/iterator interpretation, and parser token
-extraction. A profile must not duplicate a static rule row when the artifact provides it.
+- `manifest.json`
+- `catalog.json`
+- `semantic-rules.json`
+- `enum-values.json`
+- `type-root-keys.json`
+- `type-root-scopes.json`
+- `type-descriptors.json`
+- `localisation-bindings.json`
 
-`.cwt` files are prohibited as rule inputs. The repository does not provide a CWT parser,
-importer, fallback, synchronization command, or runtime compatibility mode. CWTools material may
-be studied as historical research, but it is neither an oracle nor a build, test, release, or
-maintenance dependency.
+这些文件定义 file classification、semantic rule alternatives、type/root 描述、symbol/reference
+metadata 和 localisation bindings。稳定 identity、source order、alternative identity 与重复
+key 的语义由 compiler 保留；生成 SQLite 或 manifest 不是第二个 authority。
 
-## Pipeline
+## 编译与验证
 
-```text
-rules/eu4/*.json (first-party authority)
-              |
-              +--------------------------+
-              |                          |
-              v                          v
-       pdx-bake CLI                embedded source bundle
-   developer/release checks                 |
-              |                            v
-              |                 pdx-ls first-party provider
-              |                            |
-              +-------------> user-local SQLite cache
-                                           |
-                                           v
-                              read-only runtime RuleSet
-```
+`pdx-rules::rulec` 是唯一 source compiler。它只接受固定的第一方 JSON layout，拒绝 unknown
+field、缺文件、重复 stable identity、无效 cardinality/severity/type identity 和不一致的
+cross-record invariant。`pdx-bake` 供开发/发布检查使用，输出 caller-selected 的临时或发布
+artifact；官方 runtime 不把该输出当 source。
 
-The shared compiler accepts only the fixed first-party JSON layout. Unknown fields, missing files,
-duplicate stable identities, invalid cardinality, invalid severity, mismatched type identities,
-and generated artifact round-trip differences fail compilation. `pdx-bake` writes artifacts to a
-caller-selected developer/release path; `pdx-ls` writes only a validated artifact to its user-local
-cache and never accepts that cache as an authority.
+runtime SQLite schema 当前为 `16`。编译后必须把 artifact 读回为 `RuleSet`，检查 schema、
+foreign key、`game_id`、记录和 semantic model 与 source round-trip 一致。`rule_hash` 取
+canonical logical content，而不是 SQLite 文件 bytes；rowid、插入顺序、页面布局、索引、
+VACUUM 或时间戳不构成规则语义。
 
-## Source layout
+## 官方 runtime
 
-- `manifest.json`: `source_format_version`, `game_id`, `target_game_version`;
-- `catalog.json`: file categories, symbol descriptors, normalized records;
-- `semantic-rules.json`: ordered semantic rule alternatives;
-- `enum-values.json`: static enum members;
-- `type-root-keys.json`: type root selectors;
-- `type-root-scopes.json`: initial scopes by type and root;
-- `type-descriptors.json`: path, wrapper, name, and type-selection metadata;
-- `localisation-bindings.json`: type-instance localisation key templates and explicit-field
-  mappings, including required/optional, subtype, and data-driven subtype-condition metadata.
+官方 `pdx`/`pdx-ls` binary 在 `pdx-game::eu4` 中内嵌上述 JSON source bundle。启动时先严格
+解析 source 并计算当前 `rule_hash`，再查找用户本地 SQLite cache。只有 schema `16`、`game_id`
+和 logical `rule_hash` 都匹配时才只读加载 cache；cache 缺失、损坏、过期或不匹配时，从内嵌
+source 重新生成，写入临时 SQLite，读回并完成 round-trip 后再替换用户 cache。
 
-Source format changes require a version increment and an explicit migration. Stable identities
-must not be regenerated merely because files are reordered. Generated artifacts are never edited
-by hand.
+当前实现不把跨平台原子替换、无中断切换或旧规则 fallback 作为保证；未通过验证的临时文件
+不得成为 runtime `RuleSet`。用户 cache 是加速和持久化产物，永远不能反向成为 source authority。
 
-Source format 2 renamed the generic key/value parser identity from `pdx-script` to `script`.
-Source format 3 added the first-party type-instance localisation binding source. Source format 4
-adds data-driven subtype conditions for those bindings. Source format 5 adds the optional
-`semantic-rules.deprecated` field. These migrations do not change existing EU4 file category
-identities, matchers, resolution policies, or semantic rule identities.
+正式 server 不接受 `--rules`、规则路径、初始化选项、环境变量、项目设置、搜索路径、下载的
+规则库或 user override；也不读取、更新或导入外部规则 source。`.cwt` 不属于当前编译、测试、
+运行时或更新流程。Zed extension 只获取和启动 server，不解释或分发 semantic rules。
 
-## Runtime authority
+## 当前限制
 
-Official binaries embed the first-party JSON source bundle and construct an immutable `RuleSet` from
-a user-local SQLite artifact. On startup the server validates the source, computes its canonical
-`rule_hash`, and accepts a cache only when schema, `game_id`, and logical contents match. A missing,
-malformed, or stale cache is regenerated in a temporary file and installed only after round-trip
-validation. Compilation failure is a server/source distribution defect; the runtime does not fall
-back to an old hash or search for another rule source.
-
-The server accepts no rule arguments, environment variable, initialization option, project setting,
-search path, download, or user override. The Zed extension carries no semantic rules. Server and
-rule source versions move together.
-
-## Version maintenance
-
-The source manifest records the supported EU4 version. A game update is handled by a reviewed
-source change, original regression fixtures, artifact regeneration, and a new server release.
-There is no automatic extraction from game files and no historical-version selector in v0.1.
-
-## Verification
-
-Every rule change must pass:
-
-1. strict source decoding and source invariants;
-2. deterministic canonical `rule_hash` computation;
-3. generated SQLite round-trip and foreign-key validation;
-4. manifest schema/hash/checksum verification in a temporary artifact directory;
-5. embedded source provider identity/hash and user-cache rebuild tests;
-6. affected analysis and real JSON-RPC regression tests;
-7. a clean server launch without any external rule file or committed SQLite artifact.
-
-## Rejected alternatives
-
-- CWT as a flexible or community-editable source: retains an unwanted compatibility language.
-- One-time or recurring CWT import: keeps a second authority and makes regeneration depend on an
-  external model.
-- Direct manual SQLite editing: is difficult to review and cannot provide a safe source schema.
-- User-supplied rule databases or JSON source paths: creates unsupported semantic and security states.
-- Embedding a generated SQLite file: adds a large generated repository/release input without making JSON
-  less authoritative.
-- Hand-maintained Rust tables: couples game data to engine implementation and produces poor diffs.
+- 当前 source authority 只有 EU4；规则修改需要更新 source、验证结果并发布新的 server 版本。
+- 生成 SQLite artifact 不手工维护、不作为仓库 authority，也不是 server 的嵌入输入。
+- 当前没有用户规则覆盖、历史规则选择、自动游戏文件抽取或外部规则兼容入口。

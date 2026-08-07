@@ -1,39 +1,51 @@
-# Rust build output
+# Rust and native build outputs
 **/target/
 *.pdb
-*.wasm
+*.dSYM/
+*.profraw
+*.profdata
 
-# Language-tool build caches
+# Tree-sitter / JavaScript tooling
 **/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 **/__pycache__/
 *.py[cod]
 
-# Machine-local tool and editor configuration
+# Machine-local editor and agent state
 /.cargo/
 /.zed/
 /.agents/
 /.codex/
+/.codex-toml-check/
+/.mimocode/
 
-# Ignore all dot-directories created by editors and local tools.
-**/.*/
-
-.DS_Store
-Thumbs.db
-
-# Zed clones and compiles development grammars into this directory.
+# Generated Zed extension assets
+/editors/zed/extension.wasm
 /editors/zed/grammars/
+/editors/zed/bundled-rules/*.pdxrules
 
-# Local indexes and generated runtime artifacts
+# Local indexes, caches, and generated rule artifacts
 *.pdxindex
 **/.pdx/cache/
 /rules/vanilla-cache/
-/editors/zed/bundled-rules/*.pdxrules
-
-# Rule artifacts are generated in user/release caches from the first-party JSON source.
 /rules/*.pdxrules
 
 # Temporary local rule-inspection helper
 /rules/find-rule.cjs
 
-# CWTools reference
+# OS and editor temporary files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# Fuzzing crash artifacts (keep regression corpus trackable)
+/fuzz/artifacts/
+
+# External CWTools reference material
 /reference/

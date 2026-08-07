@@ -208,6 +208,7 @@ If the task is blocked, complete all checks that do not depend on external input
 
 ## 10. Common Documentation Entry Points
 
+- [Documentation Index](docs/README.md)
 - [Overall Architecture](docs/architecture.md)
 - [System Boundaries & Crate Dependencies](docs/rfc/0001-system-boundaries.md)
 - [Syntax, CST & Incremental Parsing](docs/rfc/0002-syntax-cst.md)

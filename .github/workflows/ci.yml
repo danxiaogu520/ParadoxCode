@@ -38,7 +38,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: msrv-1.97
-      - run: cargo check --workspace --all-targets --all-features
+      - run: cargo check --locked --workspace --all-targets --all-features
 
   windows:
     name: Rust quality gates (Windows)
@@ -50,10 +50,10 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check --workspace --all-targets --all-features
-      - run: cargo test --workspace --all-targets --all-features
-      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - run: cargo build --release -p pdx-lsp --bin pdx --bin pdx-ls
+      - run: cargo check --locked --workspace --all-targets --all-features
+      - run: cargo test --locked --workspace --all-targets --all-features
+      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - run: cargo build --locked --release -p pdx-lsp --bin pdx --bin pdx-ls
 
   tree-sitter:
     name: Tree-sitter and Zed language assets
@@ -82,6 +82,32 @@ jobs:
           components: rustfmt, clippy
           targets: wasm32-wasip1
       - run: bash scripts/check-quality-gates.sh zed
+
+  fuzz:
+    name: Fuzz target compile and smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: taiki-e/install-action@cargo-fuzz
+      - uses: Swatinem/rust-cache@v2
+      - name: Verify fuzz lockfile
+        run: cargo metadata --locked --manifest-path fuzz/Cargo.toml --no-deps --format-version 1
+      - name: Build fuzz targets
+        run: cargo +nightly fuzz build --dev
+      - name: Run invariant smoke
+        run: cargo +nightly fuzz run --dev lower-hir -- -runs=100
+
+  release:
+    name: Release and artifact smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: bash scripts/check-quality-gates.sh release
 
   dependencies:
     name: Dependency policy

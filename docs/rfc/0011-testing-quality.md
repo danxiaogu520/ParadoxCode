@@ -1,158 +1,68 @@
 # RFC 0011：测试、Fuzz 与质量门禁
 
-- 状态：Accepted
-- MVP：EU4 v0.1
+- 状态：Current
+- 适用版本：EU4 v0.1
 
-## 测试层次
+## 当前测试
 
-### Unit tests
+核心 Cargo workspace 的 crate 主要使用源码内 `#[cfg(test)]` 单元测试；当前覆盖面包括：
 
-每个 crate 测试自己的不变量：
+- `pdx-text`：offset、line index、UTF-8/UTF-16、URI/path；
+- `pdx-parser`：Script/localisation CST、error recovery、增量 edit 等价性和 formatter 安全性；
+- `pdx-rules`/`pdx-bake`：严格 JSON source、稳定身份、schema/foreign key、canonical hash、
+  SQLite round-trip、embedded source 和 user-cache 校验；
+- `pdx-game::eu4`：profile、bootstrap catalog、内嵌规则和 cache provider；
+- `pdx-engine`：HIR、scope、source-root scan、overlay、shard replacement、Vanilla cache；
+- `pdx-analysis`：diagnostics、completion、hover、definition/references、symbols 和 rename；
+- `pdx-lsp`：真实内存 JSON-RPC transport、initialize/sync、UTF-16、capability、取消、过期
+  diagnostics、watched files、Vanilla cache 和各语言请求；
+- `editors/zed`：平台映射、checksum sidecar、tar/zip 受限解包和 executable cache 校验。
 
-- `pdx-text`：offset、UTF-16、line endings、URI/path
-- `pdx-parser`：typed CST、error extraction、revision-safe edit update
-- `pdx-rules`：SQLite schema、只读加载、immutability、派生查询 index、canonical logical hash
-- `pdx-bake`：strict source decoding、stable identity、invariant、artifact round-trip 和 manifest
-- `pdx-engine`：HIR lowering、scope transition、root order、overlay、shard replacement
-- `pdx-analysis`：feature query
-- `pdx-parser`：trivia safety、idempotence
+测试主要与各 crate 源码 colocated；LSP 的 transport 回归在 `pdx-lsp` 源码测试中直接驱动 framing 和消息生命周期，不是 handler mock。
 
-### Grammar corpus
-
-每个 grammar case 保存 input 与期望 S-expression/结构。目录按主题划分：
-
-```text
-basic
-operators
-mixed-blocks
-comments
-strings
-headers
-parameters
-errors
-localisation
-csv
-```
-
-从 Jomini 学到的特殊构造必须有独立 case。测试内容由 ParadoxCode 原创，不复制游戏文件。
-
-### Golden tests
-
-analysis fixture 使用小型自有 Mod workspace：
-
-```text
-vanilla/
-dependency/
-mod/
-open-documents/
-vanilla-cache/
-expected/
-```
-
-golden 输出使用稳定、可读格式记录 diagnostics、completions、definitions、references、hover 和 rename plan。更新 golden 必须人工审查。
-
-### LSP integration
-
-以内存 transport 发送真实 JSON-RPC/LSP 消息，测试 capability fallback、版本、取消和结果转换。禁止只对 handler 内部函数做 mock 后称为 integration test。
-
-### Zed smoke test
-
-CI 能验证 extension manifest 和 Wasm build；文件识别、dev install、server download 和真实编辑体验保留一份发布前人工 checklist。若 Zed 提供稳定 headless harness，再转为自动测试。
+Tree-sitter 的现有 corpus 只有 `grammars/tree-sitter-eu4/test/corpus/eu4.txt` 与
+`errors.txt`。`scripts/check-grammars.sh` 运行 grammar generate/test，并运行
+`pdx check grammar-fuzz` 的删除字符恢复检查。CSV grammar、CSV parser/formatter 测试、仓库
+顶层 `tests/` 目录和顶层 analysis golden fixture 目录当前未实现。
 
 ## Fuzz targets
 
-MVP 至少包含：
+当前恰好有五个 `cargo-fuzz` target：
 
-1. `parse_script(bytes)`
-2. `parse_localisation(bytes)`
-3. `edit_updates(seed, edit_sequence)` 与 full reparse 等价性
-4. `typed_cst_walk(bytes)`
-5. `hir_lower(bytes, minimal_rule_db)`
-6. `format(bytes)` 的 idempotence 与 token preservation
-7. `line_index(text, positions)`
-8. `load_first_party_rules(source_tree)` 与 `compile_rules(source_tree)`
-9. `parse_csv(bytes, dialect)`
+1. `parse-script`：Script parse、token 和 CST range 边界；
+2. `parse-localisation`：localisation parse、CST 和 error range 边界；
+3. `incremental-edits`：增量结果与 full reparse 的可观察结构等价性；
+4. `format-script`：安全格式化、幂等性和非 trivia token 保留；
+5. `lower-hir`：通用及 EU4 profile-aware HIR lowering 的范围和事实边界。
 
-不变量：
+CI 当前用 nightly 构建全部 target，并只运行 `lower-hir` 的 `-runs=100` invariant smoke。没有
+独立的 `line_index`、`parse_csv` 或 first-party rule-source fuzz target，也没有定时或长时间
+fuzz workflow；这些均是当前未实现的质量面。
 
-- 不 panic、越界或无限循环。
-- 输出 tree/range 均在 source 范围内。
-- 编辑更新的可观察 syntax tree 与 full parse 一致。
-- formatter 不改变非 trivia token 序列。
-- 输出大小和运行时间有合理上限。
+## Benchmark
 
-发现的 crash 输入在修复后进入 regression corpus。CI 短时间运行 fuzz smoke，定时工作流运行更长 fuzz job。
+唯一的 Cargo benchmark 是 `crates/pdx-engine/benches/synthetic_workspace.rs`，运行：
 
-## 性能测试
-
-建立可再分发的 synthetic/原创 corpus，记录：
-
-- cold workspace scan
-- parse throughput 与单次 edit latency
-- HIR lowering
-- shard replacement
-- completion/definition latency
-- memory high-water mark
-
-benchmark 结果用于发现回退，不在 MVP 早期设不现实的绝对吞吐承诺。
-
-当前可再分发基准位于 `crates/pdx-engine/benches/synthetic_workspace.rs`，默认生成 2,000 个原创 EU4 event 文件并分别测量 cold scan/index、无变化全量刷新、单磁盘文件变化刷新和单 overlay 编辑。运行：
-
-```bash
+```text
 cargo bench -p pdx-engine --bench synthetic_workspace
 ```
 
-可用 `PDX_BENCH_FILES` 调整文件数。2026-07-20 的开发机基线为 23.769 ms、14.222 ms、12.891 ms 和 0.004 ms；这些数字只用于同机趋势比较，不是跨机器验收阈值。计数回归另行断言一次 overlay 编辑恰好 parse/lower 各一次、stage/commit 不重复语义工作，并且全部磁盘 `FileState` 保持共享。
+它默认生成 2,000 个原创 EU4 event 文件，测量 initial scan/index、无变化 refresh、单磁盘文件
+refresh 和单 overlay edit；`PDX_BENCH_FILES` 可调整数量。benchmark 用于本机趋势观察，没有
+跨机器绝对阈值，也没有定时 benchmark job。
 
-## CI 门禁
+## 当前 CI 与质量门禁
 
-每个 pull request：
+- Linux `core`：`cargo fmt --all -- --check`、locked workspace `check`/`test`、clippy
+  `-D warnings` 和 `cargo doc --locked --workspace --no-deps`。
+- Rust 1.97.1 MSRV：locked workspace/all-targets/all-features `cargo check`。
+- Windows：locked workspace `check`、`test`、clippy `-D warnings` 和 release `pdx`/`pdx-ls`。
+- grammar：Node/Tree-sitter generate、corpus test 与 `grammar-fuzz`。
+- Zed：扩展 fmt、native test、`wasm32-wasip1` check/release build 和 clippy。
+- fuzz：locked metadata、nightly target build、上述短 invariant smoke。
+- release smoke：server build、Zed all-target check、规则 source temporary compile/round-trip、
+  manifest/hash/checksum/game/schema 检查及无 `--rules` 检查。
+- dependency policy：`cargo deny check advisories licenses bans sources`。
 
-- `cargo fmt --check`
-- clippy，workspace/all targets，warnings denied（第三方生成代码可显式例外）
-- unit/integration/doc tests
-- Tree-sitter corpus tests
-- first-party JSON source schema/invariant validation and temporary SQLite round-trip
-- manifest `rule_hash` 与生成数据库 canonical logical content 一致
-- user-local rule artifact cache miss/corruption/hash mismatch rebuild smoke
-- logical hash stability：插入顺序、SQLite index、VACUUM 和物理重建不改变 hash
-- runtime loader smoke test
-- Zed extension manifest/build check
-- dependency license/advisory policy
-- fuzz target compile 与短 smoke
-
-定时任务：
-
-- 长 fuzz
-- 性能基准与趋势
-- 跨平台 Windows/Linux/macOS build
-
-## 代码质量
-
-- 核心公开 API 有 rustdoc。
-- 单文件出现多个变化原因时拆模块，不以固定行数作为唯一标准。
-- `unsafe` 默认禁止；若第三方 binding 需要，封装在最小边界并记录 safety contract。
-- 用户输入路径不得使用 `unwrap/expect`。
-- diagnostic code、symbol kind 和 schema rule id 必须稳定。
-- 所有 background task 支持取消或有明确的短时上限。
-
-## Fixture 与版权
-
-- 不提交 Vanilla EU4 文件或用户本地 Vanilla 索引缓存。
-- 不提交外部规则 source tree；compiler unit test 使用最小原创第一方 JSON fixture。
-- 不把参考仓库 corpus 复制进项目；需要同类 case 时编写最小原创样例。
-- 引用外部行为或设计时在文档中记录项目和 commit。
-- 任何第三方数据导入都必须先确认许可证和再分发条件。
-
-## 发布门槛
-
-`v0.1.0` 发布前必须满足：
-
-- Phase 1–6A 的退出条件全部通过。
-- 无已知 parser/formatter crash。
-- 权威 Eu4Rules 声明的每个可支持文件类别都有 classification/parse fixture，所有主要 type family 有语义 fixture。
-- 一次性 bootstrap import report 中没有未经批准的 unsupported/ignored construct。
-- 提交的数据库通过 schema、foreign key、stable-id 和 `rule_hash` validation。
-- rename 不写只读 source root。
-- Zed 安装和启动在支持平台完成 smoke test。
-- 文档与实际 initialize options、EU4 rules schema 一致。
+tag release workflow 另外在五个平台构建 `pdx-ls`，验证版本、archive/checksum 和完整矩阵后才
+发布。workspace lint 禁止 `unsafe`；用户输入路径不以 `unwrap`/`expect` 逃逸错误。

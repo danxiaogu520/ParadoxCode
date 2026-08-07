@@ -1,24 +1,27 @@
 # Fuzz targets
 
-The fuzz workspace is intentionally separate from the production Cargo workspace. Phase 3 adds
-parser, incremental-edit, and formatter targets while keeping the editor-facing parser crates
-free of fuzzing dependencies.
+The fuzz workspace is intentionally separate from the production Cargo workspace. It keeps
+libFuzzer dependencies out of the editor-facing parser crates while covering parser, edit, formatter
+and HIR invariants.
 
-Run a short smoke session after installing `cargo-fuzz`:
-
-```text
-cargo fuzz run parse-script -- -runs=1000
-cargo fuzz run parse-localisation -- -runs=1000
-cargo fuzz run incremental-edits -- -runs=1000
-cargo fuzz run format-script -- -runs=1000
-cargo fuzz run lower-hir -- -runs=1000
-```
-
-Without the `cargo-fuzz` wrapper, a non-instrumented invariant smoke run is still available:
+Run a short smoke session after installing `cargo-fuzz` and a nightly toolchain:
 
 ```text
-cargo run --manifest-path fuzz/Cargo.toml --bin lower-hir --offline -- -runs=100
+cargo +nightly fuzz run parse-script -- -runs=1000
+cargo +nightly fuzz run parse-localisation -- -runs=1000
+cargo +nightly fuzz run incremental-edits -- -runs=1000
+cargo +nightly fuzz run format-script -- -runs=1000
+cargo +nightly fuzz run lower-hir -- -runs=1000
 ```
+
+The fuzz workspace can also be type-checked without sanitizer linking:
+
+```text
+cargo check --locked --manifest-path fuzz/Cargo.toml --bins
+```
+
+`cargo-fuzz` uses nightly for sanitizer instrumentation. The CI smoke runs on Ubuntu; Windows
+requires the platform's AddressSanitizer runtime to be installed.
 
 The targets assert that all ranges stay within the source, incremental results match a full
 reparse, generic and profile-aware HIR lowering retain bounded structural, recovery, semantic,

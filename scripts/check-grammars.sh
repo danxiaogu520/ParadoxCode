@@ -31,5 +31,5 @@ for grammar in \
     )
 done
 
-cargo run --manifest-path "$root/Cargo.toml" --bin pdx -- check grammar-fuzz --root "$root"
+cargo run --locked --manifest-path "$root/Cargo.toml" --bin pdx -- check grammar-fuzz --root "$root"
 echo "Grammar checks passed."

@@ -1,168 +1,61 @@
 # RFC 0005：HIR 与 Scope 系统
 
-- 状态：Accepted
-- MVP：EU4 v0.1
+- 状态：Partial
 
-## 实现状态（2026-07-25）
+## 当前 HIR
 
-增量实现已经落地：`HirFile` 按源顺序保留 property path、key/value 精确 range、直接 scalar、非 key bare value、localisation entry、parser recovery `UnknownConstruct`、带 polarity 的 `ParameterConditional`、按顶层 scripted definition 隔离的 parameter definition/reference，以及 profile-aware definition/reference；同一份不可变 HIR 由 `FileState`/overlay snapshot 缓存，并被 workspace shard 和 analysis 查询共享。semantic root context、semantic parent path、初始 `ScopeState` 与静态 exact command 的嵌套 transition 现在在 lowering 时生成按 range 排序的 `ScopeFact`，包括 `skip_root` type 选中实际语义根后的后代；多个 rule alternative 只要 child context、push scope 和 register replacement 完全等价，也共享同一缓存 transition。signature 冲突时，HIR 仅在直接子 key 能把其他 transition 静态证明为不可能时继续 lowering；type/dynamic key、空 block 或仍有多个可能 signature 时不作猜测。diagnostics 与已有直接子项的 nested completion traversal 通过 HIR 的 logarithmic exact-range 查询消费缓存 fact；completion 因而不会把已由 `days`/`modifier` 消歧的 block 重新按规则顺序选错。若 HIR 因 workspace-dependent type key 无法静态选择，analysis 会用当前 workspace index 再过滤一次，只在剩余规则共享唯一 transition signature 时递归；未解析或仍冲突时只验证可确定的 structural container，不回退到规则顺序。显式切换到同名 child context 时，缓存 parent path 能保留“重置 path”和“沿用 context 追加 path”的区别；transparent wrapper 的 fallback path 也不增加伪 parent segment。空 block 没有子 fact 时，completion 保留每个静态可能 destination 自己的 context、parent path 与 scope，去重后合并候选；diagnostics 仍不凭空确定 transition，无法静态判断时保留 `Unknown`。
-
-key/value completion context 还会优先使用 HIR 的精确 key/scalar range，并把 range end 视为仍在对应 token 上；仅对未成形 recovery 输入使用逐行 `=` 启发式。因此同一行的前一个 property 不会把后一个 property key 误判成 value position。对 `modifier = { factor = ... <trigger> }` 这类结构 parent fields 与 child context 共存的 block，diagnostics 将明确匹配结构规则的子项分区校验，其余子项进入 child context；completion 同时合并两组规则并保留各自实际 parent path。analysis alternative 评分只接受唯一最高分，同分时不再按 source/id 顺序任取一个分支。HIR scope set 转入当前仍为单值的 analysis `ScopeContext` 时，只有唯一候选会具体化；多个候选降级为 `any`，不会任取第一个制造假的确定性。
-
-依赖 workspace member 的 type matcher transition 已在 analysis diagnostics 回退中完成；声明型 dynamic key 仍按任意非空键保守处理。不能由直接子 key 唯一消歧的冲突 signature 不会再随机选择，但跨 alternative 汇总更精确的共同 diagnostics 尚未完成。ROOT/THIS/repeated FROM/PREV register intrinsic，以及 `replace_scope` 中可由当前 scope 和 exact scope-link 静态求值的单段/多段表达式已经在 HIR/analysis 共用语义下落地；每段都以前一段的目标 scope 校验下一段，任一段 unresolved 时保持 `Unknown`/`any`。唯一解析的 scripted effect/trigger invocation 已按其 definition HIR owner 精确验证并补全参数；无法唯一解析 owner 时仍保守使用兼容的 workspace 动态 member fallback。因此当前完成的是静态 scope/intrinsic、recovery 与 parameter lowering/局部导航/唯一调用解析切片，不能标记为完整 scope evaluator。
-
-> 修订（2026-08-05）：scope fact 递归对 type/dynamic key（`KeyMatcher::Type`/`Dynamic`，如 `<mission>`）不再一律放弃下降。没有具体规则选中属性时，HIR 可按动态 matcher 的 transition 缓存候选，使 mission 等动态 block 内的 `effect`/`trigger` 子项获得 context 候选；存在具体规则（exact/enum/any-scalar）时仍只使用具体规则，避免 `<scripted_effect>` 等通用规则抢占具体 effect 的 transition。analysis 消费这类 cached fact 时必须重新执行 workspace-aware 选择：`Type` key 只有在 `WorkspaceIndex` 中存在，或第一方 type descriptor 的 `type_key_filter` 能静态证明该 key 有效时才能确认 transition；未确认或已证明缺失的 Type 保持 `Unknown`，并过滤其子树中由候选 fact 产生的语义引用，避免级联误报。声明型 `Dynamic` 仍按任意非空 key 保守处理。`paths_equal` 同步支持 `<...>` 通配段匹配规则 parent path 与具体路径。此修订使 mission 内 effect 块的 localisation 值（如 `custom_tooltip`）能生成语义引用，语义引用生成与 hover 预览不再依赖 profile 简写。
-
-## 问题
-
-CST 只能回答文本结构，无法回答一个 key 是字段、effect、trigger、symbol definition 还是 scope link。语义还依赖 logical path、父 context、通用 `RuleSet`、所选 `GameProfile` 和当前 workspace snapshot。
-
-## HIR 原则
-
-- HIR 是按文件、可丢弃并可重建的派生数据。
-- HIR 节点始终保留 CST source range。
-- lowering 不修改 CST，也不生成规范化源码。
-- 未识别结构保留为 unknown，而不是删除。
-- HIR 不表示为通用 JSON map，重复 key 和顺序必须保留。
-
-## HIR 结构
+`pdx-engine::hir` 把 `ParsedFile` 转换成按 source order 保存的文件级派生事实。lowering 的输入是显式的 parsed syntax、可选 `LogicalPath`、`RuleSet` 和 `GameProfile`；不会读取全局 workspace。
 
 ```text
 HirFile
-  items: Vec<HirItem>
-  scope_facts: Vec<ScopeFact>
-  definitions: Vec<LocalDefinition>
-  references: Vec<LocalReference>
-
-HirItem
-  Property
-  Block
-  Definition
-  Invocation
-  Reference
-  ScopeTransition
-  ParameterConditional
-  LocalisationEntry
-  UnknownConstruct
+  syntax: Arc<ParsedFile>
+  properties
+  localisation_entries
+  bare_values
+  definitions
+  references
+  scope_facts
+  unknown_constructs
+  parameter_conditionals
+  parameter_definitions
+  parameter_references
 ```
 
-一个 CST property 可以在 HIR 中同时贡献多个 fact。例如：
+`HirProperty` 保留 key/value/full range、重复 key、路径和直接 scalar。Localisation frontend 产生 `HirLocalisationEntry`。profile/rule 解释可额外产生 `HirDefinition`、`HirReference` 和 semantic reference origin；这些事实仍带精确 `TextRange`，不携带独立的跨请求 symbol ID。
+
+CST recovery 节点不会静默丢失，而是进入 `HirUnknownConstruct`。HIR 不把重复 key 折叠成 map，也不规范化或改写源码。
+
+## Scope 数据
+
+当前粗粒度文件 scope `Scope` 只有 `Unknown` 和 `Root`。更细的 lowering 状态使用字符串 spelling：
 
 ```text
-title = example.1.t
-```
-
-可以产生 `Property` 和 `Reference<Localisation>`。`example_effect = { ... }` 在 scripted effects 顶层产生 `Definition<ScriptedEffect>`，其 block 内部仍继续 lower 为 effect context。
-
-## LoweringContext
-
-```text
-logical_path
-file_category
-  rule_hash
-rule_database
-parent_semantic_context
-scope_state
-```
-
-lowering 只能通过以上显式输入获取语义，不得读取全局 workspace。跨文件解析在 index/analysis 阶段进行。
-
-## Scope 身份
-
-`ScopeId` 是 Eu4Rules 内 intern id。MVP EU4 至少包含实际规则所需的 `country`、`province` 等 scope；不为了完整列表提前创建无规则支持的 scope。
-
-```text
-ScopeValue
-  Known(ScopeSet)
-  Unknown
-  Invalid
-```
-
-- `Known` 可以包含多个可能 scope。
-- `Unknown` 表示信息不足，不应直接产生 wrong-scope error。
-- `Invalid` 表示已证明不兼容，可产生诊断。
-
-## ScopeState
-
-```text
+ScopeValue = Known(Vec<String>) | Unknown | Invalid
 ScopeState
   root: ScopeValue
   current: Vec<ScopeValue>
   from: Vec<ScopeValue>
+  previous: Vec<ScopeValue>
 ```
 
-当前 scope 是 `current` 栈顶；空栈回退到 root。状态是持久值，进入 block 时派生新状态，离开 block 不修改父状态。
+`Known` 可以包含多个可能 scope；`Unknown` 表示信息不足，`Invalid` 表示规则已经证明不兼容。`ScopeFact` 按精确 key range 保存 semantic context、parent path 和进入该 root 时的 `ScopeState`，并支持按 range 查找。
 
-## Intrinsic
+## 当前 lowering 行为
 
-通用 evaluator 支持：
+profile-aware lowering 会根据规则和 logical path 选择 semantic root/context，并生成静态可确定的 nested transition。规则可以改变 child context、push scope 或替换 `root/current/from/previous` 中的 register。当前 evaluator 对 `THIS`、`ROOT`、`FROM`、重复 `FROM`、`PREV` 及 profile 映射的逻辑 wrapper 保留 register 状态；只有完整的 register token 才会被识别。
 
-- `THIS`：保持 current
-- `ROOT`：push root
-- `FROM` / repeated FROM：读取 from stack
-- `PREV`：pop current
-- logical wrappers：保持 scope
+scope link chain 按段计算：上一段的可能目标作为下一段的输入；任一段无法解析时保留 `Unknown`，不任取一个候选。type matcher 的 dynamic transition 可以先在 HIR 中保留候选，analysis 随后用 `WorkspaceIndex` 确认 workspace member；未确认的 type key 不作为确定 transition。
 
-所选游戏 profile 将具体 spelling 映射到 intrinsic。大小写比较使用该 profile 的 rule policy。
-
-当前 evaluator 在读取表达式和写入 `replace_scope` register 时都只把完整重复 token 识别为 register intrinsic，例如 `FROM`、`FROMFROM`、`PREV`、`PREVPREV`；`previous_owner`、`from_owner` 等普通 identifier 不得因前缀相同而误读为 register。`replace_scope = { from = owner }` 会用当前已知 scope 查询 exact effect/trigger scope-link，并把唯一目标写入 FROM；目标冲突或当前 scope 未知时写入 `Unknown`。
-
-## Link chain
-
-对 `owner.capital_scope` 一类链：
-
-1. 从 current `ScopeValue` 开始。
-2. 对每段查询 scope link rule。
-3. 验证 `from` 与当前可能 scope 的交集。
-4. 产生目标 `ScopeValue`。
-5. 任何段 unresolved 时，后续状态为 `Unknown`，但保留已知的 reference fact。
-
-当前 HIR evaluator 会让已知 scope 集合中仍兼容的分支继续到下一段；任一段没有可用目标则降级为 `Unknown`。旧 analysis fallback 只在每段得到唯一目标时继续。partial-scope 信息诊断仍未实现。
-
-每段 exact link 查询通过冻结 `RuleSet` 的 case-insensitive exact-key index 取得候选，不再线性扫描完整 semantic rule 表；root selection、diagnostics 与 completion 的 container rule 查询同样使用 context index。派生索引不参与规则 artifact 的 canonical hash。
-
-## Command scope validation
-
-effect/trigger 规则的 `allowed_scopes` 与当前 `Known(ScopeSet)` 比较：
-
-- 有交集：有效。
-- 完全无交集：wrong scope。
-- current unknown：不报告 wrong scope。
-- command unresolved：报告 unknown command，不再派生 scope error。
-
-这条顺序用于抑制级联诊断。
-
-## Block context
-
-command 可以声明：
-
-- `body_context`：子 block 是 effect、trigger 或特定结构 context。
-- `scope_transition`：进入子 block 前改变 scope。
-- `push_from`：是否将旧 current 加入 from stack。
-- `replace_root/current/from`：少量需要完整替换的规则。
-
-这些都是 `RuleSet`/游戏 profile 的有类型操作，不是用户配置中的任意代码。
+analysis 只有在当前 scope 与规则 allowed scopes 无交集时报告 wrong-scope；scope unknown 或存在多个可能值时保持保守。相同 transition signature 的 alternatives 可以合并；冲突或无法由直接子项消歧时不猜测规则顺序。
 
 ## Parameters
 
-scripted effect/trigger definition 中扫描 `$NAME$` 和 conditional parameter 建立 parameter definitions/uses。lowering 为每个 occurrence 保留 exact name range、syntax kind 与所属顶层 definition range；同名参数按 profile 的大小写策略在单个 block 内以首次 occurrence 作为定义锚点，在不同 definition block 中分别推断。analysis 的 definition/references/hover/rename 直接解析这些局部 facts，不经过 workspace 全局 symbol resolution，因而不会跨 block 串线；rename 只替换 exact name range，保留 `$`、`[[`、`!` 等语法，并沿用 Current Mod 可写边界与局部重名冲突检查。
+在 scripted definition block 内，`$NAME$` substitution 和 `[[NAME] ... ]`/`[[!NAME] ... ]` conditional 会生成局部 parameter definition/reference。每个 occurrence 保留 name range、语法形式和 owner definition range；同名参数不会跨 definition block 合并。document symbols、hover 和 rename 可直接消费这些局部 facts。
 
-Parameter definitions/references 按 occurrence range 排序；HIR 提供 position lookup 和 owner-range iterator，analysis 不为每次 hover/rename/invocation validation 全表扫描参数 facts。fuzz target 同时校验 range containment、排序与 reference 不重叠不变量。
+## Cache 与生命周期
 
-Document symbol 查询把每个 inferred parameter 作为 `parameter` symbol 返回，full range 保留首次 occurrence，selection range 精确覆盖名称；这些局部 symbol 不进入 workspace symbol 查询，避免不同 scripted definition 的同名参数污染全局结果。
+HIR 是 per-file、可丢弃的派生数据，和同一 `FileState` 的 parsed source、revision、index shard 一起缓存。文本 revision、active `RuleSet` 或 profile 变化会使对应文件状态重建；Vanilla 持久 cache 不保存 HIR。
 
-workspace 仍将局部参数 facts 投影为调用参数动态 enum member，作为 unresolved/ambiguous invocation 的保守兼容路径。对于唯一 active scripted effect/trigger，analysis 通过 index definition 的 file/range 定位 `FileState` HIR owner，只接受并补全该 owner 的参数；另一个 definition 的同名空间不再交叉污染。打开 overlay 中的唯一 definition 优先参与此解析，覆盖的磁盘 candidate 不会被误用。
+## 当前限制
 
-调用处参数验证可后置；parser 和 HIR 必须从 MVP 起保留相关节点，以免未来破坏语法模型。
-
-## 缓存
-
-HIR cache key：
-
-```text
-SourceFileId + FileRevision + GameId + RuleHash + FileCategory
-```
-
-活动 `RuleSet` 或游戏 profile 变化会使内存 HIR cache 失效；单文件文本变化只使该文件失效。Vanilla 持久缓存不是 HIR cache：LSP 启动加载到可读且 schema/game identity 有效的 cache 后，若记录的 `rule_hash` 与当前内嵌 JSON source 编译出的 `RuleSet` 不一致，后台 worker 从 cache metadata 的 Vanilla 源目录以当前内嵌规则重建，并用 SQLite transaction 保存，提交后安装新 cache。重建成功发送 INFO；扫描、重建或事务保存失败则回退安装已加载的旧 cache 并发送 WARNING（含失败原因和两个 hash）。缺失、损坏或 schema/game identity 不兼容继续降级且不隐式扫描 Vanilla；文件内容或 fingerprint 变化不自动刷新，显式用户刷新仍可重建。
-
-结构 property 仍以保留重复 key 的 source-order flat vector 暴露；scope lowering 以一次线性 stack pass 建立直接子项邻接表，再沿子边递归，避免对每个父节点重新扫描全文件。生成的 `ScopeFact` 携带 context、parent path 和 persistent registers，并按 range 排序；analysis 用 exact-range logarithmic lookup。
+当前不是完整的通用 scope evaluator：复杂或冲突的 alternatives、跨分支 partial-scope 结果和无法确认的动态成员不会被强行具体化。analysis 对多个候选通常显示为 `any`，而非任取一个。`FileAnalysis.scope` 仍是保守的粗粒度值；细节只通过 HIR `ScopeFact` 和 analysis 内部状态参与查询。

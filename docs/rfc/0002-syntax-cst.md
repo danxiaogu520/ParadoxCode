@@ -1,140 +1,67 @@
 # RFC 0002：语法、CST 与编辑更新
 
-- 状态：Accepted
-- MVP：EU4 v0.1
+- 状态：Current
 
-## 目标
+## 当前前端
 
-在用户持续输入且文件暂时不合法时，仍提供稳定结构、精确 range、注释保留和安全更新。
+`pdx-parser::FileFormat` 当前只有两项：`Script` 和 `Localisation`。两者都生成保留 source range 的 typed CST；parser 不读取规则数据库，也不把 scalar 预判成游戏语义类型。
 
-## 文本前端
-
-MVP 保留一个 EU4 Tree-sitter grammar 资产，供 Zed 编辑器侧使用：
-
-- `tree-sitter-eu4`
-
-EU4 localisation 不注册独立编辑器语言或语法高亮，但 `pdx-ls` 会在 workspace 扫描中静默解析并索引。可复用的 Script 和 localisation frontend 属于 parser 层；具体文件分类由游戏 profile 负责。EU4 CSV 在 v0.1 中是 opaque resource，不提供 parser、CST、格式化或列级诊断。
-
-规则维护不复用 Script 或任何外部规则语言。`pdx-bake` 只解析 RFC 0014 定义的严格第一方 JSON source；`.cwt` 不是项目支持的语言或输入。
+CSV 当前只作 `SyntaxOnly`/opaque resource 处理。它不是 `FileFormat`，没有 CSV CST、列级诊断、HIR 或 formatter。`pdx-engine` 对 `ParserKind::SyntaxOnly` 不创建 `ParsedSource`。
 
 ## Script CST
 
-建议命名节点：
+当前 `CstKind` 包含：
 
 ```text
-document
-item
-property
-key
-operator
-value
-block
-bare_value
-quoted_string
-header_block
-parameter_block
-parameter_condition
-comment
-ERROR
+Document, Property, Key, Operator, Value, Block,
+BareValue, QuotedString, HeaderBlock, ParameterBlock,
+ParameterCondition, Comment, Bom, Error
 ```
 
-语义形状：
+基本形状为：
 
 ```text
 Property := Key Operator Value
-Value    := Scalar | QuotedString | Block | HeaderBlock
-Block    := "{" Item* "}"
-Item     := Property | Value | ParameterBlock
+Value    := scalar | quoted string | Block | HeaderBlock | ParameterBlock
+Block    := "{" item* "}"       // mixed container
 ```
 
-`Block` 不在 syntax 层分类为 object 或 array，因为 Clausewitz 允许 mixed container。重复 key 合法地保留为多个 property。
+`Block` 保留混合内容，不区分 object/array；重复 key 作为多个 `Property` 按 source order 保留。支持的 operator 为 `=`、`<`、`<=`、`>`、`>=`、`!=`、`==` 和 `?=`。`BareValue` 保留原始文本，数字、日期、enum、symbol 和 scope 等解释留给 HIR/rule 层。
 
-## Operator
+`HeaderBlock` 覆盖 `rgb { 1 2 3 }` 一类形式；`ParameterBlock` 覆盖 `[[name] ... ]` 与 `[[!name] ... ]`。注释和 UTF-8 BOM 作为节点/token 保留，quoted string 支持转义字符。
 
-grammar 从第一版支持：
+## Localisation CST
 
-```text
-=  <  <=  >  >=  !=  ==  ?=
-```
+Localisation parser 按行处理：
 
-operator 的语义是否合法由规则层判断。例如同一个 key 可能只允许 `=`，也可能允许 comparison。
+- `l_english:` 这类语言头是 `LanguageHeader`；
+- `key:version "value"` 产生 `LocalisationEntry`、key、version 和字符串节点；
+- 无引号值使用 `UnquotedValue`，行尾 `#` 后内容是 comment；
+- 缺少 key、version、value 或 closing quote 会生成稳定的 syntax error 和 `Error` 节点；
+- BOM、原始 range 和 source text 都保留。
 
-## Scalar 分类
+Localisation value 的内容不在 parser 层解释为 localisation reference；该判断由 HIR 和 analysis 完成。
 
-lexer 只区分 quoted 与 unquoted。以下分类延迟到规则感知阶段：
-
-- bool
-- integer / decimal
-- date
-- enum
-- symbol
-- localisation key
-- scope expression
-- dynamic value
-
-这样可以保留 `1.2.3`、`yes`、`1444.11.11` 等上下文相关文本的原始含义。
-
-## 特殊 EU4 语法
-
-grammar corpus 必须包含：
-
-- header block：`rgb { 1 2 3 }`
-- conditional parameter：`[[name] ... ]`
-- undefined parameter：`[[!name] ... ]`
-- `$PARAM$` scalar 内参数引用
-- `@variable` 与包含 `:`、`.`、`|` 的 bare scalar
-- 注释紧邻 token
-- escaped quote
-- UTF-8 BOM
-- 未闭合 block/string/parameter block
-
-## ParsedFile
+## ParsedFile 与错误恢复
 
 ```text
 ParsedFile
-  source: Arc<SourceText>
-  cst: CstNode
-  line_index: LineIndex
-  syntax_errors: Vec<SyntaxError>
-  revision: FileRevision
+  format       FileFormat
+  source       原始 UTF-8 文本
+  root         CstNode
+  tokens       source order 的 SyntaxToken
+  errors       source order 的 SyntaxError
+  revision     解析 revision
 ```
 
-typed CST node 只保存 parser 生成的 kind/range/children 和对 `ParsedFile` source 的受控引用，不复制字符串。
+节点只保存 kind、range 和 children，文本通过 `ParsedFile::text` 从 source 读取。行索引属于 `pdx-text` 和 engine 的 `DocumentSnapshot`，不是 `ParsedFile` 字段。syntax error 不阻止 parser 返回可遍历的局部树；HIR 再将无法识别的结构保留为 `UnknownConstruct`。
 
-## Trivia
+## 编辑与格式化
 
-source text 是唯一真相。空白不要求成为命名节点，但 formatter 通过相邻 token byte range 读取 trivia。注释使用命名节点，以便高亮、格式化和关联文档。
+`ParsedFile::apply_edit` 接受 UTF-8 byte range 或 full-document replacement。range 越界、切分无效 UTF-8 或无法应用时返回 `EditError`；成功后当前实现执行 full reparse，并递增 revision。编辑结果必须与同一 source 的直接 `parse` 具有相同的 CST、token 和 error 可观察结果。
 
-禁止从只包含命名节点的 AST 重新打印整个文件。
+`pdx-parser::format::format` 只对无 syntax error 的文件工作。formatter 生成 canonical text 后重新解析，并校验结构等价、token 安全性和幂等性；校验失败返回零 edits 及 `UnsafeSyntax` 或 `SafetyValidationFailed`，不会猜测性改写源码。
 
-## 编辑更新
+## 当前限制
 
-每个 LSP change 当前执行受 revision 保护的 Rust full reparse：
-
-1. 使用旧 `LineIndex` 将 UTF-16 range 转成 byte range。
-2. 更新 source text。
-3. 使用 Rust parser 重新构建 typed CST、tokens 和 syntax errors。
-4. 重建 `LineIndex`。
-5. 生成新的 file revision。
-
-编辑更新必须与相同文本的直接 full parse 产生相同可观察结果。未来可以在不改变这一契约的
-前提下加入纯 Rust 增量 parser；本项目不把 Tree-sitter C runtime 作为核心依赖。
-
-如果 change range 无效或版本断裂，拒绝该变化并请求/等待 full text resync，不能猜测 offset。
-
-## 错误恢复
-
-- 每个 Rust parser recovery/error node 产生 syntax diagnostic candidate。
-- 相邻错误合并，避免一次未闭合 `{` 产生数十条消息。
-- HIR lowering 跳过无可识别边界的错误节点，但保留可识别的同级节点。
-- completion 可根据 cursor 周围 token 和父节点恢复 context。
-
-## Jomini 的角色
-
-Jomini 作为 grammar 行为和 fuzz case 的参考，不作为 CST dependency。原因是编辑器需要 comments、trivia、source ranges 和 error recovery，而 Jomini tape 主要优化完整输入的高吞吐读取。
-
-未来 CLI 如需批量读取大型已完成文件，可以单独评估 Jomini，不改变 LSP syntax model。
-
-## 资源文件
-
-图片、音频、字体和其他二进制资源不建立 CST。Workspace 只记录 logical path、source root、文件 metadata 和引用目标；格式内容解析不属于 MVP。
+当前没有纯 Rust incremental parser，编辑更新仍是 full reparse；没有 CSV parser 或 CSV formatter；parser 不负责规则覆盖率、跨文件 resolution、scope evaluator 或 LSP 协议转换。

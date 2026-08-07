@@ -10,7 +10,8 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
+  actions: read
 
 jobs:
   build:
@@ -73,6 +74,9 @@ jobs:
   publish:
     name: Publish immutable GitHub Release
     needs: build
+    permissions:
+      contents: write
+      actions: read
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

@@ -12,10 +12,10 @@ run() {
 
 check_core() {
     run cargo fmt --all -- --check
-    run cargo check --workspace --all-targets --all-features
-    run cargo test --workspace --all-targets --all-features
-    run cargo clippy --workspace --all-targets --all-features -- -D warnings
-    run cargo doc --workspace --no-deps
+    run cargo check --locked --workspace --all-targets --all-features
+    run cargo test --locked --workspace --all-targets --all-features
+    run cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+    run cargo doc --locked --workspace --no-deps
 }
 
 check_grammars() {
@@ -24,9 +24,10 @@ check_grammars() {
 
 check_zed() {
     run cargo fmt --manifest-path editors/zed/Cargo.toml -- --check
-    run cargo test --manifest-path editors/zed/Cargo.toml
-    run cargo check --manifest-path editors/zed/Cargo.toml --target wasm32-wasip1
-    run cargo clippy --manifest-path editors/zed/Cargo.toml --all-targets -- -D warnings
+    run cargo test --locked --manifest-path editors/zed/Cargo.toml
+    run cargo check --locked --manifest-path editors/zed/Cargo.toml --target wasm32-wasip1
+    run cargo build --locked --manifest-path editors/zed/Cargo.toml --target wasm32-wasip1 --release
+    run cargo clippy --locked --manifest-path editors/zed/Cargo.toml --all-targets -- -D warnings
 }
 
 check_release() {
