@@ -86,6 +86,7 @@ fn completion_traversal_uses_hir_to_disambiguate_nested_rule_contexts() {
         TextRange::empty(position),
         "",
         true,
+        "",
     );
     assert!(all_key_items.iter().any(|item| item.label == "always"));
     assert!(all_key_items.iter().any(|item| item.label == "factor"));
@@ -268,7 +269,7 @@ fn scripted_definition_completion_snippet_includes_parameters() {
         .expect("scripted effect item");
     assert_eq!(
         snippet.insert_text,
-        "apply = {\n    zeta = $1\n    alpha = $2\n    $0\n}"
+        "apply = {\n\tzeta = $1\n\talpha = $2\n\t$0\n}"
     );
     fs::remove_dir_all(root).expect("cleanup");
 }
@@ -729,7 +730,7 @@ fn key_completion_inserts_equals_for_scalars_and_skeletons_for_blocks() {
         .expect("replacement key item");
     assert_eq!(replacement.insert_text, "bar");
 
-    let block = "trigger = { ba";
+    let block = "trigger = {\n\tba";
     let mut block_host = eu4_host(RuleSet::from_model(model));
     let block_id = DocumentId::new("file:///tmp/common/events/test.txt");
     block_host
@@ -745,5 +746,5 @@ fn key_completion_inserts_equals_for_scalars_and_skeletons_for_blocks() {
         .iter()
         .find(|item| item.label == "bar")
         .expect("block rule item");
-    assert_eq!(bar.insert_text, "bar = {\n    $0\n}");
+    assert_eq!(bar.insert_text, "bar = {\n\t\t$0\n\t}");
 }

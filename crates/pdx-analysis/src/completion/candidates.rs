@@ -146,6 +146,7 @@ pub(crate) fn semantic_rules_for_completion<'rule, 'path>(
     rules
 }
 
+#[allow(clippy::too_many_arguments)] // Candidate construction keeps the query context and output state explicit.
 pub(crate) fn add_semantic_key_items(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
@@ -154,6 +155,7 @@ pub(crate) fn add_semantic_key_items(
     replacement_range: TextRange,
     prefix: &str,
     insert_assignment: bool,
+    base_indent: &str,
 ) {
     for candidate in semantic_rules_for_completion(snapshot, context) {
         let rule = candidate.rule;
@@ -172,7 +174,7 @@ pub(crate) fn add_semantic_key_items(
                     detail: rule_context_detail(rule),
                     documentation,
                     replacement_range,
-                    insert_text: key_insert_text(rule, label, insert_assignment),
+                    insert_text: key_insert_text(rule, label, insert_assignment, base_indent),
                     sort_score: completion_sort_score(
                         if rule.required { 2 } else { 5 },
                         rule.deprecated,
@@ -187,9 +189,9 @@ pub(crate) fn add_semantic_key_items(
                     let insert_text = if !insert_assignment {
                         label.clone()
                     } else if matches!(type_name.as_str(), "scripted_effect" | "scripted_trigger") {
-                        scripted_definition_snippet(snapshot, type_name, label)
+                        scripted_definition_snippet(snapshot, type_name, label, base_indent)
                     } else {
-                        key_insert_text(rule, label, true)
+                        key_insert_text(rule, label, true, base_indent)
                     };
                     push_completion(
                         items,
@@ -221,7 +223,12 @@ pub(crate) fn add_semantic_key_items(
                                 detail: "parameter".to_owned(),
                                 documentation: documentation.clone(),
                                 replacement_range,
-                                insert_text: key_insert_text(rule, &label, insert_assignment),
+                                insert_text: key_insert_text(
+                                    rule,
+                                    &label,
+                                    insert_assignment,
+                                    base_indent,
+                                ),
                                 sort_score: completion_sort_score(8, rule.deprecated),
                                 deprecated: rule.deprecated,
                                 resolve_data: Some(format!("rule:{}", rule.id)),
@@ -239,7 +246,12 @@ pub(crate) fn add_semantic_key_items(
                                 detail: enum_name.clone(),
                                 documentation: documentation.clone(),
                                 replacement_range,
-                                insert_text: key_insert_text(rule, label, insert_assignment),
+                                insert_text: key_insert_text(
+                                    rule,
+                                    label,
+                                    insert_assignment,
+                                    base_indent,
+                                ),
                                 sort_score: completion_sort_score(8, rule.deprecated),
                                 deprecated: rule.deprecated,
                                 resolve_data: Some(format!("rule:{}", rule.id)),
@@ -259,7 +271,12 @@ pub(crate) fn add_semantic_key_items(
                             detail: kind.clone(),
                             documentation: documentation.clone(),
                             replacement_range,
-                            insert_text: key_insert_text(rule, label, insert_assignment),
+                            insert_text: key_insert_text(
+                                rule,
+                                label,
+                                insert_assignment,
+                                base_indent,
+                            ),
                             sort_score: completion_sort_score(8, rule.deprecated),
                             deprecated: rule.deprecated,
                             resolve_data: Some(format!("rule:{}", rule.id)),
@@ -688,12 +705,13 @@ pub(crate) fn key_insert_text(
     rule: &pdx_rules::SemanticRule,
     label: &str,
     insert_assignment: bool,
+    base_indent: &str,
 ) -> String {
     if !insert_assignment {
         return label.to_owned();
     }
     match rule.shape {
-        RuleShape::Node => format!("{label} = {{\n    $0\n}}"),
+        RuleShape::Node => format!("{label} = {{\n{base_indent}\t$0\n{base_indent}}}"),
         RuleShape::Leaf | RuleShape::ValueClause => format!("{label} = "),
         RuleShape::LeafValue => label.to_owned(),
     }

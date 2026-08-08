@@ -46,6 +46,7 @@ pub fn complete_with_cancellation(
         .source_text(replacement_range)
         .unwrap_or_default()
         .to_owned();
+    let base_indent = line_indent(&input.source, replacement_range.start());
     let value_context = completion_value_context(&input, position);
     if input.format == FileFormat::Localisation {
         if localisation_language_header(&input, position) {
@@ -90,6 +91,7 @@ pub fn complete_with_cancellation(
                 replacement_range,
                 &prefix,
                 insert_assignment,
+                &base_indent,
             );
         }
     }

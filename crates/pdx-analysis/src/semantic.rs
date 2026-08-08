@@ -756,18 +756,20 @@ pub(crate) fn scripted_definition_snippet(
     snapshot: &AnalysisSnapshot,
     kind_name: &str,
     definition_name: &str,
+    base_indent: &str,
 ) -> String {
+    let inner_indent = format!("{base_indent}\t");
     let Some(parameters) = parameter_names_for_owner(snapshot, kind_name, definition_name) else {
-        return format!("{definition_name} = {{\n    $0\n}}");
+        return format!("{definition_name} = {{\n{inner_indent}$0\n{base_indent}}}");
     };
     if parameters.is_empty() {
-        return format!("{definition_name} = {{\n    $0\n}}");
+        return format!("{definition_name} = {{\n{inner_indent}$0\n{base_indent}}}");
     }
     let mut body = String::new();
     for (index, parameter) in parameters.iter().enumerate() {
-        body.push_str(&format!("    {parameter} = ${}\n", index + 1));
+        body.push_str(&format!("{inner_indent}{parameter} = ${}\n", index + 1));
     }
-    format!("{definition_name} = {{\n{body}    $0\n}}")
+    format!("{definition_name} = {{\n{body}{inner_indent}$0\n{base_indent}}}")
 }
 
 pub(crate) fn semantic_key_matches(
