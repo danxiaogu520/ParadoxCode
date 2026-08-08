@@ -31,7 +31,7 @@ Before starting any implementation, read in this order:
 
 1. `docs/architecture.md` — data flow, crate dependencies, concurrency, identity, and error recovery;
 2. RFCs directly related to the current task;
-3. `docs/rfc/0014-first-party-rule-source.md` — first-party rule source, compilation, and the boundary prohibiting external rule input.
+3. `docs/rfc/0013-first-party-rule-source.md` — first-party rule source, compilation, and the boundary prohibiting external rule input.
 
 ## 2. Default Agent Responsibilities
 
@@ -221,5 +221,5 @@ If the task is blocked, complete all checks that do not depend on external input
 - [LSP Runtime](docs/rfc/0009-lsp-runtime.md)
 - [Zed Integration](docs/rfc/0010-zed-integration.md)
 - [Testing & Quality Gates](docs/rfc/0011-testing-quality.md)
-- [First-Party Rule Source & Compiler](docs/rfc/0014-first-party-rule-source.md)
+- [First-Party Rule Source & Compiler](docs/rfc/0013-first-party-rule-source.md)
 - [Generic PDX Engine & EU4-First](docs/rfc/0012-generic-engine-eu4-first.md)

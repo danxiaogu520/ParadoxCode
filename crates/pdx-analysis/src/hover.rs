@@ -246,153 +246,181 @@ pub(crate) fn semantic_rule_hover_for_candidates(
     snapshot: &AnalysisSnapshot,
     candidates: &[SemanticCompletionRule<'_, '_>],
 ) -> String {
-    let mut sections = Vec::new();
-    if candidates.len() > 1 {
-        sections.push(format!(
-            "#### {} possible semantic meanings",
-            candidates.len()
-        ));
+    // Stable rule ids and source provenance identify declarations, not necessarily distinct
+    // meanings.  The first-party source can repeat one semantic rule for many generated members;
+    // keep those rows explainable in diagnostics, but do not render the same hover 226 times.
+    let mut unique_candidates: Vec<&SemanticCompletionRule<'_, '_>> =
+        Vec::with_capacity(candidates.len());
+    for candidate in candidates {
+        if !unique_candidates
+            .iter()
+            .any(|known| semantic_hover_candidate_equivalent(known, candidate))
+        {
+            unique_candidates.push(candidate);
+        }
     }
-    for (index, candidate) in candidates.iter().enumerate() {
-        let rule = candidate.rule;
-        let title = if candidates.len() > 1 {
-            format!("##### Candidate {}", index + 1)
-        } else {
-            "#### Rule".to_owned()
-        };
-        let mut details = Vec::new();
-        details.push(format!("- context: `{}`", rule.context));
-        if !candidate.parent_path.is_empty() {
-            details.push(format!("- parent: `{}`", candidate.parent_path.join(".")));
-        }
-        details.push(format!(
-            "- shape: `{}`",
-            semantic_rule_shape_label(rule.shape)
-        ));
-        details.push(format!(
-            "- value: `{}`",
-            semantic_value_hover_label(&rule.value)
-        ));
-        if let Some(operator) = rule.operator.as_deref() {
-            details.push(format!("- operator: `{operator}`"));
-        }
-        let child_scope = (rule.push_scope.is_some() || !rule.replace_scope.is_empty())
-            .then(|| semantic_child_scope(snapshot, candidate.scope, rule));
-
-        let mut scope_details = Vec::new();
-        if !rule.allowed_scopes.is_empty() {
-            let allowed = rule
-                .allowed_scopes
-                .iter()
-                .map(|scope| format!("`{scope}`"))
-                .collect::<Vec<_>>()
-                .join(", ");
-            let status = if semantic_scope_allows(rule, candidate.scope) {
-                "allowed"
-            } else {
-                "not allowed"
-            };
-            scope_details.push(format!("- allowed scopes: {allowed}"));
-            scope_details.push(format!(
-                "- current scope: `{}` ({status})",
-                candidate.scope.current
-            ));
-        }
-        if !rule.allowed_scopes.is_empty() || child_scope.is_some() {
-            scope_details.push(format!(
-                "- scope registers: {}",
-                semantic_scope_register_summary(candidate.scope)
-            ));
-        }
-        if let Some(child_scope) = child_scope.as_ref() {
-            scope_details.push(format!(
-                "- scope transition: `{}` → `{}`",
-                candidate.scope.current, child_scope.current
-            ));
-            for (register, value) in &rule.replace_scope {
-                let resolved = resolve_scope_expression_context(snapshot, candidate.scope, value);
-                scope_details.push(format!(
-                    "- scope register: `{register}` = `{value}` → `{resolved}`"
-                ));
-            }
-            scope_details.push(format!(
-                "- scope registers after: {}",
-                semantic_scope_register_summary(child_scope)
-            ));
-        }
-
-        let mut cardinality_details = Vec::new();
-        if rule.required {
-            cardinality_details.push("- required".to_owned());
-        }
-        if let Some(min) = rule.min_occurs {
-            cardinality_details.push(format!("- minimum occurrences: {min}"));
-        }
-        if let Some(max) = rule.max_occurs {
-            cardinality_details.push(format!("- maximum occurrences: {max}"));
-        }
-        if let Some(child_context) = rule.child_context.as_deref() {
-            details.push(format!("- child context: `{child_context}`"));
-        }
-        let mut sections_for_rule = vec![title, details.join("\n")];
-        if !scope_details.is_empty() {
-            sections_for_rule.push(format!("#### Scope\n\n{}", scope_details.join("\n")));
-        }
-        if !cardinality_details.is_empty() {
-            sections_for_rule.push(format!(
-                "#### Cardinality\n\n{}",
-                cardinality_details.join("\n")
-            ));
-        }
-        if !rule.source_file.is_empty() && rule.line > 0 {
-            sections_for_rule.push(format!(
-                "#### Provenance\n\n- rule: `{}:{}`",
-                rule.source_file, rule.line
-            ));
-        }
-        if !rule.documentation.is_empty() {
-            sections_for_rule.push(format!(
+    let candidates = unique_candidates.as_slice();
+    if candidates.len() > 1 {
+        let shared_documentation = shared_semantic_hover_documentation(candidates);
+        let summaries = candidates
+            .iter()
+            .map(|candidate| {
+                semantic_hover_candidate_summary(
+                    snapshot,
+                    candidate,
+                    shared_documentation.is_none(),
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        let mut sections = vec![format!(
+            "#### Possible meanings ({})\n\n{summaries}",
+            candidates.len()
+        )];
+        if let Some(documentation) = shared_documentation {
+            sections.push(format!(
                 "#### Documentation\n\n{}",
-                rule.documentation.join("  \n")
+                documentation.join("  \n")
             ));
         }
-        sections.push(sections_for_rule.join("\n\n"));
+        return sections.join("\n\n");
+    }
+
+    let Some(candidate) = candidates.first() else {
+        return String::new();
+    };
+    let rule = candidate.rule;
+    let mut sections = vec![semantic_hover_candidate_details(snapshot, candidate).join("\n")];
+    let cardinality = semantic_hover_cardinality_details(rule);
+    if !cardinality.is_empty() {
+        sections.push(format!("#### Constraints\n\n{}", cardinality.join("\n")));
+    }
+    if !rule.documentation.is_empty() {
+        sections.push(format!(
+            "#### Documentation\n\n{}",
+            rule.documentation.join("  \n")
+        ));
     }
     sections.join("\n\n")
 }
 
-pub(crate) fn semantic_scope_register_summary(scope: &ScopeContext) -> String {
-    let mut registers = vec![
-        format!("ROOT=`{}`", scope.root),
-        format!("THIS=`{}`", scope.current),
-    ];
-    for (depth, value) in scope.from.iter().enumerate() {
-        registers.push(format!("{}=`{value}`", "FROM".repeat(depth + 1)));
+fn semantic_hover_candidate_summary(
+    snapshot: &AnalysisSnapshot,
+    candidate: &SemanticCompletionRule<'_, '_>,
+    include_documentation: bool,
+) -> String {
+    let mut details = semantic_hover_candidate_details(snapshot, candidate);
+    details.extend(semantic_hover_cardinality_details(candidate.rule));
+    if include_documentation && !candidate.rule.documentation.is_empty() {
+        details.push(format!(
+            "- documentation: {}",
+            candidate.rule.documentation.join("  \n")
+        ));
     }
-    for (depth, value) in scope.previous.iter().enumerate() {
-        registers.push(format!("{}=`{value}`", "PREV".repeat(depth + 1)));
+    details.join("\n")
+}
+
+fn semantic_hover_candidate_details(
+    snapshot: &AnalysisSnapshot,
+    candidate: &SemanticCompletionRule<'_, '_>,
+) -> Vec<String> {
+    let rule = candidate.rule;
+    let mut details = vec![format!(
+        "- value: `{}`",
+        semantic_rule_hover_value_label(rule)
+    )];
+    if !rule.allowed_scopes.is_empty() {
+        let allowed = rule
+            .allowed_scopes
+            .iter()
+            .map(|scope| format!("`{scope}`"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        if semantic_scope_allows(rule, candidate.scope) {
+            details.push(format!("- valid scopes: {allowed}"));
+        } else {
+            details.push(format!(
+                "- unavailable in current scope `{}`; valid scopes: {allowed}",
+                candidate.scope.current
+            ));
+        }
     }
-    let mut registers = registers.into_iter();
-    let Some(first) = registers.next() else {
-        return String::new();
-    };
-    let rest = registers
-        .map(|register| format!("  - {register}"))
-        .collect::<Vec<_>>();
-    if rest.is_empty() {
-        first
-    } else {
-        format!("{first}\n{}", rest.join("\n"))
+    if (rule.push_scope.is_some() || !rule.replace_scope.is_empty()) && {
+        let child_scope = semantic_child_scope(snapshot, candidate.scope, rule);
+        !candidate
+            .scope
+            .current
+            .eq_ignore_ascii_case(&child_scope.current)
+    } {
+        let child_scope = semantic_child_scope(snapshot, candidate.scope, rule);
+        details.push(format!(
+            "- scope transition: `{}` → `{}`",
+            candidate.scope.current, child_scope.current
+        ));
+    }
+    details
+}
+
+fn semantic_hover_cardinality_details(rule: &pdx_rules::SemanticRule) -> Vec<String> {
+    let mut details = Vec::new();
+    if rule.required {
+        details.push("- required".to_owned());
+    }
+    if let Some(min) = rule.min_occurs.filter(|min| *min > 0)
+        && (!rule.required || min > 1)
+    {
+        details.push(format!("- at least {min}"));
+    }
+    if let Some(max) = rule.max_occurs.filter(|max| *max != 1) {
+        details.push(format!("- at most {max}"));
+    }
+    details
+}
+
+fn shared_semantic_hover_documentation(
+    candidates: &[&SemanticCompletionRule<'_, '_>],
+) -> Option<Vec<String>> {
+    let first = candidates.first()?.rule.documentation.clone();
+    (!first.is_empty()
+        && candidates
+            .iter()
+            .all(|candidate| candidate.rule.documentation == first))
+    .then_some(first)
+}
+
+fn semantic_rule_hover_value_label(rule: &pdx_rules::SemanticRule) -> String {
+    match rule.shape {
+        RuleShape::Node => "block".to_owned(),
+        RuleShape::ValueClause => "value clause".to_owned(),
+        RuleShape::Leaf | RuleShape::LeafValue => semantic_value_hover_label(&rule.value),
     }
 }
 
-pub(crate) fn semantic_rule_shape_label(shape: RuleShape) -> &'static str {
-    match shape {
-        RuleShape::Node => "block",
-        RuleShape::Leaf => "scalar",
-        RuleShape::LeafValue => "bare value",
-        RuleShape::ValueClause => "value clause",
-    }
+fn semantic_hover_candidate_equivalent(
+    left: &SemanticCompletionRule<'_, '_>,
+    right: &SemanticCompletionRule<'_, '_>,
+) -> bool {
+    left.parent_path == right.parent_path
+        && left.scope == right.scope
+        && left.rule.context == right.rule.context
+        && left.rule.parent_path == right.rule.parent_path
+        && left.rule.key == right.rule.key
+        && left.rule.operator == right.rule.operator
+        && left.rule.value == right.rule.value
+        && left.rule.shape == right.rule.shape
+        && left.rule.child_context == right.rule.child_context
+        // alternative_id, id, source_file, and line describe source declarations rather than
+        // another user-visible semantic interpretation.
+        && left.rule.severity == right.rule.severity
+        && left.rule.required == right.rule.required
+        && left.rule.deprecated == right.rule.deprecated
+        && left.rule.documentation == right.rule.documentation
+        && left.rule.allowed_scopes == right.rule.allowed_scopes
+        && left.rule.push_scope == right.rule.push_scope
+        && left.rule.replace_scope == right.rule.replace_scope
+        && left.rule.min_occurs == right.rule.min_occurs
+        && left.rule.strict_min == right.rule.strict_min
+        && left.rule.max_occurs == right.rule.max_occurs
 }
 
 pub(crate) fn semantic_value_hover_label(matcher: &ValueMatcher) -> String {
@@ -457,8 +485,8 @@ pub(crate) fn semantic_rule_documentation(
     let rule = rules.into_iter().find(|rule| {
         !rule.documentation.is_empty()
             || rule.required
-            || rule.min_occurs.is_some()
-            || rule.max_occurs != Some(1)
+            || rule.min_occurs.is_some_and(|min| min > 0)
+            || rule.max_occurs.is_some_and(|max| max != 1)
             || !rule.allowed_scopes.is_empty()
     })?;
     semantic_rule_documentation_for_rule(rule)
@@ -479,11 +507,13 @@ pub(crate) fn semantic_rule_documentation_for_rule(
     if rule.required {
         constraints.push("- required".to_owned());
     }
-    if let Some(min) = rule.min_occurs {
-        constraints.push(format!("- minimum occurrences: {min}"));
+    if let Some(min) = rule.min_occurs.filter(|min| *min > 0)
+        && (!rule.required || min > 1)
+    {
+        constraints.push(format!("- at least {min}"));
     }
-    if let Some(max) = rule.max_occurs {
-        constraints.push(format!("- maximum occurrences: {max}"));
+    if let Some(max) = rule.max_occurs.filter(|max| *max != 1) {
+        constraints.push(format!("- at most {max}"));
     }
     if !rule.allowed_scopes.is_empty() {
         constraints.push(format!(
@@ -498,12 +528,7 @@ pub(crate) fn semantic_rule_documentation_for_rule(
     if !constraints.is_empty() {
         sections.push(format!("#### Constraints\n\n{}", constraints.join("\n")));
     }
-    if !rule.source_file.is_empty() && rule.line > 0 {
-        sections.push(format!(
-            "#### Provenance\n\n- rule: `{}:{}`",
-            rule.source_file, rule.line
-        ));
-    }
+
     (!sections.is_empty()).then(|| sections.join("\n\n"))
 }
 pub(crate) fn hover_for_symbol(

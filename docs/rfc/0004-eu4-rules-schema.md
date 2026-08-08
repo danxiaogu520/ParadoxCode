@@ -4,7 +4,7 @@
 
 ## 范围
 
-本 RFC 只描述当前 `pdx-rules` runtime/schema 代码：规则如何表示为不可变 `RuleSet`、如何分类文件和查询 semantic matcher，以及 SQLite artifact 如何校验。规则 authority、外部规则输入和官方分发边界以 [RFC 0014](0014-first-party-rule-source.md) 为准，不在本文重复。
+本 RFC 只描述当前 `pdx-rules` runtime/schema 代码：规则如何表示为不可变 `RuleSet`、如何分类文件和查询 semantic matcher，以及 SQLite artifact 如何校验。规则 authority、外部规则输入和官方分发边界以 [RFC 0013](0013-first-party-rule-source.md) 为准，不在本文重复。
 
 ## Runtime model
 

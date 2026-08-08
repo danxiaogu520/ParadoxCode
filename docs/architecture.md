@@ -2,7 +2,7 @@
 
 - 状态：Current
 - 范围：EU4 v0.1；核心 workspace、index、analysis、LSP 和发布设施保持游戏无关
-- 规则 authority：[`docs/rfc/0014-first-party-rule-source.md`](rfc/0014-first-party-rule-source.md)
+- 规则 authority：[`docs/rfc/0013-first-party-rule-source.md`](rfc/0013-first-party-rule-source.md)
 
 本文只描述当前代码中的边界、数据流和不变量。功能决策见对应 RFC；实现状态不以历史日期或提交记录维护。
 

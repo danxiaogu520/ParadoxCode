@@ -16,15 +16,14 @@
 | [0010](0010-zed-integration.md) | Current | Zed extension 和 server 获取 |
 | [0011](0011-testing-quality.md) | Current | 测试、fuzz、benchmark、CI gates |
 | [0012](0012-generic-engine-eu4-first.md) | Current | 通用 engine 与 EU4-first |
-| [0013](0013-embedded-first-party-rules.md) | Superseded | RFC 0014 的兼容指针 |
-| [0014](0014-first-party-rule-source.md) | Current | 第一方规则 source/compiler/runtime authority |
+| [0013](0013-first-party-rule-source.md) | Current | 第一方规则 source/compiler/runtime authority |
 
 ## Authority
 
 - 架构、依赖、并发和稳定不变量：[`docs/architecture.md`](../architecture.md)。
 - workspace、overlay 和 Vanilla cache：RFC 0003。
 - 协议边界、capability 和 LSP 生命周期：RFC 0009。
-- 第一方规则 source、编译、artifact 和禁止外部输入：RFC 0014。
+- 第一方规则 source、编译、artifact 和禁止外部输入：RFC 0013。
 - 测试和 CI 当前实际门禁：RFC 0011。
 
 如果实现与 RFC 不一致，应先修正代码或将 RFC 标为 `Partial`，不能用历史注释掩盖差异。

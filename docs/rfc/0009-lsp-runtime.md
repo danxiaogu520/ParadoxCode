@@ -15,7 +15,7 @@ transport、initialize/shutdown/exit 生命周期、client capability negotiatio
 正式 `pdx-ls` 进程无规则参数。它接受 `--version`/`-V`，其他 process argument（包括
 `--rules`）均返回错误；不存在外部规则文件、规则路径或规则下载入口。启动 composition
 root 从 `pdx-game::eu4` 取得内嵌第一方 JSON source，使用用户本地 SQLite artifact，用户路径
-不可用时才使用不持久化的临时 artifact。规则 authority 与 cache 校验见 [RFC 0014](0014-first-party-rule-source.md)。
+不可用时才使用不持久化的临时 artifact。规则 authority 与 cache 校验见 [RFC 0013](0013-first-party-rule-source.md)。
 
 `initialize` 的当前 options 只描述 workspace：
 

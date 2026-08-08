@@ -26,7 +26,7 @@
 
 ## source compiler、`pdx-bake` 与 authority
 
-RFC 0014 规定 `rules/eu4/` 是静态 EU4 规则的唯一 source authority。当前 source format 为 `5`，固定输入包括 `manifest.json`、`catalog.json`、`semantic-rules.json`、`enum-values.json`、`type-root-keys.json`、`type-root-scopes.json`、`type-descriptors.json` 和 `localisation-bindings.json`。
+RFC 0013 规定 `rules/eu4/` 是静态 EU4 规则的唯一 source authority。当前 source format 为 `5`，固定输入包括 `manifest.json`、`catalog.json`、`semantic-rules.json`、`enum-values.json`、`type-root-keys.json`、`type-root-scopes.json`、`type-descriptors.json` 和 `localisation-bindings.json`。
 
 公开的 `pdx_rules::rulec` 入口是 `load_source`、`load_source_bundle` 和 `compile`；相关类型包括 `SourceBundle`、`SourceManifest`、`ArtifactManifest`、`CompileError`。compiler 拒绝 unknown field、缺文件、重复 stable identity 及无效 cross-record invariant，并在发布前读回 SQLite 做 round-trip 比较。
 

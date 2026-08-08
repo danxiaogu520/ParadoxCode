@@ -1,7 +1,7 @@
 # 规则声明与运行时语义矩阵
 
 - 状态：Current audit reference
-- 规则 authority：[`RFC 0014`](rfc/0014-first-party-rule-source.md)
+- 规则 authority：[`RFC 0013`](rfc/0013-first-party-rule-source.md)
 
 本文只记录当前 `rules/eu4/*.json` 与代码消费者的关系，不是第二份规则 source。规则 source、artifact 和 profile 改变时，应同步更新本文的消费状态。
 

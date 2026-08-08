@@ -56,4 +56,6 @@ scope completion 使用当前已知 scope、profile 提供的 intrinsic/scope �
 
 hover 只对已确认的 symbol、semantic property/value、规则 documentation、局部 parameter 或 Vanilla cache 的 localisation preview 生成；普通未知 scalar 和 comment 不制造 tooltip。definition/reference 的来源、priority、shadowed/ambiguous 状态可由 analysis 组合到 hover。
 
+semantic property/value hover 默认面向脚本作者，而不是规则 compiler 调试器：单一语义显示 documentation、值 matcher、必要的有效 scope、实际 scope transition 和有意义的 cardinality；多语义只显示紧凑的 matcher 摘要，并在候选语义共享时合并 documentation。等价的 source-derived rule rows 不重复渲染。context、parent path、shape、operator、scope registers 和 source provenance 属于内部分析数据，不进入默认 hover；scope 不匹配时只显示面向用户的有效 scope 提示。
+
 当前限制是：CSV/其他 opaque resource 没有 parser 级诊断或补全；scope evaluator 仍是部分实现；未被规则和 HIR 确认的动态文本不会产生确定的 symbol 诊断。未打开的 Current Mod 文件不主动 push diagnostics，但可通过 CLI/直接 analysis 查询处理。

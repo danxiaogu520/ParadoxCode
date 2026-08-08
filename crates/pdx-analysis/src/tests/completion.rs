@@ -160,20 +160,12 @@ fn semantic_rules_drive_value_completion_and_hover() {
     assert!(
         property_hover
             .contents
-            .contains("#### Rule\n\n- context: `trigger`")
+            .contains("- value: `bool (`yes` / `no`)`")
     );
-    assert!(property_hover.contents.contains("context: `trigger`"));
-    assert!(property_hover.contents.contains("shape: `scalar`"));
-    assert!(
-        property_hover
-            .contents
-            .contains("value: `bool (`yes` / `no`)`")
-    );
-    assert!(
-        property_hover
-            .contents
-            .contains("rule: `fixture.semantic:1`")
-    );
+
+    assert!(!property_hover.contents.contains("context: `trigger`"));
+    assert!(!property_hover.contents.contains("shape: `scalar`"));
+    assert!(!property_hover.contents.contains("Provenance"));
 
     let value_position = u32::try_from("trigger = { foo = yes".find("yes").expect("value") + 1)
         .expect("value offset");

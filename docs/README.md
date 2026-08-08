@@ -40,8 +40,7 @@
 | RFC 0010 | Current | Zed extension、server 获取和启动 |
 | RFC 0011 | Current | 测试、fuzz、benchmark 和 CI quality gates |
 | RFC 0012 | Current | 通用 engine 与 EU4-first 边界 |
-| RFC 0013 | Superseded | 仅保留到 RFC 0014 的当前指针 |
-| RFC 0014 | Current | 第一方规则 source、compiler 和 runtime authority |
+| RFC 0013 | Current | 第一方规则 source、compiler 和 runtime authority |
 
 RFC 中的 `Current` 表示内容与当前代码契约一致；`Partial` 表示设计和实现已经存在，但仍有明确未完成边界；`Superseded` 不定义新的行为。
 
@@ -49,6 +48,6 @@ RFC 中的 `Current` 表示内容与当前代码契约一致；`Partial` 表示�
 
 - 当前行为写入架构或对应 RFC，不追加日期化实现日志。
 - 设计尚未落地时必须标为“当前限制”或 `Partial`，不能写成已实现。
-- 规则 authority 只由 RFC 0014 定义；workspace/cache 细节由 RFC 0003 定义；协议细节由 RFC 0009 定义。
+- 规则 authority 只由 RFC 0013 定义；workspace/cache 细节由 RFC 0003 定义；协议细节由 RFC 0009 定义。
 - 代码、测试、CLI 或规则 schema 改变时，同一变更同步修正文档。
 - 性能数字必须带测量环境和复现命令，不作为跨机器验收阈值。

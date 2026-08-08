@@ -99,9 +99,10 @@ fn semantic_hover_explains_scope_transition() {
         u32::try_from(text.find("capital_scope").expect("scope link") + 1).expect("position");
     let hover = hover(&host.snapshot(), &id, position).expect("scope hover");
     assert!(hover.contents.contains("scope transition:"));
-    assert!(hover.contents.contains("scope registers: ROOT=`"));
-    assert!(hover.contents.contains("scope registers after:"));
-    assert!(hover.contents.contains("child context:") || hover.contents.contains("context:"));
+    assert!(!hover.contents.contains("scope registers:"));
+    assert!(!hover.contents.contains("scope registers after:"));
+    assert!(!hover.contents.contains("child context:"));
+    assert!(!hover.contents.contains("context:"));
 }
 
 #[test]
@@ -166,11 +167,24 @@ fn semantic_hover_keeps_multiple_matching_rule_meanings() {
         .expect("open ambiguous rule fixture");
     let position = u32::try_from(text.find("choice").expect("choice") + 1).expect("position");
     let hover = hover(&host.snapshot(), &id, position).expect("ambiguous rule hover");
-    assert!(hover.contents.contains("2 possible semantic meanings"));
-    assert!(hover.contents.contains("#### 2 possible semantic meanings"));
-    assert!(hover.contents.contains("##### Candidate 1"));
+    assert!(hover.contents.contains("#### Possible meanings (2)"));
+    assert!(!hover.contents.contains("##### Candidate 1"));
     assert!(hover.contents.contains("value: `bool (`yes` / `no`)`"));
     assert!(hover.contents.contains("value: `integer in [1, 3]`"));
+}
+
+#[test]
+fn semantic_hover_collapses_repeated_first_party_rule_rows() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("load first-party rules"));
+    let id = DocumentId::new("file:///tmp/common/on_actions/hover.txt");
+    let text = "on_action = { events = { test_event = { } } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open on_action fixture");
+    let position =
+        u32::try_from(text.find("events").expect("events key") + 1).expect("hover position");
+    let hover = hover(&host.snapshot(), &id, position).expect("repeated-rule hover");
+    assert_eq!(hover.contents.matches("- value:").count(), 1);
+    assert!(!hover.contents.contains("Possible meanings"));
 }
 
 #[test]

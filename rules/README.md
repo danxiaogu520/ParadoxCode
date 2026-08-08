@@ -27,4 +27,4 @@ cargo run --locked -p pdx-rules --bin pdx-bake -- build \
 
 The generated SQLite artifact is never hand-maintained or committed. Official `pdx` and `pdx-ls` binaries embed the JSON source, compute its canonical `rule_hash`, and materialize a validated SQLite artifact in the user-local cache on cache miss or hash mismatch. The runtime exposes no rule override or external source path.
 
-Every rule change must pass source schema/invariant validation, deterministic canonical hashing, SQLite round-trip, manifest/checksum verification and affected analysis/LSP tests. See [RFC 0014](../docs/rfc/0014-first-party-rule-source.md) and [the rule matrix](../docs/rule-semantics-matrix.md).
+Every rule change must pass source schema/invariant validation, deterministic canonical hashing, SQLite round-trip, manifest/checksum verification and affected analysis/LSP tests. See [RFC 0013](../docs/rfc/0013-first-party-rule-source.md) and [the rule matrix](../docs/rule-semantics-matrix.md).

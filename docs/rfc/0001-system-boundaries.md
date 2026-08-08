@@ -6,7 +6,7 @@
 
 ParadoxCode 的核心是与编辑器无关的 PDX 引擎，当前完整规则 profile 为 EU4。workspace、HIR、索引、analysis 和 LSP runtime 保持通用边界；EU4 的路径、文件分类和语义数据由 `pdx-game::eu4` 与 `pdx-rules` 提供。
 
-规则权威、外部规则输入和官方规则分发边界以 [RFC 0014](0014-first-party-rule-source.md) 为准；本 RFC 只记录 crate 职责和依赖方向。
+规则权威、外部规则输入和官方规则分发边界以 [RFC 0013](0013-first-party-rule-source.md) 为准；本 RFC 只记录 crate 职责和依赖方向。
 
 ## 依赖方向
 

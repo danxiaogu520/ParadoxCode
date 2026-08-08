@@ -89,7 +89,8 @@ fn memory_transport_hover_returns_semantic_value_and_null_for_unknown_text() {
         .as_str()
         .expect("semantic hover markdown");
     assert!(contents.contains("PDX property `cost`"));
-    assert!(contents.contains("rule:"));
+    assert!(contents.contains("- value:"));
+    assert!(!contents.contains("Provenance"));
     let unknown_hover = responses
         .iter()
         .find(|value| value["id"] == 3)
