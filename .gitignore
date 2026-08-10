@@ -33,6 +33,9 @@ pnpm-debug.log*
 /rules/vanilla-cache/
 /rules/*.pdxrules
 
+# Generated whole-Current-Mod diagnostic reports
+**/diagnostic-reports/
+
 # Temporary local rule-inspection helper
 /rules/find-rule.cjs
 

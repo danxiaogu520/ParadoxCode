@@ -1,6 +1,7 @@
 use super::{
     CURRENT_SCHEMA_VERSION, FileMatcher, GameProfile, KeyMatcher, ProfileMatchMode,
-    ProfileTextMatcher, RuleRecord, RuleSet, RuleShape, RulesModel, SemanticRule, ValueMatcher,
+    ProfileTextMatcher, RuleRecord, RuleSet, RuleShape, RulesModel, ScriptedMacroDescriptor,
+    ScriptedMacroUsage, SemanticRule, TypeDescriptor, ValueMatcher,
 };
 use pdx_text::LogicalPath;
 use std::collections::BTreeMap;
@@ -153,16 +154,127 @@ fn exact_semantic_rule_index_is_case_insensitive_and_excludes_dynamic_matchers()
 }
 
 #[test]
+fn canonical_hash_includes_scripted_macro_metadata() {
+    let descriptor = TypeDescriptor {
+        name: "scripted_effect".to_owned(),
+        scripted_macro: Some(ScriptedMacroDescriptor {
+            body_context: "effect".to_owned(),
+            macro_enabled: true,
+            usage: ScriptedMacroUsage {
+                replacement: true,
+                condition: true,
+                dynamic_key: true,
+                opaque_text: true,
+            },
+        }),
+        ..TypeDescriptor::default()
+    };
+    let mut first = RulesModel {
+        game_id: "test-game".to_owned(),
+        ..RulesModel::default()
+    };
+    first
+        .semantic
+        .type_descriptors
+        .insert(descriptor.name.clone(), descriptor.clone());
+    let mut second = first.clone();
+    second
+        .semantic
+        .type_descriptors
+        .get_mut("scripted_effect")
+        .expect("scripted descriptor")
+        .scripted_macro
+        .as_mut()
+        .expect("macro metadata")
+        .usage
+        .opaque_text = false;
+
+    assert_ne!(
+        RuleSet::from_model(first).rule_hash(),
+        RuleSet::from_model(second).rule_hash()
+    );
+}
+
+#[test]
+fn type_descriptor_macro_metadata_is_strict_and_old_source_defaults_it() {
+    let old_source = r#"{
+        "name": "legacy",
+        "path": null,
+        "path_file": null,
+        "path_extension": null,
+        "path_strict": false,
+        "type_per_file": false,
+        "skip_root_paths": [],
+        "name_field": null,
+        "name_from_file": false,
+        "starts_with": null,
+        "type_key_filter": null
+    }"#;
+    let descriptor: TypeDescriptor = serde_json::from_str(old_source).expect("legacy descriptor");
+    assert!(descriptor.scripted_macro.is_none());
+    assert!(
+        serde_json::to_value(&descriptor)
+            .expect("serialize legacy descriptor")
+            .get("scripted_macro")
+            .is_none()
+    );
+
+    let unknown_field = r#"{
+        "name": "scripted_effect",
+        "path": null,
+        "path_file": null,
+        "path_extension": null,
+        "path_strict": false,
+        "type_per_file": false,
+        "skip_root_paths": [],
+        "name_field": null,
+        "name_from_file": false,
+        "starts_with": null,
+        "type_key_filter": null,
+        "scripted_macro": {
+            "body_context": "effect",
+            "macro_enabled": true,
+            "usage": {
+                "replacement": true,
+                "condition": false,
+                "dynamic_key": false,
+                "opaque_text": false,
+                "not_a_usage": true
+            }
+        }
+    }"#;
+    assert!(serde_json::from_str::<TypeDescriptor>(unknown_field).is_err());
+}
+
+#[test]
 fn sqlite_round_trip_validates_logical_hash() {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
     let path = std::env::temp_dir().join(format!("paradoxcode-rules-{nonce}.pdxrules"));
-    let rules = RuleSet::from_model(RulesModel {
+    let mut model = RulesModel {
         game_id: "test-game".to_owned(),
         ..RulesModel::default()
-    });
+    };
+    model.semantic.type_descriptors.insert(
+        "scripted_trigger".to_owned(),
+        TypeDescriptor {
+            name: "scripted_trigger".to_owned(),
+            scripted_macro: Some(ScriptedMacroDescriptor {
+                body_context: "trigger".to_owned(),
+                macro_enabled: true,
+                usage: ScriptedMacroUsage {
+                    replacement: true,
+                    condition: true,
+                    dynamic_key: true,
+                    opaque_text: true,
+                },
+            }),
+            ..TypeDescriptor::default()
+        },
+    );
+    let rules = RuleSet::from_model(model);
     rules.write_sqlite(&path).expect("write rules");
     let loaded = RuleSet::load(&path).expect("load rules");
     assert_eq!(loaded, rules);

@@ -134,9 +134,9 @@ LSP/CLI 可通过 `.pdx/project.toml` 或 typed initialization options 配置 Cu
 
 ## Rules 与 Vanilla cache
 
-`rules/eu4/` 的 JSON 是唯一规则 authority。source format 当前为 `5`，runtime SQLite schema 当前为 `16`。官方 `pdx`/`pdx-ls` 内嵌 JSON source，启动时计算 canonical `rule_hash`，只读加载匹配的用户本地 SQLite artifact；缺失、损坏、schema、`game_id` 或 hash 不匹配时临时编译、round-trip 校验后替换 cache。未通过校验的 artifact 不进入 runtime；正式 server 不接受 `--rules`、外部规则路径、CWT 或用户规则覆盖。
+`rules/eu4/` 的 JSON 是唯一规则 authority。source format 当前为 `6`，runtime SQLite schema 当前为 `17`。官方 `pdx`/`pdx-ls` 内嵌 JSON source，启动时计算 canonical `rule_hash`，只读加载匹配的用户本地 SQLite artifact；缺失、损坏、schema、`game_id` 或 hash 不匹配时临时编译、round-trip 校验后替换 cache。未通过校验的 artifact 不进入 runtime；正式 server 不接受 `--rules`、外部规则路径、CWT 或用户规则覆盖。
 
-Vanilla index cache schema 当前为 `3`。它保存 cache metadata、source-file metadata、semantic shards、definition/reference 的 UTF-16 位置和有界的 localisation preview；不保存 Vanilla 源码、CST 或 HIR。Vanilla 源文件内容或 fingerprint 变化需要显式 refresh；规则 hash mismatch 可在 LSP 启动后台自动重建。cache 加载或重建期间，当前 LSP 会延迟受影响的 snapshot 请求，完成后由 event loop 安装完整 cache；失败时保留已加载的旧 cache并报告原因。
+Vanilla index cache schema 当前为 `4`。它保存 cache metadata、source-file metadata、semantic shards、scripted macro 的紧凑调用签名、definition/reference 的 UTF-16 位置和有界的 localisation preview；不保存 Vanilla 源码、CST 或 HIR。Vanilla 源文件内容或 fingerprint 变化需要显式 refresh；规则 hash mismatch 可在 LSP 启动后台自动重建。cache 加载或重建期间，当前 LSP 会延迟受影响的 snapshot 请求，完成后由 event loop 安装完整 cache；失败时保留已加载的旧 cache并报告原因。
 
 ## 并发与生命周期
 
@@ -151,7 +151,7 @@ Vanilla index cache schema 当前为 `3`。它保存 cache metadata、source-fil
 
 当前稳定身份包括 `SourceRootId`、`SourceFileId`、`DocumentId`、`LogicalPath`。`Definition` 和 `Reference` 仍通过 kind/name、file id 和 source range 表示；项目尚未实现跨 server 的 `SymbolId`、`DefinitionId` 或 `ReferenceId`。
 
-`FileIndexShard` 保存 definitions、references 和 syntax error count。`WorkspaceIndex` 维护 per-file shards、definition lookup buckets、case-sensitive kind 集合和无源码文件使用的 UTF-16 position ranges。被覆盖定义保留为 inactive/shadowed，普通 navigation 只使用 active resolution。
+`FileIndexShard` 保存 definitions、references、scripted macro signature 和 syntax error count。`WorkspaceIndex` 维护 per-file shards、definition lookup buckets、case-sensitive kind 集合和无源码文件使用的 UTF-16 position ranges。被覆盖定义保留为 inactive/shadowed，普通 navigation 只使用 active resolution。scripted effect/trigger 的成员由实际 workspace/Vanilla index 动态提供；宏参数的 occurrence 仍只保留在所属 HIR owner 内，不进入全局 symbol bucket，但按定义归纳出的参数名、顺序和 required/optional 状态会作为紧凑 signature 随 shard 持久化。
 
 ## 错误与安全不变量
 

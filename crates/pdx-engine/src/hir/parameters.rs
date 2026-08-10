@@ -1,9 +1,10 @@
 //! Local parameter definitions and references.
 
-use pdx_parser::ParsedFile;
-use pdx_rules::GameProfile;
+use pdx_parser::{ParsedFile, TokenKind};
+use pdx_rules::{GameProfile, RuleSet};
 use pdx_text::{LogicalPath, TextRange};
 
+use super::semantics::scripted_macro_path_context;
 use super::{
     HirParameterConditional, HirParameterDefinition, HirParameterReference,
     HirParameterReferenceKind, HirProperty, range_within,
@@ -14,34 +15,43 @@ pub(super) fn lower_parameters(
     properties: &[HirProperty],
     conditionals: &[HirParameterConditional],
     logical_path: Option<&LogicalPath>,
+    rules: &RuleSet,
     profile: Option<&GameProfile>,
 ) -> (Vec<HirParameterDefinition>, Vec<HirParameterReference>) {
-    let (Some(logical_path), Some(profile)) = (logical_path, profile) else {
+    let Some(logical_path) = logical_path else {
         return (Vec::new(), Vec::new());
     };
-    let rules = profile
-        .token_definitions
-        .iter()
+    let macro_path = scripted_macro_path_context(rules, Some(logical_path)).is_some();
+    let token_rules = profile
+        .into_iter()
+        .flat_map(|profile| profile.token_definitions.iter())
         .filter(|rule| rule.path.matches(logical_path.as_str()))
         .collect::<Vec<_>>();
-    if rules.is_empty() {
+    if token_rules.is_empty() && !macro_path {
         return (Vec::new(), Vec::new());
     }
+    let delimiters = token_rules
+        .iter()
+        .map(|rule| rule.delimiter)
+        .collect::<Vec<_>>();
+    let delimiters = if delimiters.is_empty() {
+        vec!['$']
+    } else {
+        delimiters
+    };
 
     let mut definitions = Vec::new();
     let mut references = Vec::new();
-    for rule in &rules {
+    for delimiter in delimiters.iter().copied() {
         for token in syntax
             .tokens()
             .iter()
-            .filter(|token| token.kind() == pdx_parser::TokenKind::Bare)
+            .filter(|token| matches!(token.kind(), TokenKind::Bare | TokenKind::Quoted))
         {
             let Some(raw) = syntax.text(token.range()) else {
                 continue;
             };
-            for (name, range, name_range) in
-                delimited_parameters(raw, token.range(), rule.delimiter)
-            {
+            for (name, range, name_range) in delimited_parameters(raw, token.range(), delimiter) {
                 let Some(owner_range) = owning_top_level_range(properties, range) else {
                     continue;
                 };
@@ -50,7 +60,7 @@ pub(super) fn lower_parameters(
                     range,
                     name_range,
                     owner_range,
-                    kind: HirParameterReferenceKind::Substitution,
+                    kind: parameter_reference_kind(properties, range, token.kind()),
                 });
                 infer_parameter_definition(
                     &mut definitions,
@@ -58,7 +68,7 @@ pub(super) fn lower_parameters(
                     range,
                     name_range,
                     owner_range,
-                    rule.delimiter,
+                    delimiter,
                 );
             }
         }
@@ -80,7 +90,7 @@ pub(super) fn lower_parameters(
             conditional.condition_range,
             conditional.name_range,
             owner_range,
-            rules[0].delimiter,
+            delimiters.first().copied().unwrap_or('$'),
         );
     }
     definitions.sort_by_key(|definition| definition.range.start());
@@ -94,6 +104,24 @@ fn owning_top_level_range(properties: &[HirProperty], occurrence: TextRange) -> 
         .filter(|property| property.top_level && range_within(occurrence, property.range))
         .map(|property| property.range)
         .next()
+}
+
+fn parameter_reference_kind(
+    properties: &[HirProperty],
+    occurrence: TextRange,
+    token_kind: TokenKind,
+) -> HirParameterReferenceKind {
+    if token_kind == TokenKind::Quoted {
+        return HirParameterReferenceKind::OpaqueTextSubstitution;
+    }
+    if properties.iter().any(|property| {
+        property.key_range.start() <= occurrence.start()
+            && property.key_range.end() >= occurrence.end()
+    }) {
+        HirParameterReferenceKind::KeySubstitution
+    } else {
+        HirParameterReferenceKind::Substitution
+    }
 }
 
 fn infer_parameter_definition(

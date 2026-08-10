@@ -39,7 +39,9 @@ fn write_cache(
     cache: &VanillaIndexCache,
 ) -> Result<(), VanillaCacheError> {
     transaction.execute_batch(
-        "DROP TABLE IF EXISTS symbol_references;
+        "DROP TABLE IF EXISTS macro_parameters;
+         DROP TABLE IF EXISTS macro_definitions;
+         DROP TABLE IF EXISTS symbol_references;
          DROP TABLE IF EXISTS navigation_positions;
          DROP TABLE IF EXISTS definitions;
          DROP TABLE IF EXISTS localisation_previews;
@@ -62,6 +64,25 @@ fn write_cache(
              range_end INTEGER NOT NULL,
              active INTEGER NOT NULL CHECK(active IN (0, 1)),
              PRIMARY KEY(file_id, ordinal)
+         );
+         CREATE TABLE macro_definitions(
+             file_id BLOB NOT NULL REFERENCES source_files(file_id),
+             ordinal INTEGER NOT NULL,
+             kind TEXT NOT NULL,
+             name TEXT NOT NULL,
+             definition_range_start INTEGER NOT NULL,
+             definition_range_end INTEGER NOT NULL,
+             PRIMARY KEY(file_id, ordinal)
+         );
+         CREATE TABLE macro_parameters(
+             file_id BLOB NOT NULL,
+             macro_ordinal INTEGER NOT NULL,
+             ordinal INTEGER NOT NULL,
+             name TEXT NOT NULL,
+             required INTEGER NOT NULL CHECK(required IN (0, 1)),
+             PRIMARY KEY(file_id, macro_ordinal, ordinal),
+             FOREIGN KEY(file_id, macro_ordinal)
+                 REFERENCES macro_definitions(file_id, ordinal)
          );
          CREATE TABLE symbol_references(
              file_id BLOB NOT NULL REFERENCES source_files(file_id),
@@ -137,6 +158,14 @@ fn write_cache(
         "INSERT INTO symbol_references(file_id, ordinal, kind, name, range_start, range_end)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
     )?;
+    let mut insert_macro = transaction.prepare(
+        "INSERT INTO macro_definitions(file_id, ordinal, kind, name, definition_range_start, definition_range_end)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+    )?;
+    let mut insert_macro_parameter = transaction.prepare(
+        "INSERT INTO macro_parameters(file_id, macro_ordinal, ordinal, name, required)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+    )?;
     for (id, file) in &cache.source_files {
         let shard = cache.index.shard(*id).ok_or_else(|| {
             VanillaCacheError::InvalidData(format!(
@@ -174,10 +203,64 @@ fn write_cache(
                 i64::from(reference.range.end())
             ])?;
         }
+        for (macro_ordinal, summary) in shard.macro_definitions.iter().enumerate() {
+            if shard.macro_definitions[..macro_ordinal]
+                .iter()
+                .any(|candidate| {
+                    candidate.kind.eq_ignore_ascii_case(&summary.kind)
+                        && candidate.name.eq_ignore_ascii_case(&summary.name)
+                        && candidate.definition_range == summary.definition_range
+                })
+            {
+                return Err(VanillaCacheError::InvalidData(format!(
+                    "duplicate macro summary {} `{}`",
+                    summary.kind, summary.name
+                )));
+            }
+            if !shard.definitions.iter().any(|definition| {
+                definition.kind.eq_ignore_ascii_case(&summary.kind)
+                    && definition.name.eq_ignore_ascii_case(&summary.name)
+                    && definition.range == summary.definition_range
+            }) {
+                return Err(VanillaCacheError::InvalidData(format!(
+                    "macro summary {} `{}` has no matching definition",
+                    summary.kind, summary.name
+                )));
+            }
+            insert_macro.execute(params![
+                encode_file_id(*id),
+                i64::try_from(macro_ordinal).unwrap_or(i64::MAX),
+                summary.kind,
+                summary.name,
+                i64::from(summary.definition_range.start()),
+                i64::from(summary.definition_range.end()),
+            ])?;
+            for (ordinal, parameter) in summary.parameters.iter().enumerate() {
+                if parameter.name.is_empty()
+                    || summary.parameters[..ordinal]
+                        .iter()
+                        .any(|candidate| candidate.name.eq_ignore_ascii_case(&parameter.name))
+                {
+                    return Err(VanillaCacheError::InvalidData(format!(
+                        "macro parameter name in {} `{}` is empty or duplicated",
+                        summary.kind, summary.name
+                    )));
+                }
+                insert_macro_parameter.execute(params![
+                    encode_file_id(*id),
+                    i64::try_from(macro_ordinal).unwrap_or(i64::MAX),
+                    i64::try_from(ordinal).unwrap_or(i64::MAX),
+                    parameter.name,
+                    i64::from(parameter.required),
+                ])?;
+            }
+        }
     }
     drop(insert_source_file);
     drop(insert_definition);
     drop(insert_reference);
+    drop(insert_macro);
+    drop(insert_macro_parameter);
     let mut insert_position = transaction.prepare(
         "INSERT INTO navigation_positions(file_id, range_start, range_end, start_line, start_character, end_line, end_character)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",

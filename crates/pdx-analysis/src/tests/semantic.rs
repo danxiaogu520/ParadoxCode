@@ -689,6 +689,78 @@ fn eu4_scripted_effect_params_are_owner_qualified() {
 }
 
 #[test]
+fn unresolved_macro_signature_keeps_parameter_blocks_open_world() {
+    use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+    use std::fs;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-open-macro-params-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    fs::create_dir_all(&definitions).expect("scripted effect directory");
+    fs::write(
+        definitions.join("00_first.txt"),
+        "ambiguous_effect = { value = $first$ }\n",
+    )
+    .expect("first definition");
+    fs::write(
+        definitions.join("01_second.txt"),
+        "ambiguous_effect = { value = $second$ }\n",
+    )
+    .expect("second definition");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan ambiguous macros");
+    let id = DocumentId::new("file:///tmp/events/open-macro-params.txt");
+    let invocation =
+        "country_event = { immediate = { ambiguous_effect = { foreign_parameter = 1 } } }\n";
+    host.open_document(id.clone(), 1, invocation.to_owned(), None)
+        .expect("open invocation");
+    let snapshot = host.snapshot();
+    assert!(
+        crate::parameter_names_for_owner(&snapshot, "scripted_effect", "ambiguous_effect")
+            .is_none()
+    );
+    let results = diagnostics(&snapshot, &id);
+    assert!(!results.iter().any(|item| {
+        item.code == DiagnosticCode::UnknownKey && item.message.contains("`foreign_parameter`")
+    }));
+    assert!(!results.iter().any(|item| {
+        item.code == DiagnosticCode::Cardinality
+            && item.message.contains("missing required parameter")
+    }));
+
+    let completion_position = u32::try_from(
+        invocation
+            .find("ambiguous_effect = { ")
+            .expect("parameter block")
+            + "ambiguous_effect = { ".len()
+            - 1,
+    )
+    .expect("completion position");
+    let labels = complete(&snapshot, &id, completion_position)
+        .items
+        .into_iter()
+        .map(|item| item.label)
+        .collect::<Vec<_>>();
+    assert!(
+        !labels
+            .iter()
+            .any(|label| label.eq_ignore_ascii_case("scaled_skill")),
+        "an unresolved owner must not fall back to the static parameter enum: {labels:?}"
+    );
+
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn eu4_legacy_governments_use_eu4_reform_semantics() {
     use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use std::fs;

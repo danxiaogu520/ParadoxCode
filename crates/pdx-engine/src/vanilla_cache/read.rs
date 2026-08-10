@@ -7,7 +7,10 @@ use std::path::Path;
 use pdx_text::{LogicalPath, Position, PositionRange, TextRange};
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
 
-use crate::index::{Definition, FileIndexShard, Reference, WorkspaceIndex};
+use crate::index::{
+    Definition, FileIndexShard, MacroDefinitionSummary, MacroParameterSignature, Reference,
+    WorkspaceIndex,
+};
 use crate::model::LocalisationPreview;
 use crate::scan::stable_file_id;
 use crate::{SourceFile, SourceFileId, SourceRoot, SourceRootKind, WorkspaceScanToken};
@@ -150,12 +153,16 @@ fn validate_table_limits(connection: &Connection) -> Result<(), VanillaCacheErro
     validate_count(connection, "source_files", MAX_CACHE_FILES)?;
     validate_count(connection, "definitions", MAX_CACHE_SYMBOLS)?;
     validate_count(connection, "symbol_references", MAX_CACHE_SYMBOLS)?;
+    validate_count(connection, "macro_definitions", MAX_CACHE_SYMBOLS)?;
+    validate_count(connection, "macro_parameters", MAX_CACHE_SYMBOLS)?;
     validate_count(connection, "navigation_positions", MAX_CACHE_SYMBOLS)?;
     validate_count(connection, "localisation_previews", MAX_CACHE_SYMBOLS)?;
     for (table, fields) in [
         ("source_files", "logical_path, category_id, resolution"),
         ("definitions", "kind, name"),
         ("symbol_references", "kind, name"),
+        ("macro_definitions", "kind, name"),
+        ("macro_parameters", "name"),
         (
             "navigation_positions",
             "range_start, range_end, start_line, start_character, end_line, end_character",
@@ -251,11 +258,13 @@ fn load_index(
                 file_id: id,
                 definitions: Vec::new(),
                 references: Vec::new(),
+                macro_definitions: Vec::new(),
                 syntax_error_count,
             },
         );
     }
     load_definitions(connection, &mut shards)?;
+    load_macro_definitions(connection, &mut shards)?;
     load_references(connection, &mut shards)?;
     let localisation_previews = load_localisation_previews(connection, &shards)?;
     let positions = load_navigation_positions(connection)?;
@@ -293,6 +302,126 @@ fn load_index(
         positions,
         localisation_previews,
     ))
+}
+
+fn load_macro_definitions(
+    connection: &Connection,
+    shards: &mut BTreeMap<SourceFileId, FileIndexShard>,
+) -> Result<(), VanillaCacheError> {
+    let mut statement = connection.prepare(
+        "SELECT file_id, ordinal, kind, name, definition_range_start, definition_range_end
+         FROM macro_definitions ORDER BY file_id, ordinal",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, Vec<u8>>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, i64>(4)?,
+            row.get::<_, i64>(5)?,
+        ))
+    })?;
+    for row in rows {
+        let (file_id, ordinal, kind, name, start, end) = row?;
+        let file_id = decode_file_id(&file_id)?;
+        let ordinal = usize::try_from(ordinal)
+            .map_err(|_| VanillaCacheError::InvalidData("negative macro ordinal".to_owned()))?;
+        let definition_range = decode_range(start, end)?;
+        let shard = shards.get_mut(&file_id).ok_or_else(|| {
+            VanillaCacheError::InvalidData(format!(
+                "macro definition references unknown file {}",
+                file_id.get()
+            ))
+        })?;
+        if ordinal != shard.macro_definitions.len() {
+            return Err(VanillaCacheError::InvalidData(
+                "macro definition ordinals are not contiguous".to_owned(),
+            ));
+        }
+        if shard.macro_definitions.iter().any(|summary| {
+            summary.kind.eq_ignore_ascii_case(&kind)
+                && summary.name.eq_ignore_ascii_case(&name)
+                && summary.definition_range == definition_range
+        }) {
+            return Err(VanillaCacheError::InvalidData(format!(
+                "duplicate macro summary {kind} `{name}`"
+            )));
+        }
+        if !shard.definitions.iter().any(|definition| {
+            definition.kind.eq_ignore_ascii_case(&kind)
+                && definition.name.eq_ignore_ascii_case(&name)
+                && definition.range == definition_range
+        }) {
+            return Err(VanillaCacheError::InvalidData(format!(
+                "macro summary {kind} `{name}` has no matching definition"
+            )));
+        }
+        shard.macro_definitions.push(MacroDefinitionSummary {
+            kind,
+            name,
+            definition_range,
+            parameters: Vec::new(),
+        });
+    }
+    drop(statement);
+
+    let mut statement = connection.prepare(
+        "SELECT file_id, macro_ordinal, ordinal, name, required
+         FROM macro_parameters ORDER BY file_id, macro_ordinal, ordinal",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, Vec<u8>>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, i64>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, i64>(4)?,
+        ))
+    })?;
+    for row in rows {
+        let (file_id, macro_ordinal, ordinal, name, required) = row?;
+        let file_id = decode_file_id(&file_id)?;
+        let macro_ordinal = usize::try_from(macro_ordinal)
+            .map_err(|_| VanillaCacheError::InvalidData("negative macro ordinal".to_owned()))?;
+        let ordinal = usize::try_from(ordinal).map_err(|_| {
+            VanillaCacheError::InvalidData("negative macro parameter ordinal".to_owned())
+        })?;
+        let required = match required {
+            0 => false,
+            1 => true,
+            _ => {
+                return Err(VanillaCacheError::InvalidData(
+                    "macro parameter required flag is not boolean".to_owned(),
+                ));
+            }
+        };
+        let summary = shards
+            .get_mut(&file_id)
+            .and_then(|shard| shard.macro_definitions.get_mut(macro_ordinal))
+            .ok_or_else(|| {
+                VanillaCacheError::InvalidData("macro parameter has no owner".to_owned())
+            })?;
+        if ordinal != summary.parameters.len() {
+            return Err(VanillaCacheError::InvalidData(
+                "macro parameter ordinals are not contiguous".to_owned(),
+            ));
+        }
+        if name.is_empty()
+            || summary
+                .parameters
+                .iter()
+                .any(|parameter| parameter.name.eq_ignore_ascii_case(&name))
+        {
+            return Err(VanillaCacheError::InvalidData(
+                "macro parameter name is empty or duplicated".to_owned(),
+            ));
+        }
+        summary
+            .parameters
+            .push(MacroParameterSignature { name, required });
+    }
+    Ok(())
 }
 
 fn load_localisation_previews(

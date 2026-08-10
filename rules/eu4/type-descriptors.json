@@ -1827,27 +1827,17 @@
     "name_field": null,
     "name_from_file": false,
     "starts_with": null,
-    "type_key_filter": [
-      [
-        "add_latest_building",
-        "unlock_merc_company",
-        "unlock_estate",
-        "for_variable_amount",
-        "show_points_needed_for_livionian_government_of_category",
-        "count_won_battles_and_reward_at_end",
-        "faction_in_power_effect",
-        "add_inflation_scaled_to_trade",
-        "unlock_estate",
-        "allow_baseline_invite_scholar",
-        "transfer_treasury",
-        "upgrade_building",
-        "add_years_of_trade_income",
-        "for",
-        "create_units_of_type",
-        "create_units_of_type_in_province"
-      ],
-      true
-    ]
+    "type_key_filter": null,
+    "scripted_macro": {
+      "body_context": "effect",
+      "macro_enabled": true,
+      "usage": {
+        "replacement": true,
+        "condition": true,
+        "dynamic_key": true,
+        "opaque_text": true
+      }
+    }
   },
   "scripted_function": {
     "name": "scripted_function",
@@ -1873,16 +1863,17 @@
     "name_field": null,
     "name_from_file": false,
     "starts_with": null,
-    "type_key_filter": [
-      [
-        "has_completed_idea_group_of_category",
-        "has_completed_idea_group_of_category",
-        "num_of_completed_idea_groups_by_category",
-        "has_any_active_incomplete_idea_group_of_category",
-        "has_unlocked_government_reform"
-      ],
-      true
-    ]
+    "type_key_filter": null,
+    "scripted_macro": {
+      "body_context": "trigger",
+      "macro_enabled": true,
+      "usage": {
+        "replacement": true,
+        "condition": true,
+        "dynamic_key": true,
+        "opaque_text": true
+      }
+    }
   },
   "sprite": {
     "name": "sprite",

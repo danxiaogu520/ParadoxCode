@@ -1,6 +1,81 @@
 use super::*;
 
 #[test]
+fn vanilla_cache_preserves_scripted_macro_references_without_hir() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-vanilla-scripted-cache-{nonce}"));
+    let vanilla = root.join("vanilla");
+    fs::create_dir_all(vanilla.join("common/scripted_effects")).expect("macro directory");
+    fs::create_dir_all(vanilla.join("events")).expect("event directory");
+    fs::write(
+        vanilla.join("common/scripted_effects/defs.txt"),
+        "cached_effect = { value = $amount$ [[optional] value = $optional$ ] }\n",
+    )
+    .expect("macro definitions");
+    fs::write(
+        vanilla.join("events/use.txt"),
+        "country_event = { immediate = { cached_effect = { amount = 1 } } }\n",
+    )
+    .expect("macro call");
+
+    let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    let mut host = AnalysisHost::with_profile(rules, pdx_game::eu4::profile());
+    host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+        ),
+    ]));
+    host.refresh_source_roots().expect("scan Vanilla");
+    let snapshot = host.snapshot();
+    assert!(snapshot.source_files().keys().all(|file_id| {
+        snapshot
+            .file_state(*file_id)
+            .is_some_and(|state| state.parsed().is_none() && state.hir().is_none())
+    }));
+    assert!(snapshot.index().references_iter().any(|reference| {
+        reference.kind == "scripted_effect" && reference.name == "cached_effect"
+    }));
+    let signature = snapshot
+        .index()
+        .active_macro_definition("scripted_effect", "cached_effect")
+        .expect("signature before caching");
+    assert_eq!(
+        signature.parameters,
+        vec![
+            MacroParameterSignature {
+                name: "amount".to_owned(),
+                required: true,
+            },
+            MacroParameterSignature {
+                name: "optional".to_owned(),
+                required: false,
+            },
+        ]
+    );
+
+    let cache = VanillaIndexCache::from_snapshot(&snapshot).expect("build cache");
+    let cache_path = root.join("cache/vanilla.pdxindex");
+    cache.save(&cache_path).expect("save cache");
+    let loaded = VanillaIndexCache::load(&cache_path).expect("load cache");
+    assert!(loaded.index().references_iter().any(|reference| {
+        reference.kind == "scripted_effect" && reference.name == "cached_effect"
+    }));
+    assert_eq!(
+        loaded
+            .index()
+            .active_macro_definition("scripted_effect", "cached_effect")
+            .expect("signature after caching"),
+        signature
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

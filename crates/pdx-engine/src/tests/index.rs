@@ -16,6 +16,7 @@ fn bulk_index_build_retains_every_shard_and_definition() {
                 active: true,
             }],
             references: Vec::new(),
+            macro_definitions: Vec::new(),
             syntax_error_count: 0,
         },
         FileIndexShard {
@@ -28,6 +29,7 @@ fn bulk_index_build_retains_every_shard_and_definition() {
                 active: true,
             }],
             references: Vec::new(),
+            macro_definitions: Vec::new(),
             syntax_error_count: 0,
         },
     ];
@@ -76,6 +78,70 @@ fn parallel_file_state_materialization_is_deterministic() {
 }
 
 #[test]
+fn type_per_file_definition_is_emitted_once_without_generic_pseudo_members() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-type-per-file-{nonce}"));
+    let countries = root.join("common/countries");
+    fs::create_dir_all(&countries).expect("country directory");
+    fs::write(
+        countries.join("AAA.txt"),
+        "country = { color = { 1 2 3 } }\n",
+    )
+    .expect("country fixture");
+
+    let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    let mut host = AnalysisHost::with_profile(rules, pdx_game::eu4::profile());
+    host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(SourceRootId::new(1), SourceRootKind::CurrentMod, root),
+    ]));
+    host.refresh_source_roots().expect("scan country file");
+
+    let snapshot = host.snapshot();
+    let definitions = snapshot.index().definitions("country_file", "AAA");
+    assert_eq!(definitions.len(), 1);
+    assert_eq!(
+        snapshot
+            .index()
+            .definitions_for_kind("country_file")
+            .count(),
+        1
+    );
+    assert!(
+        snapshot
+            .index()
+            .definitions("country_file", "country")
+            .is_empty()
+    );
+    assert!(
+        snapshot
+            .index()
+            .active_definition("country_file", "AAA")
+            .is_some()
+    );
+    let file_id = definitions[0].file_id;
+    let hir_definition = snapshot
+        .file_state(file_id)
+        .and_then(|state| state.hir())
+        .and_then(|hir| {
+            hir.definitions()
+                .iter()
+                .find(|definition| definition.kind == "country_file" && definition.name == "AAA")
+        })
+        .expect("HIR country definition");
+    assert_eq!(definitions[0].range, hir_definition.range);
+    fs::remove_dir_all(
+        countries
+            .parent()
+            .and_then(std::path::Path::parent)
+            .expect("fixture root"),
+    )
+    .expect("cleanup");
+}
+
+#[test]
 fn symbol_case_policy_controls_definition_lookup_identity() {
     let file_id = SourceFileId::new(9);
     let range = TextRange::new(0, 3).expect("range");
@@ -99,6 +165,7 @@ fn symbol_case_policy_controls_definition_lookup_identity() {
             active: true,
         }],
         references: Vec::new(),
+        macro_definitions: Vec::new(),
         syntax_error_count: 0,
     }]);
     index.configure_case_sensitivity(&rules);
@@ -192,12 +259,14 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
             file_id: first_file,
             definitions: vec![definition(first_file, "old.1")],
             references: vec![reference(first_file, "old.1")],
+            macro_definitions: Vec::new(),
             syntax_error_count: 0,
         },
         FileIndexShard {
             file_id: second_file,
             definitions: vec![definition(second_file, "untouched.1")],
             references: vec![reference(second_file, "untouched.1")],
+            macro_definitions: Vec::new(),
             syntax_error_count: 0,
         },
     ]);
@@ -206,6 +275,7 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
         file_id: first_file,
         definitions: vec![definition(first_file, "new.1")],
         references: vec![reference(first_file, "new.1")],
+        macro_definitions: Vec::new(),
         syntax_error_count: 1,
     });
 
@@ -245,12 +315,14 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
             file_id: first_file,
             definitions: vec![definition(first_file)],
             references: Vec::new(),
+            macro_definitions: Vec::new(),
             syntax_error_count: 0,
         },
         FileIndexShard {
             file_id: second_file,
             definitions: vec![definition(second_file)],
             references: Vec::new(),
+            macro_definitions: Vec::new(),
             syntax_error_count: 0,
         },
     ]);
@@ -301,6 +373,7 @@ fn identical_collector_records_resolve_as_one_physical_definition() {
         file_id,
         definitions: vec![definition.clone(), definition],
         references: Vec::new(),
+        macro_definitions: Vec::new(),
         syntax_error_count: 0,
     }]);
 
@@ -332,6 +405,7 @@ fn identical_collector_records_resolve_as_one_physical_definition() {
             },
         ],
         references: Vec::new(),
+        macro_definitions: Vec::new(),
         syntax_error_count: 0,
     }]);
     assert!(

@@ -2,8 +2,8 @@ use crate::CURRENT_SCHEMA_VERSION;
 use crate::matcher::{FileMatcher, KeyMatcher, ValueMatcher};
 use crate::model::{
     FileCategory, FileResolutionPolicy, LocalisationBinding, LocalisationBindingCondition,
-    ParserKind, RuleRecord, RuleShape, RulesModel, SemanticModel, SemanticRule, SymbolDescriptor,
-    SymbolResolutionPolicy, TypeDescriptor,
+    ParserKind, RuleRecord, RuleShape, RulesModel, ScriptedMacroDescriptor, ScriptedMacroUsage,
+    SemanticModel, SemanticRule, SymbolDescriptor, SymbolResolutionPolicy, TypeDescriptor,
 };
 use crate::runtime::{RuleSet, RulesError};
 use rusqlite::{Connection, OptionalExtension, params};
@@ -85,7 +85,13 @@ fn schema(connection: &Connection) -> Result<(), RulesError> {
             name_from_file INTEGER NOT NULL DEFAULT 0,
             starts_with TEXT,
             type_key_filter TEXT NOT NULL DEFAULT '',
-            type_key_filter_negate INTEGER NOT NULL DEFAULT 0
+            type_key_filter_negate INTEGER NOT NULL DEFAULT 0,
+            scripted_macro_body_context TEXT,
+            scripted_macro_enabled INTEGER NOT NULL DEFAULT 0,
+            scripted_macro_replacement INTEGER NOT NULL DEFAULT 0,
+            scripted_macro_condition INTEGER NOT NULL DEFAULT 0,
+            scripted_macro_dynamic_key INTEGER NOT NULL DEFAULT 0,
+            scripted_macro_opaque_text INTEGER NOT NULL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS localisation_bindings (
             type_name TEXT NOT NULL,
@@ -137,6 +143,12 @@ fn ensure_semantic_columns(connection: &Connection) -> Result<(), RulesError> {
     for (name, definition) in [
         ("type_key_filter", "TEXT NOT NULL DEFAULT ''"),
         ("type_key_filter_negate", "INTEGER NOT NULL DEFAULT 0"),
+        ("scripted_macro_body_context", "TEXT"),
+        ("scripted_macro_enabled", "INTEGER NOT NULL DEFAULT 0"),
+        ("scripted_macro_replacement", "INTEGER NOT NULL DEFAULT 0"),
+        ("scripted_macro_condition", "INTEGER NOT NULL DEFAULT 0"),
+        ("scripted_macro_dynamic_key", "INTEGER NOT NULL DEFAULT 0"),
+        ("scripted_macro_opaque_text", "INTEGER NOT NULL DEFAULT 0"),
     ] {
         let present: i64 = connection.query_row(
             "SELECT COUNT(*) FROM pragma_table_info('type_descriptors') WHERE name = ?1",
@@ -265,8 +277,9 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
         }
     }
     for (type_name, descriptor) in &rules.model.semantic.type_descriptors {
+        let scripted_macro = descriptor.scripted_macro.as_ref();
         transaction.execute(
-            "INSERT INTO type_descriptors(type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            "INSERT INTO type_descriptors(type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate, scripted_macro_body_context, scripted_macro_enabled, scripted_macro_replacement, scripted_macro_condition, scripted_macro_dynamic_key, scripted_macro_opaque_text) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
             params![
                 type_name,
                 descriptor.path,
@@ -290,6 +303,12 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
                 i64::from(
                     descriptor.type_key_filter.as_ref().is_some_and(|(_, negate)| *negate),
                 ),
+                scripted_macro.map(|value| value.body_context.as_str()),
+                i64::from(scripted_macro.is_some_and(|value| value.macro_enabled)),
+                i64::from(scripted_macro.is_some_and(|value| value.usage.replacement)),
+                i64::from(scripted_macro.is_some_and(|value| value.usage.condition)),
+                i64::from(scripted_macro.is_some_and(|value| value.usage.dynamic_key)),
+                i64::from(scripted_macro.is_some_and(|value| value.usage.opaque_text)),
             ],
         )?;
     }
@@ -458,6 +477,27 @@ fn read_model(connection: &Connection) -> Result<RulesModel, RulesError> {
     })
 }
 
+fn scripted_macro_columns_available(connection: &Connection) -> Result<bool, RulesError> {
+    for name in [
+        "scripted_macro_body_context",
+        "scripted_macro_enabled",
+        "scripted_macro_replacement",
+        "scripted_macro_condition",
+        "scripted_macro_dynamic_key",
+        "scripted_macro_opaque_text",
+    ] {
+        let present: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('type_descriptors') WHERE name = ?1",
+            params![name],
+            |row| row.get(0),
+        )?;
+        if present == 0 {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesError> {
     let mut rules = Vec::new();
     let mut statement = connection.prepare(
@@ -576,14 +616,26 @@ fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesEr
             .insert(root_key, scope);
     }
     let mut type_descriptors = BTreeMap::new();
-    let mut statement = connection.prepare(
-        "SELECT type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate FROM type_descriptors ORDER BY type_name",
-    )?;
+    let scripted_macro_columns = if scripted_macro_columns_available(connection)? {
+        "scripted_macro_body_context, scripted_macro_enabled, scripted_macro_replacement, scripted_macro_condition, scripted_macro_dynamic_key, scripted_macro_opaque_text"
+    } else {
+        "NULL, 0, 0, 0, 0, 0"
+    };
+    let descriptor_query = format!(
+        "SELECT type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate, {scripted_macro_columns} FROM type_descriptors ORDER BY type_name"
+    );
+    let mut statement = connection.prepare(&descriptor_query)?;
     let rows = statement.query_map([], |row| {
         let type_name: String = row.get(0)?;
         let skip_root_paths: String = row.get(6)?;
         let type_key_filter: String = row.get(10)?;
         let type_key_filter_negate: bool = row.get::<_, i64>(11)? != 0;
+        let scripted_macro_body_context: Option<String> = row.get(12)?;
+        let scripted_macro_enabled: bool = row.get::<_, i64>(13)? != 0;
+        let scripted_macro_replacement: bool = row.get::<_, i64>(14)? != 0;
+        let scripted_macro_condition: bool = row.get::<_, i64>(15)? != 0;
+        let scripted_macro_dynamic_key: bool = row.get::<_, i64>(16)? != 0;
+        let scripted_macro_opaque_text: bool = row.get::<_, i64>(17)? != 0;
         Ok(TypeDescriptor {
             name: type_name.clone(),
             path: row.get(1)?,
@@ -610,6 +662,18 @@ fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesEr
                     type_key_filter_negate,
                 ))
             },
+            scripted_macro: scripted_macro_body_context.map(|body_context| {
+                ScriptedMacroDescriptor {
+                    body_context,
+                    macro_enabled: scripted_macro_enabled,
+                    usage: ScriptedMacroUsage {
+                        replacement: scripted_macro_replacement,
+                        condition: scripted_macro_condition,
+                        dynamic_key: scripted_macro_dynamic_key,
+                        opaque_text: scripted_macro_opaque_text,
+                    },
+                }
+            }),
         })
     })?;
     for row in rows {

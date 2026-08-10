@@ -7,6 +7,31 @@ use pdx_text::{PositionRange, TextRange};
 
 use crate::model::{SourceFileId, WorkspaceError, WorkspaceScanToken};
 
+/// One parameter in the callable signature of a scripted macro definition.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MacroParameterSignature {
+    /// Parameter spelling as inferred from the definition body.
+    pub name: String,
+    /// Whether every observed use requires the caller to provide this parameter.
+    pub required: bool,
+}
+
+/// Compact callable metadata derived from one scripted effect or trigger definition.
+///
+/// The summary deliberately contains no source text or CST pointers so it can live in an index
+/// shard and round-trip through the Vanilla cache.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MacroDefinitionSummary {
+    /// Dynamic symbol kind, for example `scripted_effect`.
+    pub kind: String,
+    /// Definition name as written in source.
+    pub name: String,
+    /// Full range of the owning symbol definition.
+    pub definition_range: TextRange,
+    /// Parameters in first-use order.
+    pub parameters: Vec<MacroParameterSignature>,
+}
+
 /// One symbol definition retained in an index shard.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Definition {
@@ -44,6 +69,8 @@ pub struct FileIndexShard {
     pub definitions: Vec<Definition>,
     /// References in source order.
     pub references: Vec<Reference>,
+    /// Callable signatures for scripted macro definitions in this file.
+    pub macro_definitions: Vec<MacroDefinitionSummary>,
     /// Syntax error count retained as a cheap health signal.
     pub syntax_error_count: usize,
 }
@@ -195,6 +222,25 @@ impl WorkspaceIndex {
         self.shards
             .get(&file_id)
             .map_or(&[], |shard| shard.references.as_slice())
+    }
+
+    /// Returns the callable summary belonging to the uniquely active macro definition.
+    #[must_use]
+    pub fn active_macro_definition(
+        &self,
+        kind: &str,
+        name: &str,
+    ) -> Option<&MacroDefinitionSummary> {
+        let definition = self.active_definition(kind, name)?;
+        self.shards
+            .get(&definition.file_id)?
+            .macro_definitions
+            .iter()
+            .find(|summary| {
+                summary.definition_range == definition.range
+                    && summary.kind.eq_ignore_ascii_case(kind)
+                    && summary.name.eq_ignore_ascii_case(name)
+            })
     }
 
     /// Iterates over references from every retained file shard.

@@ -57,15 +57,14 @@ pub fn hover_with_cancellation(
             })
             .unwrap_or(0);
         let optional = input.hir.as_deref().is_some_and(|hir| {
-            hir.parameter_conditionals().iter().any(|conditional| {
-                !conditional.negated
-                    && conditional.name.eq_ignore_ascii_case(&definition.name)
-                    && conditional.range.start() >= definition.owner_range.start()
-                    && conditional.range.end() <= definition.owner_range.end()
-            })
+            !hir.parameter_is_required(definition.owner_range, &definition.name)
         });
         let syntax = match reference.kind {
             pdx_engine::hir::HirParameterReferenceKind::Substitution => "substitution",
+            pdx_engine::hir::HirParameterReferenceKind::KeySubstitution => "key substitution",
+            pdx_engine::hir::HirParameterReferenceKind::OpaqueTextSubstitution => {
+                "opaque text substitution"
+            }
             pdx_engine::hir::HirParameterReferenceKind::Conditional => "conditional",
         };
         let owner = owner_name.map_or_else(
@@ -74,7 +73,7 @@ pub fn hover_with_cancellation(
         );
         return Ok(Some(Hover {
             contents: format!(
-                "### parameter `{}`\n\n- Local to {owner}; inferred from its first use\n- Arity: `{}`\n- Syntax: `{syntax}`\n- Occurrences in owner: {occurrences}",
+                "### parameter `{}`\n\n- Local to {owner}; inferred from its first use\n- Presence: `{}`\n- Syntax: `{syntax}`\n- Occurrences in owner: {occurrences}",
                 definition.name,
                 if optional {
                     "optional"
@@ -601,6 +600,9 @@ pub(crate) fn hover_for_symbol(
                     value
                 ));
             }
+            if let Some(summary) = macro_definition_summary(snapshot, kind, name) {
+                sections.push(macro_signature_hover(&summary));
+            }
         } else {
             sections.push(format!("#### ambiguous {kind} symbol"));
             sections.push(format!(
@@ -621,6 +623,36 @@ pub(crate) fn hover_for_symbol(
         contents: sections.join("\n\n"),
         range: Some(range),
     })
+}
+
+fn macro_signature_hover(summary: &pdx_engine::MacroDefinitionSummary) -> String {
+    let invocation = match summary.parameters.len() {
+        0 => format!("`{} = yes`", summary.name),
+        _ => "named parameter block".to_owned(),
+    };
+    let required = summary
+        .parameters
+        .iter()
+        .filter(|parameter| parameter.required)
+        .map(|parameter| format!("`{}`", parameter.name))
+        .collect::<Vec<_>>();
+    let optional = summary
+        .parameters
+        .iter()
+        .filter(|parameter| !parameter.required)
+        .map(|parameter| format!("`{}`", parameter.name))
+        .collect::<Vec<_>>();
+    let mut lines = vec![format!("- Invocation: {invocation}")];
+    if !required.is_empty() {
+        lines.push(format!("- Required parameters: {}", required.join(", ")));
+    }
+    if !optional.is_empty() {
+        lines.push(format!("- Optional parameters: {}", optional.join(", ")));
+    }
+    if summary.parameters.is_empty() {
+        lines.push("- Parameters: none".to_owned());
+    }
+    format!("#### Callable signature\n\n{}", lines.join("\n"))
 }
 
 pub(crate) fn localisation_preview(

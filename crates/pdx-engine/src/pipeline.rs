@@ -10,7 +10,9 @@ use pdx_rules::{GameProfile, ParserKind, RuleSet};
 use pdx_text::{LineIndex, LogicalPath, PositionRange, TextRange};
 
 use crate::hir::{HirFile, lower_shared, lower_shared_with_profile};
-use crate::index::{Definition, FileIndexShard, Reference};
+use crate::index::{
+    Definition, FileIndexShard, MacroDefinitionSummary, MacroParameterSignature, Reference,
+};
 use crate::model::{
     DocumentId, DocumentSnapshot, DocumentSource, FileState, ParsedSource, SourceFile,
     SourceFileId, SourceRoot, WorkspaceError, WorkspaceScanLimits, WorkspaceScanReport,
@@ -365,6 +367,7 @@ pub(crate) fn build_file_state(
                 file_id: file.id,
                 definitions: Vec::new(),
                 references: Vec::new(),
+                macro_definitions: Vec::new(),
                 syntax_error_count: 0,
             }),
             cached_positions: None,
@@ -380,18 +383,20 @@ pub(crate) fn build_file_state(
     );
     let mut shard = match (parsed.as_ref(), hir.as_deref()) {
         (Some(ParsedSource::Text(parsed)), Some(hir)) => {
-            shard_from_parsed(file, parsed, hir, rules, profile)
+            shard_from_parsed(file, parsed, hir, rules)
         }
         (Some(ParsedSource::Text(parsed)), None) => FileIndexShard {
             file_id: file.id,
             definitions: Vec::new(),
             references: Vec::new(),
+            macro_definitions: Vec::new(),
             syntax_error_count: parsed.errors().len(),
         },
         (None, _) => FileIndexShard {
             file_id: file.id,
             definitions: Vec::new(),
             references: Vec::new(),
+            macro_definitions: Vec::new(),
             syntax_error_count: 0,
         },
     };
@@ -425,6 +430,7 @@ pub(crate) fn empty_file_state(file: &SourceFile, revision: u64) -> FileState {
             file_id: file.id,
             definitions: Vec::new(),
             references: Vec::new(),
+            macro_definitions: Vec::new(),
             syntax_error_count: 0,
         }),
         cached_positions: None,
@@ -485,19 +491,56 @@ fn shard_from_parsed(
     parsed: &ParsedFile,
     hir: &HirFile,
     rules: &RuleSet,
-    profile: &GameProfile,
 ) -> FileIndexShard {
     let mut definitions = Vec::new();
     let mut references = Vec::new();
     collect_hir_semantics(file, hir, &mut definitions, &mut references);
-    collect_profile_token_definitions(file, hir, profile, &mut definitions);
     collect_semantic_type_members(file, parsed, rules, &mut definitions);
+    let macro_definitions = collect_macro_definitions(hir, rules);
     FileIndexShard {
         file_id: file.id,
         definitions,
         references,
+        macro_definitions,
         syntax_error_count: parsed.errors().len(),
     }
+}
+
+fn collect_macro_definitions(hir: &HirFile, rules: &RuleSet) -> Vec<MacroDefinitionSummary> {
+    let mut summaries = Vec::new();
+    for definition in hir.definitions() {
+        let macro_enabled = rules
+            .model()
+            .semantic
+            .type_descriptors
+            .iter()
+            .find(|(kind, _)| kind.eq_ignore_ascii_case(&definition.kind))
+            .and_then(|(_, descriptor)| descriptor.scripted_macro.as_ref())
+            .is_some_and(|descriptor| descriptor.macro_enabled);
+        if !macro_enabled {
+            continue;
+        }
+        let parameters = hir
+            .parameter_definitions_for_owner(definition.range)
+            .map(|parameter| MacroParameterSignature {
+                name: parameter.name.clone(),
+                required: hir.parameter_is_required(definition.range, &parameter.name),
+            })
+            .collect();
+        summaries.push(MacroDefinitionSummary {
+            kind: definition.kind.clone(),
+            name: definition.name.clone(),
+            definition_range: definition.range,
+            parameters,
+        });
+    }
+    summaries.sort_by_key(|summary| summary.definition_range);
+    summaries.dedup_by(|left, right| {
+        left.definition_range == right.definition_range
+            && left.kind.eq_ignore_ascii_case(&right.kind)
+            && left.name.eq_ignore_ascii_case(&right.name)
+    });
+    summaries
 }
 
 /// Collects workspace members declared by semantic `type[...]` definitions.
@@ -516,23 +559,9 @@ fn collect_semantic_type_members(
         if !semantic_type_path_matches(descriptor, &file.logical_path) {
             continue;
         }
-
+        // File-based type instances are emitted by HIR with the filename range. The generic
+        // property collector must not reinterpret their top-level fields as type members.
         if descriptor.type_per_file {
-            let Some(file_name) = file.logical_path.as_str().rsplit('/').next() else {
-                continue;
-            };
-            let name = file_name
-                .rsplit_once('.')
-                .map_or(file_name, |(stem, _)| stem);
-            if !name.is_empty() {
-                definitions.push(Definition {
-                    kind: descriptor.name.clone(),
-                    name: name.to_owned(),
-                    file_id: file.id,
-                    range: parsed.root().range(),
-                    active: true,
-                });
-            }
             continue;
         }
 
@@ -708,40 +737,6 @@ fn semantic_type_path_matches(
         }
     }
     true
-}
-
-fn collect_profile_token_definitions(
-    file: &SourceFile,
-    hir: &HirFile,
-    profile: &GameProfile,
-    definitions: &mut Vec<Definition>,
-) {
-    for rule in profile
-        .token_definitions
-        .iter()
-        .filter(|rule| rule.path.matches(file.logical_path.as_str()))
-    {
-        for parameter in hir
-            .parameter_definitions()
-            .iter()
-            .filter(|item| item.delimiter == rule.delimiter)
-        {
-            definitions.push(Definition {
-                kind: rule.inner_kind.clone(),
-                name: parameter.name.clone(),
-                file_id: file.id,
-                range: parameter.range,
-                active: true,
-            });
-            definitions.push(Definition {
-                kind: rule.wrapped_kind.clone(),
-                name: format!("{}{}{}", rule.delimiter, parameter.name, rule.delimiter),
-                file_id: file.id,
-                range: parameter.range,
-                active: true,
-            });
-        }
-    }
 }
 
 fn collect_hir_semantics(

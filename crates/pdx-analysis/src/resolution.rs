@@ -110,10 +110,16 @@ pub(crate) fn semantic_data(snapshot: &AnalysisSnapshot, input: &ParsedInput) ->
                 reference.origin,
                 HirReferenceOrigin::Profile
                     | HirReferenceOrigin::Semantic
+                    | HirReferenceOrigin::ScriptedMacro
                     | HirReferenceOrigin::DerivedLocalisation
             )
         })
         .filter(|reference| semantic_reference_is_active(&inactive_semantic_references, reference))
+        .filter(|reference| scripted_macro_reference_is_callable(snapshot, hir, reference))
+        .filter(|reference| {
+            reference.origin != HirReferenceOrigin::ScriptedMacro
+                || workspace_member(snapshot, &reference.kind, &reference.name)
+        })
     {
         data.references.push(ReferenceInternal {
             kind: reference.kind.clone(),
@@ -125,6 +131,49 @@ pub(crate) fn semantic_data(snapshot: &AnalysisSnapshot, input: &ParsedInput) ->
         });
     }
     data
+}
+
+fn scripted_macro_reference_is_callable(
+    snapshot: &AnalysisSnapshot,
+    hir: &HirFile,
+    reference: &HirReference,
+) -> bool {
+    if reference.origin != HirReferenceOrigin::ScriptedMacro {
+        return true;
+    }
+    scripted_macro_reference_range_is_callable(
+        snapshot,
+        hir,
+        &reference.kind,
+        &reference.name,
+        reference.range,
+    )
+}
+
+fn scripted_macro_reference_range_is_callable(
+    snapshot: &AnalysisSnapshot,
+    hir: &HirFile,
+    kind: &str,
+    name: &str,
+    range: TextRange,
+) -> bool {
+    let Some(summary) = macro_definition_summary(snapshot, kind, name) else {
+        return false;
+    };
+    let Some(property) = hir
+        .properties()
+        .iter()
+        .find(|property| property.key_range == range)
+    else {
+        return false;
+    };
+    scripted_macro_invocation_shape_matches(
+        snapshot,
+        kind,
+        &summary,
+        property.scalar.as_ref().map(|scalar| scalar.value.as_str()),
+        property.scalar.is_none() && property.value_range.is_some(),
+    )
 }
 
 pub(crate) fn inactive_semantic_reference_ranges(
@@ -318,6 +367,24 @@ pub(crate) fn all_semantics(
     }
     for reference in snapshot.index().references_iter() {
         cancellation.checkpoint()?;
+        if scripted_macro_type(snapshot, &reference.kind) {
+            if !workspace_member(snapshot, &reference.kind, &reference.name) {
+                continue;
+            }
+            if let Some(hir) = snapshot
+                .file_state(reference.file_id)
+                .and_then(|state| state.hir())
+                && !scripted_macro_reference_range_is_callable(
+                    snapshot,
+                    hir,
+                    &reference.kind,
+                    &reference.name,
+                    reference.range,
+                )
+            {
+                continue;
+            }
+        }
         let path = snapshot
             .source_files()
             .get(&reference.file_id)
@@ -432,6 +499,9 @@ pub(crate) fn symbol_candidates(
     candidates.dedup_by(|left, right| {
         left.location == right.location && left.selection_range == right.selection_range
     });
+    if kind.eq_ignore_ascii_case("localisation") {
+        candidates = prefer_localisation_language(candidates);
+    }
     candidates
 }
 
@@ -480,6 +550,9 @@ pub(crate) fn symbol_candidates_for_hover(
     candidates.dedup_by(|left, right| {
         left.location == right.location && left.selection_range == right.selection_range
     });
+    if kind.eq_ignore_ascii_case("localisation") {
+        candidates = prefer_localisation_language(candidates);
+    }
     Ok(candidates)
 }
 
@@ -507,6 +580,54 @@ pub(crate) fn symbol_location_sort_key(location: &Location) -> (String, u32, u32
         location.range.start(),
         location.range.end(),
     )
+}
+
+/// Extracts the localisation language from a file's logical path. Both `localisation/l_english/...`
+/// and `localisation/domination_l_english.yml` yield `english`; non-localisation files yield `None`.
+pub(crate) fn localisation_language(path: Option<&LogicalPath>) -> Option<String> {
+    let path = path?.as_str();
+    for segment in path.split('/') {
+        if let Some(language) = segment
+            .strip_prefix("l_")
+            .filter(|language| !language.is_empty())
+        {
+            return Some(language.to_owned());
+        }
+    }
+    let file = path.rsplit('/').next()?;
+    let after = file
+        .rfind("_l_")
+        .map(|index| &file[index + 3..])
+        .unwrap_or_default();
+    let language = after
+        .strip_suffix(".yml")
+        .or_else(|| after.strip_suffix(".yaml"))
+        .unwrap_or(after);
+    (!language.is_empty()).then(|| language.to_owned())
+}
+
+/// Vanilla localisation defines every key once per supported language. When a localisation symbol
+/// has candidates in several languages, prefer the English definition so the per-language variants
+/// do not look ambiguous; when no English definition exists, keep all candidates unchanged so
+/// single-language mods still resolve.
+pub(crate) fn prefer_localisation_language(
+    candidates: Vec<ResolutionDefinition>,
+) -> Vec<ResolutionDefinition> {
+    if candidates.len() < 2 {
+        return candidates;
+    }
+    let english = candidates
+        .iter()
+        .filter(|candidate| {
+            localisation_language(candidate.location.path.as_ref()).as_deref() == Some("english")
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    if english.is_empty() {
+        candidates
+    } else {
+        english
+    }
 }
 
 pub(crate) struct DirectResolutionContext<'snapshot> {
@@ -571,6 +692,9 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
                 .filter(|definition| !self.overlay_files.contains(&definition.file_id))
                 .map(|definition| index_definition(self.snapshot, definition)),
         );
+        if kind.eq_ignore_ascii_case("localisation") {
+            candidates = prefer_localisation_language(candidates);
+        }
         if candidates.is_empty() {
             return Resolution::Missing;
         }

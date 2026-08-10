@@ -85,8 +85,8 @@ bash scripts/install-git-hooks.sh
 ```
 
 After installation, normal `git commit` commands run the complete local quality gates. Use
-`bash scripts/check-quality-gates.sh` to run them explicitly or pass `core`, `grammars`, `zed`, or
-`release` to diagnose one group.
+`bash scripts/check-quality-gates.sh` to run them explicitly or pass `core`, `grammars`, `scripts`,
+`zed`, or `release` to diagnose one group.
 
 Validate and compile the developer-maintained first-party rule source with `pdx-bake`; the output
 can be placed in the ignored build directory for inspection:
@@ -127,6 +127,19 @@ pdx index vanilla \
 The CLI and language server use the embedded first-party EU4 JSON source. `pdx-ls` materializes a
 validated SQLite runtime artifact in the user cache and rejects external rule inputs.
 
+Run a repeatable whole-Current-Mod diagnostic pass against that Vanilla cache with the development
+script below. It opens each relevant file through the real `pdx-ls` transport and writes ignored
+JSON and Markdown reports under `diagnostic-reports/`:
+
+```bash
+bash scripts/diagnose-current-mod.sh \
+  --mod /path/to/current-mod \
+  --vanilla-cache /path/to/vanilla.pdxindex
+```
+
+The command exits non-zero when errors are found; use `--fail-on warning` or `--fail-on none` to
+change the automation threshold. See [`scripts/README.md`](scripts/README.md) for options.
+
 ## Repository layout
 
 | Path | Purpose |
@@ -137,7 +150,7 @@ validated SQLite runtime artifact in the user cache and rejects external rule in
 | `rules/` | Authoritative first-party EU4 source and generated artifact/manifest |
 | `docs/` | Current architecture, RFCs, rule matrix, and performance reproduction guide |
 | `fuzz/` | Parser, edit, formatter, and HIR fuzz targets |
-| `scripts/` | Reproducible project quality checks |
+| `scripts/` | Reproducible quality checks and diagnostic workflows |
 
 ## Security
 

@@ -50,7 +50,7 @@ analysis 只有在当前 scope 与规则 allowed scopes 无交集时报告 wrong
 
 ## Parameters
 
-在 scripted definition block 内，`$NAME$` substitution 和 `[[NAME] ... ]`/`[[!NAME] ... ]` conditional 会生成局部 parameter definition/reference。每个 occurrence 保留 name range、语法形式和 owner definition range；同名参数不会跨 definition block 合并。document symbols、hover 和 rename 可直接消费这些局部 facts。
+在 scripted definition block 内，`$NAME$` substitution 和 `[[NAME] ... ]`/`[[!NAME] ... ]` conditional 会生成局部 parameter definition/reference。每个 occurrence 保留 name range、语法形式和 owner definition range；同名参数不会跨 definition block 合并。document symbols、hover 和 rename 可直接消费这些局部 facts。lowering/index 阶段还会按首次出现归纳每个 scripted definition 的紧凑调用签名：存在未受 conditional 保护的 substitution/key/text use 时参数为 required；所有实际取值 use 都位于 conditional 内、或参数只出现在 conditional 中时为 optional。当前 `required` 是无条件存在性的保守投影，不表达“提供参数 A 时参数 B 才必填”的条件依赖。该摘要不携带 CST 指针或源码，可随 index shard 保存。
 
 ## Cache 与生命周期
 

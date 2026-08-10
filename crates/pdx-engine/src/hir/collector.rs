@@ -99,6 +99,7 @@ impl<'syntax> FactCollector<'syntax> {
             self.bare_values.push(HirScalar {
                 value: value.to_owned(),
                 range: node.range(),
+                quoted: false,
             });
         }
         if node.kind() == CstKind::Property
@@ -118,6 +119,14 @@ impl<'syntax> FactCollector<'syntax> {
                 key: key.to_owned(),
                 key_range: key_node.range(),
                 range: node.range(),
+                operator: node
+                    .children()
+                    .iter()
+                    .find(|child| child.kind() == CstKind::Operator)
+                    .and_then(|operator| self.syntax.text(operator.range()))
+                    .map(str::trim)
+                    .filter(|operator| !operator.is_empty())
+                    .map(str::to_owned),
                 path: path.clone(),
                 top_level,
                 value_range: node
@@ -166,6 +175,7 @@ fn direct_scalar(syntax: &ParsedFile, node: &CstNode) -> Option<HirScalar> {
     Some(HirScalar {
         value,
         range: scalar.range(),
+        quoted: scalar.kind() == CstKind::QuotedString,
     })
 }
 

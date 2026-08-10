@@ -156,6 +156,46 @@ pub enum RuleShape {
     ValueClause,
 }
 
+/// Usage capabilities exposed by a scripted macro type.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScriptedMacroUsage {
+    /// Whether the macro can be used as a replacement.
+    #[serde(default, alias = "replace")]
+    pub replacement: bool,
+    /// Whether the macro can be used as a condition.
+    #[serde(default)]
+    pub condition: bool,
+    /// Whether the macro can provide or consume a dynamic key.
+    #[serde(default)]
+    pub dynamic_key: bool,
+    /// Whether the macro body or value is intentionally opaque text.
+    #[serde(default)]
+    pub opaque_text: bool,
+}
+
+impl ScriptedMacroUsage {
+    /// Returns whether at least one usage capability is declared.
+    #[must_use]
+    pub const fn is_nonempty(&self) -> bool {
+        self.replacement || self.condition || self.dynamic_key || self.opaque_text
+    }
+}
+
+/// Semantic metadata for a type whose instances are scripted macros.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScriptedMacroDescriptor {
+    /// Context used to validate the macro body, for example `effect` or `trigger`.
+    pub body_context: String,
+    /// Whether this type participates in scripted-macro expansion and lookup.
+    #[serde(default, alias = "enabled")]
+    pub macro_enabled: bool,
+    /// Context-independent usage capabilities for the macro.
+    #[serde(default)]
+    pub usage: ScriptedMacroUsage,
+}
+
 /// File and root-selection metadata declared by a first-party type descriptor.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -184,6 +224,9 @@ pub struct TypeDescriptor {
     ///
     /// Negated filters are represented by `negate = true`.
     pub type_key_filter: Option<(Vec<String>, bool)>,
+    /// Optional generic scripted-macro capabilities for this type.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scripted_macro: Option<ScriptedMacroDescriptor>,
 }
 
 /// One type-instance to localisation-key mapping from the first-party rule source.

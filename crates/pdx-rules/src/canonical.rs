@@ -269,6 +269,18 @@ pub(crate) fn canonical_hash(model: &RulesModel) -> RuleHash {
             }
             None => bytes.push(0),
         }
+        match &descriptor.scripted_macro {
+            Some(scripted_macro) => {
+                bytes.push(1);
+                put_str(&mut bytes, &scripted_macro.body_context);
+                bytes.push(u8::from(scripted_macro.macro_enabled));
+                bytes.push(u8::from(scripted_macro.usage.replacement));
+                bytes.push(u8::from(scripted_macro.usage.condition));
+                bytes.push(u8::from(scripted_macro.usage.dynamic_key));
+                bytes.push(u8::from(scripted_macro.usage.opaque_text));
+            }
+            None => bytes.push(0),
+        }
     }
     let mut localisation_bindings = model.semantic.localisation_bindings.clone();
     localisation_bindings.sort_by(|left, right| {

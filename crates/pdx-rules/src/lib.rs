@@ -17,8 +17,8 @@ pub use canonical::RuleHash;
 pub use matcher::{FileMatcher, KeyMatcher, ValueMatcher};
 pub use model::{
     FileCategory, FileResolutionPolicy, LocalisationBinding, LocalisationBindingCondition,
-    ParserKind, RuleRecord, RuleShape, RulesModel, SemanticModel, SemanticRule, SymbolDescriptor,
-    SymbolResolutionPolicy, TypeDescriptor,
+    ParserKind, RuleRecord, RuleShape, RulesModel, ScriptedMacroDescriptor, ScriptedMacroUsage,
+    SemanticModel, SemanticRule, SymbolDescriptor, SymbolResolutionPolicy, TypeDescriptor,
 };
 pub use profile::{
     GameProfile, ProfileConditionalDefinitionRule, ProfileContainerDefinitionRule,
@@ -29,7 +29,7 @@ pub use profile::{
 pub use runtime::{RuleSet, RulesError};
 
 /// The first runtime schema version reserved for the generated rule database.
-pub const CURRENT_SCHEMA_VERSION: u32 = 16;
+pub const CURRENT_SCHEMA_VERSION: u32 = 17;
 
 #[cfg(test)]
 mod tests;

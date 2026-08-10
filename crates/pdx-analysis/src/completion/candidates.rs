@@ -31,20 +31,8 @@ impl CompletionMemberCache {
     ) -> &[String] {
         let cache_key = (type_name.to_ascii_lowercase(), prefix.to_ascii_lowercase());
         self.workspace.entry(cache_key).or_insert_with(|| {
-            let base = type_name
-                .split_once('.')
-                .map_or(type_name, |(kind, _)| kind);
-            let alias = snapshot.game_profile().member_kind_alias(base);
-            let mut kinds = vec![type_name, base];
-            if let Some(alias) = alias {
-                kinds.push(alias);
-            }
-            kinds.sort_unstable();
-            kinds.dedup();
-            let mut names = kinds
+            let mut names = effective_workspace_member_names(snapshot, type_name)
                 .into_iter()
-                .flat_map(|kind| snapshot.index().definitions_for_kind(kind))
-                .map(|definition| definition.name.clone())
                 .filter(|name| completion_matches(name, prefix))
                 .collect::<Vec<_>>();
             names.sort_by_key(|name| name.to_ascii_lowercase());
@@ -188,7 +176,7 @@ pub(crate) fn add_semantic_key_items(
                 for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
                     let insert_text = if !insert_assignment {
                         label.clone()
-                    } else if matches!(type_name.as_str(), "scripted_effect" | "scripted_trigger") {
+                    } else if scripted_macro_type(snapshot, type_name) {
                         scripted_definition_snippet(snapshot, type_name, label, base_indent)
                     } else {
                         key_insert_text(rule, label, true, base_indent)
@@ -211,53 +199,55 @@ pub(crate) fn add_semantic_key_items(
                 }
             }
             KeyMatcher::Enum(enum_name) => {
-                if let Some(labels) =
-                    qualified_parameter_names(snapshot, rule, candidate.parent_path)
-                {
-                    for label in labels {
-                        push_completion(
-                            items,
-                            CompletionItem {
-                                label: label.clone(),
-                                kind: CompletionKind::Key,
-                                detail: "parameter".to_owned(),
-                                documentation: documentation.clone(),
-                                replacement_range,
-                                insert_text: key_insert_text(
-                                    rule,
-                                    &label,
-                                    insert_assignment,
-                                    base_indent,
-                                ),
-                                sort_score: completion_sort_score(8, rule.deprecated),
-                                deprecated: rule.deprecated,
-                                resolve_data: Some(format!("rule:{}", rule.id)),
-                            },
-                            prefix,
-                        );
+                match qualified_parameter_domain(snapshot, rule, candidate.parent_path) {
+                    QualifiedParameterDomain::Known(labels) => {
+                        for label in labels {
+                            push_completion(
+                                items,
+                                CompletionItem {
+                                    label: label.clone(),
+                                    kind: CompletionKind::Key,
+                                    detail: "parameter".to_owned(),
+                                    documentation: documentation.clone(),
+                                    replacement_range,
+                                    insert_text: key_insert_text(
+                                        rule,
+                                        &label,
+                                        insert_assignment,
+                                        base_indent,
+                                    ),
+                                    sort_score: completion_sort_score(8, rule.deprecated),
+                                    deprecated: rule.deprecated,
+                                    resolve_data: Some(format!("rule:{}", rule.id)),
+                                },
+                                prefix,
+                            );
+                        }
                     }
-                } else {
-                    for label in member_cache.enum_member_names(snapshot, enum_name, prefix) {
-                        push_completion(
-                            items,
-                            CompletionItem {
-                                label: label.clone(),
-                                kind: CompletionKind::Key,
-                                detail: enum_name.clone(),
-                                documentation: documentation.clone(),
-                                replacement_range,
-                                insert_text: key_insert_text(
-                                    rule,
-                                    label,
-                                    insert_assignment,
-                                    base_indent,
-                                ),
-                                sort_score: completion_sort_score(8, rule.deprecated),
-                                deprecated: rule.deprecated,
-                                resolve_data: Some(format!("rule:{}", rule.id)),
-                            },
-                            prefix,
-                        );
+                    QualifiedParameterDomain::OpenWorld => {}
+                    QualifiedParameterDomain::NotApplicable => {
+                        for label in member_cache.enum_member_names(snapshot, enum_name, prefix) {
+                            push_completion(
+                                items,
+                                CompletionItem {
+                                    label: label.clone(),
+                                    kind: CompletionKind::Key,
+                                    detail: enum_name.clone(),
+                                    documentation: documentation.clone(),
+                                    replacement_range,
+                                    insert_text: key_insert_text(
+                                        rule,
+                                        label,
+                                        insert_assignment,
+                                        base_indent,
+                                    ),
+                                    sort_score: completion_sort_score(8, rule.deprecated),
+                                    deprecated: rule.deprecated,
+                                    resolve_data: Some(format!("rule:{}", rule.id)),
+                                },
+                                prefix,
+                            );
+                        }
                     }
                 }
             }

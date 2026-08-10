@@ -1,6 +1,8 @@
 //! Rule/profile-aware definitions, references, and localisation semantics.
 
-use pdx_rules::{GameProfile, ProfileDefinitionRule, RuleSet, RuleShape, TypeDescriptor};
+use pdx_rules::{
+    GameProfile, KeyMatcher, ProfileDefinitionRule, RuleSet, RuleShape, TypeDescriptor,
+};
 use pdx_text::{LogicalPath, TextRange};
 
 use super::{
@@ -15,6 +17,9 @@ pub fn semantic_root_context(
     logical_path: Option<&LogicalPath>,
     key: &str,
 ) -> Option<String> {
+    if let Some(context) = scripted_macro_path_context(rules, logical_path) {
+        return Some(context);
+    }
     let semantic = &rules.model().semantic;
     if rules.semantic_rules_for_context(key).next().is_some() {
         return Some(key.to_owned());
@@ -89,6 +94,49 @@ pub fn semantic_root_context(
                         .map(|(type_name, _)| format!("type:{type_name}"))
                 })
         })
+}
+
+pub(super) fn scripted_macro_path_context(
+    rules: &RuleSet,
+    logical_path: Option<&LogicalPath>,
+) -> Option<String> {
+    let logical_path = logical_path?;
+    if !logical_path.as_str().contains('/') {
+        return None;
+    }
+    rules
+        .model()
+        .semantic
+        .type_descriptors
+        .values()
+        .filter_map(|descriptor| {
+            let macro_descriptor = descriptor.scripted_macro.as_ref()?;
+            if !macro_descriptor.macro_enabled
+                || !semantic_type_path_matches(descriptor, Some(logical_path))
+            {
+                return None;
+            }
+            let context = macro_descriptor.body_context.trim();
+            (!context.is_empty()).then(|| context.to_owned())
+        })
+        .next()
+}
+
+pub(super) fn scripted_macro_type_context(rules: &RuleSet, type_name: &str) -> Option<String> {
+    rules
+        .model()
+        .semantic
+        .type_descriptors
+        .iter()
+        .find(|(candidate, _)| candidate.eq_ignore_ascii_case(type_name))
+        .and_then(|(_, descriptor)| descriptor.scripted_macro.as_ref())
+        .filter(|descriptor| descriptor.macro_enabled)
+        .map(|descriptor| descriptor.body_context.trim().to_owned())
+        .filter(|context| !context.is_empty())
+}
+
+pub(super) fn is_scripted_macro_type(rules: &RuleSet, type_name: &str) -> bool {
+    scripted_macro_type_context(rules, type_name).is_some()
 }
 
 fn semantic_type_path_matches(
@@ -227,6 +275,11 @@ pub(super) fn lower_semantics(
         }
     }
 
+    definitions.extend(semantic_type_definitions(properties, logical_path, rules));
+    deduplicate_definitions(&mut definitions);
+
+    references.extend(scripted_macro_references(properties, scope_facts, rules));
+
     let enum_localisation_rules = rules
         .model()
         .semantic
@@ -260,6 +313,265 @@ pub(super) fn lower_semantics(
     (definitions, references)
 }
 
+fn semantic_type_definitions(
+    properties: &[HirProperty],
+    logical_path: Option<&LogicalPath>,
+    rules: &RuleSet,
+) -> Vec<HirDefinition> {
+    let mut definitions = Vec::new();
+    let Some(logical_path) = logical_path else {
+        return definitions;
+    };
+    if !logical_path.as_str().contains('/') {
+        return definitions;
+    }
+    for descriptor in rules.model().semantic.type_descriptors.values() {
+        if !semantic_type_path_matches(descriptor, Some(logical_path)) {
+            continue;
+        }
+        if descriptor.type_per_file {
+            let path = logical_path;
+            let Some(file_name) = path.as_str().rsplit('/').next() else {
+                continue;
+            };
+            let name = file_name
+                .rsplit_once('.')
+                .map_or(file_name, |(stem, _)| stem);
+            if !name.is_empty() {
+                definitions.push(HirDefinition {
+                    kind: descriptor.name.clone(),
+                    name: name.to_owned(),
+                    range: properties
+                        .iter()
+                        .find(|property| property.top_level)
+                        .map_or(TextRange::empty(0), |property| property.range),
+                    selection_range: properties
+                        .iter()
+                        .find(|property| property.top_level)
+                        .map_or(TextRange::empty(0), |property| property.key_range),
+                });
+            }
+            continue;
+        }
+        if descriptor.skip_root_paths.is_empty() {
+            for property in properties.iter().filter(|property| property.top_level) {
+                push_type_definition(&mut definitions, properties, descriptor, property);
+            }
+        } else {
+            for root in properties.iter().filter(|property| property.top_level) {
+                for path in &descriptor.skip_root_paths {
+                    collect_type_path_definitions(
+                        &mut definitions,
+                        properties,
+                        descriptor,
+                        root,
+                        path,
+                    );
+                }
+            }
+        }
+    }
+    definitions
+}
+
+fn collect_type_path_definitions(
+    definitions: &mut Vec<HirDefinition>,
+    properties: &[HirProperty],
+    descriptor: &TypeDescriptor,
+    property: &HirProperty,
+    path: &[String],
+) {
+    let Some(head) = path.first() else {
+        for child in immediate_children(properties, property) {
+            push_type_definition(definitions, properties, descriptor, child);
+        }
+        return;
+    };
+    if !head.eq_ignore_ascii_case("any") && !head.eq_ignore_ascii_case(&property.key) {
+        return;
+    }
+    if path.len() == 1 {
+        for child in immediate_children(properties, property) {
+            push_type_definition(definitions, properties, descriptor, child);
+        }
+    } else {
+        for child in immediate_children(properties, property) {
+            collect_type_path_definitions(definitions, properties, descriptor, child, &path[1..]);
+        }
+    }
+}
+
+fn immediate_children<'property>(
+    properties: &'property [HirProperty],
+    parent: &HirProperty,
+) -> impl Iterator<Item = &'property HirProperty> {
+    properties.iter().filter(|candidate| {
+        candidate.path.len() == parent.path.len().saturating_add(1)
+            && candidate.path.starts_with(&parent.path)
+            && range_within(candidate.range, parent.range)
+    })
+}
+
+fn push_type_definition(
+    definitions: &mut Vec<HirDefinition>,
+    properties: &[HirProperty],
+    descriptor: &TypeDescriptor,
+    property: &HirProperty,
+) {
+    if !descriptor
+        .type_key_filter
+        .as_ref()
+        .is_none_or(|(values, negate)| {
+            values
+                .iter()
+                .any(|value| value.eq_ignore_ascii_case(&property.key))
+                != *negate
+        })
+    {
+        return;
+    }
+    let (name, selection_range) = descriptor
+        .name_field
+        .as_deref()
+        .and_then(|field| {
+            immediate_children(properties, property)
+                .find(|child| child.key.eq_ignore_ascii_case(field))
+        })
+        .and_then(|child| {
+            child
+                .scalar
+                .as_ref()
+                .map(|scalar| (scalar.value.clone(), scalar.range))
+        })
+        .unwrap_or_else(|| (property.key.clone(), property.key_range));
+    if name.is_empty() || name.contains('$') {
+        return;
+    }
+    definitions.push(HirDefinition {
+        kind: descriptor.name.clone(),
+        name,
+        range: property.range,
+        selection_range,
+    });
+}
+
+fn deduplicate_definitions(definitions: &mut Vec<HirDefinition>) {
+    let mut seen = std::collections::BTreeSet::new();
+    definitions.retain(|definition| {
+        seen.insert((
+            definition.kind.to_ascii_lowercase(),
+            definition.name.to_ascii_lowercase(),
+            definition.range,
+        ))
+    });
+}
+
+fn scripted_macro_references(
+    properties: &[HirProperty],
+    scope_facts: &[ScopeFact],
+    rules: &RuleSet,
+) -> Vec<HirReference> {
+    let mut references = Vec::new();
+    for property in properties {
+        let Some(fact) = scope_facts
+            .iter()
+            .find(|fact| fact.range == property.key_range)
+        else {
+            continue;
+        };
+        if property.top_level || !is_concrete_scripted_key(&property.key) {
+            continue;
+        }
+
+        for rule in rules.semantic_rules_for_context(&fact.context) {
+            let type_name = match &rule.key {
+                KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
+                    if is_scripted_macro_type(rules, type_name) =>
+                {
+                    type_name
+                }
+                _ => continue,
+            };
+            let Some(body_context) = scripted_macro_type_context(rules, type_name) else {
+                continue;
+            };
+            if !body_context.eq_ignore_ascii_case(&fact.context)
+                || !semantic_paths_match(&rule.parent_path, &fact.parent_path)
+                || !property_matches_scripted_rule(property, rule, rules)
+            {
+                continue;
+            }
+            references.push(HirReference {
+                kind: type_name.clone(),
+                name: property.key.clone(),
+                range: property.key_range,
+                origin: HirReferenceOrigin::ScriptedMacro,
+            });
+        }
+    }
+    references
+}
+
+fn is_concrete_scripted_key(key: &str) -> bool {
+    !key.is_empty()
+        && !key
+            .chars()
+            .any(|character| matches!(character, '$' | '[' | ']'))
+}
+
+fn semantic_paths_match(expected: &[String], actual: &[String]) -> bool {
+    expected.len() == actual.len()
+        && expected.iter().zip(actual).all(|(expected, actual)| {
+            (expected.starts_with('<') && expected.ends_with('>'))
+                || expected.eq_ignore_ascii_case(actual)
+        })
+}
+
+fn property_matches_scripted_rule(
+    property: &HirProperty,
+    rule: &pdx_rules::SemanticRule,
+    rules: &RuleSet,
+) -> bool {
+    if rule
+        .operator
+        .as_deref()
+        .is_some_and(|operator| property.operator.as_deref() != Some(operator))
+    {
+        return false;
+    }
+    match rule.shape {
+        RuleShape::Leaf | RuleShape::LeafValue => {
+            let Some(scalar) = property.scalar.as_ref() else {
+                return false;
+            };
+            rule.value.matches(
+                &scalar.value,
+                |_type_name, value| !value.is_empty(),
+                |enum_name, value| {
+                    rules
+                        .model()
+                        .semantic
+                        .enum_values
+                        .get(enum_name)
+                        .is_some_and(|values| {
+                            values
+                                .iter()
+                                .any(|candidate| candidate.eq_ignore_ascii_case(value))
+                        })
+                },
+                |_scope, value| !value.is_empty(),
+            )
+        }
+        RuleShape::Node | RuleShape::ValueClause => {
+            property.value_range.is_some()
+                && matches!(
+                    rule.value,
+                    pdx_rules::ValueMatcher::AnyScalar | pdx_rules::ValueMatcher::Opaque(_)
+                )
+        }
+    }
+}
+
 fn semantic_localisation_reference(
     property: &HirProperty,
     scope_facts: &[ScopeFact],
@@ -268,6 +580,11 @@ fn semantic_localisation_reference(
     enum_localisation_rules: &[&pdx_rules::SemanticRule],
 ) -> Option<HirReference> {
     let scalar = property.scalar.as_ref()?;
+    // Quoted values are literal text to the game, not localisation key references. A spacer such
+    // as `custom_tooltip = " "` must not produce an unknown-symbol diagnostic.
+    if scalar.quoted {
+        return None;
+    }
     let fact = scope_facts
         .iter()
         .find(|fact| fact.range == property.key_range);

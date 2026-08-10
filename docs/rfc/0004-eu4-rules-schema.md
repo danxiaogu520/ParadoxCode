@@ -37,7 +37,7 @@ SemanticModel
 
 ## SQLite 校验
 
-当前 `pdx-rules::CURRENT_SCHEMA_VERSION` 为 `16`。`RuleSet::load` 以 read-only 方式打开 SQLite，启用 foreign keys，并要求 metadata 至少包含 `schema_version`、`game_id` 和 `rule_hash`。schema 不匹配、metadata 缺失、game identity 不符或逻辑 hash 不符都会返回错误；runtime 不从错误 artifact 继续服务。
+当前 `pdx-rules::CURRENT_SCHEMA_VERSION` 为 `17`。`RuleSet::load` 以 read-only 方式打开 SQLite，启用 foreign keys，并要求 metadata 至少包含 `schema_version`、`game_id` 和 `rule_hash`。schema 不匹配、metadata 缺失、game identity 不符或逻辑 hash 不符都会返回错误；runtime 不从错误 artifact 继续服务。
 
 读取后会重建 `RulesModel` 和不可变 `RuleSet`。runtime 不暴露 insert/update/delete；`RuleSet` 只提供查询、分类、规则 hash 和 schema version。SQLite artifact 是存储格式，不能通过手工修改来改变运行时规则。
 

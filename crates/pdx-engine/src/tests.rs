@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 pub(crate) use super::{
     AnalysisHost, Definition, DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId,
-    DocumentSource, FileIndexShard, ParsedSource, Reference, SourceFileId, SourceRoot,
-    SourceRootId, SourceRootKind, TextChange, VanillaCacheError, VanillaIndexCache,
+    DocumentSource, FileIndexShard, MacroParameterSignature, ParsedSource, Reference, SourceFileId,
+    SourceRoot, SourceRootId, SourceRootKind, TextChange, VanillaCacheError, VanillaIndexCache,
     WorkspaceChange, WorkspaceError, WorkspaceIndex, WorkspaceScanIssueKind, WorkspaceScanLimits,
     WorkspaceScanToken, pipeline_counts, reset_pipeline_counts,
 };

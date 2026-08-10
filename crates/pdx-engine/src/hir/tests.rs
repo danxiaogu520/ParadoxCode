@@ -4,7 +4,7 @@ use super::{
 };
 use pdx_game::eu4::{bootstrap_rules, first_party_rules, profile};
 use pdx_parser::{FileFormat, parse};
-use pdx_rules::{GameProfile, RuleSet, RuleShape};
+use pdx_rules::{GameProfile, KeyMatcher, RuleSet, RuleShape, ValueMatcher};
 use pdx_text::LogicalPath;
 
 #[test]
@@ -92,6 +92,56 @@ fn lowering_retains_localisation_definition_ranges() {
 }
 
 #[test]
+fn scalar_records_whether_the_value_was_quoted() {
+    let parsed = parse(FileFormat::Script, "root = { a = \"x\" b = y }\n");
+    let hir = lower(parsed, &RuleSet::empty());
+
+    let a = hir
+        .properties()
+        .iter()
+        .find(|property| property.key == "a")
+        .expect("a property");
+    let b = hir
+        .properties()
+        .iter()
+        .find(|property| property.key == "b")
+        .expect("b property");
+    assert!(a.scalar.as_ref().expect("a scalar").quoted);
+    assert!(!b.scalar.as_ref().expect("b scalar").quoted);
+}
+
+#[test]
+fn quoted_string_values_are_not_localisation_references() {
+    let path = LogicalPath::parse("events/test.txt").expect("logical path");
+    let hir = lower_with_profile(
+        parse(
+            FileFormat::Script,
+            concat!(
+                "country_event = { id = a.1 option = { ",
+                "name = option_a ",
+                "custom_tooltip = \" \" ",
+                "custom_tooltip = tooltip_key ",
+                "} }\n",
+            ),
+        ),
+        &path,
+        &first_party_rules().expect("first-party rules"),
+        &profile(),
+    );
+    let localisation = hir
+        .references()
+        .iter()
+        .filter(|reference| reference.kind == "localisation")
+        .map(|reference| reference.name.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        !localisation.contains(&" "),
+        "quoted literals must not resolve as localisation symbols: {localisation:?}"
+    );
+    assert!(localisation.contains(&"tooltip_key"));
+}
+
+#[test]
 fn required_type_localisation_templates_expand_from_dynamic_members() {
     let path = LogicalPath::parse("missions/test.txt").expect("logical path");
     let hir = lower_with_profile(
@@ -174,7 +224,7 @@ fn lowering_retains_parameter_conditionals_with_polarity() {
 fn profile_lowering_associates_local_parameter_definitions_and_uses() {
     let source = concat!(
         "first = { value = $amount$ again = $amount$ ",
-        "[[optional] enabled = yes ] }\n",
+        "[[optional] enabled = yes ] [[amount] guarded = $amount$ ] }\n",
         "second = { value = $amount$ }\n",
     );
     let path = LogicalPath::parse("common/scripted_effects/parameters.txt").expect("logical path");
@@ -186,7 +236,7 @@ fn profile_lowering_associates_local_parameter_definitions_and_uses() {
     );
 
     assert_eq!(hir.parameter_definitions().len(), 3);
-    assert_eq!(hir.parameter_references().len(), 4);
+    assert_eq!(hir.parameter_references().len(), 6);
     assert_eq!(
         hir.parameter_definitions()
             .iter()
@@ -206,11 +256,13 @@ fn profile_lowering_associates_local_parameter_definitions_and_uses() {
             .iter()
             .filter(|reference| reference.kind == HirParameterReferenceKind::Substitution)
             .count(),
-        3
+        4
     );
     let first_owner = hir.parameter_definitions()[0].owner_range;
     assert_eq!(hir.parameter_definitions_for_owner(first_owner).count(), 2);
-    assert_eq!(hir.parameter_references_for_owner(first_owner).count(), 3);
+    assert_eq!(hir.parameter_references_for_owner(first_owner).count(), 5);
+    assert!(hir.parameter_is_required(first_owner, "amount"));
+    assert!(!hir.parameter_is_required(first_owner, "optional"));
     let optional_position =
         u32::try_from(source.find("optional").expect("optional parameter")).expect("position");
     assert_eq!(
@@ -219,6 +271,182 @@ fn profile_lowering_associates_local_parameter_definitions_and_uses() {
         Some("optional")
     );
     assert!(hir.parameter_reference_at(first_owner.end()).is_none());
+
+    let conditional_source = "conditional = { [[feature] value = $amount$ ] }\n";
+    let conditional_hir = lower_with_profile(
+        parse(FileFormat::Script, conditional_source),
+        &path,
+        &bootstrap_rules(),
+        &profile(),
+    );
+    let conditional_owner = conditional_hir.parameter_definitions()[0].owner_range;
+    assert!(!conditional_hir.parameter_is_required(conditional_owner, "feature"));
+    assert!(
+        !conditional_hir.parameter_is_required(conditional_owner, "amount"),
+        "a compact boolean signature must not treat a cross-conditional dependency as unconditional"
+    );
+}
+
+#[test]
+fn scripted_macro_lowering_keeps_body_context_calls_and_local_parameter_uses() {
+    let rules = first_party_rules().expect("first-party rules");
+    let path = LogicalPath::parse("common/scripted_effects/rewrite.txt").expect("logical path");
+    let source = concat!(
+        "apply_effect = { value = yes }\n",
+        "wrapper = { ",
+        "apply_effect = yes ",
+        "$TARGET$ = { value = $AMOUNT$ } ",
+        "effect = \"$PROVINCE$ = { add = $AMOUNT$ }\" ",
+        "[[optional] value = $AMOUNT$ ] }\n",
+    );
+    let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile());
+
+    assert!(hir.references().iter().any(|reference| {
+        reference.origin == HirReferenceOrigin::ScriptedMacro
+            && reference.kind == "scripted_effect"
+            && reference.name == "apply_effect"
+    }));
+    let body_property = hir
+        .properties()
+        .iter()
+        .find(|property| {
+            property.key == "apply_effect"
+                && property.path.first().is_some_and(|root| root == "wrapper")
+        })
+        .expect("macro body property");
+    let body_fact = hir
+        .scope_facts()
+        .iter()
+        .find(|fact| fact.range == body_property.key_range)
+        .expect("macro body scope fact");
+    assert_eq!(body_fact.context, "effect");
+
+    assert!(
+        hir.parameter_definitions().iter().any(|definition| {
+            definition.name == "TARGET" && definition.owner_range == body_property.range
+        }) || hir
+            .parameter_definitions()
+            .iter()
+            .any(|definition| definition.name == "TARGET")
+    );
+    assert!(hir.parameter_references().iter().any(|reference| {
+        reference.name == "TARGET" && reference.kind == HirParameterReferenceKind::KeySubstitution
+    }));
+    assert!(hir.parameter_references().iter().any(|reference| {
+        reference.name == "PROVINCE"
+            && reference.kind == HirParameterReferenceKind::OpaqueTextSubstitution
+    }));
+    assert!(
+        hir.parameter_references()
+            .iter()
+            .any(|reference| reference.kind == HirParameterReferenceKind::Conditional)
+    );
+
+    let trigger_path =
+        LogicalPath::parse("common/scripted_triggers/rewrite.txt").expect("trigger path");
+    let trigger_hir = lower_with_profile(
+        parse(
+            FileFormat::Script,
+            "apply_trigger = { always = yes }\nwrapper_trigger = { apply_trigger = yes }\n",
+        ),
+        &trigger_path,
+        &rules,
+        &profile(),
+    );
+    let trigger_root = trigger_hir
+        .scope_facts()
+        .iter()
+        .find(|fact| fact.parent_path.is_empty())
+        .expect("trigger root fact");
+    assert_eq!(trigger_root.context, "trigger");
+    assert!(trigger_hir.references().iter().any(|reference| {
+        reference.origin == HirReferenceOrigin::ScriptedMacro
+            && reference.kind == "scripted_trigger"
+            && reference.name == "apply_trigger"
+    }));
+}
+
+#[test]
+fn scripted_macro_lowering_retains_scalar_candidates_for_signature_resolution() {
+    let rules = first_party_rules().expect("first-party rules");
+    let path =
+        LogicalPath::parse("common/scripted_effects/value_matchers.txt").expect("logical path");
+    let source = "wrapper = { apply_effect = no apply_effect = yes }\n";
+    let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile());
+
+    let apply_effect_properties = hir
+        .properties()
+        .iter()
+        .filter(|property| property.key == "apply_effect")
+        .collect::<Vec<_>>();
+    assert_eq!(apply_effect_properties.len(), 2);
+    let yes_property = apply_effect_properties
+        .iter()
+        .find(|property| {
+            property
+                .scalar
+                .as_ref()
+                .is_some_and(|scalar| scalar.value == "yes")
+        })
+        .expect("yes macro call");
+    let no_property = apply_effect_properties
+        .iter()
+        .find(|property| {
+            property
+                .scalar
+                .as_ref()
+                .is_some_and(|scalar| scalar.value == "no")
+        })
+        .expect("no macro call");
+
+    let references = hir
+        .references()
+        .iter()
+        .filter(|reference| {
+            reference.origin == HirReferenceOrigin::ScriptedMacro
+                && reference.kind == "scripted_effect"
+                && reference.name == "apply_effect"
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(references.len(), 2);
+    assert!(
+        references
+            .iter()
+            .any(|reference| reference.range == yes_property.key_range)
+    );
+    assert!(
+        references
+            .iter()
+            .any(|reference| reference.range == no_property.key_range)
+    );
+}
+
+#[test]
+fn scripted_macro_lowering_rejects_non_scalar_block_matchers() {
+    let original_rules = first_party_rules().expect("first-party rules");
+    let mut model = original_rules.model().clone();
+    for rule in &mut model.semantic.rules {
+        if matches!(&rule.key, KeyMatcher::Type(type_name) if type_name == "scripted_effect")
+            && matches!(rule.shape, RuleShape::Node | RuleShape::ValueClause)
+        {
+            rule.value = ValueMatcher::Exact("not-a-block-value".to_owned());
+        }
+    }
+    let rules = RuleSet::from_model(model);
+    let path =
+        LogicalPath::parse("common/scripted_effects/block_matcher.txt").expect("logical path");
+    let hir = lower_with_profile(
+        parse(FileFormat::Script, "wrapper = { apply_effect = { } }\n"),
+        &path,
+        &rules,
+        &profile(),
+    );
+
+    assert!(!hir.references().iter().any(|reference| {
+        reference.origin == HirReferenceOrigin::ScriptedMacro
+            && reference.kind == "scripted_effect"
+            && reference.name == "apply_effect"
+    }));
 }
 
 #[test]

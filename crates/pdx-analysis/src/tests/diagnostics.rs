@@ -271,6 +271,63 @@ fn embedded_first_party_rules_drive_runtime_value_diagnostics() {
 }
 
 #[test]
+fn scripted_macro_blocks_validate_required_and_duplicate_parameters() {
+    use std::fs;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-args-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    fs::create_dir_all(&definitions).expect("scripted effect directory");
+    fs::write(
+        definitions.join("definitions.txt"),
+        "apply = { value = $amount$ [[optional] enabled = $optional$ ] }\n",
+    )
+    .expect("scripted effect definition");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+    let id = DocumentId::new("file:///tmp/events/macro-arguments.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        concat!(
+            "country_event = { immediate = { ",
+            "apply = { optional = yes } ",
+            "apply = { amount = 1 amount = 2 } ",
+            "} }\n",
+        )
+        .to_owned(),
+        None,
+    )
+    .expect("open macro calls");
+
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(results.iter().any(|item| {
+        item.code == DiagnosticCode::Cardinality
+            && item
+                .message
+                .contains("missing required parameter(s): `amount`")
+    }));
+    assert!(results.iter().any(|item| {
+        item.code == DiagnosticCode::Cardinality
+            && item.severity == 2
+            && item
+                .message
+                .contains("parameter `amount` is provided more than once")
+    }));
+
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn required_type_localisation_keys_report_missing_derived_keys() {
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -355,5 +412,52 @@ fn mission_metadata_fields_do_not_derive_localisation_keys() {
             .iter()
             .any(|message| message.contains("mission_one_desc")),
         "the nested mission still derives its desc key: {messages:?}"
+    );
+}
+
+#[test]
+fn localisation_symbols_prefer_the_english_definition_across_languages() {
+    let mut host = eu4_host(pdx_game::eu4::bootstrap_rules());
+    host.open_document(
+        DocumentId::new("file:///tmp/localisation/l_english/test_l_english.yml"),
+        1,
+        "l_english:\n shared_key: \"English\"\n".to_owned(),
+        Some(std::path::PathBuf::from(
+            "/tmp/localisation/l_english/test_l_english.yml",
+        )),
+    )
+    .expect("open english localisation");
+    host.open_document(
+        DocumentId::new("file:///tmp/localisation/l_french/test_l_french.yml"),
+        1,
+        "l_french:\n shared_key: \"Français\"\n".to_owned(),
+        Some(std::path::PathBuf::from(
+            "/tmp/localisation/l_french/test_l_french.yml",
+        )),
+    )
+    .expect("open french localisation");
+    let script = DocumentId::new("file:///tmp/events/test.txt");
+    host.open_document(
+        script.clone(),
+        1,
+        "country_event = { id = a.1 option = { name = option_a custom_tooltip = shared_key } }\n"
+            .to_owned(),
+        Some(std::path::PathBuf::from("/tmp/events/test.txt")),
+    )
+    .expect("open script");
+
+    let results = diagnostics(&host.snapshot(), &script);
+    assert!(
+        !results
+            .iter()
+            .any(|item| item.code == DiagnosticCode::AmbiguousSymbol),
+        "per-language variants of one key must not look ambiguous: {results:?}"
+    );
+    assert!(
+        !results
+            .iter()
+            .any(|item| item.code == DiagnosticCode::UnknownSymbol
+                && item.message.contains("shared_key")),
+        "the key exists in the workspace and must resolve: {results:?}"
     );
 }

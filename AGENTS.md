@@ -138,7 +138,7 @@ Layer responsibilities:
 5. If pre-existing changes are found, preserve their content and only edit the areas the task requires.
 
 The checkout uses the repository-versioned `.githooks/pre-commit` as the local quality gate. Run
-`bash scripts/install-git-hooks.sh` after the first clone; when an agent discovers that `core.hooksPath` does not point to `.githooks`, it should install them itself. Normal commits run `git commit` directly, letting the hook invoke `scripts/check-quality-gates.sh` — there is no need to manually repeat the full suite of commands before committing. Only run the `core`, `grammars`, `zed`, or `release` groups individually when diagnosing a specific failure; CI continues to be responsible for environment-specific gates such as Windows, MSRV, and dependency policy.
+`bash scripts/install-git-hooks.sh` after the first clone; when an agent discovers that `core.hooksPath` does not point to `.githooks`, it should install them itself. Normal commits run `git commit` directly, letting the hook invoke `scripts/check-quality-gates.sh` — there is no need to manually repeat the full suite of commands before committing. Only run the `core`, `grammars`, `scripts`, `zed`, or `release` groups individually when diagnosing a specific failure; CI continues to be responsible for environment-specific gates such as Windows, MSRV, and dependency policy.
 
 ### Git Publishing Convention
 
@@ -158,6 +158,27 @@ The checkout uses the repository-versioned `.githooks/pre-commit` as the local q
 - Background tasks must be cancellable, or have clear resource and time bounds.
 - Do not implement speculative features or complex plugin systems for low-priority games; only retain extension points proven useful by the core engine and EU4 profile boundary.
 - EU4 name tables and special rules belong in the EU4 profile/rules package, not in the generic LSP layer or the Zed extension.
+
+### Whole-Current-Mod diagnostic workflow
+
+When validating a complete EU4 Current Mod against the active first-party rules and a local
+Vanilla index, use the repository script rather than duplicating parser or analysis logic:
+
+```bash
+node scripts/diagnose-current-mod.mjs \
+  --mod /path/to/current-mod \
+  --vanilla-cache /path/to/vanilla.pdxindex
+```
+
+The script drives the real `pdx-ls` stdio JSON-RPC server. It uses the embedded `rules/eu4` source,
+loads the supplied `.pdxindex`, and opens relevant `.txt`, `.gfx`, `.yml`, and `.yaml` files one at
+a time so the normal parser, HIR, resolution, and diagnostics pipeline is exercised. It can read
+`--project-config` and automatically use a configured `vanilla_index_cache`; external rule paths
+are not accepted. Reports are written as JSON and Markdown under the ignored `diagnostic-reports/`
+directory by default. The process exits `1` when the selected `--fail-on` threshold is met (`error`
+by default; `warning` or `none` are also supported). Do not commit generated reports; keep the
+diagnostic script and its documentation tracked. Use `node scripts/diagnose-current-mod.mjs --help`
+for all options and environment variables.
 
 ### Before Completing
 

@@ -351,6 +351,7 @@ pub(crate) fn validate_semantic_container(
                     ),
                 });
             }
+            validate_scripted_macro_arguments(snapshot, applicable, property, diagnostics);
             let max_occurs = applicable
                 .iter()
                 .filter(|rule| {
@@ -610,6 +611,71 @@ pub(crate) fn validate_semantic_container(
         }
     }
     Ok(())
+}
+
+fn validate_scripted_macro_arguments(
+    snapshot: &AnalysisSnapshot,
+    rules: &[&pdx_rules::SemanticRule],
+    property: &ScriptProperty,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if property.block_range.is_none() {
+        return;
+    }
+    let summary = rules.iter().find_map(|rule| {
+        let type_name = match &rule.key {
+            pdx_rules::KeyMatcher::Type(type_name) | pdx_rules::KeyMatcher::Dynamic(type_name)
+                if scripted_macro_type(snapshot, type_name) =>
+            {
+                type_name
+            }
+            _ => return None,
+        };
+        macro_definition_summary(snapshot, type_name, &property.key)
+    });
+    let Some(summary) = summary else {
+        return;
+    };
+
+    let mut counts = std::collections::BTreeMap::<String, usize>::new();
+    for argument in &property.block {
+        let count = counts.entry(argument.key.to_ascii_lowercase()).or_default();
+        *count = count.saturating_add(1);
+        if *count > 1 {
+            diagnostics.push(Diagnostic {
+                code: DiagnosticCode::Cardinality,
+                severity: 2,
+                range: argument.key_range,
+                message: format!(
+                    "macro parameter `{}` is provided more than once",
+                    argument.key
+                ),
+            });
+        }
+    }
+    let missing = summary
+        .parameters
+        .iter()
+        .filter(|parameter| {
+            parameter.required
+                && !counts
+                    .keys()
+                    .any(|name| name.eq_ignore_ascii_case(&parameter.name))
+        })
+        .map(|parameter| format!("`{}`", parameter.name))
+        .collect::<Vec<_>>();
+    if !missing.is_empty() {
+        diagnostics.push(Diagnostic {
+            code: DiagnosticCode::Cardinality,
+            severity: DiagnosticCode::Cardinality.severity(),
+            range: property.key_range,
+            message: format!(
+                "macro `{}` is missing required parameter(s): {}",
+                summary.name,
+                missing.join(", ")
+            ),
+        });
+    }
 }
 pub(crate) fn syntax_diagnostics(input: &ParsedInput) -> Vec<Diagnostic> {
     match &input.parsed {

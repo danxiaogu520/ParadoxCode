@@ -16,7 +16,10 @@ mod snapshot;
 mod vanilla_cache;
 
 pub use host::AnalysisHost;
-pub use index::{Definition, FileIndexShard, Reference, WorkspaceIndex};
+pub use index::{
+    Definition, FileIndexShard, MacroDefinitionSummary, MacroParameterSignature, Reference,
+    WorkspaceIndex,
+};
 pub use model::{
     DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId, DocumentSnapshot,
     DocumentSource, FileState, LocalisationPreview, ParsedSource, PreparedDocument,

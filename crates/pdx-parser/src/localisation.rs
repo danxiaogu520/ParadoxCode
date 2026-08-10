@@ -128,22 +128,21 @@ impl<'source> Parser<'source> {
             {
                 position += 1;
             }
-            let version_start = position;
-            while line
+            // The version digits after the colon are optional: the game also accepts entries
+            // written as `key: "value"` without a version number.
+            if line
                 .as_bytes()
                 .get(position)
                 .is_some_and(u8::is_ascii_digit)
             {
-                position += 1;
-            }
-            if version_start == position {
-                self.error(
-                    SyntaxErrorKind::InvalidLocalisationEntry,
-                    colon_start,
-                    colon_start + 1,
-                    "localisation entry version must contain digits",
-                );
-            } else {
+                let version_start = position;
+                while line
+                    .as_bytes()
+                    .get(position)
+                    .is_some_and(u8::is_ascii_digit)
+                {
+                    position += 1;
+                }
                 let version_end = start + position;
                 self.tokens.push(SyntaxToken::new(
                     TokenKind::Bare,
@@ -155,13 +154,13 @@ impl<'source> Parser<'source> {
                     version_end,
                     Vec::new(),
                 ));
-            }
-            while line
-                .as_bytes()
-                .get(position)
-                .is_some_and(u8::is_ascii_whitespace)
-            {
-                position += 1;
+                while line
+                    .as_bytes()
+                    .get(position)
+                    .is_some_and(u8::is_ascii_whitespace)
+                {
+                    position += 1;
+                }
             }
         }
         if position >= line.len() || line.as_bytes().get(position) == Some(&b'#') {

@@ -100,6 +100,7 @@ fn lower_shared_impl(
         &properties,
         &parameter_conditionals,
         logical_path,
+        rules,
         profile,
     );
     HirFile {

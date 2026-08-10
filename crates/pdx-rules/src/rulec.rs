@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 
 /// Current version of the developer-maintained source layout.
-pub const SOURCE_FORMAT_VERSION: u32 = 5;
+pub const SOURCE_FORMAT_VERSION: u32 = 6;
 
 const SOURCE_MANIFEST: &str = "manifest.json";
 const CATALOG: &str = "catalog.json";
@@ -429,6 +429,18 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
                 descriptor.name
             )));
         }
+        if let Some(scripted_macro) = &descriptor.scripted_macro {
+            if scripted_macro.body_context.trim().is_empty() {
+                return Err(CompileError::Validation(format!(
+                    "type descriptor {identity} has an empty scripted macro body context"
+                )));
+            }
+            if scripted_macro.macro_enabled && !scripted_macro.usage.is_nonempty() {
+                return Err(CompileError::Validation(format!(
+                    "type descriptor {identity} enables scripted macros without a usage capability"
+                )));
+            }
+        }
     }
     let mut binding_ids = BTreeSet::new();
     for binding in &model.semantic.localisation_bindings {
@@ -636,7 +648,10 @@ fn temporary_path(output: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{KeyMatcher, RuleShape, SemanticRule, ValueMatcher};
+    use crate::{
+        KeyMatcher, RuleShape, ScriptedMacroDescriptor, ScriptedMacroUsage, SemanticRule,
+        TypeDescriptor, ValueMatcher,
+    };
 
     #[test]
     fn validation_rejects_duplicate_rule_ids_and_invalid_cardinality() {
@@ -672,12 +687,52 @@ mod tests {
     }
 
     #[test]
-    fn committed_source_reproduces_the_release_manifest() {
+    fn validation_rejects_enabled_scripted_macro_without_usage() {
+        let mut model = RulesModel {
+            game_id: "eu4".to_owned(),
+            ..RulesModel::default()
+        };
+        model.semantic.type_descriptors.insert(
+            "scripted_effect".to_owned(),
+            TypeDescriptor {
+                name: "scripted_effect".to_owned(),
+                scripted_macro: Some(ScriptedMacroDescriptor {
+                    body_context: "effect".to_owned(),
+                    macro_enabled: true,
+                    usage: ScriptedMacroUsage::default(),
+                }),
+                ..TypeDescriptor::default()
+            },
+        );
+        let error = validate_model(&model).expect_err("empty macro usage must be rejected");
+        assert!(error.to_string().contains("usage capability"));
+    }
+
+    #[test]
+    fn committed_source_compiles_with_release_shape() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let expected: ArtifactManifest =
             read_json(&root.join("rules/manifest.json")).expect("committed manifest");
         let (_, source_model) = load_source(&root.join("rules/eu4")).expect("source model");
         assert_eq!(source_model.semantic.localisation_bindings.len(), 191);
+        let scripted_effect = source_model
+            .semantic
+            .type_descriptors
+            .get("scripted_effect")
+            .and_then(|descriptor| descriptor.scripted_macro.as_ref())
+            .expect("scripted effect macro descriptor");
+        assert_eq!(scripted_effect.body_context, "effect");
+        assert!(scripted_effect.macro_enabled);
+        assert!(scripted_effect.usage.is_nonempty());
+        let scripted_trigger = source_model
+            .semantic
+            .type_descriptors
+            .get("scripted_trigger")
+            .and_then(|descriptor| descriptor.scripted_macro.as_ref())
+            .expect("scripted trigger macro descriptor");
+        assert_eq!(scripted_trigger.body_context, "trigger");
+        assert!(scripted_trigger.macro_enabled);
+        assert!(scripted_trigger.usage.is_nonempty());
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")

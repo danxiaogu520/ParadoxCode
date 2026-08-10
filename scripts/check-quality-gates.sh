@@ -35,7 +35,7 @@ check_release() {
 }
 
 usage() {
-    echo "usage: $0 [all|core|grammars|zed|release]" >&2
+    echo "usage: $0 [all|core|grammars|scripts|zed|release]" >&2
 }
 
 group=${1:-all}

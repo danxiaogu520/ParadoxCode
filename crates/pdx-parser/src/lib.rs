@@ -284,6 +284,26 @@ mod tests {
     }
 
     #[test]
+    fn localisation_entries_allow_missing_version_digits() {
+        let localisation = parse(
+            FileFormat::Localisation,
+            "l_english:\nhello: \"text\"\nother:0 \"text\"\nlast: text\n",
+        );
+        assert!(
+            localisation.errors().is_empty(),
+            "errors: {:?}",
+            localisation.errors()
+        );
+        let entries = localisation
+            .root()
+            .children()
+            .iter()
+            .filter(|child| child.kind() == CstKind::LocalisationEntry)
+            .collect::<Vec<_>>();
+        assert_eq!(entries.len(), 3);
+    }
+
+    #[test]
     fn incremental_edits_match_full_reparse() {
         let mut current = parse(FileFormat::Script, "name = one\nvalue = yes\n");
         let edits = [

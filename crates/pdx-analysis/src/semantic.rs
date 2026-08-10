@@ -1,9 +1,10 @@
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use pdx_engine::hir::semantic_root_context as hir_semantic_root_context;
 use pdx_engine::hir::{HirFile, ScopeState, ScopeValue};
-use pdx_engine::{AnalysisSnapshot, DocumentSource};
+use pdx_engine::{
+    AnalysisSnapshot, DocumentSource, MacroDefinitionSummary, MacroParameterSignature,
+};
 use pdx_rules::{GameProfile, KeyMatcher, RuleShape, ValueMatcher};
 use pdx_text::{LogicalPath, TextRange};
 
@@ -664,36 +665,53 @@ pub(crate) fn semantic_rule_key_matches(
     parent_path: &[String],
     key: &str,
 ) -> bool {
-    qualified_parameter_names(snapshot, rule, parent_path).map_or_else(
-        || semantic_key_matches(snapshot, &rule.key, key),
-        |names| names.iter().any(|name| name.eq_ignore_ascii_case(key)),
-    )
+    match qualified_parameter_domain(snapshot, rule, parent_path) {
+        QualifiedParameterDomain::NotApplicable => semantic_key_matches(snapshot, &rule.key, key),
+        QualifiedParameterDomain::Known(names) => {
+            names.iter().any(|name| name.eq_ignore_ascii_case(key))
+        }
+        QualifiedParameterDomain::OpenWorld => !key.is_empty(),
+    }
 }
 
-pub(crate) fn qualified_parameter_names(
+pub(crate) enum QualifiedParameterDomain {
+    NotApplicable,
+    Known(Vec<String>),
+    OpenWorld,
+}
+
+pub(crate) fn qualified_parameter_domain(
     snapshot: &AnalysisSnapshot,
     rule: &pdx_rules::SemanticRule,
     parent_path: &[String],
-) -> Option<Vec<String>> {
+) -> QualifiedParameterDomain {
     let KeyMatcher::Enum(enum_name) = &rule.key else {
-        return None;
+        return QualifiedParameterDomain::NotApplicable;
     };
     if !enum_name.eq_ignore_ascii_case("scripted_effect_params") {
-        return None;
+        return QualifiedParameterDomain::NotApplicable;
     }
     let owner_kind = rule
         .parent_path
         .last()
         .and_then(|segment| segment.strip_prefix('<'))
-        .and_then(|segment| segment.strip_suffix('>'))?;
+        .and_then(|segment| segment.strip_suffix('>'));
+    let Some(owner_kind) = owner_kind else {
+        return QualifiedParameterDomain::NotApplicable;
+    };
     if !matches!(
         owner_kind.to_ascii_lowercase().as_str(),
         "scripted_effect" | "scripted_trigger"
     ) {
-        return None;
+        return QualifiedParameterDomain::NotApplicable;
     }
-    let owner_name = parent_path.last()?;
-    parameter_names_for_owner(snapshot, owner_kind, owner_name)
+    let Some(owner_name) = parent_path.last() else {
+        return QualifiedParameterDomain::OpenWorld;
+    };
+    parameter_names_for_owner(snapshot, owner_kind, owner_name).map_or(
+        QualifiedParameterDomain::OpenWorld,
+        QualifiedParameterDomain::Known,
+    )
 }
 
 pub(crate) fn parameter_names_for_owner(
@@ -701,6 +719,20 @@ pub(crate) fn parameter_names_for_owner(
     owner_kind: &str,
     owner_name: &str,
 ) -> Option<Vec<String>> {
+    macro_definition_summary(snapshot, owner_kind, owner_name).map(|summary| {
+        summary
+            .parameters
+            .into_iter()
+            .map(|parameter| parameter.name)
+            .collect()
+    })
+}
+
+pub(crate) fn macro_definition_summary(
+    snapshot: &AnalysisSnapshot,
+    owner_kind: &str,
+    owner_name: &str,
+) -> Option<MacroDefinitionSummary> {
     let mut overlay_candidates = Vec::new();
     for document in snapshot
         .documents()
@@ -714,14 +746,19 @@ pub(crate) fn parameter_names_for_owner(
             definition.kind.eq_ignore_ascii_case(owner_kind)
                 && definition.name.eq_ignore_ascii_case(owner_name)
         }) {
-            overlay_candidates.push((Arc::clone(&hir), definition.range));
+            overlay_candidates.push(macro_summary_in_hir(
+                &hir,
+                &definition.kind,
+                &definition.name,
+                definition.range,
+            ));
         }
     }
     if overlay_candidates.len() > 1 {
         return None;
     }
-    if let Some((hir, owner_range)) = overlay_candidates.pop() {
-        return Some(parameter_names_in_hir(&hir, owner_range));
+    if let Some(summary) = overlay_candidates.pop() {
+        return Some(summary);
     }
 
     let definition = snapshot.index().active_definition(owner_kind, owner_name)?;
@@ -735,39 +772,60 @@ pub(crate) fn parameter_names_for_owner(
     if hidden_by_overlay {
         return None;
     }
-    let hir = snapshot.file_state(definition.file_id)?.hir()?;
-    Some(parameter_names_in_hir(hir, definition.range))
+    snapshot
+        .index()
+        .active_macro_definition(owner_kind, owner_name)
+        .cloned()
 }
 
-pub(crate) fn parameter_names_in_hir(hir: &HirFile, owner_range: TextRange) -> Vec<String> {
-    let mut names = Vec::new();
-    let mut seen = HashSet::new();
-    for definition in hir.parameter_definitions_for_owner(owner_range) {
-        if seen.insert(definition.name.to_ascii_lowercase()) {
-            names.push(definition.name.clone());
-        }
+fn macro_summary_in_hir(
+    hir: &HirFile,
+    kind: &str,
+    name: &str,
+    owner_range: TextRange,
+) -> MacroDefinitionSummary {
+    let parameters = hir
+        .parameter_definitions_for_owner(owner_range)
+        .map(|definition| MacroParameterSignature {
+            name: definition.name.clone(),
+            required: hir.parameter_is_required(owner_range, &definition.name),
+        })
+        .collect();
+    MacroDefinitionSummary {
+        kind: kind.to_owned(),
+        name: name.to_owned(),
+        definition_range: owner_range,
+        parameters,
     }
-    names
 }
 
-/// Builds the snippet inserted for a scripted definition invocation. Declared parameters become
-/// sequential tab stops; the final cursor lands on an empty line inside the block.
+/// Builds the canonical invocation snippet for a resolved scripted macro signature.
 pub(crate) fn scripted_definition_snippet(
     snapshot: &AnalysisSnapshot,
     kind_name: &str,
     definition_name: &str,
     base_indent: &str,
 ) -> String {
-    let inner_indent = format!("{base_indent}\t");
-    let Some(parameters) = parameter_names_for_owner(snapshot, kind_name, definition_name) else {
+    let Some(summary) = macro_definition_summary(snapshot, kind_name, definition_name) else {
+        let inner_indent = format!("{base_indent}\t");
         return format!("{definition_name} = {{\n{inner_indent}$0\n{base_indent}}}");
     };
-    if parameters.is_empty() {
-        return format!("{definition_name} = {{\n{inner_indent}$0\n{base_indent}}}");
+    if summary.parameters.is_empty() {
+        return format!("{definition_name} = yes");
     }
+    let inner_indent = format!("{base_indent}\t");
     let mut body = String::new();
-    for (index, parameter) in parameters.iter().enumerate() {
-        body.push_str(&format!("{inner_indent}{parameter} = ${}\n", index + 1));
+    for (index, parameter) in summary
+        .parameters
+        .iter()
+        .filter(|parameter| parameter.required)
+        .enumerate()
+    {
+        body.push_str(&format!(
+            "{inner_indent}{} = ${}\n",
+            parameter.name,
+            index + 1
+        ));
     }
     format!("{definition_name} = {{\n{body}{inner_indent}$0\n{base_indent}}}")
 }
@@ -799,32 +857,9 @@ pub(crate) fn workspace_type_member(
     type_name: &str,
     member: &str,
 ) -> WorkspaceTypeMember {
-    let base = type_name
-        .split_once('.')
-        .map_or(type_name, |(kind, _)| kind);
-    let candidates = [
-        type_name,
-        base,
-        snapshot
-            .game_profile()
-            .member_kind_alias(base)
-            .unwrap_or(base),
-    ];
-    let mut has_members = false;
-    for candidate in candidates {
-        if snapshot
-            .index()
-            .definitions_for_kind(candidate)
-            .next()
-            .is_some()
-        {
-            has_members = true;
-            if !snapshot.index().definitions(candidate, member).is_empty() {
-                return WorkspaceTypeMember::Present;
-            }
-        }
-    }
-    if has_members {
+    if workspace_member(snapshot, type_name, member) {
+        WorkspaceTypeMember::Present
+    } else if workspace_kind_has_members(snapshot, type_name) {
         WorkspaceTypeMember::Absent
     } else {
         WorkspaceTypeMember::Unknown
@@ -854,6 +889,9 @@ pub(crate) fn semantic_property_matches(
     property: &ScriptProperty,
     scope_context: &ScopeContext,
 ) -> bool {
+    if let Some(matches) = scripted_macro_call_shape_matches(snapshot, rule, property) {
+        return matches;
+    }
     let shape_matches = match rule.shape {
         RuleShape::Node => property.block_range.is_some(),
         RuleShape::ValueClause => {
@@ -894,6 +932,63 @@ pub(crate) fn semantic_property_matches(
     ) && scope_member(snapshot, None, value, scope_context))
 }
 
+fn scripted_macro_call_shape_matches(
+    snapshot: &AnalysisSnapshot,
+    rule: &pdx_rules::SemanticRule,
+    property: &ScriptProperty,
+) -> Option<bool> {
+    let type_name = match &rule.key {
+        KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
+            if scripted_macro_type(snapshot, type_name) =>
+        {
+            type_name
+        }
+        _ => return None,
+    };
+    let summary = macro_definition_summary(snapshot, type_name, &property.key)?;
+    Some(scripted_macro_invocation_shape_matches(
+        snapshot,
+        type_name,
+        &summary,
+        property.scalar.as_ref().map(|(value, _)| value.as_str()),
+        property.block_range.is_some(),
+    ))
+}
+
+pub(crate) fn scripted_macro_invocation_shape_matches(
+    snapshot: &AnalysisSnapshot,
+    type_name: &str,
+    summary: &MacroDefinitionSummary,
+    scalar: Option<&str>,
+    is_block: bool,
+) -> bool {
+    if is_block {
+        return true;
+    }
+    let Some(value) = scalar else {
+        return false;
+    };
+    match summary.parameters.len() {
+        0 => {
+            let body_context = snapshot
+                .rules()
+                .model()
+                .semantic
+                .type_descriptors
+                .iter()
+                .find(|(kind, _)| kind.eq_ignore_ascii_case(type_name))
+                .and_then(|(_, descriptor)| descriptor.scripted_macro.as_ref())
+                .map(|descriptor| descriptor.body_context.as_str());
+            if body_context.is_some_and(|context| context.eq_ignore_ascii_case("trigger")) {
+                value.eq_ignore_ascii_case("yes") || value.eq_ignore_ascii_case("no")
+            } else {
+                value.eq_ignore_ascii_case("yes")
+            }
+        }
+        _ => false,
+    }
+}
+
 pub(crate) fn semantic_dynamic_value_matches(
     snapshot: &AnalysisSnapshot,
     kind: &str,
@@ -923,21 +1018,125 @@ pub(crate) fn semantic_dynamic_value_matches(
     enum_member(snapshot, &kind, value) || workspace_member(snapshot, &kind, value)
 }
 
-pub(crate) fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
+fn workspace_member_kinds(snapshot: &AnalysisSnapshot, type_name: &str) -> Vec<String> {
     let base = type_name
         .split_once('.')
         .map_or(type_name, |(kind, _)| kind);
-    let candidates = [
-        type_name,
-        base,
-        snapshot
-            .game_profile()
-            .member_kind_alias(base)
-            .unwrap_or(base),
-    ];
-    candidates
+    let mut kinds = vec![type_name.to_owned(), base.to_owned()];
+    if let Some(alias) = snapshot.game_profile().member_kind_alias(base) {
+        kinds.push(alias.to_owned());
+    }
+    kinds.sort_by_key(|kind| kind.to_ascii_lowercase());
+    kinds.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+    kinds
+}
+
+/// Returns members visible at this snapshot, with open overlays replacing their backing files.
+/// Macro names intentionally come from definitions, not from a static Vanilla name list.
+pub(crate) fn effective_workspace_member_names(
+    snapshot: &AnalysisSnapshot,
+    type_name: &str,
+) -> Vec<String> {
+    let hidden_files = overlay_file_ids(snapshot);
+    let kinds = workspace_member_kinds(snapshot, type_name);
+    let mut names = Vec::new();
+    for kind in &kinds {
+        names.extend(
+            snapshot
+                .index()
+                .definitions_for_kind(kind)
+                .filter(|definition| {
+                    definition.active && !hidden_files.contains(&definition.file_id)
+                })
+                .map(|definition| definition.name.clone()),
+        );
+    }
+    for document in snapshot
+        .documents()
+        .values()
+        .filter(|document| document.source() == DocumentSource::Overlay)
+    {
+        let Some(hir) = document.hir_handle() else {
+            continue;
+        };
+        names.extend(
+            hir.definitions()
+                .iter()
+                .filter(|definition| {
+                    kinds
+                        .iter()
+                        .any(|kind| definition.kind.eq_ignore_ascii_case(kind))
+                })
+                .map(|definition| definition.name.clone()),
+        );
+    }
+    names.sort_by_key(|name| name.to_ascii_lowercase());
+    names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+    names
+}
+
+pub(crate) fn scripted_macro_type(snapshot: &AnalysisSnapshot, type_name: &str) -> bool {
+    snapshot
+        .rules()
+        .model()
+        .semantic
+        .type_descriptors
         .iter()
-        .any(|candidate| !snapshot.index().definitions(candidate, member).is_empty())
+        .find(|(candidate, _)| candidate.eq_ignore_ascii_case(type_name))
+        .and_then(|(_, descriptor)| descriptor.scripted_macro.as_ref())
+        .is_some_and(|descriptor| descriptor.macro_enabled)
+}
+
+pub(crate) fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
+    let hidden_files = overlay_file_ids(snapshot);
+    let kinds = workspace_member_kinds(snapshot, type_name);
+    if kinds.iter().any(|kind| {
+        snapshot
+            .index()
+            .definitions(kind, member)
+            .into_iter()
+            .any(|definition| definition.active && !hidden_files.contains(&definition.file_id))
+    }) {
+        return true;
+    }
+    snapshot
+        .documents()
+        .values()
+        .filter(|document| document.source() == DocumentSource::Overlay)
+        .filter_map(|document| document.hir_handle())
+        .any(|hir| {
+            hir.definitions().iter().any(|definition| {
+                definition.name.eq_ignore_ascii_case(member)
+                    && kinds
+                        .iter()
+                        .any(|kind| definition.kind.eq_ignore_ascii_case(kind))
+            })
+        })
+}
+
+fn workspace_kind_has_members(snapshot: &AnalysisSnapshot, type_name: &str) -> bool {
+    let hidden_files = overlay_file_ids(snapshot);
+    let kinds = workspace_member_kinds(snapshot, type_name);
+    if kinds.iter().any(|kind| {
+        snapshot
+            .index()
+            .definitions_for_kind(kind)
+            .any(|definition| definition.active && !hidden_files.contains(&definition.file_id))
+    }) {
+        return true;
+    }
+    snapshot
+        .documents()
+        .values()
+        .filter(|document| document.source() == DocumentSource::Overlay)
+        .filter_map(|document| document.hir_handle())
+        .any(|hir| {
+            hir.definitions().iter().any(|definition| {
+                kinds
+                    .iter()
+                    .any(|kind| definition.kind.eq_ignore_ascii_case(kind))
+            })
+        })
 }
 
 pub(crate) fn enum_member(snapshot: &AnalysisSnapshot, enum_name: &str, member: &str) -> bool {

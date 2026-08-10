@@ -12,7 +12,7 @@
 - `type-descriptors.json`: path, name and type-selection metadata;
 - `localisation-bindings.json`: type-instance localisation templates and subtype conditions.
 
-The current source format is `5`; the generated runtime SQLite schema is `16`.
+The current source format is `6`; the generated runtime SQLite schema is `17`.
 
 ## Validate and build
 

@@ -33,6 +33,7 @@ SQLite artifact 只保存 source 的编译结果；`rule_hash` 取 canonical log
 | `semantic-rules.operator` | operator 约束 | HIR、analysis、completion | 已接入 |
 | `semantic-rules.shape` | node、leaf、leaf-value、value-clause 形态 | HIR、analysis | 已接入 |
 | `context` / `parent_path` | semantic context 和结构路径 | HIR、analysis context lookup | 已接入，无法消歧时保守保留候选 |
+| `type-descriptors.scripted_macro` | scripted effect/trigger 的 body context、启用状态、usage 元数据和动态成员边界 | HIR、WorkspaceIndex、analysis、Vanilla cache reference shard | lookup/body context、scalar matcher 和 `AnyScalar`/`Opaque` block shape 已接入；workspace/scope matcher 与 usage capability 完整门控为 Partial，具体成员仍由 workspace 派生 |
 | `child_context` | 子 block context | HIR scope facts、analysis traversal | 已接入 |
 | `allowed_scopes` | scope 兼容性 | HIR、diagnostics | 已接入，未知 scope 不级联报错 |
 | `push_scope` / `replace_scope` | scope register transition | HIR、analysis | 已接入 |

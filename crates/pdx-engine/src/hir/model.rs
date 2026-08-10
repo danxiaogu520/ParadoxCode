@@ -69,6 +69,8 @@ pub struct HirScalar {
     pub value: String,
     /// Exact source range including quotes when present.
     pub range: TextRange,
+    /// Whether the value was written as a quoted string literal.
+    pub quoted: bool,
 }
 
 /// A property fact retained independently of game-specific interpretation.
@@ -80,6 +82,8 @@ pub struct HirProperty {
     pub key_range: TextRange,
     /// Full property range.
     pub range: TextRange,
+    /// Operator spelling, such as `=` or `!=`, when recovered by the parser.
+    pub operator: Option<String>,
     /// Property key path from the document root.
     pub path: Vec<String>,
     /// Whether this property is a direct document child.
@@ -167,8 +171,12 @@ pub struct HirParameterDefinition {
 /// The syntax form that uses a local parameter.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum HirParameterReferenceKind {
-    /// A delimited substitution such as `$NAME$`.
+    /// A delimited substitution in a scalar value such as `value = $NAME$`.
     Substitution,
+    /// A delimited substitution that supplies a property key or scope register.
+    KeySubstitution,
+    /// A delimited substitution embedded in quoted script text.
+    OpaqueTextSubstitution,
     /// A conditional block such as `[[NAME] ... ]`.
     Conditional,
 }
@@ -195,6 +203,8 @@ pub enum HirReferenceOrigin {
     Profile,
     /// A localisation value selected by a first-party semantic rule.
     Semantic,
+    /// A concrete scripted-effect or scripted-trigger invocation selected by macro rules.
+    ScriptedMacro,
     /// A required type-instance localisation mapping expanded from a first-party template.
     DerivedLocalisation,
     /// A conservative bare value associated with the file category.
@@ -347,5 +357,39 @@ impl HirFile {
             .iter()
             .take_while(move |reference| reference.range.start() < owner_range.end())
             .filter(move |reference| reference.owner_range == owner_range)
+    }
+
+    /// Returns whether a caller must provide one inferred local parameter.
+    ///
+    /// The compact signature can only express unconditional presence. A substitution is therefore
+    /// optional when every value/key/text use is protected by any conditional block; richer
+    /// cross-parameter requirements remain an analysis concern. A parameter used only as a
+    /// condition can always be omitted by the caller.
+    #[must_use]
+    pub fn parameter_is_required(&self, owner_range: TextRange, name: &str) -> bool {
+        let owner_conditionals = self
+            .parameter_conditionals
+            .iter()
+            .filter(|conditional| {
+                conditional.range.start() >= owner_range.start()
+                    && conditional.range.end() <= owner_range.end()
+            })
+            .collect::<Vec<_>>();
+        for reference in self
+            .parameter_references_for_owner(owner_range)
+            .filter(|reference| {
+                reference.name.eq_ignore_ascii_case(name)
+                    && reference.kind != HirParameterReferenceKind::Conditional
+            })
+        {
+            let guarded = owner_conditionals.iter().any(|conditional| {
+                reference.range.start() >= conditional.range.start()
+                    && reference.range.end() <= conditional.range.end()
+            });
+            if !guarded {
+                return true;
+            }
+        }
+        false
     }
 }

@@ -50,7 +50,7 @@ category 的 parser 只有：
 
 ## Vanilla cache
 
-`VanillaIndexCache` 当前 schema 为 `3`。cache 保存 `game_id`、`rule_hash`、source identity/fingerprint、文件元数据、semantic shards、definition/reference 的 UTF-16 位置以及有界的 localisation Hover preview；不保存 Vanilla 源码、CST 或 HIR。
+`VanillaIndexCache` 当前 schema 为 `4`。cache 保存 `game_id`、`rule_hash`、source identity/fingerprint、文件元数据、semantic shards、scripted macro 的参数签名、definition/reference 的 UTF-16 位置以及有界的 localisation Hover preview；不保存 Vanilla 源码、CST 或 HIR。macro signature 只包含定义 kind/name/range 以及按首次出现排序的参数名和 required 标记，并且必须对应同一 shard 中的实际 definition。
 
 LSP 后台加载可读 cache 时，若 metadata 的 `rule_hash` 与当前规则不同，会从 cache 记录的 Vanilla source root 自动重建，完成 SQLite transaction 后再安装；重建失败则保留并安装旧 cache，同时报告原因。cache 缺失、损坏或 game/schema 不兼容时不隐式扫描目录，继续提供不含 Vanilla 的分析。
 

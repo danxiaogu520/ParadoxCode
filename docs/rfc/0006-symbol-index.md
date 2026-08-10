@@ -17,8 +17,11 @@ FileIndexShard
   file_id
   definitions: Vec<Definition>
   references: Vec<Reference>
+  macro_definitions: Vec<MacroDefinitionSummary>
   syntax_error_count
 ```
+
+`MacroDefinitionSummary` 保存 scripted macro 的 kind/name/definition range，以及按首次使用排序的参数名和 required 标记。它是可丢弃 HIR 的紧凑索引投影，不是新的全局 symbol kind；只有与 active definition 精确对应且唯一的摘要才能参与调用分析。
 
 HIR 的 `HirDefinition` 另外保留 `selection_range`；analysis 将其转换为 document/workspace `Symbol`。普通索引定义的 selection range 会从对应文件的 HIR 查回，Vanilla cache 则使用保存的 UTF-16 位置。
 
@@ -53,10 +56,10 @@ references 保存在各 shard 中，并由 analysis 遍历；当前没有独立�
 - `hover` 可显示 definition 的 kind、logical path、root 和 shadowed/ambiguous 信息。
 - rename 先检查唯一 target、合法名称、冲突和可写性，再生成 `WorkspaceEditPlan`；只产生 Current Mod 或 open overlay 的 edits，不直接写磁盘。
 
-local parameter 是 scripted definition 内的局部事实，definition/references/rename 不经过 workspace 全局 symbol bucket。
+local parameter occurrence 是 scripted definition 内的局部事实，definition/references/rename 不经过 workspace 全局 symbol bucket。调用侧所需的参数签名由 active macro definition 的 shard 摘要提供。
 
 ## 持久化与限制
 
-Current Mod 和 Dependency 的 shard 当前驻留内存；Vanilla 例外是用户本地 `VanillaIndexCache`，保存 shard、导航位置和有界 localisation preview，但不保存源码、CST 或 HIR。cache 的重建规则见 RFC 0003。
+Current Mod 和 Dependency 的 shard 当前驻留内存；Vanilla 例外是用户本地 `VanillaIndexCache`，保存 shard（包括 macro signature）、导航位置和有界 localisation preview，但不保存源码、CST 或 HIR。cache 的重建规则见 RFC 0003。
 
 当前索引没有跨服务器稳定的 symbol identity，也没有完整的 reference 倒排索引；动态拼接、未被 HIR/rule 确认的文本不会成为确定 reference。更完整的语义依赖仍由 `pdx-analysis` 在 snapshot 上计算。

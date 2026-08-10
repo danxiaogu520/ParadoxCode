@@ -20,7 +20,7 @@ mod read;
 mod write;
 
 /// Current on-disk Vanilla cache schema.
-pub const CURRENT_VANILLA_CACHE_SCHEMA_VERSION: u32 = 3;
+pub const CURRENT_VANILLA_CACHE_SCHEMA_VERSION: u32 = 4;
 
 const APPLICATION_ID: i32 = 0x5044_5856;
 const MAX_CACHE_BYTES: u64 = 1024 * 1024 * 1024;
@@ -130,6 +130,25 @@ impl VanillaIndexCache {
         if snapshot.index().references_iter().count() > MAX_CACHE_SYMBOLS {
             return Err(VanillaCacheError::LimitExceeded(
                 "reference",
+                MAX_CACHE_SYMBOLS,
+            ));
+        }
+        let macro_definition_count = snapshot
+            .index()
+            .shards
+            .values()
+            .map(|shard| shard.macro_definitions.len())
+            .sum::<usize>();
+        let macro_parameter_count = snapshot
+            .index()
+            .shards
+            .values()
+            .flat_map(|shard| shard.macro_definitions.iter())
+            .map(|summary| summary.parameters.len())
+            .sum::<usize>();
+        if macro_definition_count > MAX_CACHE_SYMBOLS || macro_parameter_count > MAX_CACHE_SYMBOLS {
+            return Err(VanillaCacheError::LimitExceeded(
+                "macro summary",
                 MAX_CACHE_SYMBOLS,
             ));
         }

@@ -16,7 +16,7 @@
 
 ## 主要公开类型与入口
 
-- `CURRENT_SCHEMA_VERSION`：当前 runtime SQLite schema，值为 `16`。
+- `CURRENT_SCHEMA_VERSION`：当前 runtime SQLite schema，值为 `17`。
 - `RuleHash`：32 字节 canonical SHA-256；可用 `from_bytes`、`as_bytes`、`to_hex`、`from_hex` 操作。
 - `ParserKind`、`FileResolutionPolicy`、`SymbolResolutionPolicy`、`FileMatcher`、`FileCategory`、`SymbolDescriptor`：文件分类和覆盖/符号冲突策略。
 - `RulesModel`、`RuleRecord`、`SemanticModel`、`SemanticRule`、`KeyMatcher`、`ValueMatcher`：规范化 catalog 与可执行语义 matcher 数据。
@@ -26,7 +26,7 @@
 
 ## source compiler、`pdx-bake` 与 authority
 
-RFC 0013 规定 `rules/eu4/` 是静态 EU4 规则的唯一 source authority。当前 source format 为 `5`，固定输入包括 `manifest.json`、`catalog.json`、`semantic-rules.json`、`enum-values.json`、`type-root-keys.json`、`type-root-scopes.json`、`type-descriptors.json` 和 `localisation-bindings.json`。
+RFC 0013 规定 `rules/eu4/` 是静态 EU4 规则的唯一 source authority。当前 source format 为 `6`，固定输入包括 `manifest.json`、`catalog.json`、`semantic-rules.json`、`enum-values.json`、`type-root-keys.json`、`type-root-scopes.json`、`type-descriptors.json` 和 `localisation-bindings.json`。
 
 公开的 `pdx_rules::rulec` 入口是 `load_source`、`load_source_bundle` 和 `compile`；相关类型包括 `SourceBundle`、`SourceManifest`、`ArtifactManifest`、`CompileError`。compiler 拒绝 unknown field、缺文件、重复 stable identity 及无效 cross-record invariant，并在发布前读回 SQLite 做 round-trip 比较。
 
@@ -48,7 +48,7 @@ cargo run -p pdx-rules --bin pdx-bake -- build --source rules/eu4 --output <arti
 
 - 不提供 LSP、workspace/index、磁盘扫描或编辑器协议；动态 scripted effects/triggers 等成员来自上层 `WorkspaceIndex`，不在这里硬编码。
 - compiler 是固定第一方 JSON source 编译器，不是 CWT/外部规则语言兼容层。
-- 当前 runtime schema 为 `16`，不接受其他 schema；规则身份由 `game_id` 和 canonical `rule_hash` 校验。
+- 当前 runtime schema 为 `17`，不接受其他 schema；规则身份由 `game_id` 和 canonical `rule_hash` 校验。
 - 正式 server 的用户入口不接受外部规则路径、下载 source 或用户规则覆盖；developer `compile` 的 source path 仅用于受控构建流程。
 
 ## 验证命令

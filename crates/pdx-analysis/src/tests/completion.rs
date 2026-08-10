@@ -243,7 +243,12 @@ fn scripted_definition_completion_snippet_includes_parameters() {
     fs::create_dir_all(root.join("common/scripted_effects")).expect("effect directory");
     fs::write(
         root.join("common/scripted_effects/00_test.txt"),
-        "apply = { value = $zeta$ [[alpha] enabled = yes ] }\n",
+        concat!(
+            "apply = { value = $zeta$ [[alpha] enabled = yes ] }\n",
+            "plain = { add_prestige = 1 }\n",
+            "scalar = { add_prestige = $amount$ }\n",
+            "optional_only = { [[value] add_prestige = $value$ ] }\n",
+        ),
     )
     .expect("scripted effect definition");
     let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
@@ -267,9 +272,33 @@ fn scripted_definition_completion_snippet_includes_parameters() {
         .iter()
         .find(|item| item.label == "apply")
         .expect("scripted effect item");
+    assert_eq!(snippet.insert_text, "apply = {\n\tzeta = $1\n\t$0\n}");
     assert_eq!(
-        snippet.insert_text,
-        "apply = {\n\tzeta = $1\n\talpha = $2\n\t$0\n}"
+        crate::semantic::scripted_definition_snippet(
+            &host.snapshot(),
+            "scripted_effect",
+            "plain",
+            ""
+        ),
+        "plain = yes"
+    );
+    assert_eq!(
+        crate::semantic::scripted_definition_snippet(
+            &host.snapshot(),
+            "scripted_effect",
+            "scalar",
+            ""
+        ),
+        "scalar = {\n\tamount = $1\n\t$0\n}"
+    );
+    assert_eq!(
+        crate::semantic::scripted_definition_snippet(
+            &host.snapshot(),
+            "scripted_effect",
+            "optional_only",
+            ""
+        ),
+        "optional_only = {\n\t$0\n}"
     );
     fs::remove_dir_all(root).expect("cleanup");
 }
