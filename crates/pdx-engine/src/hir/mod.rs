@@ -11,6 +11,7 @@ mod model;
 mod parameters;
 mod scope;
 mod semantics;
+mod templates;
 
 pub use model::*;
 pub use semantics::semantic_root_context;
@@ -103,6 +104,13 @@ fn lower_shared_impl(
         rules,
         profile,
     );
+    let macro_templates = templates::lower_macro_templates(
+        &syntax,
+        &definitions,
+        &parameter_conditionals,
+        &parameter_references,
+        rules,
+    );
     HirFile {
         syntax,
         scope: Scope::Unknown,
@@ -116,6 +124,7 @@ fn lower_shared_impl(
         parameter_conditionals,
         parameter_definitions,
         parameter_references,
+        macro_templates,
     }
 }
 

@@ -22,6 +22,33 @@ fn symbol_hover_does_not_materialize_the_full_workspace() {
 }
 
 #[test]
+fn semantic_hover_descends_into_quoted_script_with_mapped_range() {
+    let text = "trigger = { embedded = \"foo = yes\" }\n";
+    let (host, id) = quoted_script_snapshot(text);
+    let start = u32::try_from(text.find("foo").expect("inner key")).expect("offset");
+    let snapshot = host.snapshot();
+    let input = input_for_document(&snapshot, &id).expect("input");
+    let context = semantic_completion_context(&snapshot, &input, start + 1)
+        .unwrap_or_else(|| panic!("missing quoted semantic context"));
+    assert_eq!(
+        context
+            .property
+            .as_ref()
+            .map(|property| property.key.as_str()),
+        Some("foo"),
+        "{context:?}"
+    );
+
+    let hover = hover(&snapshot, &id, start + 1).expect("quoted semantic hover");
+
+    assert!(hover.contents.contains("PDX property `foo`"), "{hover:?}");
+    assert_eq!(
+        hover.range,
+        Some(TextRange::new(start, start + 3).expect("range"))
+    );
+}
+
+#[test]
 fn symbol_hover_explains_active_and_shadowed_source_roots() {
     use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use std::fs;

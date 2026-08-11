@@ -12,6 +12,7 @@ cargo +nightly fuzz run parse-localisation -- -runs=1000
 cargo +nightly fuzz run incremental-edits -- -runs=1000
 cargo +nightly fuzz run format-script -- -runs=1000
 cargo +nightly fuzz run lower-hir -- -runs=1000
+cargo +nightly fuzz run quoted-script -- -runs=1000
 ```
 
 The fuzz workspace can also be type-checked without sanitizer linking:

@@ -51,3 +51,10 @@ path = "fuzz_targets/lower_hir.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "quoted-script"
+path = "fuzz_targets/quoted_script.rs"
+test = false
+doc = false
+bench = false

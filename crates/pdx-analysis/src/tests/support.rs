@@ -76,3 +76,83 @@ pub(crate) fn semantic_snapshot_with_constraints(
         .expect("open");
     (host, id)
 }
+
+pub(crate) fn quoted_script_snapshot(text: &str) -> (AnalysisHost, DocumentId) {
+    let mut model = pdx_game::eu4::bootstrap_model();
+    model.semantic.rules.extend([
+        SemanticRule {
+            id: "fixture:trigger:embedded".to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("embedded".to_owned()),
+            operator: Some("=".to_owned()),
+            value: ValueMatcher::AnyScalar,
+            shape: RuleShape::QuotedScript,
+            child_context: Some("trigger".to_owned()),
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: vec!["Embedded trigger Script".to_owned()],
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 2,
+        },
+        SemanticRule {
+            id: "fixture:trigger:nested".to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("nested".to_owned()),
+            operator: Some("=".to_owned()),
+            value: ValueMatcher::AnyScalar,
+            shape: RuleShape::QuotedScript,
+            child_context: Some("trigger".to_owned()),
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 3,
+        },
+        SemanticRule {
+            id: "fixture:trigger:foo-quoted-child".to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("foo".to_owned()),
+            operator: Some("=".to_owned()),
+            value: ValueMatcher::Bool,
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 4,
+        },
+    ]);
+    let mut host = eu4_host(RuleSet::from_model(model));
+    let id = DocumentId::new("file:///tmp/common/events/quoted-script.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open");
+    (host, id)
+}

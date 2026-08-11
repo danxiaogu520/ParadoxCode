@@ -532,6 +532,9 @@ fn collect_macro_definitions(hir: &HirFile, rules: &RuleSet) -> Vec<MacroDefinit
             name: definition.name.clone(),
             definition_range: definition.range,
             parameters,
+            template: hir
+                .macro_template(&definition.kind, &definition.name, definition.range)
+                .cloned(),
         });
     }
     summaries.sort_by_key(|summary| summary.definition_range);

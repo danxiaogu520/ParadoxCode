@@ -254,3 +254,110 @@ fn eu4_replace_scope_links_populate_from_intrinsics() {
     );
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn scripted_macro_expansion_uses_the_callers_nested_scope() {
+    use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+    use std::fs;
+
+    let mut model = pdx_game::eu4::first_party_rules()
+        .expect("first-party rules")
+        .model()
+        .clone();
+    model.semantic.rules.push(SemanticRule {
+        id: "fixture:effect:enter-province".to_owned(),
+        context: "effect".to_owned(),
+        parent_path: Vec::new(),
+        key: KeyMatcher::Exact("fixture_enter_province".to_owned()),
+        operator: None,
+        value: ValueMatcher::AnyScalar,
+        shape: RuleShape::Node,
+        child_context: Some("effect".to_owned()),
+        alternative_id: None,
+        severity: None,
+        required: false,
+        deprecated: false,
+        documentation: Vec::new(),
+        allowed_scopes: Vec::new(),
+        push_scope: Some("province".to_owned()),
+        replace_scope: Vec::new(),
+        min_occurs: None,
+        strict_min: true,
+        max_occurs: None,
+        source_file: "fixture.semantic".to_owned(),
+        line: 1,
+    });
+    model.semantic.rules.push(SemanticRule {
+        id: "fixture:effect:country-only".to_owned(),
+        context: "effect".to_owned(),
+        parent_path: Vec::new(),
+        key: KeyMatcher::Exact("fixture_country_only".to_owned()),
+        operator: None,
+        value: ValueMatcher::Bool,
+        shape: RuleShape::Leaf,
+        child_context: None,
+        alternative_id: None,
+        severity: None,
+        required: false,
+        deprecated: false,
+        documentation: Vec::new(),
+        allowed_scopes: vec!["country".to_owned()],
+        push_scope: None,
+        replace_scope: Vec::new(),
+        min_occurs: None,
+        strict_min: true,
+        max_occurs: None,
+        source_file: "fixture.semantic".to_owned(),
+        line: 2,
+    });
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-scope-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    fs::create_dir_all(&definitions).expect("definition directory");
+    fs::write(
+        definitions.join("00_scope.txt"),
+        "country_wrapper = { fixture_country_only = yes }\n",
+    )
+    .expect("macro definition");
+    let mut host = eu4_host(RuleSet::from_model(model));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definition");
+    let id = DocumentId::new("file:///tmp/events/macro-scope.txt");
+    let source = concat!(
+        "country_event = { immediate = { ",
+        "country_wrapper = yes ",
+        "fixture_enter_province = { country_wrapper = yes }",
+        " } }\n",
+    );
+    host.open_document(id.clone(), 1, source.to_owned(), None)
+        .expect("open calls");
+
+    let results = diagnostics(&host.snapshot(), &id);
+    let wrong_scope = results
+        .iter()
+        .filter(|diagnostic| {
+            diagnostic.code == DiagnosticCode::WrongScope
+                && diagnostic.message.contains("fixture_country_only")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(wrong_scope.len(), 1, "{results:?}");
+    assert!(
+        wrong_scope[0]
+            .message
+            .contains("in expansion of `country_wrapper`")
+    );
+    let nested_call = source.rfind("country_wrapper").expect("nested macro call");
+    assert_eq!(
+        wrong_scope[0].range.start(),
+        u32::try_from(nested_call).expect("call range")
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}

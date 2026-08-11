@@ -1,0 +1,239 @@
+//! Ordered, source-ranged scripted-macro templates.
+
+use pdx_parser::{CstKind, CstNode, ParsedFile};
+use pdx_rules::RuleSet;
+use pdx_text::TextRange;
+
+use super::{
+    HirDefinition, HirParameterConditional, HirParameterReference, MacroTemplate,
+    MacroTemplateConditional, MacroTemplateFragment, MacroTemplateItem, MacroTemplateProperty,
+    MacroTemplateToken, MacroTemplateValue, range_within,
+};
+
+pub(super) fn lower_macro_templates(
+    syntax: &ParsedFile,
+    definitions: &[HirDefinition],
+    conditionals: &[HirParameterConditional],
+    references: &[HirParameterReference],
+    rules: &RuleSet,
+) -> Vec<MacroTemplate> {
+    let mut templates = Vec::new();
+    for definition in definitions {
+        let macro_enabled = rules
+            .model()
+            .semantic
+            .type_descriptors
+            .iter()
+            .find(|(kind, _)| kind.eq_ignore_ascii_case(&definition.kind))
+            .and_then(|(_, descriptor)| descriptor.scripted_macro.as_ref())
+            .is_some_and(|descriptor| descriptor.macro_enabled);
+        if !macro_enabled
+            || syntax.errors().iter().any(|error| {
+                error.range.start() >= definition.range.start()
+                    && error.range.end() <= definition.range.end()
+            })
+        {
+            continue;
+        }
+        let Some(owner) = find_node(syntax.root(), CstKind::Property, definition.range) else {
+            continue;
+        };
+        let Some(block) = property_value_child(owner, CstKind::Block) else {
+            continue;
+        };
+        let owner_references = references
+            .iter()
+            .filter(|reference| reference.owner_range == definition.range)
+            .collect::<Vec<_>>();
+        let Some(items) = template_items(syntax, block.children(), conditionals, &owner_references)
+        else {
+            continue;
+        };
+        templates.push(MacroTemplate {
+            kind: definition.kind.clone(),
+            name: definition.name.clone(),
+            definition_range: definition.range,
+            body_range: block.range(),
+            items,
+        });
+    }
+    templates.sort_by_key(|template| template.definition_range.start());
+    templates
+}
+
+fn template_items(
+    syntax: &ParsedFile,
+    nodes: &[CstNode],
+    conditionals: &[HirParameterConditional],
+    references: &[&HirParameterReference],
+) -> Option<Vec<MacroTemplateItem>> {
+    let mut items = Vec::new();
+    for node in nodes {
+        match node.kind() {
+            CstKind::Property => items.push(MacroTemplateItem::Property(template_property(
+                syntax,
+                node,
+                conditionals,
+                references,
+            )?)),
+            CstKind::BareValue | CstKind::QuotedString => {
+                items.push(MacroTemplateItem::BareValue(template_token(
+                    syntax, node, references,
+                )?));
+            }
+            CstKind::ParameterBlock => {
+                let conditional = conditionals
+                    .iter()
+                    .find(|conditional| conditional.range == node.range())?;
+                let body = node
+                    .children()
+                    .iter()
+                    .filter(|child| child.kind() != CstKind::ParameterCondition)
+                    .cloned()
+                    .collect::<Vec<_>>();
+                items.push(MacroTemplateItem::Conditional(MacroTemplateConditional {
+                    name: conditional.name.clone(),
+                    negated: conditional.negated,
+                    range: conditional.range,
+                    items: template_items(syntax, &body, conditionals, references)?,
+                }));
+            }
+            CstKind::Comment | CstKind::Bom => {}
+            CstKind::Error
+            | CstKind::HeaderBlock
+            | CstKind::Document
+            | CstKind::Key
+            | CstKind::Operator
+            | CstKind::Value
+            | CstKind::Block
+            | CstKind::ParameterCondition
+            | CstKind::LocalisationDocument
+            | CstKind::LanguageHeader
+            | CstKind::LocalisationEntry
+            | CstKind::LocalisationKey
+            | CstKind::Version
+            | CstKind::LocalisationString
+            | CstKind::UnquotedValue => return None,
+        }
+    }
+    Some(items)
+}
+
+fn template_property(
+    syntax: &ParsedFile,
+    node: &CstNode,
+    conditionals: &[HirParameterConditional],
+    references: &[&HirParameterReference],
+) -> Option<MacroTemplateProperty> {
+    let key = node
+        .children()
+        .iter()
+        .find(|child| child.kind() == CstKind::Key)?;
+    let operator = node
+        .children()
+        .iter()
+        .find(|child| child.kind() == CstKind::Operator)
+        .and_then(|operator| syntax.text(operator.range()))
+        .map(str::trim)
+        .filter(|operator| !operator.is_empty())
+        .map(str::to_owned);
+    let value = node
+        .children()
+        .iter()
+        .find(|child| child.kind() == CstKind::Value)?
+        .children()
+        .first()?;
+    let value = match value.kind() {
+        CstKind::BareValue | CstKind::QuotedString => {
+            MacroTemplateValue::Scalar(template_token(syntax, value, references)?)
+        }
+        CstKind::Block => MacroTemplateValue::Block {
+            range: value.range(),
+            items: template_items(syntax, value.children(), conditionals, references)?,
+        },
+        _ => return None,
+    };
+    Some(MacroTemplateProperty {
+        key: template_token(syntax, key, references)?,
+        range: node.range(),
+        operator,
+        value,
+    })
+}
+
+fn template_token(
+    syntax: &ParsedFile,
+    node: &CstNode,
+    references: &[&HirParameterReference],
+) -> Option<MacroTemplateToken> {
+    let raw = syntax.text(node.range())?;
+    let quoted = raw.starts_with('"') && raw.ends_with('"') && raw.len() >= 2;
+    let content_range = if quoted {
+        TextRange::new(
+            node.range().start().saturating_add(1),
+            node.range().end().saturating_sub(1),
+        )?
+    } else {
+        node.range()
+    };
+    let mut slots = references
+        .iter()
+        .copied()
+        .filter(|reference| range_within(reference.range, content_range))
+        .collect::<Vec<_>>();
+    slots.sort_by_key(|reference| reference.range.start());
+    let mut fragments = Vec::new();
+    let mut cursor = content_range.start();
+    for reference in slots {
+        if reference.range.start() < cursor {
+            continue;
+        }
+        if cursor < reference.range.start() {
+            fragments.push(MacroTemplateFragment::Literal(
+                syntax
+                    .text(TextRange::new(cursor, reference.range.start())?)?
+                    .to_owned(),
+            ));
+        }
+        fragments.push(MacroTemplateFragment::Parameter {
+            name: reference.name.clone(),
+            range: reference.range,
+        });
+        cursor = reference.range.end();
+    }
+    if cursor < content_range.end() {
+        fragments.push(MacroTemplateFragment::Literal(
+            syntax
+                .text(TextRange::new(cursor, content_range.end())?)?
+                .to_owned(),
+        ));
+    }
+    if fragments.is_empty() {
+        fragments.push(MacroTemplateFragment::Literal(
+            syntax.text(content_range)?.to_owned(),
+        ));
+    }
+    Some(MacroTemplateToken {
+        range: node.range(),
+        quoted,
+        fragments,
+    })
+}
+
+fn property_value_child(node: &CstNode, kind: CstKind) -> Option<&CstNode> {
+    node.children()
+        .iter()
+        .find(|child| child.kind() == CstKind::Value)?
+        .children()
+        .iter()
+        .find(|child| child.kind() == kind)
+}
+
+fn find_node(node: &CstNode, kind: CstKind, range: TextRange) -> Option<&CstNode> {
+    if node.kind() == kind && node.range() == range {
+        return Some(node);
+    }
+    node.children()
+        .iter()
+        .find_map(|child| find_node(child, kind, range))
+}

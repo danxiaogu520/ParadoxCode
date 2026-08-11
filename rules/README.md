@@ -12,7 +12,7 @@
 - `type-descriptors.json`: path, name and type-selection metadata;
 - `localisation-bindings.json`: type-instance localisation templates and subtype conditions.
 
-The current source format is `6`; the generated runtime SQLite schema is `17`.
+The current source format is `7`; the generated runtime SQLite schema is `18`.
 
 ## Validate and build
 
@@ -28,3 +28,5 @@ cargo run --locked -p pdx-rules --bin pdx-bake -- build \
 The generated SQLite artifact is never hand-maintained or committed. Official `pdx` and `pdx-ls` binaries embed the JSON source, compute its canonical `rule_hash`, and materialize a validated SQLite artifact in the user-local cache on cache miss or hash mismatch. The runtime exposes no rule override or external source path.
 
 Every rule change must pass source schema/invariant validation, deterministic canonical hashing, SQLite round-trip, manifest/checksum verification and affected analysis/LSP tests. See [RFC 0013](../docs/rfc/0013-first-party-rule-source.md) and [the rule matrix](../docs/rule-semantics-matrix.md).
+
+To inventory multiline quoted Script carriers in a local EU4 installation without copying payload text, run `node scripts/audit-quoted-scripts.mjs --source <EU4 directory> --rules rules/eu4/semantic-rules.json`. The key-only and key-plus-structural-path counts are review aids; they do not replace semantic context verification or make dynamic scripted members static. The exact-parent-path lower bound excludes dynamic `<...>` paths. Scripted effect/trigger parameters such as `for.effect` are intentionally absent from first-party rules and must be inferred from WorkspaceIndex/HIR templates. The audit reports their workspace candidates separately by reading top-level macro definitions and `$PARAM$` tokens; unknown engine helpers with neither fixed rules nor workspace semantics remain opaque.

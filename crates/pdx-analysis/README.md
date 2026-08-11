@@ -11,6 +11,7 @@
 - `types.rs`：公共 DTO、diagnostic/completion/hover/rename 类型和取消 token；
 - `support.rs`：解析输入、CST/HIR 输入适配和共享文本辅助；
 - `semantic.rs`：规则上下文、scope transition、semantic matcher 和诊断共享逻辑；
+- `quoted_script.rs`：diagnostics/completion/hover/navigation 共用的 secondary parse 查询预算；
 - `resolution.rs`：workspace semantic 收集、候选和 symbol resolution；
 - `diagnostics.rs`、`completion/`、`hover.rs`、`navigation.rs`：各类 editor-neutral query；
 - `tests/`：按 diagnostics、completion、semantic/scope、hover、navigation、rename 分组的行为测试。
@@ -42,14 +43,16 @@ AnalysisSnapshot
 
 ## 查询语义
 
-- completion 同时覆盖 semantic key/value、localisation key/value 和 workspace symbol；`CompletionKind` 区分 `Key`、`Value`、`Symbol`、`Localisation`。
-- hover 可展示 rule/property/value 文档、symbol 信息、localisation preview 和 scripted-definition parameter 信息；不会要求读取另一文件的完整 source。
-- definition 对 unresolved 或 ambiguous symbol 返回空结果而不随机选择；references 可由 `include_declaration` 控制定義是否包含。
-- rename 先 prepare，再检查单一 PDX identifier、唯一解析、可写位置和命名冲突；edit 只针对 open overlay 或可写 Current Mod 位置，并按安全应用顺序返回。
+- completion 同时覆盖 semantic key/value、localisation key/value 和 workspace symbol；`CompletionKind` 区分 `Key`、`Value`、`Symbol`、`Localisation`。显式 quoted-script rule 和宏 bare-parameter use-site 均可提供引号内 context。
+- hover 可展示 rule/property/value 文档、symbol 信息、localisation preview 和 scripted-definition parameter 信息；规则确认的 quoted Script 使用映射后的主文档 range。
+- definition 对 unresolved 或 ambiguous symbol 返回空结果而不随机选择；references 可由 `include_declaration` 控制定義是否包含，并按需收集 quoted Script 内已确认的引用。
+- rename 先 prepare，再检查单一 PDX identifier、唯一解析、可写位置和命名冲突；edit 只针对 open overlay 或可写 Current Mod 位置，并按安全应用顺序返回。quoted Script edit 使用 source-mapped identifier range，不以 secondary CST 节点充当身份。
 
 ## 明确不负责的边界与当前限制
 
 本 crate 不解析 JSON-RPC、不声明 capability、不做 UTF-16 `Position`/URI 转换、不处理 client version event，也不执行 game install discovery。查询只认识 snapshot 已有的文本/HIR/index；不存在或不支持的输入通常返回 `None`、空 vector 或空 completion，而不是访问磁盘补齐数据。批量 push diagnostics 明确排除 disk-only 文件，disk 文件仍可参与导航和 workspace-symbol；未唯一解析的目标不会产生导航或 rename edit。
+
+quoted Script 性能可用 `cargo bench -p pdx-analysis --bench quoted_queries` 测量；当前实现保持 query-local parse，不把 secondary CST 缓存在 HIR 或跨 snapshot 全局状态中。
 
 ## 验证命令
 

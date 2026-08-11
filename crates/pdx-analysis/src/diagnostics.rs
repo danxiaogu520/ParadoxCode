@@ -1,12 +1,16 @@
+use crate::macro_expansion::{ExpansionEnterFailure, ExpansionFailure, MacroExpansionSession};
+use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
 use crate::resolution::*;
 use crate::semantic::*;
 use crate::support::*;
 use crate::types::*;
-use pdx_engine::hir::{HirFile, Scope};
+use pdx_engine::hir::{HirFile, HirParameterReferenceKind, Scope};
 use pdx_engine::{AnalysisSnapshot, DocumentId, DocumentSource, SourceFileId};
 use pdx_parser::{FileFormat, SyntaxError};
 use pdx_rules::RuleShape;
 use pdx_text::TextRange;
+
+const MAX_EXPANDED_DIAGNOSTICS_PER_INVOCATION: usize = 32;
 
 /// Runs diagnostics for all open overlays.  Disk-only files are intentionally excluded from push
 /// diagnostics; they still participate in navigation and workspace-symbol queries.
@@ -185,6 +189,8 @@ pub(crate) fn semantic_rule_diagnostics(
     let roots = script_properties(input, parsed.root());
     cancellation.checkpoint()?;
     let mut diagnostics = Vec::new();
+    let mut expansion = MacroExpansionSession::default();
+    let mut quoted_scripts = QuotedScriptSession::new(cancellation);
     for property in roots {
         cancellation.checkpoint()?;
         let Some(context) = semantic_root_context(snapshot, &property.key, input.path.as_ref())
@@ -223,6 +229,10 @@ pub(crate) fn semantic_rule_diagnostics(
                     &mut diagnostics,
                     cancellation,
                     child.block_range.is_some(),
+                    child.block_range.unwrap_or(child.key_range),
+                    &mut expansion,
+                    &mut quoted_scripts,
+                    0,
                 )?;
             }
             continue;
@@ -238,6 +248,10 @@ pub(crate) fn semantic_rule_diagnostics(
             &mut diagnostics,
             cancellation,
             property.block_range.is_some(),
+            property.block_range.unwrap_or(property.key_range),
+            &mut expansion,
+            &mut quoted_scripts,
+            0,
         )?;
     }
     Ok(diagnostics)
@@ -254,6 +268,10 @@ pub(crate) fn validate_semantic_container(
     diagnostics: &mut Vec<Diagnostic>,
     cancellation: &CancellationToken,
     block_container: bool,
+    container_range: TextRange,
+    expansion: &mut MacroExpansionSession,
+    quoted_scripts: &mut QuotedScriptSession<'_>,
+    quoted_script_depth: usize,
 ) -> Result<(), Cancelled> {
     cancellation.checkpoint()?;
     let rules = semantic_rules_for_container(snapshot, context, parent_path, scope);
@@ -290,9 +308,16 @@ pub(crate) fn validate_semantic_container(
             })
             .copied()
             .collect::<Vec<_>>();
-        if matching.is_empty() && transparent_wrapper {
-            // EU4 logical wrappers (AND/OR/NOT) do not introduce a new rule context or
-            // scope. Their children are validated as siblings of the wrapper itself.
+        let parameterized_key = hir.is_some_and(|hir| {
+            owner_local_parameter_in_range(
+                hir,
+                property.key_range,
+                HirParameterReferenceKind::KeySubstitution,
+            )
+        });
+        if matching.is_empty() && (transparent_wrapper || parameterized_key) {
+            // EU4 logical wrappers retain their parent context. Owner-local parameter keys are
+            // likewise deferred until a call site supplies the concrete key spelling.
         } else if matching.is_empty() {
             diagnostics.push(Diagnostic {
                 code: DiagnosticCode::UnknownKey,
@@ -330,9 +355,19 @@ pub(crate) fn validate_semantic_container(
             } else {
                 &scoped_matching
             };
-            let valid = applicable
-                .iter()
-                .any(|rule| semantic_property_matches(snapshot, rule, property, scope));
+            let parameterized_scalar = property.scalar.as_ref().is_some_and(|(_, range)| {
+                hir.is_some_and(|hir| {
+                    owner_local_parameter_in_range(
+                        hir,
+                        *range,
+                        HirParameterReferenceKind::Substitution,
+                    )
+                })
+            });
+            let valid = applicable.iter().any(|rule| {
+                semantic_property_matches(snapshot, rule, property, scope)
+                    || (parameterized_scalar && semantic_property_structure_matches(rule, property))
+            });
             if !valid {
                 diagnostics.push(Diagnostic {
                     code: DiagnosticCode::InvalidValue,
@@ -351,7 +386,36 @@ pub(crate) fn validate_semantic_container(
                     ),
                 });
             }
-            validate_scripted_macro_arguments(snapshot, applicable, property, diagnostics);
+            let parameterized_invocation = hir.is_some_and(|hir| {
+                owner_local_parameter_in_range(
+                    hir,
+                    property.range,
+                    HirParameterReferenceKind::Substitution,
+                ) || owner_local_parameter_in_range(
+                    hir,
+                    property.range,
+                    HirParameterReferenceKind::KeySubstitution,
+                )
+            });
+            let arguments_allow_expansion = parameterized_invocation
+                || validate_scripted_macro_arguments(snapshot, applicable, property, diagnostics);
+            if valid
+                && !scoped_matching.is_empty()
+                && arguments_allow_expansion
+                && !parameterized_invocation
+            {
+                validate_scripted_macro_expansion(
+                    snapshot,
+                    applicable,
+                    property,
+                    scope,
+                    diagnostics,
+                    cancellation,
+                    expansion,
+                    quoted_scripts,
+                    quoted_script_depth,
+                )?;
+            }
             let max_occurs = applicable
                 .iter()
                 .filter(|rule| {
@@ -436,10 +500,40 @@ pub(crate) fn validate_semantic_container(
                     diagnostics,
                     cancellation,
                     property.block_range.is_some(),
+                    property.block_range.unwrap_or(property.key_range),
+                    expansion,
+                    quoted_scripts,
+                    quoted_script_depth,
                 )?;
             }
             continue;
         };
+        let quoted_transition = semantic_selected_transition(
+            snapshot,
+            &matching,
+            selected_alternative.as_deref(),
+            context,
+            parent_path,
+            property,
+            scope,
+            transparent_wrapper,
+        )
+        .filter(|rule| matches!(rule.shape, RuleShape::QuotedScript));
+        if quoted_transition.is_some() {
+            validate_quoted_script(
+                snapshot,
+                &next_context,
+                &child_path,
+                &next_scope,
+                property,
+                diagnostics,
+                cancellation,
+                expansion,
+                quoted_scripts,
+                quoted_script_depth,
+            )?;
+            continue;
+        }
         let destination_is_structural = next_context.eq_ignore_ascii_case(context)
             && child_path.len() == structural_path.len()
             && child_path
@@ -485,6 +579,10 @@ pub(crate) fn validate_semantic_container(
                     diagnostics,
                     cancellation,
                     true,
+                    property.block_range.unwrap_or(property.key_range),
+                    expansion,
+                    quoted_scripts,
+                    quoted_script_depth,
                 )?;
                 validate_semantic_container(
                     snapshot,
@@ -497,6 +595,10 @@ pub(crate) fn validate_semantic_container(
                     diagnostics,
                     cancellation,
                     true,
+                    property.block_range.unwrap_or(property.key_range),
+                    expansion,
+                    quoted_scripts,
+                    quoted_script_depth,
                 )?;
                 continue;
             }
@@ -512,6 +614,10 @@ pub(crate) fn validate_semantic_container(
             diagnostics,
             cancellation,
             property.block_range.is_some(),
+            property.block_range.unwrap_or(property.key_range),
+            expansion,
+            quoted_scripts,
+            quoted_script_depth,
         )?;
     }
     for (value, value_range) in bare_values {
@@ -524,7 +630,14 @@ pub(crate) fn validate_semantic_container(
             })
             .copied()
             .collect::<Vec<_>>();
-        if matching.is_empty() {
+        let parameterized_value = hir.is_some_and(|hir| {
+            owner_local_parameter_in_range(
+                hir,
+                *value_range,
+                HirParameterReferenceKind::Substitution,
+            )
+        });
+        if matching.is_empty() && !parameterized_value {
             diagnostics.push(Diagnostic {
                 code: DiagnosticCode::InvalidValue,
                 severity: DiagnosticCode::InvalidValue.severity(),
@@ -535,9 +648,14 @@ pub(crate) fn validate_semantic_container(
             });
         }
     }
-    let empty_range = properties
-        .first()
-        .map_or_else(|| TextRange::empty(0), |property| property.key_range);
+    let empty_range = properties.first().map_or_else(
+        || {
+            bare_values
+                .first()
+                .map_or(container_range, |(_, range)| *range)
+        },
+        |property| property.key_range,
+    );
     if block_container {
         for rule in rules
             .iter()
@@ -613,14 +731,235 @@ pub(crate) fn validate_semantic_container(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
+fn validate_quoted_script(
+    snapshot: &AnalysisSnapshot,
+    context: &str,
+    parent_path: &[String],
+    scope: &ScopeContext,
+    property: &ScriptProperty,
+    diagnostics: &mut Vec<Diagnostic>,
+    cancellation: &CancellationToken,
+    expansion: &mut MacroExpansionSession,
+    quoted_scripts: &mut QuotedScriptSession<'_>,
+    depth: usize,
+) -> Result<(), Cancelled> {
+    cancellation.checkpoint()?;
+    let range = property
+        .scalar
+        .as_ref()
+        .map_or(property.key_range, |(_, range)| *range);
+    let Some(origin) = property.quoted_source.as_ref() else {
+        return Ok(());
+    };
+    let script = match quoted_scripts.parse(origin.source(), depth)? {
+        QuotedScriptParse::Parsed(script) => script,
+        QuotedScriptParse::Opaque => {
+            diagnostics.push(Diagnostic {
+                code: DiagnosticCode::InvalidValue,
+                severity: DiagnosticCode::InvalidValue.severity(),
+                range,
+                message: "quoted Script payload could not be decoded".to_owned(),
+            });
+            return Ok(());
+        }
+        QuotedScriptParse::Limited(limit) => {
+            diagnostics.push(Diagnostic {
+                code: DiagnosticCode::InvalidValue,
+                severity: DiagnosticCode::InvalidValue.severity(),
+                range,
+                message: limit.message().to_owned(),
+            });
+            return Ok(());
+        }
+    };
+    for error in script.parsed().errors() {
+        cancellation.checkpoint()?;
+        let Some(range) = origin.map_decoded_range(&script, error.range) else {
+            continue;
+        };
+        diagnostics.push(Diagnostic {
+            code: DiagnosticCode::Syntax,
+            severity: DiagnosticCode::Syntax.severity(),
+            range,
+            message: error.message.clone(),
+        });
+    }
+    let (properties, bare_values) = quoted_script_container(&script, origin);
+    validate_semantic_container(
+        snapshot,
+        context,
+        parent_path,
+        &properties,
+        &bare_values,
+        scope,
+        None,
+        diagnostics,
+        cancellation,
+        true,
+        range,
+        expansion,
+        quoted_scripts,
+        depth.saturating_add(1),
+    )
+}
+
+fn owner_local_parameter_in_range(
+    hir: &HirFile,
+    range: TextRange,
+    expected_kind: HirParameterReferenceKind,
+) -> bool {
+    hir.parameter_references().iter().any(|reference| {
+        reference.kind == expected_kind
+            && reference.range.start() >= range.start()
+            && reference.range.end() <= range.end()
+            && hir
+                .parameter_definitions_for_owner(reference.owner_range)
+                .any(|definition| definition.name.eq_ignore_ascii_case(&reference.name))
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_scripted_macro_expansion(
+    snapshot: &AnalysisSnapshot,
+    rules: &[&pdx_rules::SemanticRule],
+    property: &ScriptProperty,
+    scope: &ScopeContext,
+    diagnostics: &mut Vec<Diagnostic>,
+    cancellation: &CancellationToken,
+    expansion: &mut MacroExpansionSession,
+    quoted_scripts: &mut QuotedScriptSession<'_>,
+    quoted_script_depth: usize,
+) -> Result<(), Cancelled> {
+    let Some(type_name) = rules.iter().find_map(|rule| match &rule.key {
+        pdx_rules::KeyMatcher::Type(type_name) | pdx_rules::KeyMatcher::Dynamic(type_name)
+            if scripted_macro_type(snapshot, type_name) =>
+        {
+            Some(type_name.as_str())
+        }
+        _ => None,
+    }) else {
+        return Ok(());
+    };
+    let Some(resolved) = resolve_macro_definition(snapshot, type_name, &property.key) else {
+        return Ok(());
+    };
+    let Some(template) = resolved.summary.template.as_ref() else {
+        return Ok(());
+    };
+    match expansion.enter(&resolved) {
+        Ok(()) => {}
+        Err(ExpansionEnterFailure::Cycle(chain)) => {
+            diagnostics.push(Diagnostic {
+                code: DiagnosticCode::MacroExpansionCycle,
+                severity: DiagnosticCode::MacroExpansionCycle.severity(),
+                range: property.key_range,
+                message: format!("scripted macro expansion cycle: {}", chain.join(" -> ")),
+            });
+            return Ok(());
+        }
+        Err(ExpansionEnterFailure::Limit(limit)) => {
+            diagnostics.push(macro_expansion_limit(property.key_range, limit));
+            return Ok(());
+        }
+    }
+    let expanded = match expansion.expand(
+        template,
+        property,
+        cancellation,
+        quoted_scripts,
+        quoted_script_depth,
+    ) {
+        Ok(Ok(expanded)) => expanded,
+        Ok(Err(ExpansionFailure::MissingParameter(name))) => {
+            diagnostics.push(Diagnostic {
+                code: DiagnosticCode::Cardinality,
+                severity: DiagnosticCode::Cardinality.severity(),
+                range: property.key_range,
+                message: format!(
+                    "macro `{}` expansion requires parameter `{name}` in the active branch",
+                    resolved.summary.name
+                ),
+            });
+            expansion.leave();
+            return Ok(());
+        }
+        Ok(Err(ExpansionFailure::InvalidArgument { name, range })) => {
+            diagnostics.push(Diagnostic {
+                code: DiagnosticCode::InvalidValue,
+                severity: DiagnosticCode::InvalidValue.severity(),
+                range,
+                message: format!("macro parameter `{name}` must be a scalar token for expansion"),
+            });
+            expansion.leave();
+            return Ok(());
+        }
+        Ok(Err(ExpansionFailure::Limit(limit))) => {
+            diagnostics.push(macro_expansion_limit(property.key_range, limit));
+            expansion.leave();
+            return Ok(());
+        }
+        Err(cancelled) => {
+            expansion.leave();
+            return Err(cancelled);
+        }
+    };
+    let first_expanded_diagnostic = diagnostics.len();
+    let validation = validate_semantic_container(
+        snapshot,
+        &resolved.body_context,
+        &[],
+        &expanded.properties,
+        &expanded.bare_values,
+        scope,
+        None,
+        diagnostics,
+        cancellation,
+        true,
+        property.key_range,
+        expansion,
+        quoted_scripts,
+        0,
+    );
+    expansion.leave();
+    validation?;
+    let expanded_diagnostic_count = diagnostics.len().saturating_sub(first_expanded_diagnostic);
+    if expanded_diagnostic_count > MAX_EXPANDED_DIAGNOSTICS_PER_INVOCATION {
+        let omitted = expanded_diagnostic_count - MAX_EXPANDED_DIAGNOSTICS_PER_INVOCATION;
+        diagnostics.truncate(first_expanded_diagnostic + MAX_EXPANDED_DIAGNOSTICS_PER_INVOCATION);
+        diagnostics.push(Diagnostic {
+            code: DiagnosticCode::MacroExpansionLimit,
+            severity: DiagnosticCode::MacroExpansionLimit.severity(),
+            range: property.key_range,
+            message: format!("scripted macro expansion omitted {omitted} additional diagnostic(s)"),
+        });
+    }
+    for diagnostic in &mut diagnostics[first_expanded_diagnostic..] {
+        diagnostic.message = format!(
+            "in expansion of `{}`: {}",
+            resolved.summary.name, diagnostic.message
+        );
+    }
+    Ok(())
+}
+
+fn macro_expansion_limit(range: TextRange, limit: &'static str) -> Diagnostic {
+    Diagnostic {
+        code: DiagnosticCode::MacroExpansionLimit,
+        severity: DiagnosticCode::MacroExpansionLimit.severity(),
+        range,
+        message: format!("scripted macro expansion exceeded the {limit} limit"),
+    }
+}
+
 fn validate_scripted_macro_arguments(
     snapshot: &AnalysisSnapshot,
     rules: &[&pdx_rules::SemanticRule],
     property: &ScriptProperty,
     diagnostics: &mut Vec<Diagnostic>,
-) {
+) -> bool {
     if property.block_range.is_none() {
-        return;
+        return true;
     }
     let summary = rules.iter().find_map(|rule| {
         let type_name = match &rule.key {
@@ -634,7 +973,7 @@ fn validate_scripted_macro_arguments(
         macro_definition_summary(snapshot, type_name, &property.key)
     });
     let Some(summary) = summary else {
-        return;
+        return true;
     };
 
     let mut counts = std::collections::BTreeMap::<String, usize>::new();
@@ -675,7 +1014,9 @@ fn validate_scripted_macro_arguments(
                 missing.join(", ")
             ),
         });
+        return false;
     }
+    true
 }
 pub(crate) fn syntax_diagnostics(input: &ParsedInput) -> Vec<Diagnostic> {
     match &input.parsed {

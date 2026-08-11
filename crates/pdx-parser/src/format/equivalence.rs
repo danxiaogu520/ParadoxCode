@@ -1,6 +1,6 @@
 use super::common::TextEdit;
-use super::script::{decode_payload, quoted_payload, quoted_script};
-use crate::{CstNode, FileFormat, ParsedFile, TokenKind, parse};
+use super::script::quoted_script;
+use crate::{CstNode, ParsedFile, TokenKind, parse_quoted_script};
 use pdx_text::TextRange;
 pub(super) fn equivalent(original: &ParsedFile, formatted: &ParsedFile, depth: usize) -> bool {
     if original.format() != formatted.format()
@@ -27,14 +27,12 @@ pub(super) fn equivalent(original: &ParsedFile, formatted: &ParsedFile, depth: u
             if before.kind() == TokenKind::Quoted
                 && let Some(before_script) = quoted_script(before_text, depth)
             {
-                let Some(after_payload) = quoted_payload(after_text).and_then(decode_payload)
-                else {
+                let Some(after_script) = parse_quoted_script(after_text) else {
                     return false;
                 };
-                let after_script = parse(FileFormat::Script, &after_payload);
                 return equivalent(
                     &before_script.parsed,
-                    &after_script,
+                    after_script.parsed(),
                     depth.saturating_add(1),
                 );
             }

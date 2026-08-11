@@ -29,7 +29,7 @@ pub use profile::{
 pub use runtime::{RuleSet, RulesError};
 
 /// The first runtime schema version reserved for the generated rule database.
-pub const CURRENT_SCHEMA_VERSION: u32 = 17;
+pub const CURRENT_SCHEMA_VERSION: u32 = 18;
 
 #[cfg(test)]
 mod tests;

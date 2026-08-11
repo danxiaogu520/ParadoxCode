@@ -17,3 +17,26 @@ The command writes an ignored `diagnostic-reports/current-mod-<timestamp>.json` 
 matching Markdown report. It exits with status `1` when an error is found (use `--fail-on warning`
 to fail on warnings too, or `--fail-on none` for collection-only runs). Run
 `node scripts/diagnose-current-mod.mjs --help` for all options and environment variables.
+
+## Quoted Script inventory
+
+`audit-quoted-scripts.mjs` scans a local EU4 tree for multiline quoted property values without
+printing or storing their payload text. It reports aggregate key counts, workspace scripted-macro
+candidates from the scanned definitions, and, when given the first-party semantic source,
+candidate `quoted_script` matches by key and structural parent path:
+
+```bash
+node scripts/audit-quoted-scripts.mjs \
+  --source "/path/to/Europa Universalis IV" \
+  --rules rules/eu4/semantic-rules.json
+```
+
+Use `--json` for the payload-free per-location inventory. Candidate counts are review aids rather
+than proof of semantic context. The exact-parent-path count is a conservative lower bound that
+excludes rules containing dynamic `<...>` path segments, because a lexical suffix cannot establish
+their semantic container. Scripted effect/trigger carriers are intentionally not first-party rule
+matches: the separate workspace-macro candidate count is derived from top-level definitions and
+their `$PARAM$` tokens in the scanned source tree. Runtime templates infer the actual standalone
+quoted parameters. An engine helper absent from both fixed rules and workspace semantics remains
+opaque. Dynamic members still come from the workspace/Vanilla index, and the audit never modifies
+rule source.

@@ -33,11 +33,11 @@ SemanticModel
 
 `FileCategory` 的 `parser` 当前是 `Script`、`Localisation`、`Asset` 或 `SyntaxOnly`。artifact 兼容读取中的 CSV parser 名称会映射为 `SyntaxOnly`，不会使 runtime 获得 CSV parser。`resolution` 是 `ReplaceByRelativePath`、`Merge` 或 `ReplaceDirectory`。
 
-`SemanticRule` 保存 stable source-derived id、context、parent path、key/value matcher、shape、child context、scope 操作、cardinality、severity、deprecated、documentation 和 source provenance。key matcher 当前包括 `Exact`、`Type`、`Enum`、`AnyScalar`、`Dynamic`；value matcher 包括 scalar、bool、数值、date、type/enum、scope、localisation、filepath、dynamic 和 `Opaque` 等形式。
+`SemanticRule` 保存 stable source-derived id、context、parent path、key/value matcher、shape、child context、scope 操作、cardinality、severity、deprecated、documentation 和 source provenance。key matcher 当前包括 `Exact`、`Type`、`Enum`、`AnyScalar`、`Dynamic`；value matcher 包括 scalar、bool、数值、date、type/enum、scope、localisation、filepath、dynamic 和 `Opaque` 等形式。shape 包括 `node`、`leaf`、`leaf_value`、`value_clause` 和 `quoted_script`；最后一项表示源语法必须是 quoted scalar，其 decoded payload 是 `child_context` 指定的嵌套 Script container。compiler 要求它使用 `AnyScalar`/`Opaque` value matcher且必须有非空 child context。
 
 ## SQLite 校验
 
-当前 `pdx-rules::CURRENT_SCHEMA_VERSION` 为 `17`。`RuleSet::load` 以 read-only 方式打开 SQLite，启用 foreign keys，并要求 metadata 至少包含 `schema_version`、`game_id` 和 `rule_hash`。schema 不匹配、metadata 缺失、game identity 不符或逻辑 hash 不符都会返回错误；runtime 不从错误 artifact 继续服务。
+当前 `pdx-rules::CURRENT_SCHEMA_VERSION` 为 `18`。`RuleSet::load` 以 read-only 方式打开 SQLite，启用 foreign keys，并要求 metadata 至少包含 `schema_version`、`game_id` 和 `rule_hash`。schema 不匹配、metadata 缺失、game identity 不符或逻辑 hash 不符都会返回错误；runtime 不从错误 artifact 继续服务。
 
 读取后会重建 `RulesModel` 和不可变 `RuleSet`。runtime 不暴露 insert/update/delete；`RuleSet` 只提供查询、分类、规则 hash 和 schema version。SQLite artifact 是存储格式，不能通过手工修改来改变运行时规则。
 

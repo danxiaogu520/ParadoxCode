@@ -196,6 +196,97 @@ pub struct HirParameterReference {
     pub kind: HirParameterReferenceKind,
 }
 
+/// One source token retained by a scripted-macro template.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MacroTemplateToken {
+    /// Exact definition-side token range, including quotes when present.
+    pub range: TextRange,
+    /// Whether the source token was quoted.
+    pub quoted: bool,
+    /// Literal and parameter fragments in source order, excluding surrounding quotes.
+    pub fragments: Vec<MacroTemplateFragment>,
+}
+
+/// One literal or parameter fragment within a macro template token.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum MacroTemplateFragment {
+    /// Definition-side text copied without interpretation.
+    Literal(String),
+    /// One owner-local parameter slot.
+    Parameter {
+        /// Parameter spelling without delimiters.
+        name: String,
+        /// Exact definition-side range of the delimited occurrence.
+        range: TextRange,
+    },
+}
+
+/// The value attached to a property in a macro template.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum MacroTemplateValue {
+    /// One scalar token.
+    Scalar(MacroTemplateToken),
+    /// One ordered script block.
+    Block {
+        /// Exact definition-side block range.
+        range: TextRange,
+        /// Properties, bare values, and conditional blocks in source order.
+        items: Vec<MacroTemplateItem>,
+    },
+}
+
+/// One property retained in a macro template.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MacroTemplateProperty {
+    /// Token supplying the property key.
+    pub key: MacroTemplateToken,
+    /// Full definition-side property range.
+    pub range: TextRange,
+    /// Operator spelling recovered by the parser.
+    pub operator: Option<String>,
+    /// Scalar or block value.
+    pub value: MacroTemplateValue,
+}
+
+/// One conditional block retained in a macro template.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MacroTemplateConditional {
+    /// Parameter spelling without `!`.
+    pub name: String,
+    /// Whether the body is active when the parameter is absent.
+    pub negated: bool,
+    /// Full definition-side conditional range.
+    pub range: TextRange,
+    /// Ordered body items.
+    pub items: Vec<MacroTemplateItem>,
+}
+
+/// One ordered item in a macro template container.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum MacroTemplateItem {
+    /// A key/operator/value property.
+    Property(MacroTemplateProperty),
+    /// A standalone scalar in a mixed block.
+    BareValue(MacroTemplateToken),
+    /// A supplied/absent parameter conditional.
+    Conditional(MacroTemplateConditional),
+}
+
+/// Reusable, source-ranged body of one scripted effect or trigger definition.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MacroTemplate {
+    /// Dynamic symbol kind, such as `scripted_effect`.
+    pub kind: String,
+    /// Definition name as written in source.
+    pub name: String,
+    /// Full owning definition range.
+    pub definition_range: TextRange,
+    /// Exact body block range.
+    pub body_range: TextRange,
+    /// Ordered body items.
+    pub items: Vec<MacroTemplateItem>,
+}
+
 /// The interpretation layer that emitted a HIR reference.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum HirReferenceOrigin {
@@ -226,6 +317,7 @@ pub struct HirFile {
     pub(super) parameter_conditionals: Vec<HirParameterConditional>,
     pub(super) parameter_definitions: Vec<HirParameterDefinition>,
     pub(super) parameter_references: Vec<HirParameterReference>,
+    pub(super) macro_templates: Vec<MacroTemplate>,
 }
 
 impl HirFile {
@@ -332,6 +424,27 @@ impl HirFile {
     #[must_use]
     pub fn parameter_references(&self) -> &[HirParameterReference] {
         &self.parameter_references
+    }
+
+    /// Returns reusable scripted-macro templates in definition source order.
+    #[must_use]
+    pub fn macro_templates(&self) -> &[MacroTemplate] {
+        &self.macro_templates
+    }
+
+    /// Finds the template belonging to one exact definition range and kind/name identity.
+    #[must_use]
+    pub fn macro_template(
+        &self,
+        kind: &str,
+        name: &str,
+        definition_range: TextRange,
+    ) -> Option<&MacroTemplate> {
+        self.macro_templates.iter().find(|template| {
+            template.definition_range == definition_range
+                && template.kind.eq_ignore_ascii_case(kind)
+                && template.name.eq_ignore_ascii_case(name)
+        })
     }
 
     /// Finds the local parameter occurrence containing an exact source position.

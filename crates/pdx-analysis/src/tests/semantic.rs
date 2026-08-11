@@ -18,6 +18,52 @@ fn query_input_reuses_the_document_hir_handle() {
 }
 
 #[test]
+fn quoted_transition_beats_any_scalar_leaf_fallback() {
+    let (host, _) = quoted_script_snapshot(
+        "country_event = { id = test.1 trigger = { embedded = \"foo = yes\" } }\n",
+    );
+    let snapshot = host.snapshot();
+    let quoted = snapshot
+        .rules()
+        .exact_semantic_rules("embedded")
+        .find(|rule| matches!(rule.shape, RuleShape::QuotedScript))
+        .expect("quoted fixture rule");
+    let mut fallback = quoted.clone();
+    fallback.id = "fixture:trigger:any-scalar-fallback".to_owned();
+    fallback.key = KeyMatcher::AnyScalar;
+    fallback.shape = RuleShape::Leaf;
+    fallback.child_context = None;
+    let property = crate::ScriptProperty {
+        key: "embedded".to_owned(),
+        key_range: TextRange::empty(0),
+        range: TextRange::empty(0),
+        operator: Some("=".to_owned()),
+        scalar: Some(("foo = yes".to_owned(), TextRange::empty(0))),
+        quoted: true,
+        quoted_source: None,
+        block_range: None,
+        block: Vec::new(),
+        bare_values: Vec::new(),
+    };
+    let scope = crate::ScopeContext::new(snapshot.game_profile_handle());
+
+    let selected = crate::semantic_selected_transition(
+        &snapshot,
+        &[&fallback, quoted],
+        None,
+        "trigger",
+        &[],
+        &property,
+        &scope,
+        false,
+    )
+    .expect("specific quoted transition");
+
+    assert_eq!(selected.id, quoted.id);
+    assert_eq!(selected.child_context.as_deref(), Some("trigger"));
+}
+
+#[test]
 fn identity_only_host_does_not_guess_eu4_semantics_from_game_id() {
     let mut host = AnalysisHost::new(pdx_game::eu4::bootstrap_rules());
     let id = DocumentId::new("file:///tmp/common/events/generic.txt");
@@ -331,6 +377,8 @@ fn semantic_alternative_selection_refuses_equal_scores() {
         range: TextRange::empty(0),
         operator: None,
         scalar: Some(("yes".to_owned(), TextRange::empty(0))),
+        quoted: false,
+        quoted_source: None,
         block_range: None,
         block: Vec::new(),
         bare_values: Vec::new(),
@@ -413,6 +461,8 @@ fn workspace_type_child_key_selects_only_one_transition() {
         range: TextRange::empty(0),
         operator: Some("=".to_owned()),
         scalar: None,
+        quoted: false,
+        quoted_source: None,
         block_range: Some(TextRange::empty(0)),
         block: vec![crate::ScriptProperty {
             key: "FRA".to_owned(),
@@ -420,6 +470,8 @@ fn workspace_type_child_key_selects_only_one_transition() {
             range: TextRange::empty(0),
             operator: Some("=".to_owned()),
             scalar: Some(("yes".to_owned(), TextRange::empty(0))),
+            quoted: false,
+            quoted_source: None,
             block_range: None,
             block: Vec::new(),
             bare_values: Vec::new(),
@@ -587,8 +639,8 @@ fn eu4_scripted_effect_params_are_owner_qualified() {
     fs::write(
         &definition_path,
         concat!(
-            "apply = { value = $amount$ [[optional] enabled = yes ] }\n",
-            "other_effect = { value = $other$ }\n",
+            "apply = { add_prestige = $amount$ [[optional] add_stability = 1 ] }\n",
+            "other_effect = { add_prestige = $other$ }\n",
         ),
     )
     .expect("scripted effect definition");
@@ -666,7 +718,7 @@ fn eu4_scripted_effect_params_are_owner_qualified() {
     host.open_document(
         overlay_id,
         1,
-        "apply = { value = $overlay_only$ }\n".to_owned(),
+        "apply = { add_prestige = $overlay_only$ }\n".to_owned(),
         Some(definition_path),
     )
     .expect("open scripted effect overlay");

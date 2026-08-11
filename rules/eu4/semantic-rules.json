@@ -156883,6 +156883,43 @@
     "line": 5624
   },
   {
+    "id": "missions/missions:23:quoted-script:root:mission_series:trigger",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>"
+    ],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "quoted_script",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Quoted Script form of a mission completion trigger."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "country"
+      ],
+      [
+        "root",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5624
+  },
+  {
     "id": "missions/missions:25:rule:root:mission_series:effect",
     "context": "root:mission_series",
     "parent_path": [
@@ -156914,6 +156951,43 @@
       ]
     ],
     "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5625
+  },
+  {
+    "id": "missions/missions:25:quoted-script:root:mission_series:effect",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>"
+    ],
+    "key": {
+      "exact": "effect"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "quoted_script",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Quoted Script form of a mission completion effect."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "country"
+      ],
+      [
+        "root",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
     "strict_min": true,
     "max_occurs": 1,
     "source_file": "semantic-rules.json",

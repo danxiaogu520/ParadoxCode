@@ -3,7 +3,8 @@ use std::sync::Arc;
 use pdx_engine::hir::semantic_root_context as hir_semantic_root_context;
 use pdx_engine::hir::{HirFile, ScopeState, ScopeValue};
 use pdx_engine::{
-    AnalysisSnapshot, DocumentSource, MacroDefinitionSummary, MacroParameterSignature,
+    AnalysisSnapshot, DocumentId, DocumentSource, MacroDefinitionSummary, MacroParameterSignature,
+    SourceFileId,
 };
 use pdx_rules::{GameProfile, KeyMatcher, RuleShape, ValueMatcher};
 use pdx_text::{LogicalPath, TextRange};
@@ -202,18 +203,8 @@ pub(crate) fn semantic_selected_transition<'rule>(
     scope: &ScopeContext,
     transparent_wrapper: bool,
 ) -> Option<&'rule pdx_rules::SemanticRule> {
-    let applicable = matching
-        .iter()
-        .copied()
-        .filter(|rule| {
-            // Alias definitions are concrete invocations, not competing alternatives, so
-            // alternative selection must not discard them (e.g. `if` inside an effect).
-            semantic_rule_is_alias_definition(rule)
-                || selected_alternative.is_none()
-                || semantic_rule_is_selected(rule, selected_alternative)
-        })
-        .filter(|rule| semantic_scope_allows(rule, scope))
-        .collect::<Vec<_>>();
+    let applicable =
+        semantic_transition_candidates(matching, selected_alternative, property, scope);
     if semantic_transitions_equivalent(&applicable) {
         return applicable.first().copied();
     }
@@ -266,6 +257,48 @@ pub(crate) fn semantic_selected_transition<'rule>(
     // unmatched children are reported against the parent context; alias definitions are
     // already preserved above, which keeps legitimate transitions like `if` selected.
     None
+}
+
+/// Returns the rules which may drive a property's semantic transition. `AnyScalar` is a
+/// container-local fallback: once a concrete matcher accepts the key it must not compete with
+/// that rule's destination. A quoted Script shape is likewise more specific than an ordinary
+/// scalar leaf for the same quoted value. Keeping this policy in one helper prevents diagnostics,
+/// completion and future embedded-language queries from choosing different containers.
+pub(crate) fn semantic_transition_candidates<'rule>(
+    matching: &[&'rule pdx_rules::SemanticRule],
+    selected_alternative: Option<&str>,
+    property: &ScriptProperty,
+    scope: &ScopeContext,
+) -> Vec<&'rule pdx_rules::SemanticRule> {
+    let mut applicable = matching
+        .iter()
+        .copied()
+        .filter(|rule| {
+            // Alias definitions are concrete invocations, not competing alternatives, so
+            // alternative selection must not discard them (e.g. `if` inside an effect).
+            semantic_rule_is_alias_definition(rule)
+                || selected_alternative.is_none()
+                || semantic_rule_is_selected(rule, selected_alternative)
+        })
+        .filter(|rule| semantic_scope_allows(rule, scope))
+        .filter(|rule| semantic_property_structure_matches(rule, property))
+        .collect::<Vec<_>>();
+
+    if applicable
+        .iter()
+        .any(|rule| !matches!(rule.key, KeyMatcher::AnyScalar))
+    {
+        applicable.retain(|rule| !matches!(rule.key, KeyMatcher::AnyScalar));
+    }
+
+    if property.quoted
+        && applicable
+            .iter()
+            .any(|rule| matches!(rule.shape, RuleShape::QuotedScript))
+    {
+        applicable.retain(|rule| matches!(rule.shape, RuleShape::QuotedScript));
+    }
+    applicable
 }
 
 pub(crate) fn semantic_transition_destination(
@@ -733,6 +766,46 @@ pub(crate) fn macro_definition_summary(
     owner_kind: &str,
     owner_name: &str,
 ) -> Option<MacroDefinitionSummary> {
+    resolve_macro_definition(snapshot, owner_kind, owner_name).map(|resolved| resolved.summary)
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum MacroDefinitionIdentity {
+    Overlay {
+        document: DocumentId,
+        version: Option<i64>,
+        definition_range: TextRange,
+    },
+    File {
+        file: SourceFileId,
+        revision: u64,
+        definition_range: TextRange,
+    },
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ResolvedMacroDefinition {
+    pub(crate) identity: MacroDefinitionIdentity,
+    pub(crate) summary: MacroDefinitionSummary,
+    pub(crate) body_context: String,
+}
+
+pub(crate) fn resolve_macro_definition(
+    snapshot: &AnalysisSnapshot,
+    owner_kind: &str,
+    owner_name: &str,
+) -> Option<ResolvedMacroDefinition> {
+    let body_context = snapshot
+        .rules()
+        .model()
+        .semantic
+        .type_descriptors
+        .iter()
+        .find(|(kind, _)| kind.eq_ignore_ascii_case(owner_kind))
+        .and_then(|(_, descriptor)| descriptor.scripted_macro.as_ref())
+        .filter(|descriptor| descriptor.macro_enabled)?
+        .body_context
+        .clone();
     let mut overlay_candidates = Vec::new();
     for document in snapshot
         .documents()
@@ -746,19 +819,27 @@ pub(crate) fn macro_definition_summary(
             definition.kind.eq_ignore_ascii_case(owner_kind)
                 && definition.name.eq_ignore_ascii_case(owner_name)
         }) {
-            overlay_candidates.push(macro_summary_in_hir(
-                &hir,
-                &definition.kind,
-                &definition.name,
-                definition.range,
-            ));
+            overlay_candidates.push(ResolvedMacroDefinition {
+                identity: MacroDefinitionIdentity::Overlay {
+                    document: document.id().clone(),
+                    version: document.version(),
+                    definition_range: definition.range,
+                },
+                summary: macro_summary_in_hir(
+                    &hir,
+                    &definition.kind,
+                    &definition.name,
+                    definition.range,
+                ),
+                body_context: body_context.clone(),
+            });
         }
     }
     if overlay_candidates.len() > 1 {
         return None;
     }
-    if let Some(summary) = overlay_candidates.pop() {
-        return Some(summary);
+    if let Some(resolved) = overlay_candidates.pop() {
+        return Some(resolved);
     }
 
     let definition = snapshot.index().active_definition(owner_kind, owner_name)?;
@@ -772,10 +853,20 @@ pub(crate) fn macro_definition_summary(
     if hidden_by_overlay {
         return None;
     }
-    snapshot
+    let summary = snapshot
         .index()
         .active_macro_definition(owner_kind, owner_name)
-        .cloned()
+        .cloned()?;
+    let state = snapshot.file_state(definition.file_id);
+    Some(ResolvedMacroDefinition {
+        identity: MacroDefinitionIdentity::File {
+            file: definition.file_id,
+            revision: state.map_or(0, pdx_engine::FileState::revision),
+            definition_range: definition.range,
+        },
+        summary,
+        body_context,
+    })
 }
 
 fn macro_summary_in_hir(
@@ -796,6 +887,7 @@ fn macro_summary_in_hir(
         name: name.to_owned(),
         definition_range: owner_range,
         parameters,
+        template: hir.macro_template(kind, name, owner_range).cloned(),
     }
 }
 
@@ -892,21 +984,7 @@ pub(crate) fn semantic_property_matches(
     if let Some(matches) = scripted_macro_call_shape_matches(snapshot, rule, property) {
         return matches;
     }
-    let shape_matches = match rule.shape {
-        RuleShape::Node => property.block_range.is_some(),
-        RuleShape::ValueClause => {
-            property.block_range.is_some() && !property.bare_values.is_empty()
-        }
-        RuleShape::Leaf | RuleShape::LeafValue => property.scalar.is_some(),
-    };
-    if !shape_matches {
-        return false;
-    }
-    if rule
-        .operator
-        .as_deref()
-        .is_some_and(|operator| property.operator.as_deref() != Some(operator))
-    {
+    if !semantic_property_structure_matches(rule, property) {
         return false;
     }
     let Some((value, _)) = property.scalar.as_ref() else {
@@ -930,6 +1008,33 @@ pub(crate) fn semantic_property_matches(
         rule.value,
         ValueMatcher::Int { .. } | ValueMatcher::Float { .. }
     ) && scope_member(snapshot, None, value, scope_context))
+}
+
+/// Returns whether a property satisfies the rule shape and operator independently of its scalar
+/// spelling. Macro definition placeholders use this to defer only the binding-dependent matcher.
+pub(crate) fn semantic_property_structure_matches(
+    rule: &pdx_rules::SemanticRule,
+    property: &ScriptProperty,
+) -> bool {
+    let shape_matches = match rule.shape {
+        RuleShape::Node => property.block_range.is_some(),
+        RuleShape::QuotedScript => property.quoted && property.scalar.is_some(),
+        RuleShape::ValueClause => {
+            property.block_range.is_some() && !property.bare_values.is_empty()
+        }
+        RuleShape::Leaf | RuleShape::LeafValue => property.scalar.is_some(),
+    };
+    if !shape_matches {
+        return false;
+    }
+    if rule
+        .operator
+        .as_deref()
+        .is_some_and(|operator| property.operator.as_deref() != Some(operator))
+    {
+        return false;
+    }
+    true
 }
 
 fn scripted_macro_call_shape_matches(

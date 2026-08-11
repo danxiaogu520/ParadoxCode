@@ -27,13 +27,14 @@ Tree-sitter 的现有 corpus 只有 `grammars/tree-sitter-eu4/test/corpus/eu4.tx
 
 ## Fuzz targets
 
-当前恰好有五个 `cargo-fuzz` target：
+当前有六个 `cargo-fuzz` target：
 
 1. `parse-script`：Script parse、token 和 CST range 边界；
 2. `parse-localisation`：localisation parse、CST 和 error range 边界；
 3. `incremental-edits`：增量结果与 full reparse 的可观察结构等价性；
 4. `format-script`：安全格式化、幂等性和非 trivia token 保留；
-5. `lower-hir`：通用及 EU4 profile-aware HIR lowering 的范围和事实边界。
+5. `lower-hir`：通用及 EU4 profile-aware HIR lowering 的范围和事实边界；
+6. `quoted-script`：quoted payload encode/decode 往返、UTF-8 byte source map 单调性、边界反向映射和 recovery parse。
 
 CI 当前用 nightly 构建全部 target，并只运行 `lower-hir` 的 `-runs=100` invariant smoke。没有
 独立的 `line_index`、`parse_csv` 或 first-party rule-source fuzz target，也没有定时或长时间
@@ -41,14 +42,15 @@ fuzz workflow；这些均是当前未实现的质量面。
 
 ## Benchmark
 
-唯一的 Cargo benchmark 是 `crates/pdx-engine/benches/synthetic_workspace.rs`，运行：
+当前有 workspace 扫描和 quoted semantic query 两个 Cargo benchmark：
 
 ```text
 cargo bench -p pdx-engine --bench synthetic_workspace
+cargo bench -p pdx-analysis --bench quoted_queries
 ```
 
-它默认生成 2,000 个原创 EU4 event 文件，测量 initial scan/index、无变化 refresh、单磁盘文件
-refresh 和单 overlay edit；`PDX_BENCH_FILES` 可调整数量。benchmark 用于本机趋势观察，没有
+前者默认生成 2,000 个原创 EU4 event 文件，测量 initial scan/index、无变化 refresh、单磁盘文件
+refresh 和单 overlay edit；`PDX_BENCH_FILES` 可调整数量。后者使用 250 个原创内部 effect property，测量 quoted Script diagnostics 与 completion 的 query-local secondary parse。benchmark 用于本机趋势观察，没有
 跨机器绝对阈值，也没有定时 benchmark job。
 
 ## 当前 CI 与质量门禁

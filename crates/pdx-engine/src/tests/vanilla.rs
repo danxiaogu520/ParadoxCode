@@ -44,6 +44,10 @@ fn vanilla_cache_preserves_scripted_macro_references_without_hir() {
         .index()
         .active_macro_definition("scripted_effect", "cached_effect")
         .expect("signature before caching");
+    assert!(
+        signature.template.is_some(),
+        "live index omitted macro template"
+    );
     assert_eq!(
         signature.parameters,
         vec![
@@ -72,6 +76,18 @@ fn vanilla_cache_preserves_scripted_macro_references_without_hir() {
             .expect("signature after caching"),
         signature
     );
+    let connection = rusqlite::Connection::open(&cache_path).expect("open cache for corruption");
+    connection
+        .execute(
+            "UPDATE macro_definitions SET template_payload = ?1 WHERE name = ?2",
+            rusqlite::params![b"{}".as_slice(), "cached_effect"],
+        )
+        .expect("corrupt template payload");
+    drop(connection);
+    assert!(matches!(
+        VanillaIndexCache::load(&cache_path),
+        Err(VanillaCacheError::InvalidData(_))
+    ));
     fs::remove_dir_all(root).expect("cleanup");
 }
 

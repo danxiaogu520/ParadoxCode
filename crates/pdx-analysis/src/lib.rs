@@ -6,7 +6,9 @@
 mod completion;
 mod diagnostics;
 mod hover;
+mod macro_expansion;
 mod navigation;
+mod quoted_script;
 mod resolution;
 mod semantic;
 mod support;
@@ -30,10 +32,12 @@ pub use types::{
 
 // These crate-visible re-exports keep the existing in-crate test and helper paths stable while
 // allowing the implementation to live in responsibility-oriented modules.
+#[cfg(test)]
+pub(crate) use completion::semantic_completion_context;
 #[allow(unused_imports)]
 pub(crate) use completion::{
     CompletionMemberCache, SemanticCompletionContext, add_semantic_key_items,
-    scope_expression_candidates, semantic_completion_context,
+    scope_expression_candidates,
 };
 #[cfg(test)]
 pub(crate) use resolution::ALL_SEMANTICS_CALLS;

@@ -7,6 +7,8 @@ use pdx_text::{LogicalPath, TextRange, TextSize};
 #[cfg(test)]
 use std::cell::Cell;
 
+use crate::completion::{SemanticCompletionContext, infer_macro_quoted_script_constraints};
+use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
 use crate::semantic::*;
 use crate::support::*;
 use crate::types::*;
@@ -75,12 +77,26 @@ pub(crate) enum Resolution {
 }
 
 pub(crate) fn semantic_data(snapshot: &AnalysisSnapshot, input: &ParsedInput) -> SemanticFile {
+    uncancelled(semantic_data_with_cancellation(
+        snapshot,
+        input,
+        &CancellationToken::new(),
+    ))
+}
+
+pub(crate) fn semantic_data_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    cancellation: &CancellationToken,
+) -> Result<SemanticFile, Cancelled> {
+    cancellation.checkpoint()?;
     let mut data = SemanticFile {
         definitions: Vec::new(),
         references: Vec::new(),
     };
     let Some(hir) = input.hir.as_deref() else {
-        return data;
+        collect_quoted_semantics(snapshot, input, &mut data, cancellation)?;
+        return Ok(data);
     };
     // The inactive-range set is only consulted for Semantic-origin references; skip building it
     // entirely when this file has none, keeping semantic_data O(references + definitions).
@@ -94,6 +110,7 @@ pub(crate) fn semantic_data(snapshot: &AnalysisSnapshot, input: &ParsedInput) ->
         BTreeSet::new()
     };
     for definition in hir.definitions() {
+        cancellation.checkpoint()?;
         data.definitions.push(make_definition(
             input,
             &definition.kind,
@@ -121,6 +138,7 @@ pub(crate) fn semantic_data(snapshot: &AnalysisSnapshot, input: &ParsedInput) ->
                 || workspace_member(snapshot, &reference.kind, &reference.name)
         })
     {
+        cancellation.checkpoint()?;
         data.references.push(ReferenceInternal {
             kind: reference.kind.clone(),
             name: reference.name.clone(),
@@ -130,7 +148,299 @@ pub(crate) fn semantic_data(snapshot: &AnalysisSnapshot, input: &ParsedInput) ->
             path: input.path.clone(),
         });
     }
-    data
+    collect_quoted_semantics(snapshot, input, &mut data, cancellation)?;
+    Ok(data)
+}
+
+fn collect_quoted_semantics(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    data: &mut SemanticFile,
+    cancellation: &CancellationToken,
+) -> Result<(), Cancelled> {
+    if input.format != pdx_parser::FileFormat::Script {
+        return Ok(());
+    }
+    let ParsedContent::Text(parsed) = &input.parsed;
+    let mut quoted_scripts = QuotedScriptSession::new(cancellation);
+    for root in script_properties(input, parsed.root()) {
+        cancellation.checkpoint()?;
+        let Some(context) = semantic_root_context(snapshot, &root.key, input.path.as_ref()) else {
+            continue;
+        };
+        let scope = semantic_initial_scope(snapshot, input, &context, &root.key, root.key_range);
+        collect_quoted_semantic_container(
+            snapshot,
+            input,
+            &context,
+            &[],
+            &scope,
+            &root.block,
+            false,
+            None,
+            None,
+            data,
+            cancellation,
+            &mut quoted_scripts,
+            0,
+        )?;
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn collect_quoted_semantic_container(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    context: &str,
+    parent_path: &[String],
+    scope: &ScopeContext,
+    properties: &[ScriptProperty],
+    embedded: bool,
+    container_key: Option<&str>,
+    container_property: Option<&ScriptProperty>,
+    data: &mut SemanticFile,
+    cancellation: &CancellationToken,
+    quoted_scripts: &mut QuotedScriptSession<'_>,
+    quoted_depth: usize,
+) -> Result<(), Cancelled> {
+    let rules = semantic_rules_for_container(snapshot, context, parent_path, scope);
+    for property in properties {
+        cancellation.checkpoint()?;
+        if embedded {
+            collect_embedded_property_semantics(
+                snapshot,
+                input,
+                context,
+                parent_path,
+                scope,
+                container_key,
+                property,
+                &rules,
+                data,
+            );
+        }
+        if property.block_range.is_none()
+            && let Some(origin) = property.quoted_source.as_ref()
+            && let Some(invocation) = container_property
+        {
+            let inference_context = SemanticCompletionContext {
+                context: context.to_owned(),
+                parent_path: parent_path.to_vec(),
+                structural_containers: Vec::new(),
+                alternative_containers: Vec::new(),
+                scope: scope.clone(),
+                container_property: Some(invocation.clone()),
+                property: Some(property.clone()),
+                quoted_depth,
+                embedded_value_context: None,
+            };
+            let inferred = infer_macro_quoted_script_constraints(
+                snapshot,
+                &inference_context,
+                property,
+                cancellation,
+            )?;
+            if !inferred.is_empty() {
+                if let QuotedScriptParse::Parsed(script) =
+                    quoted_scripts.parse(origin.source(), quoted_depth)?
+                {
+                    let (quoted_properties, _) = quoted_script_container(&script, origin);
+                    for site in inferred {
+                        collect_quoted_semantic_container(
+                            snapshot,
+                            input,
+                            &site.context,
+                            &site.parent_path,
+                            &site.scope,
+                            &quoted_properties,
+                            true,
+                            None,
+                            None,
+                            data,
+                            cancellation,
+                            quoted_scripts,
+                            quoted_depth.saturating_add(1),
+                        )?;
+                    }
+                }
+                continue;
+            }
+        }
+        let transparent = context.eq_ignore_ascii_case("trigger")
+            && snapshot
+                .game_profile()
+                .is_transparent_scope_wrapper(&property.key);
+        let matching = rules
+            .iter()
+            .copied()
+            .filter(|rule| {
+                !matches!(rule.shape, RuleShape::LeafValue)
+                    && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
+            })
+            .collect::<Vec<_>>();
+        let Some(selected) = semantic_selected_transition(
+            snapshot,
+            &matching,
+            None,
+            context,
+            parent_path,
+            property,
+            scope,
+            transparent,
+        ) else {
+            continue;
+        };
+        let (next_context, next_path) = semantic_transition_destination(
+            selected,
+            context,
+            parent_path,
+            &property.key,
+            transparent,
+        );
+        let next_scope = semantic_child_scope(snapshot, scope, selected);
+        if matches!(selected.shape, RuleShape::QuotedScript) {
+            let Some(origin) = property.quoted_source.as_ref() else {
+                continue;
+            };
+            let QuotedScriptParse::Parsed(script) =
+                quoted_scripts.parse(origin.source(), quoted_depth)?
+            else {
+                continue;
+            };
+            let (quoted_properties, _) = quoted_script_container(&script, origin);
+            collect_quoted_semantic_container(
+                snapshot,
+                input,
+                &next_context,
+                &next_path,
+                &next_scope,
+                &quoted_properties,
+                true,
+                None,
+                None,
+                data,
+                cancellation,
+                quoted_scripts,
+                quoted_depth.saturating_add(1),
+            )?;
+        } else if property.block_range.is_some() {
+            collect_quoted_semantic_container(
+                snapshot,
+                input,
+                &next_context,
+                &next_path,
+                &next_scope,
+                &property.block,
+                embedded,
+                Some(&property.key),
+                Some(property),
+                data,
+                cancellation,
+                quoted_scripts,
+                quoted_depth,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn collect_embedded_property_semantics(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    _context: &str,
+    parent_path: &[String],
+    scope: &ScopeContext,
+    container_key: Option<&str>,
+    property: &ScriptProperty,
+    rules: &[&pdx_rules::SemanticRule],
+    data: &mut SemanticFile,
+) {
+    if let Some((value, range)) = property.scalar.as_ref() {
+        if let Some(kind) = input.profile.reference_kind(&property.key)
+            && !value.is_empty()
+            && !value.eq_ignore_ascii_case("yes")
+            && !value.eq_ignore_ascii_case("no")
+            && value.parse::<f64>().is_err()
+        {
+            data.references
+                .push(embedded_reference(input, kind, value, *range));
+        }
+        if let Some(kind) = input
+            .profile
+            .value_definition_kind(&property.key, container_key)
+            && !value.is_empty()
+        {
+            data.definitions.push(make_definition(
+                input,
+                kind,
+                value.clone(),
+                property.range,
+                *range,
+            ));
+        }
+        if !property.quoted
+            && rules.iter().any(|rule| {
+                matches!(rule.shape, RuleShape::Leaf)
+                    && matches!(rule.value, pdx_rules::ValueMatcher::Localisation)
+                    && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
+                    && semantic_scope_allows(rule, scope)
+                    && semantic_property_matches(snapshot, rule, property, scope)
+            })
+        {
+            data.references
+                .push(embedded_reference(input, "localisation", value, *range));
+        }
+    }
+
+    for rule in rules.iter().copied().filter(|rule| {
+        semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
+            && semantic_scope_allows(rule, scope)
+    }) {
+        let type_name = match &rule.key {
+            KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
+                if scripted_macro_type(snapshot, type_name) =>
+            {
+                type_name
+            }
+            _ => continue,
+        };
+        let Some(summary) = macro_definition_summary(snapshot, type_name, &property.key) else {
+            continue;
+        };
+        if scripted_macro_invocation_shape_matches(
+            snapshot,
+            type_name,
+            &summary,
+            property.scalar.as_ref().map(|(value, _)| value.as_str()),
+            property.block_range.is_some(),
+        ) {
+            data.references.push(embedded_reference(
+                input,
+                type_name,
+                &property.key,
+                property.key_range,
+            ));
+            break;
+        }
+    }
+}
+
+fn embedded_reference(
+    input: &ParsedInput,
+    kind: &str,
+    name: &str,
+    range: TextRange,
+) -> ReferenceInternal {
+    ReferenceInternal {
+        kind: kind.to_owned(),
+        name: name.to_owned(),
+        range,
+        document: input.document.clone(),
+        file: input.file,
+        path: input.path.clone(),
+    }
 }
 
 fn scripted_macro_reference_is_callable(
@@ -398,13 +708,42 @@ pub(crate) fn all_semantics(
             path,
         });
     }
+    let overlay_files = snapshot
+        .documents()
+        .values()
+        .filter(|document| document.source() == DocumentSource::Overlay)
+        .filter_map(|document| document.path())
+        .filter_map(|path| {
+            snapshot
+                .source_files()
+                .values()
+                .find(|file| file.physical_path == path)
+                .map(|file| file.id)
+        })
+        .collect::<BTreeSet<_>>();
+    for file in snapshot.source_files().values() {
+        cancellation.checkpoint()?;
+        if overlay_files.contains(&file.id) {
+            continue;
+        }
+        let Some(input) = input_for_source_file(snapshot, file.id) else {
+            continue;
+        };
+        let mut quoted = SemanticFile {
+            definitions: Vec::new(),
+            references: Vec::new(),
+        };
+        collect_quoted_semantics(snapshot, &input, &mut quoted, cancellation)?;
+        all.definitions.extend(quoted.definitions);
+        all.references.extend(quoted.references);
+    }
     for document in snapshot.documents().values() {
         cancellation.checkpoint()?;
         if document.source() != DocumentSource::Overlay {
             continue;
         }
         if let Some(input) = input_for_document(snapshot, document.id()) {
-            let semantic = semantic_data(snapshot, &input);
+            let semantic = semantic_data_with_cancellation(snapshot, &input, cancellation)?;
             all.definitions.extend(semantic.definitions);
             all.references.extend(semantic.references);
         }

@@ -9,9 +9,13 @@ use pdx_text::TextRange;
 mod cst;
 pub mod format;
 mod localisation;
+mod quoted_script;
 mod script;
 
 pub use cst::{CstKind, CstNode, SyntaxError, SyntaxErrorKind, SyntaxToken, TokenKind};
+pub use quoted_script::{
+    QuotedScript, QuotedScriptSourceMap, encode_quoted_script_text, parse_quoted_script,
+};
 
 /// One of the reusable Paradox text frontends.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

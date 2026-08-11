@@ -11,7 +11,7 @@
 
 HIR 目录按 `model.rs`、`collector.rs`、`parameters.rs`、`scope.rs`、`semantics.rs` 拆分，
 `hir/mod.rs` 保持 `pdx_engine::hir::*` 的公开入口。Vanilla cache 目录将 cache facade、SQLite
-read/write、preview 和稳定 codec 分到 `mod.rs`、`read.rs`、`write.rs`、`preview.rs`、`codec.rs`。
+read/write、preview、稳定 scalar codec 和 macro template codec 分到 `mod.rs`、`read.rs`、`write.rs`、`preview.rs`、`codec.rs`、`template_codec.rs`。
 测试按 index、documents、scan、Vanilla 和 HIR lowering 分组，避免测试组织重新聚合到 facade。
 
 ## 核心公开类型与入口
@@ -19,9 +19,9 @@ read/write、preview 和稳定 codec 分到 `mod.rs`、`read.rs`、`write.rs`、
 - `SourceRootId`、`SourceFileId`、`DocumentId` 是运行期稳定身份；`SourceRoot` 携带 `id`、`kind`、`path`、`order`、`writable`，`SourceRootKind` 为 `Vanilla`、`Dependency`、`CurrentMod`。
 - `AnalysisHost::empty/new/with_profile` 创建可变状态 owner；`apply_change` 配置 root/workspace，`refresh_source_roots*` 扫描并原子替换文件状态，`apply_disk_file_changes*` 做 Current Mod/Dependency 的定向更新。
 - `AnalysisSnapshot` 由 `AnalysisHost::snapshot` 产生，提供 `revision`、rules/profile、roots、documents、`source_files`、`file_state`、`index`、`scan_report`、`resolve` 和 Vanilla localisation preview。
-- `FileState` 保留一个文件版本的 source、`ParsedSource`、可选 HIR 与 `FileIndexShard`；`FileIndexShard` 原子携带 definitions、references 和 syntax error count。
+- `FileState` 保留一个文件版本的 source、`ParsedSource`、可选 HIR 与 `FileIndexShard`；`FileIndexShard` 原子携带 definitions、references、scripted macro signature/template summary 和 syntax error count。
 - `WorkspaceIndex` 由 shards 建立，支持 `definitions`、`active_definition`、`references`、位置缓存以及 `replace_shard/remove_shard`。shadowed definitions 会保留，但只有 active definition 用于解析。
-- `VanillaIndexCache::from_snapshot/load/load_cancellable/save` 操作 schema `3` 的 SQLite cache；`metadata`、`source_root`、`source_files`、`index`、`localisation_previews` 是只读访问器。
+- `VanillaIndexCache::from_snapshot/load/load_cancellable/save` 操作 schema `5` 的 SQLite cache；`metadata`、`source_root`、`source_files`、`index`、`localisation_previews` 是只读访问器。cache 持久化 source-independent macro template IR，不保存源码、CST 或完整 HIR。
 
 ## 数据流与并发边界
 
@@ -43,7 +43,7 @@ Overlay + disk candidates -> AnalysisSnapshot -> pdx-analysis queries
 
 - `ParsedSource` 当前只有 Script/Localisation 的 `Text` 变体；规则分类为 opaque asset 的文件会参与路径/overlay resolution，但不读取 source、不产生 parse/HIR。
 - root 扫描默认限制为深度 64、100,000 个文件、单文件 16 MiB，并跳过 symbolic link；profile whitelist、非法路径、文件身份碰撞和取消都会显式报告。
-- Vanilla cache 必须从唯一的 `Vanilla` root、保留 ID `0` 的专用 snapshot 建立；cache 不保存 Vanilla source text，只保存 metadata、shards、UTF-16 位置和以 240 字符为截断阈值、可能追加省略号的 localisation preview。
+- Vanilla cache 必须从唯一的 `Vanilla` root、保留 ID `0` 的专用 snapshot 建立；cache 不保存 Vanilla source text，只保存 metadata、shards（含有界 macro template IR）、UTF-16 位置和以 240 字符为截断阈值、可能追加省略号的 localisation preview。
 - `install_vanilla_cache` 校验 game/root/whitelist/identity collision，但刻意不要求 `rule_hash` 相同；当前 cache API 本身不会因 hash 不同自动重建，启动时的重建策略由 `pdx-lsp` 负责。
 
 ## 验证命令

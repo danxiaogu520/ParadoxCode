@@ -130,13 +130,13 @@ pub fn hover_with_cancellation(
         )?));
     }
     cancellation.checkpoint()?;
-    if let Some(details) = semantic_rule_hover_at(snapshot, &input, position) {
+    if let Some(details) = semantic_rule_hover_at(snapshot, &input, position, cancellation)? {
         return Ok(Some(Hover {
             contents: format!("### PDX property `{word}`\n\n{details}"),
             range: Some(range),
         }));
     }
-    if let Some(details) = semantic_value_hover_at(snapshot, &input, position) {
+    if let Some(details) = semantic_value_hover_at(snapshot, &input, position, cancellation)? {
         return Ok(Some(Hover {
             contents: format!("### PDX value `{word}`\n\n{details}"),
             range: Some(range),
@@ -172,11 +172,18 @@ pub(crate) fn semantic_rule_hover_at(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     position: TextSize,
-) -> Option<String> {
-    let context = semantic_completion_context(snapshot, input, position)?;
-    let property = context.property.as_ref()?;
+    cancellation: &CancellationToken,
+) -> Result<Option<String>, Cancelled> {
+    let Some(context) =
+        semantic_completion_context_with_cancellation(snapshot, input, position, cancellation)?
+    else {
+        return Ok(None);
+    };
+    let Some(property) = context.property.as_ref() else {
+        return Ok(None);
+    };
     if !contains(property.key_range, position) {
-        return None;
+        return Ok(None);
     }
     let candidates = semantic_rules_for_completion(snapshot, &context)
         .into_iter()
@@ -190,19 +197,28 @@ pub(crate) fn semantic_rule_hover_at(
                 )
         })
         .collect::<Vec<_>>();
-    (!candidates.is_empty()).then(|| semantic_rule_hover_for_candidates(snapshot, &candidates))
+    Ok((!candidates.is_empty()).then(|| semantic_rule_hover_for_candidates(snapshot, &candidates)))
 }
 
 pub(crate) fn semantic_value_hover_at(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     position: TextSize,
-) -> Option<String> {
-    let context = semantic_completion_context(snapshot, input, position)?;
-    let property = context.property.as_ref()?;
-    let (value, value_range) = property.scalar.as_ref()?;
+    cancellation: &CancellationToken,
+) -> Result<Option<String>, Cancelled> {
+    let Some(context) =
+        semantic_completion_context_with_cancellation(snapshot, input, position, cancellation)?
+    else {
+        return Ok(None);
+    };
+    let Some(property) = context.property.as_ref() else {
+        return Ok(None);
+    };
+    let Some((value, value_range)) = property.scalar.as_ref() else {
+        return Ok(None);
+    };
     if !contains(*value_range, position) {
-        return None;
+        return Ok(None);
     }
     let candidates = semantic_rules_for_completion(snapshot, &context)
         .into_iter()
@@ -222,13 +238,13 @@ pub(crate) fn semantic_value_hover_at(
         })
         .collect::<Vec<_>>();
     if candidates.is_empty() {
-        return None;
+        return Ok(None);
     }
     let accepted = candidates.iter().any(|candidate| {
         semantic_scope_allows(candidate.rule, candidate.scope)
             && semantic_property_matches(snapshot, candidate.rule, property, candidate.scope)
     });
-    Some(format!(
+    Ok(Some(format!(
         "- property: `{}`\n- value: `{}`\n- validation: `{}`\n\n{}",
         property.key,
         value,
@@ -238,7 +254,7 @@ pub(crate) fn semantic_value_hover_at(
             "does not match"
         },
         semantic_rule_hover_for_candidates(snapshot, &candidates)
-    ))
+    )))
 }
 
 pub(crate) fn semantic_rule_hover_for_candidates(
@@ -390,6 +406,7 @@ fn shared_semantic_hover_documentation(
 fn semantic_rule_hover_value_label(rule: &pdx_rules::SemanticRule) -> String {
     match rule.shape {
         RuleShape::Node => "block".to_owned(),
+        RuleShape::QuotedScript => "quoted script".to_owned(),
         RuleShape::ValueClause => "value clause".to_owned(),
         RuleShape::Leaf | RuleShape::LeafValue => semantic_value_hover_label(&rule.value),
     }

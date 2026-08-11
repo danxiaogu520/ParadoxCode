@@ -17,16 +17,19 @@ use crate::{
 mod codec;
 mod preview;
 mod read;
+mod template_codec;
 mod write;
 
 /// Current on-disk Vanilla cache schema.
-pub const CURRENT_VANILLA_CACHE_SCHEMA_VERSION: u32 = 4;
+pub const CURRENT_VANILLA_CACHE_SCHEMA_VERSION: u32 = 5;
 
 const APPLICATION_ID: i32 = 0x5044_5856;
 const MAX_CACHE_BYTES: u64 = 1024 * 1024 * 1024;
 const MAX_CACHE_FILES: usize = 100_000;
 const MAX_CACHE_SYMBOLS: usize = 5_000_000;
 const MAX_TEXT_FIELD_BYTES: usize = 1024 * 1024;
+const MAX_MACRO_TEMPLATE_BYTES: usize = 16 * 1024 * 1024;
+const MAX_MACRO_TEMPLATE_NODES: usize = 1_000_000;
 const VANILLA_ROOT_ID: SourceRootId = SourceRootId::new(0);
 
 type VanillaIndexParts = (

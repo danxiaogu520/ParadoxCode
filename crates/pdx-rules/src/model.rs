@@ -148,6 +148,8 @@ pub struct RuleRecord {
 pub enum RuleShape {
     /// The rule expects a nested block.
     Node,
+    /// The rule expects a quoted scalar whose decoded payload is nested Script.
+    QuotedScript,
     /// The rule expects a scalar leaf.
     Leaf,
     /// The rule describes a leaf value.
@@ -281,6 +283,7 @@ impl RuleShape {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Node => "node",
+            Self::QuotedScript => "quoted-script",
             Self::Leaf => "leaf",
             Self::LeafValue => "leaf-value",
             Self::ValueClause => "value-clause",
@@ -290,6 +293,7 @@ impl RuleShape {
     pub(crate) fn parse(value: &str) -> Result<Self, RulesError> {
         match value {
             "node" => Ok(Self::Node),
+            "quoted-script" => Ok(Self::QuotedScript),
             "leaf" => Ok(Self::Leaf),
             "leaf-value" => Ok(Self::LeafValue),
             "value-clause" => Ok(Self::ValueClause),

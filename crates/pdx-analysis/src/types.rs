@@ -108,6 +108,10 @@ pub enum DiagnosticCode {
     Cardinality,
     /// A key or value is known to the semantic rule set but is used from the wrong game scope.
     WrongScope,
+    /// Recursive scripted-macro expansion reached a definition already on the active stack.
+    MacroExpansionCycle,
+    /// Scripted-macro expansion exceeded a bounded work or size limit.
+    MacroExpansionLimit,
 }
 
 impl DiagnosticCode {
@@ -123,6 +127,8 @@ impl DiagnosticCode {
             Self::InvalidValue => "pdx-invalid-value",
             Self::Cardinality => "pdx-cardinality",
             Self::WrongScope => "pdx-wrong-scope",
+            Self::MacroExpansionCycle => "pdx-macro-expansion-cycle",
+            Self::MacroExpansionLimit => "pdx-macro-expansion-limit",
         }
     }
 
@@ -130,14 +136,15 @@ impl DiagnosticCode {
     #[must_use]
     pub const fn severity(self) -> u8 {
         match self {
-            Self::UnknownKey => 2,
+            Self::UnknownKey | Self::MacroExpansionLimit => 2,
             Self::Syntax
             | Self::UnknownSymbol
             | Self::AmbiguousSymbol
             | Self::UnknownScope
             | Self::InvalidValue
-            | Self::Cardinality => 1,
-            Self::WrongScope => 1,
+            | Self::Cardinality
+            | Self::WrongScope
+            | Self::MacroExpansionCycle => 1,
         }
     }
 }

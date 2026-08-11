@@ -19,6 +19,7 @@ use super::codec::{
     decode_file_id, decode_path, decode_position_component, decode_range, join_logical_path,
     parse_resolution,
 };
+use super::template_codec;
 use super::{
     APPLICATION_ID, CURRENT_VANILLA_CACHE_SCHEMA_VERSION, LoadedIndex, MAX_CACHE_BYTES,
     MAX_CACHE_FILES, MAX_CACHE_SYMBOLS, MAX_TEXT_FIELD_BYTES, VANILLA_ROOT_ID, VanillaCacheError,
@@ -188,6 +189,19 @@ fn validate_table_limits(connection: &Connection) -> Result<(), VanillaCacheErro
             ));
         }
     }
+    let max_template = connection.query_row(
+        "SELECT COALESCE(MAX(length(template_payload)), 0) FROM macro_definitions",
+        [],
+        |row| row.get::<_, i64>(0),
+    )?;
+    if max_template < 0
+        || usize::try_from(max_template).map_or(true, |max| max > super::MAX_MACRO_TEMPLATE_BYTES)
+    {
+        return Err(VanillaCacheError::LimitExceeded(
+            "macro template byte",
+            super::MAX_MACRO_TEMPLATE_BYTES,
+        ));
+    }
     Ok(())
 }
 
@@ -309,7 +323,7 @@ fn load_macro_definitions(
     shards: &mut BTreeMap<SourceFileId, FileIndexShard>,
 ) -> Result<(), VanillaCacheError> {
     let mut statement = connection.prepare(
-        "SELECT file_id, ordinal, kind, name, definition_range_start, definition_range_end
+        "SELECT file_id, ordinal, kind, name, definition_range_start, definition_range_end, template_payload
          FROM macro_definitions ORDER BY file_id, ordinal",
     )?;
     let rows = statement.query_map([], |row| {
@@ -320,10 +334,11 @@ fn load_macro_definitions(
             row.get::<_, String>(3)?,
             row.get::<_, i64>(4)?,
             row.get::<_, i64>(5)?,
+            row.get::<_, Option<Vec<u8>>>(6)?,
         ))
     })?;
     for row in rows {
-        let (file_id, ordinal, kind, name, start, end) = row?;
+        let (file_id, ordinal, kind, name, start, end, template_payload) = row?;
         let file_id = decode_file_id(&file_id)?;
         let ordinal = usize::try_from(ordinal)
             .map_err(|_| VanillaCacheError::InvalidData("negative macro ordinal".to_owned()))?;
@@ -357,11 +372,16 @@ fn load_macro_definitions(
                 "macro summary {kind} `{name}` has no matching definition"
             )));
         }
+        let template = template_payload
+            .as_deref()
+            .map(|payload| template_codec::decode(payload, &kind, &name, definition_range))
+            .transpose()?;
         shard.macro_definitions.push(MacroDefinitionSummary {
             kind,
             name,
             definition_range,
             parameters: Vec::new(),
+            template,
         });
     }
     drop(statement);

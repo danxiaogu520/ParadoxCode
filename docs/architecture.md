@@ -24,7 +24,7 @@ Editor buffer / Current Mod / Dependency Mods / Vanilla cache
               Script or Localisation CST
                            |
                            v
-      profile/rule-aware HIR lowering
+ profile/rule-aware HIR lowering + ordered macro templates
                            |
                            v
                  FileIndexShard
@@ -33,7 +33,8 @@ Editor buffer / Current Mod / Dependency Mods / Vanilla cache
                  immutable snapshot
                            |
                            v
-      diagnostics / completion / hover / navigation / rename
+ diagnostics / completion / hover / navigation / rename
+       (query-local macro binding and bounded expansion)
                            |
                            v
                        LSP adapter
@@ -91,18 +92,21 @@ pdx-lsp     -> pdx-engine + pdx-analysis + pdx-parser + pdx-rules + pdx-game
 ```text
 pdx-parser/src/format/
   mod.rs, common.rs, script.rs, localisation.rs, equivalence.rs, tests.rs
+pdx-parser/src/quoted_script.rs
+  quoted payload decode/encode, recovery parse, composable UTF-8 source map
 
 pdx-rules/src/
   model.rs, matcher.rs, profile.rs, runtime.rs, canonical.rs, sqlite.rs, rulec.rs, tests.rs
 
 pdx-engine/src/
   model.rs, index.rs, scan.rs, pipeline.rs, host.rs, snapshot.rs
-  hir/{mod.rs, model.rs, collector.rs, parameters.rs, scope.rs, semantics.rs, tests.rs}
+  hir/{mod.rs, model.rs, collector.rs, parameters.rs, scope.rs, semantics.rs, templates.rs, tests.rs}
   vanilla_cache/{mod.rs, read.rs, write.rs, codec.rs, preview.rs}
 
 pdx-analysis/src/
-  types.rs, support.rs, semantic.rs, resolution.rs, diagnostics.rs, hover.rs, navigation.rs
-  completion/{mod.rs, context.rs, candidates.rs, support.rs}
+  types.rs, support.rs, semantic.rs, macro_expansion.rs, quoted_script.rs, resolution.rs, diagnostics.rs, hover.rs,
+  navigation.rs
+  completion/{mod.rs, context.rs, candidates.rs, macro_constraints.rs, support.rs}
   tests/{mod.rs, support.rs, diagnostics.rs, completion.rs, semantic.rs, scope.rs, hover.rs,
          navigation.rs, rename.rs}
 
@@ -134,9 +138,9 @@ LSP/CLI 可通过 `.pdx/project.toml` 或 typed initialization options 配置 Cu
 
 ## Rules 与 Vanilla cache
 
-`rules/eu4/` 的 JSON 是唯一规则 authority。source format 当前为 `6`，runtime SQLite schema 当前为 `17`。官方 `pdx`/`pdx-ls` 内嵌 JSON source，启动时计算 canonical `rule_hash`，只读加载匹配的用户本地 SQLite artifact；缺失、损坏、schema、`game_id` 或 hash 不匹配时临时编译、round-trip 校验后替换 cache。未通过校验的 artifact 不进入 runtime；正式 server 不接受 `--rules`、外部规则路径、CWT 或用户规则覆盖。
+`rules/eu4/` 的 JSON 是唯一规则 authority。source format 当前为 `7`，runtime SQLite schema 当前为 `18`。官方 `pdx`/`pdx-ls` 内嵌 JSON source，启动时计算 canonical `rule_hash`，只读加载匹配的用户本地 SQLite artifact；缺失、损坏、schema、`game_id` 或 hash 不匹配时临时编译、round-trip 校验后替换 cache。未通过校验的 artifact 不进入 runtime；正式 server 不接受 `--rules`、外部规则路径、CWT 或用户规则覆盖。
 
-Vanilla index cache schema 当前为 `4`。它保存 cache metadata、source-file metadata、semantic shards、scripted macro 的紧凑调用签名、definition/reference 的 UTF-16 位置和有界的 localisation preview；不保存 Vanilla 源码、CST 或 HIR。Vanilla 源文件内容或 fingerprint 变化需要显式 refresh；规则 hash mismatch 可在 LSP 启动后台自动重建。cache 加载或重建期间，当前 LSP 会延迟受影响的 snapshot 请求，完成后由 event loop 安装完整 cache；失败时保留已加载的旧 cache并报告原因。
+Vanilla index cache schema 当前为 `4`。它保存 cache metadata、source-file metadata、semantic shards、scripted macro 的紧凑调用签名、definition/reference 的 UTF-16 位置和有界的 localisation preview；不保存 Vanilla 源码、CST、HIR 或 macro template。因此 Vanilla macro 保持 signature/OpenWorld 调用分析，不进行体展开。Vanilla 源文件内容或 fingerprint 变化需要显式 refresh；规则 hash mismatch 可在 LSP 启动后台自动重建。cache 加载或重建期间，当前 LSP 会延迟受影响的 snapshot 请求，完成后由 event loop 安装完整 cache；失败时保留已加载的旧 cache并报告原因。
 
 ## 并发与生命周期
 
@@ -145,13 +149,19 @@ Vanilla index cache schema 当前为 `4`。它保存 cache metadata、source-fil
 - 编辑结果必须匹配当前 document version、文本和路径；过期 diagnostics 不发布。
 - 每个文件独立生成并替换 `FileIndexShard`；取消或 workspace-level error 不安装半成品 snapshot。
 - semantic diagnostics 默认约 200 ms debounce；completion/hover 等交互查询优先于后台诊断。
+- scripted macro 的 diagnostics 展开和值补全约束收集均使用单次查询内的 identity 栈、节点/token-byte/展开深度预算和 cancellation，不持有 `AnalysisHost` 锁，也不使用跨 snapshot 的全局可变缓存。
+- 规则标记为 `quoted_script` 的 scalar 使用 parser 提供的容错 secondary Script parse 和可组合 UTF-8 source map；diagnostics、completion、hover 和 navigation/rename 的语义引用收集在查询内下钻，普通 quoted scalar 仍保持 opaque。secondary parse 共用深度、单 payload、累计字节、节点数和 cancellation 预算，不写入主 HIR。
 - LSP 当前使用 stdio JSON-RPC，stdout 只输出协议数据。
 
 ## 当前身份与索引
 
-当前稳定身份包括 `SourceRootId`、`SourceFileId`、`DocumentId`、`LogicalPath`。`Definition` 和 `Reference` 仍通过 kind/name、file id 和 source range 表示；项目尚未实现跨 server 的 `SymbolId`、`DefinitionId` 或 `ReferenceId`。
+当前稳定身份包括 `SourceRootId`、`SourceFileId`、`DocumentId`、`LogicalPath`。`Definition` 和 `Reference` 仍通过 kind/name、file id 和 source range 表示；项目尚未实现跨 server 的 `SymbolId`、`DefinitionId` 或 `ReferenceId`。macro 递归检测只使用 snapshot/query 内精确的 overlay document/version/range 或 source file/revision/range identity，不把 kind/name 单独当作定义身份。
 
-`FileIndexShard` 保存 definitions、references、scripted macro signature 和 syntax error count。`WorkspaceIndex` 维护 per-file shards、definition lookup buckets、case-sensitive kind 集合和无源码文件使用的 UTF-16 position ranges。被覆盖定义保留为 inactive/shadowed，普通 navigation 只使用 active resolution。scripted effect/trigger 的成员由实际 workspace/Vanilla index 动态提供；宏参数的 occurrence 仍只保留在所属 HIR owner 内，不进入全局 symbol bucket，但按定义归纳出的参数名、顺序和 required/optional 状态会作为紧凑 signature 随 shard 持久化。
+`FileIndexShard` 保存 definitions、references、scripted macro summary 和 syntax error count。`WorkspaceIndex` 维护 per-file shards、definition lookup buckets、case-sensitive kind 集合和无源码文件使用的 UTF-16 position ranges。被覆盖定义保留为 inactive/shadowed，普通 navigation 只使用 active resolution。scripted effect/trigger 的成员由实际 workspace/Vanilla index 动态提供；宏参数的 occurrence 仍只保留在所属 HIR owner 内，不进入全局 symbol bucket。每个可降低的宏定义在 shard 中保存参数 signature 和 source-independent `MacroTemplate` IR，后者只含有序 property/bare value/conditional、token fragment 与 source range，不含源码或 CST identity。
+
+HIR 与 shard summary 使用同一种按源码顺序排列的 `MacroTemplate`。调用侧仅绑定 scalar token，duplicate parameter 仍诊断但按 last-wins 展开；conditional 按参数是否 supplied 确定激活。展开体使用 descriptor 的 body context 和调用点 scope 重新执行现有 semantic validator，不读取定义侧缓存的 `ScopeFact`。参数派生内容的诊断映射到调用参数值，固定模板内容映射到调用名；普通 semantic code 保留，只有 cycle/limit 使用专门 code。定义体内仍依赖当前 owner 参数的嵌套调用会延后到外层调用具体化后再递归，避免把 `$X$` 当作最终实参。
+
+宏调用参数的 value completion 使用同一模板和查询预算做符号化约束收集：当前参数绑定为 `Target`，其他已提供 scalar 保留具体值，未知或 block 参数保持 `Unknown`；conditional 按 supplied/absent 选择，目标经 named block 转发到嵌套宏时继续追踪。每个目标 use-site 的 `ValueMatcher` 先生成候选，再对多个 use-site 取交集；作为 standalone bare item 注入 container 的目标参数会推导 quoted Script 的 context/path/scope，调用点可直接在引号内补全。宏诊断展开也会把这种 quoted argument 投影为虚拟 property tree 并精确回映。活动定义来自 Current Mod、Dependency 或 cache-only Vanilla 时均消费其 shard template；缺模板、环、预算耗尽或复合 token 才保守退回 signature/OpenWorld。first-party path rule 不描述具体 scripted effect/trigger 的参数语义，动态宏及其模板必须从 workspace source/cache index 派生。
 
 ## 错误与安全不变量
 
@@ -169,4 +179,6 @@ Vanilla index cache schema 当前为 `4`。它保存 cache metadata、source-fil
 - CSV 没有 parser、formatter、HIR 或列级语义诊断。
 - HIR scope evaluator、动态成员确认和部分 profile 语义仍是保守的 Partial 实现。
 - 没有跨进程稳定 symbol identity，也没有完整 reference 倒排索引。
+- Vanilla cache 不保存 macro template，HeaderBlock、property-value conditional 或含 syntax error 的宏 owner 当前也不会生成可展开模板；这些调用保守退回 signature/OpenWorld 行为。
+- quoted Script 的 navigation 只收集 profile/rule 已确认的 reference、value definition、localisation 和 scripted-macro 语义；任意动态拼接文本仍保持 opaque，也不会写入持久 index shard。
 - 只有 EU4 profile 有 v0.1 交付承诺；没有运行时游戏切换或第三方 plugin ABI。

@@ -1,5 +1,8 @@
 use super::common::{contains_line_break, fits_line, indent};
-use crate::{CstKind, CstNode, FileFormat, ParsedFile, parse};
+use crate::{
+    CstKind, CstNode, ParsedFile, encode_quoted_script_text,
+    parse_quoted_script as parse_quoted_payload,
+};
 use pdx_text::TextRange;
 const MAX_QUOTED_SCRIPT_DEPTH: usize = 64;
 pub(super) fn format_script(file: &ParsedFile) -> String {
@@ -429,7 +432,10 @@ impl<'file> PdxFormatter<'file> {
             return ValueLayout::inline(source);
         }
         if compact || (!force_expand && lines.len() == 1 && !contains_line_break(&lines[0])) {
-            return ValueLayout::width_sensitive(format!("\"{}\"", encode_payload(&lines[0])));
+            return ValueLayout::width_sensitive(format!(
+                "\"{}\"",
+                encode_quoted_script_text(&lines[0])
+            ));
         }
         ValueLayout::Expanded {
             opener: "\"".to_owned(),
@@ -439,7 +445,7 @@ impl<'file> PdxFormatter<'file> {
                     format!(
                         "{}{}",
                         indent(depth.saturating_add(1)),
-                        encode_payload(&line)
+                        encode_quoted_script_text(&line)
                     )
                 })
                 .collect(),
@@ -515,9 +521,7 @@ pub(super) fn quoted_script(source: &str, depth: usize) -> Option<QuotedScript> 
     if depth >= MAX_QUOTED_SCRIPT_DEPTH || !contains_line_break(source) {
         return None;
     }
-    let payload = quoted_payload(source)?;
-    let decoded = decode_payload(payload)?;
-    let parsed = parse(FileFormat::Script, &decoded);
+    let parsed = parse_quoted_payload(source)?.parsed().clone();
     if !parsed.errors().is_empty() || !has_semantic_item(parsed.root()) {
         return None;
     }
@@ -531,40 +535,4 @@ fn has_semantic_item(root: &CstNode) -> bool {
             CstKind::Property | CstKind::HeaderBlock | CstKind::ParameterBlock
         )
     })
-}
-
-pub(super) fn quoted_payload(source: &str) -> Option<&str> {
-    source.strip_prefix('"')?.strip_suffix('"')
-}
-
-pub(super) fn decode_payload(payload: &str) -> Option<String> {
-    let mut decoded = String::with_capacity(payload.len());
-    let mut characters = payload.chars();
-    while let Some(character) = characters.next() {
-        if character != '\\' {
-            decoded.push(character);
-            continue;
-        }
-        let escaped = characters.next()?;
-        match escaped {
-            '"' | '\\' => decoded.push(escaped),
-            _ => {
-                decoded.push('\\');
-                decoded.push(escaped);
-            }
-        }
-    }
-    Some(decoded)
-}
-
-fn encode_payload(payload: &str) -> String {
-    let mut encoded = String::with_capacity(payload.len());
-    for character in payload.chars() {
-        match character {
-            '"' => encoded.push_str("\\\""),
-            '\\' => encoded.push_str("\\\\"),
-            _ => encoded.push(character),
-        }
-    }
-    encoded
 }

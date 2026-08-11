@@ -540,10 +540,13 @@ fn property_matches_scripted_rule(
         return false;
     }
     match rule.shape {
-        RuleShape::Leaf | RuleShape::LeafValue => {
+        RuleShape::Leaf | RuleShape::LeafValue | RuleShape::QuotedScript => {
             let Some(scalar) = property.scalar.as_ref() else {
                 return false;
             };
+            if matches!(rule.shape, RuleShape::QuotedScript) && !scalar.quoted {
+                return false;
+            }
             rule.value.matches(
                 &scalar.value,
                 |_type_name, value| !value.is_empty(),

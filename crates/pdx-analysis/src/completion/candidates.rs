@@ -8,6 +8,7 @@ use pdx_rules::{KeyMatcher, RuleShape, ValueMatcher};
 use pdx_text::TextRange;
 
 use super::context::SemanticCompletionContext;
+use super::macro_constraints::infer_macro_value_constraints;
 use super::support::{completion_sort_score, push_completion};
 
 pub(crate) struct SemanticCompletionRule<'rule, 'path> {
@@ -483,6 +484,202 @@ pub(crate) fn add_semantic_value_items(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn add_inferred_macro_value_items(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    property: &ScriptProperty,
+    member_cache: &mut CompletionMemberCache,
+    items: &mut Vec<CompletionItem>,
+    replacement_range: TextRange,
+    prefix: &str,
+    cancellation: &CancellationToken,
+) -> Result<bool, Cancelled> {
+    let sites = infer_macro_value_constraints(snapshot, context, property, cancellation)?;
+    if sites.is_empty() {
+        return Ok(false);
+    }
+    let mut intersection: Option<BTreeMap<(String, CompletionKind), CompletionItem>> = None;
+    for site in sites {
+        cancellation.checkpoint()?;
+        let site_context = SemanticCompletionContext {
+            context: context.context.clone(),
+            parent_path: context.parent_path.clone(),
+            structural_containers: Vec::new(),
+            alternative_containers: Vec::new(),
+            scope: site.scope,
+            container_property: None,
+            property: None,
+            quoted_depth: context.quoted_depth,
+            embedded_value_context: context.embedded_value_context,
+        };
+        let mut site_items = Vec::new();
+        for matcher in &site.matchers {
+            add_inferred_matcher_items(
+                snapshot,
+                &site_context,
+                matcher,
+                member_cache,
+                &mut site_items,
+                replacement_range,
+                prefix,
+            );
+        }
+        let site_items = site_items
+            .into_iter()
+            .map(|item| ((item.label.to_ascii_lowercase(), item.kind), item))
+            .collect::<BTreeMap<_, _>>();
+        if let Some(known) = &mut intersection {
+            known.retain(|key, _| site_items.contains_key(key));
+        } else {
+            intersection = Some(site_items);
+        }
+    }
+    if let Some(intersection) = intersection {
+        items.extend(intersection.into_values());
+    }
+    Ok(true)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn add_inferred_matcher_items(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    matcher: &ValueMatcher,
+    member_cache: &mut CompletionMemberCache,
+    items: &mut Vec<CompletionItem>,
+    replacement_range: TextRange,
+    prefix: &str,
+) {
+    match matcher {
+        ValueMatcher::Exact(label) => add_value_completion(
+            items,
+            label,
+            &semantic_value_matcher_label(matcher),
+            None,
+            replacement_range,
+            prefix,
+            false,
+        ),
+        ValueMatcher::Bool => {
+            for label in ["yes", "no"] {
+                add_value_completion(items, label, "bool", None, replacement_range, prefix, false);
+            }
+        }
+        ValueMatcher::Int { min, max } => {
+            add_numeric_completion(
+                items,
+                min.map(|value| value.to_string()).as_deref(),
+                "int",
+                None,
+                replacement_range,
+                prefix,
+                false,
+            );
+            add_numeric_completion(
+                items,
+                max.map(|value| value.to_string()).as_deref(),
+                "int",
+                None,
+                replacement_range,
+                prefix,
+                false,
+            );
+        }
+        ValueMatcher::Float { min, max } => {
+            add_value_completion(items, "0", "float", None, replacement_range, prefix, false);
+            if min.is_some() || max.is_some() {
+                for label in [min.as_deref().unwrap_or("1"), max.as_deref().unwrap_or("1")] {
+                    add_value_completion(
+                        items,
+                        label,
+                        "float",
+                        None,
+                        replacement_range,
+                        prefix,
+                        false,
+                    );
+                }
+            }
+        }
+        ValueMatcher::Date => add_value_completion(
+            items,
+            "1444.11.11",
+            "date",
+            None,
+            replacement_range,
+            prefix,
+            false,
+        ),
+        ValueMatcher::Type(type_name) => {
+            for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
+                add_value_completion(
+                    items,
+                    label,
+                    type_name,
+                    None,
+                    replacement_range,
+                    prefix,
+                    false,
+                );
+            }
+        }
+        ValueMatcher::Enum(enum_name) => {
+            for label in member_cache.enum_member_names(snapshot, enum_name, prefix) {
+                add_value_completion(
+                    items,
+                    label,
+                    enum_name,
+                    None,
+                    replacement_range,
+                    prefix,
+                    false,
+                );
+            }
+        }
+        ValueMatcher::Scope(expected) => {
+            for (label, detail) in
+                scope_expression_candidates(snapshot, context, expected.as_deref())
+            {
+                add_value_completion(
+                    items,
+                    &label,
+                    detail,
+                    None,
+                    replacement_range,
+                    prefix,
+                    false,
+                );
+            }
+        }
+        ValueMatcher::Localisation => {
+            for label in member_cache.workspace_member_names(snapshot, "localisation", prefix) {
+                add_localisation_value_completion(
+                    items,
+                    label,
+                    "localisation",
+                    None,
+                    replacement_range,
+                    prefix,
+                    false,
+                );
+            }
+        }
+        ValueMatcher::Dynamic(kind) => {
+            for label in member_cache.workspace_member_names(snapshot, kind, prefix) {
+                add_value_completion(items, label, kind, None, replacement_range, prefix, false);
+            }
+            if matches!(kind.as_str(), "variable" | "value") {
+                add_value_completion(items, "$0", kind, None, replacement_range, prefix, false);
+            }
+        }
+        ValueMatcher::DynamicSet(_)
+        | ValueMatcher::AnyScalar
+        | ValueMatcher::Filepath
+        | ValueMatcher::Opaque(_) => {}
+    }
+}
+
 /// Maximum number of multi-segment scope chains offered as completion candidates.
 pub(crate) const SCOPE_CHAIN_LIMIT: usize = 16;
 
@@ -702,6 +899,9 @@ pub(crate) fn key_insert_text(
     }
     match rule.shape {
         RuleShape::Node => format!("{label} = {{\n{base_indent}\t$0\n{base_indent}}}"),
+        RuleShape::QuotedScript => {
+            format!("{label} = \"\n{base_indent}\t$0\n{base_indent}\"")
+        }
         RuleShape::Leaf | RuleShape::ValueClause => format!("{label} = "),
         RuleShape::LeafValue => label.to_owned(),
     }

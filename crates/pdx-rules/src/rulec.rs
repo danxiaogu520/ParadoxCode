@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 
 /// Current version of the developer-maintained source layout.
-pub const SOURCE_FORMAT_VERSION: u32 = 6;
+pub const SOURCE_FORMAT_VERSION: u32 = 7;
 
 const SOURCE_MANIFEST: &str = "manifest.json";
 const CATALOG: &str = "catalog.json";
@@ -411,6 +411,27 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
                 rule.id
             )));
         }
+        if matches!(rule.shape, crate::RuleShape::QuotedScript) {
+            if rule
+                .child_context
+                .as_deref()
+                .is_none_or(|context| context.trim().is_empty())
+            {
+                return Err(CompileError::Validation(format!(
+                    "semantic rule {} has quoted Script without a child context",
+                    rule.id
+                )));
+            }
+            if !matches!(
+                rule.value,
+                crate::ValueMatcher::AnyScalar | crate::ValueMatcher::Opaque(_)
+            ) {
+                return Err(CompileError::Validation(format!(
+                    "semantic rule {} has quoted Script with a non-opaque scalar matcher",
+                    rule.id
+                )));
+            }
+        }
         if rule.context.eq_ignore_ascii_case("trigger")
             && matches!(rule.shape, crate::RuleShape::Node)
             && matches!(&rule.key, crate::KeyMatcher::Exact(key)
@@ -687,6 +708,54 @@ mod tests {
     }
 
     #[test]
+    fn validation_requires_quoted_script_context_and_opaque_value() {
+        let mut rule = SemanticRule {
+            id: "quoted".to_owned(),
+            context: "effect".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("effect".to_owned()),
+            operator: Some("=".to_owned()),
+            value: ValueMatcher::AnyScalar,
+            shape: RuleShape::QuotedScript,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "semantic-rules.json".to_owned(),
+            line: 1,
+        };
+        let mut model = RulesModel {
+            game_id: "eu4".to_owned(),
+            ..RulesModel::default()
+        };
+        model.semantic.rules.push(rule.clone());
+        assert!(
+            validate_model(&model)
+                .expect_err("quoted Script needs child context")
+                .to_string()
+                .contains("without a child context")
+        );
+
+        rule.child_context = Some("effect".to_owned());
+        rule.value = ValueMatcher::Bool;
+        model.semantic.rules = vec![rule];
+        assert!(
+            validate_model(&model)
+                .expect_err("quoted Script needs opaque matcher")
+                .to_string()
+                .contains("non-opaque scalar matcher")
+        );
+    }
+
+    #[test]
     fn validation_rejects_enabled_scripted_macro_without_usage() {
         let mut model = RulesModel {
             game_id: "eu4".to_owned(),
@@ -715,6 +784,21 @@ mod tests {
             read_json(&root.join("rules/manifest.json")).expect("committed manifest");
         let (_, source_model) = load_source(&root.join("rules/eu4")).expect("source model");
         assert_eq!(source_model.semantic.localisation_bindings.len(), 191);
+        let quoted_script_rules = source_model
+            .semantic
+            .rules
+            .iter()
+            .filter(|rule| matches!(rule.shape, RuleShape::QuotedScript))
+            .map(|rule| rule.id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            quoted_script_rules,
+            [
+                "missions/missions:23:quoted-script:root:mission_series:trigger",
+                "missions/missions:25:quoted-script:root:mission_series:effect",
+            ],
+            "first-party quoted Script rules must describe fixed schemas, not workspace macros"
+        );
         let scripted_effect = source_model
             .semantic
             .type_descriptors

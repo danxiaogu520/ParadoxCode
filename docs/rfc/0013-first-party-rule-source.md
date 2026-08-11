@@ -6,7 +6,7 @@
 
 ## Authority
 
-`rules/eu4/` 是静态 EU4 规则的唯一 source authority。当前 source format 为 `6`，manifest
+`rules/eu4/` 是静态 EU4 规则的唯一 source authority。当前 source format 为 `7`，manifest
 记录 `game_id = "eu4"` 和目标游戏版本。source bundle 由以下 JSON 组成：
 
 - `manifest.json`
@@ -34,7 +34,7 @@ field、缺文件、重复 stable identity、无效 cardinality/severity/type id
 cross-record invariant。`pdx-bake` 供开发/发布检查使用，输出 caller-selected 的临时或发布
 artifact；官方 runtime 不把该输出当 source。
 
-runtime SQLite schema 当前为 `17`。编译后必须把 artifact 读回为 `RuleSet`，检查 schema、
+runtime SQLite schema 当前为 `18`。编译后必须把 artifact 读回为 `RuleSet`，检查 schema、
 foreign key、`game_id`、记录和 semantic model 与 source round-trip 一致。`rule_hash` 取
 canonical logical content，而不是 SQLite 文件 bytes；rowid、插入顺序、页面布局、索引、
 VACUUM 或时间戳不构成规则语义。
@@ -42,7 +42,7 @@ VACUUM 或时间戳不构成规则语义。
 ## 官方 runtime
 
 官方 `pdx`/`pdx-ls` binary 在 `pdx-game::eu4` 中内嵌上述 JSON source bundle。启动时先严格
-解析 source 并计算当前 `rule_hash`，再查找用户本地 SQLite cache。只有 schema `17`、`game_id`
+解析 source 并计算当前 `rule_hash`，再查找用户本地 SQLite cache。只有 schema `18`、`game_id`
 和 logical `rule_hash` 都匹配时才只读加载 cache；cache 缺失、损坏、过期或不匹配时，从内嵌
 source 重新生成，写入临时 SQLite，读回并完成 round-trip 后再替换用户 cache。
 

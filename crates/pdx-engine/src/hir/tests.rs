@@ -1,6 +1,7 @@
 use super::{
-    HirParameterReferenceKind, HirReferenceOrigin, ScopeState, ScopeValue, lower,
-    lower_with_profile, property_children, resolve_scope_expression,
+    HirParameterReferenceKind, HirReferenceOrigin, MacroTemplateFragment, MacroTemplateItem,
+    MacroTemplateValue, ScopeState, ScopeValue, lower, lower_with_profile, property_children,
+    resolve_scope_expression,
 };
 use pdx_game::eu4::{bootstrap_rules, first_party_rules, profile};
 use pdx_parser::{FileFormat, parse};
@@ -364,6 +365,101 @@ fn scripted_macro_lowering_keeps_body_context_calls_and_local_parameter_uses() {
             && reference.kind == "scripted_trigger"
             && reference.name == "apply_trigger"
     }));
+}
+
+#[test]
+fn scripted_macro_templates_preserve_order_conditionals_and_token_fragments() {
+    let rules = first_party_rules().expect("first-party rules");
+    let path = LogicalPath::parse("common/scripted_effects/template.txt").expect("logical path");
+    let source = concat!(
+        "wrapper = { ",
+        "prefix_$TARGET$ = $VALUE$ ",
+        "[[OPTION] add_prestige = $VALUE$ ] ",
+        "[[!SKIP] FRA GER ] ",
+        "nested = { $KEY$ = yes }",
+        " }\n",
+    );
+    let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile());
+
+    let template = hir
+        .macro_template(
+            "scripted_effect",
+            "wrapper",
+            hir.definitions()
+                .iter()
+                .find(|definition| definition.name == "wrapper")
+                .expect("wrapper definition")
+                .range,
+        )
+        .expect("macro template");
+    assert_eq!(template.items.len(), 4);
+
+    let MacroTemplateItem::Property(first) = &template.items[0] else {
+        panic!("first item must be a property");
+    };
+    assert_eq!(
+        first.key.fragments,
+        [
+            MacroTemplateFragment::Literal("prefix_".to_owned()),
+            MacroTemplateFragment::Parameter {
+                name: "TARGET".to_owned(),
+                range: hir
+                    .parameter_references()
+                    .iter()
+                    .find(|reference| reference.name == "TARGET")
+                    .expect("target reference")
+                    .range,
+            },
+        ]
+    );
+    let MacroTemplateValue::Scalar(value) = &first.value else {
+        panic!("first value must be scalar");
+    };
+    assert!(matches!(
+        value.fragments.as_slice(),
+        [MacroTemplateFragment::Parameter { name, .. }] if name == "VALUE"
+    ));
+
+    let MacroTemplateItem::Conditional(optional) = &template.items[1] else {
+        panic!("second item must be conditional");
+    };
+    assert_eq!(optional.name, "OPTION");
+    assert!(!optional.negated);
+    assert!(matches!(
+        optional.items.as_slice(),
+        [MacroTemplateItem::Property(_)]
+    ));
+
+    let MacroTemplateItem::Conditional(skipped) = &template.items[2] else {
+        panic!("third item must be conditional");
+    };
+    assert_eq!(skipped.name, "SKIP");
+    assert!(skipped.negated);
+    assert!(matches!(
+        skipped.items.as_slice(),
+        [
+            MacroTemplateItem::BareValue(_),
+            MacroTemplateItem::BareValue(_)
+        ]
+    ));
+
+    let MacroTemplateItem::Property(nested) = &template.items[3] else {
+        panic!("fourth item must be nested property");
+    };
+    assert!(matches!(nested.value, MacroTemplateValue::Block { .. }));
+}
+
+#[test]
+fn scripted_macro_templates_skip_syntax_damaged_owners() {
+    let rules = first_party_rules().expect("first-party rules");
+    let path = LogicalPath::parse("common/scripted_effects/broken.txt").expect("logical path");
+    let hir = lower_with_profile(
+        parse(FileFormat::Script, "broken = { add_prestige = $VALUE$\n"),
+        &path,
+        &rules,
+        &profile(),
+    );
+    assert!(hir.macro_templates().is_empty());
 }
 
 #[test]

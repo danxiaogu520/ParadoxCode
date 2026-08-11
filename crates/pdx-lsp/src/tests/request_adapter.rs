@@ -101,6 +101,50 @@ fn memory_transport_hover_returns_semantic_value_and_null_for_unknown_text() {
 }
 
 #[test]
+fn memory_transport_completes_macro_argument_values_from_body_constraints() {
+    let (root_dir, root_uri) = temp_workspace_dir();
+    let effects_dir = root_dir.join("common/scripted_effects");
+    fs::create_dir_all(&effects_dir).expect("create scripted effects directory");
+    fs::write(
+        effects_dir.join("00_complete.txt"),
+        "bool_macro = { set_primitive = $VALUE$ }\n",
+    )
+    .expect("scripted effect definition");
+    let events_dir = root_dir.join("events");
+    fs::create_dir_all(&events_dir).expect("create events directory");
+    let file_path = events_dir.join("macro-completion.txt");
+    fs::write(&file_path, "").expect("create placeholder file");
+    let uri = canonical_uri(&file_path);
+    let text = "country_event = { immediate = { bool_macro = { VALUE =  } } }\n";
+    let position = text.find("=  }").expect("empty value") + 2;
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":position}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let completion = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("completion response");
+    let items = completion["result"]["items"]
+        .as_array()
+        .expect("completion items");
+    assert!(items.iter().any(|item| item["label"] == "yes"), "{items:?}");
+    assert!(items.iter().any(|item| item["label"] == "no"), "{items:?}");
+    let _: CompletionResponse = typed_result(&responses, 2);
+    fs::remove_dir_all(root_dir).expect("cleanup");
+}
+
+#[test]
 fn memory_transport_delegates_phase5_requests_to_analysis() {
     let (root_dir, root_uri) = temp_workspace_dir();
     let events_dir = root_dir.join("events");

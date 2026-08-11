@@ -35,6 +35,11 @@ Script block 的布局从内向外决定：空 block 输出 `{ }`；只含 scala
 的 Script 时才作为 quoted script 递归格式化；否则整个 quoted value 保持 opaque。递归深度
 受实现上限约束，普通 localisation value 永远不解释其内部内容。
 
+formatter 与 analysis 复用 parser 的 quoted payload decoder，但识别策略不同：formatter 的
+“多行、无 syntax error、含 semantic item”仅是安全改写门禁；analysis 是否下钻完全由
+`RuleShape::QuotedScript` 决定，并允许单行和 recovery CST。格式化把 payload 折叠为单行不会
+改变其语义覆盖。
+
 Localisation 只规范语言头、entry 的基础空格、布局空行和行尾空白；引号内部文本、颜色/格式
 标记、`$KEY$` 和转义保持不变。
 

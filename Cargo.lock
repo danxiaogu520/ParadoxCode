@@ -362,6 +362,8 @@ dependencies = [
  "pdx-rules",
  "pdx-text",
  "rusqlite",
+ "serde",
+ "serde_json",
  "sha2",
 ]
 

@@ -30,6 +30,12 @@ Block    := "{" item* "}"       // mixed container
 
 `HeaderBlock` 覆盖 `rgb { 1 2 3 }` 一类形式；`ParameterBlock` 覆盖 `[[name] ... ]` 与 `[[!name] ... ]`。注释和 UTF-8 BOM 作为节点/token 保留，quoted string 支持转义字符。
 
+主 CST 始终把 quoted string 保持为单个 opaque `QuotedString`。对于规则明确声明为
+`quoted_script` 的 scalar，parser 另提供容错 secondary Script parse：解码 `\"`/`\\`，保留
+parser recovery，并返回 decoded UTF-8 byte boundary 到原 quoted token 的单调 source map。
+analysis 可以组合多层 map，把嵌套 quoted Script 的诊断、补全、hover 和 navigation/rename range 映回主文档；该 API 不会
+自行判断普通 prose 是否是 Script，也不会改变主 CST 文法。
+
 ## Localisation CST
 
 Localisation parser 按行处理：

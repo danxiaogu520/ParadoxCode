@@ -7,6 +7,7 @@ use rusqlite::{Connection, Transaction, params};
 
 use super::codec::{encode_file_id, encode_path, resolution_name};
 use super::read::validate_database_identity;
+use super::template_codec;
 use super::{
     APPLICATION_ID, CURRENT_VANILLA_CACHE_SCHEMA_VERSION, VanillaCacheError, VanillaIndexCache,
 };
@@ -72,6 +73,7 @@ fn write_cache(
              name TEXT NOT NULL,
              definition_range_start INTEGER NOT NULL,
              definition_range_end INTEGER NOT NULL,
+             template_payload BLOB,
              PRIMARY KEY(file_id, ordinal)
          );
          CREATE TABLE macro_parameters(
@@ -159,8 +161,8 @@ fn write_cache(
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
     )?;
     let mut insert_macro = transaction.prepare(
-        "INSERT INTO macro_definitions(file_id, ordinal, kind, name, definition_range_start, definition_range_end)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        "INSERT INTO macro_definitions(file_id, ordinal, kind, name, definition_range_start, definition_range_end, template_payload)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )?;
     let mut insert_macro_parameter = transaction.prepare(
         "INSERT INTO macro_parameters(file_id, macro_ordinal, ordinal, name, required)
@@ -227,6 +229,22 @@ fn write_cache(
                     summary.kind, summary.name
                 )));
             }
+            let template_payload = summary
+                .template
+                .as_ref()
+                .map(|template| {
+                    if !template.kind.eq_ignore_ascii_case(&summary.kind)
+                        || !template.name.eq_ignore_ascii_case(&summary.name)
+                        || template.definition_range != summary.definition_range
+                    {
+                        return Err(VanillaCacheError::InvalidData(format!(
+                            "macro template identity does not match {} `{}`",
+                            summary.kind, summary.name
+                        )));
+                    }
+                    template_codec::encode(template)
+                })
+                .transpose()?;
             insert_macro.execute(params![
                 encode_file_id(*id),
                 i64::try_from(macro_ordinal).unwrap_or(i64::MAX),
@@ -234,6 +252,7 @@ fn write_cache(
                 summary.name,
                 i64::from(summary.definition_range.start()),
                 i64::from(summary.definition_range.end()),
+                template_payload,
             ])?;
             for (ordinal, parameter) in summary.parameters.iter().enumerate() {
                 if parameter.name.is_empty()

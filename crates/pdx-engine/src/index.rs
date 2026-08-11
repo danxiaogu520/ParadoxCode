@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use pdx_rules::{RuleSet, SymbolResolutionPolicy};
 use pdx_text::{PositionRange, TextRange};
 
+use crate::hir::MacroTemplate;
 use crate::model::{SourceFileId, WorkspaceError, WorkspaceScanToken};
 
 /// One parameter in the callable signature of a scripted macro definition.
@@ -16,10 +17,11 @@ pub struct MacroParameterSignature {
     pub required: bool,
 }
 
-/// Compact callable metadata derived from one scripted effect or trigger definition.
+/// Indexed callable metadata derived from one scripted effect or trigger definition.
 ///
-/// The summary deliberately contains no source text or CST pointers so it can live in an index
-/// shard and round-trip through the Vanilla cache.
+/// The optional template is normalized, source-ranged semantic IR. It contains neither source
+/// text nor CST pointers, so the same representation can drive live-workspace and cache-only
+/// analysis without teaching the engine any concrete macro names.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MacroDefinitionSummary {
     /// Dynamic symbol kind, for example `scripted_effect`.
@@ -30,6 +32,8 @@ pub struct MacroDefinitionSummary {
     pub definition_range: TextRange,
     /// Parameters in first-use order.
     pub parameters: Vec<MacroParameterSignature>,
+    /// Reusable body semantics, when the definition could be lowered as a macro template.
+    pub template: Option<MacroTemplate>,
 }
 
 /// One symbol definition retained in an index shard.
@@ -69,7 +73,7 @@ pub struct FileIndexShard {
     pub definitions: Vec<Definition>,
     /// References in source order.
     pub references: Vec<Reference>,
-    /// Callable signatures for scripted macro definitions in this file.
+    /// Callable signatures and normalized templates for scripted macro definitions in this file.
     pub macro_definitions: Vec<MacroDefinitionSummary>,
     /// Syntax error count retained as a cheap health signal.
     pub syntax_error_count: usize,

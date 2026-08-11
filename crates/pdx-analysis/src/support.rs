@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use pdx_engine::hir::HirFile;
 use pdx_engine::{AnalysisSnapshot, DocumentId, DocumentSource, ParsedSource, SourceFileId};
-use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile};
+use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile, QuotedScript};
 use pdx_rules::GameProfile;
 use pdx_text::{LogicalPath, TextRange, TextSize};
 
@@ -124,9 +124,73 @@ pub(crate) struct ScriptProperty {
     pub(crate) range: TextRange,
     pub(crate) operator: Option<String>,
     pub(crate) scalar: Option<(String, TextRange)>,
+    pub(crate) quoted: bool,
+    pub(crate) quoted_source: Option<QuotedScalarSource>,
     pub(crate) block_range: Option<TextRange>,
     pub(crate) block: Vec<ScriptProperty>,
     pub(crate) bare_values: Vec<(String, TextRange)>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct QuotedScalarSource {
+    source: Arc<str>,
+    source_offsets: QuotedScalarOffsets,
+}
+
+#[derive(Clone, Debug)]
+enum QuotedScalarOffsets {
+    /// Top-level CST offsets map directly into the document and need no per-byte allocation.
+    Direct { start: TextSize, len: TextSize },
+    /// Secondary CST offsets compose through the enclosing quoted Script source map.
+    Mapped(Arc<[TextSize]>),
+}
+
+impl QuotedScalarSource {
+    pub(crate) fn source(&self) -> &str {
+        &self.source
+    }
+
+    fn map_offset(&self, offset: TextSize) -> Option<TextSize> {
+        match &self.source_offsets {
+            QuotedScalarOffsets::Direct { start, len } if offset <= *len => {
+                start.checked_add(offset)
+            }
+            QuotedScalarOffsets::Direct { .. } => None,
+            QuotedScalarOffsets::Mapped(offsets) => {
+                offsets.get(usize::try_from(offset).ok()?).copied()
+            }
+        }
+    }
+
+    pub(crate) fn map_decoded_range(
+        &self,
+        script: &QuotedScript,
+        range: TextRange,
+    ) -> Option<TextRange> {
+        let relative = script.source_map().decoded_range(range)?;
+        TextRange::new(
+            self.map_offset(relative.start())?,
+            self.map_offset(relative.end())?,
+        )
+    }
+
+    pub(crate) fn decoded_position(
+        &self,
+        script: &QuotedScript,
+        position: TextSize,
+    ) -> Option<TextSize> {
+        let local = match &self.source_offsets {
+            QuotedScalarOffsets::Direct { start, len } => {
+                usize::try_from(position.saturating_sub(*start).min(*len)).ok()?
+            }
+            QuotedScalarOffsets::Mapped(offsets) => offsets
+                .partition_point(|candidate| *candidate <= position)
+                .saturating_sub(1),
+        };
+        script
+            .source_map()
+            .source_offset(u32::try_from(local).ok()?)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -150,12 +214,44 @@ impl ScopeContext {
     }
 }
 pub(crate) fn script_properties(input: &ParsedInput, parent: &CstNode) -> Vec<ScriptProperty> {
+    let ParsedContent::Text(parsed) = &input.parsed;
+    script_properties_mapped(parsed, parent, Some, true)
+}
+
+pub(crate) fn quoted_script_container(
+    script: &QuotedScript,
+    origin: &QuotedScalarSource,
+) -> (Vec<ScriptProperty>, Vec<(String, TextRange)>) {
+    let parsed = script.parsed();
+    let map = |offset| {
+        let relative = script.source_map().decoded_offset(offset)?;
+        origin.map_offset(relative)
+    };
+    (
+        script_properties_mapped(parsed, parsed.root(), map, false),
+        script_bare_values_mapped(parsed, parsed.root(), map),
+    )
+}
+
+fn script_properties_mapped(
+    parsed: &ParsedFile,
+    parent: &CstNode,
+    map_offset: impl Copy + Fn(TextSize) -> Option<TextSize>,
+    direct_offsets: bool,
+) -> Vec<ScriptProperty> {
+    let map_range =
+        |range: TextRange| TextRange::new(map_offset(range.start())?, map_offset(range.end())?);
     parent
         .children()
         .iter()
         .filter(|node| node.kind() == CstKind::Property)
         .filter_map(|node| {
-            let (key, key_range) = property_key(input, node)?;
+            let key_node = node
+                .children()
+                .iter()
+                .find(|child| child.kind() == CstKind::Key)?;
+            let key = parsed.text(key_node.range())?.trim().to_owned();
+            let key_range = map_range(key_node.range())?;
             let value = node
                 .children()
                 .iter()
@@ -166,73 +262,104 @@ pub(crate) fn script_properties(input: &ParsedInput, parent: &CstNode) -> Vec<Sc
                     .iter()
                     .find(|child| child.kind() == CstKind::Block)
             });
-            let block = block_node.map_or_else(Vec::new, |block| script_properties(input, block));
+            let block = block_node.map_or_else(Vec::new, |block| {
+                script_properties_mapped(parsed, block, map_offset, direct_offsets)
+            });
             let bare_values = block_node.map_or_else(Vec::new, |block| {
-                block
-                    .children()
-                    .iter()
-                    .filter(|child| {
-                        matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString)
-                    })
-                    .filter_map(|child| {
-                        let raw = input.source_text(child.range())?.trim();
-                        let value = raw
-                            .strip_prefix('"')
-                            .and_then(|value| value.strip_suffix('"'))
-                            .unwrap_or(raw)
-                            .to_owned();
-                        Some((value, child.range()))
-                    })
-                    .collect()
+                script_bare_values_mapped(parsed, block, map_offset)
             });
             let operator = node
                 .children()
                 .iter()
                 .find(|child| child.kind() == CstKind::Operator)
-                .and_then(|child| input.source_text(child.range()))
+                .and_then(|child| parsed.text(child.range()))
                 .map(str::to_owned);
+            let scalar_node = property_scalar_node(node);
+            let scalar = scalar_node.and_then(|scalar| {
+                let raw = parsed.text(scalar.range())?.trim();
+                let value = raw
+                    .strip_prefix('"')
+                    .and_then(|value| value.strip_suffix('"'))
+                    .unwrap_or(raw)
+                    .to_owned();
+                Some((value, map_range(scalar.range())?))
+            });
+            let quoted_source = scalar_node
+                .filter(|scalar| scalar.kind() == CstKind::QuotedString)
+                .and_then(|scalar| {
+                    let source = Arc::<str>::from(parsed.text(scalar.range())?);
+                    // A quoted token found in a decoded secondary CST is still the raw token for
+                    // that Script layer. Retaining it verbatim lets the next descent decode exactly
+                    // one additional layer; re-encoding here would introduce a spurious layer.
+                    let source_offsets = if direct_offsets {
+                        QuotedScalarOffsets::Direct {
+                            start: scalar.range().start(),
+                            len: scalar.range().len(),
+                        }
+                    } else {
+                        let start = usize::try_from(scalar.range().start()).ok()?;
+                        let len = usize::try_from(scalar.range().len()).ok()?;
+                        let offsets = (0..=len)
+                            .map(|offset| {
+                                map_offset(u32::try_from(start.checked_add(offset)?).ok()?)
+                            })
+                            .collect::<Option<Vec<_>>>()?;
+                        QuotedScalarOffsets::Mapped(offsets.into())
+                    };
+                    Some(QuotedScalarSource {
+                        source,
+                        source_offsets,
+                    })
+                });
             Some(ScriptProperty {
                 key,
                 key_range,
-                range: node.range(),
+                range: map_range(node.range())?,
                 operator,
-                scalar: property_scalar(input, node),
-                block_range: block_node.map(CstNode::range),
+                scalar,
+                quoted: scalar_node.is_some_and(|scalar| scalar.kind() == CstKind::QuotedString),
+                quoted_source,
+                block_range: block_node.and_then(|block| map_range(block.range())),
                 block,
                 bare_values,
             })
         })
         .collect()
 }
-pub(crate) fn property_key(input: &ParsedInput, node: &CstNode) -> Option<(String, TextRange)> {
-    let key = node
-        .children()
-        .iter()
-        .find(|child| child.kind() == CstKind::Key)?;
-    let text = text(input, key.range())?.trim().to_owned();
-    Some((text, key.range()))
-}
 
-pub(crate) fn property_scalar(input: &ParsedInput, node: &CstNode) -> Option<(String, TextRange)> {
-    let value = node
+fn script_bare_values_mapped(
+    parsed: &ParsedFile,
+    parent: &CstNode,
+    map_offset: impl Copy + Fn(TextSize) -> Option<TextSize>,
+) -> Vec<(String, TextRange)> {
+    parent
         .children()
         .iter()
-        .find(|child| child.kind() == CstKind::Value)?;
-    let scalar = value
-        .children()
-        .iter()
-        .find(|child| matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString))?;
-    let raw = text(input, scalar.range())?.trim();
-    let value = raw
-        .strip_prefix('"')
-        .and_then(|value| value.strip_suffix('"'))
-        .unwrap_or(raw)
-        .to_owned();
-    Some((value, scalar.range()))
+        .filter(|child| matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString))
+        .filter_map(|child| {
+            let raw = parsed.text(child.range())?.trim();
+            let value = raw
+                .strip_prefix('"')
+                .and_then(|value| value.strip_suffix('"'))
+                .unwrap_or(raw)
+                .to_owned();
+            Some((
+                value,
+                TextRange::new(
+                    map_offset(child.range().start())?,
+                    map_offset(child.range().end())?,
+                )?,
+            ))
+        })
+        .collect()
 }
-
-pub(crate) fn text(input: &ParsedInput, range: TextRange) -> Option<&str> {
-    input.source_text(range)
+fn property_scalar_node(node: &CstNode) -> Option<&CstNode> {
+    node.children()
+        .iter()
+        .find(|child| child.kind() == CstKind::Value)?
+        .children()
+        .iter()
+        .find(|child| matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString))
 }
 
 pub(crate) fn properties(input: &ParsedInput) -> Vec<PropertyInfo> {
