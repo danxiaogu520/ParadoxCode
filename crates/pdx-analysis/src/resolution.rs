@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::sync::Arc;
 
 use pdx_engine::hir::{HirFile, HirReference, HirReferenceOrigin};
 use pdx_engine::{AnalysisSnapshot, Definition, DocumentId, DocumentSource, SourceFileId};
@@ -90,6 +91,29 @@ pub(crate) fn semantic_data_with_cancellation(
     cancellation: &CancellationToken,
 ) -> Result<SemanticFile, Cancelled> {
     cancellation.checkpoint()?;
+    // Overlay documents are re-extracted by every query (diagnostics, hover, completion,
+    // navigation). The result only depends on the immutable snapshot, so cache it per
+    // (revision, document) and share it across all worker threads observing that revision.
+    let Some(document) = input.document.as_ref() else {
+        return semantic_data_with_cancellation_uncached(snapshot, input, cancellation);
+    };
+    let revision = snapshot.revision();
+    let key = document.as_str();
+    if let Some(cached) = snapshot.query_cache().get::<SemanticFile>(revision, key) {
+        return Ok((*cached).clone());
+    }
+    let data = semantic_data_with_cancellation_uncached(snapshot, input, cancellation)?;
+    snapshot
+        .query_cache()
+        .insert(revision, key.to_owned(), Arc::new(data.clone()));
+    Ok(data)
+}
+
+fn semantic_data_with_cancellation_uncached(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    cancellation: &CancellationToken,
+) -> Result<SemanticFile, Cancelled> {
     let mut data = SemanticFile {
         definitions: Vec::new(),
         references: Vec::new(),
@@ -213,7 +237,6 @@ fn collect_quoted_semantic_container(
     quoted_scripts: &mut QuotedScriptSession<'_>,
     quoted_depth: usize,
 ) -> Result<(), Cancelled> {
-    let rules = semantic_rules_for_container(snapshot, context, parent_path, scope);
     for property in properties {
         cancellation.checkpoint()?;
         if embedded {
@@ -225,7 +248,6 @@ fn collect_quoted_semantic_container(
                 scope,
                 container_key,
                 property,
-                &rules,
                 data,
             );
         }
@@ -280,14 +302,14 @@ fn collect_quoted_semantic_container(
             && snapshot
                 .game_profile()
                 .is_transparent_scope_wrapper(&property.key);
-        let matching = rules
-            .iter()
-            .copied()
-            .filter(|rule| {
-                !matches!(rule.shape, RuleShape::LeafValue)
-                    && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
-            })
-            .collect::<Vec<_>>();
+        let matching =
+            semantic_rules_for_container_key(snapshot, context, parent_path, &property.key)
+                .into_iter()
+                .filter(|rule| {
+                    !matches!(rule.shape, RuleShape::LeafValue)
+                        && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
+                })
+                .collect::<Vec<_>>();
         let Some(selected) = semantic_selected_transition(
             snapshot,
             &matching,
@@ -358,12 +380,11 @@ fn collect_quoted_semantic_container(
 fn collect_embedded_property_semantics(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
-    _context: &str,
+    context: &str,
     parent_path: &[String],
     scope: &ScopeContext,
     container_key: Option<&str>,
     property: &ScriptProperty,
-    rules: &[&pdx_rules::SemanticRule],
     data: &mut SemanticFile,
 ) {
     if let Some((value, range)) = property.scalar.as_ref() {
@@ -390,23 +411,28 @@ fn collect_embedded_property_semantics(
             ));
         }
         if !property.quoted
-            && rules.iter().any(|rule| {
-                matches!(rule.shape, RuleShape::Leaf)
-                    && matches!(rule.value, pdx_rules::ValueMatcher::Localisation)
-                    && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
-                    && semantic_scope_allows(rule, scope)
-                    && semantic_property_matches(snapshot, rule, property, scope)
-            })
+            && semantic_rules_for_container_key(snapshot, context, parent_path, &property.key)
+                .iter()
+                .any(|rule| {
+                    matches!(rule.shape, RuleShape::Leaf)
+                        && matches!(rule.value, pdx_rules::ValueMatcher::Localisation)
+                        && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
+                        && semantic_scope_allows(rule, scope)
+                        && semantic_property_matches(snapshot, rule, property, scope)
+                })
         {
             data.references
                 .push(embedded_reference(input, "localisation", value, *range));
         }
     }
 
-    for rule in rules.iter().copied().filter(|rule| {
-        semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
-            && semantic_scope_allows(rule, scope)
-    }) {
+    for rule in semantic_rules_for_container_key(snapshot, context, parent_path, &property.key)
+        .into_iter()
+        .filter(|rule| {
+            semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
+                && semantic_scope_allows(rule, scope)
+        })
+    {
         let type_name = match &rule.key {
             KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
                 if scripted_macro_type(snapshot, type_name) =>
@@ -725,13 +751,7 @@ pub(crate) fn all_semantics(
         .values()
         .filter(|document| document.source() == DocumentSource::Overlay)
         .filter_map(|document| document.path())
-        .filter_map(|path| {
-            snapshot
-                .source_files()
-                .values()
-                .find(|file| file.physical_path == path)
-                .map(|file| file.id)
-        })
+        .filter_map(|path| snapshot.source_file_id_for_path(path))
         .collect::<BTreeSet<_>>();
     for file in snapshot.source_files().values() {
         cancellation.checkpoint()?;
@@ -812,13 +832,7 @@ pub(crate) fn symbol_candidates(
         .values()
         .filter(|document| document.source() == DocumentSource::Overlay)
         .filter_map(|document| document.path())
-        .filter_map(|path| {
-            snapshot
-                .source_files()
-                .values()
-                .find(|file| file.physical_path == path)
-                .map(|file| file.id)
-        })
+        .filter_map(|path| snapshot.source_file_id_for_path(path))
         .collect::<BTreeSet<_>>();
     let mut candidates = all
         .definitions
@@ -1000,12 +1014,9 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
             .filter(|document| document.source() == DocumentSource::Overlay)
         {
             if let Some(path) = document.path()
-                && let Some(file) = snapshot
-                    .source_files()
-                    .values()
-                    .find(|file| file.physical_path == path)
+                && let Some(file) = snapshot.source_file_id_for_path(path)
             {
-                context.overlay_files.insert(file.id);
+                context.overlay_files.insert(file);
             }
             let Some(input) = input_for_document(snapshot, document.id()) else {
                 continue;

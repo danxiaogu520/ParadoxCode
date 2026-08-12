@@ -148,12 +148,25 @@ pub(crate) fn add_semantic_key_items(
 ) {
     for candidate in semantic_rules_for_completion(snapshot, context) {
         let rule = candidate.rule;
-        if matches!(rule.shape, RuleShape::LeafValue)
-            || !semantic_scope_allows(rule, candidate.scope)
-        {
+        if !semantic_scope_allows(rule, candidate.scope) {
             continue;
         }
         let documentation = (!rule.documentation.is_empty()).then(|| rule.documentation.join("\n"));
+        if matches!(rule.shape, RuleShape::LeafValue) {
+            // A leaf-value container such as `required_missions = { ... }` accepts any key as
+            // an instance of the rule's value type; complete the workspace members of that
+            // type instead of rule keys.
+            add_leaf_value_member_items(
+                snapshot,
+                rule,
+                member_cache,
+                items,
+                replacement_range,
+                prefix,
+                documentation,
+            );
+            continue;
+        }
         match &rule.key {
             KeyMatcher::Exact(label) => push_completion(
                 items,
@@ -276,8 +289,191 @@ pub(crate) fn add_semantic_key_items(
                     );
                 }
             }
-            KeyMatcher::AnyScalar | KeyMatcher::Date => {}
+            KeyMatcher::Date => {
+                push_completion(
+                    items,
+                    CompletionItem {
+                        label: "1444.11.11".to_owned(),
+                        kind: CompletionKind::Key,
+                        detail: "date".to_owned(),
+                        documentation: documentation.clone(),
+                        replacement_range,
+                        insert_text: key_insert_text(
+                            rule,
+                            "1444.11.11",
+                            insert_assignment,
+                            base_indent,
+                        ),
+                        sort_score: completion_sort_score(8, rule.deprecated),
+                        deprecated: rule.deprecated,
+                        resolve_data: Some(format!("rule:{}", rule.id)),
+                    },
+                    prefix,
+                );
+            }
+            // AnyScalar keys accept arbitrary spellings and carry no member information.
+            KeyMatcher::AnyScalar => {}
         }
+    }
+}
+
+/// Completes workspace/static members for a leaf-value rule's value matcher.
+///
+/// Used both for keys inside a leaf-value container and for bare values of a `value_clause`
+/// rule whose children are leaf-value rules. Members are completed as keys (the inserted text
+/// is the bare spelling, without an assignment).
+fn add_leaf_value_member_items(
+    snapshot: &AnalysisSnapshot,
+    rule: &pdx_rules::SemanticRule,
+    member_cache: &mut CompletionMemberCache,
+    items: &mut Vec<CompletionItem>,
+    replacement_range: TextRange,
+    prefix: &str,
+    documentation: Option<String>,
+) {
+    match &rule.value {
+        ValueMatcher::Type(type_name) => {
+            for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
+                push_completion(
+                    items,
+                    CompletionItem {
+                        label: label.clone(),
+                        kind: CompletionKind::Key,
+                        detail: type_name.clone(),
+                        documentation: documentation.clone(),
+                        replacement_range,
+                        insert_text: label.clone(),
+                        sort_score: completion_sort_score(8, rule.deprecated),
+                        deprecated: rule.deprecated,
+                        resolve_data: Some(format!("rule:{}", rule.id)),
+                    },
+                    prefix,
+                );
+            }
+        }
+        ValueMatcher::Enum(enum_name) => {
+            for label in member_cache.enum_member_names(snapshot, enum_name, prefix) {
+                push_completion(
+                    items,
+                    CompletionItem {
+                        label: label.clone(),
+                        kind: CompletionKind::Key,
+                        detail: enum_name.clone(),
+                        documentation: documentation.clone(),
+                        replacement_range,
+                        insert_text: label.clone(),
+                        sort_score: completion_sort_score(8, rule.deprecated),
+                        deprecated: rule.deprecated,
+                        resolve_data: Some(format!("rule:{}", rule.id)),
+                    },
+                    prefix,
+                );
+            }
+        }
+        ValueMatcher::Dynamic(kind) => {
+            for label in member_cache.workspace_member_names(snapshot, kind, prefix) {
+                push_completion(
+                    items,
+                    CompletionItem {
+                        label: label.clone(),
+                        kind: CompletionKind::Key,
+                        detail: kind.clone(),
+                        documentation: documentation.clone(),
+                        replacement_range,
+                        insert_text: label.clone(),
+                        sort_score: completion_sort_score(8, rule.deprecated),
+                        deprecated: rule.deprecated,
+                        resolve_data: Some(format!("rule:{}", rule.id)),
+                    },
+                    prefix,
+                );
+            }
+        }
+        ValueMatcher::Localisation => {
+            for label in member_cache.workspace_member_names(snapshot, "localisation", prefix) {
+                add_localisation_value_completion(
+                    items,
+                    label,
+                    "localisation",
+                    documentation.clone(),
+                    replacement_range,
+                    prefix,
+                    rule.deprecated,
+                );
+            }
+        }
+        ValueMatcher::Exact(label) => {
+            add_value_completion(
+                items,
+                label,
+                &semantic_value_matcher_label(&rule.value),
+                documentation,
+                replacement_range,
+                prefix,
+                rule.deprecated,
+            );
+        }
+        ValueMatcher::Bool => {
+            for label in ["yes", "no"] {
+                add_value_completion(
+                    items,
+                    label,
+                    "bool",
+                    documentation.clone(),
+                    replacement_range,
+                    prefix,
+                    rule.deprecated,
+                );
+            }
+        }
+        ValueMatcher::Int { min, max } => {
+            add_numeric_completion(
+                items,
+                min.map(|value| value.to_string()).as_deref(),
+                "int",
+                documentation.clone(),
+                replacement_range,
+                prefix,
+                rule.deprecated,
+            );
+            add_numeric_completion(
+                items,
+                max.map(|value| value.to_string()).as_deref(),
+                "int",
+                documentation.clone(),
+                replacement_range,
+                prefix,
+                rule.deprecated,
+            );
+        }
+        ValueMatcher::Float { min, max } => {
+            add_value_completion(
+                items,
+                min.as_deref().or(max.as_deref()).unwrap_or("0"),
+                "float",
+                documentation.clone(),
+                replacement_range,
+                prefix,
+                rule.deprecated,
+            );
+        }
+        ValueMatcher::Date => {
+            add_value_completion(
+                items,
+                "1444.11.11",
+                "date",
+                documentation,
+                replacement_range,
+                prefix,
+                rule.deprecated,
+            );
+        }
+        // AnyScalar, DynamicSet, Filepath, Opaque, and Scope carry no member information.
+        ValueMatcher::AnyScalar
+        | ValueMatcher::DynamicSet(_)
+        | ValueMatcher::Filepath
+        | ValueMatcher::Opaque(_)
+        | ValueMatcher::Scope(_) => {}
     }
 }
 
@@ -294,8 +490,7 @@ pub(crate) fn add_semantic_value_items(
         .into_iter()
         .filter(|candidate| {
             let rule = candidate.rule;
-            !matches!(rule.shape, RuleShape::LeafValue)
-                && semantic_rule_key_matches(snapshot, rule, candidate.parent_path, &property.key)
+            semantic_rule_key_matches(snapshot, rule, candidate.parent_path, &property.key)
                 && rule
                     .operator
                     .as_deref()
@@ -306,6 +501,45 @@ pub(crate) fn add_semantic_value_items(
     for candidate in matching {
         let rule = candidate.rule;
         let documentation = (!rule.documentation.is_empty()).then(|| rule.documentation.join("\n"));
+        if matches!(rule.shape, RuleShape::LeafValue) {
+            // A bare `key = ` position inside a leaf-value container completes the members of
+            // the value type, mirroring the key-position behavior.
+            add_leaf_value_member_items(
+                snapshot,
+                rule,
+                member_cache,
+                items,
+                replacement_range,
+                prefix,
+                documentation,
+            );
+            continue;
+        }
+        if matches!(rule.shape, RuleShape::ValueClause) {
+            // A bare value of a `value_clause` rule is validated by the leaf-value rules of its
+            // child container; complete their value-type members here.
+            let mut child_path = candidate.parent_path.to_vec();
+            child_path.push(property.key.clone());
+            for child_rule in semantic_rules_for_container(
+                snapshot,
+                &context.context,
+                &child_path,
+                &context.scope,
+            ) {
+                if matches!(child_rule.shape, RuleShape::LeafValue) {
+                    add_leaf_value_member_items(
+                        snapshot,
+                        child_rule,
+                        member_cache,
+                        items,
+                        replacement_range,
+                        prefix,
+                        documentation.clone(),
+                    );
+                }
+            }
+            continue;
+        }
         match &rule.value {
             ValueMatcher::Exact(label) => add_value_completion(
                 items,
@@ -453,7 +687,59 @@ pub(crate) fn add_semantic_value_items(
                 }
             }
             ValueMatcher::Dynamic(kind) => {
+                // Mirror `semantic_dynamic_value_matches`: scope fields accept scope expressions
+                // and variable names; every dynamic kind additionally accepts scope expressions
+                // and same-named static enum members at runtime.
+                if kind.eq_ignore_ascii_case("scope_field") {
+                    for (label, detail) in scope_expression_candidates(snapshot, context, None) {
+                        add_value_completion(
+                            items,
+                            &label,
+                            detail,
+                            documentation.clone(),
+                            replacement_range,
+                            prefix,
+                            rule.deprecated,
+                        );
+                    }
+                    for label in
+                        member_cache.workspace_member_names(snapshot, "variable_name", prefix)
+                    {
+                        add_value_completion(
+                            items,
+                            label,
+                            "variable_name",
+                            documentation.clone(),
+                            replacement_range,
+                            prefix,
+                            rule.deprecated,
+                        );
+                    }
+                    continue;
+                }
                 for label in member_cache.workspace_member_names(snapshot, kind, prefix) {
+                    add_value_completion(
+                        items,
+                        label,
+                        kind,
+                        documentation.clone(),
+                        replacement_range,
+                        prefix,
+                        rule.deprecated,
+                    );
+                }
+                for (label, detail) in scope_expression_candidates(snapshot, context, None) {
+                    add_value_completion(
+                        items,
+                        &label,
+                        detail,
+                        documentation.clone(),
+                        replacement_range,
+                        prefix,
+                        rule.deprecated,
+                    );
+                }
+                for label in member_cache.enum_member_names(snapshot, kind, prefix) {
                     add_value_completion(
                         items,
                         label,

@@ -58,13 +58,7 @@ pub(crate) fn input_for_document(
         });
     let file = document
         .path()
-        .and_then(|path| {
-            snapshot
-                .source_files()
-                .values()
-                .find(|file| file.physical_path == path)
-        })
-        .map(|file| file.id);
+        .and_then(|path| snapshot.source_file_id_for_path(path));
     let source = document.text_handle();
     let parsed = document.parsed()?;
     let format = parsed.format();
@@ -514,12 +508,6 @@ pub(crate) fn overlay_file_ids(snapshot: &AnalysisSnapshot) -> BTreeSet<SourceFi
         .values()
         .filter(|document| document.source() == DocumentSource::Overlay)
         .filter_map(|document| document.path())
-        .flat_map(|path| {
-            snapshot
-                .source_files()
-                .values()
-                .filter(move |file| file.physical_path == path)
-                .map(|file| file.id)
-        })
+        .filter_map(|path| snapshot.source_file_id_for_path(path))
         .collect()
 }

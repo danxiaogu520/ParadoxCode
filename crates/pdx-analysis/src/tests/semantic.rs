@@ -349,9 +349,8 @@ fn eu4_alias_alternatives_do_not_cross_report_cardinality() {
 
 #[test]
 fn semantic_alternative_selection_refuses_equal_scores() {
-    let host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
-    let snapshot = host.snapshot();
-    let mut left = snapshot.rules().model().semantic.rules[0].clone();
+    let base = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    let mut left = base.model().semantic.rules[0].clone();
     left.id = "fixture:left".to_owned();
     left.context = "fixture".to_owned();
     left.parent_path.clear();
@@ -364,10 +363,21 @@ fn semantic_alternative_selection_refuses_equal_scores() {
     right.id = "fixture:right".to_owned();
     right.key = KeyMatcher::Exact("right".to_owned());
     right.alternative_id = Some("right-alternative".to_owned());
-    let rules = [&left, &right];
+    // Rebuild the runtime index so the keyed container lookups can see the fixture rules.
+    let mut model = base.model().clone();
+    model.semantic.rules = vec![left.clone(), right.clone()];
+    let host = eu4_host(pdx_rules::RuleSet::from_model(model));
+    let snapshot = host.snapshot();
+    let rules = snapshot
+        .rules()
+        .model()
+        .semantic
+        .rules
+        .iter()
+        .collect::<Vec<_>>();
     let scope = crate::ScopeContext::new(std::sync::Arc::new(pdx_game::eu4::profile()));
     assert_eq!(
-        crate::semantic_selected_alternative(&snapshot, &rules, &[], &[], &[], &scope),
+        crate::semantic_selected_alternative(&snapshot, &rules, "fixture", &[], &[], &[], &scope),
         None
     );
 
@@ -384,8 +394,16 @@ fn semantic_alternative_selection_refuses_equal_scores() {
         bare_values: Vec::new(),
     };
     assert_eq!(
-        crate::semantic_selected_alternative(&snapshot, &rules, &[], &[property], &[], &scope,)
-            .as_deref(),
+        crate::semantic_selected_alternative(
+            &snapshot,
+            &rules,
+            "fixture",
+            &[],
+            &[property],
+            &[],
+            &scope,
+        )
+        .as_deref(),
         Some("left-alternative")
     );
 }

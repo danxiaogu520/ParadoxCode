@@ -3,6 +3,275 @@
 use super::support::*;
 
 #[test]
+fn leaf_value_container_completion_offers_typed_workspace_members() {
+    use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+    use std::fs;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-mission-complete-{nonce}"));
+    fs::create_dir_all(root.join("missions")).expect("mission directory");
+    let path = root.join("missions/test.txt");
+    let text = concat!(
+        "test_series = { slot = 1 generic = no ai = yes has_country_shield = no\n",
+        "  mission_a = { icon = mission_unknown position = 1 }\n",
+        "  mission_b = { icon = mission_unknown position = 2 required_missions = { } }\n",
+        "}\n",
+    );
+    fs::write(&path, text).expect("write mission document");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("index mission document");
+    let id = DocumentId::new("file:///tmp/missions/test.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), Some(path.clone()))
+        .expect("open");
+    let snapshot = host.snapshot();
+    let position = u32::try_from(
+        text.find("required_missions = { }")
+            .expect("required_missions block")
+            + "required_missions = {".len()
+            + 1,
+    )
+    .expect("position");
+    let result = complete(&snapshot, &id, position);
+    assert!(
+        result.items.iter().any(|item| item.label == "mission_a"),
+        "a leaf-value container must complete workspace members: {:?}",
+        result
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
+    assert!(result.items.iter().any(|item| item.label == "mission_b"));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn leaf_value_exact_literals_and_date_keys_complete_remaining_matchers() {
+    let mut model = pdx_game::eu4::bootstrap_model();
+    for rule in [
+        SemanticRule {
+            id: "fixture:container".to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("container".to_owned()),
+            operator: None,
+            value: ValueMatcher::AnyScalar,
+            shape: RuleShape::Node,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 1,
+        },
+        SemanticRule {
+            id: "fixture:exact-block".to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: vec!["container".to_owned()],
+            key: KeyMatcher::Exact("exact_block".to_owned()),
+            operator: None,
+            value: ValueMatcher::AnyScalar,
+            shape: RuleShape::ValueClause,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 1,
+        },
+        SemanticRule {
+            id: "fixture:exact-leaf".to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: vec!["container".to_owned(), "exact_block".to_owned()],
+            key: KeyMatcher::AnyScalar,
+            operator: None,
+            value: ValueMatcher::Exact("leader".to_owned()),
+            shape: RuleShape::LeafValue,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 1,
+        },
+        SemanticRule {
+            id: "fixture:date-key".to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: vec!["container".to_owned()],
+            key: KeyMatcher::Date,
+            operator: None,
+            value: ValueMatcher::AnyScalar,
+            shape: RuleShape::Node,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 1,
+        },
+    ] {
+        model.semantic.rules.push(rule);
+    }
+    let mut host = eu4_host(RuleSet::from_model(model));
+    let id = DocumentId::new("file:///tmp/common/events/test.txt");
+
+    // Inside the leaf-value container the exact literal completes as a key.
+    let block_text = "trigger = { container = { exact_block = { lea } } }";
+    host.open_document(id.clone(), 1, block_text.to_owned(), None)
+        .expect("open block document");
+    let block_position =
+        u32::try_from(block_text.find("lea").expect("literal prefix") + 2).expect("position");
+    let block_result = complete(&host.snapshot(), &id, block_position);
+    assert!(
+        block_result.items.iter().any(|item| item.label == "leader"),
+        "an exact leaf-value container must complete the literal: {:?}",
+        block_result
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
+
+    // A bare value of the value_clause inherits the leaf-value literal as well.
+    let bare_text = "trigger = { container = { exact_block = lea } }";
+    host.stage_document_text(&id, 2, bare_text.to_owned())
+        .expect("stage bare document");
+    let prepared = host
+        .snapshot()
+        .prepare_document(&id)
+        .expect("prepare bare document");
+    assert!(host.commit_prepared_document(prepared));
+    let bare_position =
+        u32::try_from(bare_text.find("lea").expect("literal prefix") + 2).expect("position");
+    let bare_result = complete(&host.snapshot(), &id, bare_position);
+    assert!(
+        bare_result.items.iter().any(|item| item.label == "leader"),
+        "a value_clause bare value must complete the leaf-value literal: {:?}",
+        bare_result
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
+
+    // Date-keyed rules complete a campaign-date template.
+    let date_text = "trigger = { container = {  } }";
+    host.stage_document_text(&id, 3, date_text.to_owned())
+        .expect("stage date document");
+    let prepared = host
+        .snapshot()
+        .prepare_document(&id)
+        .expect("prepare date document");
+    assert!(host.commit_prepared_document(prepared));
+    let date_result = complete(
+        &host.snapshot(),
+        &id,
+        u32::try_from(
+            date_text.find("container = {").expect("container block") + "container = {".len() + 1,
+        )
+        .expect("position"),
+    );
+    assert!(
+        date_result
+            .items
+            .iter()
+            .any(|item| item.label == "1444.11.11"),
+        "date-keyed rules must complete a campaign date template"
+    );
+}
+
+#[test]
+fn leaf_value_clause_bare_value_completion_offers_typed_workspace_members() {
+    use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+    use std::fs;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-mission-bare-{nonce}"));
+    fs::create_dir_all(root.join("missions")).expect("mission directory");
+    let path = root.join("missions/test.txt");
+    let text = concat!(
+        "test_series = { slot = 1 generic = no ai = yes has_country_shield = no\n",
+        "  mission_a = { icon = mission_unknown position = 1 }\n",
+        "  mission_b = { icon = mission_unknown position = 2 required_missions = \n",
+        "  }\n",
+        "}\n",
+    );
+    fs::write(&path, text).expect("write mission document");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("index mission document");
+    let id = DocumentId::new("file:///tmp/missions/test.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), Some(path.clone()))
+        .expect("open");
+    let snapshot = host.snapshot();
+    let position = u32::try_from(
+        text.find("required_missions = ")
+            .expect("required_missions value")
+            + "required_missions = ".len(),
+    )
+    .expect("position");
+    let result = complete(&snapshot, &id, position);
+    assert!(
+        result.items.iter().any(|item| item.label == "mission_a"),
+        "a value_clause bare value must complete workspace members: {:?}",
+        result
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
+    assert!(result.items.iter().any(|item| item.label == "mission_b"));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn quoted_script_completion_distinguishes_keys_values_and_escapes_snippets() {
     let key_text = "trigger = { embedded = \"\n fo\n\" }\n";
     let (host, id) = quoted_script_snapshot(key_text);
@@ -591,8 +860,14 @@ fn scripted_macro_argument_value_inference_handles_conditionals_scope_and_confli
     );
     let cycle = complete_argument(&host, "cycle", "cycle_a = { VALUE =  }");
     assert!(
-        cycle.is_empty(),
-        "cyclic constraint inference must fall back without guessing: {cycle:?}"
+        cycle.iter().any(|item| item.label == "this"),
+        "cyclic inference must fall back to rule-backed scope candidates: {cycle:?}"
+    );
+    assert!(
+        cycle
+            .iter()
+            .all(|item| item.detail == "scope" || item.detail == "scope link"),
+        "cyclic fallback must not guess unrelated value types: {cycle:?}"
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
@@ -1248,6 +1523,149 @@ fn completion_detail_uses_bare_categories() {
         .find(|item| item.label == "member_a")
         .expect("enum member item");
     assert_eq!(member.detail, "fixture_enum");
+}
+
+#[test]
+fn dynamic_value_completion_covers_scope_expressions_and_same_named_enums() {
+    let mut model = pdx_game::eu4::bootstrap_model();
+    model.semantic.enum_values.insert(
+        "fixture_dynamic".to_owned(),
+        vec!["member_a".to_owned(), "member_b".to_owned()],
+    );
+    for (id, key, value) in [
+        (
+            "fixture:dynamic-scope",
+            "dynamic_scope",
+            ValueMatcher::Dynamic("scope_field".to_owned()),
+        ),
+        (
+            "fixture:dynamic-enum",
+            "dynamic_enum",
+            ValueMatcher::Dynamic("fixture_dynamic".to_owned()),
+        ),
+    ] {
+        model.semantic.rules.push(SemanticRule {
+            id: id.to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact(key.to_owned()),
+            operator: None,
+            value,
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 1,
+        });
+    }
+    let mut host = eu4_host(RuleSet::from_model(model.clone()));
+    let id = DocumentId::new("file:///tmp/common/events/test.txt");
+
+    // A scope-field dynamic value completes scope expressions and variable names.
+    let scope_text = "trigger = { dynamic_scope = ";
+    host.open_document(id.clone(), 1, scope_text.to_owned(), None)
+        .expect("open scope document");
+    let scope_result = complete(
+        &host.snapshot(),
+        &id,
+        u32::try_from(scope_text.len()).expect("position"),
+    );
+    assert!(
+        scope_result.items.iter().any(|item| item.label == "root"),
+        "a scope_field dynamic value must complete scope expressions: {:?}",
+        scope_result
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
+
+    // A dynamic value with a same-named static enum completes the enum members.
+    let enum_text = "trigger = { dynamic_enum = memb";
+    host.stage_document_text(&id, 2, enum_text.to_owned())
+        .expect("stage enum document");
+    let prepared = host
+        .snapshot()
+        .prepare_document(&id)
+        .expect("prepare enum document");
+    assert!(host.commit_prepared_document(prepared));
+    let enum_result = complete(
+        &host.snapshot(),
+        &id,
+        u32::try_from(enum_text.find("memb").expect("prefix") + 2).expect("position"),
+    );
+    assert!(
+        enum_result
+            .items
+            .iter()
+            .any(|item| item.label == "member_a"),
+        "a dynamic value must complete same-named static enum members: {:?}",
+        enum_result
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        enum_result
+            .items
+            .iter()
+            .any(|item| item.label == "member_b")
+    );
+
+    // An ordinary value rule also completes when the cursor sits directly after `key = ` at
+    // the end of the line (the half-open property range boundary).
+    model.semantic.rules.push(SemanticRule {
+        id: "fixture:bool-value".to_owned(),
+        context: "trigger".to_owned(),
+        parent_path: Vec::new(),
+        key: KeyMatcher::Exact("bool_value".to_owned()),
+        operator: None,
+        value: ValueMatcher::Bool,
+        shape: RuleShape::Leaf,
+        child_context: None,
+        alternative_id: None,
+        severity: None,
+        required: false,
+        deprecated: false,
+        documentation: Vec::new(),
+        allowed_scopes: Vec::new(),
+        push_scope: None,
+        replace_scope: Vec::new(),
+        min_occurs: None,
+        strict_min: true,
+        max_occurs: None,
+        source_file: "fixture.semantic".to_owned(),
+        line: 1,
+    });
+    let mut host = eu4_host(RuleSet::from_model(model));
+    let bool_text = "trigger = { bool_value = ";
+    host.open_document(id.clone(), 1, bool_text.to_owned(), None)
+        .expect("open bool document");
+    let bool_result = complete(
+        &host.snapshot(),
+        &id,
+        u32::try_from(bool_text.len()).expect("position"),
+    );
+    assert!(
+        bool_result.items.iter().any(|item| item.label == "yes"),
+        "a value rule must complete after an unfinished assignment: {:?}",
+        bool_result
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
 }
 
 #[test]

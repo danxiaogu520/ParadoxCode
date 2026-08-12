@@ -437,22 +437,10 @@ pub(crate) fn validate_semantic_container(
     if rules.is_empty() {
         return Ok(());
     }
-    let mut exact_rules =
-        std::collections::BTreeMap::<String, Vec<&pdx_rules::SemanticRule>>::new();
-    let mut non_exact_rules = Vec::new();
-    for rule in &rules {
-        if let pdx_rules::KeyMatcher::Exact(key) = &rule.key {
-            exact_rules
-                .entry(key.to_ascii_lowercase())
-                .or_default()
-                .push(*rule);
-        } else {
-            non_exact_rules.push(*rule);
-        }
-    }
     let selected_alternative = semantic_selected_alternative(
         snapshot,
         &rules,
+        context,
         parent_path,
         properties,
         bare_values,
@@ -477,17 +465,14 @@ pub(crate) fn validate_semantic_container(
             && profile.is_transparent_scope_wrapper(&property.key))
             || ((trigger_like || effect_like)
                 && profile.is_dynamic_scope_expression(&property.key));
-        let matching = exact_rules
-            .get(&key)
-            .into_iter()
-            .flatten()
-            .copied()
-            .chain(non_exact_rules.iter().copied())
-            .filter(|rule| {
-                !matches!(rule.shape, RuleShape::LeafValue)
-                    && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
-            })
-            .collect::<Vec<_>>();
+        let matching =
+            semantic_rules_for_container_key(snapshot, context, parent_path, &property.key)
+                .into_iter()
+                .filter(|rule| {
+                    !matches!(rule.shape, RuleShape::LeafValue)
+                        && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
+                })
+                .collect::<Vec<_>>();
         let parameterized_key = hir.is_some_and(|hir| {
             owner_local_parameter_in_range(
                 hir,
@@ -750,7 +735,14 @@ pub(crate) fn validate_semantic_container(
                 // moved to its target, so structural and transitioned children share next_scope.
                 let (structural_properties, transition_properties): (Vec<_>, Vec<_>) =
                     property.block.iter().cloned().partition(|child| {
-                        structural_rules.iter().any(|rule| {
+                        semantic_rules_for_container_key(
+                            snapshot,
+                            context,
+                            &structural_path,
+                            &child.key,
+                        )
+                        .iter()
+                        .any(|rule| {
                             !matches!(rule.shape, RuleShape::LeafValue)
                                 && semantic_rule_key_matches(
                                     snapshot,
@@ -862,11 +854,21 @@ pub(crate) fn validate_semantic_container(
         |property| property.key_range,
     );
     if block_container {
-        for rule in rules
-            .iter()
-            .filter(|rule| semantic_scope_allows(rule, scope))
-        {
+        for rule in rules.iter() {
             cancellation.checkpoint()?;
+            // Cardinality gates run before the scope/selection checks for non-leaf rules so
+            // the hundreds of unrelated rules in a container skip the scope filter entirely.
+            let min_occurs = if matches!(rule.shape, RuleShape::LeafValue) {
+                None
+            } else {
+                semantic_min_occurs(rule).filter(|min_occurs| *min_occurs > 0)
+            };
+            if min_occurs.is_none() && !matches!(rule.shape, RuleShape::LeafValue) {
+                continue;
+            }
+            if !semantic_scope_allows(rule, scope) {
+                continue;
+            }
             if !semantic_rule_is_selected(rule, selected_alternative.as_deref()) {
                 continue;
             }
@@ -908,12 +910,7 @@ pub(crate) fn validate_semantic_container(
                 }
                 continue;
             }
-            let Some(min_occurs) = semantic_min_occurs(rule) else {
-                continue;
-            };
-            if min_occurs == 0 {
-                continue;
-            }
+            let min_occurs = min_occurs.expect("non-leaf rules carry a positive cardinality gate");
             let count = properties
                 .iter()
                 .filter(|property| {

@@ -1,6 +1,71 @@
 use super::*;
 
 #[test]
+fn physical_path_lookup_follows_scan_and_targeted_disk_changes() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-path-index-{nonce}"));
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("event directory");
+    fs::write(events.join("kept.txt"), "country_event = { id = kept.1 }\n").expect("kept file");
+    fs::write(events.join("gone.txt"), "country_event = { id = gone.1 }\n").expect("gone file");
+
+    let mut host = eu4_host();
+    host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        ),
+    ]));
+    host.refresh_source_roots().expect("scan");
+    let snapshot = host.snapshot();
+    assert!(
+        snapshot
+            .source_file_id_for_path(&events.join("kept.txt"))
+            .is_some(),
+        "scanned file is resolvable by physical path"
+    );
+    let gone_id = snapshot
+        .source_file_id_for_path(&events.join("gone.txt"))
+        .expect("scanned file is indexed");
+
+    fs::remove_file(events.join("gone.txt")).expect("remove file");
+    host.apply_disk_file_changes(&[DiskFileChange::new(
+        events.join("gone.txt"),
+        DiskFileChangeKind::Deleted,
+    )])
+    .expect("apply deletion");
+    let snapshot = host.snapshot();
+    assert_eq!(
+        snapshot.source_file_id_for_path(&events.join("gone.txt")),
+        None,
+        "deleted file leaves the path index"
+    );
+    assert!(
+        snapshot.source_files().get(&gone_id).is_none(),
+        "deleted file leaves the file table"
+    );
+
+    fs::write(events.join("new.txt"), "country_event = { id = new.1 }\n").expect("new file");
+    host.apply_disk_file_changes(&[DiskFileChange::new(
+        events.join("new.txt"),
+        DiskFileChangeKind::Created,
+    )])
+    .expect("apply creation");
+    let snapshot = host.snapshot();
+    assert!(
+        snapshot
+            .source_file_id_for_path(&events.join("new.txt"))
+            .is_some(),
+        "created file enters the path index"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn recoverable_file_failures_do_not_abort_the_workspace_scan() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

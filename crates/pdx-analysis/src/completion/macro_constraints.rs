@@ -347,8 +347,10 @@ impl<'a> ConstraintCollector<'a> {
                 .iter()
                 .copied()
                 .filter(|rule| {
-                    !matches!(rule.shape, RuleShape::LeafValue)
-                        && semantic_rule_key_matches(self.snapshot, rule, parent_path, key)
+                    // Leaf-value rules participate so a macro parameter inside a leaf-value
+                    // container (for example `required_missions = { $MISSION$ }`) inherits the
+                    // container's value-type constraint.
+                    semantic_rule_key_matches(self.snapshot, rule, parent_path, key)
                         && semantic_scope_allows(rule, scope)
                         && operator_matches(rule, property)
                 })
@@ -357,7 +359,7 @@ impl<'a> ConstraintCollector<'a> {
                 SymbolicValue::Scalar(SymbolicToken::Target) => {
                     let mut matchers = matching
                         .iter()
-                        .filter(|rule| matches!(rule.shape, RuleShape::Leaf))
+                        .filter(|rule| matches!(rule.shape, RuleShape::Leaf | RuleShape::LeafValue))
                         .map(|rule| rule.value.clone())
                         .filter(is_completion_constraint)
                         .collect::<Vec<_>>();

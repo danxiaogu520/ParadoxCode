@@ -1,6 +1,6 @@
 //! Mutable workspace owner and atomic state transitions.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -20,6 +20,7 @@ use crate::pipeline::{
     position_ranges_for_state, prepare_document_snapshot, staged_overlay_document,
     unparsed_document,
 };
+use crate::query_cache::SnapshotQueryCache;
 use crate::scan::{
     collect_whitelisted_files, read_source_file, read_source_file_cancellable, record_scan_issue,
     source_priorities, stable_file_id,
@@ -37,11 +38,13 @@ pub struct AnalysisHost {
     workspace_root: Option<PathBuf>,
     documents: Arc<BTreeMap<DocumentId, DocumentSnapshot>>,
     source_files: Arc<BTreeMap<SourceFileId, SourceFile>>,
+    source_file_paths: Arc<HashMap<PathBuf, SourceFileId>>,
     file_states: Arc<BTreeMap<SourceFileId, Arc<FileState>>>,
     index: Arc<WorkspaceIndex>,
     scan_report: Arc<WorkspaceScanReport>,
     vanilla_root: Option<SourceRoot>,
     vanilla_localisation_previews: Arc<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>>,
+    query_cache: Arc<SnapshotQueryCache>,
 }
 
 impl AnalysisHost {
@@ -69,11 +72,13 @@ impl AnalysisHost {
             workspace_root: None,
             documents: Arc::new(BTreeMap::new()),
             source_files: Arc::new(BTreeMap::new()),
+            source_file_paths: Arc::new(HashMap::new()),
             file_states: Arc::new(BTreeMap::new()),
             index: Arc::new(WorkspaceIndex::empty()),
             scan_report: Arc::new(WorkspaceScanReport::default()),
             vanilla_root: None,
             vanilla_localisation_previews: Arc::new(BTreeMap::new()),
+            query_cache: Arc::new(SnapshotQueryCache::new()),
         }
     }
 
@@ -169,17 +174,19 @@ impl AnalysisHost {
         let mut roots = Vec::with_capacity(self.roots.len().saturating_add(1));
         roots.push(vanilla.clone());
         roots.extend(self.roots.iter().cloned());
-        let mut index = WorkspaceIndex::from_shards(shards);
+        // One combined build sets the case policy and derives the lookup maps together, so the
+        // merged Vanilla + workspace shards are not rebuilt twice.
+        let mut index = WorkspaceIndex::from_shards_with_rules(shards, self.rules.as_ref());
         index.replace_all_position_ranges(cached_positions);
         for (file_id, state) in self.file_states.iter() {
             index.replace_position_ranges(*file_id, position_ranges_for_state(state));
         }
-        index.configure_case_sensitivity(self.rules.as_ref());
         let priorities = source_priorities(&roots, &files);
         index.resolve_priorities(&priorities, self.rules.as_ref());
 
         self.roots = Arc::from(roots);
         self.source_files = Arc::new(files);
+        self.source_file_paths = Arc::new(source_file_paths(&self.source_files));
         self.index = Arc::new(index);
         self.vanilla_root = Some(vanilla);
         self.vanilla_localisation_previews = Arc::new(cached_previews);
@@ -385,6 +392,7 @@ impl AnalysisHost {
         }
         cancellation.checkpoint()?;
         self.source_files = Arc::new(files);
+        self.source_file_paths = Arc::new(source_file_paths(&self.source_files));
         self.file_states = Arc::new(file_states);
         self.index = Arc::new(index);
         self.scan_report = Arc::new(report.clone());
@@ -412,6 +420,7 @@ impl AnalysisHost {
         cancellation.checkpoint()?;
         let limits = WorkspaceScanLimits::default();
         let mut files = self.source_files.as_ref().clone();
+        let mut paths = self.source_file_paths.as_ref().clone();
         let mut file_states = self.file_states.as_ref().clone();
         let mut index = self.index.as_ref().clone();
         let mut report = WorkspaceScanReport::default();
@@ -473,6 +482,7 @@ impl AnalysisHost {
             };
             if change.kind == DiskFileChangeKind::Deleted || missing {
                 if files.remove(&id).is_some() {
+                    paths.remove(&change.path);
                     file_states.remove(&id);
                     let priorities = source_priorities(&self.roots, &files);
                     index.remove_shard_resolved(id, &priorities, self.rules.as_ref());
@@ -537,6 +547,7 @@ impl AnalysisHost {
                 None => empty_file_state(&source_file, file_revision),
             });
             files.insert(id, source_file);
+            paths.insert(change.path.clone(), id);
             file_states.insert(id, Arc::clone(&state));
             let priorities = source_priorities(&self.roots, &files);
             index.replace_shard_resolved(state.shard().clone(), &priorities, self.rules.as_ref());
@@ -548,6 +559,7 @@ impl AnalysisHost {
         cancellation.checkpoint()?;
         if changed {
             self.source_files = Arc::new(files);
+            self.source_file_paths = Arc::new(paths);
             self.file_states = Arc::new(file_states);
             self.index = Arc::new(index);
             self.scan_report = Arc::new(report.clone());
@@ -772,10 +784,22 @@ impl AnalysisHost {
             workspace_root: self.workspace_root.clone(),
             documents: Arc::clone(&self.documents),
             source_files: Arc::clone(&self.source_files),
+            source_file_paths: Arc::clone(&self.source_file_paths),
             file_states: Arc::clone(&self.file_states),
             index: Arc::clone(&self.index),
             scan_report: Arc::clone(&self.scan_report),
             vanilla_localisation_previews: Arc::clone(&self.vanilla_localisation_previews),
+            query_cache: Arc::clone(&self.query_cache),
         }
     }
+}
+
+/// Builds the physical-path lookup used to resolve one scanned file without scanning the full
+/// file table. First match wins, mirroring the iteration order of the previous linear scans.
+fn source_file_paths(files: &BTreeMap<SourceFileId, SourceFile>) -> HashMap<PathBuf, SourceFileId> {
+    let mut paths = HashMap::with_capacity(files.len());
+    for (id, file) in files {
+        paths.entry(file.physical_path.clone()).or_insert(*id);
+    }
+    paths
 }

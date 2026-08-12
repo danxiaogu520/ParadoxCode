@@ -26,9 +26,52 @@ use super::{
     VanillaIndexCache, VanillaIndexCacheMetadata,
 };
 
+/// Row-count and text-length limits per table, in validation order.
+const TABLE_LIMITS: [(&str, usize, &str); 7] = [
+    (
+        "source_files",
+        MAX_CACHE_FILES,
+        "logical_path, category_id, resolution",
+    ),
+    ("definitions", MAX_CACHE_SYMBOLS, "kind, name"),
+    ("symbol_references", MAX_CACHE_SYMBOLS, "kind, name"),
+    ("macro_definitions", MAX_CACHE_SYMBOLS, "kind, name"),
+    ("macro_parameters", MAX_CACHE_SYMBOLS, "name"),
+    (
+        "navigation_positions",
+        MAX_CACHE_SYMBOLS,
+        "range_start, range_end, start_line, start_character, end_line, end_character",
+    ),
+    (
+        "localisation_previews",
+        MAX_CACHE_SYMBOLS,
+        "range_start, range_end, language, value",
+    ),
+];
+
 pub(super) fn load_cancellable(
     path: &Path,
     cancellation: &WorkspaceScanToken,
+) -> Result<VanillaIndexCache, VanillaCacheError> {
+    load_cancellable_with(path, cancellation, true)
+}
+
+/// Loads a cache while skipping the derivation of symbol lookup maps.
+///
+/// The returned cache is only suitable for immediate installation: `install_vanilla_cache`
+/// merges the shards with the workspace and rebuilds the maps once, so the maps derived here
+/// would be discarded. Validation is identical to [`load_cancellable`].
+pub(super) fn load_cancellable_for_install(
+    path: &Path,
+    cancellation: &WorkspaceScanToken,
+) -> Result<VanillaIndexCache, VanillaCacheError> {
+    load_cancellable_with(path, cancellation, false)
+}
+
+fn load_cancellable_with(
+    path: &Path,
+    cancellation: &WorkspaceScanToken,
+    build_lookup_maps: bool,
 ) -> Result<VanillaIndexCache, VanillaCacheError> {
     if cancellation.is_cancelled() {
         return Err(VanillaCacheError::Cancelled);
@@ -49,10 +92,13 @@ pub(super) fn load_cancellable(
     let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let cancellation = cancellation.clone();
     connection.progress_handler(1_000, Some(move || cancellation.is_cancelled()));
-    load_connection(&connection).map_err(map_interrupted)
+    load_connection(&connection, build_lookup_maps).map_err(map_interrupted)
 }
 
-fn load_connection(connection: &Connection) -> Result<VanillaIndexCache, VanillaCacheError> {
+fn load_connection(
+    connection: &Connection,
+    build_lookup_maps: bool,
+) -> Result<VanillaIndexCache, VanillaCacheError> {
     validate_database_identity(connection)?;
     let schema_version = metadata_text(connection, "schema_version")?
         .parse::<u32>()
@@ -76,7 +122,7 @@ fn load_connection(connection: &Connection) -> Result<VanillaIndexCache, Vanilla
         .parse::<usize>()
         .map_err(|_| VanillaCacheError::InvalidMetadata("indexed_files"))?;
     let (source_files, index, positions, localisation_previews) =
-        load_index(connection, &source_root)?;
+        load_index(connection, &source_root, build_lookup_maps)?;
     if indexed_files != source_files.len() {
         return Err(VanillaCacheError::InvalidData(format!(
             "metadata records {indexed_files} files but cache contains {}",
@@ -151,37 +197,28 @@ fn metadata_text(connection: &Connection, key: &'static str) -> Result<String, V
 }
 
 fn validate_table_limits(connection: &Connection) -> Result<(), VanillaCacheError> {
-    validate_count(connection, "source_files", MAX_CACHE_FILES)?;
-    validate_count(connection, "definitions", MAX_CACHE_SYMBOLS)?;
-    validate_count(connection, "symbol_references", MAX_CACHE_SYMBOLS)?;
-    validate_count(connection, "macro_definitions", MAX_CACHE_SYMBOLS)?;
-    validate_count(connection, "macro_parameters", MAX_CACHE_SYMBOLS)?;
-    validate_count(connection, "navigation_positions", MAX_CACHE_SYMBOLS)?;
-    validate_count(connection, "localisation_previews", MAX_CACHE_SYMBOLS)?;
-    for (table, fields) in [
-        ("source_files", "logical_path, category_id, resolution"),
-        ("definitions", "kind, name"),
-        ("symbol_references", "kind, name"),
-        ("macro_definitions", "kind, name"),
-        ("macro_parameters", "name"),
-        (
-            "navigation_positions",
-            "range_start, range_end, start_line, start_character, end_line, end_character",
-        ),
-        (
-            "localisation_previews",
-            "range_start, range_end, language, value",
-        ),
-    ] {
+    // One scan per table returns both the row count and the longest text field, so the
+    // bounds checks never rescan a table. The order matches TABLE_LIMITS so failures can
+    // name the offending table statically.
+    for (index, (table, limit, fields)) in TABLE_LIMITS.iter().enumerate() {
+        let fields = fields
+            .split(", ")
+            .map(|field| format!("COALESCE(length({field}), 0)"))
+            .collect::<Vec<_>>()
+            .join(", ");
         let query = format!(
-            "SELECT COALESCE(MAX(max_length), 0) FROM (SELECT max({}) AS max_length FROM {table})",
-            fields
-                .split(", ")
-                .map(|field| format!("COALESCE(length({field}), 0)"))
-                .collect::<Vec<_>>()
-                .join(", ")
+            "SELECT count(*), COALESCE(MAX(max_length), 0) FROM (SELECT max({fields}) AS max_length FROM {table})"
         );
-        let max = connection.query_row(&query, [], |row| row.get::<_, i64>(0))?;
+        let (count, max) = connection.query_row(&query, [], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+        })?;
+        let limit = *limit;
+        if count < 0 || usize::try_from(count).map_or(true, |count| count > limit) {
+            return Err(VanillaCacheError::LimitExceeded(
+                TABLE_LIMITS[index].0,
+                limit,
+            ));
+        }
         if max < 0 || usize::try_from(max).map_or(true, |max| max > MAX_TEXT_FIELD_BYTES) {
             return Err(VanillaCacheError::LimitExceeded(
                 "text field byte",
@@ -205,23 +242,10 @@ fn validate_table_limits(connection: &Connection) -> Result<(), VanillaCacheErro
     Ok(())
 }
 
-fn validate_count(
-    connection: &Connection,
-    table: &'static str,
-    limit: usize,
-) -> Result<(), VanillaCacheError> {
-    let count = connection.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
-        row.get::<_, i64>(0)
-    })?;
-    if count < 0 || usize::try_from(count).map_or(true, |count| count > limit) {
-        return Err(VanillaCacheError::LimitExceeded(table, limit));
-    }
-    Ok(())
-}
-
 fn load_index(
     connection: &Connection,
     source_root: &Path,
+    build_lookup_maps: bool,
 ) -> Result<LoadedIndex, VanillaCacheError> {
     let mut source_files = BTreeMap::new();
     let mut shards = BTreeMap::new();
@@ -312,7 +336,15 @@ fn load_index(
     }
     Ok((
         source_files,
-        WorkspaceIndex::from_shards(shards.into_values()),
+        if build_lookup_maps {
+            WorkspaceIndex::from_shards(shards.into_values())
+        } else {
+            // Installation merges these shards and rebuilds the maps once; skip the throwaway
+            // derivation here and keep only the shards and the position table.
+            let mut index = WorkspaceIndex::empty();
+            index.shards = shards;
+            index
+        },
         positions,
         localisation_previews,
     ))

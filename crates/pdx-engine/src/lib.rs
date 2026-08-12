@@ -11,6 +11,7 @@ mod host;
 mod index;
 mod model;
 mod pipeline;
+mod query_cache;
 mod scan;
 mod snapshot;
 mod vanilla_cache;
@@ -27,6 +28,7 @@ pub use model::{
     TextChange, WorkspaceChange, WorkspaceError, WorkspaceScanIssue, WorkspaceScanIssueKind,
     WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
 };
+pub use query_cache::SnapshotQueryCache;
 pub use snapshot::AnalysisSnapshot;
 pub use vanilla_cache::{
     CURRENT_VANILLA_CACHE_SCHEMA_VERSION, VanillaCacheError, VanillaIndexCache,

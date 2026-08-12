@@ -81,8 +81,9 @@ pub struct VanillaIndexCache {
 
 impl VanillaIndexCache {
     /// Consumes a validated cache so installation can move its large semantic index.
-    pub(crate) fn into_parts(self) -> VanillaIndexParts {
-        let positions = self.index.position_ranges().clone();
+    pub(crate) fn into_parts(mut self) -> VanillaIndexParts {
+        // Move the position table out instead of cloning it; the caller rebuilds the index.
+        let positions = std::mem::take(&mut self.index.position_ranges);
         (
             self.metadata,
             self.root,
@@ -210,6 +211,19 @@ impl VanillaIndexCache {
         cancellation: &WorkspaceScanToken,
     ) -> Result<Self, VanillaCacheError> {
         read::load_cancellable(path, cancellation)
+    }
+
+    /// Loads a cache for immediate installation, skipping the derivation of lookup maps.
+    ///
+    /// [`AnalysisHost::install_vanilla_cache`] merges the cache shards with the workspace and
+    /// rebuilds the maps once, so the maps a full load derives would be discarded. Validation
+    /// is identical to [`Self::load_cancellable`]; the returned cache must not be used for
+    /// symbol queries before installation.
+    pub fn load_cancellable_for_install(
+        path: &Path,
+        cancellation: &WorkspaceScanToken,
+    ) -> Result<Self, VanillaCacheError> {
+        read::load_cancellable_for_install(path, cancellation)
     }
 
     /// Atomically replaces a recognized cache database in one SQLite transaction.

@@ -140,7 +140,7 @@ LSP/CLI 可通过 `.pdx/project.toml` 或 typed initialization options 配置 Cu
 
 `rules/eu4/` 的 JSON 是唯一规则 authority。source format 当前为 `7`，runtime SQLite schema 当前为 `18`。官方 `pdx`/`pdx-ls` 内嵌 JSON source，启动时计算 canonical `rule_hash`，只读加载匹配的用户本地 SQLite artifact；缺失、损坏、schema、`game_id` 或 hash 不匹配时临时编译、round-trip 校验后替换 cache。未通过校验的 artifact 不进入 runtime；正式 server 不接受 `--rules`、外部规则路径、CWT 或用户规则覆盖。
 
-Vanilla index cache schema 当前为 `4`。它保存 cache metadata、source-file metadata、semantic shards、scripted macro 的紧凑调用签名、definition/reference 的 UTF-16 位置和有界的 localisation preview；不保存 Vanilla 源码、CST、HIR 或 macro template。因此 Vanilla macro 保持 signature/OpenWorld 调用分析，不进行体展开。Vanilla 源文件内容或 fingerprint 变化需要显式 refresh；规则 hash mismatch 可在 LSP 启动后台自动重建。缓存文件缺失、损坏或 schema 不兼容（例如旧测试版本产物）时，若自动发现可用，LSP 会从已记录或发现的安装目录重建到同一显式路径，而不是静默失去 Vanilla 符号；发现失败不写入用户配置，且不阻断启动。cache 加载或重建期间，当前 LSP 会延迟受影响的 snapshot 请求，完成后由 event loop 安装完整 cache；失败时保留已加载的旧 cache并报告原因。
+Vanilla index cache schema 当前为 `4`。它保存 cache metadata、source-file metadata、semantic shards、scripted macro 的紧凑调用签名、definition/reference 的 UTF-16 位置和有界的 localisation preview；不保存 Vanilla 源码、CST、HIR 或 macro template。因此 Vanilla macro 保持 signature/OpenWorld 调用分析，不进行体展开。Vanilla 源文件内容或 fingerprint 变化需要显式 refresh；规则 hash mismatch 可在 LSP 启动后台自动重建。缓存文件缺失、损坏或 schema 不兼容（例如旧测试版本产物）时，若自动发现可用，LSP 会从已记录或发现的安装目录重建到同一显式路径，而不是静默失去 Vanilla 符号；发现失败不写入用户配置，且不阻断启动。cache 加载或重建期间，当前 LSP 会延迟受影响的 snapshot 请求，完成后由 event loop 安装完整 cache；失败时保留已加载的旧 cache并报告原因。LSP 启动加载使用 `load_cancellable_for_install`：校验与完整加载一致，但跳过 symbol lookup maps 的派生（安装时合并 shards 后只构建一次）；`install_vanilla_cache` 用单次 `from_shards_with_rules` 构建合并索引（case policy 与 lookup maps 一起派生），`source_file_paths` 用 `HashMap` 键控物理路径。
 
 ## 并发与生命周期
 
@@ -150,6 +150,9 @@ Vanilla index cache schema 当前为 `4`。它保存 cache metadata、source-fil
 - 每个文件独立生成并替换 `FileIndexShard`；取消或 workspace-level error 不安装半成品 snapshot。
 - semantic diagnostics 默认约 200 ms debounce；completion/hover 等交互查询优先于后台诊断。
 - scripted macro 的 diagnostics 展开和值补全约束收集均使用单次查询内的 identity 栈、节点/token-byte/展开深度预算和 cancellation，不持有 `AnalysisHost` 锁，也不使用跨 snapshot 的全局可变缓存。
+- `AnalysisSnapshot` 携带按 `(revision, key)` 键控的共享惰性查询缓存（`SnapshotQueryCache`，有界容量、条目不可变）：每个 revision 内 overlay 文档的语义提取、workspace member 判定和 scripted macro 定义解析只计算一次，所有 worker 复用；revision 前进即天然失效，不使用全局状态。
+- `RuleSet` 构建期按 `context → exact key` 索引 semantic 规则，并提供上下文内 key 查询；EU4 的 `effect`/`trigger` 上下文各有约 1900 条规则，逐属性匹配只扫描该 key 的 exact 规则与少量非 exact matcher，不再线性扫描整个上下文。
+- `AnalysisSnapshot` 维护 `physical path → SourceFileId` 映射（扫描与磁盘变更时增量维护），overlay 归属与路径解析是 O(log n) 查找，不再线性扫描含 Vanilla 的完整文件表。
 - 规则标记为 `quoted_script` 的 scalar 使用 parser 提供的容错 secondary Script parse 和可组合 UTF-8 source map；diagnostics、completion、hover 和 navigation/rename 的语义引用收集在查询内下钻，普通 quoted scalar 仍保持 opaque。secondary parse 共用深度、单 payload、累计字节、节点数和 cancellation 预算，不写入主 HIR。
 - LSP 当前使用 stdio JSON-RPC，stdout 只输出协议数据。
 - 开发诊断器使用有界的 `pdx/workspaceDiagnostics` snapshot request 分批查询 Current Mod 的磁盘

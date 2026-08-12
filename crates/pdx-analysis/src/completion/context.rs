@@ -66,7 +66,9 @@ pub(crate) fn semantic_completion_context_with_cancellation(
         let Some(block_range) = root.block_range else {
             continue;
         };
-        if !contains(block_range, position) {
+        // Inclusive end: a cursor directly after an unfinished block (`key = { ` at end of
+        // file) sits on the half-open range end and must still resolve to the block.
+        if position < block_range.start() || position > block_range.end() {
             continue;
         }
         let scope = semantic_initial_scope(snapshot, input, &context, &root.key, root.key_range);
@@ -330,9 +332,12 @@ pub(crate) fn semantic_completion_container(
             quoted_scripts,
         );
     }
-    let property = properties
-        .into_iter()
-        .find(|property| contains(property.range, position));
+    let property = properties.into_iter().find(|property| {
+        contains(property.range, position)
+            // A value position directly after an unfinished `key = ` sits on the half-open
+            // end of the property range; accept it so the value completion still fires.
+            || (position >= property.key_range.start() && property.range.end() == position)
+    });
     Ok(SemanticCompletionContext {
         context,
         parent_path,

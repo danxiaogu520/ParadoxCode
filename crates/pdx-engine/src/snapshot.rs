@@ -1,6 +1,7 @@
 //! Immutable workspace view used by analysis queries.
 
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -13,6 +14,7 @@ use crate::model::{
     ResolvedCandidate, SourceFile, SourceFileId, SourceRoot, WorkspaceScanReport,
 };
 use crate::pipeline::prepare_document_snapshot;
+use crate::query_cache::SnapshotQueryCache;
 use crate::scan::root_priority;
 
 /// Immutable workspace view used by analysis queries.
@@ -25,11 +27,13 @@ pub struct AnalysisSnapshot {
     pub(crate) workspace_root: Option<PathBuf>,
     pub(crate) documents: Arc<BTreeMap<DocumentId, DocumentSnapshot>>,
     pub(crate) source_files: Arc<BTreeMap<SourceFileId, SourceFile>>,
+    pub(crate) source_file_paths: Arc<HashMap<PathBuf, SourceFileId>>,
     pub(crate) file_states: Arc<BTreeMap<SourceFileId, Arc<FileState>>>,
     pub(crate) index: Arc<WorkspaceIndex>,
     pub(crate) scan_report: Arc<WorkspaceScanReport>,
     pub(crate) vanilla_localisation_previews:
         Arc<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>>,
+    pub(crate) query_cache: Arc<SnapshotQueryCache>,
 }
 
 impl AnalysisSnapshot {
@@ -102,6 +106,16 @@ impl AnalysisSnapshot {
     #[must_use]
     pub fn source_files(&self) -> &BTreeMap<SourceFileId, SourceFile> {
         &self.source_files
+    }
+
+    /// Resolves the stable id of one scanned file by physical path.
+    ///
+    /// The map is maintained by the workspace scan and targeted disk-change pipelines, so the
+    /// lookup is logarithmic instead of a linear scan over every indexed file (including the
+    /// Vanilla index).
+    #[must_use]
+    pub fn source_file_id_for_path(&self, path: &std::path::Path) -> Option<SourceFileId> {
+        self.source_file_paths.get(path).copied()
     }
 
     /// Returns the immutable parse/HIR/index state for one scanned disk file.
@@ -194,6 +208,16 @@ impl AnalysisSnapshot {
     #[must_use]
     pub fn source_text(&self, file_id: SourceFileId) -> Option<&str> {
         self.file_state(file_id).map(FileState::source)
+    }
+
+    /// Returns the shared lazy query cache for this revision.
+    ///
+    /// Higher layers cache expensive snapshot-derived query results under `(revision, key)`;
+    /// entries are immutable for the lifetime of the revision and are shared by every cloned
+    /// snapshot value.
+    #[must_use]
+    pub fn query_cache(&self) -> &SnapshotQueryCache {
+        &self.query_cache
     }
 
     /// Returns a cached Vanilla localisation preview without reading the Vanilla source file.

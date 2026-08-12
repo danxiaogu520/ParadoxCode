@@ -26,3 +26,7 @@ pdx-game = { path = "../pdx-game" }
 [[bench]]
 name = "quoted_queries"
 harness = false
+
+[[bench]]
+name = "interactive_queries"
+harness = false

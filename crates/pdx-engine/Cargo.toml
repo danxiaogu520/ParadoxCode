@@ -30,3 +30,7 @@ pdx-game = { path = "../pdx-game" }
 [[bench]]
 name = "synthetic_workspace"
 harness = false
+
+[[bench]]
+name = "vanilla_cache"
+harness = false

@@ -32,7 +32,10 @@ pub(crate) fn run_vanilla_cache_load(
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &VanillaSetupCancellation,
 ) -> Result<(VanillaIndexCache, String), String> {
-    let loaded = match VanillaIndexCache::load_cancellable(path, &cancellation.workspace) {
+    let loaded = match VanillaIndexCache::load_cancellable_for_install(
+        path,
+        &cancellation.workspace,
+    ) {
         Ok(loaded) => loaded,
         Err(error) => {
             // A missing, corrupt, or schema-incompatible cache (for example one built

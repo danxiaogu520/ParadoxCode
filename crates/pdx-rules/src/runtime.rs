@@ -100,6 +100,10 @@ pub struct RuleSet {
     pub(crate) model: RulesModel,
     pub(crate) exact_semantic_rules: BTreeMap<String, Vec<usize>>,
     pub(crate) semantic_rules_by_context: BTreeMap<String, Vec<usize>>,
+    /// Lowercased context -> (lowercased exact key -> rule indices).
+    pub(crate) semantic_exact_rules_by_context_key: BTreeMap<String, BTreeMap<String, Vec<usize>>>,
+    /// Lowercased context -> rule indices whose key is not exact.
+    pub(crate) semantic_non_exact_rules_by_context: BTreeMap<String, Vec<usize>>,
 }
 
 impl RuleSet {
@@ -125,6 +129,8 @@ impl RuleSet {
             },
             exact_semantic_rules: BTreeMap::new(),
             semantic_rules_by_context: BTreeMap::new(),
+            semantic_exact_rules_by_context_key: BTreeMap::new(),
+            semantic_non_exact_rules_by_context: BTreeMap::new(),
         }
     }
 
@@ -173,12 +179,29 @@ impl RuleSet {
         let rule_hash = canonical_hash(&model);
         let mut exact_semantic_rules = BTreeMap::<String, Vec<usize>>::new();
         let mut semantic_rules_by_context = BTreeMap::<String, Vec<usize>>::new();
+        let mut semantic_exact_rules_by_context_key =
+            BTreeMap::<String, BTreeMap<String, Vec<usize>>>::new();
+        let mut semantic_non_exact_rules_by_context = BTreeMap::<String, Vec<usize>>::new();
         for (index, rule) in model.semantic.rules.iter().enumerate() {
-            if let KeyMatcher::Exact(key) = &rule.key {
-                exact_semantic_rules
-                    .entry(key.to_ascii_lowercase())
-                    .or_default()
-                    .push(index);
+            match &rule.key {
+                KeyMatcher::Exact(key) => {
+                    exact_semantic_rules
+                        .entry(key.to_ascii_lowercase())
+                        .or_default()
+                        .push(index);
+                    semantic_exact_rules_by_context_key
+                        .entry(rule.context.to_ascii_lowercase())
+                        .or_default()
+                        .entry(key.to_ascii_lowercase())
+                        .or_default()
+                        .push(index);
+                }
+                _ => {
+                    semantic_non_exact_rules_by_context
+                        .entry(rule.context.to_ascii_lowercase())
+                        .or_default()
+                        .push(index);
+                }
             }
             semantic_rules_by_context
                 .entry(rule.context.to_ascii_lowercase())
@@ -191,6 +214,8 @@ impl RuleSet {
             model,
             exact_semantic_rules,
             semantic_rules_by_context,
+            semantic_exact_rules_by_context_key,
+            semantic_non_exact_rules_by_context,
         }
     }
 
@@ -213,6 +238,32 @@ impl RuleSet {
         case_insensitive_indices(&self.semantic_rules_by_context, context)
             .into_iter()
             .flatten()
+            .map(|index| &self.model.semantic.rules[*index])
+    }
+
+    /// Returns semantic rules for one context and property key without scanning unrelated rules.
+    ///
+    /// Exact-key rules are indexed per context and key, so per-property lookups stay proportional
+    /// to the few matching rules plus the context's non-exact matchers (type, enum, dynamic).
+    pub fn semantic_rules_for_context_key(
+        &self,
+        context: &str,
+        key: &str,
+    ) -> impl Iterator<Item = &SemanticRule> {
+        let context_key = context.to_ascii_lowercase();
+        let exact = self
+            .semantic_exact_rules_by_context_key
+            .get(&context_key)
+            .and_then(|by_key| by_key.get(&key.to_ascii_lowercase()))
+            .into_iter()
+            .flatten();
+        let non_exact = self
+            .semantic_non_exact_rules_by_context
+            .get(&context_key)
+            .into_iter()
+            .flatten();
+        exact
+            .chain(non_exact)
             .map(|index| &self.model.semantic.rules[*index])
     }
 

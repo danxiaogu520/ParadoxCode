@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use pdx_engine::hir::{HirFile, ScopeState, ScopeValue};
@@ -26,8 +27,10 @@ pub(crate) fn semantic_rules_for_container<'a>(
         .rules()
         .semantic_rules_for_context(context)
         .collect::<Vec<_>>();
+    let mut merged = false;
     for inherited in snapshot.game_profile().inherited_semantic_contexts(context) {
         candidates.extend(snapshot.rules().semantic_rules_for_context(inherited));
+        merged = true;
     }
     if let Some(type_name) = context.strip_prefix("type:") {
         candidates.extend(
@@ -35,10 +38,67 @@ pub(crate) fn semantic_rules_for_container<'a>(
                 .rules()
                 .semantic_rules_for_context(&format!("root:{type_name}")),
         );
-        candidates.sort_by(|left, right| left.id.cmp(&right.id));
+        merged = true;
     }
-    candidates.sort_by(|left, right| left.id.cmp(&right.id));
-    candidates.dedup_by(|left, right| left.id.eq_ignore_ascii_case(&right.id));
+    // A single source is already ordered by rule id; only merged sources need sorting so the
+    // dedup and deterministic selection stay stable.
+    if merged {
+        candidates.sort_by(|left, right| left.id.cmp(&right.id));
+        candidates.dedup_by(|left, right| left.id.eq_ignore_ascii_case(&right.id));
+    }
+    candidates
+        .into_iter()
+        .filter(|rule| semantic_parent_path_matches(snapshot, &rule.parent_path, parent_path))
+        .collect()
+}
+
+/// Returns the `LeafValue` rules of one container; used only to match bare values.
+pub(crate) fn semantic_leaf_rules_for_container<'a>(
+    snapshot: &'a AnalysisSnapshot,
+    context: &str,
+    parent_path: &[String],
+    scope: &ScopeContext,
+) -> Vec<&'a pdx_rules::SemanticRule> {
+    semantic_rules_for_container(snapshot, context, parent_path, scope)
+        .into_iter()
+        .filter(|rule| matches!(rule.shape, RuleShape::LeafValue))
+        .collect()
+}
+
+/// Returns the container rules whose key can match `key`: the exact-key rules for `key` plus
+/// every non-exact matcher in the context. Callers must still apply scope, path, and shape
+/// filters, but they no longer scan every rule in large contexts (EU4 has ~1900 per context).
+pub(crate) fn semantic_rules_for_container_key<'a>(
+    snapshot: &'a AnalysisSnapshot,
+    context: &str,
+    parent_path: &[String],
+    key: &str,
+) -> Vec<&'a pdx_rules::SemanticRule> {
+    let mut candidates = snapshot
+        .rules()
+        .semantic_rules_for_context_key(context, key)
+        .collect::<Vec<_>>();
+    let mut merged = false;
+    for inherited in snapshot.game_profile().inherited_semantic_contexts(context) {
+        candidates.extend(
+            snapshot
+                .rules()
+                .semantic_rules_for_context_key(inherited, key),
+        );
+        merged = true;
+    }
+    if let Some(type_name) = context.strip_prefix("type:") {
+        candidates.extend(
+            snapshot
+                .rules()
+                .semantic_rules_for_context_key(&format!("root:{type_name}"), key),
+        );
+        merged = true;
+    }
+    if merged {
+        candidates.sort_by(|left, right| left.id.cmp(&right.id));
+        candidates.dedup_by(|left, right| left.id.eq_ignore_ascii_case(&right.id));
+    }
     candidates
         .into_iter()
         .filter(|rule| semantic_parent_path_matches(snapshot, &rule.parent_path, parent_path))
@@ -148,25 +208,28 @@ pub(crate) fn cached_scope_fact_for_property<'hir>(
     // when the first-party descriptor's negative/positive key filter proves it structurally.
     let mut transition_matching = matching.to_vec();
     if transition_matching.is_empty() {
-        transition_matching = semantic_rules_for_container(snapshot, context, parent_path, scope)
-            .into_iter()
-            .filter(|rule| {
-                !matches!(rule.shape, RuleShape::LeafValue)
-                    && semantic_scope_allows(rule, scope)
-                    && match &rule.key {
-                        KeyMatcher::Type(type_name) => {
-                            match workspace_type_member(snapshot, type_name, &property.key) {
-                                WorkspaceTypeMember::Present => true,
-                                WorkspaceTypeMember::Absent => false,
-                                WorkspaceTypeMember::Unknown => {
-                                    type_member_provably_valid(snapshot, type_name, &property.key)
+        transition_matching =
+            semantic_rules_for_container_key(snapshot, context, parent_path, &property.key)
+                .into_iter()
+                .filter(|rule| {
+                    !matches!(rule.shape, RuleShape::LeafValue)
+                        && semantic_scope_allows(rule, scope)
+                        && match &rule.key {
+                            KeyMatcher::Type(type_name) => {
+                                match workspace_type_member(snapshot, type_name, &property.key) {
+                                    WorkspaceTypeMember::Present => true,
+                                    WorkspaceTypeMember::Absent => false,
+                                    WorkspaceTypeMember::Unknown => type_member_provably_valid(
+                                        snapshot,
+                                        type_name,
+                                        &property.key,
+                                    ),
                                 }
                             }
+                            _ => false,
                         }
-                        _ => false,
-                    }
-            })
-            .collect();
+                })
+                .collect();
     }
     let selected = semantic_selected_transition(
         snapshot,
@@ -240,7 +303,28 @@ pub(crate) fn semantic_selected_transition<'rule>(
     if !transparent_wrapper {
         structural_path.push(property.key.clone());
     }
-    let structural_rules = semantic_rules_for_container(snapshot, context, &structural_path, scope);
+    // Leaf-value rules are matched against bare values, which are not keys; build their lists
+    // lazily because properties without bare values (the common case) never consult them.
+    let has_bare_values = !property.bare_values.is_empty();
+    let structural_leaf_rules = if has_bare_values {
+        semantic_leaf_rules_for_container(snapshot, context, &structural_path, scope)
+    } else {
+        Vec::new()
+    };
+    // Whether the structural container covers each block child is candidate-independent;
+    // compute it once so the per-candidate filter only re-checks the destination container.
+    let structural_child_checks = property
+        .block
+        .iter()
+        .map(|child| {
+            semantic_rules_for_container_key(snapshot, context, &structural_path, &child.key)
+                .iter()
+                .any(|rule| {
+                    !matches!(rule.shape, RuleShape::LeafValue)
+                        && semantic_rule_key_matches(snapshot, rule, &structural_path, &child.key)
+                })
+        })
+        .collect::<Vec<_>>();
     let possible = applicable
         .iter()
         .copied()
@@ -253,25 +337,47 @@ pub(crate) fn semantic_selected_transition<'rule>(
                 transparent_wrapper,
             );
             let child_scope = semantic_child_scope(snapshot, scope, candidate);
-            let child_rules =
-                semantic_rules_for_container(snapshot, &child_context, &child_path, &child_scope);
-            property.block.iter().all(|child| {
-                structural_rules.iter().any(|rule| {
-                    !matches!(rule.shape, RuleShape::LeafValue)
-                        && semantic_rule_key_matches(snapshot, rule, &structural_path, &child.key)
-                }) || child_rules.iter().any(|rule| {
-                    !matches!(rule.shape, RuleShape::LeafValue)
-                        && semantic_rule_key_matches(snapshot, rule, &child_path, &child.key)
+            let child_leaf_rules = if has_bare_values {
+                semantic_leaf_rules_for_container(
+                    snapshot,
+                    &child_context,
+                    &child_path,
+                    &child_scope,
+                )
+            } else {
+                Vec::new()
+            };
+            property
+                .block
+                .iter()
+                .zip(&structural_child_checks)
+                .all(|(child, structural_ok)| {
+                    *structural_ok
+                        || semantic_rules_for_container_key(
+                            snapshot,
+                            &child_context,
+                            &child_path,
+                            &child.key,
+                        )
+                        .iter()
+                        .any(|rule| {
+                            !matches!(rule.shape, RuleShape::LeafValue)
+                                && semantic_rule_key_matches(
+                                    snapshot,
+                                    rule,
+                                    &child_path,
+                                    &child.key,
+                                )
+                        })
                 })
-            }) && property.bare_values.iter().all(|(value, _)| {
-                structural_rules.iter().any(|rule| {
-                    matches!(rule.shape, RuleShape::LeafValue)
-                        && semantic_leaf_value_matches(snapshot, rule, value, scope)
-                }) || child_rules.iter().any(|rule| {
-                    matches!(rule.shape, RuleShape::LeafValue)
-                        && semantic_leaf_value_matches(snapshot, rule, value, &child_scope)
+                && property.bare_values.iter().all(|(value, _)| {
+                    structural_leaf_rules
+                        .iter()
+                        .any(|rule| semantic_leaf_value_matches(snapshot, rule, value, scope))
+                        || child_leaf_rules.iter().any(|rule| {
+                            semantic_leaf_value_matches(snapshot, rule, value, &child_scope)
+                        })
                 })
-            })
         })
         .collect::<Vec<_>>();
     if !possible.is_empty() && semantic_transitions_equivalent(&possible) {
@@ -392,27 +498,63 @@ pub(crate) fn semantic_optional_text_eq(left: Option<&str>, right: Option<&str>)
 pub(crate) fn semantic_selected_alternative(
     snapshot: &AnalysisSnapshot,
     rules: &[&pdx_rules::SemanticRule],
+    context: &str,
     parent_path: &[String],
     properties: &[ScriptProperty],
     bare_values: &[(String, TextRange)],
     scope: &ScopeContext,
 ) -> Option<String> {
-    let mut alternatives = Vec::<String>::new();
+    // Alternatives are grouped in first-occurrence order; groups are small (one to three
+    // rules), while the container holds hundreds of rules and alternatives. Discover which
+    // alternatives the container content can actually reach with keyed per-property lookups,
+    // then score only those groups instead of every alternative against every property.
+    let mut alternatives = Vec::<(String, Vec<&pdx_rules::SemanticRule>)>::new();
+    let mut by_id = HashMap::<&str, usize>::new();
     for rule in rules {
-        if let Some(alternative) = rule.alternative_id.as_ref()
-            && !alternatives.iter().any(|known| known == alternative)
+        if let Some(alternative) = rule.alternative_id.as_deref()
+            && let Some(index) = by_id.get(alternative).copied()
         {
-            alternatives.push(alternative.clone());
+            alternatives[index].1.push(rule);
+        } else if let Some(alternative) = rule.alternative_id.as_deref() {
+            by_id.insert(alternative, alternatives.len());
+            alternatives.push((alternative.to_owned(), vec![rule]));
+        }
+    }
+    let mut relevant = Vec::<usize>::new();
+    let mut seen = std::collections::BTreeSet::<usize>::new();
+    for property in properties {
+        for rule in semantic_rules_for_container_key(snapshot, context, parent_path, &property.key)
+            .into_iter()
+            .filter(|rule| {
+                !matches!(rule.shape, RuleShape::LeafValue)
+                    && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
+            })
+        {
+            if let Some(alternative) = rule.alternative_id.as_deref()
+                && let Some(index) = by_id.get(alternative).copied()
+                && seen.insert(index)
+            {
+                relevant.push(index);
+            }
+        }
+    }
+    for (value, _) in bare_values {
+        for rule in rules.iter().copied().filter(|rule| {
+            matches!(rule.shape, RuleShape::LeafValue)
+                && semantic_leaf_value_matches(snapshot, rule, value, scope)
+        }) {
+            if let Some(alternative) = rule.alternative_id.as_deref()
+                && let Some(index) = by_id.get(alternative).copied()
+                && seen.insert(index)
+            {
+                relevant.push(index);
+            }
         }
     }
     let mut best: Option<((usize, usize), String)> = None;
     let mut tied = false;
-    for alternative in alternatives {
-        let group = rules
-            .iter()
-            .filter(|rule| rule.alternative_id.as_deref() == Some(alternative.as_str()))
-            .copied()
-            .collect::<Vec<_>>();
+    for index in relevant {
+        let (alternative, group) = &alternatives[index];
         let mut present = 0_usize;
         let mut valid = 0_usize;
         for property in properties {
@@ -442,11 +584,11 @@ pub(crate) fn semantic_selected_alternative(
         let score = (valid, present);
         match best.as_ref() {
             None => {
-                best = Some((score, alternative));
+                best = Some((score, alternative.clone()));
                 tied = false;
             }
             Some((current, _)) if score > *current => {
-                best = Some((score, alternative));
+                best = Some((score, alternative.clone()));
                 tied = false;
             }
             Some((current, _)) if score == *current => tied = true,
@@ -455,8 +597,14 @@ pub(crate) fn semantic_selected_alternative(
     }
     if tied {
         None
+    } else if let Some((_, alternative)) = best {
+        Some(alternative)
+    } else if alternatives.len() == 1 {
+        // With no matching content the single alternative is selected by default, matching the
+        // previous full-scan behavior where one all-zero alternative still won.
+        Some(alternatives[0].0.clone())
     } else {
-        best.map(|(_, alternative)| alternative)
+        None
     }
 }
 
@@ -827,6 +975,29 @@ pub(crate) struct ResolvedMacroDefinition {
 }
 
 pub(crate) fn resolve_macro_definition(
+    snapshot: &AnalysisSnapshot,
+    owner_kind: &str,
+    owner_name: &str,
+) -> Option<ResolvedMacroDefinition> {
+    // The resolution scans every open overlay document, and it is invoked once per
+    // (property, rule) during diagnostics, completion, and hover. Memoize per
+    // (revision, kind, name) so a revision pays for the scan only once.
+    let revision = snapshot.revision();
+    let key = format!("macro-definition:{owner_kind}:{owner_name}");
+    if let Some(cached) = snapshot
+        .query_cache()
+        .get::<Option<ResolvedMacroDefinition>>(revision, &key)
+    {
+        return cached.as_ref().clone();
+    }
+    let resolved = resolve_macro_definition_uncached(snapshot, owner_kind, owner_name);
+    snapshot
+        .query_cache()
+        .insert(revision, key, Arc::new(resolved.clone()));
+    resolved
+}
+
+fn resolve_macro_definition_uncached(
     snapshot: &AnalysisSnapshot,
     owner_kind: &str,
     owner_name: &str,
@@ -1244,6 +1415,25 @@ pub(crate) fn scripted_macro_type(snapshot: &AnalysisSnapshot, type_name: &str) 
 }
 
 pub(crate) fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
+    // Membership is a pure function of the immutable snapshot, and the matching pipeline calls
+    // it once per (rule, property) — hundreds of times per document. Memoize per revision.
+    let revision = snapshot.revision();
+    let key = format!(
+        "workspace-member:{}:{}",
+        type_name.to_ascii_lowercase(),
+        member.to_ascii_lowercase()
+    );
+    if let Some(cached) = snapshot.query_cache().get::<bool>(revision, &key) {
+        return *cached;
+    }
+    let result = workspace_member_uncached(snapshot, type_name, member);
+    snapshot
+        .query_cache()
+        .insert(revision, key, Arc::new(result));
+    result
+}
+
+fn workspace_member_uncached(snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
     let hidden_files = overlay_file_ids(snapshot);
     let kinds = workspace_member_kinds(snapshot, type_name);
     let mut names = vec![member.to_owned()];
@@ -1263,21 +1453,14 @@ pub(crate) fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, mem
     }) {
         return true;
     }
-    snapshot
-        .documents()
-        .values()
-        .filter(|document| document.source() == DocumentSource::Overlay)
-        .filter_map(|document| document.hir_handle())
-        .any(|hir| {
-            hir.definitions().iter().any(|definition| {
-                names
-                    .iter()
-                    .any(|name| definition.name.eq_ignore_ascii_case(name))
-                    && kinds
-                        .iter()
-                        .any(|kind| definition.kind.eq_ignore_ascii_case(kind))
-            })
+    let members = overlay_members(snapshot);
+    names.iter().any(|name| {
+        kinds.iter().any(|kind| {
+            members
+                .names
+                .contains(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
         })
+    })
 }
 
 fn workspace_kind_has_members(snapshot: &AnalysisSnapshot, type_name: &str) -> bool {
@@ -1291,21 +1474,70 @@ fn workspace_kind_has_members(snapshot: &AnalysisSnapshot, type_name: &str) -> b
     }) {
         return true;
     }
-    snapshot
+    let members = overlay_members(snapshot);
+    kinds
+        .iter()
+        .any(|kind| members.kinds.contains(&kind.to_ascii_lowercase()))
+}
+
+/// Lowercased overlay definition identity, built once per snapshot revision and shared by every
+/// workspace-membership check in that revision.
+#[derive(Default)]
+pub(crate) struct OverlayMembers {
+    /// Lowercased `(kind, name)` pairs of every overlay definition.
+    pub(crate) names: HashSet<(String, String)>,
+    /// Lowercased kinds present in any overlay definition.
+    pub(crate) kinds: HashSet<String>,
+}
+
+/// Returns the overlay definition view for this revision, computing it at most once.
+pub(crate) fn overlay_members(snapshot: &AnalysisSnapshot) -> Arc<OverlayMembers> {
+    let revision = snapshot.revision();
+    let key = "overlay-members";
+    if let Some(cached) = snapshot.query_cache().get::<OverlayMembers>(revision, key) {
+        return cached;
+    }
+    let mut members = OverlayMembers::default();
+    for document in snapshot
         .documents()
         .values()
         .filter(|document| document.source() == DocumentSource::Overlay)
         .filter_map(|document| document.hir_handle())
-        .any(|hir| {
-            hir.definitions().iter().any(|definition| {
-                kinds
-                    .iter()
-                    .any(|kind| definition.kind.eq_ignore_ascii_case(kind))
-            })
-        })
+    {
+        for definition in document.definitions() {
+            let kind = definition.kind.to_ascii_lowercase();
+            members.kinds.insert(kind.clone());
+            members
+                .names
+                .insert((kind, definition.name.to_ascii_lowercase()));
+        }
+    }
+    let members = Arc::new(members);
+    snapshot
+        .query_cache()
+        .insert(revision, key.to_owned(), Arc::clone(&members));
+    members
 }
 
 pub(crate) fn enum_member(snapshot: &AnalysisSnapshot, enum_name: &str, member: &str) -> bool {
+    // Same memoization rationale as `workspace_member`; static enum lookups repeat per rule.
+    let revision = snapshot.revision();
+    let key = format!(
+        "enum-member:{}:{}",
+        enum_name.to_ascii_lowercase(),
+        member.to_ascii_lowercase()
+    );
+    if let Some(cached) = snapshot.query_cache().get::<bool>(revision, &key) {
+        return *cached;
+    }
+    let result = enum_member_uncached(snapshot, enum_name, member);
+    snapshot
+        .query_cache()
+        .insert(revision, key, Arc::new(result));
+    result
+}
+
+fn enum_member_uncached(snapshot: &AnalysisSnapshot, enum_name: &str, member: &str) -> bool {
     let static_member = snapshot
         .rules()
         .model()

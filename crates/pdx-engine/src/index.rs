@@ -130,6 +130,21 @@ impl WorkspaceIndex {
         }
     }
 
+    /// Builds an index with the symbol case policy applied in the same single pass.
+    #[must_use]
+    pub fn from_shards_with_rules(
+        shards: impl IntoIterator<Item = FileIndexShard>,
+        rules: &RuleSet,
+    ) -> Self {
+        match Self::from_shards_cancellable_with_rules(shards, rules, &WorkspaceScanToken::new()) {
+            Ok(index) => index,
+            Err(WorkspaceError::Cancelled) => {
+                unreachable!("a fresh workspace scan token cannot be cancelled")
+            }
+            Err(_) => unreachable!("index construction has no other fallible operation"),
+        }
+    }
+
     fn from_shards_cancellable(
         shards: impl IntoIterator<Item = FileIndexShard>,
         cancellation: &WorkspaceScanToken,
@@ -321,7 +336,8 @@ impl WorkspaceIndex {
         rules: &RuleSet,
     ) {
         let affected = self.remove_shard_entries(file_id);
-        self.resolve_definition_buckets(&affected, priorities, rules);
+        let policies = symbol_policies(rules);
+        self.resolve_definition_buckets(&affected, priorities, &policies);
     }
 
     pub(crate) fn resolve_priorities(
@@ -345,9 +361,10 @@ impl WorkspaceIndex {
         cancellation: &WorkspaceScanToken,
     ) -> Result<(), WorkspaceError> {
         let keys = self.definitions.keys().cloned().collect::<Vec<_>>();
+        let policies = symbol_policies(rules);
         for key in &keys {
             cancellation.checkpoint()?;
-            self.resolve_definition_buckets(std::slice::from_ref(key), priorities, rules);
+            self.resolve_definition_buckets(std::slice::from_ref(key), priorities, &policies);
         }
         Ok(())
     }
@@ -359,7 +376,8 @@ impl WorkspaceIndex {
         rules: &RuleSet,
     ) {
         let affected = self.replace_shard_entries(shard);
-        self.resolve_definition_buckets(&affected, priorities, rules);
+        let policies = symbol_policies(rules);
+        self.resolve_definition_buckets(&affected, priorities, &policies);
     }
 
     fn replace_shard_entries(&mut self, shard: FileIndexShard) -> Vec<(String, String)> {
@@ -408,24 +426,22 @@ impl WorkspaceIndex {
         &mut self,
         keys: &[(String, String)],
         priorities: &BTreeMap<SourceFileId, u64>,
-        rules: &RuleSet,
+        policies: &BTreeMap<String, SymbolResolutionPolicy>,
     ) {
         for key in keys {
-            let Some(values) = self.definitions.get(key).cloned() else {
+            let policy = policies
+                .get(&key.0.to_ascii_lowercase())
+                .copied()
+                .unwrap_or(SymbolResolutionPolicy::ReplaceBySymbol);
+            let Some(highest) = self.definitions.get(key).and_then(|values| {
+                values
+                    .iter()
+                    .map(|pointer| priorities.get(&pointer.file_id).copied().unwrap_or(0))
+                    .max()
+            }) else {
                 continue;
             };
-            let policy = rules
-                .model()
-                .symbol_descriptors
-                .iter()
-                .find(|descriptor| descriptor.kind_id.eq_ignore_ascii_case(&key.0))
-                .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| {
-                    descriptor.resolution
-                });
-            let highest = values
-                .iter()
-                .map(|pointer| priorities.get(&pointer.file_id).copied().unwrap_or(0))
-                .max();
+            let values = self.definitions.get(key).expect("checked above");
             for pointer in values {
                 let Some(definition) = self
                     .shards
@@ -437,7 +453,8 @@ impl WorkspaceIndex {
                 definition.active = match policy {
                     SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique => true,
                     SymbolResolutionPolicy::ReplaceBySymbol => {
-                        Some(priorities.get(&definition.file_id).copied().unwrap_or(0)) == highest
+                        Some(priorities.get(&definition.file_id).copied().unwrap_or(0))
+                            == Some(highest)
                     }
                 };
             }
@@ -504,6 +521,21 @@ impl WorkspaceIndex {
         }
         Ok(())
     }
+}
+
+/// Builds the kind -> resolution policy lookup used while resolving definition priorities.
+fn symbol_policies(rules: &RuleSet) -> BTreeMap<String, SymbolResolutionPolicy> {
+    rules
+        .model()
+        .symbol_descriptors
+        .iter()
+        .map(|descriptor| {
+            (
+                descriptor.kind_id.to_ascii_lowercase(),
+                descriptor.resolution,
+            )
+        })
+        .collect()
 }
 
 impl WorkspaceIndex {
