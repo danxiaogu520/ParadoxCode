@@ -51,8 +51,7 @@
   ],
   "ancestor_personalities": [
     {"field": "name", "template": "$", "required": true},
-    {"field": "desc", "template": "$_desc", "required": true, "subtype": "ai", "condition": {"key_prefix": "ancestor_"}},
-    {"field": "become", "template": "an_$", "required": true, "subtype": "ai", "condition": {"key_prefix": "ancestor_"}}
+    {"field": "desc", "template": "desc_$", "required": true, "subtype": "ai", "condition": {"key_prefix": "ancestor_"}}
   ],
   "building": [{"field": "name", "template": "building_$", "required": true}],
   "casus_belli": [

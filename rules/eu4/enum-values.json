@@ -1714,10 +1714,18 @@
     "tribal_religious_society"
   ],
   "graphical_cultures": [
-    "name",
-    "path",
-    "path_file",
-    "start_from_root"
+    "aboriginalgfx",
+    "africangfx",
+    "asiangfx",
+    "easterngfx",
+    "indiangfx",
+    "inuitgfx",
+    "muslimgfx",
+    "northamericagfx",
+    "polynesiangfx",
+    "southamericagfx",
+    "southeastasiangfx",
+    "westerngfx"
   ],
   "great_project": [
     "any",
@@ -2540,6 +2548,36 @@
   "who_or_subject": [
     "subject",
     "who"
+  ],
+  "vanilla_exported_modifier_keys": [
+    "blood_gain_modifier",
+    "bureaucrats_influence",
+    "enuchs_influence",
+    "monthly_adur_burzhen_mihr",
+    "monthly_adur_farnbag",
+    "monthly_adur_gushnasp",
+    "monthly_authority_power",
+    "monthly_council_consensus",
+    "monthly_cultural_unity",
+    "monthly_divine_authority",
+    "monthly_egyptian_westernization",
+    "monthly_hessian_militarization",
+    "monthly_ottoman_decadence",
+    "monthly_prussian_militarized_society_1",
+    "monthly_prussian_militarized_society_2",
+    "monthly_prussian_militarized_society_3",
+    "mr_aristocrats_influence",
+    "mr_guilds_influence",
+    "mr_traders_influence",
+    "ottoman_decadence_gain_modifier",
+    "pr_captains_influence",
+    "pr_smugglers_influence",
+    "rr_girondists_influence",
+    "rr_jacobins_influence",
+    "rr_royalists_influence",
+    "russian_modernization_gain_modifier",
+    "soyurghals_amount_check_influence",
+    "temples_influence"
   ],
   "winter_types": [
     "mild_winter",

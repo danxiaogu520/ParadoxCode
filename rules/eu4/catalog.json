@@ -1,6 +1,19 @@
 {
   "file_categories": [
     {
+      "id": "eu4-opaque-credits",
+      "parser": "syntax-only",
+      "resolution": "replace-by-relative-path",
+      "matcher": {
+        "path_prefix": null,
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": "interface/credits.txt",
+        "case_sensitive": false
+      }
+    },
+    {
       "id": "asset",
       "parser": "asset",
       "resolution": "replace-by-relative-path",
