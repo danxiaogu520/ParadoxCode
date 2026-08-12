@@ -328,12 +328,14 @@ impl LspServer {
                             };
                             in_flight_vanilla = Some(cancellation);
                             vanilla_cache_in_flight = true;
+                            let auto_vanilla = auto_vanilla.clone();
                             scope.spawn(move || {
                                 let result = run_vanilla_cache_load(
                                     &path,
                                     rules,
                                     profile,
                                     current_rule_hash,
+                                    auto_vanilla.as_ref(),
                                     progress
                                         .as_deref()
                                         .map(|callback| callback as &(dyn Fn(usize, usize) + Sync)),

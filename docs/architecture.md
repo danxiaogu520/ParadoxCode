@@ -140,7 +140,7 @@ LSP/CLI 可通过 `.pdx/project.toml` 或 typed initialization options 配置 Cu
 
 `rules/eu4/` 的 JSON 是唯一规则 authority。source format 当前为 `7`，runtime SQLite schema 当前为 `18`。官方 `pdx`/`pdx-ls` 内嵌 JSON source，启动时计算 canonical `rule_hash`，只读加载匹配的用户本地 SQLite artifact；缺失、损坏、schema、`game_id` 或 hash 不匹配时临时编译、round-trip 校验后替换 cache。未通过校验的 artifact 不进入 runtime；正式 server 不接受 `--rules`、外部规则路径、CWT 或用户规则覆盖。
 
-Vanilla index cache schema 当前为 `4`。它保存 cache metadata、source-file metadata、semantic shards、scripted macro 的紧凑调用签名、definition/reference 的 UTF-16 位置和有界的 localisation preview；不保存 Vanilla 源码、CST、HIR 或 macro template。因此 Vanilla macro 保持 signature/OpenWorld 调用分析，不进行体展开。Vanilla 源文件内容或 fingerprint 变化需要显式 refresh；规则 hash mismatch 可在 LSP 启动后台自动重建。cache 加载或重建期间，当前 LSP 会延迟受影响的 snapshot 请求，完成后由 event loop 安装完整 cache；失败时保留已加载的旧 cache并报告原因。
+Vanilla index cache schema 当前为 `4`。它保存 cache metadata、source-file metadata、semantic shards、scripted macro 的紧凑调用签名、definition/reference 的 UTF-16 位置和有界的 localisation preview；不保存 Vanilla 源码、CST、HIR 或 macro template。因此 Vanilla macro 保持 signature/OpenWorld 调用分析，不进行体展开。Vanilla 源文件内容或 fingerprint 变化需要显式 refresh；规则 hash mismatch 可在 LSP 启动后台自动重建。缓存文件缺失、损坏或 schema 不兼容（例如旧测试版本产物）时，若自动发现可用，LSP 会从已记录或发现的安装目录重建到同一显式路径，而不是静默失去 Vanilla 符号；发现失败不写入用户配置，且不阻断启动。cache 加载或重建期间，当前 LSP 会延迟受影响的 snapshot 请求，完成后由 event loop 安装完整 cache；失败时保留已加载的旧 cache并报告原因。
 
 ## 并发与生命周期
 

@@ -609,6 +609,79 @@ fn stale_vanilla_cache_reports_regeneration_failure_explicitly() {
     fs::remove_dir_all(container).expect("cleanup");
 }
 
+fn fixture_vanilla_source(root: &std::path::Path) -> std::path::PathBuf {
+    let source = root.join("library/Europa Universalis IV");
+    for directory in pdx_game::eu4::INSTALL_DESCRIPTOR.validation_directories {
+        fs::create_dir_all(source.join(directory)).expect("validation directory");
+    }
+    #[cfg(target_os = "windows")]
+    let executable = source.join("eu4.exe");
+    #[cfg(target_os = "linux")]
+    let executable = source.join("eu4");
+    #[cfg(target_os = "macos")]
+    let executable = source.join("Europa Universalis IV.app/Contents/MacOS/eu4");
+    fs::create_dir_all(executable.parent().expect("executable parent"))
+        .expect("executable parent directory");
+    fs::write(executable, b"fixture executable").expect("executable marker");
+    fs::create_dir_all(source.join("common/events")).expect("indexed directory");
+    fs::write(
+        source.join("common/events/definitions.txt"),
+        "country_event = { id = vanilla.1 }\n",
+    )
+    .expect("fixture source");
+    source
+}
+
+#[test]
+fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
+    let (root, _) = temp_workspace_dir();
+    fixture_vanilla_source(&root);
+    let automatic = AutoVanillaConfiguration {
+        descriptor: pdx_game::eu4::INSTALL_DESCRIPTOR,
+        user_paths: UserPaths {
+            config_file: root.join("user/config.toml"),
+            cache_root: root.join("user/cache"),
+        },
+    };
+    let rules = pdx_game::eu4::first_party_rules().expect("rules");
+    let explicit = root.join("explicit/vanilla.pdxindex");
+    fs::create_dir_all(explicit.parent().expect("cache parent")).expect("cache directory");
+    fs::write(&explicit, b"not a vanilla cache").expect("corrupt cache fixture");
+    let cancellation = VanillaSetupCancellation::new();
+
+    let (cache, message) = run_vanilla_cache_load(
+        &explicit,
+        rules.clone(),
+        pdx_game::eu4::profile(),
+        rules.rule_hash().to_hex(),
+        Some(&automatic),
+        None,
+        &cancellation,
+    )
+    .expect("unavailable cache must rebuild");
+    assert!(
+        message.contains("rebuilt from the discovered installation"),
+        "the rebuild must be explicit: {message}"
+    );
+    assert_eq!(cache.metadata().game_id, "eu4");
+    let reloaded = VanillaIndexCache::load(&explicit).expect("rebuilt cache loads");
+    assert_eq!(reloaded.metadata().rule_hash, rules.rule_hash().to_hex());
+
+    // A second start finds a matching cache and loads it directly.
+    let (_, second) = run_vanilla_cache_load(
+        &explicit,
+        rules.clone(),
+        pdx_game::eu4::profile(),
+        rules.rule_hash().to_hex(),
+        Some(&automatic),
+        None,
+        &cancellation,
+    )
+    .expect("rebuilt cache loads");
+    assert!(second.contains("loaded from"), "{second}");
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
 #[test]
 fn automatic_vanilla_setup_builds_cache_and_records_single_attempt() {
     let (root, _) = temp_workspace_dir();

@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::Path;
 
 use lsp_types::{
@@ -27,16 +28,38 @@ pub(crate) fn run_vanilla_cache_load(
     rules: RuleSet,
     profile: GameProfile,
     current_rule_hash: String,
+    auto_vanilla: Option<&AutoVanillaConfiguration>,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &VanillaSetupCancellation,
 ) -> Result<(VanillaIndexCache, String), String> {
-    let loaded =
-        VanillaIndexCache::load_cancellable(path, &cancellation.workspace).map_err(|error| {
-            format!(
+    let loaded = match VanillaIndexCache::load_cancellable(path, &cancellation.workspace) {
+        Ok(loaded) => loaded,
+        Err(error) => {
+            // A missing, corrupt, or schema-incompatible cache (for example one built
+            // by an older test build) falls back to automatic discovery and rebuilds
+            // into the same explicit path, instead of silently losing Vanilla symbols.
+            if let Some(rebuilt) = rebuild_unavailable_cache(
+                path,
+                &rules,
+                &profile,
+                auto_vanilla,
+                progress,
+                cancellation,
+            )? {
+                return Ok((
+                    rebuilt,
+                    format!(
+                        "Vanilla cache {} was unavailable and has been rebuilt from the discovered installation",
+                        path.display()
+                    ),
+                ));
+            }
+            return Err(format!(
                 "Vanilla cache {} could not be loaded; continuing without Vanilla symbols: {error}",
                 path.display()
-            )
-        })?;
+            ));
+        }
+    };
     if loaded.metadata().rule_hash == current_rule_hash {
         return Ok((
             loaded,
@@ -45,24 +68,15 @@ pub(crate) fn run_vanilla_cache_load(
     }
     let stale_hash = loaded.metadata().rule_hash.clone();
     let source = loaded.source_root().path.clone();
-    let rebuilt = (|| {
-        let mut host = AnalysisHost::with_profile(rules, profile);
-        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-            SourceRootId::new(0),
-            SourceRootKind::Vanilla,
-            source.clone(),
-        )]));
-        host.refresh_source_roots_cancellable_with_progress(&cancellation.workspace, progress)
-            .map_err(|error| {
-                format!("Vanilla indexing failed during cache regeneration: {error}")
-            })?;
-        let cache = VanillaIndexCache::from_snapshot(&host.snapshot())
-            .map_err(|error| format!("Vanilla cache regeneration failed: {error}"))?;
-        cache
-            .save(path)
-            .map_err(|error| format!("Vanilla cache regeneration could not be saved: {error}"))?;
-        Ok::<_, String>(cache)
-    })();
+    let rebuilt = build_cache_from_source(
+        &source,
+        path,
+        &rules,
+        &profile,
+        progress,
+        cancellation,
+        "Vanilla cache regeneration",
+    );
     match rebuilt {
         Ok(cache) => Ok((
             cache,
@@ -76,6 +90,117 @@ pub(crate) fn run_vanilla_cache_load(
             format!("{error}; using the existing cache built with rules hash {stale_hash}"),
         )),
     }
+}
+
+/// Rebuilds an explicit cache path when the cache file itself cannot be loaded.
+///
+/// Returns `Ok(None)` when automatic discovery is unavailable or declines to
+/// participate; `Ok(Some(cache))` after a successful rebuild. Discovery failures
+/// are reported but never recorded in the user configuration, because an explicit
+/// cache path is a caller-owned location and must not mark the user-level
+/// automatic setup as attempted.
+fn rebuild_unavailable_cache(
+    path: &Path,
+    rules: &RuleSet,
+    profile: &GameProfile,
+    auto_vanilla: Option<&AutoVanillaConfiguration>,
+    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+    cancellation: &VanillaSetupCancellation,
+) -> Result<Option<VanillaIndexCache>, String> {
+    let Some(auto_vanilla) = auto_vanilla else {
+        return Ok(None);
+    };
+    if cancellation.workspace.is_cancelled() {
+        return Err("Vanilla cache rebuild was cancelled".to_owned());
+    }
+    let configured_source = UserConfiguration::load(&auto_vanilla.user_paths.config_file)
+        .ok()
+        .and_then(|configuration| {
+            configuration
+                .games
+                .get(auto_vanilla.descriptor.game_id)
+                .and_then(|game| game.vanilla_source.clone())
+        })
+        .filter(|source| source.is_dir());
+    let source = match configured_source {
+        Some(source) => source,
+        None => {
+            let report = discover_installations(
+                &auto_vanilla.descriptor,
+                &DiscoveryOptions::default(),
+                &cancellation.discovery,
+            );
+            if report.cancelled {
+                return Err("Vanilla cache rebuild discovery was cancelled".to_owned());
+            }
+            match report.installations.as_slice() {
+                [source] => source.clone(),
+                [] => return Ok(None),
+                candidates => {
+                    return Err(format!(
+                        "multiple {} installations were found; run `pdx setup vanilla --game {} --source <directory>` to choose one: {}",
+                        auto_vanilla.descriptor.display_name,
+                        auto_vanilla.descriptor.game_id,
+                        candidates
+                            .iter()
+                            .map(|path| path.display().to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ));
+                }
+            }
+        }
+    };
+    // The old file is known to be unusable (missing, corrupt, or from an older
+    // schema); remove it so the rebuild can write a fresh cache in its place.
+    match fs::remove_file(path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(format!(
+                "Vanilla cache rebuild could not replace {}: {error}",
+                path.display()
+            ));
+        }
+    }
+    build_cache_from_source(
+        &source,
+        path,
+        rules,
+        profile,
+        progress,
+        cancellation,
+        "Vanilla cache rebuild",
+    )
+    .map(Some)
+}
+
+fn build_cache_from_source(
+    source: &Path,
+    path: &Path,
+    rules: &RuleSet,
+    profile: &GameProfile,
+    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+    cancellation: &VanillaSetupCancellation,
+    activity: &str,
+) -> Result<VanillaIndexCache, String> {
+    let mut host = AnalysisHost::with_profile(rules.clone(), profile.clone());
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        source.to_owned(),
+    )]));
+    host.refresh_source_roots_cancellable_with_progress(&cancellation.workspace, progress)
+        .map_err(|error| format!("{activity} failed while indexing {source:?}: {error}"))?;
+    let cache = VanillaIndexCache::from_snapshot(&host.snapshot())
+        .map_err(|error| format!("{activity} failed: {error}"))?;
+    cache.save(path).map_err(|error| {
+        format!(
+            "{activity} could not be saved to {}: {error}",
+            path.display()
+        )
+    })?;
+    Ok(cache)
 }
 
 pub(crate) fn watched_files_registration(

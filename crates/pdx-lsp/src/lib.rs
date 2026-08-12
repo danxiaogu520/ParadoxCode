@@ -69,7 +69,9 @@ pub(crate) use text::changed_document_len;
 #[cfg(test)]
 pub(crate) use transport::read_message;
 #[cfg(test)]
-pub(crate) use vanilla::{apply_user_vanilla_configuration, run_auto_vanilla_setup_with_options};
+pub(crate) use vanilla::{
+    apply_user_vanilla_configuration, run_auto_vanilla_setup_with_options, run_vanilla_cache_load,
+};
 #[cfg(test)]
 pub(crate) use workspace::{ResolvedSourceRoots, resolve_source_roots};
 

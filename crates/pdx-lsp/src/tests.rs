@@ -5,8 +5,8 @@ pub(crate) use crate::{
     ServerState, VanillaSetupCancellation, apply_user_vanilla_configuration, bounded_results,
     cancel_initialize_from_notification, cancel_request_from_notification, changed_document_len,
     diagnostic_result_counts, path_to_uri, prepare_initialize_candidate, read_message,
-    resolve_source_roots, run_auto_vanilla_setup_with_options, strip_snippet_placeholders,
-    uri_to_path,
+    resolve_source_roots, run_auto_vanilla_setup_with_options, run_vanilla_cache_load,
+    strip_snippet_placeholders, uri_to_path,
 };
 
 mod support;
