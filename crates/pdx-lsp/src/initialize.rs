@@ -94,13 +94,8 @@ pub(crate) fn prepare_initialize_candidate(
             ));
             None
         }
-        Some(path) if !path.is_file() => {
-            warnings.push(format!(
-                "Vanilla cache {} does not exist; continuing without Vanilla symbols",
-                path.display()
-            ));
-            None
-        }
+        // A missing file is handled by the background load worker, which falls back
+        // to automatic discovery and rebuilds the cache in place.
         Some(path) => Some(path),
     };
     if cancellation.is_cancelled() {

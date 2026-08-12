@@ -328,7 +328,9 @@ impl LspServer {
                             };
                             in_flight_vanilla = Some(cancellation);
                             vanilla_cache_in_flight = true;
-                            let auto_vanilla = auto_vanilla.clone();
+                            // The user-level auto configuration survives `apply_user_vanilla_configuration`,
+                            // so an unavailable configured cache can still fall back to discovery.
+                            let auto_vanilla = self.auto_vanilla.clone();
                             scope.spawn(move || {
                                 let result = run_vanilla_cache_load(
                                     &path,

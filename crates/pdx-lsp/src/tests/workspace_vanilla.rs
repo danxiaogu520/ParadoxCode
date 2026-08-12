@@ -363,14 +363,14 @@ fn missing_vanilla_cache_degrades_with_an_lsp_warning() {
     );
     let warning = responses
         .iter()
-        .find(|value| value["method"] == "window/showMessage")
+        .find(|value| {
+            value["method"] == "window/showMessage"
+                && value["params"]["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("continuing without Vanilla symbols"))
+        })
         .expect("missing cache warning");
     assert_eq!(warning["params"]["type"], 2);
-    assert!(
-        warning["params"]["message"]
-            .as_str()
-            .is_some_and(|message| message.contains("continuing without Vanilla symbols"))
-    );
     assert_eq!(server.snapshot().source_roots().len(), 1);
     fs::remove_dir_all(root).expect("cleanup");
 }
@@ -679,6 +679,68 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
     )
     .expect("rebuilt cache loads");
     assert!(second.contains("loaded from"), "{second}");
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn unavailable_configured_cache_is_rebuilt_from_configured_source() {
+    let (root, _) = temp_workspace_dir();
+    let source = fixture_vanilla_source(&root);
+    let cache_path = root.join("user/cache/eu4/vanilla.pdxindex");
+    let config_file = root.join("user/config.toml");
+    let mut configuration = UserConfiguration::default();
+    let game = configuration.games.entry("eu4".to_owned()).or_default();
+    game.vanilla_source = Some(source);
+    game.vanilla_cache = Some(cache_path.clone());
+    game.auto_discovery_attempted = true;
+    configuration.save(&config_file).expect("configuration");
+    let automatic = AutoVanillaConfiguration {
+        descriptor: pdx_game::eu4::INSTALL_DESCRIPTOR,
+        user_paths: UserPaths {
+            config_file,
+            cache_root: root.join("user/cache"),
+        },
+    };
+
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&root.join("workspace")),"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions)
+        .expect("embedded rules")
+        .with_auto_vanilla(automatic);
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+
+    responses
+        .iter()
+        .find(|value| {
+            value["method"] == "window/showMessage"
+                && value["params"]["type"] == 3
+                && value["params"]["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("rebuilt"))
+        })
+        .expect("rebuild info notification");
+    assert!(
+        !responses.iter().any(|value| {
+            value["method"] == "window/showMessage" && value["params"]["type"] == 2
+        }),
+        "an unavailable configured cache must rebuild rather than warn"
+    );
+    let reloaded = VanillaIndexCache::load(&cache_path).expect("rebuilt cache loads");
+    assert_eq!(
+        reloaded.metadata().rule_hash,
+        pdx_game::eu4::first_party_rules()
+            .expect("rules")
+            .rule_hash()
+            .to_hex()
+    );
     fs::remove_dir_all(root).expect("cleanup");
 }
 
