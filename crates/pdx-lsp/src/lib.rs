@@ -42,6 +42,7 @@ pub(crate) const MAX_LSP_MESSAGE_BYTES: usize = 32 * 1024 * 1024;
 pub(crate) const MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
 pub(crate) const MAX_COMPLETION_RESULTS: usize = 512;
 pub(crate) const MAX_WORKSPACE_SYMBOL_RESULTS: usize = 256;
+pub(crate) const MAX_WORKSPACE_DIAGNOSTIC_FILES: usize = 128;
 pub(crate) const MAX_PUBLISHED_DIAGNOSTICS: usize = 1_000;
 pub(crate) const WATCHED_FILES_REGISTRATION_ID: &str = "pdx-source-roots";
 pub(crate) const WATCHED_FILES_REQUEST_ID: &str = "pdx/register-source-root-watchers";

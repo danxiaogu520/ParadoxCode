@@ -9,7 +9,7 @@ use lsp_types::{
     Range as LspRange, ShowMessageParams, SymbolKind, Uri,
 };
 use pdx_analysis::{
-    CancellationToken, Cancelled, CompletionKind, Location, RenameError, RenameFailure,
+    CancellationToken, Cancelled, CompletionKind, Diagnostic, Location, RenameError, RenameFailure,
     diagnostics_with_cancellation,
 };
 use pdx_engine::{AnalysisSnapshot, DocumentError, DocumentId, WorkspaceError};
@@ -121,6 +121,9 @@ pub(crate) fn is_snapshot_request(method: &str) -> bool {
             | "textDocument/documentSymbol"
             | "textDocument/formatting"
             | "workspace/symbol"
+            | "pdx/workspaceDiagnostics"
+            | "pdx/classifyPaths"
+            | "pdx/textDiagnostics"
     )
 }
 
@@ -187,45 +190,53 @@ pub(crate) fn diagnostic_values(
         let diagnostics = diagnostics_with_cancellation(snapshot, id, cancellation)
             .ok()
             .unwrap_or_default();
-        let (retained, omitted) =
-            diagnostic_result_counts(diagnostics.len(), MAX_PUBLISHED_DIAGNOSTICS);
-        let mut values = diagnostics
-            .into_iter()
-            .take(retained)
-            .map(|diagnostic| {
-                LspDiagnostic::new(
-                    range_to_lsp(document.line_index(), document.text(), diagnostic.range),
-                    match diagnostic.severity {
-                        1 => Some(DiagnosticSeverity::ERROR),
-                        2 => Some(DiagnosticSeverity::WARNING),
-                        3 => Some(DiagnosticSeverity::INFORMATION),
-                        4 => Some(DiagnosticSeverity::HINT),
-                        _ => None,
-                    },
-                    Some(NumberOrString::String(diagnostic.code.as_str().to_owned())),
-                    Some("pdx-analysis".to_owned()),
-                    diagnostic.message,
-                    None,
-                    None,
-                )
-            })
-            .collect::<Vec<_>>();
-        if omitted > 0 {
-            values.push(LspDiagnostic::new(
-                LspRange::default(),
-                Some(DiagnosticSeverity::INFORMATION),
-                Some(NumberOrString::String(
-                    "pdx-diagnostics-truncated".to_owned(),
-                )),
-                Some("pdx-lsp".to_owned()),
-                format!("{omitted} additional diagnostics were omitted"),
-                None,
-                None,
-            ));
-        }
-        values
+        diagnostic_values_for_text(diagnostics, document.line_index(), document.text())
     });
     serde_json::to_value(values).ok()
+}
+
+pub(crate) fn diagnostic_values_for_text(
+    diagnostics: Vec<Diagnostic>,
+    line_index: &LineIndex,
+    text: &str,
+) -> Vec<LspDiagnostic> {
+    let (retained, omitted) =
+        diagnostic_result_counts(diagnostics.len(), MAX_PUBLISHED_DIAGNOSTICS);
+    let mut values = diagnostics
+        .into_iter()
+        .take(retained)
+        .map(|diagnostic| {
+            LspDiagnostic::new(
+                range_to_lsp(line_index, text, diagnostic.range),
+                match diagnostic.severity {
+                    1 => Some(DiagnosticSeverity::ERROR),
+                    2 => Some(DiagnosticSeverity::WARNING),
+                    3 => Some(DiagnosticSeverity::INFORMATION),
+                    4 => Some(DiagnosticSeverity::HINT),
+                    _ => None,
+                },
+                Some(NumberOrString::String(diagnostic.code.as_str().to_owned())),
+                Some("pdx-analysis".to_owned()),
+                diagnostic.message,
+                None,
+                None,
+            )
+        })
+        .collect::<Vec<_>>();
+    if omitted > 0 {
+        values.push(LspDiagnostic::new(
+            LspRange::default(),
+            Some(DiagnosticSeverity::INFORMATION),
+            Some(NumberOrString::String(
+                "pdx-diagnostics-truncated".to_owned(),
+            )),
+            Some("pdx-lsp".to_owned()),
+            format!("{omitted} additional diagnostics were omitted"),
+            None,
+            None,
+        ));
+    }
+    values
 }
 
 pub(crate) fn diagnostics_notification(uri: &str, values: Value) -> Value {

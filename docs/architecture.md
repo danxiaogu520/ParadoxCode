@@ -152,6 +152,12 @@ Vanilla index cache schema 当前为 `4`。它保存 cache metadata、source-fil
 - scripted macro 的 diagnostics 展开和值补全约束收集均使用单次查询内的 identity 栈、节点/token-byte/展开深度预算和 cancellation，不持有 `AnalysisHost` 锁，也不使用跨 snapshot 的全局可变缓存。
 - 规则标记为 `quoted_script` 的 scalar 使用 parser 提供的容错 secondary Script parse 和可组合 UTF-8 source map；diagnostics、completion、hover 和 navigation/rename 的语义引用收集在查询内下钻，普通 quoted scalar 仍保持 opaque。secondary parse 共用深度、单 payload、累计字节、节点数和 cancellation 预算，不写入主 HIR。
 - LSP 当前使用 stdio JSON-RPC，stdout 只输出协议数据。
+- 开发诊断器使用有界的 `pdx/workspaceDiagnostics` snapshot request 分批查询 Current Mod 的磁盘
+  file state；该请求复用普通 analysis diagnostics、支持取消且不创建 overlay。显式打开但不在
+  workspace scan 中的文件仍走标准 `didOpen`/push diagnostics 路径。
+- 同一诊断器的 Vanilla-source 模式先通过 `pdx/classifyPaths` 选择 profile 文件，再使用有界的
+  `pdx/textDiagnostics` request（每批至多 16 个文件和 16 MiB）分析调用方提供的瞬时文本；查询
+  不写入 `AnalysisHost`，符号解析仍读取与 first-party `rule_hash` 匹配的不可变 Vanilla snapshot。
 
 ## 当前身份与索引
 

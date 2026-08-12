@@ -11,21 +11,57 @@ use pdx_analysis::{
     CancellationToken, Cancelled, CompletionKind, complete_with_cancellation, completion_resolve,
     definition_with_cancellation, document_symbols_with_cancellation, hover_with_cancellation,
     prepare_rename_with_cancellation, references_with_cancellation, rename_with_cancellation,
+    source_file_diagnostics_with_cancellation, text_diagnostics_with_cancellation,
     workspace_symbols_with_cancellation,
 };
-use pdx_engine::{AnalysisSnapshot, DocumentId, ParsedSource};
+use pdx_engine::{AnalysisSnapshot, DocumentId, ParsedSource, SourceRootKind};
 use pdx_parser::format::format;
-use pdx_text::{Position, TextRange};
+use pdx_rules::ParserKind;
+use pdx_text::{LineIndex, LogicalPath, Position, TextRange};
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::protocol::{
-    RpcError, cancelled_error, completion_kind, location_range_to_lsp, location_to_lsp,
-    range_to_lsp, range_to_lsp_for_location, rename_failure, symbol_kind, typed_params,
-    typed_value,
+    RpcError, cancelled_error, completion_kind, diagnostic_values_for_text, location_range_to_lsp,
+    location_to_lsp, range_to_lsp, range_to_lsp_for_location, rename_failure, symbol_kind,
+    typed_params, typed_value,
 };
+use crate::uri::path_to_uri;
 use crate::{
-    INVALID_PARAMS, MAX_COMPLETION_RESULTS, MAX_WORKSPACE_SYMBOL_RESULTS, METHOD_NOT_FOUND,
+    INVALID_PARAMS, MAX_COMPLETION_RESULTS, MAX_WORKSPACE_DIAGNOSTIC_FILES,
+    MAX_WORKSPACE_SYMBOL_RESULTS, METHOD_NOT_FOUND,
 };
+
+const DEFAULT_WORKSPACE_DIAGNOSTIC_FILES: usize = 16;
+const MAX_CLASSIFIED_PATHS: usize = 4_096;
+const MAX_TEXT_DIAGNOSTIC_FILES: usize = 16;
+const MAX_TEXT_DIAGNOSTIC_BYTES: usize = 16 * 1024 * 1024;
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields, rename_all = "camelCase")]
+struct WorkspaceDiagnosticsParams {
+    offset: usize,
+    limit: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct ClassifyPathsParams {
+    paths: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct TextDiagnosticInput {
+    path: String,
+    text: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct TextDiagnosticsParams {
+    files: Vec<TextDiagnosticInput>,
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct SnapshotRequestContext {
@@ -60,8 +96,172 @@ impl SnapshotRequestContext {
             "textDocument/documentSymbol" => self.document_symbols(params),
             "textDocument/formatting" => self.formatting(params),
             "workspace/symbol" => self.workspace_symbols(params),
+            "pdx/workspaceDiagnostics" => self.workspace_diagnostics(params),
+            "pdx/classifyPaths" => self.classify_paths(params),
+            "pdx/textDiagnostics" => self.text_diagnostics(params),
             _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
         }
+    }
+
+    fn text_diagnostics(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = typed_params::<TextDiagnosticsParams>(params, "text diagnostics")?;
+        if params.files.is_empty() || params.files.len() > MAX_TEXT_DIAGNOSTIC_FILES {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!("text diagnostics require between 1 and {MAX_TEXT_DIAGNOSTIC_FILES} files"),
+            ));
+        }
+        let total_bytes = params
+            .files
+            .iter()
+            .try_fold(0usize, |total, file| total.checked_add(file.text.len()))
+            .ok_or_else(|| {
+                RpcError::new(INVALID_PARAMS, "text diagnostics payload is too large")
+            })?;
+        if total_bytes > MAX_TEXT_DIAGNOSTIC_BYTES {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!("text diagnostics are limited to {MAX_TEXT_DIAGNOSTIC_BYTES} bytes"),
+            ));
+        }
+
+        let mut results = Vec::with_capacity(params.files.len());
+        for file in params.files {
+            self.ensure_active()?;
+            if !self.snapshot.game_profile().allows_scan_file(&file.path) {
+                return Err(RpcError::new(
+                    INVALID_PARAMS,
+                    format!("path is outside the active game profile: {}", file.path),
+                ));
+            }
+            let logical_path = LogicalPath::parse(&file.path).map_err(|error| {
+                RpcError::new(
+                    INVALID_PARAMS,
+                    format!("invalid logical path {}: {error}", file.path),
+                )
+            })?;
+            let diagnostics = text_diagnostics_with_cancellation(
+                &self.snapshot,
+                &logical_path,
+                &file.text,
+                &self.cancellation,
+            )
+            .map_err(cancelled_error)?;
+            let line_index = LineIndex::new(&file.text);
+            results.push(serde_json::json!({
+                "path": file.path,
+                "diagnostics": diagnostic_values_for_text(diagnostics, &line_index, &file.text),
+            }));
+        }
+        Ok(Value::Array(results))
+    }
+
+    fn classify_paths(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = typed_params::<ClassifyPathsParams>(params, "path classification")?;
+        if params.paths.len() > MAX_CLASSIFIED_PATHS {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!("path classification is limited to {MAX_CLASSIFIED_PATHS} paths"),
+            ));
+        }
+        let mut accepted = Vec::new();
+        for path in params.paths {
+            self.ensure_active()?;
+            if !self.snapshot.game_profile().allows_scan_file(&path) {
+                continue;
+            }
+            let Ok(logical) = LogicalPath::parse(&path) else {
+                continue;
+            };
+            let Some(category) = self.snapshot.rules().classify(&logical) else {
+                continue;
+            };
+            if matches!(
+                category.parser,
+                ParserKind::Script | ParserKind::Localisation
+            ) {
+                accepted.push(path);
+            }
+        }
+        typed_value(accepted, "path classification response")
+    }
+
+    fn workspace_diagnostics(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = params.map_or_else(
+            || Ok(WorkspaceDiagnosticsParams::default()),
+            |value| {
+                typed_params::<WorkspaceDiagnosticsParams>(Some(value), "workspace diagnostics")
+            },
+        )?;
+        let limit = params.limit.unwrap_or(DEFAULT_WORKSPACE_DIAGNOSTIC_FILES);
+        if limit == 0 || limit > MAX_WORKSPACE_DIAGNOSTIC_FILES {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!(
+                    "workspace diagnostics limit must be between 1 and {MAX_WORKSPACE_DIAGNOSTIC_FILES}"
+                ),
+            ));
+        }
+
+        let current_root_ids = self
+            .snapshot
+            .source_roots()
+            .iter()
+            .filter(|root| root.kind == SourceRootKind::CurrentMod)
+            .map(|root| root.id)
+            .collect::<std::collections::BTreeSet<_>>();
+        let mut files = self
+            .snapshot
+            .source_files()
+            .values()
+            .filter(|file| current_root_ids.contains(&file.root_id))
+            .filter(|file| {
+                self.snapshot
+                    .file_state(file.id)
+                    .is_some_and(|state| state.parsed().is_some())
+            })
+            .collect::<Vec<_>>();
+        files.sort_by(|left, right| {
+            left.logical_path
+                .as_str()
+                .cmp(right.logical_path.as_str())
+                .then_with(|| left.physical_path.cmp(&right.physical_path))
+        });
+        let total = files.len();
+        let end = params.offset.saturating_add(limit).min(total);
+        let mut items = Vec::with_capacity(end.saturating_sub(params.offset));
+        if params.offset < total {
+            for file in &files[params.offset..end] {
+                self.ensure_active()?;
+                let state = self
+                    .snapshot
+                    .file_state(file.id)
+                    .expect("filtered source file has state");
+                let diagnostics = source_file_diagnostics_with_cancellation(
+                    &self.snapshot,
+                    file.id,
+                    &self.cancellation,
+                )
+                .map_err(cancelled_error)?;
+                let line_index = LineIndex::new(state.source());
+                items.push(serde_json::json!({
+                    "uri": path_to_uri(&file.physical_path),
+                    "logicalPath": file.logical_path.as_str(),
+                    "diagnostics": diagnostic_values_for_text(
+                        diagnostics,
+                        &line_index,
+                        state.source(),
+                    ),
+                }));
+            }
+        }
+        self.ensure_active()?;
+        Ok(serde_json::json!({
+            "offset": params.offset,
+            "nextOffset": (end < total).then_some(end),
+            "total": total,
+            "items": items,
+        }))
     }
 
     fn completion(&self, params: Option<&Value>) -> Result<Value, RpcError> {

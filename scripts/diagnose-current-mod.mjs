@@ -28,6 +28,8 @@ const DEFAULT_OUTPUT_DIR = join(REPOSITORY_ROOT, 'diagnostic-reports');
 const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_FILE_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_FILES = 100_000;
+const DEFAULT_WORKSPACE_DIAGNOSTIC_BATCH_SIZE = 16;
+const CHECKPOINT_FILE_INTERVAL = 128;
 const MAX_SOURCE_BYTES = 16 * 1024 * 1024;
 const MAX_SCAN_DEPTH = 64;
 const MAX_REPORTED_SYMLINKS = 256;
@@ -36,14 +38,31 @@ const JSON_RPC_VERSION = '2.0';
 const RELEVANT_EXTENSIONS = new Set(['.txt', '.gfx', '.yml', '.yaml']);
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true });
 const WINDOWS_1252_DECODER = new TextDecoder('windows-1252');
+let activeServerChild;
 
-const USAGE = `Usage: node scripts/diagnose-current-mod.mjs --mod PATH [options]
+function terminateActiveServer() {
+  const child = activeServerChild;
+  if (child && child.exitCode === null && child.signalCode === null) child.kill();
+}
+
+process.once('exit', terminateActiveServer);
+process.once('SIGINT', () => {
+  terminateActiveServer();
+  process.exit(130);
+});
+process.once('SIGTERM', () => {
+  terminateActiveServer();
+  process.exit(143);
+});
+
+const USAGE = `Usage: node scripts/diagnose-current-mod.mjs (--mod PATH | --vanilla-source PATH) [options]
 
 Diagnose every EU4 source file in a Current Mod using the embedded first-party rules and a local
 Vanilla index cache. The default output is diagnostic-reports/current-mod-<timestamp>.{json,md}.
 
 Required:
   --mod PATH                 Current Mod directory
+  --vanilla-source PATH      Vanilla source tree; diagnose through virtual overlays backed by its cache
 
 Options:
   --vanilla-cache PATH       Vanilla .pdxindex (also PDX_DIAGNOSTIC_VANILLA_CACHE)
@@ -54,12 +73,20 @@ Options:
   --timeout-ms N             overall server timeout (default: ${DEFAULT_TIMEOUT_MS})
   --file-timeout-ms N        timeout for one file (default: ${DEFAULT_FILE_TIMEOUT_MS})
   --max-files N              maximum files to inspect (default: ${DEFAULT_MAX_FILES})
+  --path-prefix PATH         inspect only files below this source-relative path
+  --shard-count N            split selected files into N stable round-robin shards (default: 1)
+  --shard-index N            zero-based shard to inspect (default: 0)
+  --batch-size N             indexed files per diagnostic request (default: ${DEFAULT_WORKSPACE_DIAGNOSTIC_BATCH_SIZE})
+  --concurrency N            simultaneous virtual/explicit overlays (default: 8)
+  --checkpoint-every N       completed files between partial reports (default: ${CHECKPOINT_FILE_INTERVAL})
   --fail-on LEVEL             error, warning, or none (default: error)
   --help                     show this help
 
 Environment equivalents: PDX_DIAGNOSTIC_VANILLA_CACHE, PDX_DIAGNOSTIC_SERVER,
 PDX_DIAGNOSTIC_WORKSPACE, PDX_DIAGNOSTIC_PROJECT_CONFIG, PDX_DIAGNOSTIC_OUTPUT,
 PDX_DIAGNOSTIC_TIMEOUT_MS, PDX_DIAGNOSTIC_FILE_TIMEOUT_MS, PDX_DIAGNOSTIC_MAX_FILES,
+PDX_DIAGNOSTIC_PATH_PREFIX, PDX_DIAGNOSTIC_SHARD_COUNT, PDX_DIAGNOSTIC_SHARD_INDEX,
+PDX_DIAGNOSTIC_BATCH_SIZE, PDX_DIAGNOSTIC_CONCURRENCY, PDX_DIAGNOSTIC_CHECKPOINT_EVERY,
 PDX_DIAGNOSTIC_FAIL_ON.
 `;
 
@@ -93,6 +120,17 @@ function parsePositiveInteger(value, label) {
   return parsed;
 }
 
+function parseNonnegativeInteger(value, label) {
+  if (!/^[0-9]+$/.test(String(value))) {
+    throw new CliUsageError(`${label} must be a nonnegative integer, got ${JSON.stringify(value)}`);
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new CliUsageError(`${label} is outside the supported range: ${value}`);
+  }
+  return parsed;
+}
+
 function parseFailOn(value) {
   const normalized = String(value).toLowerCase();
   if (!['error', 'warning', 'none'].includes(normalized)) {
@@ -104,6 +142,7 @@ function parseFailOn(value) {
 function parseArgs(argv) {
   const options = {
     mod: undefined,
+    vanillaSource: undefined,
     vanillaCache:
       envValue('PDX_DIAGNOSTIC_VANILLA_CACHE') || envValue('PDX_PERF_CACHE') || undefined,
     server: envValue('PDX_DIAGNOSTIC_SERVER'),
@@ -122,6 +161,21 @@ function parseArgs(argv) {
       envValue('PDX_DIAGNOSTIC_MAX_FILES') || DEFAULT_MAX_FILES,
       'max files',
     ),
+    pathPrefix: envValue('PDX_DIAGNOSTIC_PATH_PREFIX'),
+    shardCount: parsePositiveInteger(envValue('PDX_DIAGNOSTIC_SHARD_COUNT') || 1, 'shard count'),
+    shardIndex: parseNonnegativeInteger(envValue('PDX_DIAGNOSTIC_SHARD_INDEX') || 0, 'shard index'),
+    batchSize: parsePositiveInteger(
+      envValue('PDX_DIAGNOSTIC_BATCH_SIZE') || DEFAULT_WORKSPACE_DIAGNOSTIC_BATCH_SIZE,
+      'batch size',
+    ),
+    concurrency: parsePositiveInteger(
+      envValue('PDX_DIAGNOSTIC_CONCURRENCY') || 8,
+      'concurrency',
+    ),
+    checkpointEvery: parsePositiveInteger(
+      envValue('PDX_DIAGNOSTIC_CHECKPOINT_EVERY') || CHECKPOINT_FILE_INTERVAL,
+      'checkpoint interval',
+    ),
     failOn: parseFailOn(envValue('PDX_DIAGNOSTIC_FAIL_ON') || 'error'),
   };
 
@@ -129,6 +183,7 @@ function parseArgs(argv) {
     ['--mod', 'mod'],
     ['--current-mod', 'mod'],
     ['--current-mode', 'mod'],
+    ['--vanilla-source', 'vanillaSource'],
     ['--vanilla-cache', 'vanillaCache'],
     ['--vanilla', 'vanillaCache'],
     ['--server', 'server'],
@@ -138,6 +193,12 @@ function parseArgs(argv) {
     ['--timeout-ms', 'timeoutMs'],
     ['--file-timeout-ms', 'fileTimeoutMs'],
     ['--max-files', 'maxFiles'],
+    ['--path-prefix', 'pathPrefix'],
+    ['--shard-count', 'shardCount'],
+    ['--shard-index', 'shardIndex'],
+    ['--batch-size', 'batchSize'],
+    ['--concurrency', 'concurrency'],
+    ['--checkpoint-every', 'checkpointEvery'],
     ['--fail-on', 'failOn'],
   ]);
   const seen = new Set();
@@ -159,8 +220,14 @@ function parseArgs(argv) {
     if (!value || value.startsWith('--')) {
       throw new CliUsageError(`missing value for ${argument}`);
     }
-    if (['timeoutMs', 'fileTimeoutMs', 'maxFiles'].includes(key)) {
+    if (
+      ['timeoutMs', 'fileTimeoutMs', 'maxFiles', 'batchSize', 'concurrency', 'checkpointEvery', 'shardCount'].includes(
+        key,
+      )
+    ) {
       options[key] = parsePositiveInteger(value, argument);
+    } else if (key === 'shardIndex') {
+      options[key] = parseNonnegativeInteger(value, argument);
     } else if (key === 'failOn') {
       options[key] = parseFailOn(value);
     } else {
@@ -169,8 +236,11 @@ function parseArgs(argv) {
     index += 1;
   }
 
-  if (!options.mod) {
-    throw new CliUsageError('--mod is required');
+  if (Boolean(options.mod) === Boolean(options.vanillaSource)) {
+    throw new CliUsageError('exactly one of --mod or --vanilla-source is required');
+  }
+  if (options.shardIndex >= options.shardCount) {
+    throw new CliUsageError('--shard-index must be smaller than --shard-count');
   }
   return options;
 }
@@ -250,8 +320,18 @@ function userConfiguredVanillaCache() {
 }
 
 function resolveOptions(raw) {
-  const mod = canonicalDirectory(raw.mod, '--mod');
-  const workspace = canonicalDirectory(raw.workspace || dirname(mod), '--workspace');
+  const vanillaSource = raw.vanillaSource
+    ? canonicalDirectory(raw.vanillaSource, '--vanilla-source')
+    : undefined;
+  const source = vanillaSource || canonicalDirectory(raw.mod, '--mod');
+  let virtualOverlayRoot;
+  let mod = source;
+  if (vanillaSource) {
+    virtualOverlayRoot = resolve(raw.output, '.vanilla-overlay-workspace');
+    mkdirSync(virtualOverlayRoot, { recursive: true });
+    mod = realpathSync(virtualOverlayRoot);
+  }
+  const workspace = canonicalDirectory(raw.workspace || (vanillaSource ? mod : dirname(mod)), '--workspace');
   let projectConfig = raw.projectConfig;
   if (!projectConfig) {
     const candidates = [join(workspace, '.pdx', 'project.toml'), join(mod, '.pdx', 'project.toml')];
@@ -271,7 +351,24 @@ function resolveOptions(raw) {
   vanillaCache = canonicalFile(vanillaCache, '--vanilla-cache');
 
   const server = resolveServer(raw.server);
-  return { ...raw, mod, workspace, projectConfig, vanillaCache, server };
+  const pathPrefix = raw.pathPrefix
+    ? raw.pathPrefix.replaceAll('\\', '/').replace(/^\/+|\/+$/g, '')
+    : undefined;
+  if (pathPrefix && pathPrefix.split('/').some((component) => component === '..')) {
+    throw new CliUsageError('--path-prefix must remain within the diagnosed source tree');
+  }
+  return {
+    ...raw,
+    mod,
+    source,
+    vanillaSource,
+    virtualOverlayRoot,
+    workspace,
+    projectConfig,
+    vanillaCache,
+    server,
+    pathPrefix,
+  };
 }
 
 function resolveServer(explicit) {
@@ -345,8 +442,24 @@ function fileUri(path) {
   return pathToFileURL(path).href;
 }
 
-function jsonRpcIdEquals(left, right) {
-  return left !== undefined && right !== undefined && JSON.stringify(left) === JSON.stringify(right);
+function pathKey(path) {
+  const key = resolve(path);
+  return process.platform === 'win32' ? key.toLowerCase() : key;
+}
+
+function diagnosticItemPath(item, root) {
+  if (typeof item.logicalPath !== 'string' || !item.logicalPath) {
+    return fileURLToPath(item.uri);
+  }
+  const candidate = resolve(root, ...item.logicalPath.split('/'));
+  const rootKey = pathKey(root);
+  const candidateKey = pathKey(candidate);
+  if (candidateKey !== rootKey && !candidateKey.startsWith(`${rootKey}${sep}`)) {
+    throw new ProtocolError(
+      `pdx/workspaceDiagnostics returned a path outside the Current Mod: ${item.logicalPath}`,
+    );
+  }
+  return candidate;
 }
 
 class LspClient {
@@ -355,6 +468,7 @@ class LspClient {
     this.buffer = Buffer.alloc(0);
     this.messages = [];
     this.waiters = [];
+    this.pendingRequests = new Map();
     this.closed = false;
     this.nextId = 1;
     this.serverMessages = [];
@@ -411,6 +525,26 @@ class LspClient {
   }
 
   enqueue(message) {
+    if (message.method && message.id !== undefined) {
+      this.handle(message);
+      return;
+    }
+    if (!message.method && message.id !== undefined) {
+      const key = JSON.stringify(message.id);
+      const pending = this.pendingRequests.get(key);
+      if (pending) {
+        this.pendingRequests.delete(key);
+        clearTimeout(pending.timer);
+        if (message.error) {
+          pending.reject(
+            new ProtocolError(`${pending.method} failed: ${JSON.stringify(message.error)}`),
+          );
+        } else {
+          pending.resolve(message.result);
+        }
+        return;
+      }
+    }
     const waiter = this.waiters.shift();
     if (waiter) {
       clearTimeout(waiter.timer);
@@ -425,6 +559,11 @@ class LspClient {
       clearTimeout(waiter.timer);
       waiter.reject(error);
     }
+    for (const pending of this.pendingRequests.values()) {
+      clearTimeout(pending.timer);
+      pending.reject(error);
+    }
+    this.pendingRequests.clear();
   }
 
   async next(timeoutMs) {
@@ -451,21 +590,29 @@ class LspClient {
     this.send({ jsonrpc: JSON_RPC_VERSION, method, ...(params === undefined ? {} : { params }) });
   }
 
-  async request(method, params, timeoutMs) {
+  request(method, params, timeoutMs) {
     const id = this.nextId;
     this.nextId += 1;
-    this.send({ jsonrpc: JSON_RPC_VERSION, id, method, params });
-    const deadline = Date.now() + timeoutMs;
-    while (true) {
-      const remaining = deadline - Date.now();
-      if (remaining <= 0) throw new ProtocolError(`timed out waiting for ${method}`);
-      const message = await this.next(remaining);
-      this.handle(message);
-      if (jsonRpcIdEquals(message.id, id) && !message.method) {
-        if (message.error) throw new ProtocolError(`${method} failed: ${JSON.stringify(message.error)}`);
-        return message.result;
+    const key = JSON.stringify(id);
+    return new Promise((resolveRequest, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingRequests.delete(key);
+        reject(new ProtocolError(`timed out waiting for ${method}`));
+      }, timeoutMs);
+      this.pendingRequests.set(key, {
+        method,
+        resolve: resolveRequest,
+        reject,
+        timer,
+      });
+      try {
+        this.send({ jsonrpc: JSON_RPC_VERSION, id, method, params });
+      } catch (error) {
+        this.pendingRequests.delete(key);
+        clearTimeout(timer);
+        reject(error);
       }
-    }
+    });
   }
 
   handle(message) {
@@ -510,6 +657,7 @@ class LspClient {
 async function waitForVanillaReady(client, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let started = false;
+  let lastReportedPercentage = -10;
   while (true) {
     const remaining = deadline - Date.now();
     if (remaining <= 0) throw new ProtocolError('timed out waiting for Vanilla cache loading');
@@ -520,6 +668,16 @@ async function waitForVanillaReady(client, timeoutMs) {
     const progressText = `${value?.title || ''} ${value?.message || ''}`.toLowerCase();
     if (value?.kind === 'begin' && progressText.includes('vanilla')) {
       started = true;
+      console.error(value.message || 'Vanilla cache loading started');
+    }
+    if (
+      started &&
+      value?.kind === 'report' &&
+      Number.isFinite(value.percentage) &&
+      value.percentage >= lastReportedPercentage + 10
+    ) {
+      lastReportedPercentage = value.percentage;
+      console.error(value.message || `Vanilla cache loading: ${value.percentage}%`);
     }
     if (started && value?.kind === 'end') return value.message || 'Vanilla cache loading completed';
   }
@@ -601,7 +759,9 @@ function baseReport(options, files, skippedSymlinks, omittedSymlinks, depthLimit
         external_source: false,
         ...firstPartyRuleMetadata(),
       },
-      current_mod: options.mod,
+      mode: options.vanillaSource ? 'vanilla-source' : 'current-mod',
+      source: options.source,
+      current_mod: options.vanillaSource ? null : options.mod,
       workspace: options.workspace,
       project_config: options.projectConfig || null,
       vanilla_cache: {
@@ -613,12 +773,16 @@ function baseReport(options, files, skippedSymlinks, omittedSymlinks, depthLimit
       },
       server: options.server,
       fail_on: options.failOn,
+      shard: { index: options.shardIndex, count: options.shardCount },
     },
     scan: {
       relevant_files_discovered: files.length,
       symlinks_skipped: skippedSymlinks,
       symlinks_skipped_omitted: omittedSymlinks,
       depth_limited_directories: depthLimitedDirectories,
+      workspace_diagnostic_files: null,
+      next_workspace_diagnostic_offset: 0,
+      diagnosable_files_selected: null,
       oversized_files_skipped: [],
       oversized_files_skipped_omitted: 0,
     },
@@ -694,7 +858,8 @@ function renderMarkdown(report) {
     '',
     `- Status: **${report.status}**`,
     `- Generated: ${report.generated_at}`,
-    `- Current Mod: \`${markdownEscape(report.inputs.current_mod)}\``,
+    `- Mode: \`${markdownEscape(report.inputs.mode)}\``,
+    `- Source: \`${markdownEscape(report.inputs.source)}\``,
     `- Vanilla cache: \`${markdownEscape(report.inputs.vanilla_cache.path)}\``,
     `- Rules: ${report.inputs.rules.authority}`,
     `- Failure threshold: \`${report.inputs.fail_on}\``,
@@ -733,6 +898,16 @@ function renderMarkdown(report) {
   const vanilla = report.inputs.vanilla_cache;
   lines.push(`- Cache loaded: **${vanilla.loaded ? 'yes' : 'no'}**`);
   if (vanilla.status_message) lines.push(`- Server status: ${markdownEscape(vanilla.status_message)}`);
+  if (report.scan.workspace_diagnostic_files !== null) {
+    lines.push(
+      `- Indexed workspace files diagnosed: ${report.scan.next_workspace_diagnostic_offset}/${report.scan.workspace_diagnostic_files}`,
+    );
+  }
+  if (report.scan.diagnosable_files_selected !== null) {
+    lines.push(
+      `- Profile-supported Script/Localisation files: ${report.scan.diagnosable_files_selected}`,
+    );
+  }
   if (report.scan.symlinks_skipped.length || report.scan.symlinks_skipped_omitted) {
     const symlinkCount = report.scan.symlinks_skipped.length + report.scan.symlinks_skipped_omitted;
     lines.push(`- Symlinks skipped: ${symlinkCount}`);
@@ -792,6 +967,7 @@ function renderMarkdown(report) {
 
 function writeReports(report, outputDir) {
   mkdirSync(outputDir, { recursive: true });
+  report.files.sort((left, right) => left.path.localeCompare(right.path));
   const stamp = report.generated_at.replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
   const base = join(outputDir, `current-mod-${stamp}`);
   const jsonPath = `${base}.json`;
@@ -801,24 +977,298 @@ function writeReports(report, outputDir) {
   return { jsonPath, markdownPath };
 }
 
+async function diagnoseIndexedWorkspace(client, report, options) {
+  const analyzed = new Set();
+  let offset = 0;
+  let nextCheckpoint = CHECKPOINT_FILE_INTERVAL;
+  while (true) {
+    const batch = await client.request(
+      'pdx/workspaceDiagnostics',
+      { offset, limit: options.batchSize },
+      Math.max(options.fileTimeoutMs * options.batchSize, 120_000),
+    );
+    if (!batch || !Array.isArray(batch.items) || !Number.isSafeInteger(batch.total)) {
+      throw new ProtocolError('pdx/workspaceDiagnostics returned an invalid batch');
+    }
+    report.scan.workspace_diagnostic_files = batch.total;
+    for (const item of batch.items) {
+      if (typeof item?.uri !== 'string' || !Array.isArray(item.diagnostics)) {
+        throw new ProtocolError('pdx/workspaceDiagnostics returned an invalid file result');
+      }
+      const file = diagnosticItemPath(item, options.mod);
+      const bytes = readFileSync(file);
+      const decoded = decodeSource(bytes);
+      addFileResult(report, file, decoded.text, decoded.encoding, item.diagnostics, options.mod);
+      analyzed.add(pathKey(file));
+    }
+    const nextOffset = batch.nextOffset;
+    report.scan.next_workspace_diagnostic_offset = nextOffset ?? batch.total;
+    const completed = report.scan.next_workspace_diagnostic_offset;
+    console.error(`Workspace diagnostics: ${completed}/${batch.total} indexed files`);
+    if (completed >= nextCheckpoint || nextOffset === null) {
+      writeReports(report, resolve(options.output));
+      console.error(`Checkpoint written after ${completed} indexed files`);
+      nextCheckpoint = completed + CHECKPOINT_FILE_INTERVAL;
+    }
+    if (nextOffset === null) break;
+    if (!Number.isSafeInteger(nextOffset) || nextOffset <= offset || nextOffset > batch.total) {
+      throw new ProtocolError('pdx/workspaceDiagnostics returned a non-advancing offset');
+    }
+    offset = nextOffset;
+  }
+  return analyzed;
+}
+
+async function selectDiagnosableFiles(client, report, options, files) {
+  const accepted = new Set();
+  for (let offset = 0; offset < files.length; offset += 4_096) {
+    const batch = files.slice(offset, offset + 4_096);
+    const logicalPaths = batch.map((file) =>
+      relative(options.source, file).split(sep).join('/'),
+    );
+    const result = await client.request(
+      'pdx/classifyPaths',
+      { paths: logicalPaths },
+      options.fileTimeoutMs,
+    );
+    if (!Array.isArray(result) || result.some((path) => typeof path !== 'string')) {
+      throw new ProtocolError('pdx/classifyPaths returned an invalid result');
+    }
+    for (const path of result) accepted.add(path);
+  }
+  const selected = files.filter((file) =>
+    accepted.has(relative(options.source, file).split(sep).join('/')),
+  );
+  report.scan.diagnosable_files_selected = selected.length;
+  console.error(
+    `Selected ${selected.length}/${files.length} profile-supported Script/Localisation files`,
+  );
+  return selected;
+}
+
+async function diagnoseExplicitFiles(client, report, options, files, totalFiles) {
+  const pending = new Map();
+  let cursor = 0;
+
+  function openUntilFull() {
+    while (pending.size < options.concurrency && cursor < files.length) {
+      const file = files[cursor];
+      cursor += 1;
+      const relativePath = relative(options.source, file).split(sep).join('/');
+      try {
+        const bytes = readFileSync(file);
+        if (bytes.length > MAX_SOURCE_BYTES) {
+          if (report.scan.oversized_files_skipped.length < MAX_REPORTED_TOOL_ERRORS) {
+            report.scan.oversized_files_skipped.push(relativePath);
+          } else {
+            report.scan.oversized_files_skipped_omitted += 1;
+          }
+          addToolError(
+            report,
+            `${relativePath} exceeds the ${MAX_SOURCE_BYTES} byte source-file limit`,
+          );
+          continue;
+        }
+        const decoded = decodeSource(bytes);
+        const overlayPath = options.virtualOverlayRoot
+          ? join(options.virtualOverlayRoot, ...relativePath.split('/'))
+          : file;
+        const uri = fileUri(overlayPath);
+        client.notify('textDocument/didOpen', {
+          textDocument: { uri, languageId: 'eu4', version: 1, text: decoded.text },
+        });
+        pending.set(uri, { file, relativePath, decoded });
+      } catch (error) {
+        addToolError(report, `${relativePath}: ${error.message}`);
+      }
+    }
+  }
+
+  openUntilFull();
+  while (pending.size) {
+    let diagnosticMessage;
+    try {
+      diagnosticMessage = await client.waitFor(
+        (message) =>
+          message.method === 'textDocument/publishDiagnostics' &&
+          pending.has(message.params?.uri),
+        options.fileTimeoutMs,
+        'diagnostics for an explicit file batch',
+      );
+    } catch (error) {
+      const stalled = [...pending.entries()];
+      for (const [uri, value] of stalled) {
+        client.notify('textDocument/didClose', { textDocument: { uri } });
+        addToolError(report, `${value.relativePath}: ${error.message}`);
+        console.error(`[timeout] ${value.relativePath}`);
+      }
+      pending.clear();
+      openUntilFull();
+      continue;
+    }
+    const uri = diagnosticMessage.params.uri;
+    const current = pending.get(uri);
+    pending.delete(uri);
+    client.notify('textDocument/didClose', { textDocument: { uri } });
+    addFileResult(
+      report,
+      current.file,
+      current.decoded.text,
+      current.decoded.encoding,
+      diagnosticMessage.params?.diagnostics || [],
+      options.source,
+    );
+    console.error(
+      `[${report.summary.files_analyzed}/${totalFiles}] ${current.relativePath}: ${diagnosticMessage.params?.diagnostics?.length || 0} diagnostics`,
+    );
+    if (report.summary.files_analyzed % options.checkpointEvery === 0) {
+      writeReports(report, resolve(options.output));
+      console.error(`Checkpoint written after ${report.summary.files_analyzed} files`);
+    }
+    openUntilFull();
+  }
+}
+
+async function diagnoseTextFiles(client, report, options, files) {
+  const requestBatchSize = Math.min(options.batchSize, 16);
+  let cursor = 0;
+  let completed = 0;
+  let nextCheckpoint = options.checkpointEvery;
+
+  async function worker() {
+    while (true) {
+      const offset = cursor;
+      cursor += requestBatchSize;
+      if (offset >= files.length) return;
+      const batch = files.slice(offset, offset + requestBatchSize);
+      const inputs = [];
+      const sources = new Map();
+      for (const file of batch) {
+        const relativePath = relative(options.source, file).split(sep).join('/');
+        try {
+          const bytes = readFileSync(file);
+          if (bytes.length > MAX_SOURCE_BYTES) {
+            if (report.scan.oversized_files_skipped.length < MAX_REPORTED_TOOL_ERRORS) {
+              report.scan.oversized_files_skipped.push(relativePath);
+            } else {
+              report.scan.oversized_files_skipped_omitted += 1;
+            }
+            addToolError(
+              report,
+              `${relativePath} exceeds the ${MAX_SOURCE_BYTES} byte source-file limit`,
+            );
+            continue;
+          }
+          const decoded = decodeSource(bytes);
+          inputs.push({ path: relativePath, text: decoded.text });
+          sources.set(relativePath, { file, decoded });
+        } catch (error) {
+          addToolError(report, `${relativePath}: ${error.message}`);
+        }
+      }
+
+      if (inputs.length) {
+        try {
+          const results = await client.request(
+            'pdx/textDiagnostics',
+            { files: inputs },
+            Math.max(options.fileTimeoutMs, options.fileTimeoutMs * inputs.length),
+          );
+          if (!Array.isArray(results) || results.length !== inputs.length) {
+            throw new ProtocolError('pdx/textDiagnostics returned an invalid batch');
+          }
+          const returned = new Set();
+          for (const result of results) {
+            if (
+              typeof result?.path !== 'string' ||
+              !Array.isArray(result.diagnostics) ||
+              !sources.has(result.path) ||
+              returned.has(result.path)
+            ) {
+              throw new ProtocolError('pdx/textDiagnostics returned an invalid file result');
+            }
+            returned.add(result.path);
+            const source = sources.get(result.path);
+            addFileResult(
+              report,
+              source.file,
+              source.decoded.text,
+              source.decoded.encoding,
+              result.diagnostics,
+              options.source,
+            );
+            console.error(
+              `[${report.summary.files_analyzed}/${files.length}] ${result.path}: ${result.diagnostics.length} diagnostics`,
+            );
+          }
+        } catch (error) {
+          for (const input of inputs) {
+            addToolError(report, `${input.path}: ${error.message}`);
+            console.error(`[batch failed] ${input.path}: ${error.message}`);
+          }
+        }
+      }
+
+      completed += batch.length;
+      if (completed >= nextCheckpoint || completed === files.length) {
+        writeReports(report, resolve(options.output));
+        console.error(`Checkpoint written after ${completed}/${files.length} attempted files`);
+        while (nextCheckpoint <= completed) nextCheckpoint += options.checkpointEvery;
+      }
+    }
+  }
+
+  const workerCount = Math.min(options.concurrency, Math.ceil(files.length / requestBatchSize));
+  console.error(`Running ${workerCount} concurrent text diagnostic worker(s)`);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+}
+
 function collectServerMessages(client, report) {
   for (const message of client?.serverMessages || []) report.server_messages.push(message);
   report.server_messages = [...new Set(report.server_messages)];
 }
 
 async function stopClient(client, timeoutMs) {
-  if (!client || client.closed) return;
-  try {
-    await client.request('shutdown', null, Math.min(timeoutMs, 10_000));
-    client.notify('exit');
-  } catch {
-    client.child.kill();
+  if (!client) return;
+  if (!client.closed) {
+    try {
+      await client.request('shutdown', null, Math.min(timeoutMs, 10_000));
+      client.notify('exit');
+    } catch {
+      client.child.kill();
+    }
+  }
+  if (!client.closed) {
+    await new Promise((resolveExit) => {
+      const timer = setTimeout(() => {
+        client.child.kill();
+        resolveExit();
+      }, 2_000);
+      client.child.once('close', () => {
+        clearTimeout(timer);
+        resolveExit();
+      });
+    });
   }
 }
 
 async function run(rawOptions) {
   const options = resolveOptions(rawOptions);
-  const collected = collectSourceFiles(options.mod, options.maxFiles);
+  const collected = collectSourceFiles(options.source, options.maxFiles);
+  if (options.pathPrefix) {
+    collected.files = collected.files.filter((file) => {
+      const logicalPath = relative(options.source, file).split(sep).join('/');
+      return logicalPath === options.pathPrefix || logicalPath.startsWith(`${options.pathPrefix}/`);
+    });
+  }
+  if (options.shardCount > 1) {
+    collected.files = collected.files.filter((_, index) => index % options.shardCount === options.shardIndex);
+  }
+  console.error(
+    `Discovered ${collected.files.length} relevant source files${
+      options.pathPrefix ? ` below ${options.pathPrefix}` : ''
+    }${options.shardCount > 1 ? ` in shard ${options.shardIndex}/${options.shardCount}` : ''}`,
+  );
   const report = baseReport(
     options,
     collected.files,
@@ -833,6 +1283,7 @@ async function run(rawOptions) {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
     });
+    activeServerChild = child;
     client = new LspClient(child);
     const initializeParams = {
       processId: process.pid,
@@ -851,9 +1302,13 @@ async function run(rawOptions) {
       },
       trace: 'off',
     };
+    const initializeStarted = Date.now();
     await client.request('initialize', initializeParams, options.timeoutMs);
+    console.error(`Workspace initialized in ${Date.now() - initializeStarted} ms`);
     client.notify('initialized', {});
+    const vanillaStarted = Date.now();
     const vanillaMessage = await waitForVanillaReady(client, options.timeoutMs);
+    console.error(`Vanilla cache ready in ${Date.now() - vanillaStarted} ms`);
     const vanillaFailed = /could not|failed|without vanilla|error/i.test(vanillaMessage);
     report.inputs.vanilla_cache.loaded = !vanillaFailed;
     report.inputs.vanilla_cache.status_message = vanillaMessage;
@@ -861,55 +1316,34 @@ async function run(rawOptions) {
       addToolError(report, `Vanilla cache was not enabled: ${vanillaMessage}`);
     }
 
-    for (const file of collected.files) {
-      let uri;
-      let opened = false;
-      try {
-        const bytes = readFileSync(file);
-        if (bytes.length > MAX_SOURCE_BYTES) {
-          const relativePath = relative(options.mod, file).split(sep).join('/');
-          if (report.scan.oversized_files_skipped.length < MAX_REPORTED_TOOL_ERRORS) {
-            report.scan.oversized_files_skipped.push(relativePath);
-          } else {
-            report.scan.oversized_files_skipped_omitted += 1;
-          }
-          addToolError(
-            report,
-            `${relativePath} exceeds the ${MAX_SOURCE_BYTES} byte source-file limit`,
-          );
-          continue;
-        }
-        const decoded = decodeSource(bytes);
-        uri = fileUri(file);
-        client.notify('textDocument/didOpen', {
-          textDocument: { uri, languageId: 'eu4', version: 1, text: decoded.text },
-        });
-        opened = true;
-        const diagnosticMessage = await client.waitFor(
-          (message) =>
-            message.method === 'textDocument/publishDiagnostics' && message.params?.uri === uri,
-          options.fileTimeoutMs,
-          `diagnostics for ${relative(options.mod, file)}`,
+    const selectedFiles = options.vanillaSource
+      ? await selectDiagnosableFiles(client, report, options, collected.files)
+      : collected.files;
+    if (options.vanillaSource) {
+      console.error(`Diagnosing ${selectedFiles.length} Vanilla files in bounded text batches`);
+      await diagnoseTextFiles(client, report, options, selectedFiles);
+    } else {
+      const indexedFiles = await diagnoseIndexedWorkspace(client, report, options);
+      const explicitOnlyFiles = selectedFiles.filter((file) => !indexedFiles.has(pathKey(file)));
+      if (explicitOnlyFiles.length) {
+        console.error(
+          `Opening ${explicitOnlyFiles.length} file(s) not present in the indexed workspace`,
         );
-        addFileResult(
-          report,
-          file,
-          decoded.text,
-          decoded.encoding,
-          diagnosticMessage.params?.diagnostics || [],
-          options.mod,
-        );
-      } catch (error) {
-        addToolError(report, `${relative(options.mod, file)}: ${error.message}`);
-      } finally {
-        if (opened) client.notify('textDocument/didClose', { textDocument: { uri } });
       }
+      await diagnoseExplicitFiles(
+        client,
+        report,
+        options,
+        explicitOnlyFiles,
+        selectedFiles.length,
+      );
     }
   } catch (error) {
     addToolError(report, error instanceof Error ? error.message : String(error));
   } finally {
     collectServerMessages(client, report);
     await stopClient(client, options.timeoutMs);
+    activeServerChild = undefined;
     if (client?.serverStderr?.trim()) {
       report.server_stderr = client.serverStderr.trim();
     }

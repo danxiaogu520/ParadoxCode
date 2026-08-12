@@ -11,6 +11,116 @@ use serde_json::{Value, json};
 use super::*;
 
 #[test]
+fn classify_paths_uses_profile_whitelist_and_diagnostic_parser_categories() {
+    let (root, root_uri) = temp_workspace_dir();
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdx/classifyPaths","params":{"paths":["events/test.txt","localisation/test_l_english.yml","ThirdPartyLicenses.txt","interface/test.gui"]}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let classified = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("classification response");
+    assert_eq!(
+        classified["result"],
+        json!(["events/test.txt", "localisation/test_l_english.yml"])
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn text_diagnostics_analyzes_caller_supplied_files_without_opening_overlays() {
+    let (root, root_uri) = temp_workspace_dir();
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdx/textDiagnostics","params":{"files":[
+            {"path":"events/invalid.txt","text":"country_event = { id = text.1 scope = nowhere }\n"},
+            {"path":"events/valid.txt","text":"country_event = { id = text.2 }\n"}
+        ]}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let response = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("text diagnostics response");
+    let files = response["result"].as_array().expect("file results");
+    assert_eq!(files.len(), 2);
+    assert_eq!(files[0]["path"], "events/invalid.txt");
+    assert!(
+        files[0]["diagnostics"]
+            .as_array()
+            .is_some_and(|items| items.iter().any(|item| item["code"] == "pdx-unknown-scope"))
+    );
+    assert_eq!(files[1]["path"], "events/valid.txt");
+    assert!(files[1]["diagnostics"].is_array());
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn workspace_diagnostics_batches_indexed_disk_files_without_opening_overlays() {
+    let (root, root_uri) = temp_workspace_dir();
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("events directory");
+    fs::write(
+        events.join("a.txt"),
+        "country_event = { id = batch.1 scope = nowhere }\n",
+    )
+    .expect("first source");
+    fs::write(events.join("b.txt"), "country_event = { id = batch.2 }\n").expect("second source");
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdx/workspaceDiagnostics","params":{"offset":0,"limit":1}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"pdx/workspaceDiagnostics","params":{"offset":1,"limit":1}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let first = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("first batch");
+    assert_eq!(first["result"]["total"], 2);
+    assert_eq!(first["result"]["nextOffset"], 1);
+    assert_eq!(first["result"]["items"][0]["logicalPath"], "events/a.txt");
+    assert!(
+        first["result"]["items"][0]["diagnostics"]
+            .as_array()
+            .is_some_and(|items| items.iter().any(|item| item["code"] == "pdx-unknown-scope"))
+    );
+    let second = responses
+        .iter()
+        .find(|value| value["id"] == 3)
+        .expect("second batch");
+    assert!(second["result"]["nextOffset"].is_null());
+    assert_eq!(second["result"]["items"][0]["logicalPath"], "events/b.txt");
+    assert!(second["result"]["items"][0]["diagnostics"].is_array());
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn noncanonical_document_uri_preserves_rule_path_context() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
