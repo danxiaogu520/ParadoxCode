@@ -783,7 +783,7 @@ mod tests {
         let expected: ArtifactManifest =
             read_json(&root.join("rules/manifest.json")).expect("committed manifest");
         let (_, source_model) = load_source(&root.join("rules/eu4")).expect("source model");
-        assert_eq!(source_model.semantic.localisation_bindings.len(), 191);
+        assert_eq!(source_model.semantic.localisation_bindings.len(), 190);
         let quoted_script_rules = source_model
             .semantic
             .rules

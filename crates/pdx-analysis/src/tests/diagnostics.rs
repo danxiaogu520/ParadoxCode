@@ -83,6 +83,94 @@ fn scripted_macro_bare_parameter_validates_quoted_effect_payload_at_call_site() 
 }
 
 #[test]
+fn scripted_macro_preserves_literal_quoted_script_through_nested_expansion() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-nested-quoted-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&definitions).expect("definition directory");
+    std::fs::write(
+        definitions.join("00_validate.txt"),
+        concat!(
+            "inject = { $BODY$ }\n",
+            "wrapper = { inject = { BODY = \"add_prestige = 1\" } }\n",
+        ),
+    )
+    .expect("macro definitions");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+    let id = DocumentId::new("file:///tmp/events/macro-nested-quoted.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "country_event = { immediate = { wrapper = yes } }\n".to_owned(),
+        None,
+    )
+    .expect("open call");
+
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        diagnostics.iter().all(|diagnostic| {
+            diagnostic.code != DiagnosticCode::InvalidValue
+                || !diagnostic.message.contains("bare value")
+        }),
+        "nested quoted Script must be reparsed: {diagnostics:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn scripted_macro_omits_missing_optional_forwarded_arguments() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-forwarded-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&definitions).expect("definition directory");
+    std::fs::write(
+        definitions.join("00_validate.txt"),
+        concat!(
+            "inner = { [[optional] add_prestige = $optional$ ] }\n",
+            "outer = { inner = { optional = \"$optional$\" } }\n",
+            "composite = { set_country_flag = PREFIX_$optional$_END }\n",
+        ),
+    )
+    .expect("macro definitions");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+    let id = DocumentId::new("file:///tmp/events/macro-forwarded.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "country_event = { id = fixture.1 option = { outer = { } composite = { } } }\n".to_owned(),
+        None,
+    )
+    .expect("open call");
+
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results
+            .iter()
+            .all(|diagnostic| !diagnostic.message.contains("optional")),
+        "omitted forwarding parameter must leave the nested conditional inactive: {results:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn first_party_mission_trigger_and_effect_accept_quoted_script_forms() {
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -593,6 +681,8 @@ fn scripted_macro_definition_defers_parameterized_nested_invocations() {
         "wrapper = { helper = $X$ }\n",
         "wrapper2 = { helper = { AMOUNT = $X$ } }\n",
         "wrapper3 = { helper = { $PARAM$ = $X$ } }\n",
+        "numeric_helper = { [[1] always = $1$ ] }\n",
+        "numeric_wrapper = { numeric_helper = { 1 = \"$1$\" } }\n",
     );
     std::fs::write(&definition_path, definitions_source).expect("macro definitions");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
@@ -615,6 +705,9 @@ fn scripted_macro_definition_defers_parameterized_nested_invocations() {
     assert!(
         !definition_diagnostics.iter().any(|diagnostic| {
             diagnostic.message.contains("in expansion of `helper`")
+                || diagnostic
+                    .message
+                    .contains("in expansion of `numeric_helper`")
                 || diagnostic
                     .message
                     .contains("expansion requires parameter `AMOUNT`")
@@ -835,8 +928,10 @@ fn scripted_macro_expansion_enforces_a_global_expansion_depth_limit() {
     let results = diagnostics(&host.snapshot(), &id);
     assert!(
         results.iter().any(|diagnostic| {
+            // Expansion limits mean this file was not fully validated (info), not that
+            // the script is wrong.
             diagnostic.code == DiagnosticCode::MacroExpansionLimit
-                && diagnostic.severity == 2
+                && diagnostic.severity == 3
                 && diagnostic.message.contains("expansion depth")
         }),
         "{results:?}"
@@ -1045,6 +1140,44 @@ fn required_type_localisation_keys_report_missing_derived_keys() {
 }
 
 #[test]
+fn ancestor_personality_localisation_uses_vanilla_key_templates() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        std::path::PathBuf::from("/tmp"),
+    )]));
+    host.open_document(
+        DocumentId::new("file:///tmp/localisation/ancestor_l_english.yml"),
+        1,
+        "l_english:\n ancestor_test_personality:0 \"Test\"\n desc_ancestor_test_personality:0 \"Description\"\n"
+            .to_owned(),
+        Some(std::path::PathBuf::from(
+            "/tmp/localisation/ancestor_l_english.yml",
+        )),
+    )
+    .expect("open localisation");
+    let id = DocumentId::new("file:///tmp/common/ancestor_personalities/test.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "ancestor_test_personality = { global_tax_modifier = 0.1 }\n".to_owned(),
+        Some(std::path::PathBuf::from(
+            "/tmp/common/ancestor_personalities/test.txt",
+        )),
+    )
+    .expect("open ancestor personality");
+
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results
+            .iter()
+            .all(|item| item.code != DiagnosticCode::UnknownSymbol),
+        "ancestor localisation must use `$` and `desc_$` only: {results:?}"
+    );
+}
+
+#[test]
 fn mission_metadata_fields_do_not_derive_localisation_keys() {
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -1142,5 +1275,801 @@ fn localisation_symbols_prefer_the_english_definition_across_languages() {
             .any(|item| item.code == DiagnosticCode::UnknownSymbol
                 && item.message.contains("shared_key")),
         "the key exists in the workspace and must resolve: {results:?}"
+    );
+}
+
+#[test]
+fn duplicate_localisation_keys_do_not_produce_ambiguous_diagnostics() {
+    let mut host = eu4_host(pdx_game::eu4::bootstrap_rules());
+    for (name, text) in [
+        ("base_l_english.yml", "l_english:\n shared_key: \"Base\"\n"),
+        (
+            "replace_l_english.yml",
+            "l_english:\n shared_key: \"Replacement\"\n",
+        ),
+    ] {
+        host.open_document(
+            DocumentId::new(format!("file:///tmp/localisation/{name}")),
+            1,
+            text.to_owned(),
+            Some(std::path::PathBuf::from(format!(
+                "/tmp/localisation/{name}"
+            ))),
+        )
+        .expect("open localisation");
+    }
+    let script = DocumentId::new("file:///tmp/events/test.txt");
+    host.open_document(
+        script.clone(),
+        1,
+        "country_event = { id = a.1 option = { name = shared_key } }\n".to_owned(),
+        Some(std::path::PathBuf::from("/tmp/events/test.txt")),
+    )
+    .expect("open script");
+
+    let results = diagnostics(&host.snapshot(), &script);
+    assert!(
+        !results.iter().any(|item| {
+            item.code == DiagnosticCode::AmbiguousSymbol && item.message.contains("shared_key")
+        }),
+        "localisation overrides must not be reported as ambiguous: {results:?}"
+    );
+}
+
+#[test]
+fn game_age_ability_definitions_are_collected_only_below_abilities() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        std::path::PathBuf::from("/tmp"),
+    )]));
+    let id = DocumentId::new("file:///tmp/common/ages/test.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "age_one = { can_start = { always = yes } abilities = { ab_one = { modifier = { global_tax_modifier = 0.1 } } } }\n".to_owned(),
+        Some(std::path::PathBuf::from("/tmp/common/ages/test.txt")),
+    )
+    .expect("open age source");
+
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results.iter().all(|item| {
+            !item.message.contains("localisation symbol `can_start`")
+                && !item.message.contains("localisation symbol `abilities`")
+                && !item.message.contains("unexpected key `ab_one`")
+                && !item.message.contains("`<game_age_ability>` occurs 0 times")
+        }),
+        "age structure was mistaken for ability definitions: {results:?}"
+    );
+}
+
+#[test]
+fn custom_government_attributes_remain_open_world() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/test.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "country_event = { id = a.1 trigger = { has_government_attribute = my_custom_attribute } }\n"
+            .to_owned(),
+        Some(std::path::PathBuf::from("/tmp/events/test.txt")),
+    )
+    .expect("open event");
+
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results.iter().all(|item| {
+            item.code != DiagnosticCode::InvalidValue
+                || !item.message.contains("has_government_attribute")
+        }),
+        "custom attributes must use the open alternative: {results:?}"
+    );
+}
+
+#[test]
+fn runtime_flags_remain_open_world_for_semantic_validation() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/runtime-flags.txt");
+    let text = "country_event = { id = runtime.1 trigger = { has_country_flag = engine_supplied_flag } immediate = { clr_country_flag = engine_supplied_flag } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open event");
+
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        diagnostics.iter().all(|diagnostic| {
+            diagnostic.code != DiagnosticCode::InvalidValue
+                || (!diagnostic.message.contains("has_country_flag")
+                    && !diagnostic.message.contains("clr_country_flag"))
+        }),
+        "runtime flags must not require a statically indexed setter: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn unresolved_macro_placeholders_do_not_become_symbol_errors() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/common/scripted_triggers/placeholders.txt");
+    let text = "wrapper = { $global_trigger$ = yes custom_trigger_tooltip = { tooltip = $tooltip$ always = yes } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open placeholder definition");
+
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results.iter().all(|diagnostic| {
+            diagnostic.code != DiagnosticCode::UnknownSymbol || !diagnostic.message.contains('$')
+        }),
+        "unbound definition parameters cannot be resolved before invocation: {results:?}"
+    );
+}
+
+#[test]
+fn named_event_targets_are_valid_scope_values_and_wrappers() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/named-event-targets.txt");
+    let text = "country_event = { id = target.1 trigger = { war_with = event_target:agenda_country event_target:agenda_country = { exists = yes } } immediate = { global_event_target:agenda_province = { add_base_tax = 1 } } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open event");
+
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        diagnostics.iter().all(|diagnostic| {
+            !diagnostic.message.contains("event_target:agenda_country")
+                && !diagnostic
+                    .message
+                    .contains("global_event_target:agenda_province")
+        }),
+        "named event targets should stay conservative until runtime: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn runtime_event_targets_and_exiled_characters_remain_valid() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/runtime-targets.txt");
+    let text = concat!(
+        "country_event = { id = target.2 ",
+        "trigger = { has_saved_event_target = engine_supplied_target } ",
+        "immediate = { exile_ruler_as = saved_ruler set_ruler = saved_ruler ",
+        "exile_heir_as = saved_heir set_heir = saved_heir } }\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open event");
+
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        diagnostics.iter().all(|diagnostic| {
+            diagnostic.code != DiagnosticCode::InvalidValue
+                || (!diagnostic.message.contains("has_saved_event_target")
+                    && !diagnostic.message.contains("set_ruler")
+                    && !diagnostic.message.contains("set_heir"))
+        }),
+        "runtime targets and locally exiled characters must validate: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn vanilla_dynamic_names_empty_event_lists_and_inherited_contexts_are_valid() {
+    let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    for (path, text, forbidden) in [
+        (
+            "/tmp/common/on_actions/test.txt",
+            "on_test = { events = { } }\n",
+            "value of `events`",
+        ),
+        (
+            "/tmp/common/policies/test.txt",
+            "test_policy = { monarch_power = ADM potential = { always = yes } allow = { always = yes } global_tax_modifier = 0.1 }\n",
+            "unexpected key `global_tax_modifier`",
+        ),
+        (
+            "/tmp/common/triggered_modifiers/test.txt",
+            "test_modifier = { potential = { always = yes } trigger = { always = yes } global_unrest = -1 }\n",
+            "unexpected key `global_unrest`",
+        ),
+        (
+            "/tmp/common/ruler_personalities/test.txt",
+            "test_personality = { nation_designer_cost = 0 gift_chance = 10 }\n",
+            "unexpected key `gift_chance`",
+        ),
+        (
+            "/tmp/events/test.txt",
+            "country_event = { id = test.1 trigger = { dynasty = \"de' Medici\" has_heir = \"Ladislaus Postumus\" culture_group = owner religion_group = owner } }\n",
+            "does not match the semantic rule",
+        ),
+    ] {
+        let mut host = eu4_host(rules.clone());
+        let id = DocumentId::new(format!("file://{path}"));
+        host.open_document(
+            id.clone(),
+            1,
+            text.to_owned(),
+            Some(std::path::PathBuf::from(path)),
+        )
+        .expect("open Vanilla-shaped fixture");
+        let results = diagnostics(&host.snapshot(), &id);
+        assert!(
+            results
+                .iter()
+                .all(|diagnostic| !diagnostic.message.contains(forbidden)),
+            "{path} retained `{forbidden}`: {results:?}"
+        );
+    }
+}
+
+#[test]
+fn vanilla_dates_filtered_sprite_roots_and_runtime_tags_do_not_false_positive() {
+    let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    for (path, text, forbidden) in [
+        (
+            "/tmp/history/provinces/1 - Test.txt",
+            "owner = FRA\n1444.11.11 = { add_local_autonomy = 10 }\n",
+            "1444.11.11",
+        ),
+        (
+            "/tmp/interface/test.gfx",
+            "spriteTypes = { pdxmesh = { name = test_mesh file = test.mesh } spriteType = { name = test texturefile = test.dds } }\n",
+            "pdxmesh",
+        ),
+        (
+            "/tmp/events/test.txt",
+            "country_event = { id = test.1 trigger = { tag = F00 tag = T99 } }\n",
+            "value of `tag`",
+        ),
+        (
+            "/tmp/events/random-list.txt",
+            "country_event = { id = test.2 immediate = { random_list = { 11 = { trigger = { always = yes } add_treasury = 1 } } } }\n",
+            "unexpected key `trigger`",
+        ),
+        (
+            "/tmp/common/church_aspects/test.txt",
+            "test_aspect = { cost = 1 modifier = { monthly_asha_vahishta = 0.5 } }\n",
+            "monthly_asha_vahishta",
+        ),
+    ] {
+        let mut host = eu4_host(rules.clone());
+        let id = DocumentId::new(format!("file://{path}"));
+        host.open_document(
+            id.clone(),
+            1,
+            text.to_owned(),
+            Some(std::path::PathBuf::from(path)),
+        )
+        .expect("open Vanilla-shaped fixture");
+        let results = diagnostics(&host.snapshot(), &id);
+        assert!(
+            results
+                .iter()
+                .all(|diagnostic| !diagnostic.message.contains(forbidden)),
+            "{path} retained `{forbidden}`: {results:?}"
+        );
+    }
+}
+
+#[test]
+fn nested_government_mechanic_powers_feed_dynamic_value_validation() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-government-powers-{nonce}"));
+    let mechanics = root.join("common/government_mechanics");
+    std::fs::create_dir_all(&mechanics).expect("mechanics directory");
+    std::fs::write(
+        mechanics.join("00_test.txt"),
+        "test_mechanic = { powers = { test_power = { max = 100 } } }\n",
+    )
+    .expect("mechanic source");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan mechanic power");
+    let id = DocumentId::new("file:///tmp/events/government-power.txt");
+    let text = "country_event = { id = power.1 immediate = { add_government_power = { mechanic_type = test_mechanic power_type = test_power value = 1 } } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open event");
+
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        diagnostics.iter().all(|diagnostic| {
+            diagnostic.code != DiagnosticCode::InvalidValue
+                || !diagnostic.message.contains("power_type")
+        }),
+        "nested powers should enter the workspace index: {diagnostics:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn typed_name_fields_do_not_inherit_the_localisation_fallback() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/typed-name.txt");
+    let text = "country_event = { id = names.1 option = { name = missing_option_loc } immediate = { add_country_modifier = { name = runtime_modifier duration = 1 } } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open event");
+
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == DiagnosticCode::UnknownSymbol
+            && diagnostic.message.contains("missing_option_loc")
+    }));
+    assert!(
+        diagnostics.iter().all(|diagnostic| {
+            diagnostic.code != DiagnosticCode::UnknownSymbol
+                || !diagnostic.message.contains("runtime_modifier")
+        }),
+        "modifier identifiers must not be treated as localisation: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn exported_modifier_keys_are_numeric_modifier_rules() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        std::path::PathBuf::from("/tmp"),
+    )]));
+    let id = DocumentId::new("file:///tmp/common/advisortypes/test.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "philosopher = { monarch_power = ADM prestige = 1 modifier = { meritocracy = 1 monthly_russian_modernization = 0.02 } }\n"
+            .to_owned(),
+        Some(std::path::PathBuf::from(
+            "/tmp/common/advisortypes/test.txt",
+        )),
+    )
+    .expect("open advisor type");
+
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results.iter().all(|item| {
+            (!item.message.contains("meritocracy")
+                && !item.message.contains("monthly_russian_modernization")
+                && !item.message.contains("prestige"))
+                || !matches!(
+                    item.code,
+                    DiagnosticCode::UnknownKey | DiagnosticCode::InvalidValue
+                )
+        }),
+        "exported modifier names must accept numeric values: {results:?}"
+    );
+}
+
+#[test]
+fn vanilla_powerprojection_file_and_static_modifier_blocks_validate() {
+    let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    for (path, text, forbidden) in [
+        (
+            "/tmp/common/powerprojection/00_static.txt",
+            concat!(
+                "great_power_1 = { power = 25 }\n",
+                "MAY_reform_passed = { max = 10 min = 0 yearly_decay = 1 }\n",
+                "zim_african_great_power = { max = 25 min = 25 power = 1 decay = no }\n",
+            ),
+            "power",
+        ),
+        (
+            "/tmp/common/static_modifiers/test.txt",
+            "power_projection = { defensiveness = 0.1 global_trade_power = 0.2 prestige = 0.5 }\n",
+            "power_projection",
+        ),
+    ] {
+        let mut host = eu4_host(rules.clone());
+        let id = DocumentId::new(format!("file://{path}"));
+        host.open_document(
+            id.clone(),
+            1,
+            text.to_owned(),
+            Some(std::path::PathBuf::from(path)),
+        )
+        .expect("open Vanilla-shaped fixture");
+        let results = diagnostics(&host.snapshot(), &id);
+        assert!(
+            results.iter().all(|diagnostic| {
+                diagnostic.code != DiagnosticCode::UnknownKey
+                    && !diagnostic.message.contains(forbidden)
+            }),
+            "{path} retained unexpected diagnostics: {results:?}"
+        );
+    }
+}
+
+#[test]
+fn severity_review_quoted_names_and_non_instance_scalars_are_not_localisation() {
+    let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    for (path, text, forbidden) in [
+        (
+            "/tmp/history/countries/FRA - France.txt",
+            "FRA = {\n\tmonarch = {\n\t\tname = \"Charles VI\"\n\t\tname = Charles\n\t}\n\trevolt = { type = nationalist_rebels size = 2 name = \"Les Gueux\" }\n}\n",
+            "localisation symbol",
+        ),
+        (
+            "/tmp/interface/ages_view.gfx",
+            "spriteTypes = { pdxmesh = { name = \"aow_reformation_reformed_mesh\" file = test.mesh } }\n",
+            "localisation symbol",
+        ),
+        (
+            "/tmp/common/religions/00_religion.txt",
+            "christian = {\n\tdefender_of_faith = yes\n\tcan_form_personal_unions = yes\n}\n",
+            "`defender_of_faith`",
+        ),
+    ] {
+        let mut host = eu4_host(rules.clone());
+        let id = DocumentId::new(format!("file://{path}"));
+        host.open_document(
+            id.clone(),
+            1,
+            text.to_owned(),
+            Some(std::path::PathBuf::from(path)),
+        )
+        .expect("open Vanilla-shaped fixture");
+        let results = diagnostics(&host.snapshot(), &id);
+        assert!(
+            results.iter().all(|diagnostic| {
+                diagnostic.code != DiagnosticCode::UnknownSymbol
+                    || (!diagnostic.message.contains(forbidden)
+                        && !diagnostic.message.contains("`Charles`"))
+            }),
+            "{path} retained literal-text false positives: {results:?}"
+        );
+    }
+}
+
+#[test]
+fn severity_review_unknown_keys_are_errors_and_known_keys_are_accepted() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/map/terrain.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "grasslands = { type = grasslands color = { 0 1 2 } }\ncompletely_wrong_key = { type = grasslands }\n"
+            .to_owned(),
+        Some(std::path::PathBuf::from("/tmp/map/terrain.txt")),
+    )
+    .expect("open terrain");
+    let terrain_results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        terrain_results.iter().all(|diagnostic| {
+            diagnostic.code != DiagnosticCode::UnknownKey
+                || !diagnostic.message.contains("grasslands")
+        }),
+        "terrain names must be accepted: {terrain_results:?}"
+    );
+
+    let technology = DocumentId::new("file:///tmp/common/technology.txt");
+    host.open_document(
+        technology.clone(),
+        1,
+        "groups = { adm = { adm_tech = \"technologies/adm.txt\" totally_wrong = 1 } }\n".to_owned(),
+        Some(std::path::PathBuf::from("/tmp/common/technology.txt")),
+    )
+    .expect("open technology");
+    let technology_results = diagnostics(&host.snapshot(), &technology);
+    assert!(
+        technology_results.iter().all(|diagnostic| {
+            diagnostic.code != DiagnosticCode::UnknownKey
+                || !diagnostic.message.contains("adm_tech")
+        }),
+        "technology table keys must be accepted: {technology_results:?}"
+    );
+    let unknown = technology_results
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.code == DiagnosticCode::UnknownKey
+                && diagnostic.message.contains("totally_wrong")
+        })
+        .unwrap_or_else(|| panic!("unknown key must be reported: {technology_results:?}"));
+    assert_eq!(
+        unknown.severity, 1,
+        "unknown keys are errors: {technology_results:?}"
+    );
+}
+
+#[test]
+fn severity_review_incident_options_keep_trigger_wrappers() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/common/imperial_incidents/00_test.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "incident_test = {\n\tevent = test.1\n\tdefault_option = 0\n\toption = {\n\t\tOR = {\n\t\t\tNOT = { emperor = { is_rival = TEU } }\n\t\t}\n\t}\n}\n"
+            .to_owned(),
+        Some(std::path::PathBuf::from(
+            "/tmp/common/imperial_incidents/00_test.txt",
+        )),
+    )
+    .expect("open incident");
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results.iter().all(|diagnostic| {
+            diagnostic.code != DiagnosticCode::UnknownKey
+                || (!diagnostic.message.contains("`OR`") && !diagnostic.message.contains("`NOT`"))
+        }),
+        "trigger wrappers must stay valid inside incident options: {results:?}"
+    );
+}
+
+#[test]
+fn severity_review_color_overflow_is_a_warning_and_missing_ruler_an_error() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let natives = DocumentId::new("file:///tmp/common/natives/00_test.txt");
+    host.open_document(
+        natives.clone(),
+        1,
+        "natives_test = { graphical_culture = inuitgfx color = { 0 255 400 } }\n".to_owned(),
+        Some(std::path::PathBuf::from("/tmp/common/natives/00_test.txt")),
+    )
+    .expect("open natives");
+    let natives_results = diagnostics(&host.snapshot(), &natives);
+    let overflow = natives_results
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.code == DiagnosticCode::InvalidValue && diagnostic.message.contains("400")
+        })
+        .unwrap_or_else(|| panic!("color overflow must be reported: {natives_results:?}"));
+    assert_eq!(overflow.severity, 2, "clamped color values are warnings");
+
+    let event = DocumentId::new("file:///tmp/events/ruler-missing.txt");
+    host.open_document(
+        event.clone(),
+        1,
+        "country_event = { immediate = { set_ruler = bloody_mary } }\n".to_owned(),
+        Some(std::path::PathBuf::from("/tmp/events/ruler-missing.txt")),
+    )
+    .expect("open event");
+    let event_results = diagnostics(&host.snapshot(), &event);
+    let missing_ruler = event_results
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.code == DiagnosticCode::InvalidValue
+                && diagnostic.message.contains("set_ruler")
+        })
+        .unwrap_or_else(|| panic!("missing exiled ruler must be reported: {event_results:?}"));
+    assert_eq!(missing_ruler.severity, 1, "missing ruler is an error");
+}
+
+#[test]
+fn vanilla_optional_fields_and_disaster_weights_preserve_their_actual_shapes() {
+    let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    let model = rules.model();
+    for id in [
+        "common/buildings:33:rule:root:building:manufactory",
+        "common/casus_belli_and_war_goals:4:rule:type:casus_belli:is_triggered_only",
+        "common/ideas_and_native_advancements:76:rule:root:customideas:ai_will_do",
+        "common/ideas_and_native_advancements:77:rule:root:customideas:category",
+        "common/religions_and_related:396:rule:root:aspects_and_blessings:is_blessing",
+        "common/religions_and_related:79:rule:type:aspects_and_blessings:is_blessing",
+        "common/buildings:3:rule:type:building:cost",
+        "common/buildings:7:rule:root:building:cost",
+        "common/buildings:8:rule:root:building:time",
+        "common/religions_and_related:380:rule:root:aspects_and_blessings:cost",
+        "common/diplomatic_actions_new:42:rule:root:new_diplomatic_action:ai_value",
+        "common/governments_and_reforms:33:rule:type:government_name:government_reform",
+        "common/governments_and_reforms:600:rule:root:government_name:government_reform",
+        "common/ideas_and_native_advancements:37:rule:root:idea_group:ai_will_do",
+        "common/ideas_and_native_advancements:38:rule:root:idea_group:category",
+        "common/ideas_and_native_advancements:6:rule:type:idea_group:category",
+        "common/modifiers_consolidated:1:rule:type:event_modifier:scalar",
+        "common/imperial_reforms:7:rule:type:imperial_reform:emperor",
+        "common/religions_and_related:114:leaf-value:root:religion_group:int[0..255]",
+        "common/religions_and_related:116:leaf-value:root:religion_group:float[0.0..1.0]",
+        "common/religions_and_related:355:rule:root:religion_propagation:trading_policy",
+        "common/religions_and_related:63:rule:type:religion_propagation:trading_policy",
+    ] {
+        let rule = model
+            .semantic
+            .rules
+            .iter()
+            .find(|rule| rule.id == id)
+            .unwrap_or_else(|| panic!("missing semantic rule {id}"));
+        assert_eq!(rule.min_occurs, Some(0), "{id} is optional in Vanilla");
+    }
+    for id in [
+        "common/disasters:28:rule:root:disaster:int",
+        "common/disasters:29:rule:root:disaster:int",
+    ] {
+        let rule = model
+            .semantic
+            .rules
+            .iter()
+            .find(|rule| rule.id == id)
+            .unwrap_or_else(|| panic!("missing semantic rule {id}"));
+        assert_eq!(rule.key, KeyMatcher::AnyScalar);
+    }
+    let disaster_events = model
+        .semantic
+        .rules
+        .iter()
+        .find(|rule| rule.id == "common/disasters:27:rule:root:disaster:events")
+        .expect("disaster events rule");
+    assert_eq!(disaster_events.shape, RuleShape::Node);
+
+    let on_action_weights = model
+        .semantic
+        .rules
+        .iter()
+        .filter(|rule| {
+            rule.context == "root:on_action"
+                && rule.parent_path == ["random_events"]
+                && rule.key == KeyMatcher::AnyScalar
+        })
+        .count();
+    assert_eq!(on_action_weights, 452);
+    assert!(
+        model.semantic.rules.iter().all(|rule| {
+            !matches!(&rule.value, ValueMatcher::Exact(value) if value == "localisation_synced")
+        }),
+        "the source sentinel must compile to an unconstrained scalar matcher"
+    );
+    let date_keys = model
+        .semantic
+        .rules
+        .iter()
+        .filter(|rule| rule.key == KeyMatcher::Date)
+        .count();
+    assert_eq!(date_keys, 7);
+    let event_picture = model
+        .semantic
+        .rules
+        .iter()
+        .find(|rule| rule.id == "events/events:17:rule:root:event:picture")
+        .expect("event picture rule");
+    assert_eq!(event_picture.max_occurs, None);
+    let government_rank_keys = model
+        .semantic
+        .rules
+        .iter()
+        .filter(|rule| {
+            rule.context == "root:government_name"
+                && rule.key == KeyMatcher::AnyScalar
+                && rule.parent_path.first().is_some_and(|parent| {
+                    [
+                        "rank",
+                        "ruler_male",
+                        "ruler_female",
+                        "consort_male",
+                        "consort_female",
+                        "heir_male",
+                        "heir_female",
+                    ]
+                    .contains(&parent.as_str())
+                })
+        })
+        .count();
+    assert_eq!(government_rank_keys, 14);
+    // Color components are ints 0..255; Vanilla ships `color = { 5 371 129 }`
+    // (state_edicts/zzz_chinese_industrialization.txt) and the game clamps
+    // out-of-range components, so the rules keep the bound but report at warning
+    // severity (runs fine, but imperfect).
+    for id in [
+        "common/00_small_types_consolidated:207:leaf-value:root:edict:int[0..255",
+        "common/trade_consolidated:54:leaf-value:root:trade_company:int[0..255",
+    ] {
+        let rule = model
+            .semantic
+            .rules
+            .iter()
+            .find(|rule| rule.id == id)
+            .unwrap_or_else(|| panic!("missing semantic rule {id}"));
+        assert_eq!(
+            rule.value,
+            ValueMatcher::Int {
+                min: Some(0),
+                max: Some(255),
+            }
+        );
+        assert_eq!(rule.severity, Some(2), "{id} must report as a warning");
+    }
+    assert!(model.semantic.rules.iter().any(|rule| {
+        rule.id == "eu4:trade_node:outgoing_path"
+            && rule.parent_path == ["outgoing", "path"]
+            && rule.key == KeyMatcher::AnyScalar
+    }));
+}
+
+#[test]
+fn vanilla_leader_names_and_custom_idea_metadata_are_not_false_symbols() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let achievement = DocumentId::new("file:///tmp/common/achievements.txt");
+    host.open_document(
+        achievement.clone(),
+        1,
+        "achievement = { happened = { has_leader = \"The French Paradox\" } }\n".to_owned(),
+        None,
+    )
+    .expect("open achievement");
+    let achievement_diagnostics = diagnostics(&host.snapshot(), &achievement);
+    assert!(
+        achievement_diagnostics.iter().all(|diagnostic| {
+            diagnostic.code != DiagnosticCode::InvalidValue
+                || !diagnostic.message.contains("has_leader")
+        }),
+        "literal leader names are valid: {achievement_diagnostics:?}"
+    );
+
+    let custom_ideas = DocumentId::new("file:///tmp/common/custom_ideas/test.txt");
+    host.open_document(
+        custom_ideas.clone(),
+        1,
+        "group = { category = ADM custom_idea = { global_tax_modifier = 0.05 } }\n".to_owned(),
+        None,
+    )
+    .expect("open custom ideas");
+    let custom_diagnostics = diagnostics(&host.snapshot(), &custom_ideas);
+    assert!(
+        custom_diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.message.contains("category_desc")),
+        "metadata keys are not custom-idea definitions: {custom_diagnostics:?}"
+    );
+    assert!(
+        custom_diagnostics.iter().all(|diagnostic| {
+            diagnostic.code != DiagnosticCode::UnknownKey
+                || !diagnostic.message.contains("global_tax_modifier")
+        }),
+        "custom ideas inherit modifier keys: {custom_diagnostics:?}"
+    );
+}
+
+#[test]
+fn type_per_file_rules_validate_the_document_root_once() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        std::path::PathBuf::from("/tmp"),
+    )]));
+    let id = DocumentId::new("file:///tmp/common/countries/Test.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "graphical_culture = westerngfx\ncolor = { 20 50 210 }\nleader_names = { Blittersdorf \"von Gelnhausen\" }\n"
+            .to_owned(),
+        Some(std::path::PathBuf::from("/tmp/common/countries/Test.txt")),
+    )
+    .expect("open country file");
+
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results.iter().all(|item| {
+            item.code != DiagnosticCode::InvalidValue
+                || !["`20`", "`50`", "`210`"]
+                    .iter()
+                    .any(|value| item.message.contains(value))
+        }),
+        "country color values must be validated inside the document root: {results:?}"
+    );
+    assert!(
+        results.iter().all(|item| {
+            item.code != DiagnosticCode::InvalidValue
+                || (!item.message.contains("graphical_culture")
+                    && !item.message.contains("Blittersdorf")
+                    && !item.message.contains("von Gelnhausen"))
+        }),
+        "first-party graphical cultures and literal leader names must be accepted: {results:?}"
+    );
+    let missing_color = results
+        .iter()
+        .filter(|item| item.code == DiagnosticCode::Cardinality && item.message.contains("`color`"))
+        .count();
+    assert_eq!(
+        missing_color, 0,
+        "the present file-level color field must satisfy cardinality: {results:?}"
+    );
+    let missing_monarch_names = results
+        .iter()
+        .filter(|item| {
+            item.code == DiagnosticCode::Cardinality && item.message.contains("`monarch_names`")
+        })
+        .count();
+    assert_eq!(
+        missing_monarch_names, 1,
+        "missing file-level fields must be reported once: {results:?}"
     );
 }

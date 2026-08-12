@@ -72,6 +72,7 @@ fn parser_for_document(
                 .filter_map(|relative| LogicalPath::parse(&relative.to_string_lossy()).ok())
                 .min_by_key(|path| path.as_str().len())
         })
+        .or_else(|| path.and_then(|path| LogicalPath::parse(&path.to_string_lossy()).ok()))
         .or_else(|| {
             id.as_str()
                 .split(['/', '\\'])

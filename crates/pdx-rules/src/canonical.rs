@@ -354,6 +354,7 @@ fn put_semantic_key(bytes: &mut Vec<u8>, matcher: &KeyMatcher) {
             put_str(bytes, value);
         }
         KeyMatcher::AnyScalar => put_str(bytes, "any"),
+        KeyMatcher::Date => put_str(bytes, "date"),
         KeyMatcher::Dynamic(value) => {
             put_str(bytes, "dynamic");
             put_str(bytes, value);

@@ -499,10 +499,73 @@ impl HirFile {
                 reference.range.start() >= conditional.range.start()
                     && reference.range.end() <= conditional.range.end()
             });
-            if !guarded {
+            if !guarded
+                && self.parameter_reference_occupies_token(reference)
+                && !self.parameter_reference_is_same_named_value(reference)
+            {
                 return true;
             }
         }
         false
+    }
+
+    fn parameter_reference_occupies_token(&self, reference: &HirParameterReference) -> bool {
+        fn containing_token(
+            node: &pdx_parser::CstNode,
+            range: TextRange,
+        ) -> Option<&pdx_parser::CstNode> {
+            if range.start() < node.range().start() || range.end() > node.range().end() {
+                return None;
+            }
+            node.children()
+                .iter()
+                .find_map(|child| containing_token(child, range))
+                .or_else(|| {
+                    matches!(
+                        node.kind(),
+                        pdx_parser::CstKind::Key
+                            | pdx_parser::CstKind::BareValue
+                            | pdx_parser::CstKind::QuotedString
+                    )
+                    .then_some(node)
+                })
+        }
+
+        let Some(token) = containing_token(self.syntax.root(), reference.range) else {
+            return true;
+        };
+        let Some(raw) = self.syntax.text(token.range()).map(str::trim) else {
+            return true;
+        };
+        let content = raw
+            .strip_prefix('"')
+            .and_then(|value| value.strip_suffix('"'))
+            .unwrap_or(raw);
+        content.eq_ignore_ascii_case(&format!("${}$", reference.name))
+    }
+
+    fn parameter_reference_is_same_named_value(&self, reference: &HirParameterReference) -> bool {
+        fn containing_property(
+            node: &pdx_parser::CstNode,
+            range: TextRange,
+        ) -> Option<&pdx_parser::CstNode> {
+            if range.start() < node.range().start() || range.end() > node.range().end() {
+                return None;
+            }
+            node.children()
+                .iter()
+                .find_map(|child| containing_property(child, range))
+                .or_else(|| (node.kind() == pdx_parser::CstKind::Property).then_some(node))
+        }
+
+        containing_property(self.syntax.root(), reference.range)
+            .and_then(|property| {
+                property
+                    .children()
+                    .iter()
+                    .find(|child| child.kind() == pdx_parser::CstKind::Key)
+            })
+            .and_then(|key| self.syntax.text(key.range()))
+            .is_some_and(|key| key.trim().eq_ignore_ascii_case(&reference.name))
     }
 }

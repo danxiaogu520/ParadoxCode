@@ -154,6 +154,15 @@ fn exact_semantic_rule_index_is_case_insensitive_and_excludes_dynamic_matchers()
 }
 
 #[test]
+fn date_key_matcher_accepts_campaign_dates_only() {
+    let matcher = KeyMatcher::Date;
+    assert!(matcher.matches("1444.11.11", |_, _| false, |_, _| false));
+    assert!(matcher.matches("1444.11", |_, _| false, |_, _| false));
+    assert!(!matcher.matches("date_field", |_, _| false, |_, _| false));
+    assert!(!matcher.matches("1444.13.40.extra", |_, _| false, |_, _| false));
+}
+
+#[test]
 fn canonical_hash_includes_scripted_macro_metadata() {
     let descriptor = TypeDescriptor {
         name: "scripted_effect".to_owned(),

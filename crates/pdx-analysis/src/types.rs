@@ -132,11 +132,16 @@ impl DiagnosticCode {
         }
     }
 
-    /// Returns the conservative LSP severity number (1 error, 2 warning).
+    /// Returns the conservative LSP severity number (1 error, 2 warning, 3 information).
     #[must_use]
     pub const fn severity(self) -> u8 {
         match self {
-            Self::UnknownKey | Self::MacroExpansionLimit => 2,
+            // An unknown key is silently ignored by the game, so the authored line is
+            // ineffective code; it is an error once the surrounding context is known.
+            Self::UnknownKey => 1,
+            // Expansion limits are analysis-side work bounds; reaching one means this
+            // file was not fully validated, not that the file itself is wrong.
+            Self::MacroExpansionLimit => 3,
             Self::Syntax
             | Self::UnknownSymbol
             | Self::AmbiguousSymbol

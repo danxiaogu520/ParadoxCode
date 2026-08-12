@@ -3,9 +3,10 @@ use std::path::Path;
 use std::sync::Arc;
 
 use pdx_engine::hir::HirFile;
+use pdx_engine::hir::lower_with_profile;
 use pdx_engine::{AnalysisSnapshot, DocumentId, DocumentSource, ParsedSource, SourceFileId};
-use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile, QuotedScript};
-use pdx_rules::GameProfile;
+use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile, QuotedScript, parse};
+use pdx_rules::{GameProfile, ParserKind};
 use pdx_text::{LogicalPath, TextRange, TextSize};
 
 use crate::types::*;
@@ -105,6 +106,41 @@ pub(crate) fn input_for_source_file(
     })
 }
 
+pub(crate) fn input_for_text(
+    snapshot: &AnalysisSnapshot,
+    path: &LogicalPath,
+    text: &str,
+) -> Option<ParsedInput> {
+    let format = match snapshot.rules().classify(path)?.parser {
+        ParserKind::Script => FileFormat::Script,
+        ParserKind::Localisation => FileFormat::Localisation,
+        ParserKind::Asset | ParserKind::SyntaxOnly => return None,
+    };
+    let source = Arc::<str>::from(text);
+    let parsed = Arc::new(parse(format, &source));
+    let hir = Arc::new(lower_with_profile(
+        (*parsed).clone(),
+        path,
+        snapshot.rules(),
+        snapshot.game_profile(),
+    ));
+    let file = snapshot
+        .source_files()
+        .values()
+        .find(|file| file.logical_path == *path)
+        .map(|file| file.id);
+    Some(ParsedInput {
+        document: None,
+        file,
+        path: Some(path.clone()),
+        format,
+        source,
+        parsed: ParsedContent::Text(parsed),
+        hir: Some(hir),
+        profile: snapshot.game_profile_handle(),
+    })
+}
+
 pub(crate) fn logical_path(snapshot: &AnalysisSnapshot, path: &Path) -> Option<LogicalPath> {
     snapshot
         .source_roots()
@@ -112,6 +148,7 @@ pub(crate) fn logical_path(snapshot: &AnalysisSnapshot, path: &Path) -> Option<L
         .filter_map(|root| path.strip_prefix(&root.path).ok())
         .filter_map(|relative| LogicalPath::parse(&relative.to_string_lossy()).ok())
         .min_by_key(|path| path.as_str().len())
+        .or_else(|| LogicalPath::parse(&path.to_string_lossy()).ok())
         .or_else(|| {
             path.file_name()
                 .and_then(|name| LogicalPath::parse(&name.to_string_lossy()).ok())
@@ -146,6 +183,16 @@ enum QuotedScalarOffsets {
 }
 
 impl QuotedScalarSource {
+    pub(crate) fn synthetic(source: Arc<str>, fallback: TextRange) -> Self {
+        let offsets = (0..=source.len())
+            .map(|_| fallback.start())
+            .collect::<Vec<_>>();
+        Self {
+            source,
+            source_offsets: QuotedScalarOffsets::Mapped(offsets.into()),
+        }
+    }
+
     pub(crate) fn source(&self) -> &str {
         &self.source
     }
@@ -216,6 +263,14 @@ impl ScopeContext {
 pub(crate) fn script_properties(input: &ParsedInput, parent: &CstNode) -> Vec<ScriptProperty> {
     let ParsedContent::Text(parsed) = &input.parsed;
     script_properties_mapped(parsed, parent, Some, true)
+}
+
+pub(crate) fn script_bare_values(
+    input: &ParsedInput,
+    parent: &CstNode,
+) -> Vec<(String, TextRange)> {
+    let ParsedContent::Text(parsed) = &input.parsed;
+    script_bare_values_mapped(parsed, parent, Some)
 }
 
 pub(crate) fn quoted_script_container(

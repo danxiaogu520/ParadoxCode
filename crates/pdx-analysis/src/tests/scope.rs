@@ -22,6 +22,31 @@ fn eu4_scope_links_switch_effect_context_and_scope() {
 }
 
 #[test]
+fn unknown_tooltip_and_named_event_target_scopes_stay_conservative() {
+    let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
+    let mut host = eu4_host(rules);
+    let id = DocumentId::new("file:///tmp/events/conservative-scopes.txt");
+    let text = concat!(
+        "country_event = { immediate = { ",
+        "tooltip = { add_base_tax = 1 } ",
+        "event_target:runtime_province = { spawn_rebels = { type = catholic_rebels size = 1 } } ",
+        "225 = { ROOT = { set_capital = PREV } } ",
+        "} }\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open");
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results.iter().all(|item| {
+            item.code != DiagnosticCode::WrongScope
+                && !(item.code == DiagnosticCode::InvalidValue
+                    && item.message.contains("set_capital"))
+        }),
+        "runtime/tooltip scopes must not be disproved statically: {results:?}"
+    );
+}
+
+#[test]
 fn eu4_scope_link_chains_are_resolved_segment_by_segment() {
     let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
     let host = eu4_host(rules);
@@ -51,7 +76,7 @@ fn eu4_scope_link_chains_are_resolved_segment_by_segment() {
 }
 
 #[test]
-fn unresolved_game_age_ability_does_not_descend_cached_scope_fact() {
+fn game_age_abilities_defined_in_the_current_file_validate_their_effects() {
     use std::fs;
 
     let nonce = std::time::SystemTime::now()
@@ -92,40 +117,26 @@ fn unresolved_game_age_ability_does_not_descend_cached_scope_fact() {
     .expect("open target");
 
     let diagnostics = diagnostics(&host.snapshot(), &id);
-    let missing_loc_ranges = source
-        .match_indices("missing_loc")
-        .map(|(start, _)| {
-            TextRange::new(start as u32, (start + "missing_loc".len()) as u32).expect("range")
-        })
-        .collect::<Vec<_>>();
-    let missing_key = diagnostics.iter().filter(|item| {
-        item.code == DiagnosticCode::UnknownKey && item.message.contains("`MISSING`")
-    });
-    assert_eq!(
-        missing_key.count(),
-        1,
-        "unresolved ability should report one key"
+    assert!(
+        diagnostics.iter().all(|item| {
+            item.code != DiagnosticCode::UnknownKey || !item.message.contains("`MISSING`")
+        }),
+        "an ability declared below `abilities` is a workspace definition: {diagnostics:?}"
     );
     let missing_symbols = diagnostics.iter().filter(|item| {
         item.code == DiagnosticCode::UnknownSymbol && item.message.contains("`missing_loc`")
     });
     assert_eq!(
         missing_symbols.count(),
-        1,
-        "known ability should still validate its value"
-    );
-    assert!(
-        diagnostics.iter().all(|item| {
-            item.code != DiagnosticCode::UnknownSymbol || item.range != missing_loc_ranges[1]
-        }),
-        "the unresolved ability must not cascade to its missing_loc value"
+        2,
+        "both indexed and newly declared abilities must validate their nested effects"
     );
 
     fs::remove_dir_all(root).expect("cleanup");
 }
 
 #[test]
-fn unresolved_game_age_ability_without_index_does_not_descend_cached_scope_fact() {
+fn game_age_ability_in_an_initially_empty_index_is_a_definition() {
     use std::fs;
 
     let nonce = std::time::SystemTime::now()
@@ -156,16 +167,16 @@ fn unresolved_game_age_ability_without_index_does_not_descend_cached_scope_fact(
     let diagnostics = diagnostics(&host.snapshot(), &id);
     let missing_loc_start = source.find("missing_loc").expect("missing localisation") as u32;
     assert!(
-        diagnostics.iter().any(|item| {
-            item.code == DiagnosticCode::UnknownKey && item.message.contains("`MISSING`")
+        diagnostics.iter().all(|item| {
+            item.code != DiagnosticCode::UnknownKey || !item.message.contains("`MISSING`")
         }),
-        "the unresolved ability should retain its parent key diagnostic: {diagnostics:?}"
+        "the current file must contribute its game-age ability definition: {diagnostics:?}"
     );
     assert!(
-        diagnostics.iter().all(|item| {
-            item.code != DiagnosticCode::UnknownSymbol || item.range.start() != missing_loc_start
+        diagnostics.iter().any(|item| {
+            item.code == DiagnosticCode::UnknownSymbol && item.range.start() == missing_loc_start
         }),
-        "an empty type index must not cascade into missing_loc: {diagnostics:?}"
+        "a newly defined ability must validate its nested effect: {diagnostics:?}"
     );
 
     fs::remove_dir_all(root).expect("cleanup");

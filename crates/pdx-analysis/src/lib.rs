@@ -17,6 +17,7 @@ mod types;
 pub use completion::{complete, complete_with_cancellation, completion, completion_resolve};
 pub use diagnostics::{
     analyze, analyze_document, analyze_source_file, diagnostics, diagnostics_with_cancellation,
+    source_file_diagnostics_with_cancellation, text_diagnostics_with_cancellation,
 };
 pub use hover::{hover, hover_with_cancellation};
 pub use navigation::{

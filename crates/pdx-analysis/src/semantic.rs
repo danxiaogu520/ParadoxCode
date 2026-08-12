@@ -1,7 +1,11 @@
 use std::sync::Arc;
 
-use pdx_engine::hir::semantic_root_context as hir_semantic_root_context;
 use pdx_engine::hir::{HirFile, ScopeState, ScopeValue};
+use pdx_engine::hir::{
+    semantic_file_root_context as hir_semantic_file_root_context,
+    semantic_root_context as hir_semantic_root_context,
+    semantic_root_context_is_fallback as hir_semantic_root_context_is_fallback,
+};
 use pdx_engine::{
     AnalysisSnapshot, DocumentId, DocumentSource, MacroDefinitionSummary, MacroParameterSignature,
     SourceFileId,
@@ -22,6 +26,9 @@ pub(crate) fn semantic_rules_for_container<'a>(
         .rules()
         .semantic_rules_for_context(context)
         .collect::<Vec<_>>();
+    for inherited in snapshot.game_profile().inherited_semantic_contexts(context) {
+        candidates.extend(snapshot.rules().semantic_rules_for_context(inherited));
+    }
     if let Some(type_name) = context.strip_prefix("type:") {
         candidates.extend(
             snapshot
@@ -30,6 +37,8 @@ pub(crate) fn semantic_rules_for_container<'a>(
         );
         candidates.sort_by(|left, right| left.id.cmp(&right.id));
     }
+    candidates.sort_by(|left, right| left.id.cmp(&right.id));
+    candidates.dedup_by(|left, right| left.id.eq_ignore_ascii_case(&right.id));
     candidates
         .into_iter()
         .filter(|rule| semantic_parent_path_matches(snapshot, &rule.parent_path, parent_path))
@@ -101,6 +110,21 @@ pub(crate) fn semantic_root_context(
     logical_path: Option<&LogicalPath>,
 ) -> Option<String> {
     hir_semantic_root_context(snapshot.rules(), logical_path, key)
+}
+
+pub(crate) fn semantic_root_context_is_fallback(
+    snapshot: &AnalysisSnapshot,
+    key: &str,
+    logical_path: Option<&LogicalPath>,
+) -> bool {
+    hir_semantic_root_context_is_fallback(snapshot.rules(), logical_path, key)
+}
+
+pub(crate) fn semantic_file_root_context(
+    snapshot: &AnalysisSnapshot,
+    logical_path: Option<&LogicalPath>,
+) -> Option<String> {
+    hir_semantic_file_root_context(snapshot.rules(), logical_path)
 }
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cached_scope_fact_for_property<'hir>(
@@ -485,6 +509,7 @@ pub(crate) fn semantic_matcher_label(matcher: &KeyMatcher) -> String {
         KeyMatcher::Type(value) => format!("<{value}>"),
         KeyMatcher::Enum(value) => format!("enum[{value}]"),
         KeyMatcher::AnyScalar => "scalar".to_owned(),
+        KeyMatcher::Date => "date".to_owned(),
         KeyMatcher::Dynamic(value) => format!("value_set[{value}]"),
     }
 }
@@ -506,6 +531,12 @@ pub(crate) fn semantic_parent_path_matches(
                 .and_then(|name| name.strip_suffix(']'))
             {
                 enum_member(snapshot, enum_name, actual)
+            } else if expected.eq_ignore_ascii_case("int") {
+                actual.parse::<i64>().is_ok()
+            } else if expected.eq_ignore_ascii_case("float") {
+                actual.parse::<f64>().is_ok()
+            } else if expected.eq_ignore_ascii_case("date_field") {
+                ValueMatcher::Date.matches(actual, |_, _| false, |_, _| false, |_, _| false)
             } else {
                 expected.eq_ignore_ascii_case(actual)
             }
@@ -546,18 +577,23 @@ pub(crate) fn semantic_child_scope(
     rule: &pdx_rules::SemanticRule,
 ) -> ScopeContext {
     let mut child = parent.clone();
-    if let Some(push_scope) = &rule.push_scope
-        && !push_scope.eq_ignore_ascii_case("any")
-    {
+    if let Some(push_scope) = &rule.push_scope {
         child.previous.insert(0, child.current.clone());
-        child.current.clone_from(push_scope);
+        if push_scope.eq_ignore_ascii_case("any") {
+            child.current = "any".to_owned();
+        } else {
+            child.current.clone_from(push_scope);
+        }
     }
     for (register, value) in &rule.replace_scope {
         let value = resolve_scope_expression_context(snapshot, &child, value);
         let register = register.to_ascii_lowercase().replace('_', "");
         match register.as_str() {
             "root" => child.root = value,
-            "this" => child.current = value,
+            "this" => {
+                child.previous.insert(0, child.current.clone());
+                child.current = value;
+            }
             _ => {
                 if let Some(depth) = repeated_scope_register_depth(&register, "from") {
                     set_scope_register(&mut child.from, depth, &value);
@@ -993,6 +1029,11 @@ pub(crate) fn semantic_property_matches(
             ValueMatcher::AnyScalar | ValueMatcher::Opaque(_)
         );
     };
+    // Runtime value references such as `variable:name` are untyped at load time, so any
+    // value rule accepts them once the property structure itself matched.
+    if snapshot.game_profile().is_dynamic_value_reference(value) {
+        return true;
+    }
     if let ValueMatcher::Dynamic(kind) = &rule.value {
         return semantic_dynamic_value_matches(snapshot, kind, value, scope_context);
     }
@@ -1008,6 +1049,8 @@ pub(crate) fn semantic_property_matches(
         rule.value,
         ValueMatcher::Int { .. } | ValueMatcher::Float { .. }
     ) && scope_member(snapshot, None, value, scope_context))
+        || (matches!(rule.value, ValueMatcher::Type(_))
+            && scope_member(snapshot, None, value, scope_context))
 }
 
 /// Returns whether a property satisfies the rule shape and operator independently of its scalar
@@ -1020,7 +1063,8 @@ pub(crate) fn semantic_property_structure_matches(
         RuleShape::Node => property.block_range.is_some(),
         RuleShape::QuotedScript => property.quoted && property.scalar.is_some(),
         RuleShape::ValueClause => {
-            property.block_range.is_some() && !property.bare_values.is_empty()
+            property.block_range.is_some()
+                && (!property.bare_values.is_empty() || rule.min_occurs.unwrap_or(0) == 0)
         }
         RuleShape::Leaf | RuleShape::LeafValue => property.scalar.is_some(),
     };
@@ -1106,10 +1150,9 @@ pub(crate) fn semantic_dynamic_value_matches(
             || workspace_member(snapshot, "variable_name", value);
     }
     if kind == "variable" {
-        return value.parse::<f64>().is_ok()
-            || value.starts_with('$')
-            || workspace_member(snapshot, "variable", value)
-            || workspace_member(snapshot, "variable_name", value);
+        // EU4 variables may be introduced by runtime effects, scripted macro arguments, and
+        // define-style constants that are not enumerable from a workspace snapshot.
+        return !value.is_empty();
     }
     if kind == "value" {
         return value.parse::<f64>().is_ok()
@@ -1119,6 +1162,14 @@ pub(crate) fn semantic_dynamic_value_matches(
     }
     if value.starts_with('$') && value.ends_with('$') {
         return true;
+    }
+    // Scope expressions and scope keywords are valid dynamic members at runtime
+    // (for example `kill_mercenary_leader = THIS` or `set_ruler = ROOT`).
+    if scope_member(snapshot, None, value, scope_context) {
+        return true;
+    }
+    if snapshot.game_profile().is_open_world_value_kind(&kind) {
+        return !value.is_empty();
     }
     enum_member(snapshot, &kind, value) || workspace_member(snapshot, &kind, value)
 }
@@ -1195,12 +1246,20 @@ pub(crate) fn scripted_macro_type(snapshot: &AnalysisSnapshot, type_name: &str) 
 pub(crate) fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
     let hidden_files = overlay_file_ids(snapshot);
     let kinds = workspace_member_kinds(snapshot, type_name);
-    if kinds.iter().any(|kind| {
-        snapshot
-            .index()
-            .definitions(kind, member)
-            .into_iter()
-            .any(|definition| definition.active && !hidden_files.contains(&definition.file_id))
+    let mut names = vec![member.to_owned()];
+    for kind in &kinds {
+        for suffix in snapshot.game_profile().member_name_suffixes_for(kind) {
+            names.push(format!("{member}{suffix}"));
+        }
+    }
+    if names.iter().any(|name| {
+        kinds.iter().any(|kind| {
+            snapshot
+                .index()
+                .definitions(kind, name)
+                .into_iter()
+                .any(|definition| definition.active && !hidden_files.contains(&definition.file_id))
+        })
     }) {
         return true;
     }
@@ -1211,7 +1270,9 @@ pub(crate) fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, mem
         .filter_map(|document| document.hir_handle())
         .any(|hir| {
             hir.definitions().iter().any(|definition| {
-                definition.name.eq_ignore_ascii_case(member)
+                names
+                    .iter()
+                    .any(|name| definition.name.eq_ignore_ascii_case(name))
                     && kinds
                         .iter()
                         .any(|kind| definition.kind.eq_ignore_ascii_case(kind))
@@ -1271,7 +1332,35 @@ pub(crate) fn scope_member(
     member: &str,
     context: &ScopeContext,
 ) -> bool {
+    let member = member.trim();
+    if context.profile.is_dynamic_scope_expression(member) {
+        // Runtime event targets may resolve to any concrete scope. Their existence and concrete
+        // type cannot be disproved from a static workspace snapshot.
+        return true;
+    }
     let lowered = member.to_ascii_lowercase().replace('_', "");
+    if matches!(
+        lowered.as_str(),
+        "owner" | "controller" | "emperor" | "overlord"
+    ) {
+        return scope.is_none_or(|expected| context.profile.scopes_compatible("country", expected));
+    }
+    if matches!(lowered.as_str(), "capital" | "capitalscope" | "location") {
+        return scope
+            .is_none_or(|expected| context.profile.scopes_compatible("province", expected));
+    }
+    if let Some(destination) = snapshot
+        .rules()
+        .exact_semantic_rules(member)
+        .find_map(|rule| {
+            rule.push_scope
+                .as_deref()
+                .or_else(|| (!rule.replace_scope.is_empty()).then_some("any"))
+        })
+    {
+        return scope
+            .is_none_or(|expected| context.profile.scopes_compatible(destination, expected));
+    }
     let resolved = if lowered == "root" {
         Some(context.root.as_str())
     } else if lowered == "this" {
@@ -1292,7 +1381,8 @@ pub(crate) fn scope_member(
     };
     if !context.profile.is_scope(resolved) {
         // Country tags are valid scope references, e.g. `who = TRP`.
-        return workspace_member(snapshot, "country_tag", member);
+        return context.profile.enum_extra_member("country_tags", member)
+            || workspace_member(snapshot, "country_tag", member);
     }
     scope.is_none_or(|expected| context.profile.scopes_compatible(resolved, expected))
 }

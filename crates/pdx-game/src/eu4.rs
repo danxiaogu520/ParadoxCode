@@ -8,10 +8,11 @@ use crate::{GameInstallDescriptor, PlatformExecutablePaths};
 use pdx_rules::rulec::{SourceBundle, load_source_bundle};
 use pdx_rules::{
     FileCategory, FileMatcher, FileResolutionPolicy, GameProfile, ParserKind,
-    ProfileConditionalDefinitionRule, ProfileDefinitionRule, ProfileMatchMode,
-    ProfileReferenceRule, ProfileRootScopeRule, ProfileScopeCompatibility, ProfileTextMatcher,
-    ProfileTokenDefinitionRule, ProfileValueDefinitionRule, RuleSet, RulesModel, SourceEncoding,
-    SymbolDescriptor, SymbolResolutionPolicy,
+    ProfileConditionalDefinitionRule, ProfileContainerValueDefinitionRule, ProfileDefinitionRule,
+    ProfileMatchMode, ProfileMemberNameSuffixRule, ProfileReferenceRule, ProfileRootScopeRule,
+    ProfileScopeCompatibility, ProfileTextMatcher, ProfileTokenDefinitionRule,
+    ProfileValueDefinitionRule, RuleSet, RulesModel, SourceEncoding, SymbolDescriptor,
+    SymbolResolutionPolicy,
 };
 
 const FIRST_PARTY_SOURCE: SourceBundle<'static> = SourceBundle {
@@ -280,6 +281,21 @@ pub fn profile() -> GameProfile {
     let reference = |mode, key, kind: &str| ProfileReferenceRule {
         key: matcher(mode, key),
         kind: kind.to_owned(),
+        excluded_keys: Vec::new(),
+        excluded_paths: Vec::new(),
+    };
+    // `name`/`desc`/`title`/`tooltip` are localisation keys in event-style content, but
+    // literal text in history files (dynast names, rebel names) and resource identifiers
+    // in interface files (mesh/sprite names).
+    let text_paths = ["history/countries/", "history/provinces/", "interface/"]
+        .into_iter()
+        .map(|pattern| matcher(ProfileMatchMode::Contains, pattern))
+        .collect::<Vec<_>>();
+    let localisation_reference = |mode, key| ProfileReferenceRule {
+        key: matcher(mode, key),
+        kind: "localisation".to_owned(),
+        excluded_keys: Vec::new(),
+        excluded_paths: text_paths.clone(),
     };
     let mut definitions = vec![
         definition(
@@ -412,6 +428,12 @@ pub fn profile() -> GameProfile {
         value_definition("set_consort_flag", None, "consort_flag"),
         value_definition("save_event_target_as", None, "event_target"),
         value_definition("save_global_event_target_as", None, "global_event_target"),
+        value_definition("exile_ruler_as", None, "exiled_ruler"),
+        value_definition("exile_heir_as", None, "exiled_heir"),
+        value_definition("exile_consort_as", None, "exiled_consort"),
+        value_definition("exiled_as", Some("define_exiled_ruler"), "exiled_ruler"),
+        value_definition("exiled_as", Some("define_exiled_heir"), "exiled_heir"),
+        value_definition("exiled_as", Some("define_exiled_consort"), "exiled_consort"),
         value_definition("set_saved_name", None, "saved_name"),
     ];
     for parent in [
@@ -422,6 +444,17 @@ pub fn profile() -> GameProfile {
     ] {
         value_definitions.push(value_definition("which", Some(parent), "variable"));
     }
+    let container_value_definition =
+        |key: &str, name_field: &str, kind: &str| ProfileContainerValueDefinitionRule {
+            key: ProfileTextMatcher::insensitive(ProfileMatchMode::Exact, key.to_owned()),
+            name_field: name_field.to_owned(),
+            kind: kind.to_owned(),
+        };
+    let container_value_definitions = vec![
+        container_value_definition("exile_ruler_as", "name", "exiled_ruler"),
+        container_value_definition("exile_heir_as", "name", "exiled_heir"),
+        container_value_definition("exile_consort_as", "name", "exiled_consort"),
+    ];
     GameProfile {
         game_id: GAME_ID.to_owned(),
         source_encoding: SourceEncoding::Windows1252,
@@ -446,7 +479,17 @@ pub fn profile() -> GameProfile {
                 "scripted_effect",
             ),
             reference(ProfileMatchMode::Exact, "call_effect", "scripted_effect"),
-            reference(ProfileMatchMode::Suffix, "_effect", "scripted_effect"),
+            // Sound files use `default_effect`/`specific_effect` to name sound groups,
+            // not scripted effects.
+            ProfileReferenceRule {
+                key: matcher(ProfileMatchMode::Suffix, "_effect"),
+                kind: "scripted_effect".to_owned(),
+                excluded_keys: ["default_effect", "specific_effect"]
+                    .into_iter()
+                    .map(str::to_owned)
+                    .collect(),
+                excluded_paths: Vec::new(),
+            },
             reference(
                 ProfileMatchMode::Contains,
                 "scripted_trigger",
@@ -457,12 +500,13 @@ pub fn profile() -> GameProfile {
             reference(ProfileMatchMode::Exact, "localisation", "localisation"),
             reference(ProfileMatchMode::Exact, "localization", "localisation"),
             reference(ProfileMatchMode::Exact, "loc_key", "localisation"),
-            reference(ProfileMatchMode::Exact, "name", "localisation"),
-            reference(ProfileMatchMode::Exact, "desc", "localisation"),
-            reference(ProfileMatchMode::Exact, "title", "localisation"),
-            reference(ProfileMatchMode::Exact, "tooltip", "localisation"),
+            localisation_reference(ProfileMatchMode::Exact, "name"),
+            localisation_reference(ProfileMatchMode::Exact, "desc"),
+            localisation_reference(ProfileMatchMode::Exact, "title"),
+            localisation_reference(ProfileMatchMode::Exact, "tooltip"),
         ],
         value_definitions,
+        container_value_definitions,
         container_definitions: Vec::new(),
         conditional_definitions: vec![ProfileConditionalDefinitionRule {
             path: matcher(ProfileMatchMode::Contains, "common/government_reforms/"),
@@ -515,6 +559,7 @@ pub fn profile() -> GameProfile {
             "global",
             "none",
             "overlord",
+            "emperor",
             "event_target",
             "global_event_target",
         ]
@@ -551,6 +596,68 @@ pub fn profile() -> GameProfile {
             .into_iter()
             .map(str::to_owned)
             .collect(),
+        semantic_context_inheritance: [
+            ("type:advisor_type", vec!["modifier"]),
+            ("type:ancestor_personalities", vec!["modifier"]),
+            ("type:customideas", vec!["modifier"]),
+            ("type:country_history", vec!["effect"]),
+            ("type:cult", vec!["modifier"]),
+            ("type:government_ranks", vec!["modifier"]),
+            ("type:leader_personality", vec!["modifier"]),
+            ("type:on_action", vec!["effect"]),
+            ("type:personal_deity", vec!["modifier"]),
+            ("type:policy", vec!["modifier"]),
+            ("type:professionalism_modifier", vec!["modifier"]),
+            ("type:province_history", vec!["effect"]),
+            ("type:province_triggered_modifier", vec!["modifier"]),
+            (
+                "type:ruler_personality",
+                vec!["modifier", "personality_modifier"],
+            ),
+            ("type:static_modifier", vec!["modifier"]),
+            ("type:terrain", vec!["modifier"]),
+            ("type:trading_policy", vec!["modifier"]),
+            ("type:triggered_modifier", vec!["modifier"]),
+            ("imperial_incident_option", vec!["trigger"]),
+            ("imperial_incident_option_modifier", vec!["trigger"]),
+            ("root:fervor", vec!["modifier"]),
+            ("root:power_projection", vec!["modifier"]),
+        ]
+        .into_iter()
+        .map(|(context, inherited)| {
+            (
+                context.to_owned(),
+                inherited.into_iter().map(str::to_owned).collect(),
+            )
+        })
+        .collect(),
+        quoted_script_definition_keys: [
+            matcher(ProfileMatchMode::Exact, "effect"),
+            matcher(ProfileMatchMode::Suffix, "_effect"),
+        ]
+        .into_iter()
+        .collect(),
+        dynamic_scope_prefixes: vec!["event_target".to_owned(), "global_event_target".to_owned()],
+        dynamic_value_prefixes: ["variable", "modifier"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+        open_world_value_kinds: [
+            "country_flag",
+            "global_flag",
+            "province_flag",
+            "ruler_flag",
+            "heir_flag",
+            "consort_flag",
+            "saved_name",
+            "named_unrest",
+            "event_target",
+            "global_event_target",
+            "dynasty_name",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect(),
         member_kind_aliases: [
             ("country_tags", "country_tag"),
             ("country_tag", "country_tag"),
@@ -568,6 +675,7 @@ pub fn profile() -> GameProfile {
             ("trade_companies", "trade_company"),
             ("trade_company", "trade_company"),
             ("event_modifiers", "event_modifier"),
+            ("ruler_personality", "ancestor_personalities"),
             ("event_modifier", "event_modifier"),
             ("static_modifiers", "static_modifier"),
             ("static_modifier", "static_modifier"),
@@ -607,10 +715,22 @@ pub fn profile() -> GameProfile {
             ),
             ("modifiers", "static_modifier"),
             ("modifier", "static_modifier"),
+            ("ruler_personality", "ancestor_personalities"),
         ]
         .into_iter()
         .map(|(alias, kind)| (alias.to_owned(), kind.to_owned()))
         .collect(),
+        member_name_suffixes: vec![ProfileMemberNameSuffixRule {
+            kinds: [
+                "ruler_personality",
+                "leader_personality",
+                "ancestor_personalities",
+            ]
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+            suffix: "_personality".to_owned(),
+        }],
         fallback_keys: [
             "id",
             "name",
@@ -699,10 +819,19 @@ pub fn profile() -> GameProfile {
         .into_iter()
         .map(str::to_owned)
         .collect(),
-        enum_extra_members: [(
-            "scripted_effect_params".to_owned(),
-            vec!["scaled_skill".to_owned()],
-        )]
+        enum_extra_members: [
+            (
+                "scripted_effect_params".to_owned(),
+                vec!["scaled_skill".to_owned()],
+            ),
+            (
+                "country_tags".to_owned(),
+                ["F", "T"]
+                    .into_iter()
+                    .flat_map(|prefix| (0..100).map(move |number| format!("{prefix}{number:02}")))
+                    .collect(),
+            ),
+        ]
         .into_iter()
         .collect(),
     }
@@ -891,7 +1020,7 @@ mod tests {
         assert!(!rules.model().semantic.rules.is_empty());
         assert_eq!(
             rules.model().semantic.localisation_bindings.len(),
-            191,
+            190,
             "embedded source must carry the complete first-party type localisation map"
         );
     }

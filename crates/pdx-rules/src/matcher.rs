@@ -77,6 +77,8 @@ pub enum KeyMatcher {
     Enum(String),
     /// Matches any non-empty scalar key.
     AnyScalar,
+    /// Matches a campaign date key such as `1444.11.11`.
+    Date,
     /// Matches a key that declares a dynamic value set.
     Dynamic(String),
 }
@@ -95,6 +97,7 @@ impl KeyMatcher {
             Self::Type(type_name) => type_members(type_name, key),
             Self::Enum(enum_name) => enum_members(enum_name, key),
             Self::AnyScalar => !key.is_empty(),
+            Self::Date => is_eu4_date(key),
             Self::Dynamic(_) => !key.is_empty(),
         }
     }
@@ -149,7 +152,7 @@ impl ValueMatcher {
     ) -> bool {
         match self {
             Self::AnyScalar | Self::Opaque(_) => true,
-            Self::Exact(expected) => expected == value,
+            Self::Exact(expected) => expected.eq_ignore_ascii_case(value),
             Self::Bool => matches!(value.to_ascii_lowercase().as_str(), "yes" | "no"),
             Self::Int { min, max } => {
                 let Ok(value) = value.parse::<i64>() else {
@@ -169,7 +172,8 @@ impl ValueMatcher {
             Self::Type(type_name) => type_members(type_name, value),
             Self::Enum(enum_name) => enum_members(enum_name, value),
             Self::Scope(scope) => scopes(scope.as_deref(), value),
-            Self::Localisation => !value.is_empty(),
+            // The game falls back to rendering the raw spelling, so an empty string is valid.
+            Self::Localisation => true,
             Self::Filepath | Self::Dynamic(_) | Self::DynamicSet(_) => !value.is_empty(),
         }
     }

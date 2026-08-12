@@ -248,6 +248,62 @@ mod tests {
     }
 
     #[test]
+    fn script_accepts_quoted_property_keys() {
+        let parsed = parse(
+            FileFormat::Script,
+            "monarch_names = { \"Friedrich #0\" = 100 }\n",
+        );
+        assert!(parsed.errors().is_empty(), "errors: {:?}", parsed.errors());
+        let monarch_names = &parsed.root().children()[0];
+        let block = monarch_names
+            .children()
+            .iter()
+            .find(|child| child.kind() == CstKind::Value)
+            .and_then(|value| {
+                value
+                    .children()
+                    .iter()
+                    .find(|child| child.kind() == CstKind::Block)
+            })
+            .expect("monarch names block");
+        assert_eq!(block.children().len(), 1);
+        assert_eq!(block.children()[0].kind(), CstKind::Property);
+        let key = block.children()[0]
+            .children()
+            .iter()
+            .find(|child| child.kind() == CstKind::Key)
+            .expect("quoted key");
+        assert_eq!(parsed.text(key.range()), Some("\"Friedrich #0\""));
+    }
+
+    #[test]
+    fn script_accepts_anonymous_nested_vector_blocks() {
+        let parsed = parse(
+            FileFormat::Script,
+            "position = { { 0.0 -5.0 0.0 } { 0.0 -6.5 0.0 } }\n",
+        );
+        assert!(parsed.errors().is_empty(), "errors: {:?}", parsed.errors());
+        let value = parsed.root().children()[0]
+            .children()
+            .iter()
+            .find(|child| child.kind() == CstKind::Value)
+            .expect("position value");
+        let outer = value
+            .children()
+            .iter()
+            .find(|child| child.kind() == CstKind::Block)
+            .expect("outer block");
+        assert_eq!(
+            outer
+                .children()
+                .iter()
+                .filter(|child| child.kind() == CstKind::Block)
+                .count(),
+            2
+        );
+    }
+
+    #[test]
     fn syntax_errors_have_stable_codes_and_safe_ranges() {
         let parsed = parse(FileFormat::Script, "key = { value = \"unfinished");
         assert!(parsed.errors().iter().any(|error| {

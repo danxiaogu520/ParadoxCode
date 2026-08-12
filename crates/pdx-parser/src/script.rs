@@ -61,17 +61,35 @@ impl<'source> Parser<'source> {
 
             let start = self.position;
             let Some(first) = self.parse_bare() else {
-                if self.peek() == Some(b'"') {
+                if self.peek() == Some(b'{') {
+                    // Clausewitz data occasionally uses anonymous nested vectors, for example
+                    // `position = { { 0 0 0 } { 1 1 1 } }` in GFX configuration.
+                    children.push(self.parse_block());
+                } else if self.peek() == Some(b'"') {
                     let quoted = self.parse_quoted(CstKind::QuotedString);
-                    if terminator.is_none() {
-                        self.error(
-                            SyntaxErrorKind::UnexpectedToken,
+                    self.skip_whitespace();
+                    if self.operator_starts_here() {
+                        children.push(self.parse_property(start, quoted));
+                    } else if self.peek() == Some(b'{') {
+                        let block = self.parse_block();
+                        let end = block.range().end() as usize;
+                        children.push(self.node(
+                            CstKind::HeaderBlock,
                             start,
-                            quoted.range().end() as usize,
-                            "a top-level script value must be assigned to a key",
-                        );
+                            end,
+                            vec![quoted, block],
+                        ));
+                    } else {
+                        if terminator.is_none() {
+                            self.error(
+                                SyntaxErrorKind::UnexpectedToken,
+                                start,
+                                quoted.range().end() as usize,
+                                "a top-level script value must be assigned to a key",
+                            );
+                        }
+                        children.push(quoted);
                     }
-                    children.push(quoted);
                 } else if self.starts_parameter_block() {
                     children.push(self.parse_parameter_block());
                 } else {

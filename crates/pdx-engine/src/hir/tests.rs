@@ -1,7 +1,7 @@
 use super::{
     HirParameterReferenceKind, HirReferenceOrigin, MacroTemplateFragment, MacroTemplateItem,
     MacroTemplateValue, ScopeState, ScopeValue, lower, lower_with_profile, property_children,
-    resolve_scope_expression,
+    resolve_scope_expression, semantic_root_context,
 };
 use pdx_game::eu4::{bootstrap_rules, first_party_rules, profile};
 use pdx_parser::{FileFormat, parse};
@@ -36,6 +36,21 @@ fn lowering_retains_property_paths_scalars_and_top_level_identity() {
             .map(|value| value.value.as_str())
             .collect::<Vec<_>>(),
         ["yes"]
+    );
+}
+
+#[test]
+fn shared_type_paths_use_the_top_level_key_filter() {
+    let rules = first_party_rules().expect("first-party rules");
+    let path = LogicalPath::new("common/estate_crown_land/00_interactions.txt");
+
+    assert_eq!(
+        semantic_root_context(&rules, Some(&path), "interaction").as_deref(),
+        Some("type:estate_interaction")
+    );
+    assert_eq!(
+        semantic_root_context(&rules, Some(&path), "bonus").as_deref(),
+        Some("type:estate_crown_land_bonus")
     );
 }
 
@@ -272,6 +287,18 @@ fn profile_lowering_associates_local_parameter_definitions_and_uses() {
         Some("optional")
     );
     assert!(hir.parameter_reference_at(first_owner.end()).is_none());
+
+    let concatenated_source =
+        "tooltip_name = { value = PREFIX_$optional$_SUFFIX required_value = $required$ }\n";
+    let concatenated_hir = lower_with_profile(
+        parse(FileFormat::Script, concatenated_source),
+        &path,
+        &bootstrap_rules(),
+        &profile(),
+    );
+    let concatenated_owner = concatenated_hir.parameter_definitions()[0].owner_range;
+    assert!(!concatenated_hir.parameter_is_required(concatenated_owner, "optional"));
+    assert!(concatenated_hir.parameter_is_required(concatenated_owner, "required"));
 
     let conditional_source = "conditional = { [[feature] value = $amount$ ] }\n";
     let conditional_hir = lower_with_profile(
@@ -567,6 +594,25 @@ fn profile_aware_lowering_produces_shared_typed_definitions_and_references() {
     assert!(hir.references().iter().any(|reference| {
         reference.kind == "localisation" && reference.name == "profile_title"
     }));
+}
+
+#[test]
+fn profile_aware_lowering_indexes_definitions_inside_quoted_effect_arguments() {
+    let rules = bootstrap_rules();
+    let path = LogicalPath::parse("missions/quoted_effect.txt").expect("logical path");
+    let source = "mission = { first_effect = \"set_country_flag = embedded_flag\" }\n";
+
+    let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile());
+    let definition = hir
+        .definitions()
+        .iter()
+        .find(|definition| definition.kind == "country_flag" && definition.name == "embedded_flag")
+        .expect("embedded flag definition");
+    assert_eq!(
+        &source[usize::try_from(definition.selection_range.start()).expect("start")
+            ..usize::try_from(definition.selection_range.end()).expect("end")],
+        "embedded_flag"
+    );
 }
 
 #[test]

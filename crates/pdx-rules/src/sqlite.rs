@@ -339,6 +339,7 @@ fn semantic_key_columns(matcher: &KeyMatcher) -> (&'static str, Option<&str>) {
         KeyMatcher::Type(value) => ("type", Some(value)),
         KeyMatcher::Enum(value) => ("enum", Some(value)),
         KeyMatcher::AnyScalar => ("any", None),
+        KeyMatcher::Date => ("date", None),
         KeyMatcher::Dynamic(value) => ("dynamic", Some(value)),
     }
 }
@@ -725,6 +726,7 @@ fn decode_semantic_key(kind: &str, value: Option<&str>) -> Result<KeyMatcher, Ru
         "type" => KeyMatcher::Type(value.unwrap_or_default().to_owned()),
         "enum" => KeyMatcher::Enum(value.unwrap_or_default().to_owned()),
         "any" => KeyMatcher::AnyScalar,
+        "date" => KeyMatcher::Date,
         "dynamic" => KeyMatcher::Dynamic(value.unwrap_or_default().to_owned()),
         other => return Err(RulesError::InvalidRuleShape(other.to_owned())),
     })

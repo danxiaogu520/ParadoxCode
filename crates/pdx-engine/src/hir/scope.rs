@@ -169,8 +169,11 @@ fn scope_transition_rules<'rule>(
                     }
                 }
                 KeyMatcher::AnyScalar => strong.push(rule),
+                KeyMatcher::Date if rule.key.matches(key, |_, _| false, |_, _| false) => {
+                    strong.push(rule);
+                }
                 KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) => weak.push(rule),
-                KeyMatcher::Exact(_) => {}
+                KeyMatcher::Exact(_) | KeyMatcher::Date => {}
             }
         }
     }
@@ -326,8 +329,11 @@ pub(crate) fn child_key_may_match(
                     }
                 }
                 KeyMatcher::AnyScalar => return !key.is_empty(),
+                KeyMatcher::Date if rule.key.matches(key, |_, _| false, |_, _| false) => {
+                    return true;
+                }
                 KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) => dynamic_matcher = true,
-                KeyMatcher::Exact(_) => {}
+                KeyMatcher::Exact(_) | KeyMatcher::Date => {}
             }
         }
     }
@@ -412,22 +418,28 @@ pub(crate) fn child_scope_state(
     profile: &GameProfile,
 ) -> ScopeState {
     let mut child = parent.clone();
-    if let Some(push_scope) = rule.push_scope.as_deref()
-        && !push_scope.eq_ignore_ascii_case("any")
-    {
+    if let Some(push_scope) = rule.push_scope.as_deref() {
         if let Some(current) = child.current.first().cloned() {
             child.previous.insert(0, current);
         }
-        child
-            .current
-            .insert(0, ScopeValue::Known(vec![push_scope.to_owned()]));
+        let next = if push_scope.eq_ignore_ascii_case("any") {
+            ScopeValue::Unknown
+        } else {
+            ScopeValue::Known(vec![push_scope.to_owned()])
+        };
+        child.current.insert(0, next);
     }
     for (register, value) in &rule.replace_scope {
         let value = resolve_scope_expression(&child, value, rules, profile);
         let register = register.to_ascii_lowercase().replace('_', "");
         match register.as_str() {
             "root" => child.root = value,
-            "this" => set_scope_register(&mut child.current, 0, value),
+            "this" => {
+                if let Some(current) = child.current.first().cloned() {
+                    child.previous.insert(0, current);
+                }
+                set_scope_register(&mut child.current, 0, value);
+            }
             _ => {
                 if let Some(depth) = repeated_scope_register_depth(&register, "from") {
                     set_scope_register(&mut child.from, depth, value);

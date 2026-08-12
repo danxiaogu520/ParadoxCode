@@ -1,6 +1,7 @@
 //! Query-local scripted-macro binding and tree instantiation.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use pdx_engine::hir::{
     MacroTemplate, MacroTemplateFragment, MacroTemplateItem, MacroTemplateProperty,
@@ -66,6 +67,7 @@ pub(crate) struct MacroExpansionSession {
     stack: Vec<ExpansionFrame>,
     expanded_nodes: usize,
     expanded_token_bytes: usize,
+    limit_reported: bool,
 }
 
 impl MacroExpansionSession {
@@ -146,7 +148,9 @@ impl MacroExpansionSession {
                         Ok(property) => property,
                         Err(error) => return Ok(Err(error)),
                     };
-                    expanded.properties.push(property);
+                    if let Some(property) = property {
+                        expanded.properties.push(property);
+                    }
                 }
                 MacroTemplateItem::BareValue(token) => {
                     let rendered = match self.render_token(token, bindings, fallback_range) {
@@ -208,11 +212,22 @@ impl MacroExpansionSession {
         cancellation: &CancellationToken,
         quoted_scripts: &mut QuotedScriptSession<'_>,
         quoted_script_depth: usize,
-    ) -> Result<Result<ScriptProperty, ExpansionFailure>, Cancelled> {
-        let key = match self.render_token(&property.key, bindings, fallback_range) {
+    ) -> Result<Result<Option<ScriptProperty>, ExpansionFailure>, Cancelled> {
+        let mut key = match self.render_token(&property.key, bindings, fallback_range) {
             Ok(key) => key,
             Err(error) => return Ok(Err(error)),
         };
+        key.value = key.value.trim().to_owned();
+        if let MacroTemplateValue::Scalar(token) = &property.value
+            && let [MacroTemplateFragment::Parameter { name, .. }] = token.fragments.as_slice()
+            && !bindings.contains_key(&name.to_ascii_lowercase())
+            && key.value.eq_ignore_ascii_case(name)
+        {
+            // EU4 macros forward optional arguments as `name = "$name$"`. When the caller omits
+            // one, the preprocessor omits the forwarding property so the nested conditional stays
+            // inactive instead of treating the forwarded substitution as required.
+            return Ok(Ok(None));
+        }
         let (scalar, quoted, quoted_source, block_range, block, bare_values) = match &property.value
         {
             MacroTemplateValue::Scalar(token) => {
@@ -252,7 +267,7 @@ impl MacroExpansionSession {
                 )
             }
         };
-        Ok(Ok(ScriptProperty {
+        Ok(Ok(Some(ScriptProperty {
             key: key.value,
             key_range: key.range,
             range: fallback_range,
@@ -263,7 +278,7 @@ impl MacroExpansionSession {
             block_range,
             block,
             bare_values,
-        }))
+        })))
     }
 
     fn render_token(
@@ -281,6 +296,9 @@ impl MacroExpansionSession {
                 MacroTemplateFragment::Literal(literal) => value.push_str(literal),
                 MacroTemplateFragment::Parameter { name, .. } => {
                     let Some(binding) = bindings.get(&name.to_ascii_lowercase()) else {
+                        if token.fragments.len() > 1 {
+                            continue;
+                        }
                         return Err(ExpansionFailure::MissingParameter(name.clone()));
                     };
                     match binding {
@@ -309,6 +327,10 @@ impl MacroExpansionSession {
             }
         }
         self.charge_token_bytes(value.len())?;
+        if quoted_source.is_none() && token.quoted {
+            let source = Arc::<str>::from(format!("\"{value}\""));
+            quoted_source = Some(QuotedScalarSource::synthetic(source, origin));
+        }
         Ok(RenderedToken {
             value,
             range: origin,
@@ -331,6 +353,15 @@ impl MacroExpansionSession {
             Err(ExpansionFailure::Limit("expanded token bytes"))
         } else {
             Ok(())
+        }
+    }
+
+    pub(crate) fn should_report_limit(&mut self) -> bool {
+        if self.limit_reported {
+            false
+        } else {
+            self.limit_reported = true;
+            true
         }
     }
 }

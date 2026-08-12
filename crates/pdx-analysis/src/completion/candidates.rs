@@ -276,7 +276,7 @@ pub(crate) fn add_semantic_key_items(
                     );
                 }
             }
-            KeyMatcher::AnyScalar => {}
+            KeyMatcher::AnyScalar | KeyMatcher::Date => {}
         }
     }
 }

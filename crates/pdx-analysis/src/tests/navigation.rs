@@ -145,15 +145,17 @@ fn references_find_quoted_script_symbols_in_unopened_workspace_files() {
 }
 
 #[test]
-fn ambiguous_symbol_is_diagnosed_and_never_picks_a_definition() {
+fn ambiguous_symbol_is_never_diagnosed_and_never_picks_a_definition() {
     let (host, id) = snapshot(
         "country_event = { id = duplicate.1 }\ncountry_event = { id = duplicate.1 }\nevent = duplicate.1\n",
     );
     let snapshot = host.snapshot();
+    // The game resolves same-name definitions deterministically by source priority, so
+    // ambiguity is not diagnosed; navigation still refuses to pick one candidate.
     assert!(
         diagnostics(&snapshot, &id)
             .iter()
-            .any(|item| item.code == DiagnosticCode::AmbiguousSymbol)
+            .all(|item| item.code != DiagnosticCode::AmbiguousSymbol)
     );
     assert!(definition(&snapshot, &id, 80).is_empty());
     let reference = u32::try_from(

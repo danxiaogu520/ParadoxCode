@@ -14,7 +14,9 @@ mod semantics;
 mod templates;
 
 pub use model::*;
-pub use semantics::semantic_root_context;
+pub use semantics::{
+    semantic_file_root_context, semantic_root_context, semantic_root_context_is_fallback,
+};
 
 #[cfg(test)]
 pub(crate) use scope::{

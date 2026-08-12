@@ -120,6 +120,11 @@ pub struct ProfileReferenceRule {
     pub key: ProfileTextMatcher,
     /// Stable target symbol kind.
     pub kind: String,
+    /// Property keys that must not be interpreted as this reference kind.
+    pub excluded_keys: Vec<String>,
+    /// Logical paths where the property key must not be interpreted as this kind
+    /// (for example history files where `name` is literal text, not localisation).
+    pub excluded_paths: Vec<ProfileTextMatcher>,
 }
 
 /// One scalar value that declares a workspace symbol.
@@ -131,6 +136,26 @@ pub struct ProfileValueDefinitionRule {
     pub parent_key: Option<ProfileTextMatcher>,
     /// Stable declared symbol kind.
     pub kind: String,
+}
+
+/// One block-valued property whose nested name field declares a workspace symbol.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProfileContainerValueDefinitionRule {
+    /// Property-key selector.
+    pub key: ProfileTextMatcher,
+    /// Nested scalar field that supplies the declared symbol name.
+    pub name_field: String,
+    /// Stable declared symbol kind.
+    pub kind: String,
+}
+
+/// One suffix appended to member names when validating a dynamic value kind.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProfileMemberNameSuffixRule {
+    /// Value kinds whose members also accept the suffixed spelling.
+    pub kinds: Vec<String>,
+    /// Suffix appended to a candidate name before the membership lookup.
+    pub suffix: String,
 }
 
 /// One block whose direct child keys declare workspace symbols.
@@ -213,6 +238,8 @@ pub struct GameProfile {
     pub references: Vec<ProfileReferenceRule>,
     /// Ordered scalar value-definition rules; the first match wins.
     pub value_definitions: Vec<ProfileValueDefinitionRule>,
+    /// Ordered block value-definition rules; the first match wins.
+    pub container_value_definitions: Vec<ProfileContainerValueDefinitionRule>,
     /// Blocks whose direct child keys declare symbols.
     pub container_definitions: Vec<ProfileContainerDefinitionRule>,
     /// Additional definitions gated by nested fields.
@@ -232,8 +259,23 @@ pub struct GameProfile {
     /// A wrapper preserves the current semantic context and scope while its children are
     /// validated.  The spelling is game-specific (for example, EU4's AND/OR/NOT).
     pub transparent_scope_wrappers: Vec<String>,
+    /// Additional first-party rule contexts inherited by a semantic container.
+    ///
+    /// This keeps inline game constructs data-driven; for example a game profile can declare
+    /// that one type accepts the keys from its generic modifier context.
+    pub semantic_context_inheritance: BTreeMap<String, Vec<String>>,
+    /// Quoted scalar keys whose payload may declare workspace symbols as embedded Script.
+    pub quoted_script_definition_keys: Vec<ProfileTextMatcher>,
+    /// Prefixes for runtime-named scope expressions such as `event_target:name`.
+    pub dynamic_scope_prefixes: Vec<String>,
+    /// Scalar prefixes that make any value rule accept a runtime reference.
+    pub dynamic_value_prefixes: Vec<String>,
+    /// Dynamic value kinds that cannot be proven complete from workspace declarations.
+    pub open_world_value_kinds: Vec<String>,
     /// semantic type/enum spellings mapped to workspace symbol kinds.
     pub member_kind_aliases: BTreeMap<String, String>,
+    /// Value kinds whose member lookups also try a suffixed spelling.
+    pub member_name_suffixes: Vec<ProfileMemberNameSuffixRule>,
     /// Profile fallback keys used when no imported semantic rule selects a property.
     pub fallback_keys: Vec<String>,
     /// Additional static enum members supplied by the profile.
@@ -252,6 +294,7 @@ impl GameProfile {
             definitions: Vec::new(),
             references: Vec::new(),
             value_definitions: Vec::new(),
+            container_value_definitions: Vec::new(),
             container_definitions: Vec::new(),
             conditional_definitions: Vec::new(),
             token_definitions: Vec::new(),
@@ -260,10 +303,109 @@ impl GameProfile {
             root_scopes: Vec::new(),
             scope_compatibilities: Vec::new(),
             transparent_scope_wrappers: Vec::new(),
+            semantic_context_inheritance: BTreeMap::new(),
+            quoted_script_definition_keys: Vec::new(),
+            dynamic_scope_prefixes: Vec::new(),
+            dynamic_value_prefixes: Vec::new(),
+            open_world_value_kinds: Vec::new(),
             member_kind_aliases: BTreeMap::new(),
+            member_name_suffixes: Vec::new(),
             fallback_keys: Vec::new(),
             enum_extra_members: BTreeMap::new(),
         }
+    }
+
+    /// Returns additional rule contexts inherited by `context`.
+    #[must_use]
+    pub fn inherited_semantic_contexts(&self, context: &str) -> &[String] {
+        self.semantic_context_inheritance
+            .iter()
+            .find(|(candidate, _)| candidate.eq_ignore_ascii_case(context))
+            .map_or(&[], |(_, inherited)| inherited.as_slice())
+    }
+
+    /// Returns whether `context` directly or transitively inherits `ancestor`.
+    ///
+    /// For example `imperial_incident_option_modifier` inherits `trigger`, so trigger
+    /// wrappers and scope links stay valid inside incident options.
+    #[must_use]
+    pub fn semantic_context_inherits(&self, context: &str, ancestor: &str) -> bool {
+        let mut pending = self.inherited_semantic_contexts(context).to_vec();
+        let mut visited = std::collections::BTreeSet::new();
+        while let Some(candidate) = pending.pop() {
+            if candidate.eq_ignore_ascii_case(ancestor) {
+                return true;
+            }
+            if visited.insert(candidate.to_ascii_lowercase()) {
+                pending.extend(self.inherited_semantic_contexts(&candidate).iter().cloned());
+            }
+        }
+        false
+    }
+
+    /// Returns whether a quoted scalar key carries Script whose definitions enter the index.
+    #[must_use]
+    pub fn indexes_quoted_script_definitions(&self, key: &str) -> bool {
+        self.quoted_script_definition_keys
+            .iter()
+            .any(|matcher| matcher.matches(key))
+    }
+
+    /// Returns whether a spelling is a runtime-named scope expression.
+    #[must_use]
+    pub fn is_dynamic_scope_expression(&self, value: &str) -> bool {
+        value.split_once(':').is_some_and(|(prefix, name)| {
+            !name.is_empty()
+                && self
+                    .dynamic_scope_prefixes
+                    .iter()
+                    .any(|candidate| candidate.eq_ignore_ascii_case(prefix))
+        })
+    }
+
+    /// Returns whether a scalar is a runtime value reference such as `variable:name`.
+    #[must_use]
+    pub fn is_dynamic_value_reference(&self, value: &str) -> bool {
+        value.split_once(':').is_some_and(|(prefix, name)| {
+            !name.is_empty()
+                && self
+                    .dynamic_value_prefixes
+                    .iter()
+                    .any(|candidate| candidate.eq_ignore_ascii_case(prefix))
+        })
+    }
+
+    /// Returns the first block value-definition rule matching a property key.
+    #[must_use]
+    pub fn container_value_definition(
+        &self,
+        key: &str,
+    ) -> Option<&ProfileContainerValueDefinitionRule> {
+        self.container_value_definitions
+            .iter()
+            .find(|rule| rule.key.matches(key))
+    }
+
+    /// Returns the suffixes appended when looking up members of `kind`.
+    #[must_use]
+    pub fn member_name_suffixes_for(&self, kind: &str) -> Vec<&str> {
+        self.member_name_suffixes
+            .iter()
+            .filter(|rule| {
+                rule.kinds
+                    .iter()
+                    .any(|candidate| candidate.eq_ignore_ascii_case(kind))
+            })
+            .map(|rule| rule.suffix.as_str())
+            .collect()
+    }
+
+    /// Returns whether declarations of a dynamic value kind are necessarily incomplete.
+    #[must_use]
+    pub fn is_open_world_value_kind(&self, kind: &str) -> bool {
+        self.open_world_value_kinds
+            .iter()
+            .any(|candidate| candidate.eq_ignore_ascii_case(kind))
     }
 
     /// Returns the logical directory whitelist used for source-root discovery.
@@ -320,10 +462,19 @@ impl GameProfile {
     /// Returns the target kind for a scalar property reference.
     #[must_use]
     pub fn reference_kind(&self, key: &str) -> Option<&str> {
-        self.references
-            .iter()
-            .find(|rule| rule.key.matches(key))
-            .map(|rule| rule.kind.as_str())
+        self.reference_rule(key).map(|rule| rule.kind.as_str())
+    }
+
+    /// Returns the first reference rule whose key selector accepts `key`.
+    #[must_use]
+    pub fn reference_rule(&self, key: &str) -> Option<&ProfileReferenceRule> {
+        self.references.iter().find(|rule| {
+            rule.key.matches(key)
+                && !rule
+                    .excluded_keys
+                    .iter()
+                    .any(|excluded| excluded.eq_ignore_ascii_case(key))
+        })
     }
 
     /// Returns the declared kind for one scalar value property.

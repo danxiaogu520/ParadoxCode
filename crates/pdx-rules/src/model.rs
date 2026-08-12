@@ -398,6 +398,11 @@ impl RulesModel {
                     .path_prefix
                     .as_ref()
                     .map_or(0, |prefix| prefix.len())
+                    + category
+                        .matcher
+                        .path_suffix
+                        .as_ref()
+                        .map_or(0, |suffix| suffix.len())
             })
     }
 }

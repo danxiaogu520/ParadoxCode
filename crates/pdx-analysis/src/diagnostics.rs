@@ -59,6 +59,38 @@ pub fn analyze_source_file(
     Some(analyze_input(snapshot, &input))
 }
 
+/// Returns diagnostics for one indexed disk file while cooperatively observing cancellation.
+pub fn source_file_diagnostics_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    file: SourceFileId,
+    cancellation: &CancellationToken,
+) -> Result<Vec<Diagnostic>, Cancelled> {
+    cancellation.checkpoint()?;
+    let Some(input) = input_for_source_file(snapshot, file) else {
+        return Ok(Vec::new());
+    };
+    analyze_input_with_cancellation(snapshot, &input, cancellation)
+        .map(|analysis| analysis.diagnostics)
+}
+
+/// Returns diagnostics for caller-supplied text classified by its logical path.
+///
+/// This query does not mutate the workspace or create an overlay. It is intended for bounded
+/// batch tooling whose backing files already participate in the immutable snapshot index.
+pub fn text_diagnostics_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    path: &pdx_text::LogicalPath,
+    text: &str,
+    cancellation: &CancellationToken,
+) -> Result<Vec<Diagnostic>, Cancelled> {
+    cancellation.checkpoint()?;
+    let Some(input) = input_for_text(snapshot, path, text) else {
+        return Ok(Vec::new());
+    };
+    analyze_input_with_cancellation(snapshot, &input, cancellation)
+        .map(|analysis| analysis.diagnostics)
+}
+
 /// Returns diagnostics for one document, or an empty vector for unsupported/nonexistent files.
 #[must_use]
 pub fn diagnostics(snapshot: &AnalysisSnapshot, document: &DocumentId) -> Vec<Diagnostic> {
@@ -106,7 +138,13 @@ pub(crate) fn analyze_input_with_cancellation(
         cancellation.checkpoint()?;
         if property.key.eq_ignore_ascii_case("scope")
             && let Some((value, range)) = property.value.as_ref()
-            && !input.profile.is_scope(value)
+            && !value.contains('$')
+            && !scope_member(
+                snapshot,
+                None,
+                value,
+                &ScopeContext::new(snapshot.game_profile_handle()),
+            )
             && !unknown_scope_reported
         {
             diagnostics.push(Diagnostic {
@@ -120,19 +158,43 @@ pub(crate) fn analyze_input_with_cancellation(
     }
     for reference in &semantic.references {
         cancellation.checkpoint()?;
+        if reference.name.contains('$') {
+            continue;
+        }
         match resolution.resolve(&reference.kind, &reference.name) {
+            // `on_trigger` and `_trigger`-suffixed carriers may name fixed builtin
+            // triggers, not only workspace scripted triggers; likewise for effects.
+            Resolution::Missing
+                if (reference.kind.eq_ignore_ascii_case("scripted_trigger")
+                    && builtin_rule_has_key(snapshot, "trigger", &reference.name))
+                    || (reference.kind.eq_ignore_ascii_case("scripted_effect")
+                        && builtin_rule_has_key(snapshot, "effect", &reference.name)) => {}
+            // Scalar arguments inside a scripted macro invocation are untyped
+            // parameter values, not localisation key references.
+            Resolution::Missing
+                if reference.kind.eq_ignore_ascii_case("localisation")
+                    && localisation_reference_is_macro_argument(
+                        snapshot,
+                        input,
+                        reference.range,
+                    ) => {}
             Resolution::Missing => diagnostics.push(Diagnostic {
                 code: DiagnosticCode::UnknownSymbol,
-                severity: DiagnosticCode::UnknownSymbol.severity(),
+                // The game renders a missing localisation key as its raw spelling, so a
+                // missing key is a data-quality hint rather than a script error.
+                severity: if reference.kind.eq_ignore_ascii_case("localisation") {
+                    2
+                } else {
+                    DiagnosticCode::UnknownSymbol.severity()
+                },
                 range: reference.range,
                 message: format!("unknown {} symbol `{}`", reference.kind, reference.name),
             }),
-            Resolution::Ambiguous => diagnostics.push(Diagnostic {
-                code: DiagnosticCode::AmbiguousSymbol,
-                severity: DiagnosticCode::AmbiguousSymbol.severity(),
-                range: reference.range,
-                message: format!("ambiguous {} symbol `{}`", reference.kind, reference.name),
-            }),
+            // Localisation is merged across languages and may be repeated by replace files.
+            // Existence is enough for diagnostics; navigation retains the candidate set.
+            // The game resolves same-name definitions deterministically by source priority,
+            // so ambiguity is never a runtime error and is intentionally not diagnosed.
+            Resolution::Ambiguous => {}
             Resolution::Unique(_) => {}
         }
     }
@@ -176,6 +238,47 @@ pub(crate) fn analyze_input_with_cancellation(
             .collect(),
     })
 }
+
+/// Returns whether a fixed first-party rule in `context` accepts `key` exactly.
+fn builtin_rule_has_key(snapshot: &AnalysisSnapshot, context: &str, key: &str) -> bool {
+    snapshot
+        .rules()
+        .semantic_rules_for_context(context)
+        .any(|rule| {
+            matches!(
+                &rule.key,
+                pdx_rules::KeyMatcher::Exact(expected)
+                    if expected.eq_ignore_ascii_case(key)
+            )
+        })
+}
+
+/// Returns whether a localisation-kind reference sits inside a scripted macro
+/// invocation, where scalar arguments are untyped parameter values.
+fn localisation_reference_is_macro_argument(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    range: TextRange,
+) -> bool {
+    let Some(hir) = input.hir.as_deref() else {
+        return false;
+    };
+    let Some(property) = hir.properties().iter().rfind(|property| {
+        property.range.start() <= range.start() && property.range.end() >= range.end()
+    }) else {
+        return false;
+    };
+    // A definition body (path length 2) keeps localisation validation; only
+    // nested invocations carry opaque macro arguments.
+    if property.path.len() < 3 {
+        return false;
+    }
+    let Some(parent_key) = property.path.iter().rev().nth(1) else {
+        return false;
+    };
+    workspace_member(snapshot, "scripted_effect", parent_key)
+        || workspace_member(snapshot, "scripted_trigger", parent_key)
+}
 pub(crate) fn semantic_rule_diagnostics(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
@@ -187,18 +290,48 @@ pub(crate) fn semantic_rule_diagnostics(
     }
     let ParsedContent::Text(parsed) = &input.parsed;
     let roots = script_properties(input, parsed.root());
+    let root_bare_values = script_bare_values(input, parsed.root());
     cancellation.checkpoint()?;
     let mut diagnostics = Vec::new();
     let mut expansion = MacroExpansionSession::default();
     let mut quoted_scripts = QuotedScriptSession::new(cancellation);
+    if let Some(context) = semantic_file_root_context(snapshot, input.path.as_ref()) {
+        let (root_key, key_range) = roots.first().map_or_else(
+            || ("", parsed.root().range()),
+            |property| (property.key.as_str(), property.key_range),
+        );
+        let scope = semantic_initial_scope(snapshot, input, &context, root_key, key_range);
+        validate_semantic_container(
+            snapshot,
+            &context,
+            &[],
+            &roots,
+            &root_bare_values,
+            &scope,
+            input.hir.as_deref(),
+            &mut diagnostics,
+            cancellation,
+            true,
+            parsed.root().range(),
+            &mut expansion,
+            &mut quoted_scripts,
+            0,
+        )?;
+        return Ok(diagnostics);
+    }
     for property in roots {
         cancellation.checkpoint()?;
         let Some(context) = semantic_root_context(snapshot, &property.key, input.path.as_ref())
         else {
             continue;
         };
+        // A context guessed from the directory layout alone is less trustworthy than a
+        // key/filter-declared match, so its diagnostics are downgraded one step.
+        let fallback_context =
+            semantic_root_context_is_fallback(snapshot, &property.key, input.path.as_ref());
         let scope =
             semantic_initial_scope(snapshot, input, &context, &property.key, property.key_range);
+        let mut container_diagnostics = Vec::new();
         if let Some(type_name) = context.strip_prefix("type:")
             && snapshot
                 .rules()
@@ -216,6 +349,19 @@ pub(crate) fn semantic_rule_diagnostics(
                 })
         {
             for child in &property.block {
+                let descriptor = &snapshot.rules().model().semantic.type_descriptors[type_name];
+                if descriptor
+                    .type_key_filter
+                    .as_ref()
+                    .is_some_and(|(values, negate)| {
+                        values
+                            .iter()
+                            .any(|value| value.eq_ignore_ascii_case(&child.key))
+                            == *negate
+                    })
+                {
+                    continue;
+                }
                 let child_scope =
                     semantic_initial_scope(snapshot, input, &context, &child.key, child.key_range);
                 validate_semantic_container(
@@ -226,7 +372,7 @@ pub(crate) fn semantic_rule_diagnostics(
                     &child.bare_values,
                     &child_scope,
                     input.hir.as_deref(),
-                    &mut diagnostics,
+                    &mut container_diagnostics,
                     cancellation,
                     child.block_range.is_some(),
                     child.block_range.unwrap_or(child.key_range),
@@ -235,24 +381,37 @@ pub(crate) fn semantic_rule_diagnostics(
                     0,
                 )?;
             }
-            continue;
+        } else {
+            validate_semantic_container(
+                snapshot,
+                &context,
+                &[],
+                &property.block,
+                &property.bare_values,
+                &scope,
+                input.hir.as_deref(),
+                &mut container_diagnostics,
+                cancellation,
+                property.block_range.is_some(),
+                property.block_range.unwrap_or(property.key_range),
+                &mut expansion,
+                &mut quoted_scripts,
+                0,
+            )?;
         }
-        validate_semantic_container(
-            snapshot,
-            &context,
-            &[],
-            &property.block,
-            &property.bare_values,
-            &scope,
-            input.hir.as_deref(),
-            &mut diagnostics,
-            cancellation,
-            property.block_range.is_some(),
-            property.block_range.unwrap_or(property.key_range),
-            &mut expansion,
-            &mut quoted_scripts,
-            0,
-        )?;
+        if fallback_context {
+            // Only key/scope classification depends on the guessed context; value and
+            // cardinality diagnostics fire from matched rules and stay trustworthy.
+            for diagnostic in &mut container_diagnostics {
+                if matches!(
+                    diagnostic.code,
+                    DiagnosticCode::UnknownKey | DiagnosticCode::WrongScope
+                ) {
+                    diagnostic.severity = diagnostic.severity.saturating_add(1);
+                }
+            }
+        }
+        diagnostics.extend(container_diagnostics);
     }
     Ok(diagnostics)
 }
@@ -278,6 +437,19 @@ pub(crate) fn validate_semantic_container(
     if rules.is_empty() {
         return Ok(());
     }
+    let mut exact_rules =
+        std::collections::BTreeMap::<String, Vec<&pdx_rules::SemanticRule>>::new();
+    let mut non_exact_rules = Vec::new();
+    for rule in &rules {
+        if let pdx_rules::KeyMatcher::Exact(key) = &rule.key {
+            exact_rules
+                .entry(key.to_ascii_lowercase())
+                .or_default()
+                .push(*rule);
+        } else {
+            non_exact_rules.push(*rule);
+        }
+    }
     let selected_alternative = semantic_selected_alternative(
         snapshot,
         &rules,
@@ -294,19 +466,27 @@ pub(crate) fn validate_semantic_container(
             .map(|fact| scope_context_from_hir(snapshot.game_profile_handle(), &fact.state));
         let scope = fact_scope.as_ref().unwrap_or(scope);
         let key = property.key.to_ascii_lowercase();
-        let count = counts.entry(key).or_default();
+        let count = counts.entry(key.clone()).or_default();
         *count = count.saturating_add(1);
-        let transparent_wrapper = context.eq_ignore_ascii_case("trigger")
-            && snapshot
-                .game_profile()
-                .is_transparent_scope_wrapper(&property.key);
-        let matching = rules
-            .iter()
+        let profile = snapshot.game_profile();
+        let trigger_like = context.eq_ignore_ascii_case("trigger")
+            || profile.semantic_context_inherits(context, "trigger");
+        let effect_like = context.eq_ignore_ascii_case("effect")
+            || profile.semantic_context_inherits(context, "effect");
+        let transparent_wrapper = (trigger_like
+            && profile.is_transparent_scope_wrapper(&property.key))
+            || ((trigger_like || effect_like)
+                && profile.is_dynamic_scope_expression(&property.key));
+        let matching = exact_rules
+            .get(&key)
+            .into_iter()
+            .flatten()
+            .copied()
+            .chain(non_exact_rules.iter().copied())
             .filter(|rule| {
                 !matches!(rule.shape, RuleShape::LeafValue)
                     && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
             })
-            .copied()
             .collect::<Vec<_>>();
         let parameterized_key = hir.is_some_and(|hir| {
             owner_local_parameter_in_range(
@@ -395,7 +575,11 @@ pub(crate) fn validate_semantic_container(
                     hir,
                     property.range,
                     HirParameterReferenceKind::KeySubstitution,
-                )
+                ) || (property_contains_parameter_token(property)
+                    && hir.parameter_definitions().iter().any(|definition| {
+                        property.range.start() >= definition.owner_range.start()
+                            && property.range.end() <= definition.owner_range.end()
+                    }))
             });
             let arguments_allow_expansion = parameterized_invocation
                 || validate_scripted_macro_arguments(snapshot, applicable, property, diagnostics);
@@ -416,14 +600,23 @@ pub(crate) fn validate_semantic_container(
                     quoted_script_depth,
                 )?;
             }
-            let max_occurs = applicable
-                .iter()
-                .filter(|rule| {
-                    !semantic_rule_is_alias_definition(rule)
-                        && semantic_rule_is_selected(rule, selected_alternative.as_deref())
-                })
-                .filter_map(|rule| rule.max_occurs)
-                .max();
+            let unlimited_occurrences = applicable.iter().any(|rule| {
+                !semantic_rule_is_alias_definition(rule)
+                    && semantic_rule_is_selected(rule, selected_alternative.as_deref())
+                    && rule.max_occurs.is_none()
+            });
+            let max_occurs = if unlimited_occurrences {
+                None
+            } else {
+                applicable
+                    .iter()
+                    .filter(|rule| {
+                        !semantic_rule_is_alias_definition(rule)
+                            && semantic_rule_is_selected(rule, selected_alternative.as_deref())
+                    })
+                    .filter_map(|rule| rule.max_occurs)
+                    .max()
+            };
             if let Some(max_occurs) = max_occurs
                 && *count > max_occurs
             {
@@ -458,6 +651,15 @@ pub(crate) fn validate_semantic_container(
                 fact.parent_path.clone(),
                 scope_context_from_hir(snapshot.game_profile_handle(), &fact.state),
             ))
+        } else if transparent_wrapper
+            && snapshot
+                .game_profile()
+                .is_dynamic_scope_expression(&property.key)
+        {
+            let mut next_scope = scope.clone();
+            next_scope.previous.insert(0, next_scope.current.clone());
+            next_scope.current = "any".to_owned();
+            Some((context.to_owned(), parent_path.to_vec(), next_scope))
         } else {
             semantic_selected_transition(
                 snapshot,
@@ -640,7 +842,10 @@ pub(crate) fn validate_semantic_container(
         if matching.is_empty() && !parameterized_value {
             diagnostics.push(Diagnostic {
                 code: DiagnosticCode::InvalidValue,
-                severity: DiagnosticCode::InvalidValue.severity(),
+                severity: semantic_rule_severity(
+                    rules.iter().copied(),
+                    DiagnosticCode::InvalidValue,
+                ),
                 range: *value_range,
                 message: format!(
                     "bare value `{value}` does not match the semantic rule value clause"
@@ -706,6 +911,9 @@ pub(crate) fn validate_semantic_container(
             let Some(min_occurs) = semantic_min_occurs(rule) else {
                 continue;
             };
+            if min_occurs == 0 {
+                continue;
+            }
             let count = properties
                 .iter()
                 .filter(|property| {
@@ -729,6 +937,19 @@ pub(crate) fn validate_semantic_container(
         }
     }
     Ok(())
+}
+
+fn property_contains_parameter_token(property: &ScriptProperty) -> bool {
+    property.key.contains('$')
+        || property
+            .scalar
+            .as_ref()
+            .is_some_and(|(value, _)| value.contains('$'))
+        || property
+            .bare_values
+            .iter()
+            .any(|(value, _)| value.contains('$'))
+        || property.block.iter().any(property_contains_parameter_token)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -859,7 +1080,9 @@ fn validate_scripted_macro_expansion(
             return Ok(());
         }
         Err(ExpansionEnterFailure::Limit(limit)) => {
-            diagnostics.push(macro_expansion_limit(property.key_range, limit));
+            if expansion.should_report_limit() {
+                diagnostics.push(macro_expansion_limit(property.key_range, limit));
+            }
             return Ok(());
         }
     }
@@ -895,7 +1118,9 @@ fn validate_scripted_macro_expansion(
             return Ok(());
         }
         Ok(Err(ExpansionFailure::Limit(limit))) => {
-            diagnostics.push(macro_expansion_limit(property.key_range, limit));
+            if expansion.should_report_limit() {
+                diagnostics.push(macro_expansion_limit(property.key_range, limit));
+            }
             expansion.leave();
             return Ok(());
         }

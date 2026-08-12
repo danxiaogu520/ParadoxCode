@@ -134,6 +134,15 @@ pub(crate) fn semantic_data_with_cancellation(
         .filter(|reference| semantic_reference_is_active(&inactive_semantic_references, reference))
         .filter(|reference| scripted_macro_reference_is_callable(snapshot, hir, reference))
         .filter(|reference| {
+            !matches!(
+                reference.kind.to_ascii_lowercase().as_str(),
+                "scripted_effect" | "scripted_trigger"
+            ) || !reference
+                .name
+                .chars()
+                .any(|character| character.is_whitespace() || matches!(character, '=' | '{' | '}'))
+        })
+        .filter(|reference| {
             reference.origin != HirReferenceOrigin::ScriptedMacro
                 || workspace_member(snapshot, &reference.kind, &reference.name)
         })
@@ -572,7 +581,10 @@ pub(crate) fn semantic_type_property_is_invalid<'a>(
                     has_concrete = true;
                     any_scalar_concrete = true;
                 }
-                KeyMatcher::Exact(_) | KeyMatcher::AnyScalar | KeyMatcher::Enum(_) => {}
+                KeyMatcher::Exact(_)
+                | KeyMatcher::AnyScalar
+                | KeyMatcher::Date
+                | KeyMatcher::Enum(_) => {}
             }
         }
         by_path.insert(

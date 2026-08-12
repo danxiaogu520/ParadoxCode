@@ -1,5 +1,6 @@
 //! Rule/profile-aware definitions, references, and localisation semantics.
 
+use pdx_parser::parse_quoted_script;
 use pdx_rules::{
     GameProfile, KeyMatcher, ProfileDefinitionRule, RuleSet, RuleShape, TypeDescriptor,
 };
@@ -17,18 +18,49 @@ pub fn semantic_root_context(
     logical_path: Option<&LogicalPath>,
     key: &str,
 ) -> Option<String> {
+    semantic_root_context_with_confidence(rules, logical_path, key).0
+}
+
+/// Returns whether the selected context came from the weakest path-only fallback.
+///
+/// A context chosen by the plain path fallback is a guess from the directory layout
+/// rather than a key/filter-declared match, so diagnostics derived from it are less
+/// trustworthy and callers may downgrade their severity.
+#[must_use]
+pub fn semantic_root_context_is_fallback(
+    rules: &RuleSet,
+    logical_path: Option<&LogicalPath>,
+    key: &str,
+) -> bool {
+    semantic_root_context_with_confidence(rules, logical_path, key).1
+}
+
+fn semantic_root_context_with_confidence(
+    rules: &RuleSet,
+    logical_path: Option<&LogicalPath>,
+    key: &str,
+) -> (Option<String>, bool) {
     if let Some(context) = scripted_macro_path_context(rules, logical_path) {
-        return Some(context);
+        return (Some(context), false);
     }
     let semantic = &rules.model().semantic;
+    // A top-level key may name a rule context directly (`trigger`, `effect`). A
+    // `root:<key>` context that belongs to a type descriptor must not be selected in
+    // an unrelated directory (for example `fervor` inside common/static_modifiers).
+    let key_context_matches_path = |candidate: &str| {
+        semantic
+            .type_descriptors
+            .get(candidate)
+            .is_none_or(|descriptor| semantic_type_path_matches(descriptor, logical_path))
+    };
     if rules.semantic_rules_for_context(key).next().is_some() {
-        return Some(key.to_owned());
+        return (Some(key.to_owned()), false);
     }
     let root = format!("root:{key}");
-    if rules.semantic_rules_for_context(&root).next().is_some() {
-        return Some(root);
+    if rules.semantic_rules_for_context(&root).next().is_some() && key_context_matches_path(key) {
+        return (Some(root), false);
     }
-    semantic
+    if let Some(context) = semantic
         .type_root_keys
         .iter()
         .find(|(type_name, roots)| {
@@ -79,21 +111,78 @@ pub fn semantic_root_context(
                         && semantic_type_path_matches(descriptor, logical_path)
                 })
                 .map(|(type_name, _)| format!("type:{type_name}"))
-                .or_else(|| {
-                    semantic
-                        .type_descriptors
-                        .iter()
-                        .find(|(type_name, descriptor)| {
-                            !semantic.type_root_keys.contains_key(*type_name)
-                                && semantic_type_path_matches(descriptor, logical_path)
-                                && rules
-                                    .semantic_rules_for_context(&format!("root:{type_name}"))
-                                    .next()
-                                    .is_some()
-                        })
-                        .map(|(type_name, _)| format!("type:{type_name}"))
-                })
         })
+        .or_else(|| {
+            semantic
+                .type_descriptors
+                .iter()
+                .find(|(type_name, descriptor)| {
+                    !semantic.type_root_keys.contains_key(*type_name)
+                        && semantic_type_path_matches(descriptor, logical_path)
+                        && descriptor
+                            .type_key_filter
+                            .as_ref()
+                            .is_some_and(|(values, negate)| {
+                                values.iter().any(|value| value.eq_ignore_ascii_case(key))
+                                    != *negate
+                            })
+                        && rules
+                            .semantic_rules_for_context(&format!("root:{type_name}"))
+                            .next()
+                            .is_some()
+                })
+                .map(|(type_name, _)| format!("type:{type_name}"))
+        })
+    {
+        return (Some(context), false);
+    }
+    // Weakest match: any descriptor whose directory contains the file and whose type
+    // has rules, without any key/filter constraint.
+    let context = semantic
+        .type_descriptors
+        .iter()
+        .find(|(type_name, descriptor)| {
+            !semantic.type_root_keys.contains_key(*type_name)
+                && descriptor.type_key_filter.is_none()
+                && semantic_type_path_matches(descriptor, logical_path)
+                && rules
+                    .semantic_rules_for_context(&format!("root:{type_name}"))
+                    .next()
+                    .is_some()
+        })
+        .map(|(type_name, _)| format!("type:{type_name}"));
+    (context.clone(), context.is_some())
+}
+
+/// Selects the semantic context for a type whose definition is the complete file.
+///
+/// Unlike [`semantic_root_context`], this lookup is intentionally independent of a top-level
+/// property key. A `type_per_file` descriptor describes the document root itself, so selecting
+/// its context from an arbitrary first property can otherwise make validation depend on field
+/// order or validate every field as a separate root container.
+#[must_use]
+pub fn semantic_file_root_context(
+    rules: &RuleSet,
+    logical_path: Option<&LogicalPath>,
+) -> Option<String> {
+    let logical_path = logical_path?;
+    if !logical_path.as_str().contains('/') {
+        return None;
+    }
+    rules
+        .model()
+        .semantic
+        .type_descriptors
+        .iter()
+        .find(|(type_name, descriptor)| {
+            descriptor.type_per_file
+                && semantic_type_path_matches(descriptor, Some(logical_path))
+                && rules
+                    .semantic_rules_for_context(&format!("root:{type_name}"))
+                    .next()
+                    .is_some()
+        })
+        .map(|(type_name, _)| format!("type:{type_name}"))
 }
 
 pub(super) fn scripted_macro_path_context(
@@ -150,6 +239,7 @@ fn semantic_type_path_matches(
         .as_str()
         .replace('\\', "/")
         .to_ascii_lowercase();
+    let (_directory, file_name) = path.rsplit_once('/').unwrap_or(("", path.as_str()));
     if !path.contains('/') {
         return true;
     }
@@ -159,7 +249,13 @@ fn semantic_type_path_matches(
             .strip_prefix("game/")
             .unwrap_or(prefix.trim_matches('/'))
             .to_ascii_lowercase();
-        let prefix_match = path == prefix || path.starts_with(&format!("{prefix}/"));
+        // The file may sit directly under the descriptor directory, or under any
+        // directory that ends with it (an absolute path or a cache layout whose
+        // root prefix differs from the game-relative one).
+        let prefix_match = path == prefix
+            || path.starts_with(&format!("{prefix}/"))
+            || _directory == prefix
+            || _directory.ends_with(&format!("/{prefix}"));
         if !prefix_match {
             return false;
         }
@@ -172,7 +268,7 @@ fn semantic_type_path_matches(
         }
     }
     if let Some(file) = descriptor.path_file.as_deref()
-        && !path.ends_with(&file.to_ascii_lowercase())
+        && !file_name.eq_ignore_ascii_case(file)
     {
         return false;
     }
@@ -254,7 +350,9 @@ pub(super) fn lower_semantics(
                     }
                 }
             }
-            if let Some(reference) = reference_from_property(profile, property) {
+            if let Some(reference) = reference_from_property(profile, property, logical_path)
+                && !semantic_rules_describe_property(property, scope_facts, logical_path, rules)
+            {
                 references.push(reference);
             }
         }
@@ -273,6 +371,28 @@ pub(super) fn lower_semantics(
                 });
             }
         }
+
+        for property in properties {
+            let Some(rule) = profile.container_value_definition(&property.key) else {
+                continue;
+            };
+            let Some(named) = nested_property(properties, property, &rule.name_field) else {
+                continue;
+            };
+            let Some(scalar) = named.scalar.as_ref() else {
+                continue;
+            };
+            if !scalar.value.is_empty() {
+                definitions.push(HirDefinition {
+                    kind: rule.kind.clone(),
+                    name: scalar.value.clone(),
+                    range: named.range,
+                    selection_range: scalar.range,
+                });
+            }
+        }
+
+        definitions.extend(quoted_script_value_definitions(properties, profile));
     }
 
     definitions.extend(semantic_type_definitions(properties, logical_path, rules));
@@ -311,6 +431,106 @@ pub(super) fn lower_semantics(
         }));
     }
     (definitions, references)
+}
+
+fn semantic_rules_describe_property(
+    property: &HirProperty,
+    scope_facts: &[ScopeFact],
+    logical_path: Option<&LogicalPath>,
+    rules: &RuleSet,
+) -> bool {
+    let fact = scope_facts
+        .iter()
+        .find(|fact| fact.range == property.key_range);
+    let root_context = semantic_root_context(
+        rules,
+        logical_path,
+        property
+            .path
+            .first()
+            .map(String::as_str)
+            .unwrap_or_default(),
+    );
+    let property_parent_path = property
+        .path
+        .get(1..property.path.len().saturating_sub(1))
+        .unwrap_or_default();
+    let actual_parent_path = fact
+        .as_ref()
+        .map_or(property_parent_path, |fact| fact.parent_path.as_slice());
+    // Dynamic scope-link blocks (country tags, `event_target:name`, province ids) are
+    // not statically selectable, so they emit no fact of their own. The nearest
+    // preceding fact still names the semantic container for their children.
+    let context = fact.as_ref().map(|fact| fact.context.as_str()).or_else(|| {
+        scope_facts
+            .iter()
+            .rfind(|fact| fact.range.end() <= property.key_range.start())
+            .map(|fact| fact.context.as_str())
+    });
+    rules.exact_semantic_rules(&property.key).any(|rule| {
+        (context.is_some_and(|context| rule.context.eq_ignore_ascii_case(context))
+            || root_context.as_deref().is_some_and(|context| {
+                rule.context.eq_ignore_ascii_case(context)
+                    || context.strip_prefix("type:").is_some_and(|type_name| {
+                        rule.context
+                            .eq_ignore_ascii_case(&format!("root:{type_name}"))
+                    })
+            }))
+            && localisation_parent_path_matches(rules, &rule.parent_path, actual_parent_path)
+    })
+}
+
+fn quoted_script_value_definitions(
+    properties: &[HirProperty],
+    profile: &GameProfile,
+) -> Vec<HirDefinition> {
+    let mut definitions = Vec::new();
+    for property in properties {
+        let Some(scalar) = property.scalar.as_ref() else {
+            continue;
+        };
+        if !scalar.quoted || !profile.indexes_quoted_script_definitions(&property.key) {
+            continue;
+        }
+        let source = format!("\"{}\"", scalar.value);
+        let Some(script) = parse_quoted_script(&source) else {
+            continue;
+        };
+        let collected = super::collector::collect(script.parsed());
+        for embedded in &collected.properties {
+            let parent_key = embedded.path.iter().rev().nth(1).map(String::as_str);
+            let Some(kind) = profile.value_definition_kind(&embedded.key, parent_key) else {
+                continue;
+            };
+            let Some(value) = embedded
+                .scalar
+                .as_ref()
+                .filter(|value| !value.value.is_empty())
+            else {
+                continue;
+            };
+            let map_range = |range: TextRange| {
+                let relative = script.source_map().decoded_range(range)?;
+                TextRange::new(
+                    scalar.range.start().checked_add(relative.start())?,
+                    scalar.range.start().checked_add(relative.end())?,
+                )
+            };
+            let Some(range) = map_range(embedded.range) else {
+                continue;
+            };
+            let Some(selection_range) = map_range(value.range) else {
+                continue;
+            };
+            definitions.push(HirDefinition {
+                kind: kind.to_owned(),
+                name: value.value.clone(),
+                range,
+                selection_range,
+            });
+        }
+    }
+    definitions
 }
 
 fn semantic_type_definitions(
@@ -585,7 +805,7 @@ fn semantic_localisation_reference(
     let scalar = property.scalar.as_ref()?;
     // Quoted values are literal text to the game, not localisation key references. A spacer such
     // as `custom_tooltip = " "` must not produce an unknown-symbol diagnostic.
-    if scalar.quoted {
+    if scalar.quoted || scalar.value.contains('$') {
         return None;
     }
     let fact = scope_facts
@@ -607,7 +827,14 @@ fn semantic_localisation_reference(
     let actual_parent_path = fact
         .as_ref()
         .map_or(property_parent_path, |fact| fact.parent_path.as_slice());
-    let context = fact.as_ref().map(|fact| fact.context.as_str());
+    // Dynamic scope-link blocks emit no fact of their own; the nearest preceding
+    // fact still names the semantic container for their children.
+    let context = fact.as_ref().map(|fact| fact.context.as_str()).or_else(|| {
+        scope_facts
+            .iter()
+            .rfind(|fact| fact.range.end() <= property.key_range.start())
+            .map(|fact| fact.context.as_str())
+    });
     let matches_rule = |rule: &pdx_rules::SemanticRule| {
         (context.is_some_and(|context| rule.context.eq_ignore_ascii_case(context))
             || root_context.as_deref().is_some_and(|context| {
@@ -637,10 +864,30 @@ fn localisation_parent_path_matches(
     expected: &[String],
     actual: &[String],
 ) -> bool {
-    expected.len() == actual.len()
-        && expected.iter().zip(actual).all(|(expected, actual)| {
+    // Scope-link keys (country tags, `event_target:name`, province ids) extend the
+    // structural path without changing the semantic container, so the rule parent
+    // path may be a suffix of the observed path.
+    if expected.len() > actual.len() {
+        return false;
+    }
+    let expected_offset = actual.len() - expected.len();
+    expected
+        .iter()
+        .zip(actual.iter().skip(expected_offset))
+        .all(|(expected, actual)| {
             if expected.starts_with('<') && expected.ends_with('>') {
                 !actual.is_empty()
+            } else if expected.eq_ignore_ascii_case("date_field") {
+                pdx_rules::ValueMatcher::Date.matches(
+                    actual,
+                    |_, _| false,
+                    |_, _| false,
+                    |_, _| false,
+                )
+            } else if expected.eq_ignore_ascii_case("int") {
+                actual.parse::<i64>().is_ok()
+            } else if expected.eq_ignore_ascii_case("float") {
+                actual.parse::<f64>().is_ok()
             } else if let Some(enum_name) = expected
                 .strip_prefix("enum[")
                 .and_then(|value| value.strip_suffix(']'))
@@ -779,7 +1026,10 @@ fn localisation_type_instances(
 
     let mut instances = Vec::<(String, TextRange, TextRange)>::new();
     for property in candidates {
-        if !property_key_matches_type(descriptor, &property.key) {
+        // Only container blocks declare type instances; scalar fields inside a parent
+        // block (for example `can_form_personal_unions = yes` inside a religion group)
+        // must not be treated as instances of the child type.
+        if property.scalar.is_some() || !property_key_matches_type(descriptor, &property.key) {
             continue;
         }
         let (name, reference_range) = descriptor
@@ -900,18 +1150,32 @@ fn definition_from_rule(
     }
 }
 
-fn reference_from_property(profile: &GameProfile, property: &HirProperty) -> Option<HirReference> {
-    let kind = profile.reference_kind(&property.key)?;
+fn reference_from_property(
+    profile: &GameProfile,
+    property: &HirProperty,
+    logical_path: Option<&LogicalPath>,
+) -> Option<HirReference> {
+    let rule = profile.reference_rule(&property.key)?;
     let scalar = property.scalar.as_ref()?;
-    if scalar.value.is_empty()
+    // Quoted values are literal text to the game (names, resource identifiers, tooltip
+    // spacers), not symbol references.
+    if scalar.quoted
+        || scalar.value.is_empty()
         || scalar.value.eq_ignore_ascii_case("yes")
         || scalar.value.eq_ignore_ascii_case("no")
         || scalar.value.parse::<f64>().is_ok()
     {
         return None;
     }
+    if logical_path.is_some_and(|path| {
+        rule.excluded_paths
+            .iter()
+            .any(|matcher| matcher.matches(path.as_str()))
+    }) {
+        return None;
+    }
     Some(HirReference {
-        kind: kind.to_owned(),
+        kind: rule.kind.clone(),
         name: scalar.value.clone(),
         range: scalar.range,
         origin: HirReferenceOrigin::Profile,
