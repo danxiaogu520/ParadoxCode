@@ -1,6 +1,6 @@
 //! Read, validate, and decode Vanilla cache databases.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
 
@@ -53,7 +53,7 @@ pub(super) fn load_cancellable(
     path: &Path,
     cancellation: &WorkspaceScanToken,
 ) -> Result<VanillaIndexCache, VanillaCacheError> {
-    load_cancellable_with(path, cancellation, true)
+    load_cancellable_with(path, cancellation, true, None)
 }
 
 /// Loads a cache while skipping the derivation of symbol lookup maps.
@@ -65,13 +65,26 @@ pub(super) fn load_cancellable_for_install(
     path: &Path,
     cancellation: &WorkspaceScanToken,
 ) -> Result<VanillaIndexCache, VanillaCacheError> {
-    load_cancellable_with(path, cancellation, false)
+    load_cancellable_with(path, cancellation, false, None)
+}
+
+/// [`load_cancellable_for_install`] with `(done, total)` row-level progress reports.
+///
+/// The totals are derived from the table-limit validation pass, so the first report fires
+/// before any row is materialized and the final report lands after cross-table validation.
+pub(super) fn load_cancellable_for_install_with_progress(
+    path: &Path,
+    cancellation: &WorkspaceScanToken,
+    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+) -> Result<VanillaIndexCache, VanillaCacheError> {
+    load_cancellable_with(path, cancellation, false, progress)
 }
 
 fn load_cancellable_with(
     path: &Path,
     cancellation: &WorkspaceScanToken,
     build_lookup_maps: bool,
+    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
 ) -> Result<VanillaIndexCache, VanillaCacheError> {
     if cancellation.is_cancelled() {
         return Err(VanillaCacheError::Cancelled);
@@ -92,12 +105,13 @@ fn load_cancellable_with(
     let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let cancellation = cancellation.clone();
     connection.progress_handler(1_000, Some(move || cancellation.is_cancelled()));
-    load_connection(&connection, build_lookup_maps).map_err(map_interrupted)
+    load_connection(&connection, build_lookup_maps, progress).map_err(map_interrupted)
 }
 
 fn load_connection(
     connection: &Connection,
     build_lookup_maps: bool,
+    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
 ) -> Result<VanillaIndexCache, VanillaCacheError> {
     validate_database_identity(connection)?;
     let schema_version = metadata_text(connection, "schema_version")?
@@ -106,7 +120,36 @@ fn load_connection(
     if schema_version != CURRENT_VANILLA_CACHE_SCHEMA_VERSION {
         return Err(VanillaCacheError::UnsupportedSchema(schema_version));
     }
-    validate_table_limits(connection)?;
+    let table_counts = validate_table_limits(connection)?;
+    // Every loaded row plus the derived cross-table validation work: the known-range set
+    // holds one entry per definition and reference, and every navigation position and
+    // localisation preview is checked once against it.
+    let [
+        files,
+        definitions,
+        references,
+        macros,
+        macro_parameters,
+        positions,
+        previews,
+    ] = table_counts;
+    let total = files
+        + definitions
+        + references
+        + macros
+        + macro_parameters
+        + positions
+        + previews
+        + definitions
+        + references
+        + positions
+        + previews;
+    let mut progress = LoadProgress {
+        callback: progress,
+        total,
+        done: 0,
+    };
+    progress.report(0);
     let source_root = decode_path(
         &metadata_blob(connection, "source_root")?,
         &metadata_text(connection, "path_encoding")?,
@@ -122,7 +165,7 @@ fn load_connection(
         .parse::<usize>()
         .map_err(|_| VanillaCacheError::InvalidMetadata("indexed_files"))?;
     let (source_files, index, positions, localisation_previews) =
-        load_index(connection, &source_root, build_lookup_maps)?;
+        load_index(connection, &source_root, build_lookup_maps, &mut progress)?;
     if indexed_files != source_files.len() {
         return Err(VanillaCacheError::InvalidData(format!(
             "metadata records {indexed_files} files but cache contains {}",
@@ -196,10 +239,28 @@ fn metadata_text(connection: &Connection, key: &'static str) -> Result<String, V
     String::from_utf8(bytes).map_err(|_| VanillaCacheError::InvalidMetadata(key))
 }
 
-fn validate_table_limits(connection: &Connection) -> Result<(), VanillaCacheError> {
+/// Shared row-progress accounting for one cache load.
+struct LoadProgress<'a> {
+    callback: Option<&'a (dyn Fn(usize, usize) + Sync)>,
+    total: usize,
+    done: usize,
+}
+
+impl LoadProgress<'_> {
+    /// Adds completed work units and forwards a `(done, total)` report.
+    fn report(&mut self, added: usize) {
+        self.done = self.done.saturating_add(added);
+        if let Some(callback) = self.callback {
+            callback(self.done, self.total);
+        }
+    }
+}
+
+fn validate_table_limits(connection: &Connection) -> Result<[usize; 7], VanillaCacheError> {
     // One scan per table returns both the row count and the longest text field, so the
     // bounds checks never rescan a table. The order matches TABLE_LIMITS so failures can
     // name the offending table statically.
+    let mut counts = [0usize; 7];
     for (index, (table, limit, fields)) in TABLE_LIMITS.iter().enumerate() {
         let fields = fields
             .split(", ")
@@ -219,6 +280,9 @@ fn validate_table_limits(connection: &Connection) -> Result<(), VanillaCacheErro
                 limit,
             ));
         }
+        counts[index] = usize::try_from(count).map_err(|_| {
+            VanillaCacheError::InvalidData("table row count exceeds platform usize".to_owned())
+        })?;
         if max < 0 || usize::try_from(max).map_or(true, |max| max > MAX_TEXT_FIELD_BYTES) {
             return Err(VanillaCacheError::LimitExceeded(
                 "text field byte",
@@ -239,13 +303,14 @@ fn validate_table_limits(connection: &Connection) -> Result<(), VanillaCacheErro
             super::MAX_MACRO_TEMPLATE_BYTES,
         ));
     }
-    Ok(())
+    Ok(counts)
 }
 
 fn load_index(
     connection: &Connection,
     source_root: &Path,
     build_lookup_maps: bool,
+    progress: &mut LoadProgress<'_>,
 ) -> Result<LoadedIndex, VanillaCacheError> {
     let mut source_files = BTreeMap::new();
     let mut shards = BTreeMap::new();
@@ -301,27 +366,39 @@ fn load_index(
             },
         );
     }
-    load_definitions(connection, &mut shards)?;
-    load_macro_definitions(connection, &mut shards)?;
-    load_references(connection, &mut shards)?;
-    let localisation_previews = load_localisation_previews(connection, &shards)?;
+    progress.report(source_files.len());
+    let definition_count = load_definitions(connection, &mut shards)?;
+    progress.report(definition_count);
+    let macro_count = load_macro_definitions(connection, &mut shards)?;
+    progress.report(macro_count);
+    let reference_count = load_references(connection, &mut shards)?;
+    progress.report(reference_count);
+    // Membership sets replace per-position linear scans of a shard's symbol vectors, which
+    // are quadratic for files with tens of thousands of symbols (the EU4 localisation
+    // files). Validation semantics are identical: a position range must belong to a
+    // definition or reference of the same file, and a preview range must belong to a
+    // localisation definition of the same file.
+    let mut known_ranges = HashSet::with_capacity(definition_count.saturating_add(reference_count));
+    let mut localisation_ranges = HashSet::with_capacity(definition_count);
+    for shard in shards.values() {
+        for definition in &shard.definitions {
+            known_ranges.insert((definition.file_id, definition.range));
+            if definition.kind.eq_ignore_ascii_case("localisation") {
+                localisation_ranges.insert((definition.file_id, definition.range));
+            }
+        }
+        for reference in &shard.references {
+            known_ranges.insert((reference.file_id, reference.range));
+        }
+    }
+    progress.report(definition_count.saturating_add(reference_count));
+    let localisation_previews =
+        load_localisation_previews(connection, &shards, &localisation_ranges)?;
+    progress.report(localisation_previews.len());
     let positions = load_navigation_positions(connection)?;
+    progress.report(positions.len());
     for ((file_id, range), position) in &positions {
-        let Some(shard) = shards.get(file_id) else {
-            return Err(VanillaCacheError::InvalidData(format!(
-                "navigation position references unknown file {}",
-                file_id.get()
-            )));
-        };
-        let known_range = shard
-            .definitions
-            .iter()
-            .any(|definition| definition.range == *range)
-            || shard
-                .references
-                .iter()
-                .any(|reference| reference.range == *range);
-        if !known_range {
+        if !known_ranges.contains(&(*file_id, *range)) {
             return Err(VanillaCacheError::InvalidData(format!(
                 "navigation position references unknown range {}..{}",
                 range.start(),
@@ -334,6 +411,7 @@ fn load_index(
             ));
         }
     }
+    progress.report(positions.len());
     Ok((
         source_files,
         if build_lookup_maps {
@@ -353,7 +431,8 @@ fn load_index(
 fn load_macro_definitions(
     connection: &Connection,
     shards: &mut BTreeMap<SourceFileId, FileIndexShard>,
-) -> Result<(), VanillaCacheError> {
+) -> Result<usize, VanillaCacheError> {
+    let mut rows_loaded = 0usize;
     let mut statement = connection.prepare(
         "SELECT file_id, ordinal, kind, name, definition_range_start, definition_range_end, template_payload
          FROM macro_definitions ORDER BY file_id, ordinal",
@@ -415,6 +494,7 @@ fn load_macro_definitions(
             parameters: Vec::new(),
             template,
         });
+        rows_loaded = rows_loaded.saturating_add(1);
     }
     drop(statement);
 
@@ -472,13 +552,15 @@ fn load_macro_definitions(
         summary
             .parameters
             .push(MacroParameterSignature { name, required });
+        rows_loaded = rows_loaded.saturating_add(1);
     }
-    Ok(())
+    Ok(rows_loaded)
 }
 
 fn load_localisation_previews(
     connection: &Connection,
     shards: &BTreeMap<SourceFileId, FileIndexShard>,
+    localisation_ranges: &HashSet<(SourceFileId, TextRange)>,
 ) -> Result<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>, VanillaCacheError> {
     let mut statement = connection.prepare(
         "SELECT file_id, range_start, range_end, language, value
@@ -498,15 +580,13 @@ fn load_localisation_previews(
         let (file_id, start, end, language, value) = row?;
         let file_id = decode_file_id(&file_id)?;
         let range = decode_range(start, end)?;
-        let Some(shard) = shards.get(&file_id) else {
+        if shards.get(&file_id).is_none() {
             return Err(VanillaCacheError::InvalidData(format!(
                 "localisation preview references unknown file {}",
                 file_id.get()
             )));
-        };
-        if !shard.definitions.iter().any(|definition| {
-            definition.range == range && definition.kind.eq_ignore_ascii_case("localisation")
-        }) {
+        }
+        if !localisation_ranges.contains(&(file_id, range)) {
             return Err(VanillaCacheError::InvalidData(format!(
                 "localisation preview range {}..{} is not a localisation definition",
                 range.start(),
@@ -533,7 +613,8 @@ fn load_localisation_previews(
 fn load_definitions(
     connection: &Connection,
     shards: &mut BTreeMap<SourceFileId, FileIndexShard>,
-) -> Result<(), VanillaCacheError> {
+) -> Result<usize, VanillaCacheError> {
+    let mut rows_loaded = 0usize;
     let mut statement = connection.prepare(
         "SELECT file_id, kind, name, range_start, range_end, active
          FROM definitions ORDER BY file_id, ordinal",
@@ -577,14 +658,16 @@ fn load_definitions(
                 range,
                 active,
             });
+        rows_loaded = rows_loaded.saturating_add(1);
     }
-    Ok(())
+    Ok(rows_loaded)
 }
 
 fn load_references(
     connection: &Connection,
     shards: &mut BTreeMap<SourceFileId, FileIndexShard>,
-) -> Result<(), VanillaCacheError> {
+) -> Result<usize, VanillaCacheError> {
+    let mut rows_loaded = 0usize;
     let mut statement = connection.prepare(
         "SELECT file_id, kind, name, range_start, range_end
          FROM symbol_references ORDER BY file_id, ordinal",
@@ -617,8 +700,9 @@ fn load_references(
                 file_id,
                 range,
             });
+        rows_loaded = rows_loaded.saturating_add(1);
     }
-    Ok(())
+    Ok(rows_loaded)
 }
 
 fn load_navigation_positions(

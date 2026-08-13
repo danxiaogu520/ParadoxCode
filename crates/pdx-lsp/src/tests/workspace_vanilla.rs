@@ -573,6 +573,57 @@ fn stale_cache_regeneration_reports_work_done_progress() {
 }
 
 #[test]
+fn valid_cache_load_reports_work_done_progress() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let container = std::env::temp_dir().join(format!("pdx-lsp-valid-cache-progress-{nonce}"));
+    let cache_path = valid_cache_fixture(&container);
+
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&container.join("workspace")),"capabilities":{"window":{"workDoneProgress":true}},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+
+    assert!(
+        responses.iter().any(|value| {
+            value["method"] == "$/progress"
+                && value["params"]["value"]["kind"] == "report"
+                && value["params"]["value"]["message"]
+                    .as_str()
+                    .is_some_and(|message| message.starts_with("Loading Vanilla index"))
+        }),
+        "the cache load must forward row-level progress reports"
+    );
+    assert!(
+        responses.iter().any(|value| {
+            value["method"] == "$/progress" && value["params"]["value"]["kind"] == "end"
+        }),
+        "an end report must be emitted once the worker finishes"
+    );
+    assert!(
+        !responses.iter().any(|value| {
+            value["method"] == "window/showMessage"
+                && value["params"]["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("regenerated"))
+        }),
+        "a matching cache must be loaded without regeneration"
+    );
+    assert_eq!(server.snapshot().source_roots().len(), 2);
+    fs::remove_dir_all(container).expect("cleanup");
+}
+
+#[test]
 fn stale_vanilla_cache_reports_regeneration_failure_explicitly() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

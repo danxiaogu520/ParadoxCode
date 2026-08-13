@@ -122,3 +122,25 @@ pub(crate) fn stale_cache_fixture(container: &std::path::Path) -> std::path::Pat
     stale_cache.save(&cache_path).expect("save stale cache");
     cache_path
 }
+
+/// Builds a cache whose rule hash matches the embedded first-party rules.
+pub(crate) fn valid_cache_fixture(container: &std::path::Path) -> std::path::PathBuf {
+    let workspace = container.join("workspace");
+    let vanilla = container.join("vanilla");
+    fs::create_dir_all(&workspace).expect("workspace directory");
+    fs::create_dir_all(&vanilla).expect("Vanilla directory");
+    let vanilla = fs::canonicalize(&vanilla).expect("canonical Vanilla directory");
+    let cache_path = container.join("vanilla.pdxindex");
+
+    let rules = pdx_game::eu4::first_party_rules().expect("embedded rules");
+    let mut host = AnalysisHost::with_profile(rules, pdx_game::eu4::profile());
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        vanilla,
+    )]));
+    host.refresh_source_roots().expect("scan Vanilla");
+    let cache = VanillaIndexCache::from_snapshot(&host.snapshot()).expect("cache");
+    cache.save(&cache_path).expect("save cache");
+    cache_path
+}

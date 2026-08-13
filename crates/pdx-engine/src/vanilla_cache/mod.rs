@@ -226,11 +226,36 @@ impl VanillaIndexCache {
         read::load_cancellable_for_install(path, cancellation)
     }
 
+    /// [`Self::load_cancellable_for_install`] with `(done, total)` row-level progress reports.
+    ///
+    /// The totals are derived from the table-limit validation pass, so the first report fires
+    /// before any row is materialized and the final report lands after cross-table validation.
+    pub fn load_cancellable_for_install_with_progress(
+        path: &Path,
+        cancellation: &WorkspaceScanToken,
+        progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+    ) -> Result<Self, VanillaCacheError> {
+        read::load_cancellable_for_install_with_progress(path, cancellation, progress)
+    }
+
     /// Atomically replaces a recognized cache database in one SQLite transaction.
     ///
     /// An existing non-cache SQLite file is never overwritten.
     pub fn save(&self, path: &Path) -> Result<(), VanillaCacheError> {
         write::save(self, path)
+    }
+
+    /// [`Self::save`] with per-source-file `(done, total)` progress reports.
+    ///
+    /// The total is the cached source-file count, matching the scan progress that precedes the
+    /// save during a background rebuild; the position and preview tables are written after the
+    /// final report.
+    pub fn save_with_progress(
+        &self,
+        path: &Path,
+        progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+    ) -> Result<(), VanillaCacheError> {
+        write::save_with_progress(self, path, progress)
     }
 
     /// Returns immutable cache metadata.

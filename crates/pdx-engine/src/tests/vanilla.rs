@@ -92,6 +92,52 @@ fn vanilla_cache_preserves_scripted_macro_references_without_hir() {
 }
 
 #[test]
+fn corrupted_navigation_position_is_rejected_without_symbol_table_scans() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-vanilla-position-cache-{nonce}"));
+    let vanilla = root.join("vanilla");
+    fs::create_dir_all(vanilla.join("events")).expect("event directory");
+    fs::write(
+        vanilla.join("events/position.txt"),
+        "country_event = { id = corrupted.position }",
+    )
+    .expect("vanilla event");
+
+    let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    let mut host = AnalysisHost::with_profile(rules, pdx_game::eu4::profile());
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+    )]));
+    host.refresh_source_roots().expect("scan Vanilla");
+    let cache = VanillaIndexCache::from_snapshot(&host.snapshot()).expect("build cache");
+    let cache_path = root.join("cache/vanilla.pdxindex");
+    cache.save(&cache_path).expect("save cache");
+    assert!(
+        VanillaIndexCache::load(&cache_path).is_ok(),
+        "valid cache loads"
+    );
+
+    let connection = rusqlite::Connection::open(&cache_path).expect("open cache for corruption");
+    connection
+        .execute(
+            "UPDATE navigation_positions SET range_start = range_start + 1",
+            [],
+        )
+        .expect("corrupt navigation range");
+    drop(connection);
+    assert!(matches!(
+        VanillaIndexCache::load(&cache_path),
+        Err(VanillaCacheError::InvalidData(_))
+    ));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

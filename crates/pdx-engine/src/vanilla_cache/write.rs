@@ -13,6 +13,19 @@ use super::{
 };
 
 pub(super) fn save(cache: &VanillaIndexCache, path: &Path) -> Result<(), VanillaCacheError> {
+    save_with_progress(cache, path, None)
+}
+
+/// [`save`] with per-source-file `(done, total)` progress reports.
+///
+/// The total is the cached source-file count, matching the scan progress that precedes the
+/// save during a background rebuild; the position and preview tables are written after the
+/// final report.
+pub(super) fn save_with_progress(
+    cache: &VanillaIndexCache,
+    path: &Path,
+    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+) -> Result<(), VanillaCacheError> {
     if let Some(parent) = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
@@ -30,7 +43,7 @@ pub(super) fn save(cache: &VanillaIndexCache, path: &Path) -> Result<(), Vanilla
         validate_database_identity(&connection)?;
     }
     let transaction = connection.transaction()?;
-    write_cache(&transaction, cache)?;
+    write_cache(&transaction, cache, progress)?;
     transaction.commit()?;
     Ok(())
 }
@@ -38,6 +51,7 @@ pub(super) fn save(cache: &VanillaIndexCache, path: &Path) -> Result<(), Vanilla
 fn write_cache(
     transaction: &Transaction<'_>,
     cache: &VanillaIndexCache,
+    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
 ) -> Result<(), VanillaCacheError> {
     transaction.execute_batch(
         "DROP TABLE IF EXISTS macro_parameters;
@@ -168,6 +182,7 @@ fn write_cache(
         "INSERT INTO macro_parameters(file_id, macro_ordinal, ordinal, name, required)
          VALUES (?1, ?2, ?3, ?4, ?5)",
     )?;
+    let mut files_written = 0usize;
     for (id, file) in &cache.source_files {
         let shard = cache.index.shard(*id).ok_or_else(|| {
             VanillaCacheError::InvalidData(format!(
@@ -175,6 +190,7 @@ fn write_cache(
                 file.logical_path.as_str()
             ))
         })?;
+        files_written = files_written.saturating_add(1);
         insert_source_file.execute(params![
             encode_file_id(*id),
             file.logical_path.as_str(),
@@ -273,6 +289,9 @@ fn write_cache(
                     i64::from(parameter.required),
                 ])?;
             }
+        }
+        if let Some(progress) = progress {
+            progress(files_written, cache.source_files.len());
         }
     }
     drop(insert_source_file);

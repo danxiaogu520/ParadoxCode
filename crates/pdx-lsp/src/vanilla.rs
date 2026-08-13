@@ -32,9 +32,10 @@ pub(crate) fn run_vanilla_cache_load(
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &VanillaSetupCancellation,
 ) -> Result<(VanillaIndexCache, String), String> {
-    let loaded = match VanillaIndexCache::load_cancellable_for_install(
+    let loaded = match VanillaIndexCache::load_cancellable_for_install_with_progress(
         path,
         &cancellation.workspace,
+        progress,
     ) {
         Ok(loaded) => loaded,
         Err(error) => {
@@ -197,7 +198,7 @@ fn build_cache_from_source(
         .map_err(|error| format!("{activity} failed while indexing {source:?}: {error}"))?;
     let cache = VanillaIndexCache::from_snapshot(&host.snapshot())
         .map_err(|error| format!("{activity} failed: {error}"))?;
-    cache.save(path).map_err(|error| {
+    cache.save_with_progress(path, progress).map_err(|error| {
         format!(
             "{activity} could not be saved to {}: {error}",
             path.display()

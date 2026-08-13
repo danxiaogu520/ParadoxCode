@@ -45,16 +45,21 @@ fn work_done_progress_end(token: &str, message: &str) -> Value {
     })
 }
 
-/// Builds the worker progress callback that forwards engine scan progress as `$/progress` reports.
+/// Builds the worker progress callback that forwards engine progress as `$/progress` reports.
+///
+/// `discovering` is shown while the work unit total is still unknown; `indexing` carries the
+/// running `(done/total)` counter once the engine knows the full scope.
 fn vanilla_progress_sender(
     sender: mpsc::Sender<TransportEvent>,
     token: String,
+    discovering: &'static str,
+    indexing: &'static str,
 ) -> impl Fn(usize, usize) {
     move |done, total| {
         let message = if total == 0 {
-            "Discovering Vanilla files…".to_owned()
+            format!("{discovering}…")
         } else {
-            format!("Indexing Vanilla files ({done}/{total})…")
+            format!("{indexing} ({done}/{total})…")
         };
         let mut value = json!({"kind": "report", "message": message});
         if let Some(percent) = done
@@ -310,6 +315,8 @@ impl LspServer {
                                     Some(Box::new(vanilla_progress_sender(
                                         sender.clone(),
                                         progress_token.clone(),
+                                        "Loading Vanilla index",
+                                        "Loading Vanilla index",
                                     )))
                                 } else {
                                     write_message(
@@ -371,6 +378,8 @@ impl LspServer {
                                     Some(Box::new(vanilla_progress_sender(
                                         sender.clone(),
                                         progress_token.clone(),
+                                        "Discovering Vanilla files",
+                                        "Indexing Vanilla files",
                                     )))
                                 } else {
                                     write_message(
