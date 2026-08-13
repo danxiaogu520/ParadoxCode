@@ -275,3 +275,150 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
     assert!(snapshot.file_state(vanilla_localisation.file_id).is_none());
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-dependency-cache-{nonce}"));
+    let dependency = root.join("dependency");
+    fs::create_dir_all(dependency.join("common/scripted_effects")).expect("macro directory");
+    fs::create_dir_all(dependency.join("events")).expect("event directory");
+    fs::write(
+        dependency.join("common/scripted_effects/dep_effects.txt"),
+        "dep_cached_effect = { value = $amount$ }\n",
+    )
+    .expect("macro definitions");
+    fs::write(
+        dependency.join("events/dep_events.txt"),
+        "country_event = { id = dep.1 immediate = { dep_cached_effect = { amount = 1 } } }\n",
+    )
+    .expect("dependency events");
+    let dependency_path = fs::canonicalize(&dependency).expect("canonical dependency root");
+    let dependency_root = SourceRoot::new(
+        SourceRootId::new(42),
+        SourceRootKind::Dependency,
+        dependency_path.clone(),
+    );
+
+    // Build the cache from a dedicated dependency-only workspace.
+    let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    let mut builder = AnalysisHost::with_profile(rules, pdx_game::eu4::profile());
+    builder.apply_change(WorkspaceChange::SetSourceRoots(vec![
+        dependency_root.clone(),
+    ]));
+    builder.refresh_source_roots().expect("scan dependency");
+    let cache = VanillaIndexCache::from_snapshot(&builder.snapshot()).expect("build cache");
+    let cache_path = root.join("cache/dependency.pdxindex");
+    cache.save(&cache_path).expect("save cache");
+
+    // The cache restores the non-Vanilla root identity.
+    let loaded = VanillaIndexCache::load(&cache_path).expect("load cache");
+    assert_eq!(loaded.source_root().id, dependency_root.id);
+    assert_eq!(loaded.source_root().kind, SourceRootKind::Dependency);
+
+    // Install into a workspace where the dependency root is configured but not scanned.
+    let mut host = AnalysisHost::with_profile(
+        pdx_game::eu4::first_party_rules().unwrap(),
+        pdx_game::eu4::profile(),
+    );
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![
+        dependency_root.clone(),
+    ]));
+    host.install_index_cache(loaded)
+        .expect("install dependency cache");
+    let snapshot = host.snapshot();
+    let definition = snapshot
+        .index()
+        .active_definition("event", "dep.1")
+        .expect("cached dependency definition is queryable");
+    assert_eq!(
+        snapshot
+            .source_files()
+            .get(&definition.file_id)
+            .expect("dependency file metadata")
+            .root_id,
+        dependency_root.id
+    );
+    assert!(
+        snapshot.file_state(definition.file_id).is_none(),
+        "cached dependency files are never materialized"
+    );
+    assert!(snapshot.index().references_iter().any(|reference| {
+        reference.kind == "scripted_effect" && reference.name == "dep_cached_effect"
+    }));
+    let macro_after_install = snapshot
+        .index()
+        .active_macro_definition("scripted_effect", "dep_cached_effect")
+        .expect("cached dependency macro remains active");
+    assert!(macro_after_install.template.is_some());
+    let kinds = snapshot
+        .index()
+        .references_iter()
+        .map(|reference| (reference.kind.as_str(), reference.name.as_str()))
+        .collect::<Vec<_>>();
+    assert!(
+        kinds.contains(&("scripted_effect", "dep_cached_effect")),
+        "scripted_effect references after install: {kinds:?}"
+    );
+
+    // A subsequent root refresh must skip the installed cache root.
+    host.refresh_source_roots().expect("refresh workspace");
+    assert!(
+        host.snapshot()
+            .index()
+            .active_definition("event", "dep.1")
+            .is_some()
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn dependency_index_cache_rejects_an_unrelated_configured_root() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-dependency-mismatch-{nonce}"));
+    let dependency = root.join("dependency");
+    fs::create_dir_all(dependency.join("events")).expect("event directory");
+    fs::write(
+        dependency.join("events/mismatch.txt"),
+        "country_event = { id = mismatch.1 }\n",
+    )
+    .expect("dependency events");
+    let dependency_path = fs::canonicalize(&dependency).expect("canonical dependency root");
+
+    let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    let mut builder = AnalysisHost::with_profile(rules, pdx_game::eu4::profile());
+    builder.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(7),
+        SourceRootKind::Dependency,
+        dependency_path.clone(),
+    )]));
+    builder.refresh_source_roots().expect("scan dependency");
+    let cache = VanillaIndexCache::from_snapshot(&builder.snapshot()).expect("build cache");
+    let cache_path = root.join("cache/dependency.pdxindex");
+    cache.save(&cache_path).expect("save cache");
+    let loaded = VanillaIndexCache::load(&cache_path).expect("load cache");
+
+    // The configured root claims the same id but a different directory.
+    let other = root.join("other");
+    fs::create_dir_all(&other).expect("other directory");
+    let mut host = AnalysisHost::with_profile(
+        pdx_game::eu4::first_party_rules().unwrap(),
+        pdx_game::eu4::profile(),
+    );
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(7),
+        SourceRootKind::Dependency,
+        fs::canonicalize(&other).expect("canonical other root"),
+    )]));
+    assert!(matches!(
+        host.install_index_cache(loaded),
+        Err(VanillaCacheError::InvalidData(_))
+    ));
+    fs::remove_dir_all(root).expect("cleanup");
+}

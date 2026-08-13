@@ -20,8 +20,15 @@ mod read;
 mod template_codec;
 mod write;
 
-/// Current on-disk Vanilla cache schema.
-pub const CURRENT_VANILLA_CACHE_SCHEMA_VERSION: u32 = 5;
+/// Current on-disk cache schema.
+///
+/// Schema 6 records the cached source root identity (`root_id` and `root_kind` metadata), which
+/// allows a single cache format to serve any game-data layer. Schema 5 caches remain loadable
+/// and are interpreted as Vanilla.
+pub const CURRENT_VANILLA_CACHE_SCHEMA_VERSION: u32 = 6;
+
+/// Oldest on-disk cache schema this executable can still load.
+pub const MIN_SUPPORTED_CACHE_SCHEMA_VERSION: u32 = 5;
 
 const APPLICATION_ID: i32 = 0x5044_5856;
 const MAX_CACHE_BYTES: u64 = 1024 * 1024 * 1024;
@@ -94,31 +101,24 @@ impl VanillaIndexCache {
         )
     }
 
-    /// Builds a cache from a dedicated Vanilla-only workspace snapshot.
+    /// Builds a cache from a dedicated single-root workspace snapshot.
+    ///
+    /// The snapshot must contain exactly one source root; its identity is recorded in the cache
+    /// and restored on load, so the same format serves the Vanilla installation and dependency
+    /// layers.
     pub fn from_snapshot(snapshot: &AnalysisSnapshot) -> Result<Self, VanillaCacheError> {
         let [root] = snapshot.source_roots() else {
             return Err(VanillaCacheError::InvalidData(
-                "a Vanilla cache must be built from exactly one source root".to_owned(),
+                "a cache must be built from exactly one source root".to_owned(),
             ));
         };
-        if root.kind != SourceRootKind::Vanilla {
-            return Err(VanillaCacheError::InvalidData(
-                "the cache source root is not marked as Vanilla".to_owned(),
-            ));
-        }
-        if root.id != VANILLA_ROOT_ID {
-            return Err(VanillaCacheError::InvalidData(format!(
-                "the Vanilla source root must use reserved id {}",
-                VANILLA_ROOT_ID.get()
-            )));
-        }
         if let Some(file) = snapshot.source_files().values().find(|file| {
             !snapshot
                 .game_profile()
                 .allows_scan_file(file.logical_path.as_str())
         }) {
             return Err(VanillaCacheError::InvalidData(format!(
-                "Vanilla file {} is outside the active profile scan whitelist",
+                "cache file {} is outside the active profile scan whitelist",
                 file.logical_path.as_str()
             )));
         }
@@ -215,7 +215,7 @@ impl VanillaIndexCache {
 
     /// Loads a cache for immediate installation, skipping the derivation of lookup maps.
     ///
-    /// [`AnalysisHost::install_vanilla_cache`] merges the cache shards with the workspace and
+    /// [`crate::AnalysisHost::install_index_cache`] merges the cache shards with the workspace and
     /// rebuilds the maps once, so the maps a full load derives would be discarded. Validation
     /// is identical to [`Self::load_cancellable`]; the returned cache must not be used for
     /// symbol queries before installation.
@@ -387,4 +387,23 @@ impl From<rusqlite::Error> for VanillaCacheError {
 fn put_fingerprint_field(hasher: &mut Sha256, value: &[u8]) {
     hasher.update(u64::try_from(value.len()).unwrap_or(u64::MAX).to_le_bytes());
     hasher.update(value);
+}
+
+/// Canonical on-disk spelling of a cached source root kind.
+pub(super) fn root_kind_name(kind: SourceRootKind) -> &'static str {
+    match kind {
+        SourceRootKind::Vanilla => "vanilla",
+        SourceRootKind::Dependency => "dependency",
+        SourceRootKind::CurrentMod => "current_mod",
+    }
+}
+
+/// Parses the canonical on-disk spelling of a cached source root kind.
+pub(super) fn parse_root_kind(name: &str) -> Result<SourceRootKind, VanillaCacheError> {
+    match name {
+        "vanilla" => Ok(SourceRootKind::Vanilla),
+        "dependency" => Ok(SourceRootKind::Dependency),
+        "current_mod" => Ok(SourceRootKind::CurrentMod),
+        _ => Err(VanillaCacheError::InvalidMetadata("root_kind")),
+    }
 }

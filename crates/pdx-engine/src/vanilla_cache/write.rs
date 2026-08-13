@@ -154,6 +154,11 @@ fn write_cache(
             "indexed_files",
             cache.metadata.indexed_files.to_string().into_bytes(),
         ),
+        ("root_id", cache.root.id.get().to_le_bytes().to_vec()),
+        (
+            "root_kind",
+            super::root_kind_name(cache.root.kind).as_bytes().to_vec(),
+        ),
         ("path_encoding", path_encoding.as_bytes().to_vec()),
         ("source_root", source_root),
     ] {

@@ -1,5 +1,7 @@
 use super::*;
 
+use crate::dependency::run_dependency_cache_load;
+
 /// Monotonic nonce for work-done-progress tokens and their create-request ids.
 fn progress_nonce() -> u128 {
     std::time::SystemTime::now()
@@ -49,7 +51,7 @@ fn work_done_progress_end(token: &str, message: &str) -> Value {
 ///
 /// `discovering` is shown while the work unit total is still unknown; `indexing` carries the
 /// running `(done/total)` counter once the engine knows the full scope.
-fn vanilla_progress_sender(
+fn progress_sender(
     sender: mpsc::Sender<TransportEvent>,
     token: String,
     discovering: &'static str,
@@ -68,7 +70,7 @@ fn vanilla_progress_sender(
         {
             value["percentage"] = json!(u32::try_from(percent).unwrap_or(100));
         }
-        let _ = sender.send(TransportEvent::VanillaProgress(VanillaProgress {
+        let _ = sender.send(TransportEvent::Progress(Progress {
             params: json!({"token": token, "value": value}),
         }));
     }
@@ -111,6 +113,9 @@ impl LspServer {
             let mut in_flight_vanilla = None::<VanillaSetupCancellation>;
             let mut vanilla_cache_in_flight = false;
             let mut vanilla_progress_token = None::<String>;
+            let mut in_flight_dependency = None::<WorkspaceScanToken>;
+            let mut dependency_cache_in_flight = false;
+            let mut dependency_progress_token = None::<String>;
             let mut in_flight_disk_changes = None::<InFlightDiskChanges>;
             let mut deferred_messages = VecDeque::<Value>::new();
 
@@ -130,10 +135,13 @@ impl LspServer {
                 let disk_changes_busy =
                     !self.pending_disk_changes.is_empty() || in_flight_disk_changes.is_some();
                 let vanilla_cache_busy = vanilla_cache_in_flight && in_flight_vanilla.is_some();
+                let dependency_cache_busy =
+                    dependency_cache_in_flight && in_flight_dependency.is_some();
                 let deferred_ready = !parse_busy
                     && !initialize_busy
                     && !disk_changes_busy
                     && !vanilla_cache_busy
+                    && !dependency_cache_busy
                     && !deferred_messages.is_empty();
                 let (event, from_reader) = if deferred_ready {
                     let message = deferred_messages.pop_front().expect("checked non-empty");
@@ -180,10 +188,13 @@ impl LspServer {
                             || in_flight_disk_changes.is_some();
                         let vanilla_cache_busy =
                             vanilla_cache_in_flight && in_flight_vanilla.is_some();
+                        let dependency_cache_busy =
+                            dependency_cache_in_flight && in_flight_dependency.is_some();
                         if from_reader
                             && (((parse_busy || disk_changes_busy)
                                 && is_snapshot_request_message(&message))
                                 || (vanilla_cache_busy && is_snapshot_request_message(&message))
+                                || (dependency_cache_busy && is_snapshot_request_message(&message))
                                 || (initialize_busy && !is_initialize_control_message(&message)))
                         {
                             deferred_messages.push_back(message);
@@ -229,6 +240,9 @@ impl LspServer {
                             if let Some(task) = in_flight_vanilla.as_ref() {
                                 task.cancel();
                             }
+                            if let Some(task) = in_flight_dependency.as_ref() {
+                                task.cancel();
+                            }
                             if let Some(task) = in_flight_disk_changes.as_ref() {
                                 task.cancellation.cancel();
                             }
@@ -253,40 +267,49 @@ impl LspServer {
                             .take()
                             .expect("checked initialize task");
                         self.cancelled.remove(&result.request_id);
-                        let (response, warnings, auto_vanilla, vanilla_cache) = match result.result
-                        {
-                            Ok(prepared) if !task.cancellation.is_cancelled() => {
-                                self.host = prepared.host;
-                                self.state = ServerState::Initialized;
-                                self.watcher_registration = prepared.watcher_registration;
-                                self.client_work_done_progress = prepared.client_work_done_progress;
-                                self.client_snippet_support = prepared.client_snippet_support;
-                                (
-                                    json!({
-                                        "jsonrpc": JSON_RPC_VERSION,
-                                        "id": result.id,
-                                        "result": prepared.result,
-                                    }),
-                                    prepared.warnings,
-                                    prepared.auto_vanilla,
-                                    prepared.vanilla_cache,
-                                )
-                            }
-                            Ok(_) => {
-                                self.state = ServerState::Uninitialized;
-                                (
-                                    RpcError::new(REQUEST_CANCELLED, "request was cancelled")
-                                        .response(result.id),
-                                    Vec::new(),
-                                    None,
-                                    None,
-                                )
-                            }
-                            Err(error) => {
-                                self.state = ServerState::Uninitialized;
-                                (error.response(result.id), Vec::new(), None, None)
-                            }
-                        };
+                        let (response, warnings, auto_vanilla, vanilla_cache, dependency_caches) =
+                            match result.result {
+                                Ok(prepared) if !task.cancellation.is_cancelled() => {
+                                    self.host = prepared.host;
+                                    self.state = ServerState::Initialized;
+                                    self.watcher_registration = prepared.watcher_registration;
+                                    self.client_work_done_progress =
+                                        prepared.client_work_done_progress;
+                                    self.client_snippet_support = prepared.client_snippet_support;
+                                    (
+                                        json!({
+                                            "jsonrpc": JSON_RPC_VERSION,
+                                            "id": result.id,
+                                            "result": prepared.result,
+                                        }),
+                                        prepared.warnings,
+                                        prepared.auto_vanilla,
+                                        prepared.vanilla_cache,
+                                        prepared.dependency_caches,
+                                    )
+                                }
+                                Ok(_) => {
+                                    self.state = ServerState::Uninitialized;
+                                    (
+                                        RpcError::new(REQUEST_CANCELLED, "request was cancelled")
+                                            .response(result.id),
+                                        Vec::new(),
+                                        None,
+                                        None,
+                                        Vec::new(),
+                                    )
+                                }
+                                Err(error) => {
+                                    self.state = ServerState::Uninitialized;
+                                    (
+                                        error.response(result.id),
+                                        Vec::new(),
+                                        None,
+                                        None,
+                                        Vec::new(),
+                                    )
+                                }
+                            };
                         write_message(&mut output, &response)?;
                         for warning in warnings {
                             write_message(&mut output, &show_warning_notification(warning))?;
@@ -312,7 +335,7 @@ impl LspServer {
                                             "Loading Vanilla index…",
                                         ),
                                     )?;
-                                    Some(Box::new(vanilla_progress_sender(
+                                    Some(Box::new(progress_sender(
                                         sender.clone(),
                                         progress_token.clone(),
                                         "Loading Vanilla index",
@@ -375,7 +398,7 @@ impl LspServer {
                                             "Building Vanilla index…",
                                         ),
                                     )?;
-                                    Some(Box::new(vanilla_progress_sender(
+                                    Some(Box::new(progress_sender(
                                         sender.clone(),
                                         progress_token.clone(),
                                         "Discovering Vanilla files",
@@ -412,6 +435,72 @@ impl LspServer {
                                     sender.send(TransportEvent::VanillaSetup(VanillaSetupResult {
                                         result,
                                     }));
+                            });
+                        }
+                        if !dependency_caches.is_empty() {
+                            let cancellation = WorkspaceScanToken::new();
+                            let sender = event_sender.clone();
+                            let worker_cancellation = cancellation.clone();
+                            let rules = self.host.snapshot().rules().clone();
+                            let profile = self.host.snapshot().game_profile().clone();
+                            let current_rule_hash = rules.rule_hash().to_hex();
+                            let progress_token = format!("pdx-dependency-{}", progress_nonce());
+                            let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
+                                if self.client_work_done_progress {
+                                    write_message(
+                                        &mut output,
+                                        &work_done_progress_create(&progress_token),
+                                    )?;
+                                    write_message(
+                                        &mut output,
+                                        &work_done_progress_begin(
+                                            &progress_token,
+                                            "Loading dependency index…",
+                                        ),
+                                    )?;
+                                    Some(Box::new(progress_sender(
+                                        sender.clone(),
+                                        progress_token.clone(),
+                                        "Loading dependency index",
+                                        "Indexing dependency files",
+                                    )))
+                                } else {
+                                    write_message(
+                                        &mut output,
+                                        &show_info_notification(
+                                            "Dependency indexes are being loaded in the background…"
+                                                .to_owned(),
+                                        ),
+                                    )?;
+                                    None
+                                };
+                            dependency_progress_token = if self.client_work_done_progress {
+                                Some(progress_token.clone())
+                            } else {
+                                None
+                            };
+                            in_flight_dependency = Some(cancellation);
+                            dependency_cache_in_flight = true;
+                            scope.spawn(move || {
+                                let results = dependency_caches
+                                    .into_iter()
+                                    .map(|config| {
+                                        let result = run_dependency_cache_load(
+                                            &config,
+                                            rules.clone(),
+                                            profile.clone(),
+                                            current_rule_hash.clone(),
+                                            progress.as_deref().map(|callback| {
+                                                callback as &(dyn Fn(usize, usize) + Sync)
+                                            }),
+                                            &worker_cancellation,
+                                        );
+                                        (config, result)
+                                    })
+                                    .collect();
+                                let _ = sender.send(TransportEvent::DependencySetup(
+                                    DependencySetupResult { results },
+                                ));
                             });
                         }
                     }
@@ -461,7 +550,7 @@ impl LspServer {
                         };
                         write_message(&mut output, &response)?;
                     }
-                    TransportEvent::VanillaProgress(result) => {
+                    TransportEvent::Progress(result) => {
                         write_message(
                             &mut output,
                             &json!({
@@ -470,6 +559,78 @@ impl LspServer {
                                 "params": result.params,
                             }),
                         )?;
+                    }
+                    TransportEvent::DependencySetup(result) => {
+                        in_flight_dependency = None;
+                        dependency_cache_in_flight = false;
+                        if let Some(token) = dependency_progress_token.take() {
+                            let message = result
+                                .results
+                                .iter()
+                                .map(|(_, result)| match result {
+                                    Ok((_, message)) => message.clone(),
+                                    Err(message) => message.clone(),
+                                })
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            write_message(&mut output, &work_done_progress_end(&token, &message))?;
+                        }
+                        let mut diagnostics_dirty = false;
+                        for (config, result) in result.results {
+                            match result {
+                                Ok((cache, message)) => {
+                                    let cache_rule_hash = cache.metadata().rule_hash.clone();
+                                    let current_rule_hash =
+                                        self.host.snapshot().rules().rule_hash().to_hex();
+                                    match self.host.install_index_cache(cache) {
+                                        Ok(()) => {
+                                            diagnostics_dirty = true;
+                                            if cache_rule_hash != current_rule_hash {
+                                                write_message(
+                                                    &mut output,
+                                                    &show_warning_notification(format!(
+                                                        "{message}; the installed dependency cache was built with rules hash {cache_rule_hash}, but the active rules hash is {current_rule_hash}"
+                                                    )),
+                                                )?;
+                                            } else {
+                                                write_message(
+                                                    &mut output,
+                                                    &show_info_notification(message),
+                                                )?;
+                                            }
+                                        }
+                                        Err(error) => write_message(
+                                            &mut output,
+                                            &show_warning_notification(format!(
+                                                "dependency cache for {} could not be enabled in this workspace: {error}",
+                                                config.root.path.display()
+                                            )),
+                                        )?,
+                                    }
+                                }
+                                Err(message) => {
+                                    write_message(&mut output, &show_warning_notification(message))?
+                                }
+                            }
+                        }
+                        if diagnostics_dirty {
+                            let open = self
+                                .host
+                                .snapshot()
+                                .documents()
+                                .iter()
+                                .filter_map(|(id, document)| {
+                                    document.version().map(|version| (id.clone(), version))
+                                })
+                                .collect::<Vec<_>>();
+                            for (id, version) in open {
+                                self.schedule_diagnostics_for_document(
+                                    id,
+                                    version,
+                                    DIAGNOSTIC_DEBOUNCE,
+                                );
+                            }
+                        }
                     }
                     TransportEvent::VanillaSetup(result) => {
                         in_flight_vanilla = None;

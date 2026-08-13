@@ -24,6 +24,10 @@ struct WorkspaceInitializationOptions {
 struct DependencyConfiguration {
     id: String,
     path: PathBuf,
+    /// Optional persistent index cache for this dependency. When configured, the dependency is
+    /// not scanned live; the cache is loaded (or built once in the background) instead.
+    #[serde(default)]
+    index: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
@@ -42,6 +46,18 @@ pub(crate) struct ResolvedSourceRoots {
     pub(crate) roots: Vec<SourceRoot>,
     pub(crate) vanilla_cache: Option<PathBuf>,
     pub(crate) vanilla_explicit: bool,
+    /// Dependencies configured with a persistent index cache. These roots are excluded from
+    /// live scanning and are installed from their cache files instead.
+    pub(crate) dependency_caches: Vec<DependencyIndexCache>,
+}
+
+/// A dependency configured with a persistent index cache.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct DependencyIndexCache {
+    /// The configured dependency root with its caller-assigned identity and order.
+    pub(crate) root: SourceRoot,
+    /// Where the cache file is stored (or will be built).
+    pub(crate) index_path: PathBuf,
 }
 pub(crate) fn resolve_source_roots(
     client_root: Option<&Path>,
@@ -127,7 +143,7 @@ pub(crate) fn resolve_source_roots(
                 )
             })?,
     };
-    let mut configured = Vec::<(String, PathBuf)>::new();
+    let mut configured = Vec::<(String, PathBuf, Option<PathBuf>)>::new();
     let mut root_ids = BTreeMap::<u32, String>::new();
     for dependency in project.dependencies.unwrap_or_default() {
         if dependency.id.trim().is_empty() {
@@ -147,14 +163,41 @@ pub(crate) fn resolve_source_roots(
         }
         if configured
             .iter()
-            .any(|(id, _)| id.eq_ignore_ascii_case(&dependency.id))
+            .any(|(id, _, _)| id.eq_ignore_ascii_case(&dependency.id))
         {
             return Err(RpcError::new(
                 INVALID_PARAMS,
                 format!("duplicate dependency id: {}", dependency.id),
             ));
         }
-        let path = resolve_directory(&dependency.path, base.as_deref(), "dependency path")?;
+        // An indexed dependency may keep its source directory offline because the cache holds
+        // all indexed data; the directory is validated again when a rebuild is needed. Live
+        // dependencies must exist because they are scanned every session.
+        let path = match dependency.index.as_ref() {
+            Some(_) => {
+                let path =
+                    resolve_configured_path(&dependency.path, base.as_deref(), "dependency path")?;
+                if path.is_dir() {
+                    fs::canonicalize(&path).map_err(|error| {
+                        RpcError::new(
+                            INVALID_PARAMS,
+                            format!("cannot resolve dependency path: {error}"),
+                        )
+                    })?
+                } else {
+                    path
+                }
+            }
+            None => resolve_directory(&dependency.path, base.as_deref(), "dependency path")?,
+        };
+        let index = match dependency.index {
+            None => None,
+            Some(index) => Some(resolve_configured_path(
+                &index,
+                base.as_deref(),
+                "dependency index",
+            )?),
+        };
         let root_id = stable_dependency_root_id(&dependency.id);
         if let Some(previous) = root_ids.insert(root_id, dependency.id.clone()) {
             return Err(RpcError::new(
@@ -165,10 +208,13 @@ pub(crate) fn resolve_source_roots(
                 ),
             ));
         }
-        configured.push((dependency.id, path));
+        configured.push((dependency.id, path, index));
     }
 
-    let mut paths = configured.iter().map(|(_, path)| path).collect::<Vec<_>>();
+    let mut paths = configured
+        .iter()
+        .map(|(_, path, _)| path)
+        .collect::<Vec<_>>();
     if let Some(current_mod) = current_mod.as_ref() {
         paths.push(current_mod);
     }
@@ -187,8 +233,9 @@ pub(crate) fn resolve_source_roots(
         }
     }
 
-    let mut roots = Vec::with_capacity(configured.len() + usize::from(current_mod.is_some()));
-    for (order, (id, path)) in configured.into_iter().enumerate() {
+    let mut roots = Vec::with_capacity(configured.len().saturating_add(1));
+    let mut dependency_caches = Vec::new();
+    for (order, (id, path, index)) in configured.into_iter().enumerate() {
         let mut root = SourceRoot::new(
             SourceRootId::new(stable_dependency_root_id(&id)),
             SourceRootKind::Dependency,
@@ -200,7 +247,10 @@ pub(crate) fn resolve_source_roots(
                 "too many dependency roots to assign stable order",
             )
         })?;
-        roots.push(root);
+        match index {
+            Some(index_path) => dependency_caches.push(DependencyIndexCache { root, index_path }),
+            None => roots.push(root),
+        }
     }
     if let Some(path) = current_mod.clone() {
         roots.push(SourceRoot::new(
@@ -214,6 +264,7 @@ pub(crate) fn resolve_source_roots(
         roots,
         vanilla_cache: vanilla_index_cache,
         vanilla_explicit,
+        dependency_caches,
     })
 }
 
@@ -273,7 +324,7 @@ fn resolve_path(
     })
 }
 
-fn stable_dependency_root_id(id: &str) -> u32 {
+pub(crate) fn stable_dependency_root_id(id: &str) -> u32 {
     let mut value = 0x811c9dc5_u32;
     for byte in id.bytes().map(|byte| byte.to_ascii_lowercase()) {
         value = (value ^ u32::from(byte)).wrapping_mul(0x0100_0193);

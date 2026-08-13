@@ -32,6 +32,34 @@ roots, pass `.pdx/project.toml` through Zed initialization options:
 }
 ```
 
+Alternatively configure the roots inline; the extension declares a JSON Schema for these options, so
+Zed offers completion, validation, and hover documentation while editing the settings file:
+
+```json
+{
+  "lsp": {
+    "pdx-ls": {
+      "initialization_options": {
+        "modDirectory": "D:/Games/MyMod",
+        "dependencies": [
+          {
+            "id": "gui-xu",
+            "path": "D:/SteamLibrary/workshop/content/236850/3047072888",
+            "index": "D:/Games/MyMod/.pdx/cache/gui-xu.pdxindex"
+          }
+        ],
+        "vanillaIndexCache": "D:/Games/EU4/vanilla.pdxindex"
+      }
+    }
+  }
+}
+```
+
+While a dependency declares `index`, `pdx-ls` loads the persistent cache instead of scanning the
+dependency live, and rebuilds it in the background when the file is missing. After changing the
+dependency, rebuild its cache (`pdx index dependency --id <id> --source <path> --output <cache>`)
+and restart the language server; remove the `index` field to fall back to live scanning.
+
 Restart the language server after changing initialization options. The extension does not implement
 symbol extraction, scope derivation, diagnostics, Vanilla discovery or rule interpretation.
 

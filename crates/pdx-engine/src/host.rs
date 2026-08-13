@@ -1,8 +1,8 @@
 //! Mutable workspace owner and atomic state transitions.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use pdx_rules::{GameProfile, ParserKind, RuleSet};
@@ -12,7 +12,7 @@ use crate::index::{FileIndexShard, WorkspaceIndex};
 use crate::model::{
     DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId, DocumentSnapshot,
     DocumentSource, FileState, LocalisationPreview, PreparedDocument, SourceFile, SourceFileId,
-    SourceRoot, SourceRootKind, TextChange, WorkspaceChange, WorkspaceError,
+    SourceRoot, SourceRootId, SourceRootKind, TextChange, WorkspaceChange, WorkspaceError,
     WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
 };
 use crate::pipeline::{
@@ -43,6 +43,7 @@ pub struct AnalysisHost {
     index: Arc<WorkspaceIndex>,
     scan_report: Arc<WorkspaceScanReport>,
     vanilla_root: Option<SourceRoot>,
+    installed_caches: BTreeSet<SourceRootId>,
     vanilla_localisation_previews: Arc<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>>,
     query_cache: Arc<SnapshotQueryCache>,
 }
@@ -77,6 +78,7 @@ impl AnalysisHost {
             index: Arc::new(WorkspaceIndex::empty()),
             scan_report: Arc::new(WorkspaceScanReport::default()),
             vanilla_root: None,
+            installed_caches: BTreeSet::new(),
             vanilla_localisation_previews: Arc::new(BTreeMap::new()),
             query_cache: Arc::new(SnapshotQueryCache::new()),
         }
@@ -104,6 +106,7 @@ impl AnalysisHost {
             WorkspaceChange::SetSourceRoots(roots) => {
                 self.roots = Arc::from(roots);
                 self.vanilla_root = None;
+                self.installed_caches = BTreeSet::new();
                 self.vanilla_localisation_previews = Arc::new(BTreeMap::new());
             }
             WorkspaceChange::SetWorkspaceRoot(root) => self.workspace_root = root,
@@ -119,6 +122,23 @@ impl AnalysisHost {
         &mut self,
         cache: VanillaIndexCache,
     ) -> Result<(), VanillaCacheError> {
+        let vanilla = cache.source_root().clone();
+        self.install_index_cache(cache)?;
+        self.vanilla_root = Some(vanilla);
+        Ok(())
+    }
+
+    /// Installs a validated persistent index cache for any configured source root.
+    ///
+    /// The cached root may already be configured (a dependency with an explicit index): its
+    /// identity must then match the configured root and the cache replaces live scanning for it.
+    /// An unknown cached root (the Vanilla installation) is inserted at the front of the root
+    /// order. The cache's rule hash is intentionally not required to match; it remains observable
+    /// in metadata so the caller can decide whether to refresh.
+    pub fn install_index_cache(
+        &mut self,
+        cache: VanillaIndexCache,
+    ) -> Result<(), VanillaCacheError> {
         if cache.metadata().game_id != self.rules.game_id()
             || cache.metadata().game_id != self.profile.game_id
         {
@@ -127,24 +147,46 @@ impl AnalysisHost {
                 actual: cache.metadata().game_id.clone(),
             });
         }
-        let vanilla = cache.source_root();
-        for root in self.roots.iter() {
-            if root.id == vanilla.id {
-                return Err(VanillaCacheError::InvalidData(format!(
-                    "reserved Vanilla root id {} is already configured",
-                    vanilla.id.get()
-                )));
+        let cached_root = cache.source_root().clone();
+        let mut roots = self.roots.to_vec();
+        match roots.iter_mut().find(|root| root.id == cached_root.id) {
+            Some(configured) => {
+                if configured.kind != cached_root.kind {
+                    return Err(VanillaCacheError::InvalidData(format!(
+                        "cached root kind {:?} does not match configured root {} for id {}",
+                        cached_root.kind,
+                        configured.path.display(),
+                        cached_root.id.get()
+                    )));
+                }
+                if !paths_match(&configured.path, &cached_root.path) {
+                    return Err(VanillaCacheError::InvalidData(format!(
+                        "cached root path {} does not match configured root {}",
+                        cached_root.path.display(),
+                        configured.path.display()
+                    )));
+                }
+                // The configured root keeps its caller-assigned order; only its index data
+                // is replaced.
             }
-            if root.kind == SourceRootKind::Vanilla {
-                return Err(VanillaCacheError::InvalidData(
-                    "a Vanilla source root is already configured".to_owned(),
-                ));
-            }
-            if vanilla.path.starts_with(&root.path) || root.path.starts_with(&vanilla.path) {
-                return Err(VanillaCacheError::RootConflict {
-                    vanilla: vanilla.path.clone(),
-                    configured: root.path.clone(),
-                });
+            None => {
+                for root in roots.iter() {
+                    if root.kind == cached_root.kind {
+                        return Err(VanillaCacheError::InvalidData(format!(
+                            "a {:?} source root is already configured",
+                            cached_root.kind
+                        )));
+                    }
+                    if cached_root.path.starts_with(&root.path)
+                        || root.path.starts_with(&cached_root.path)
+                    {
+                        return Err(VanillaCacheError::RootConflict {
+                            vanilla: cached_root.path.clone(),
+                            configured: root.path.clone(),
+                        });
+                    }
+                }
+                roots.insert(0, cached_root.clone());
             }
         }
         if let Some(file) = cache
@@ -153,13 +195,12 @@ impl AnalysisHost {
             .find(|file| !self.profile.allows_scan_file(file.logical_path.as_str()))
         {
             return Err(VanillaCacheError::InvalidData(format!(
-                "Vanilla cache file {} is outside the active profile scan whitelist",
+                "cache file {} is outside the active profile scan whitelist",
                 file.logical_path.as_str()
             )));
         }
 
-        let (_, vanilla, mut files, cached_index, cached_positions, cached_previews) =
-            cache.into_parts();
+        let (_, _, mut files, cached_index, cached_positions, cached_previews) = cache.into_parts();
         for (id, file) in self.source_files.iter() {
             if let Some(cached) = files.insert(*id, file.clone()) {
                 return Err(VanillaCacheError::InvalidData(format!(
@@ -171,11 +212,8 @@ impl AnalysisHost {
         }
         let mut shards = cached_index.shards.into_values().collect::<Vec<_>>();
         shards.extend(self.index.shards.values().cloned());
-        let mut roots = Vec::with_capacity(self.roots.len().saturating_add(1));
-        roots.push(vanilla.clone());
-        roots.extend(self.roots.iter().cloned());
         // One combined build sets the case policy and derives the lookup maps together, so the
-        // merged Vanilla + workspace shards are not rebuilt twice.
+        // merged cache + workspace shards are not rebuilt twice.
         let mut index = WorkspaceIndex::from_shards_with_rules(shards, self.rules.as_ref());
         index.replace_all_position_ranges(cached_positions);
         for (file_id, state) in self.file_states.iter() {
@@ -184,12 +222,14 @@ impl AnalysisHost {
         let priorities = source_priorities(&roots, &files);
         index.resolve_priorities(&priorities, self.rules.as_ref());
 
+        let mut localisation_previews = (*self.vanilla_localisation_previews).clone();
+        localisation_previews.extend(cached_previews);
         self.roots = Arc::from(roots);
         self.source_files = Arc::new(files);
         self.source_file_paths = Arc::new(source_file_paths(&self.source_files));
         self.index = Arc::new(index);
-        self.vanilla_root = Some(vanilla);
-        self.vanilla_localisation_previews = Arc::new(cached_previews);
+        self.vanilla_localisation_previews = Arc::new(localisation_previews);
+        self.installed_caches.insert(cached_root.id);
         self.revision = self.revision.saturating_add(1);
         Ok(())
     }
@@ -251,11 +291,7 @@ impl AnalysisHost {
         let mut report = WorkspaceScanReport::default();
         for root in self.roots.iter() {
             cancellation.checkpoint()?;
-            if self
-                .vanilla_root
-                .as_ref()
-                .is_some_and(|vanilla| vanilla.id == root.id)
-            {
+            if self.installed_caches.contains(&root.id) {
                 continue;
             }
             let mut paths = Vec::new();
@@ -338,11 +374,11 @@ impl AnalysisHost {
             .values()
             .map(|state| state.shard().clone())
             .collect::<Vec<_>>();
-        if let Some(vanilla) = self.vanilla_root.as_ref() {
+        if !self.installed_caches.is_empty() {
             for (id, cached) in self
                 .source_files
                 .iter()
-                .filter(|(_, file)| file.root_id == vanilla.id)
+                .filter(|(_, file)| self.installed_caches.contains(&file.root_id))
             {
                 if let Some(existing) = files.insert(*id, cached.clone()) {
                     return Err(WorkspaceError::FileIdCollision {
@@ -358,7 +394,7 @@ impl AnalysisHost {
                     .filter(|(id, _)| {
                         self.source_files
                             .get(id)
-                            .is_some_and(|file| file.root_id == vanilla.id)
+                            .is_some_and(|file| self.installed_caches.contains(&file.root_id))
                     })
                     .map(|(_, shard)| shard.clone()),
             );
@@ -387,7 +423,7 @@ impl AnalysisHost {
             .filter(|root| files.values().any(|file| file.root_id == root.id))
             .nth(1)
             .is_some();
-        if self.vanilla_root.is_some() || has_multiple_source_roots {
+        if !self.installed_caches.is_empty() || has_multiple_source_roots {
             index.resolve_priorities_cancellable(&priorities, self.rules.as_ref(), cancellation)?;
         }
         cancellation.checkpoint()?;
@@ -802,4 +838,19 @@ fn source_file_paths(files: &BTreeMap<SourceFileId, SourceFile>) -> HashMap<Path
         paths.entry(file.physical_path.clone()).or_insert(*id);
     }
     paths
+}
+
+/// Compares two configured/cached root paths tolerating an offline source directory.
+///
+/// A cached root keeps the canonical path recorded at build time; the configured root may be a
+/// plain absolute path, and its source directory may no longer exist. Equal canonical forms
+/// (when both resolve) or identical raw paths are accepted.
+fn paths_match(left: &Path, right: &Path) -> bool {
+    if left == right {
+        return true;
+    }
+    match (fs::canonicalize(left), fs::canonicalize(right)) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
 }

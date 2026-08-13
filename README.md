@@ -102,7 +102,8 @@ artifact is not committed to the repository.
 ## Development setup
 
 The current alpha can launch `pdx-ls` from a configured path or from `PATH`. Workspace source roots
-are configured through `.pdx/project.toml`.
+are configured through `.pdx/project.toml` or, in Zed, through `lsp.pdx-ls.initialization_options`
+in `.zed/settings.json`.
 The documented setup is for contributors and is not the final installation experience.
 
 Let ParadoxCode discover, validate, index, and remember the local EU4 installation:
@@ -123,6 +124,42 @@ pdx index vanilla \
   --source /path/to/eu4 \
   --output /path/to/vanilla.pdxindex
 ```
+
+Large dependency Mods can be indexed once and loaded from the persistent cache on every launch
+instead of being rescanned:
+
+```bash
+pdx index dependency \
+  --id gui-xu \
+  --source /path/to/dependency-mod \
+  --output /path/to/dependency.pdxindex
+```
+
+The `id` must match the dependency id configured in the editor. In Zed, the cache is declared in
+`.zed/settings.json`; `pdx-ls` loads it in the background and rebuilds it automatically when the
+file is missing (a rules-hash change regenerates it like the Vanilla cache):
+
+```json
+{
+  "lsp": {
+    "pdx-ls": {
+      "initialization_options": {
+        "dependencies": [
+          {
+            "id": "gui-xu",
+            "path": "/path/to/dependency-mod",
+            "index": "/path/to/dependency.pdxindex"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+While `index` is set, the dependency is not scanned live; after changing the dependency, rebuild
+its cache with `pdx index dependency` and restart the language server (command palette
+`pdx-ls: restart`). Remove the `index` field to fall back to live scanning.
 
 The CLI and language server use the embedded first-party EU4 JSON source. `pdx-ls` materializes a
 validated SQLite runtime artifact in the user cache and rejects external rule inputs.

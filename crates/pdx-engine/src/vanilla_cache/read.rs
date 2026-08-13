@@ -13,7 +13,9 @@ use crate::index::{
 };
 use crate::model::LocalisationPreview;
 use crate::scan::stable_file_id;
-use crate::{SourceFile, SourceFileId, SourceRoot, SourceRootKind, WorkspaceScanToken};
+use crate::{
+    SourceFile, SourceFileId, SourceRoot, SourceRootId, SourceRootKind, WorkspaceScanToken,
+};
 
 use super::codec::{
     decode_file_id, decode_path, decode_position_component, decode_range, join_logical_path,
@@ -22,8 +24,9 @@ use super::codec::{
 use super::template_codec;
 use super::{
     APPLICATION_ID, CURRENT_VANILLA_CACHE_SCHEMA_VERSION, LoadedIndex, MAX_CACHE_BYTES,
-    MAX_CACHE_FILES, MAX_CACHE_SYMBOLS, MAX_TEXT_FIELD_BYTES, VANILLA_ROOT_ID, VanillaCacheError,
-    VanillaIndexCache, VanillaIndexCacheMetadata,
+    MAX_CACHE_FILES, MAX_CACHE_SYMBOLS, MAX_TEXT_FIELD_BYTES, MIN_SUPPORTED_CACHE_SCHEMA_VERSION,
+    VANILLA_ROOT_ID, VanillaCacheError, VanillaIndexCache, VanillaIndexCacheMetadata,
+    parse_root_kind,
 };
 
 /// Row-count and text-length limits per table, in validation order.
@@ -117,7 +120,9 @@ fn load_connection(
     let schema_version = metadata_text(connection, "schema_version")?
         .parse::<u32>()
         .map_err(|_| VanillaCacheError::InvalidMetadata("schema_version"))?;
-    if schema_version != CURRENT_VANILLA_CACHE_SCHEMA_VERSION {
+    if !(MIN_SUPPORTED_CACHE_SCHEMA_VERSION..=CURRENT_VANILLA_CACHE_SCHEMA_VERSION)
+        .contains(&schema_version)
+    {
         return Err(VanillaCacheError::UnsupportedSchema(schema_version));
     }
     let table_counts = validate_table_limits(connection)?;
@@ -154,6 +159,21 @@ fn load_connection(
         &metadata_blob(connection, "source_root")?,
         &metadata_text(connection, "path_encoding")?,
     )?;
+    // Schema 5 caches predate root-identity metadata and are by definition Vanilla.
+    let root = if schema_version >= 6 {
+        let root_id = u32::from_le_bytes(
+            metadata_blob(connection, "root_id")?
+                .try_into()
+                .map_err(|_| VanillaCacheError::InvalidMetadata("root_id"))?,
+        );
+        SourceRoot::new(
+            SourceRootId::new(root_id),
+            parse_root_kind(&metadata_text(connection, "root_kind")?)?,
+            source_root,
+        )
+    } else {
+        SourceRoot::new(VANILLA_ROOT_ID, SourceRootKind::Vanilla, source_root)
+    };
     let game_id = metadata_text(connection, "game_id")?;
     let rule_hash = metadata_text(connection, "rule_hash")?;
     let source_identity = metadata_text(connection, "source_identity")?;
@@ -165,7 +185,7 @@ fn load_connection(
         .parse::<usize>()
         .map_err(|_| VanillaCacheError::InvalidMetadata("indexed_files"))?;
     let (source_files, index, positions, localisation_previews) =
-        load_index(connection, &source_root, build_lookup_maps, &mut progress)?;
+        load_index(connection, &root, build_lookup_maps, &mut progress)?;
     if indexed_files != source_files.len() {
         return Err(VanillaCacheError::InvalidData(format!(
             "metadata records {indexed_files} files but cache contains {}",
@@ -184,7 +204,7 @@ fn load_connection(
             created_unix_seconds,
             indexed_files,
         },
-        root: SourceRoot::new(VANILLA_ROOT_ID, SourceRootKind::Vanilla, source_root),
+        root,
         source_files,
         index,
         localisation_previews,
@@ -308,7 +328,7 @@ fn validate_table_limits(connection: &Connection) -> Result<[usize; 7], VanillaC
 
 fn load_index(
     connection: &Connection,
-    source_root: &Path,
+    root: &SourceRoot,
     build_lookup_maps: bool,
     progress: &mut LoadProgress<'_>,
 ) -> Result<LoadedIndex, VanillaCacheError> {
@@ -332,7 +352,7 @@ fn load_index(
         let id = decode_file_id(&id)?;
         let logical_path = LogicalPath::parse(&logical_path)
             .map_err(|error| VanillaCacheError::InvalidData(error.to_string()))?;
-        if stable_file_id(VANILLA_ROOT_ID, &logical_path) != id.get() {
+        if stable_file_id(root.id, &logical_path) != id.get() {
             return Err(VanillaCacheError::InvalidData(format!(
                 "file id does not match logical path {}",
                 logical_path.as_str()
@@ -343,8 +363,8 @@ fn load_index(
         })?;
         let file = SourceFile {
             id,
-            root_id: VANILLA_ROOT_ID,
-            physical_path: join_logical_path(source_root, &logical_path),
+            root_id: root.id,
+            physical_path: join_logical_path(&root.path, &logical_path),
             logical_path,
             category_id,
             resolution: parse_resolution(&resolution)?,

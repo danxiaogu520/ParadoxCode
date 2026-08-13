@@ -480,9 +480,69 @@ impl zed::Extension for ParadoxCodeExtension {
         let args = configured_args.unwrap_or_default();
         Ok(zed::Command::new(binary).args(args))
     }
+
+    fn language_server_initialization_options_schema(
+        &mut self,
+        language_server_id: &zed::LanguageServerId,
+        _worktree: &zed::Worktree,
+    ) -> Option<serde_json::Value> {
+        if language_server_id.as_ref() != LANGUAGE_SERVER_ID {
+            return None;
+        }
+        Some(initialization_options_schema())
+    }
 }
 
 zed::register_extension!(ParadoxCodeExtension);
+
+/// JSON Schema for `lsp.pdx-ls.initialization_options`.
+///
+/// Mirrors the `WorkspaceInitializationOptions` accepted by `pdx-ls`: `projectConfig`,
+/// `modDirectory`, `vanillaIndexCache`, and the dependency list with its optional persistent
+/// index cache. Zed uses this schema to offer completion, validation, and documentation while
+/// the user edits `.zed/settings.json`.
+fn initialization_options_schema() -> serde_json::Value {
+    serde_json::json!({
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+            "projectConfig": {
+                "type": "string",
+                "description": "Path to a `.pdx/project.toml` whose fields are overridden by the inline options below."
+            },
+            "modDirectory": {
+                "type": "string",
+                "description": "Directory of the current Mod being edited. Defaults to the workspace root."
+            },
+            "vanillaIndexCache": {
+                "type": "string",
+                "description": "Path to a persistent Vanilla index cache (`.pdxindex`). When absent, `pdx-ls` attempts automatic discovery once."
+            },
+            "dependencies": {
+                "type": "array",
+                "description": "Dependency Mods in order from lowest to highest priority.",
+                "items": {
+                    "type": "object",
+                    "required": ["id", "path"],
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "description": "Stable dependency identity used for symbol resolution."
+                        },
+                        "path": {
+                            "type": "string",
+                            "description": "Directory of the dependency Mod."
+                        },
+                        "index": {
+                            "type": "string",
+                            "description": "Optional persistent index cache (`.pdxindex`). When set, the dependency is not scanned live; the cache is loaded and rebuilt in the background when missing. Rebuild after changing the dependency by running `pdx index dependency --id <id> --source <path> --output <cache>` and restarting the language server."
+                        }
+                    }
+                }
+            }
+        }
+    })
+}
 
 /// Returns the extension's development identifier.
 #[must_use]
@@ -497,6 +557,7 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    use super::initialization_options_schema;
     use flate2::Compression;
     use flate2::write::{DeflateEncoder, GzEncoder};
 
@@ -626,6 +687,33 @@ mod tests {
         archive.extend_from_slice(&central_offset.to_le_bytes());
         archive.extend_from_slice(&0_u16.to_le_bytes());
         archive
+    }
+
+    #[test]
+    fn initialization_options_schema_describes_the_pdx_ls_workspace_options() {
+        let schema = initialization_options_schema();
+        let properties = schema["properties"].as_object().expect("schema properties");
+        for key in [
+            "projectConfig",
+            "modDirectory",
+            "vanillaIndexCache",
+            "dependencies",
+        ] {
+            assert!(properties.contains_key(key), "missing {key}");
+        }
+        let dependencies = properties["dependencies"].clone();
+        assert_eq!(dependencies["type"], "array");
+        let items = dependencies["items"].as_object().expect("dependency items");
+        assert_eq!(items["required"], serde_json::json!(["id", "path"]));
+        for key in ["id", "path", "index"] {
+            assert!(
+                items["properties"]
+                    .as_object()
+                    .expect("item properties")
+                    .contains_key(key)
+            );
+        }
+        assert_eq!(schema["type"], "object");
     }
 
     #[test]

@@ -16,7 +16,9 @@ use pdx_game::{
     validate_installation_for_source,
 };
 
-const USAGE: &str = "usage:\n  pdx --version\n  pdx index vanilla --source <EU4 directory> --output <cache.pdxindex>\n  pdx setup vanilla [--game eu4] [--deep] [--root <directory>]... [--source <game directory>]\n  pdx check policy|zed|release|grammar-fuzz|all [--root <repository root>]\n  pdx release package --version <semver> --target <target> --binary <path> --output-dir <path> [--root <repository root>]\n  pdx release verify --version <semver> --directory <path> [--root <repository root>]\n  pdx dev prepare-manifest [--root <repository root>]";
+use crate::workspace::stable_dependency_root_id;
+
+const USAGE: &str = "usage:\n  pdx --version\n  pdx index vanilla --source <EU4 directory> --output <cache.pdxindex>\n  pdx index dependency --id <id> --source <directory> --output <cache.pdxindex>\n  pdx setup vanilla [--game eu4] [--deep] [--root <directory>]... [--source <game directory>]\n  pdx check policy|zed|release|grammar-fuzz|all [--root <repository root>]\n  pdx release package --version <semver> --target <target> --binary <path> --output-dir <path> [--root <repository root>]\n  pdx release verify --version <semver> --directory <path> [--root <repository root>]\n  pdx dev prepare-manifest [--root <repository root>]";
 const SUPPORTED_GAME_INSTALLATIONS: &[GameInstallDescriptor] = &[pdx_game::eu4::INSTALL_DESCRIPTOR];
 
 /// Executes one `pdx` command and returns text intended for stdout.
@@ -25,6 +27,9 @@ pub fn execute_pdx(args: &[String]) -> Result<String, CliError> {
         [argument] if argument == "--version" || argument == "-V" => Ok("pdx 0.1.0".to_owned()),
         [index, vanilla, rest @ ..] if index == "index" && vanilla == "vanilla" => {
             index_vanilla(rest)
+        }
+        [index, dependency, rest @ ..] if index == "index" && dependency == "dependency" => {
+            index_dependency(rest)
         }
         [setup, vanilla, rest @ ..] if setup == "setup" && vanilla == "vanilla" => {
             let paths = UserPaths::platform()?;
@@ -202,7 +207,15 @@ fn setup_game(
     };
 
     let cache_path = paths.vanilla_cache(descriptor.game_id);
-    let summary = match build_eu4_cache(&selected, &cache_path) {
+    let summary = match build_cache(
+        SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            selected.clone(),
+        ),
+        &cache_path,
+        "Vanilla",
+    ) {
         Ok(summary) => summary,
         Err(error) => {
             let game = configuration
@@ -302,18 +315,79 @@ fn index_vanilla(args: &[String]) -> Result<String, CliError> {
         )));
     }
 
-    build_eu4_cache(&source, &output)
+    build_cache(
+        SourceRoot::new(SourceRootId::new(0), SourceRootKind::Vanilla, source),
+        &output,
+        "Vanilla",
+    )
 }
 
-fn build_eu4_cache(source: &std::path::Path, output: &std::path::Path) -> Result<String, CliError> {
+fn index_dependency(args: &[String]) -> Result<String, CliError> {
+    let mut id = None::<String>;
+    let mut source = None::<PathBuf>;
+    let mut output = None::<PathBuf>;
+    let mut index = 0;
+    while index < args.len() {
+        let flag = &args[index];
+        let value = args
+            .get(index + 1)
+            .ok_or_else(|| CliError::Usage(format!("missing value for {flag}\n\n{USAGE}")))?;
+        let duplicate = match flag.as_str() {
+            "--id" => id.replace(value.clone()).is_some(),
+            "--source" => source.replace(PathBuf::from(value)).is_some(),
+            "--output" => output.replace(PathBuf::from(value)).is_some(),
+            _ => {
+                return Err(CliError::Usage(format!(
+                    "unknown option: {flag}\n\n{USAGE}"
+                )));
+            }
+        };
+        if duplicate {
+            return Err(CliError::Usage(format!(
+                "option supplied more than once: {flag}"
+            )));
+        }
+        index += 2;
+    }
+    let id = required_value(id, "--id")?;
+    if id.trim().is_empty() || id != id.trim() {
+        return Err(CliError::Usage(format!(
+            "dependency id must not be empty or have surrounding whitespace: {id}\n\n{USAGE}"
+        )));
+    }
+    let source = required_path(source, "--source")?;
+    let output = required_path(output, "--output")?;
+    let source = std::fs::canonicalize(&source).map_err(|error| CliError::Path {
+        field: "--source",
+        path: source,
+        error,
+    })?;
+    if !source.is_dir() {
+        return Err(CliError::Usage(format!(
+            "--source is not a directory: {}",
+            source.display()
+        )));
+    }
+    build_cache(
+        SourceRoot::new(
+            SourceRootId::new(stable_dependency_root_id(&id)),
+            SourceRootKind::Dependency,
+            source,
+        ),
+        &output,
+        &format!("Dependency {id}"),
+    )
+}
+
+fn build_cache(
+    root: SourceRoot,
+    output: &std::path::Path,
+    label: &str,
+) -> Result<String, CliError> {
     let started = Instant::now();
     let rules = pdx_game::eu4::first_party_rules()?;
     let mut host = AnalysisHost::with_profile(rules, pdx_game::eu4::profile());
-    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-        SourceRootId::new(0),
-        SourceRootKind::Vanilla,
-        source.to_owned(),
-    )]));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![root]));
     let scan_started = Instant::now();
     let report = host.refresh_source_roots()?;
     let scan_elapsed = scan_started.elapsed();
@@ -324,7 +398,7 @@ fn build_eu4_cache(source: &std::path::Path, output: &std::path::Path) -> Result
     cache.save(output)?;
     let save_elapsed = save_started.elapsed();
     Ok(format!(
-        "Vanilla cache written to {}\nindexed files: {}\nlegacy encoded files: {}\nskipped entries: {}\nscan time: {} ms\ncache materialization: {} ms\ncache save: {} ms\ntotal time: {} ms\nsource fingerprint: {}\nrules hash: {}",
+        "{label} cache written to {}\nindexed files: {}\nlegacy encoded files: {}\nskipped entries: {}\nscan time: {} ms\ncache materialization: {} ms\ncache save: {} ms\ntotal time: {} ms\nsource fingerprint: {}\nrules hash: {}",
         output.display(),
         cache.metadata().indexed_files,
         report.legacy_encoded_files,
@@ -336,6 +410,10 @@ fn build_eu4_cache(source: &std::path::Path, output: &std::path::Path) -> Result
         cache.metadata().source_fingerprint,
         cache.metadata().rule_hash
     ))
+}
+
+fn required_value(value: Option<String>, flag: &'static str) -> Result<String, CliError> {
+    value.ok_or_else(|| CliError::Usage(format!("missing required option: {flag}\n\n{USAGE}")))
 }
 
 fn required_path(value: Option<PathBuf>, flag: &'static str) -> Result<PathBuf, CliError> {
@@ -698,7 +776,7 @@ fn extract_toml_value(block: &str, key: &str) -> String {
 mod tests {
     use std::fs;
 
-    use pdx_engine::VanillaIndexCache;
+    use pdx_engine::{SourceRootId, SourceRootKind, VanillaIndexCache};
     use pdx_game::{DiscoveryOutcome, UserConfiguration, UserPaths};
 
     use super::{CliError, execute_pdx, setup_vanilla};
@@ -749,6 +827,45 @@ mod tests {
             refreshed.metadata().source_fingerprint,
             first_cache.metadata().source_fingerprint
         );
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn index_dependency_builds_a_cache_with_the_stable_root_identity() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pdx-cli-dependency-cache-{nonce}"));
+        let source = root.join("dependency");
+        fs::create_dir_all(source.join("common/events")).expect("fixture directory");
+        fs::write(
+            source.join("common/events/definitions.txt"),
+            "country_event = { id = dep.1 }\n",
+        )
+        .expect("fixture source");
+        let output = root.join("cache/dependency.pdxindex");
+        let args = vec![
+            "index".to_owned(),
+            "dependency".to_owned(),
+            "--id".to_owned(),
+            "dep-a".to_owned(),
+            "--source".to_owned(),
+            source.display().to_string(),
+            "--output".to_owned(),
+            output.display().to_string(),
+        ];
+
+        let summary = execute_pdx(&args).expect("build dependency cache");
+        assert!(summary.contains("Dependency dep-a cache written to"));
+        assert!(summary.contains("indexed files: 1"));
+        let cache = VanillaIndexCache::load(&output).expect("load dependency cache");
+        assert_eq!(cache.source_root().kind, SourceRootKind::Dependency);
+        assert_eq!(
+            cache.source_root().id,
+            SourceRootId::new(super::stable_dependency_root_id("dep-a"))
+        );
+        assert_eq!(cache.metadata().indexed_files, 1);
         fs::remove_dir_all(root).expect("cleanup");
     }
 

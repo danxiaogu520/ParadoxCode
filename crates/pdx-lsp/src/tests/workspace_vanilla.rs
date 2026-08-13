@@ -885,6 +885,7 @@ fn explicit_project_cache_precedes_user_discovery_configuration() {
         roots: Vec::new(),
         vanilla_cache: Some(project_cache.clone()),
         vanilla_explicit: true,
+        dependency_caches: Vec::new(),
     };
     let mut warnings = Vec::new();
     let setup =
@@ -937,4 +938,184 @@ fn unsuccessful_automatic_discovery_is_recorded_and_not_repeated() {
     .expect_err("failed automatic search is not repeated");
     assert!(second.contains("already attempted"));
     fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn indexed_dependencies_are_excluded_from_live_scanning() {
+    let (root, _) = temp_workspace_dir();
+    fs::create_dir_all(root.join("mod/common/events")).expect("current directory");
+    fs::create_dir_all(root.join("deps/live/common/events")).expect("live dependency");
+    fs::create_dir_all(root.join("deps/cached/common/events")).expect("cached dependency");
+    let canonical_root = fs::canonicalize(&root).expect("canonical root");
+    let resolved = super::resolve_source_roots(
+        Some(&canonical_root),
+        Some(json!({
+            "modDirectory": "mod",
+            "dependencies": [
+                {"id": "live-dep", "path": "deps/live"},
+                {"id": "cached-dep", "path": "deps/cached", "index": "cache/cached-dep.pdxindex"}
+            ]
+        })),
+        &pdx_engine::WorkspaceScanToken::new(),
+    )
+    .expect("inline initializationOptions");
+    // Only the live dependency and the current mod participate in real-time scanning.
+    assert_eq!(resolved.roots.len(), 2);
+    assert!(
+        resolved
+            .roots
+            .iter()
+            .any(|root| root.kind == SourceRootKind::Dependency)
+    );
+    // The indexed dependency keeps its configured identity and moves to the cache list.
+    assert_eq!(resolved.dependency_caches.len(), 1);
+    let cached = &resolved.dependency_caches[0];
+    assert_eq!(cached.root.kind, SourceRootKind::Dependency);
+    assert_eq!(cached.root.order, 1);
+    assert_eq!(cached.root.path, canonical_root.join("deps/cached"));
+    assert_eq!(
+        cached.index_path,
+        canonical_root.join("cache/cached-dep.pdxindex")
+    );
+}
+
+#[test]
+fn existing_dependency_index_cache_is_installed_in_the_background() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let container = std::env::temp_dir().join(format!("pdx-lsp-dep-cache-load-{nonce}"));
+    let workspace = container.join("workspace");
+    let dependency = container.join("dependency");
+    fs::create_dir_all(workspace.join("common/events")).expect("workspace fixture");
+    fs::create_dir_all(dependency.join("common/events")).expect("dependency fixture");
+    fs::write(
+        dependency.join("common/events/dep_events.txt"),
+        "country_event = { id = dep.1 }\n",
+    )
+    .expect("dependency definition");
+    let dependency = fs::canonicalize(&dependency).expect("canonical dependency");
+    let dependency_root = SourceRoot::new(
+        SourceRootId::new(42),
+        SourceRootKind::Dependency,
+        dependency.clone(),
+    );
+    let mut builder = AnalysisHost::with_profile(
+        pdx_game::eu4::first_party_rules().expect("embedded rules"),
+        pdx_game::eu4::profile(),
+    );
+    builder.apply_change(WorkspaceChange::SetSourceRoots(vec![
+        dependency_root.clone(),
+    ]));
+    builder.refresh_source_roots().expect("scan dependency");
+    let cache =
+        VanillaIndexCache::from_snapshot(&builder.snapshot()).expect("build dependency cache");
+    let cache_path = container.join("dependency.pdxindex");
+    cache.save(&cache_path).expect("save dependency cache");
+    fs::remove_dir_all(&dependency).expect("make dependency source unavailable after caching");
+
+    let reference = workspace.join("common/events/reference.txt");
+    fs::write(&reference, "event = dep.1\n").expect("workspace reference");
+    let reference_uri = canonical_uri(&reference);
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":canonical_uri(&workspace),"capabilities":{},"initializationOptions":{"modDirectory":".","dependencies":[{"id":"dep-a","path":dependency,"index":cache_path}]}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"eu4","version":1,"text":"event = dep.1\n"}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{"textDocument":{"uri":reference_uri},"position":{"line":0,"character":8}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+
+    let definition = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("definition response");
+    assert_eq!(definition["error"], Value::Null);
+    assert_eq!(
+        definition["result"][0]["range"],
+        json!({
+            "start": {"line": 0, "character": 23},
+            "end": {"line": 0, "character": 28}
+        })
+    );
+    assert!(
+        responses.iter().any(|value| {
+            value["method"] == "window/showMessage"
+                && value["params"]["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("symbols loaded from"))
+        }),
+        "expected a cache-load notification"
+    );
+    assert!(
+        server
+            .snapshot()
+            .index()
+            .active_definition("event", "dep.1")
+            .is_some(),
+        "cached dependency definition is queryable after install"
+    );
+    fs::remove_dir_all(container).expect("cleanup");
+}
+
+#[test]
+fn missing_dependency_index_cache_is_built_in_the_background() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let container = std::env::temp_dir().join(format!("pdx-lsp-dep-cache-build-{nonce}"));
+    let workspace = container.join("workspace");
+    let dependency = container.join("dependency");
+    fs::create_dir_all(workspace.join("common/events")).expect("workspace fixture");
+    fs::create_dir_all(dependency.join("common/events")).expect("dependency fixture");
+    fs::write(
+        dependency.join("common/events/dep_events.txt"),
+        "country_event = { id = dep.2 }\n",
+    )
+    .expect("dependency definition");
+    let cache_path = container.join("missing/dependency.pdxindex");
+    let reference = workspace.join("common/events/reference.txt");
+    fs::write(&reference, "event = dep.2\n").expect("workspace reference");
+    let reference_uri = canonical_uri(&reference);
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":canonical_uri(&workspace),"capabilities":{},"initializationOptions":{"modDirectory":".","dependencies":[{"id":"dep-b","path":dependency,"index":cache_path}]}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"eu4","version":1,"text":"event = dep.2\n"}}}),
+        json!({"jsonrpc":"2.0","method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+
+    assert!(
+        responses.iter().any(|value| {
+            value["method"] == "window/showMessage"
+                && value["params"]["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("was built and loaded"))
+        }),
+        "expected a background-build notification"
+    );
+    assert!(cache_path.is_file(), "cache file was materialized");
+    assert!(
+        server
+            .snapshot()
+            .index()
+            .active_definition("event", "dep.2")
+            .is_some(),
+        "built dependency definition is queryable after install"
+    );
+    fs::remove_dir_all(container).expect("cleanup");
 }

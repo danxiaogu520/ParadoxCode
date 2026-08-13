@@ -38,6 +38,7 @@ use crate::text::{
 use crate::transport::{read_message, write_message};
 use crate::uri::uri_to_path;
 use crate::vanilla::{run_auto_vanilla_setup, run_vanilla_cache_load};
+use crate::workspace::DependencyIndexCache;
 use crate::{
     DIAGNOSTIC_DEBOUNCE, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, JSON_RPC_VERSION,
     METHOD_NOT_FOUND, REQUEST_CANCELLED, SERVER_NOT_INITIALIZED,
@@ -126,6 +127,9 @@ pub(crate) struct PreparedInitialize {
     pub(crate) warnings: Vec<String>,
     pub(crate) auto_vanilla: Option<AutoVanillaConfiguration>,
     pub(crate) vanilla_cache: Option<PathBuf>,
+    /// Dependencies configured with persistent index caches, loaded in the background after
+    /// the initialize response is sent.
+    pub(crate) dependency_caches: Vec<DependencyIndexCache>,
     pub(crate) watcher_registration: Option<Value>,
     pub(crate) client_work_done_progress: bool,
     pub(crate) client_snippet_support: bool,
@@ -136,8 +140,19 @@ pub(crate) struct VanillaSetupResult {
     result: Result<(VanillaIndexCache, String), String>,
 }
 
-/// One `$/progress` workDoneProgress payload emitted by the Vanilla background worker.
-pub(crate) struct VanillaProgress {
+/// One dependency cache background result: the configured cache and its load/rebuild outcome.
+pub(crate) type DependencySetupOutcome = (
+    DependencyIndexCache,
+    Result<(VanillaIndexCache, String), String>,
+);
+
+#[derive(Debug)]
+pub(crate) struct DependencySetupResult {
+    pub(crate) results: Vec<DependencySetupOutcome>,
+}
+
+/// One `$/progress` workDoneProgress payload emitted by a background worker.
+pub(crate) struct Progress {
     params: Value,
 }
 
@@ -188,7 +203,8 @@ enum TransportEvent {
     Diagnostics(DiagnosticsResult),
     Request(SnapshotRequestResult),
     VanillaSetup(VanillaSetupResult),
-    VanillaProgress(VanillaProgress),
+    DependencySetup(DependencySetupResult),
+    Progress(Progress),
     DiskChanges(DiskChangesResult),
 }
 

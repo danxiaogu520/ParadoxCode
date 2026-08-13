@@ -8,6 +8,7 @@ pub mod check;
 pub mod cli;
 pub mod release;
 
+mod dependency;
 mod initialize;
 mod protocol;
 mod requests;

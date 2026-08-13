@@ -144,6 +144,7 @@ pub(crate) fn prepare_initialize_candidate(
         warnings,
         auto_vanilla,
         vanilla_cache,
+        dependency_caches: resolved.dependency_caches,
         watcher_registration,
         client_work_done_progress,
         client_snippet_support,
