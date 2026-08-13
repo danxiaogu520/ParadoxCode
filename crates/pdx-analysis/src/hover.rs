@@ -677,8 +677,7 @@ pub(crate) fn localisation_preview(
     definition: &ResolutionDefinition,
 ) -> Option<(Option<String>, String)> {
     if let Some(file) = definition.location.file
-        && let Some(preview) =
-            snapshot.vanilla_localisation_preview(file, definition.location.range)
+        && let Some(preview) = snapshot.localisation_preview(file, definition.location.range)
     {
         return Some((preview.language.clone(), preview.value.clone()));
     }

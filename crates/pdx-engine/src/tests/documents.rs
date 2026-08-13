@@ -594,14 +594,14 @@ fn roots_overlay_and_shards_preserve_shadowed_semantic_definitions() {
             id: SourceRootId::new(2),
             kind: SourceRootKind::Dependency,
             path: dependency,
-            order: 0,
+            order: 1,
             writable: false,
         },
         SourceRoot {
             id: SourceRootId::new(3),
             kind: SourceRootKind::CurrentMod,
             path: current.clone(),
-            order: 0,
+            order: 2,
             writable: true,
         },
     ]));

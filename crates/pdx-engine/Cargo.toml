@@ -32,5 +32,5 @@ name = "synthetic_workspace"
 harness = false
 
 [[bench]]
-name = "vanilla_cache"
+name = "index_cache"
 harness = false

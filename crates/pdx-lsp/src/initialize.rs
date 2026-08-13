@@ -85,7 +85,7 @@ pub(crate) fn prepare_initialize_candidate(
         host.refresh_source_roots_cancellable(cancellation)
             .map_err(workspace_scan_error)?;
     }
-    let vanilla_cache = match resolved.vanilla_cache.take() {
+    let index_cache = match resolved.index_cache.take() {
         None => None,
         Some(path) if !scan_workspace => {
             warnings.push(format!(
@@ -143,7 +143,7 @@ pub(crate) fn prepare_initialize_candidate(
         result,
         warnings,
         auto_vanilla,
-        vanilla_cache,
+        index_cache,
         dependency_caches: resolved.dependency_caches,
         watcher_registration,
         client_work_done_progress,

@@ -8,11 +8,9 @@ use rusqlite::{Connection, Transaction, params};
 use super::codec::{encode_file_id, encode_path, resolution_name};
 use super::read::validate_database_identity;
 use super::template_codec;
-use super::{
-    APPLICATION_ID, CURRENT_VANILLA_CACHE_SCHEMA_VERSION, VanillaCacheError, VanillaIndexCache,
-};
+use super::{APPLICATION_ID, CURRENT_CACHE_SCHEMA_VERSION, IndexCache, IndexCacheError};
 
-pub(super) fn save(cache: &VanillaIndexCache, path: &Path) -> Result<(), VanillaCacheError> {
+pub(super) fn save(cache: &IndexCache, path: &Path) -> Result<(), IndexCacheError> {
     save_with_progress(cache, path, None)
 }
 
@@ -22,10 +20,10 @@ pub(super) fn save(cache: &VanillaIndexCache, path: &Path) -> Result<(), Vanilla
 /// save during a background rebuild; the position and preview tables are written after the
 /// final report.
 pub(super) fn save_with_progress(
-    cache: &VanillaIndexCache,
+    cache: &IndexCache,
     path: &Path,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
-) -> Result<(), VanillaCacheError> {
+) -> Result<(), IndexCacheError> {
     if let Some(parent) = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
@@ -50,9 +48,9 @@ pub(super) fn save_with_progress(
 
 fn write_cache(
     transaction: &Transaction<'_>,
-    cache: &VanillaIndexCache,
+    cache: &IndexCache,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
-) -> Result<(), VanillaCacheError> {
+) -> Result<(), IndexCacheError> {
     transaction.execute_batch(
         "DROP TABLE IF EXISTS macro_parameters;
          DROP TABLE IF EXISTS macro_definitions;
@@ -129,7 +127,7 @@ fn write_cache(
          );",
     )?;
     transaction.pragma_update(None, "application_id", APPLICATION_ID)?;
-    transaction.pragma_update(None, "user_version", CURRENT_VANILLA_CACHE_SCHEMA_VERSION)?;
+    transaction.pragma_update(None, "user_version", CURRENT_CACHE_SCHEMA_VERSION)?;
     let (path_encoding, source_root) = encode_path(&cache.root.path)?;
     for (key, value) in [
         (
@@ -190,7 +188,7 @@ fn write_cache(
     let mut files_written = 0usize;
     for (id, file) in &cache.source_files {
         let shard = cache.index.shard(*id).ok_or_else(|| {
-            VanillaCacheError::InvalidData(format!(
+            IndexCacheError::InvalidData(format!(
                 "source file {} has no index shard",
                 file.logical_path.as_str()
             ))
@@ -202,7 +200,7 @@ fn write_cache(
             file.category_id,
             resolution_name(file.resolution),
             i64::try_from(shard.syntax_error_count).map_err(|_| {
-                VanillaCacheError::InvalidData("syntax error count exceeds SQLite range".into())
+                IndexCacheError::InvalidData("syntax error count exceeds SQLite range".into())
             })?
         ])?;
         for (ordinal, definition) in shard.definitions.iter().enumerate() {
@@ -235,7 +233,7 @@ fn write_cache(
                         && candidate.definition_range == summary.definition_range
                 })
             {
-                return Err(VanillaCacheError::InvalidData(format!(
+                return Err(IndexCacheError::InvalidData(format!(
                     "duplicate macro summary {} `{}`",
                     summary.kind, summary.name
                 )));
@@ -245,7 +243,7 @@ fn write_cache(
                     && definition.name.eq_ignore_ascii_case(&summary.name)
                     && definition.range == summary.definition_range
             }) {
-                return Err(VanillaCacheError::InvalidData(format!(
+                return Err(IndexCacheError::InvalidData(format!(
                     "macro summary {} `{}` has no matching definition",
                     summary.kind, summary.name
                 )));
@@ -258,7 +256,7 @@ fn write_cache(
                         || !template.name.eq_ignore_ascii_case(&summary.name)
                         || template.definition_range != summary.definition_range
                     {
-                        return Err(VanillaCacheError::InvalidData(format!(
+                        return Err(IndexCacheError::InvalidData(format!(
                             "macro template identity does not match {} `{}`",
                             summary.kind, summary.name
                         )));
@@ -281,7 +279,7 @@ fn write_cache(
                         .iter()
                         .any(|candidate| candidate.name.eq_ignore_ascii_case(&parameter.name))
                 {
-                    return Err(VanillaCacheError::InvalidData(format!(
+                    return Err(IndexCacheError::InvalidData(format!(
                         "macro parameter name in {} `{}` is empty or duplicated",
                         summary.kind, summary.name
                     )));
@@ -310,7 +308,7 @@ fn write_cache(
     )?;
     for ((file_id, range), position) in cache.index.position_ranges() {
         if !cache.source_files.contains_key(file_id) {
-            return Err(VanillaCacheError::InvalidData(format!(
+            return Err(IndexCacheError::InvalidData(format!(
                 "navigation position references unknown file {}",
                 file_id.get()
             )));
@@ -332,13 +330,13 @@ fn write_cache(
     )?;
     for ((file_id, range), preview) in &cache.localisation_previews {
         let Some(file) = cache.source_files.get(file_id) else {
-            return Err(VanillaCacheError::InvalidData(format!(
+            return Err(IndexCacheError::InvalidData(format!(
                 "localisation preview references unknown file {}",
                 file_id.get()
             )));
         };
         let Some(shard) = cache.index.shard(*file_id) else {
-            return Err(VanillaCacheError::InvalidData(format!(
+            return Err(IndexCacheError::InvalidData(format!(
                 "localisation preview file {} has no index shard",
                 file.logical_path.as_str()
             )));
@@ -346,7 +344,7 @@ fn write_cache(
         if !shard.definitions.iter().any(|definition| {
             definition.range == *range && definition.kind.eq_ignore_ascii_case("localisation")
         }) {
-            return Err(VanillaCacheError::InvalidData(format!(
+            return Err(IndexCacheError::InvalidData(format!(
                 "localisation preview range {}..{} is not a localisation definition",
                 range.start(),
                 range.end()

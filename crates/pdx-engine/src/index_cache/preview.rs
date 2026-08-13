@@ -5,18 +5,18 @@ use std::collections::BTreeMap;
 use pdx_parser::{CstKind, FileFormat};
 use pdx_text::TextRange;
 
-use super::VanillaCacheError;
+use super::IndexCacheError;
 use crate::{AnalysisSnapshot, LocalisationPreview, ParsedSource, SourceFileId};
 
 const MAX_LOCALISATION_PREVIEW_CHARS: usize = 240;
 
 pub(super) fn collect_localisation_previews(
     snapshot: &AnalysisSnapshot,
-) -> Result<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>, VanillaCacheError> {
+) -> Result<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>, IndexCacheError> {
     let mut previews = BTreeMap::new();
     for (file_id, file) in snapshot.source_files() {
         let state = snapshot.file_state(*file_id).ok_or_else(|| {
-            VanillaCacheError::InvalidData(format!(
+            IndexCacheError::InvalidData(format!(
                 "Vanilla file {} has no materialized file state",
                 file.logical_path.as_str()
             ))
@@ -27,7 +27,7 @@ pub(super) fn collect_localisation_previews(
                     .insert((*file_id, *range), preview.clone())
                     .is_some()
                 {
-                    return Err(VanillaCacheError::InvalidData(format!(
+                    return Err(IndexCacheError::InvalidData(format!(
                         "duplicate localisation preview in {}",
                         file.logical_path.as_str()
                     )));
@@ -83,7 +83,7 @@ pub(super) fn collect_localisation_previews(
                         )
                         .is_some()
                     {
-                        return Err(VanillaCacheError::InvalidData(format!(
+                        return Err(IndexCacheError::InvalidData(format!(
                             "duplicate localisation preview in {}",
                             file.logical_path.as_str()
                         )));

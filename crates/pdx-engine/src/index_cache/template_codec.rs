@@ -8,7 +8,7 @@ use crate::hir::{
     MacroTemplateProperty, MacroTemplateToken, MacroTemplateValue,
 };
 
-use super::{MAX_MACRO_TEMPLATE_BYTES, MAX_MACRO_TEMPLATE_NODES, VanillaCacheError};
+use super::{IndexCacheError, MAX_MACRO_TEMPLATE_BYTES, MAX_MACRO_TEMPLATE_NODES};
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(transparent)]
@@ -79,10 +79,10 @@ struct Budget {
 }
 
 impl Budget {
-    fn node(&mut self) -> Result<(), VanillaCacheError> {
+    fn node(&mut self) -> Result<(), IndexCacheError> {
         self.nodes = self.nodes.saturating_add(1);
         if self.nodes > MAX_MACRO_TEMPLATE_NODES {
-            return Err(VanillaCacheError::LimitExceeded(
+            return Err(IndexCacheError::LimitExceeded(
                 "macro template node",
                 MAX_MACRO_TEMPLATE_NODES,
             ));
@@ -90,10 +90,10 @@ impl Budget {
         Ok(())
     }
 
-    fn text(&mut self, value: &str) -> Result<(), VanillaCacheError> {
+    fn text(&mut self, value: &str) -> Result<(), IndexCacheError> {
         self.text_bytes = self.text_bytes.saturating_add(value.len());
         if self.text_bytes > MAX_MACRO_TEMPLATE_BYTES {
-            return Err(VanillaCacheError::LimitExceeded(
+            return Err(IndexCacheError::LimitExceeded(
                 "macro template text byte",
                 MAX_MACRO_TEMPLATE_BYTES,
             ));
@@ -102,12 +102,12 @@ impl Budget {
     }
 }
 
-pub(super) fn encode(template: &MacroTemplate) -> Result<Vec<u8>, VanillaCacheError> {
+pub(super) fn encode(template: &MacroTemplate) -> Result<Vec<u8>, IndexCacheError> {
     let dto = Template::from(template);
     let payload = serde_json::to_vec(&dto)
-        .map_err(|error| VanillaCacheError::InvalidData(error.to_string()))?;
+        .map_err(|error| IndexCacheError::InvalidData(error.to_string()))?;
     if payload.len() > MAX_MACRO_TEMPLATE_BYTES {
-        return Err(VanillaCacheError::LimitExceeded(
+        return Err(IndexCacheError::LimitExceeded(
             "macro template byte",
             MAX_MACRO_TEMPLATE_BYTES,
         ));
@@ -120,15 +120,15 @@ pub(super) fn decode(
     expected_kind: &str,
     expected_name: &str,
     expected_definition_range: TextRange,
-) -> Result<MacroTemplate, VanillaCacheError> {
+) -> Result<MacroTemplate, IndexCacheError> {
     if payload.len() > MAX_MACRO_TEMPLATE_BYTES {
-        return Err(VanillaCacheError::LimitExceeded(
+        return Err(IndexCacheError::LimitExceeded(
             "macro template byte",
             MAX_MACRO_TEMPLATE_BYTES,
         ));
     }
     let dto: Template = serde_json::from_slice(payload).map_err(|error| {
-        VanillaCacheError::InvalidData(format!("invalid macro template payload: {error}"))
+        IndexCacheError::InvalidData(format!("invalid macro template payload: {error}"))
     })?;
     let mut budget = Budget::default();
     let template = dto.into_model(&mut budget)?;
@@ -136,7 +136,7 @@ pub(super) fn decode(
         || !template.name.eq_ignore_ascii_case(expected_name)
         || template.definition_range != expected_definition_range
     {
-        return Err(VanillaCacheError::InvalidData(format!(
+        return Err(IndexCacheError::InvalidData(format!(
             "macro template identity does not match {expected_kind} `{expected_name}`"
         )));
     }
@@ -144,9 +144,9 @@ pub(super) fn decode(
     Ok(template)
 }
 
-fn decode_range(range: Range) -> Result<TextRange, VanillaCacheError> {
+fn decode_range(range: Range) -> Result<TextRange, IndexCacheError> {
     TextRange::new(range.0[0], range.0[1]).ok_or_else(|| {
-        VanillaCacheError::InvalidData("macro template range end precedes start".to_owned())
+        IndexCacheError::InvalidData("macro template range end precedes start".to_owned())
     })
 }
 
@@ -154,9 +154,9 @@ fn range_within(inner: TextRange, outer: TextRange) -> bool {
     inner.start() >= outer.start() && inner.end() <= outer.end()
 }
 
-fn validate_template_ranges(template: &MacroTemplate) -> Result<(), VanillaCacheError> {
+fn validate_template_ranges(template: &MacroTemplate) -> Result<(), IndexCacheError> {
     if !range_within(template.body_range, template.definition_range) {
-        return Err(VanillaCacheError::InvalidData(
+        return Err(IndexCacheError::InvalidData(
             "macro template body range escapes its definition".to_owned(),
         ));
     }
@@ -166,7 +166,7 @@ fn validate_template_ranges(template: &MacroTemplate) -> Result<(), VanillaCache
 fn validate_items_ranges(
     items: &[MacroTemplateItem],
     owner: TextRange,
-) -> Result<(), VanillaCacheError> {
+) -> Result<(), IndexCacheError> {
     for item in items {
         match item {
             MacroTemplateItem::Property(property) => {
@@ -193,7 +193,7 @@ fn validate_items_ranges(
 fn validate_token_range(
     token: &MacroTemplateToken,
     owner: TextRange,
-) -> Result<(), VanillaCacheError> {
+) -> Result<(), IndexCacheError> {
     require_range(token.range, owner)?;
     for fragment in &token.fragments {
         if let MacroTemplateFragment::Parameter { range, .. } = fragment {
@@ -203,11 +203,11 @@ fn validate_token_range(
     Ok(())
 }
 
-fn require_range(range: TextRange, owner: TextRange) -> Result<(), VanillaCacheError> {
+fn require_range(range: TextRange, owner: TextRange) -> Result<(), IndexCacheError> {
     if range_within(range, owner) {
         Ok(())
     } else {
-        Err(VanillaCacheError::InvalidData(
+        Err(IndexCacheError::InvalidData(
             "macro template item range escapes its definition".to_owned(),
         ))
     }
@@ -226,7 +226,7 @@ impl From<&MacroTemplate> for Template {
 }
 
 impl Template {
-    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplate, VanillaCacheError> {
+    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplate, IndexCacheError> {
         budget.node()?;
         budget.text(&self.kind)?;
         budget.text(&self.name)?;
@@ -243,7 +243,7 @@ impl Template {
 fn decode_items(
     items: Vec<Item>,
     budget: &mut Budget,
-) -> Result<Vec<MacroTemplateItem>, VanillaCacheError> {
+) -> Result<Vec<MacroTemplateItem>, IndexCacheError> {
     items
         .into_iter()
         .map(|item| item.into_model(budget))
@@ -251,7 +251,7 @@ fn decode_items(
 }
 
 impl Item {
-    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateItem, VanillaCacheError> {
+    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateItem, IndexCacheError> {
         budget.node()?;
         match self {
             Self::Property(property) => {
@@ -266,7 +266,7 @@ impl Item {
 }
 
 impl Property {
-    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateProperty, VanillaCacheError> {
+    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateProperty, IndexCacheError> {
         if let Some(operator) = &self.operator {
             budget.text(operator)?;
         }
@@ -280,7 +280,7 @@ impl Property {
 }
 
 impl Value {
-    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateValue, VanillaCacheError> {
+    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateValue, IndexCacheError> {
         match self {
             Self::Scalar(token) => Ok(MacroTemplateValue::Scalar(token.into_model(budget)?)),
             Self::Block { range, items } => Ok(MacroTemplateValue::Block {
@@ -292,10 +292,7 @@ impl Value {
 }
 
 impl Conditional {
-    fn into_model(
-        self,
-        budget: &mut Budget,
-    ) -> Result<MacroTemplateConditional, VanillaCacheError> {
+    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateConditional, IndexCacheError> {
         budget.text(&self.name)?;
         Ok(MacroTemplateConditional {
             name: self.name,
@@ -307,7 +304,7 @@ impl Conditional {
 }
 
 impl Token {
-    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateToken, VanillaCacheError> {
+    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateToken, IndexCacheError> {
         Ok(MacroTemplateToken {
             range: decode_range(self.range)?,
             quoted: self.quoted,
@@ -321,7 +318,7 @@ impl Token {
 }
 
 impl Fragment {
-    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateFragment, VanillaCacheError> {
+    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateFragment, IndexCacheError> {
         budget.node()?;
         match self {
             Self::Literal(value) => {

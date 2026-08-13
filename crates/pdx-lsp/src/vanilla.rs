@@ -6,7 +6,7 @@ use lsp_types::{
     RegistrationParams, RelativePattern, Uri, WatchKind,
 };
 use pdx_engine::{
-    AnalysisHost, SourceRoot, SourceRootId, SourceRootKind, VanillaIndexCache, WorkspaceChange,
+    AnalysisHost, IndexCache, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
 };
 use pdx_game::{
     DiscoveryOptions, DiscoveryOutcome, UserConfiguration, UserPaths, discover_installations,
@@ -16,23 +16,23 @@ use serde_json::{Value, json};
 
 use crate::initialize::AutoVanillaConfiguration;
 use crate::protocol::RpcError;
-use crate::server::VanillaSetupCancellation;
+use crate::server::IndexSetupCancellation;
 use crate::uri::path_to_uri;
 use crate::workspace::ResolvedSourceRoots;
 use crate::{
     INTERNAL_ERROR, JSON_RPC_VERSION, WATCHED_FILES_REGISTRATION_ID, WATCHED_FILES_REQUEST_ID,
 };
 
-pub(crate) fn run_vanilla_cache_load(
+pub(crate) fn run_index_cache_load(
     path: &Path,
     rules: RuleSet,
     profile: GameProfile,
     current_rule_hash: String,
     auto_vanilla: Option<&AutoVanillaConfiguration>,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
-    cancellation: &VanillaSetupCancellation,
-) -> Result<(VanillaIndexCache, String), String> {
-    let loaded = match VanillaIndexCache::load_cancellable_for_install_with_progress(
+    cancellation: &IndexSetupCancellation,
+) -> Result<(IndexCache, String), String> {
+    let loaded = match IndexCache::load_cancellable_for_install_with_progress(
         path,
         &cancellation.workspace,
         progress,
@@ -109,8 +109,8 @@ fn rebuild_unavailable_cache(
     profile: &GameProfile,
     auto_vanilla: Option<&AutoVanillaConfiguration>,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
-    cancellation: &VanillaSetupCancellation,
-) -> Result<Option<VanillaIndexCache>, String> {
+    cancellation: &IndexSetupCancellation,
+) -> Result<Option<IndexCache>, String> {
     let Some(auto_vanilla) = auto_vanilla else {
         return Ok(None);
     };
@@ -185,9 +185,9 @@ fn build_cache_from_source(
     rules: &RuleSet,
     profile: &GameProfile,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
-    cancellation: &VanillaSetupCancellation,
+    cancellation: &IndexSetupCancellation,
     activity: &str,
-) -> Result<VanillaIndexCache, String> {
+) -> Result<IndexCache, String> {
     let mut host = AnalysisHost::with_profile(rules.clone(), profile.clone());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
@@ -196,7 +196,7 @@ fn build_cache_from_source(
     )]));
     host.refresh_source_roots_cancellable_with_progress(&cancellation.workspace, progress)
         .map_err(|error| format!("{activity} failed while indexing {source:?}: {error}"))?;
-    let cache = VanillaIndexCache::from_snapshot(&host.snapshot())
+    let cache = IndexCache::from_snapshot(&host.snapshot())
         .map_err(|error| format!("{activity} failed: {error}"))?;
     cache.save_with_progress(path, progress).map_err(|error| {
         format!(
@@ -299,7 +299,7 @@ pub(crate) fn apply_user_vanilla_configuration(
         return Some(auto_vanilla.clone());
     };
     if let Some(cache) = game.vanilla_cache.as_ref() {
-        resolved.vanilla_cache = Some(cache.clone());
+        resolved.index_cache = Some(cache.clone());
         return None;
     }
     if game.auto_discovery_attempted {
@@ -318,8 +318,8 @@ pub(crate) fn run_auto_vanilla_setup(
     rules: RuleSet,
     profile: GameProfile,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
-    cancellation: &VanillaSetupCancellation,
-) -> Result<(VanillaIndexCache, String), String> {
+    cancellation: &IndexSetupCancellation,
+) -> Result<(IndexCache, String), String> {
     run_auto_vanilla_setup_with_options(
         auto_vanilla,
         rules,
@@ -335,9 +335,9 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
     rules: RuleSet,
     profile: GameProfile,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
-    cancellation: &VanillaSetupCancellation,
+    cancellation: &IndexSetupCancellation,
     discovery_options: &DiscoveryOptions,
-) -> Result<(VanillaIndexCache, String), String> {
+) -> Result<(IndexCache, String), String> {
     let descriptor = auto_vanilla.descriptor;
     let mut configuration =
         UserConfiguration::load(&auto_vanilla.user_paths.config_file).map_err(|error| {
@@ -403,7 +403,7 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
     let setup = (|| {
         host.refresh_source_roots_cancellable_with_progress(&cancellation.workspace, progress)
             .map_err(|error| format!("Vanilla indexing failed: {error}"))?;
-        let cache = VanillaIndexCache::from_snapshot(&host.snapshot())
+        let cache = IndexCache::from_snapshot(&host.snapshot())
             .map_err(|error| format!("Vanilla cache creation failed: {error}"))?;
         let cache_path = auto_vanilla.user_paths.vanilla_cache(descriptor.game_id);
         cache

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use pdx_engine::{
-    AnalysisHost, SourceRoot, SourceRootId, SourceRootKind, VanillaIndexCache, WorkspaceChange,
+    AnalysisHost, IndexCache, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
     WorkspaceScanToken,
 };
 
@@ -87,18 +87,18 @@ fn main() {
 
     let cache_path = fixture.root.join("vanilla.pdxindex");
     let (build, cache) =
-        measured(|| VanillaIndexCache::from_snapshot(&builder.snapshot()).expect("build cache"));
+        measured(|| IndexCache::from_snapshot(&builder.snapshot()).expect("build cache"));
     let (save, _) = measured(|| cache.save(&cache_path).expect("save cache"));
     drop(cache);
     drop(builder);
 
     let (load, cache) = measured(|| {
-        VanillaIndexCache::load_cancellable_for_install(&cache_path, &WorkspaceScanToken::new())
+        IndexCache::load_cancellable_for_install(&cache_path, &WorkspaceScanToken::new())
             .expect("load cache")
     });
     let mut host =
         AnalysisHost::with_profile(pdx_game::eu4::bootstrap_rules(), pdx_game::eu4::profile());
-    let (install, _) = measured(|| host.install_vanilla_cache(cache).expect("install cache"));
+    let (install, _) = measured(|| host.install_index_cache(cache).expect("install cache"));
     black_box(host.snapshot());
 
     println!("vanilla cache: {count} files");

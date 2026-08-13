@@ -4,7 +4,7 @@ use std::io::{Cursor, Read};
 
 use super::*;
 use pdx_engine::{
-    AnalysisHost, SourceRoot, SourceRootId, SourceRootKind, VanillaIndexCache, WorkspaceChange,
+    AnalysisHost, IndexCache, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -117,8 +117,7 @@ pub(crate) fn stale_cache_fixture(container: &std::path::Path) -> std::path::Pat
         vanilla,
     )]));
     stale_host.refresh_source_roots().expect("scan Vanilla");
-    let stale_cache =
-        VanillaIndexCache::from_snapshot(&stale_host.snapshot()).expect("stale cache");
+    let stale_cache = IndexCache::from_snapshot(&stale_host.snapshot()).expect("stale cache");
     stale_cache.save(&cache_path).expect("save stale cache");
     cache_path
 }
@@ -140,7 +139,7 @@ pub(crate) fn valid_cache_fixture(container: &std::path::Path) -> std::path::Pat
         vanilla,
     )]));
     host.refresh_source_roots().expect("scan Vanilla");
-    let cache = VanillaIndexCache::from_snapshot(&host.snapshot()).expect("cache");
+    let cache = IndexCache::from_snapshot(&host.snapshot()).expect("cache");
     cache.save(&cache_path).expect("save cache");
     cache_path
 }

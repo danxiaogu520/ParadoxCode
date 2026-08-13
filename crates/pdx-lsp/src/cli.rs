@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use pdx_engine::{
-    AnalysisHost, SourceRoot, SourceRootId, SourceRootKind, VanillaCacheError, VanillaIndexCache,
+    AnalysisHost, IndexCache, IndexCacheError, SourceRoot, SourceRootId, SourceRootKind,
     WorkspaceChange, WorkspaceError,
 };
 use pdx_game::{
@@ -18,7 +18,7 @@ use pdx_game::{
 
 use crate::workspace::stable_dependency_root_id;
 
-const USAGE: &str = "usage:\n  pdx --version\n  pdx index vanilla --source <EU4 directory> --output <cache.pdxindex>\n  pdx index dependency --id <id> --source <directory> --output <cache.pdxindex>\n  pdx setup vanilla [--game eu4] [--deep] [--root <directory>]... [--source <game directory>]\n  pdx check policy|zed|release|grammar-fuzz|all [--root <repository root>]\n  pdx release package --version <semver> --target <target> --binary <path> --output-dir <path> [--root <repository root>]\n  pdx release verify --version <semver> --directory <path> [--root <repository root>]\n  pdx dev prepare-manifest [--root <repository root>]";
+const USAGE: &str = "usage:\n  pdx --version\n  pdx index [vanilla] --source <EU4 directory> --output <cache.pdxindex>\n  pdx index dependency --id <id> --source <directory> --output <cache.pdxindex>\n  pdx setup vanilla [--game eu4] [--deep] [--root <directory>]... [--source <game directory>]\n  pdx check policy|zed|release|grammar-fuzz|all [--root <repository root>]\n  pdx release package --version <semver> --target <target> --binary <path> --output-dir <path> [--root <repository root>]\n  pdx release verify --version <semver> --directory <path> [--root <repository root>]\n  pdx dev prepare-manifest [--root <repository root>]";
 const SUPPORTED_GAME_INSTALLATIONS: &[GameInstallDescriptor] = &[pdx_game::eu4::INSTALL_DESCRIPTOR];
 
 /// Executes one `pdx` command and returns text intended for stdout.
@@ -28,6 +28,12 @@ pub fn execute_pdx(args: &[String]) -> Result<String, CliError> {
         [index, vanilla, rest @ ..] if index == "index" && vanilla == "vanilla" => {
             index_vanilla(rest)
         }
+        // `pdx index --source ... --output ...` is the Vanilla-layer spelling; the kind is
+        // implicit in the reserved root id 0.
+        [index, rest @ ..] if index == "index" && !rest.is_empty() && rest[0] != "dependency" => {
+            index_vanilla(rest)
+        }
+        [index] if index == "index" => Err(CliError::Usage(USAGE.to_owned())),
         [index, dependency, rest @ ..] if index == "index" && dependency == "dependency" => {
             index_dependency(rest)
         }
@@ -392,7 +398,7 @@ fn build_cache(
     let report = host.refresh_source_roots()?;
     let scan_elapsed = scan_started.elapsed();
     let cache_started = Instant::now();
-    let cache = VanillaIndexCache::from_snapshot(&host.snapshot())?;
+    let cache = IndexCache::from_snapshot(&host.snapshot())?;
     let cache_elapsed = cache_started.elapsed();
     let save_started = Instant::now();
     cache.save(output)?;
@@ -436,7 +442,7 @@ pub enum CliError {
     /// The one-shot Vanilla source scan failed.
     Workspace(WorkspaceError),
     /// The persistent cache could not be built or written.
-    Cache(VanillaCacheError),
+    Cache(IndexCacheError),
     /// Installation discovery or candidate selection did not produce a usable source.
     Discovery(String),
     /// User-local discovery configuration failed.
@@ -513,8 +519,8 @@ impl From<WorkspaceError> for CliError {
     }
 }
 
-impl From<VanillaCacheError> for CliError {
-    fn from(error: VanillaCacheError) -> Self {
+impl From<IndexCacheError> for CliError {
+    fn from(error: IndexCacheError) -> Self {
         Self::Cache(error)
     }
 }
@@ -776,7 +782,7 @@ fn extract_toml_value(block: &str, key: &str) -> String {
 mod tests {
     use std::fs;
 
-    use pdx_engine::{SourceRootId, SourceRootKind, VanillaIndexCache};
+    use pdx_engine::{IndexCache, SourceRootId, SourceRootKind};
     use pdx_game::{DiscoveryOutcome, UserConfiguration, UserPaths};
 
     use super::{CliError, execute_pdx, setup_vanilla};
@@ -818,11 +824,11 @@ mod tests {
 
         let first = execute_pdx(&args).expect("build cache");
         assert!(first.contains("indexed files: 1"));
-        let first_cache = VanillaIndexCache::load(&output).expect("load first cache");
+        let first_cache = IndexCache::load(&output).expect("load first cache");
         assert_eq!(first_cache.metadata().indexed_files, 1);
         let second = execute_pdx(&args).expect("explicit refresh");
         assert!(second.contains("indexed files: 1"));
-        let refreshed = VanillaIndexCache::load(&output).expect("load refreshed cache");
+        let refreshed = IndexCache::load(&output).expect("load refreshed cache");
         assert_eq!(
             refreshed.metadata().source_fingerprint,
             first_cache.metadata().source_fingerprint
@@ -859,7 +865,7 @@ mod tests {
         let summary = execute_pdx(&args).expect("build dependency cache");
         assert!(summary.contains("Dependency dep-a cache written to"));
         assert!(summary.contains("indexed files: 1"));
-        let cache = VanillaIndexCache::load(&output).expect("load dependency cache");
+        let cache = IndexCache::load(&output).expect("load dependency cache");
         assert_eq!(cache.source_root().kind, SourceRootKind::Dependency);
         assert_eq!(
             cache.source_root().id,
@@ -915,7 +921,7 @@ mod tests {
             )
         );
         let cache_path = game.vanilla_cache.as_ref().expect("cache path");
-        let cache = VanillaIndexCache::load(cache_path).expect("load generated cache");
+        let cache = IndexCache::load(cache_path).expect("load generated cache");
         assert_eq!(cache.metadata().game_id, "eu4");
         assert_eq!(cache.metadata().indexed_files, 1);
     }

@@ -9,6 +9,7 @@ use pdx_rules::{GameProfile, ParserKind, RuleSet};
 use pdx_text::{LogicalPath, TextRange};
 
 use crate::index::{FileIndexShard, WorkspaceIndex};
+use crate::index_cache::{IndexCache, IndexCacheError};
 use crate::model::{
     DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId, DocumentSnapshot,
     DocumentSource, FileState, LocalisationPreview, PreparedDocument, SourceFile, SourceFileId,
@@ -26,7 +27,6 @@ use crate::scan::{
     source_priorities, stable_file_id,
 };
 use crate::snapshot::AnalysisSnapshot;
-use crate::vanilla_cache::{VanillaCacheError, VanillaIndexCache};
 
 /// Mutable owner of workspace state.
 #[derive(Clone, Debug)]
@@ -42,9 +42,8 @@ pub struct AnalysisHost {
     file_states: Arc<BTreeMap<SourceFileId, Arc<FileState>>>,
     index: Arc<WorkspaceIndex>,
     scan_report: Arc<WorkspaceScanReport>,
-    vanilla_root: Option<SourceRoot>,
     installed_caches: BTreeSet<SourceRootId>,
-    vanilla_localisation_previews: Arc<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>>,
+    localisation_previews: Arc<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>>,
     query_cache: Arc<SnapshotQueryCache>,
 }
 
@@ -77,9 +76,8 @@ impl AnalysisHost {
             file_states: Arc::new(BTreeMap::new()),
             index: Arc::new(WorkspaceIndex::empty()),
             scan_report: Arc::new(WorkspaceScanReport::default()),
-            vanilla_root: None,
             installed_caches: BTreeSet::new(),
-            vanilla_localisation_previews: Arc::new(BTreeMap::new()),
+            localisation_previews: Arc::new(BTreeMap::new()),
             query_cache: Arc::new(SnapshotQueryCache::new()),
         }
     }
@@ -105,27 +103,12 @@ impl AnalysisHost {
         match change {
             WorkspaceChange::SetSourceRoots(roots) => {
                 self.roots = Arc::from(roots);
-                self.vanilla_root = None;
                 self.installed_caches = BTreeSet::new();
-                self.vanilla_localisation_previews = Arc::new(BTreeMap::new());
+                self.localisation_previews = Arc::new(BTreeMap::new());
             }
             WorkspaceChange::SetWorkspaceRoot(root) => self.workspace_root = root,
         }
         self.revision = self.revision.saturating_add(1);
-    }
-
-    /// Installs a validated persistent Vanilla cache without scanning its original directory.
-    ///
-    /// The cache's rule hash is intentionally not required to match. It remains observable in
-    /// metadata so the user can decide whether to run an explicit refresh.
-    pub fn install_vanilla_cache(
-        &mut self,
-        cache: VanillaIndexCache,
-    ) -> Result<(), VanillaCacheError> {
-        let vanilla = cache.source_root().clone();
-        self.install_index_cache(cache)?;
-        self.vanilla_root = Some(vanilla);
-        Ok(())
     }
 
     /// Installs a validated persistent index cache for any configured source root.
@@ -135,14 +118,11 @@ impl AnalysisHost {
     /// An unknown cached root (the Vanilla installation) is inserted at the front of the root
     /// order. The cache's rule hash is intentionally not required to match; it remains observable
     /// in metadata so the caller can decide whether to refresh.
-    pub fn install_index_cache(
-        &mut self,
-        cache: VanillaIndexCache,
-    ) -> Result<(), VanillaCacheError> {
+    pub fn install_index_cache(&mut self, cache: IndexCache) -> Result<(), IndexCacheError> {
         if cache.metadata().game_id != self.rules.game_id()
             || cache.metadata().game_id != self.profile.game_id
         {
-            return Err(VanillaCacheError::GameMismatch {
+            return Err(IndexCacheError::GameMismatch {
                 expected: self.profile.game_id.clone(),
                 actual: cache.metadata().game_id.clone(),
             });
@@ -152,7 +132,7 @@ impl AnalysisHost {
         match roots.iter_mut().find(|root| root.id == cached_root.id) {
             Some(configured) => {
                 if configured.kind != cached_root.kind {
-                    return Err(VanillaCacheError::InvalidData(format!(
+                    return Err(IndexCacheError::InvalidData(format!(
                         "cached root kind {:?} does not match configured root {} for id {}",
                         cached_root.kind,
                         configured.path.display(),
@@ -160,7 +140,7 @@ impl AnalysisHost {
                     )));
                 }
                 if !paths_match(&configured.path, &cached_root.path) {
-                    return Err(VanillaCacheError::InvalidData(format!(
+                    return Err(IndexCacheError::InvalidData(format!(
                         "cached root path {} does not match configured root {}",
                         cached_root.path.display(),
                         configured.path.display()
@@ -172,7 +152,7 @@ impl AnalysisHost {
             None => {
                 for root in roots.iter() {
                     if root.kind == cached_root.kind {
-                        return Err(VanillaCacheError::InvalidData(format!(
+                        return Err(IndexCacheError::InvalidData(format!(
                             "a {:?} source root is already configured",
                             cached_root.kind
                         )));
@@ -180,8 +160,8 @@ impl AnalysisHost {
                     if cached_root.path.starts_with(&root.path)
                         || root.path.starts_with(&cached_root.path)
                     {
-                        return Err(VanillaCacheError::RootConflict {
-                            vanilla: cached_root.path.clone(),
+                        return Err(IndexCacheError::RootConflict {
+                            root: cached_root.path.clone(),
                             configured: root.path.clone(),
                         });
                     }
@@ -194,7 +174,7 @@ impl AnalysisHost {
             .values()
             .find(|file| !self.profile.allows_scan_file(file.logical_path.as_str()))
         {
-            return Err(VanillaCacheError::InvalidData(format!(
+            return Err(IndexCacheError::InvalidData(format!(
                 "cache file {} is outside the active profile scan whitelist",
                 file.logical_path.as_str()
             )));
@@ -203,7 +183,7 @@ impl AnalysisHost {
         let (_, _, mut files, cached_index, cached_positions, cached_previews) = cache.into_parts();
         for (id, file) in self.source_files.iter() {
             if let Some(cached) = files.insert(*id, file.clone()) {
-                return Err(VanillaCacheError::InvalidData(format!(
+                return Err(IndexCacheError::InvalidData(format!(
                     "file id collision between {} and {}",
                     cached.physical_path.display(),
                     file.physical_path.display()
@@ -222,13 +202,13 @@ impl AnalysisHost {
         let priorities = source_priorities(&roots, &files);
         index.resolve_priorities(&priorities, self.rules.as_ref());
 
-        let mut localisation_previews = (*self.vanilla_localisation_previews).clone();
+        let mut localisation_previews = (*self.localisation_previews).clone();
         localisation_previews.extend(cached_previews);
         self.roots = Arc::from(roots);
         self.source_files = Arc::new(files);
         self.source_file_paths = Arc::new(source_file_paths(&self.source_files));
         self.index = Arc::new(index);
-        self.vanilla_localisation_previews = Arc::new(localisation_previews);
+        self.localisation_previews = Arc::new(localisation_previews);
         self.installed_caches.insert(cached_root.id);
         self.revision = self.revision.saturating_add(1);
         Ok(())
@@ -824,7 +804,7 @@ impl AnalysisHost {
             file_states: Arc::clone(&self.file_states),
             index: Arc::clone(&self.index),
             scan_report: Arc::clone(&self.scan_report),
-            vanilla_localisation_previews: Arc::clone(&self.vanilla_localisation_previews),
+            localisation_previews: Arc::clone(&self.localisation_previews),
             query_cache: Arc::clone(&self.query_cache),
         }
     }

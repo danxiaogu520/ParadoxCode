@@ -1027,11 +1027,11 @@ fn vanilla_cache_only_macro_expands_persisted_body_semantics() {
     vanilla_host
         .refresh_source_roots()
         .expect("scan cache source");
-    let cache = VanillaIndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
+    let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
     std::fs::remove_dir_all(&root).expect("discard Vanilla source");
 
     let mut host = eu4_host(rules);
-    host.install_vanilla_cache(cache).expect("install cache");
+    host.install_index_cache(cache).expect("install cache");
     let id = DocumentId::new("file:///tmp/events/cached-macro.txt");
     host.open_document(
         id.clone(),
@@ -1073,14 +1073,14 @@ fn vanilla_cache_only_macro_validates_quoted_payload_at_exact_call_site_range() 
         vanilla.clone(),
     )]));
     vanilla_host.refresh_source_roots().expect("scan Vanilla");
-    let cache = VanillaIndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
+    let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
     let cache_path = root.join("cache/vanilla.pdxindex");
     cache.save(&cache_path).expect("save cache");
     std::fs::remove_dir_all(&vanilla).expect("discard Vanilla source");
-    let cache = VanillaIndexCache::load(&cache_path).expect("load cache without source");
+    let cache = IndexCache::load(&cache_path).expect("load cache without source");
 
     let mut host = eu4_host(rules);
-    host.install_vanilla_cache(cache).expect("install cache");
+    host.install_index_cache(cache).expect("install cache");
     let id = DocumentId::new("file:///tmp/events/cached-quoted-diagnostic.txt");
     let text = "country_event = { immediate = { cached_inject = { BODY = \"definitely_unknown_effect = yes\" } } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)

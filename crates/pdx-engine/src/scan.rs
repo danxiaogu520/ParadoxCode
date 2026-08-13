@@ -10,9 +10,8 @@ use pdx_rules::{GameProfile, SourceEncoding};
 use pdx_text::LogicalPath;
 
 use crate::model::{
-    SourceFile, SourceFileId, SourceRoot, SourceRootId, SourceRootKind, WorkspaceError,
-    WorkspaceScanIssue, WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanReport,
-    WorkspaceScanToken,
+    SourceFile, SourceFileId, SourceRoot, SourceRootId, WorkspaceError, WorkspaceScanIssue,
+    WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
 };
 
 pub(crate) fn record_scan_issue(
@@ -449,12 +448,13 @@ pub(crate) fn stable_file_id(root: SourceRootId, logical: &LogicalPath) -> u64 {
     value
 }
 
+/// Priority of one source root during overlay resolution.
+///
+/// Priorities come exclusively from the globally unique `order` assigned by the workspace
+/// configuration (Vanilla 0, dependencies 1..n, Current Mod n+1). The root kind is a layer
+/// identity and never participates in priority arithmetic.
 pub(crate) fn root_priority(root: &SourceRoot) -> u64 {
-    match root.kind {
-        SourceRootKind::Vanilla => 0,
-        SourceRootKind::Dependency => 1_000 + u64::from(root.order),
-        SourceRootKind::CurrentMod => 10_000 + u64::from(root.order),
-    }
+    u64::from(root.order)
 }
 
 pub(crate) fn source_priorities(

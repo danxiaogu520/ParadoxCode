@@ -110,9 +110,9 @@ impl LspServer {
             let mut in_flight = BTreeMap::<DocumentId, InFlightDiagnostics>::new();
             let mut in_flight_requests = HashMap::<RequestId, InFlightRequest>::new();
             let mut in_flight_initialize = None::<InFlightInitialize>;
-            let mut in_flight_vanilla = None::<VanillaSetupCancellation>;
-            let mut vanilla_cache_in_flight = false;
-            let mut vanilla_progress_token = None::<String>;
+            let mut in_flight_index = None::<IndexSetupCancellation>;
+            let mut index_cache_in_flight = false;
+            let mut index_progress_token = None::<String>;
             let mut in_flight_dependency = None::<WorkspaceScanToken>;
             let mut dependency_cache_in_flight = false;
             let mut dependency_progress_token = None::<String>;
@@ -134,7 +134,7 @@ impl LspServer {
                 let initialize_busy = in_flight_initialize.is_some();
                 let disk_changes_busy =
                     !self.pending_disk_changes.is_empty() || in_flight_disk_changes.is_some();
-                let vanilla_cache_busy = vanilla_cache_in_flight && in_flight_vanilla.is_some();
+                let vanilla_cache_busy = index_cache_in_flight && in_flight_index.is_some();
                 let dependency_cache_busy =
                     dependency_cache_in_flight && in_flight_dependency.is_some();
                 let deferred_ready = !parse_busy
@@ -186,8 +186,7 @@ impl LspServer {
                         let initialize_busy = in_flight_initialize.is_some();
                         let disk_changes_busy = !self.pending_disk_changes.is_empty()
                             || in_flight_disk_changes.is_some();
-                        let vanilla_cache_busy =
-                            vanilla_cache_in_flight && in_flight_vanilla.is_some();
+                        let vanilla_cache_busy = index_cache_in_flight && in_flight_index.is_some();
                         let dependency_cache_busy =
                             dependency_cache_in_flight && in_flight_dependency.is_some();
                         if from_reader
@@ -237,7 +236,7 @@ impl LspServer {
                             if let Some(task) = in_flight_initialize.as_ref() {
                                 task.cancellation.cancel();
                             }
-                            if let Some(task) = in_flight_vanilla.as_ref() {
+                            if let Some(task) = in_flight_index.as_ref() {
                                 task.cancel();
                             }
                             if let Some(task) = in_flight_dependency.as_ref() {
@@ -267,7 +266,7 @@ impl LspServer {
                             .take()
                             .expect("checked initialize task");
                         self.cancelled.remove(&result.request_id);
-                        let (response, warnings, auto_vanilla, vanilla_cache, dependency_caches) =
+                        let (response, warnings, auto_vanilla, index_cache, dependency_caches) =
                             match result.result {
                                 Ok(prepared) if !task.cancellation.is_cancelled() => {
                                     self.host = prepared.host;
@@ -284,7 +283,7 @@ impl LspServer {
                                         }),
                                         prepared.warnings,
                                         prepared.auto_vanilla,
-                                        prepared.vanilla_cache,
+                                        prepared.index_cache,
                                         prepared.dependency_caches,
                                     )
                                 }
@@ -314,8 +313,8 @@ impl LspServer {
                         for warning in warnings {
                             write_message(&mut output, &show_warning_notification(warning))?;
                         }
-                        if let Some(path) = vanilla_cache {
-                            let cancellation = VanillaSetupCancellation::new();
+                        if let Some(path) = index_cache {
+                            let cancellation = IndexSetupCancellation::new();
                             let sender = event_sender.clone();
                             let worker_cancellation = cancellation.clone();
                             let rules = self.host.snapshot().rules().clone();
@@ -351,18 +350,18 @@ impl LspServer {
                                     )?;
                                     None
                                 };
-                            vanilla_progress_token = if self.client_work_done_progress {
+                            index_progress_token = if self.client_work_done_progress {
                                 Some(progress_token.clone())
                             } else {
                                 None
                             };
-                            in_flight_vanilla = Some(cancellation);
-                            vanilla_cache_in_flight = true;
+                            in_flight_index = Some(cancellation);
+                            index_cache_in_flight = true;
                             // The user-level auto configuration survives `apply_user_vanilla_configuration`,
                             // so an unavailable configured cache can still fall back to discovery.
                             let auto_vanilla = self.auto_vanilla.clone();
                             scope.spawn(move || {
-                                let result = run_vanilla_cache_load(
+                                let result = run_index_cache_load(
                                     &path,
                                     rules,
                                     profile,
@@ -374,12 +373,12 @@ impl LspServer {
                                     &worker_cancellation,
                                 );
                                 let _ =
-                                    sender.send(TransportEvent::VanillaSetup(VanillaSetupResult {
+                                    sender.send(TransportEvent::VanillaSetup(IndexSetupResult {
                                         result,
                                     }));
                             });
                         } else if let Some(configuration) = auto_vanilla {
-                            let cancellation = VanillaSetupCancellation::new();
+                            let cancellation = IndexSetupCancellation::new();
                             let sender = event_sender.clone();
                             let rules = self.host.snapshot().rules().clone();
                             let profile = self.host.snapshot().game_profile().clone();
@@ -414,13 +413,13 @@ impl LspServer {
                                     )?;
                                     None
                                 };
-                            vanilla_progress_token = if self.client_work_done_progress {
+                            index_progress_token = if self.client_work_done_progress {
                                 Some(progress_token.clone())
                             } else {
                                 None
                             };
-                            in_flight_vanilla = Some(cancellation);
-                            vanilla_cache_in_flight = false;
+                            in_flight_index = Some(cancellation);
+                            index_cache_in_flight = false;
                             scope.spawn(move || {
                                 let result = run_auto_vanilla_setup(
                                     &configuration,
@@ -432,7 +431,7 @@ impl LspServer {
                                     &worker_cancellation,
                                 );
                                 let _ =
-                                    sender.send(TransportEvent::VanillaSetup(VanillaSetupResult {
+                                    sender.send(TransportEvent::VanillaSetup(IndexSetupResult {
                                         result,
                                     }));
                             });
@@ -633,9 +632,9 @@ impl LspServer {
                         }
                     }
                     TransportEvent::VanillaSetup(result) => {
-                        in_flight_vanilla = None;
-                        vanilla_cache_in_flight = false;
-                        if let Some(token) = vanilla_progress_token.take() {
+                        in_flight_index = None;
+                        index_cache_in_flight = false;
+                        if let Some(token) = index_progress_token.take() {
                             let message = match &result.result {
                                 Ok((_, message)) => message.clone(),
                                 Err(message) => message.clone(),
@@ -647,7 +646,7 @@ impl LspServer {
                                 let cache_rule_hash = cache.metadata().rule_hash.clone();
                                 let current_rule_hash =
                                     self.host.snapshot().rules().rule_hash().to_hex();
-                                match self.host.install_vanilla_cache(cache) {
+                                match self.host.install_index_cache(cache) {
                                     Ok(()) => {
                                         if cache_rule_hash != current_rule_hash {
                                             write_message(
@@ -751,7 +750,7 @@ impl LspServer {
                         || !in_flight.is_empty()
                         || !in_flight_requests.is_empty()
                         || in_flight_initialize.is_some()
-                        || in_flight_vanilla.is_some()
+                        || in_flight_index.is_some()
                         || !self.pending_disk_changes.is_empty()
                         || in_flight_disk_changes.is_some());
                 if !reader_active && !draining_shutdown && deferred_messages.is_empty() {

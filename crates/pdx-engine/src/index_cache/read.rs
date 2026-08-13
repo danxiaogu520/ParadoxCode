@@ -23,10 +23,9 @@ use super::codec::{
 };
 use super::template_codec;
 use super::{
-    APPLICATION_ID, CURRENT_VANILLA_CACHE_SCHEMA_VERSION, LoadedIndex, MAX_CACHE_BYTES,
-    MAX_CACHE_FILES, MAX_CACHE_SYMBOLS, MAX_TEXT_FIELD_BYTES, MIN_SUPPORTED_CACHE_SCHEMA_VERSION,
-    VANILLA_ROOT_ID, VanillaCacheError, VanillaIndexCache, VanillaIndexCacheMetadata,
-    parse_root_kind,
+    APPLICATION_ID, CURRENT_CACHE_SCHEMA_VERSION, IndexCache, IndexCacheError, IndexCacheMetadata,
+    LoadedIndex, MAX_CACHE_BYTES, MAX_CACHE_FILES, MAX_CACHE_SYMBOLS, MAX_TEXT_FIELD_BYTES,
+    MIN_SUPPORTED_CACHE_SCHEMA_VERSION, VANILLA_ROOT_ID, parse_root_kind,
 };
 
 /// Row-count and text-length limits per table, in validation order.
@@ -55,19 +54,19 @@ const TABLE_LIMITS: [(&str, usize, &str); 7] = [
 pub(super) fn load_cancellable(
     path: &Path,
     cancellation: &WorkspaceScanToken,
-) -> Result<VanillaIndexCache, VanillaCacheError> {
+) -> Result<IndexCache, IndexCacheError> {
     load_cancellable_with(path, cancellation, true, None)
 }
 
 /// Loads a cache while skipping the derivation of symbol lookup maps.
 ///
-/// The returned cache is only suitable for immediate installation: `install_vanilla_cache`
+/// The returned cache is only suitable for immediate installation: `install_index_cache`
 /// merges the shards with the workspace and rebuilds the maps once, so the maps derived here
 /// would be discarded. Validation is identical to [`load_cancellable`].
 pub(super) fn load_cancellable_for_install(
     path: &Path,
     cancellation: &WorkspaceScanToken,
-) -> Result<VanillaIndexCache, VanillaCacheError> {
+) -> Result<IndexCache, IndexCacheError> {
     load_cancellable_with(path, cancellation, false, None)
 }
 
@@ -79,7 +78,7 @@ pub(super) fn load_cancellable_for_install_with_progress(
     path: &Path,
     cancellation: &WorkspaceScanToken,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
-) -> Result<VanillaIndexCache, VanillaCacheError> {
+) -> Result<IndexCache, IndexCacheError> {
     load_cancellable_with(path, cancellation, false, progress)
 }
 
@@ -88,19 +87,19 @@ fn load_cancellable_with(
     cancellation: &WorkspaceScanToken,
     build_lookup_maps: bool,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
-) -> Result<VanillaIndexCache, VanillaCacheError> {
+) -> Result<IndexCache, IndexCacheError> {
     if cancellation.is_cancelled() {
-        return Err(VanillaCacheError::Cancelled);
+        return Err(IndexCacheError::Cancelled);
     }
     let metadata = fs::metadata(path)?;
     if !metadata.is_file() {
-        return Err(VanillaCacheError::InvalidData(format!(
+        return Err(IndexCacheError::InvalidData(format!(
             "cache is not a regular file: {}",
             path.display()
         )));
     }
     if metadata.len() > MAX_CACHE_BYTES {
-        return Err(VanillaCacheError::LimitExceeded(
+        return Err(IndexCacheError::LimitExceeded(
             "cache byte",
             usize::try_from(MAX_CACHE_BYTES).unwrap_or(usize::MAX),
         ));
@@ -115,15 +114,15 @@ fn load_connection(
     connection: &Connection,
     build_lookup_maps: bool,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
-) -> Result<VanillaIndexCache, VanillaCacheError> {
+) -> Result<IndexCache, IndexCacheError> {
     validate_database_identity(connection)?;
     let schema_version = metadata_text(connection, "schema_version")?
         .parse::<u32>()
-        .map_err(|_| VanillaCacheError::InvalidMetadata("schema_version"))?;
-    if !(MIN_SUPPORTED_CACHE_SCHEMA_VERSION..=CURRENT_VANILLA_CACHE_SCHEMA_VERSION)
+        .map_err(|_| IndexCacheError::InvalidMetadata("schema_version"))?;
+    if !(MIN_SUPPORTED_CACHE_SCHEMA_VERSION..=CURRENT_CACHE_SCHEMA_VERSION)
         .contains(&schema_version)
     {
-        return Err(VanillaCacheError::UnsupportedSchema(schema_version));
+        return Err(IndexCacheError::UnsupportedSchema(schema_version));
     }
     let table_counts = validate_table_limits(connection)?;
     // Every loaded row plus the derived cross-table validation work: the known-range set
@@ -164,7 +163,7 @@ fn load_connection(
         let root_id = u32::from_le_bytes(
             metadata_blob(connection, "root_id")?
                 .try_into()
-                .map_err(|_| VanillaCacheError::InvalidMetadata("root_id"))?,
+                .map_err(|_| IndexCacheError::InvalidMetadata("root_id"))?,
         );
         SourceRoot::new(
             SourceRootId::new(root_id),
@@ -180,22 +179,22 @@ fn load_connection(
     let source_fingerprint = metadata_text(connection, "source_fingerprint")?;
     let created_unix_seconds = metadata_text(connection, "created_unix_seconds")?
         .parse::<u64>()
-        .map_err(|_| VanillaCacheError::InvalidMetadata("created_unix_seconds"))?;
+        .map_err(|_| IndexCacheError::InvalidMetadata("created_unix_seconds"))?;
     let indexed_files = metadata_text(connection, "indexed_files")?
         .parse::<usize>()
-        .map_err(|_| VanillaCacheError::InvalidMetadata("indexed_files"))?;
+        .map_err(|_| IndexCacheError::InvalidMetadata("indexed_files"))?;
     let (source_files, index, positions, localisation_previews) =
         load_index(connection, &root, build_lookup_maps, &mut progress)?;
     if indexed_files != source_files.len() {
-        return Err(VanillaCacheError::InvalidData(format!(
+        return Err(IndexCacheError::InvalidData(format!(
             "metadata records {indexed_files} files but cache contains {}",
             source_files.len()
         )));
     }
     let mut index = index;
     index.replace_all_position_ranges(positions);
-    Ok(VanillaIndexCache {
-        metadata: VanillaIndexCacheMetadata {
+    Ok(IndexCache {
+        metadata: IndexCacheMetadata {
             schema_version,
             game_id,
             rule_hash,
@@ -211,27 +210,27 @@ fn load_connection(
     })
 }
 
-fn map_interrupted(error: VanillaCacheError) -> VanillaCacheError {
+fn map_interrupted(error: IndexCacheError) -> IndexCacheError {
     match error {
-        VanillaCacheError::Sql(ref sqlite)
+        IndexCacheError::Sql(ref sqlite)
             if sqlite.sqlite_error_code() == Some(rusqlite::ErrorCode::OperationInterrupted) =>
         {
-            VanillaCacheError::Cancelled
+            IndexCacheError::Cancelled
         }
         error => error,
     }
 }
 
-pub(super) fn validate_database_identity(connection: &Connection) -> Result<(), VanillaCacheError> {
+pub(super) fn validate_database_identity(connection: &Connection) -> Result<(), IndexCacheError> {
     let application_id =
         connection.pragma_query_value(None, "application_id", |row| row.get::<_, i32>(0))?;
     if application_id != APPLICATION_ID {
-        return Err(VanillaCacheError::NotVanillaCache);
+        return Err(IndexCacheError::NotIndexCache);
     }
     Ok(())
 }
 
-fn metadata_blob(connection: &Connection, key: &'static str) -> Result<Vec<u8>, VanillaCacheError> {
+fn metadata_blob(connection: &Connection, key: &'static str) -> Result<Vec<u8>, IndexCacheError> {
     let length = connection
         .query_row(
             "SELECT length(value) FROM metadata WHERE key = ?1",
@@ -239,9 +238,9 @@ fn metadata_blob(connection: &Connection, key: &'static str) -> Result<Vec<u8>, 
             |row| row.get::<_, i64>(0),
         )
         .optional()?
-        .ok_or(VanillaCacheError::InvalidMetadata(key))?;
+        .ok_or(IndexCacheError::InvalidMetadata(key))?;
     if length < 0 || usize::try_from(length).map_or(true, |length| length > MAX_TEXT_FIELD_BYTES) {
-        return Err(VanillaCacheError::LimitExceeded(
+        return Err(IndexCacheError::LimitExceeded(
             "metadata field byte",
             MAX_TEXT_FIELD_BYTES,
         ));
@@ -251,12 +250,12 @@ fn metadata_blob(connection: &Connection, key: &'static str) -> Result<Vec<u8>, 
             row.get(0)
         })
         .optional()?
-        .ok_or(VanillaCacheError::InvalidMetadata(key))
+        .ok_or(IndexCacheError::InvalidMetadata(key))
 }
 
-fn metadata_text(connection: &Connection, key: &'static str) -> Result<String, VanillaCacheError> {
+fn metadata_text(connection: &Connection, key: &'static str) -> Result<String, IndexCacheError> {
     let bytes = metadata_blob(connection, key)?;
-    String::from_utf8(bytes).map_err(|_| VanillaCacheError::InvalidMetadata(key))
+    String::from_utf8(bytes).map_err(|_| IndexCacheError::InvalidMetadata(key))
 }
 
 /// Shared row-progress accounting for one cache load.
@@ -276,7 +275,7 @@ impl LoadProgress<'_> {
     }
 }
 
-fn validate_table_limits(connection: &Connection) -> Result<[usize; 7], VanillaCacheError> {
+fn validate_table_limits(connection: &Connection) -> Result<[usize; 7], IndexCacheError> {
     // One scan per table returns both the row count and the longest text field, so the
     // bounds checks never rescan a table. The order matches TABLE_LIMITS so failures can
     // name the offending table statically.
@@ -295,16 +294,13 @@ fn validate_table_limits(connection: &Connection) -> Result<[usize; 7], VanillaC
         })?;
         let limit = *limit;
         if count < 0 || usize::try_from(count).map_or(true, |count| count > limit) {
-            return Err(VanillaCacheError::LimitExceeded(
-                TABLE_LIMITS[index].0,
-                limit,
-            ));
+            return Err(IndexCacheError::LimitExceeded(TABLE_LIMITS[index].0, limit));
         }
         counts[index] = usize::try_from(count).map_err(|_| {
-            VanillaCacheError::InvalidData("table row count exceeds platform usize".to_owned())
+            IndexCacheError::InvalidData("table row count exceeds platform usize".to_owned())
         })?;
         if max < 0 || usize::try_from(max).map_or(true, |max| max > MAX_TEXT_FIELD_BYTES) {
-            return Err(VanillaCacheError::LimitExceeded(
+            return Err(IndexCacheError::LimitExceeded(
                 "text field byte",
                 MAX_TEXT_FIELD_BYTES,
             ));
@@ -318,7 +314,7 @@ fn validate_table_limits(connection: &Connection) -> Result<[usize; 7], VanillaC
     if max_template < 0
         || usize::try_from(max_template).map_or(true, |max| max > super::MAX_MACRO_TEMPLATE_BYTES)
     {
-        return Err(VanillaCacheError::LimitExceeded(
+        return Err(IndexCacheError::LimitExceeded(
             "macro template byte",
             super::MAX_MACRO_TEMPLATE_BYTES,
         ));
@@ -331,7 +327,7 @@ fn load_index(
     root: &SourceRoot,
     build_lookup_maps: bool,
     progress: &mut LoadProgress<'_>,
-) -> Result<LoadedIndex, VanillaCacheError> {
+) -> Result<LoadedIndex, IndexCacheError> {
     let mut source_files = BTreeMap::new();
     let mut shards = BTreeMap::new();
     let mut statement = connection.prepare(
@@ -351,16 +347,15 @@ fn load_index(
         let (id, logical_path, category_id, resolution, syntax_error_count) = row?;
         let id = decode_file_id(&id)?;
         let logical_path = LogicalPath::parse(&logical_path)
-            .map_err(|error| VanillaCacheError::InvalidData(error.to_string()))?;
+            .map_err(|error| IndexCacheError::InvalidData(error.to_string()))?;
         if stable_file_id(root.id, &logical_path) != id.get() {
-            return Err(VanillaCacheError::InvalidData(format!(
+            return Err(IndexCacheError::InvalidData(format!(
                 "file id does not match logical path {}",
                 logical_path.as_str()
             )));
         }
-        let syntax_error_count = usize::try_from(syntax_error_count).map_err(|_| {
-            VanillaCacheError::InvalidData("negative syntax error count".to_owned())
-        })?;
+        let syntax_error_count = usize::try_from(syntax_error_count)
+            .map_err(|_| IndexCacheError::InvalidData("negative syntax error count".to_owned()))?;
         let file = SourceFile {
             id,
             root_id: root.id,
@@ -370,7 +365,7 @@ fn load_index(
             resolution: parse_resolution(&resolution)?,
         };
         if source_files.insert(id, file).is_some() {
-            return Err(VanillaCacheError::InvalidData(format!(
+            return Err(IndexCacheError::InvalidData(format!(
                 "duplicate source file id {}",
                 id.get()
             )));
@@ -419,14 +414,14 @@ fn load_index(
     progress.report(positions.len());
     for ((file_id, range), position) in &positions {
         if !known_ranges.contains(&(*file_id, *range)) {
-            return Err(VanillaCacheError::InvalidData(format!(
+            return Err(IndexCacheError::InvalidData(format!(
                 "navigation position references unknown range {}..{}",
                 range.start(),
                 range.end()
             )));
         }
         if position.start > position.end {
-            return Err(VanillaCacheError::InvalidData(
+            return Err(IndexCacheError::InvalidData(
                 "navigation position end precedes start".to_owned(),
             ));
         }
@@ -451,7 +446,7 @@ fn load_index(
 fn load_macro_definitions(
     connection: &Connection,
     shards: &mut BTreeMap<SourceFileId, FileIndexShard>,
-) -> Result<usize, VanillaCacheError> {
+) -> Result<usize, IndexCacheError> {
     let mut rows_loaded = 0usize;
     let mut statement = connection.prepare(
         "SELECT file_id, ordinal, kind, name, definition_range_start, definition_range_end, template_payload
@@ -472,16 +467,16 @@ fn load_macro_definitions(
         let (file_id, ordinal, kind, name, start, end, template_payload) = row?;
         let file_id = decode_file_id(&file_id)?;
         let ordinal = usize::try_from(ordinal)
-            .map_err(|_| VanillaCacheError::InvalidData("negative macro ordinal".to_owned()))?;
+            .map_err(|_| IndexCacheError::InvalidData("negative macro ordinal".to_owned()))?;
         let definition_range = decode_range(start, end)?;
         let shard = shards.get_mut(&file_id).ok_or_else(|| {
-            VanillaCacheError::InvalidData(format!(
+            IndexCacheError::InvalidData(format!(
                 "macro definition references unknown file {}",
                 file_id.get()
             ))
         })?;
         if ordinal != shard.macro_definitions.len() {
-            return Err(VanillaCacheError::InvalidData(
+            return Err(IndexCacheError::InvalidData(
                 "macro definition ordinals are not contiguous".to_owned(),
             ));
         }
@@ -490,7 +485,7 @@ fn load_macro_definitions(
                 && summary.name.eq_ignore_ascii_case(&name)
                 && summary.definition_range == definition_range
         }) {
-            return Err(VanillaCacheError::InvalidData(format!(
+            return Err(IndexCacheError::InvalidData(format!(
                 "duplicate macro summary {kind} `{name}`"
             )));
         }
@@ -499,7 +494,7 @@ fn load_macro_definitions(
                 && definition.name.eq_ignore_ascii_case(&name)
                 && definition.range == definition_range
         }) {
-            return Err(VanillaCacheError::InvalidData(format!(
+            return Err(IndexCacheError::InvalidData(format!(
                 "macro summary {kind} `{name}` has no matching definition"
             )));
         }
@@ -535,15 +530,15 @@ fn load_macro_definitions(
         let (file_id, macro_ordinal, ordinal, name, required) = row?;
         let file_id = decode_file_id(&file_id)?;
         let macro_ordinal = usize::try_from(macro_ordinal)
-            .map_err(|_| VanillaCacheError::InvalidData("negative macro ordinal".to_owned()))?;
+            .map_err(|_| IndexCacheError::InvalidData("negative macro ordinal".to_owned()))?;
         let ordinal = usize::try_from(ordinal).map_err(|_| {
-            VanillaCacheError::InvalidData("negative macro parameter ordinal".to_owned())
+            IndexCacheError::InvalidData("negative macro parameter ordinal".to_owned())
         })?;
         let required = match required {
             0 => false,
             1 => true,
             _ => {
-                return Err(VanillaCacheError::InvalidData(
+                return Err(IndexCacheError::InvalidData(
                     "macro parameter required flag is not boolean".to_owned(),
                 ));
             }
@@ -552,10 +547,10 @@ fn load_macro_definitions(
             .get_mut(&file_id)
             .and_then(|shard| shard.macro_definitions.get_mut(macro_ordinal))
             .ok_or_else(|| {
-                VanillaCacheError::InvalidData("macro parameter has no owner".to_owned())
+                IndexCacheError::InvalidData("macro parameter has no owner".to_owned())
             })?;
         if ordinal != summary.parameters.len() {
-            return Err(VanillaCacheError::InvalidData(
+            return Err(IndexCacheError::InvalidData(
                 "macro parameter ordinals are not contiguous".to_owned(),
             ));
         }
@@ -565,7 +560,7 @@ fn load_macro_definitions(
                 .iter()
                 .any(|parameter| parameter.name.eq_ignore_ascii_case(&name))
         {
-            return Err(VanillaCacheError::InvalidData(
+            return Err(IndexCacheError::InvalidData(
                 "macro parameter name is empty or duplicated".to_owned(),
             ));
         }
@@ -581,7 +576,7 @@ fn load_localisation_previews(
     connection: &Connection,
     shards: &BTreeMap<SourceFileId, FileIndexShard>,
     localisation_ranges: &HashSet<(SourceFileId, TextRange)>,
-) -> Result<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>, VanillaCacheError> {
+) -> Result<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>, IndexCacheError> {
     let mut statement = connection.prepare(
         "SELECT file_id, range_start, range_end, language, value
          FROM localisation_previews ORDER BY file_id, range_start, range_end",
@@ -601,20 +596,20 @@ fn load_localisation_previews(
         let file_id = decode_file_id(&file_id)?;
         let range = decode_range(start, end)?;
         if shards.get(&file_id).is_none() {
-            return Err(VanillaCacheError::InvalidData(format!(
+            return Err(IndexCacheError::InvalidData(format!(
                 "localisation preview references unknown file {}",
                 file_id.get()
             )));
         }
         if !localisation_ranges.contains(&(file_id, range)) {
-            return Err(VanillaCacheError::InvalidData(format!(
+            return Err(IndexCacheError::InvalidData(format!(
                 "localisation preview range {}..{} is not a localisation definition",
                 range.start(),
                 range.end()
             )));
         }
         if value.is_empty() {
-            return Err(VanillaCacheError::InvalidData(
+            return Err(IndexCacheError::InvalidData(
                 "localisation preview value is empty".to_owned(),
             ));
         }
@@ -622,7 +617,7 @@ fn load_localisation_previews(
             .insert((file_id, range), LocalisationPreview { language, value })
             .is_some()
         {
-            return Err(VanillaCacheError::InvalidData(
+            return Err(IndexCacheError::InvalidData(
                 "duplicate localisation preview".to_owned(),
             ));
         }
@@ -633,7 +628,7 @@ fn load_localisation_previews(
 fn load_definitions(
     connection: &Connection,
     shards: &mut BTreeMap<SourceFileId, FileIndexShard>,
-) -> Result<usize, VanillaCacheError> {
+) -> Result<usize, IndexCacheError> {
     let mut rows_loaded = 0usize;
     let mut statement = connection.prepare(
         "SELECT file_id, kind, name, range_start, range_end, active
@@ -657,7 +652,7 @@ fn load_definitions(
             0 => false,
             1 => true,
             _ => {
-                return Err(VanillaCacheError::InvalidData(
+                return Err(IndexCacheError::InvalidData(
                     "definition active flag is not boolean".to_owned(),
                 ));
             }
@@ -665,7 +660,7 @@ fn load_definitions(
         shards
             .get_mut(&file_id)
             .ok_or_else(|| {
-                VanillaCacheError::InvalidData(format!(
+                IndexCacheError::InvalidData(format!(
                     "definition references unknown file {}",
                     file_id.get()
                 ))
@@ -686,7 +681,7 @@ fn load_definitions(
 fn load_references(
     connection: &Connection,
     shards: &mut BTreeMap<SourceFileId, FileIndexShard>,
-) -> Result<usize, VanillaCacheError> {
+) -> Result<usize, IndexCacheError> {
     let mut rows_loaded = 0usize;
     let mut statement = connection.prepare(
         "SELECT file_id, kind, name, range_start, range_end
@@ -708,7 +703,7 @@ fn load_references(
         shards
             .get_mut(&file_id)
             .ok_or_else(|| {
-                VanillaCacheError::InvalidData(format!(
+                IndexCacheError::InvalidData(format!(
                     "reference targets unknown file {}",
                     file_id.get()
                 ))
@@ -727,7 +722,7 @@ fn load_references(
 
 fn load_navigation_positions(
     connection: &Connection,
-) -> Result<BTreeMap<(SourceFileId, TextRange), PositionRange>, VanillaCacheError> {
+) -> Result<BTreeMap<(SourceFileId, TextRange), PositionRange>, IndexCacheError> {
     let mut statement = connection.prepare(
         "SELECT file_id, range_start, range_end, start_line, start_character, end_line, end_character
          FROM navigation_positions ORDER BY file_id, range_start, range_end",
@@ -757,7 +752,7 @@ fn load_navigation_positions(
             Position::new(end_line, end_character),
         );
         if positions.insert((file_id, range), position).is_some() {
-            return Err(VanillaCacheError::InvalidData(
+            return Err(IndexCacheError::InvalidData(
                 "duplicate navigation position".to_owned(),
             ));
         }

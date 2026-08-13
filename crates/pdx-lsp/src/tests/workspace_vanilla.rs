@@ -3,7 +3,7 @@ use std::io::Cursor;
 
 use lsp_types::SymbolInformation;
 use pdx_engine::{
-    AnalysisHost, SourceRoot, SourceRootId, SourceRootKind, VanillaIndexCache, WorkspaceChange,
+    AnalysisHost, IndexCache, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
 };
 use pdx_game::{DiscoveryOptions, DiscoveryOutcome, UserConfiguration, UserPaths};
 
@@ -205,7 +205,7 @@ fn project_config_loads_ordered_dependencies_and_keeps_them_read_only() {
         .refresh_source_roots()
         .expect("scan Vanilla once");
     let vanilla_cache =
-        VanillaIndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build Vanilla cache");
+        IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build Vanilla cache");
     let vanilla_cache_path = config_dir.join("vanilla.pdxindex");
     vanilla_cache
         .save(&vanilla_cache_path)
@@ -272,12 +272,13 @@ path = "dependencies/high"
     let roots = snapshot.source_roots();
     assert_eq!(roots.len(), 4);
     assert_eq!(roots[0].kind, pdx_engine::SourceRootKind::Vanilla);
+    assert_eq!(roots[0].order, 0);
     assert_eq!(roots[1].kind, pdx_engine::SourceRootKind::Dependency);
-    assert_eq!(roots[1].order, 0);
+    assert_eq!(roots[1].order, 1);
     assert_eq!(roots[2].kind, pdx_engine::SourceRootKind::Dependency);
-    assert_eq!(roots[2].order, 1);
+    assert_eq!(roots[2].order, 2);
     assert_eq!(roots[3].kind, pdx_engine::SourceRootKind::CurrentMod);
-    assert!(roots[3].writable);
+    assert_eq!(roots[3].order, 3);
     let active = snapshot
         .index()
         .active_definition("event", "shared.1")
@@ -398,8 +399,7 @@ fn initialize_defers_an_existing_vanilla_cache() {
         SourceRootKind::Vanilla,
         vanilla,
     )]));
-    let cache =
-        VanillaIndexCache::from_snapshot(&vanilla_host.snapshot()).expect("empty Vanilla cache");
+    let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("empty Vanilla cache");
     cache.save(&cache_path).expect("save Vanilla cache");
 
     let params = serde_json::from_value(json!({
@@ -420,7 +420,7 @@ fn initialize_defers_an_existing_vanilla_cache() {
     )
     .expect("prepare initialize candidate");
 
-    assert_eq!(candidate.vanilla_cache, Some(cache_path.clone()));
+    assert_eq!(candidate.index_cache, Some(cache_path.clone()));
     assert!(
         candidate
             .host
@@ -441,7 +441,7 @@ fn stale_vanilla_cache_is_regenerated_with_an_explicit_notification() {
     let cache_path = stale_cache_fixture(&container);
     let first_party_rules = pdx_game::eu4::first_party_rules().expect("embedded rules");
     assert_ne!(
-        VanillaIndexCache::load(&cache_path)
+        IndexCache::load(&cache_path)
             .expect("stale cache reload")
             .metadata()
             .rule_hash,
@@ -488,7 +488,7 @@ fn stale_vanilla_cache_is_regenerated_with_an_explicit_notification() {
         "no stale-cache warning should remain after a successful regeneration"
     );
     assert_eq!(
-        VanillaIndexCache::load(&cache_path)
+        IndexCache::load(&cache_path)
             .expect("regenerated cache reload")
             .metadata()
             .rule_hash,
@@ -560,7 +560,7 @@ fn stale_cache_regeneration_reports_work_done_progress() {
         "an end report must be emitted once the worker finishes"
     );
     assert_eq!(
-        VanillaIndexCache::load(&cache_path)
+        IndexCache::load(&cache_path)
             .expect("regenerated cache reload")
             .metadata()
             .rule_hash,
@@ -698,9 +698,9 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
     let explicit = root.join("explicit/vanilla.pdxindex");
     fs::create_dir_all(explicit.parent().expect("cache parent")).expect("cache directory");
     fs::write(&explicit, b"not a vanilla cache").expect("corrupt cache fixture");
-    let cancellation = VanillaSetupCancellation::new();
+    let cancellation = IndexSetupCancellation::new();
 
-    let (cache, message) = run_vanilla_cache_load(
+    let (cache, message) = run_index_cache_load(
         &explicit,
         rules.clone(),
         pdx_game::eu4::profile(),
@@ -715,11 +715,11 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
         "the rebuild must be explicit: {message}"
     );
     assert_eq!(cache.metadata().game_id, "eu4");
-    let reloaded = VanillaIndexCache::load(&explicit).expect("rebuilt cache loads");
+    let reloaded = IndexCache::load(&explicit).expect("rebuilt cache loads");
     assert_eq!(reloaded.metadata().rule_hash, rules.rule_hash().to_hex());
 
     // A second start finds a matching cache and loads it directly.
-    let (_, second) = run_vanilla_cache_load(
+    let (_, second) = run_index_cache_load(
         &explicit,
         rules.clone(),
         pdx_game::eu4::profile(),
@@ -784,7 +784,7 @@ fn unavailable_configured_cache_is_rebuilt_from_configured_source() {
         }),
         "an unavailable configured cache must rebuild rather than warn"
     );
-    let reloaded = VanillaIndexCache::load(&cache_path).expect("rebuilt cache loads");
+    let reloaded = IndexCache::load(&cache_path).expect("rebuilt cache loads");
     assert_eq!(
         reloaded.metadata().rule_hash,
         pdx_game::eu4::first_party_rules()
@@ -834,7 +834,7 @@ fn automatic_vanilla_setup_builds_cache_and_records_single_attempt() {
         pdx_game::eu4::first_party_rules().expect("rules"),
         pdx_game::eu4::profile(),
         None,
-        &VanillaSetupCancellation::new(),
+        &IndexSetupCancellation::new(),
         &options,
     )
     .expect("automatic setup");
@@ -852,7 +852,7 @@ fn automatic_vanilla_setup_builds_cache_and_records_single_attempt() {
         pdx_game::eu4::first_party_rules().expect("rules"),
         pdx_game::eu4::profile(),
         None,
-        &VanillaSetupCancellation::new(),
+        &IndexSetupCancellation::new(),
         &options,
     )
     .expect_err("automatic setup only runs once");
@@ -883,7 +883,7 @@ fn explicit_project_cache_precedes_user_discovery_configuration() {
     let mut resolved = ResolvedSourceRoots {
         workspace_root: None,
         roots: Vec::new(),
-        vanilla_cache: Some(project_cache.clone()),
+        index_cache: Some(project_cache.clone()),
         vanilla_explicit: true,
         dependency_caches: Vec::new(),
     };
@@ -891,7 +891,7 @@ fn explicit_project_cache_precedes_user_discovery_configuration() {
     let setup =
         apply_user_vanilla_configuration(&mut resolved, Some(&automatic), "eu4", &mut warnings);
     assert!(setup.is_none());
-    assert_eq!(resolved.vanilla_cache, Some(project_cache));
+    assert_eq!(resolved.index_cache, Some(project_cache));
     assert!(warnings.is_empty());
     fs::remove_dir_all(root).expect("cleanup");
 }
@@ -916,7 +916,7 @@ fn unsuccessful_automatic_discovery_is_recorded_and_not_repeated() {
         pdx_game::eu4::first_party_rules().expect("rules"),
         pdx_game::eu4::profile(),
         None,
-        &VanillaSetupCancellation::new(),
+        &IndexSetupCancellation::new(),
         &options,
     )
     .expect_err("empty search has no candidate");
@@ -932,7 +932,7 @@ fn unsuccessful_automatic_discovery_is_recorded_and_not_repeated() {
         pdx_game::eu4::first_party_rules().expect("rules"),
         pdx_game::eu4::profile(),
         None,
-        &VanillaSetupCancellation::new(),
+        &IndexSetupCancellation::new(),
         &options,
     )
     .expect_err("failed automatic search is not repeated");
@@ -971,12 +971,14 @@ fn indexed_dependencies_are_excluded_from_live_scanning() {
     assert_eq!(resolved.dependency_caches.len(), 1);
     let cached = &resolved.dependency_caches[0];
     assert_eq!(cached.root.kind, SourceRootKind::Dependency);
-    assert_eq!(cached.root.order, 1);
+    assert_eq!(cached.root.order, 2);
     assert_eq!(cached.root.path, canonical_root.join("deps/cached"));
     assert_eq!(
         cached.index_path,
         canonical_root.join("cache/cached-dep.pdxindex")
     );
+    assert_eq!(resolved.roots[0].order, 1, "live dependency order");
+    assert_eq!(resolved.roots[1].order, 3, "current mod order");
 }
 
 #[test]
@@ -1009,8 +1011,7 @@ fn existing_dependency_index_cache_is_installed_in_the_background() {
         dependency_root.clone(),
     ]));
     builder.refresh_source_roots().expect("scan dependency");
-    let cache =
-        VanillaIndexCache::from_snapshot(&builder.snapshot()).expect("build dependency cache");
+    let cache = IndexCache::from_snapshot(&builder.snapshot()).expect("build dependency cache");
     let cache_path = container.join("dependency.pdxindex");
     cache.save(&cache_path).expect("save dependency cache");
     fs::remove_dir_all(&dependency).expect("make dependency source unavailable after caching");

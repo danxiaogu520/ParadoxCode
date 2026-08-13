@@ -2,7 +2,7 @@
 
 use std::fs;
 
-use pdx_engine::{AnalysisHost, VanillaIndexCache, WorkspaceChange, WorkspaceScanToken};
+use pdx_engine::{AnalysisHost, IndexCache, WorkspaceChange, WorkspaceScanToken};
 use pdx_rules::{GameProfile, RuleSet};
 
 use crate::workspace::DependencyIndexCache;
@@ -20,8 +20,8 @@ pub(crate) fn run_dependency_cache_load(
     current_rule_hash: String,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &WorkspaceScanToken,
-) -> Result<(VanillaIndexCache, String), String> {
-    let loaded = match VanillaIndexCache::load_cancellable_for_install_with_progress(
+) -> Result<(IndexCache, String), String> {
+    let loaded = match IndexCache::load_cancellable_for_install_with_progress(
         &config.index_path,
         cancellation,
         progress,
@@ -106,7 +106,7 @@ fn build_dependency_cache(
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &WorkspaceScanToken,
     activity: &str,
-) -> Result<VanillaIndexCache, String> {
+) -> Result<IndexCache, String> {
     if cancellation.is_cancelled() {
         return Err("dependency index build was cancelled".to_owned());
     }
@@ -119,7 +119,7 @@ fn build_dependency_cache(
                 config.root.path.display()
             )
         })?;
-    let cache = VanillaIndexCache::from_snapshot(&host.snapshot())
+    let cache = IndexCache::from_snapshot(&host.snapshot())
         .map_err(|error| format!("{activity} failed: {error}"))?;
     cache
         .save_with_progress(&config.index_path, progress)

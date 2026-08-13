@@ -44,7 +44,7 @@ struct ProjectConfiguration {
 pub(crate) struct ResolvedSourceRoots {
     pub(crate) workspace_root: Option<PathBuf>,
     pub(crate) roots: Vec<SourceRoot>,
-    pub(crate) vanilla_cache: Option<PathBuf>,
+    pub(crate) index_cache: Option<PathBuf>,
     pub(crate) vanilla_explicit: bool,
     /// Dependencies configured with a persistent index cache. These roots are excluded from
     /// live scanning and are installed from their cache files instead.
@@ -235,34 +235,50 @@ pub(crate) fn resolve_source_roots(
 
     let mut roots = Vec::with_capacity(configured.len().saturating_add(1));
     let mut dependency_caches = Vec::new();
+    let dependency_count = configured.len();
     for (order, (id, path, index)) in configured.into_iter().enumerate() {
+        // Orders are globally unique across all layers: 0 belongs to the Vanilla layer, live
+        // dependencies and cached dependencies share the 1..=n range in configuration order,
+        // and the Current Mod takes n+1.
+        let order = u32::try_from(order)
+            .map_err(|_| {
+                RpcError::new(
+                    INVALID_PARAMS,
+                    "too many dependency roots to assign stable order",
+                )
+            })?
+            .saturating_add(1);
         let mut root = SourceRoot::new(
             SourceRootId::new(stable_dependency_root_id(&id)),
             SourceRootKind::Dependency,
             path,
         );
-        root.order = u32::try_from(order).map_err(|_| {
-            RpcError::new(
-                INVALID_PARAMS,
-                "too many dependency roots to assign stable order",
-            )
-        })?;
+        root.order = order;
         match index {
             Some(index_path) => dependency_caches.push(DependencyIndexCache { root, index_path }),
             None => roots.push(root),
         }
     }
     if let Some(path) = current_mod.clone() {
-        roots.push(SourceRoot::new(
+        let mut current_root = SourceRoot::new(
             SourceRootId::new(u32::MAX),
             SourceRootKind::CurrentMod,
             path,
-        ));
+        );
+        current_root.order = u32::try_from(dependency_count)
+            .map_err(|_| {
+                RpcError::new(
+                    INVALID_PARAMS,
+                    "too many dependency roots to assign stable order",
+                )
+            })?
+            .saturating_add(1);
+        roots.push(current_root);
     }
     Ok(ResolvedSourceRoots {
         workspace_root: current_mod.or(base),
         roots,
-        vanilla_cache: vanilla_index_cache,
+        index_cache: vanilla_index_cache,
         vanilla_explicit,
         dependency_caches,
     })

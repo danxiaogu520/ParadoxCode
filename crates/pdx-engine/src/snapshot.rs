@@ -31,8 +31,7 @@ pub struct AnalysisSnapshot {
     pub(crate) file_states: Arc<BTreeMap<SourceFileId, Arc<FileState>>>,
     pub(crate) index: Arc<WorkspaceIndex>,
     pub(crate) scan_report: Arc<WorkspaceScanReport>,
-    pub(crate) vanilla_localisation_previews:
-        Arc<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>>,
+    pub(crate) localisation_previews: Arc<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>>,
     pub(crate) query_cache: Arc<SnapshotQueryCache>,
 }
 
@@ -111,8 +110,8 @@ impl AnalysisSnapshot {
     /// Resolves the stable id of one scanned file by physical path.
     ///
     /// The map is maintained by the workspace scan and targeted disk-change pipelines, so the
-    /// lookup is logarithmic instead of a linear scan over every indexed file (including the
-    /// Vanilla index).
+    /// lookup is logarithmic instead of a linear scan over every indexed file (including
+    /// cache-installed roots).
     #[must_use]
     pub fn source_file_id_for_path(&self, path: &std::path::Path) -> Option<SourceFileId> {
         self.source_file_paths.get(path).copied()
@@ -220,13 +219,13 @@ impl AnalysisSnapshot {
         &self.query_cache
     }
 
-    /// Returns a cached Vanilla localisation preview without reading the Vanilla source file.
+    /// Returns a cached localisation preview without reading the source file.
     #[must_use]
-    pub fn vanilla_localisation_preview(
+    pub fn localisation_preview(
         &self,
         file_id: SourceFileId,
         range: TextRange,
     ) -> Option<&LocalisationPreview> {
-        self.vanilla_localisation_previews.get(&(file_id, range))
+        self.localisation_previews.get(&(file_id, range))
     }
 }

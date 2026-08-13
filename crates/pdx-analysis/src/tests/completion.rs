@@ -894,11 +894,11 @@ fn vanilla_cache_only_macro_value_completion_uses_persisted_body_constraints() {
         root.clone(),
     )]));
     vanilla_host.refresh_source_roots().expect("scan Vanilla");
-    let cache = VanillaIndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
+    let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
     std::fs::remove_dir_all(&root).expect("discard Vanilla source");
 
     let mut host = eu4_host(rules);
-    host.install_vanilla_cache(cache).expect("install cache");
+    host.install_index_cache(cache).expect("install cache");
     let id = DocumentId::new("file:///tmp/events/cached-completion.txt");
     let text = "country_event = { immediate = { cached_bool = { VALUE =  } } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
@@ -933,11 +933,11 @@ fn vanilla_cache_only_macro_completes_inside_quoted_effect_payload() {
         root.clone(),
     )]));
     vanilla_host.refresh_source_roots().expect("scan Vanilla");
-    let cache = VanillaIndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
+    let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
     std::fs::remove_dir_all(&root).expect("discard Vanilla source");
 
     let mut host = eu4_host(rules);
-    host.install_vanilla_cache(cache).expect("install cache");
+    host.install_index_cache(cache).expect("install cache");
     let id = DocumentId::new("file:///tmp/events/cached-quoted-completion.txt");
     let text = "country_event = { immediate = { cached_inject = { BODY = \"add_pre\" } } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
@@ -986,11 +986,11 @@ fn vanilla_cache_macro_templates_preserve_nested_conditional_and_scope_semantics
         root.clone(),
     )]));
     vanilla_host.refresh_source_roots().expect("scan Vanilla");
-    let cache = VanillaIndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
+    let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
     std::fs::remove_dir_all(&root).expect("discard Vanilla source");
 
     let mut host = eu4_host(rules);
-    host.install_vanilla_cache(cache).expect("install cache");
+    host.install_index_cache(cache).expect("install cache");
     let complete_argument = |host: &AnalysisHost, id_suffix: &str, event: &str, body: &str| {
         let id = DocumentId::new(format!("file:///tmp/events/{id_suffix}.txt"));
         let text = format!("{event} = {{ immediate = {{ {body} }} }}\n");
@@ -1084,7 +1084,7 @@ fn current_mod_macro_template_overrides_cached_vanilla_template() {
         vanilla.clone(),
     )]));
     vanilla_host.refresh_source_roots().expect("scan Vanilla");
-    let cache = VanillaIndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
+    let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
     std::fs::remove_dir_all(&vanilla).expect("discard Vanilla source");
 
     let mut host = eu4_host(rules);
@@ -1094,7 +1094,7 @@ fn current_mod_macro_template_overrides_cached_vanilla_template() {
         current,
     )]));
     host.refresh_source_roots().expect("scan current Mod");
-    host.install_vanilla_cache(cache).expect("install cache");
+    host.install_index_cache(cache).expect("install cache");
     let id = DocumentId::new("file:///tmp/events/priority-macro.txt");
     let text = "country_event = { immediate = { priority_macro = { VALUE =  } } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)

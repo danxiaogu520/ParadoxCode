@@ -9,17 +9,20 @@ pub mod hir;
 
 mod host;
 mod index;
+mod index_cache;
 mod model;
 mod pipeline;
 mod query_cache;
 mod scan;
 mod snapshot;
-mod vanilla_cache;
 
 pub use host::AnalysisHost;
 pub use index::{
     Definition, FileIndexShard, MacroDefinitionSummary, MacroParameterSignature, Reference,
     WorkspaceIndex,
+};
+pub use index_cache::{
+    CURRENT_CACHE_SCHEMA_VERSION, IndexCache, IndexCacheError, IndexCacheMetadata,
 };
 pub use model::{
     DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId, DocumentSnapshot,
@@ -30,10 +33,6 @@ pub use model::{
 };
 pub use query_cache::SnapshotQueryCache;
 pub use snapshot::AnalysisSnapshot;
-pub use vanilla_cache::{
-    CURRENT_VANILLA_CACHE_SCHEMA_VERSION, VanillaCacheError, VanillaIndexCache,
-    VanillaIndexCacheMetadata,
-};
 
 #[cfg(test)]
 thread_local! {

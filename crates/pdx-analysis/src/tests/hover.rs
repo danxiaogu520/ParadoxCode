@@ -378,8 +378,7 @@ fn vanilla_cache_localisation_hover_shows_derived_text_without_source_state() {
     vanilla_host
         .refresh_source_roots()
         .expect("scan Vanilla for cache");
-    let cache =
-        VanillaIndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build Vanilla cache");
+    let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build Vanilla cache");
     let localisation_file = cache
         .index()
         .active_definition("localisation", "cached_name")
@@ -392,7 +391,7 @@ fn vanilla_cache_localisation_hover_shows_derived_text_without_source_state() {
         SourceRootKind::CurrentMod,
         current.clone(),
     )]));
-    host.install_vanilla_cache(cache)
+    host.install_index_cache(cache)
         .expect("install Vanilla cache");
     let document = DocumentId::new("file:///current/events/hover.txt");
     let text = "country_event = { title = cached_name }\n";

@@ -62,10 +62,10 @@ fn vanilla_cache_preserves_scripted_macro_references_without_hir() {
         ]
     );
 
-    let cache = VanillaIndexCache::from_snapshot(&snapshot).expect("build cache");
+    let cache = IndexCache::from_snapshot(&snapshot).expect("build cache");
     let cache_path = root.join("cache/vanilla.pdxindex");
     cache.save(&cache_path).expect("save cache");
-    let loaded = VanillaIndexCache::load(&cache_path).expect("load cache");
+    let loaded = IndexCache::load(&cache_path).expect("load cache");
     assert!(loaded.index().references_iter().any(|reference| {
         reference.kind == "scripted_effect" && reference.name == "cached_effect"
     }));
@@ -85,8 +85,8 @@ fn vanilla_cache_preserves_scripted_macro_references_without_hir() {
         .expect("corrupt template payload");
     drop(connection);
     assert!(matches!(
-        VanillaIndexCache::load(&cache_path),
-        Err(VanillaCacheError::InvalidData(_))
+        IndexCache::load(&cache_path),
+        Err(IndexCacheError::InvalidData(_))
     ));
     fs::remove_dir_all(root).expect("cleanup");
 }
@@ -114,13 +114,10 @@ fn corrupted_navigation_position_is_rejected_without_symbol_table_scans() {
         fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
     )]));
     host.refresh_source_roots().expect("scan Vanilla");
-    let cache = VanillaIndexCache::from_snapshot(&host.snapshot()).expect("build cache");
+    let cache = IndexCache::from_snapshot(&host.snapshot()).expect("build cache");
     let cache_path = root.join("cache/vanilla.pdxindex");
     cache.save(&cache_path).expect("save cache");
-    assert!(
-        VanillaIndexCache::load(&cache_path).is_ok(),
-        "valid cache loads"
-    );
+    assert!(IndexCache::load(&cache_path).is_ok(), "valid cache loads");
 
     let connection = rusqlite::Connection::open(&cache_path).expect("open cache for corruption");
     connection
@@ -131,8 +128,8 @@ fn corrupted_navigation_position_is_rejected_without_symbol_table_scans() {
         .expect("corrupt navigation range");
     drop(connection);
     assert!(matches!(
-        VanillaIndexCache::load(&cache_path),
-        Err(VanillaCacheError::InvalidData(_))
+        IndexCache::load(&cache_path),
+        Err(IndexCacheError::InvalidData(_))
     ));
     fs::remove_dir_all(root).expect("cleanup");
 }
@@ -183,16 +180,16 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
             .file_state(*file_id)
             .is_some_and(|state| state.parsed().is_none() && state.hir().is_none())
     }));
-    let cache = VanillaIndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
+    let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
     let cache_path = root.join("cache/vanilla.pdxindex");
     cache.save(&cache_path).expect("save cache");
     let cancelled = WorkspaceScanToken::new();
     cancelled.cancel();
     assert!(matches!(
-        VanillaIndexCache::load_cancellable(&cache_path, &cancelled),
-        Err(VanillaCacheError::Cancelled)
+        IndexCache::load_cancellable(&cache_path, &cancelled),
+        Err(IndexCacheError::Cancelled)
     ));
-    let loaded = VanillaIndexCache::load(&cache_path).expect("load cache");
+    let loaded = IndexCache::load(&cache_path).expect("load cache");
     assert_eq!(loaded.metadata(), cache.metadata());
     assert_eq!(loaded.source_files(), cache.source_files());
     assert_eq!(loaded.index(), cache.index());
@@ -209,7 +206,7 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
     drop(foreign);
     assert!(matches!(
         cache.save(&foreign_path),
-        Err(VanillaCacheError::NotVanillaCache)
+        Err(IndexCacheError::NotIndexCache)
     ));
     let foreign = rusqlite::Connection::open(&foreign_path).expect("reopen foreign database");
     assert_eq!(
@@ -231,7 +228,7 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
         ),
     ]));
     host.refresh_source_roots().expect("scan current root");
-    host.install_vanilla_cache(loaded)
+    host.install_index_cache(loaded)
         .expect("install cache without Vanilla source access");
     host.refresh_source_roots()
         .expect("refresh must skip unavailable Vanilla root");
@@ -268,7 +265,7 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
         .active_definition("localisation", "vanilla_name")
         .expect("cached Vanilla localisation remains available");
     let preview = snapshot
-        .vanilla_localisation_preview(vanilla_localisation.file_id, vanilla_localisation.range)
+        .localisation_preview(vanilla_localisation.file_id, vanilla_localisation.range)
         .expect("cached Vanilla localisation preview");
     assert_eq!(preview.language.as_deref(), Some("l_english"));
     assert_eq!(preview.value, "Vanilla text");
@@ -310,12 +307,12 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
         dependency_root.clone(),
     ]));
     builder.refresh_source_roots().expect("scan dependency");
-    let cache = VanillaIndexCache::from_snapshot(&builder.snapshot()).expect("build cache");
+    let cache = IndexCache::from_snapshot(&builder.snapshot()).expect("build cache");
     let cache_path = root.join("cache/dependency.pdxindex");
     cache.save(&cache_path).expect("save cache");
 
     // The cache restores the non-Vanilla root identity.
-    let loaded = VanillaIndexCache::load(&cache_path).expect("load cache");
+    let loaded = IndexCache::load(&cache_path).expect("load cache");
     assert_eq!(loaded.source_root().id, dependency_root.id);
     assert_eq!(loaded.source_root().kind, SourceRootKind::Dependency);
 
@@ -399,10 +396,10 @@ fn dependency_index_cache_rejects_an_unrelated_configured_root() {
         dependency_path.clone(),
     )]));
     builder.refresh_source_roots().expect("scan dependency");
-    let cache = VanillaIndexCache::from_snapshot(&builder.snapshot()).expect("build cache");
+    let cache = IndexCache::from_snapshot(&builder.snapshot()).expect("build cache");
     let cache_path = root.join("cache/dependency.pdxindex");
     cache.save(&cache_path).expect("save cache");
-    let loaded = VanillaIndexCache::load(&cache_path).expect("load cache");
+    let loaded = IndexCache::load(&cache_path).expect("load cache");
 
     // The configured root claims the same id but a different directory.
     let other = root.join("other");
@@ -418,7 +415,7 @@ fn dependency_index_cache_rejects_an_unrelated_configured_root() {
     )]));
     assert!(matches!(
         host.install_index_cache(loaded),
-        Err(VanillaCacheError::InvalidData(_))
+        Err(IndexCacheError::InvalidData(_))
     ));
     fs::remove_dir_all(root).expect("cleanup");
 }

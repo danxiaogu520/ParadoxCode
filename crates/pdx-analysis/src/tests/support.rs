@@ -8,8 +8,7 @@ pub(crate) use crate::{
     workspace_symbols, workspace_symbols_with_cancellation,
 };
 pub(crate) use pdx_engine::{
-    AnalysisHost, DocumentId, SourceRoot, SourceRootId, SourceRootKind, VanillaIndexCache,
-    WorkspaceChange,
+    AnalysisHost, DocumentId, IndexCache, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
 };
 pub(crate) use pdx_rules::{
     KeyMatcher, ProfileDefinitionRule, ProfileMatchMode, ProfileTextMatcher, RuleSet, RuleShape,

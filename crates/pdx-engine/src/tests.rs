@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 pub(crate) use super::{
     AnalysisHost, Definition, DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId,
-    DocumentSource, FileIndexShard, MacroParameterSignature, ParsedSource, Reference, SourceFileId,
-    SourceRoot, SourceRootId, SourceRootKind, TextChange, VanillaCacheError, VanillaIndexCache,
+    DocumentSource, FileIndexShard, IndexCache, IndexCacheError, MacroParameterSignature,
+    ParsedSource, Reference, SourceFileId, SourceRoot, SourceRootId, SourceRootKind, TextChange,
     WorkspaceChange, WorkspaceError, WorkspaceIndex, WorkspaceScanIssueKind, WorkspaceScanLimits,
     WorkspaceScanToken, pipeline_counts, reset_pipeline_counts,
 };
@@ -18,5 +18,5 @@ fn eu4_host() -> AnalysisHost {
 
 mod documents;
 mod index;
+mod index_cache;
 mod scan;
-mod vanilla;

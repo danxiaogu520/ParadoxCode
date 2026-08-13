@@ -14,7 +14,7 @@ use lsp_types::{
 use pdx_analysis::CancellationToken;
 use pdx_engine::{
     AnalysisHost, AnalysisSnapshot, DiskFileChange, DiskFileChangeKind, DocumentId, DocumentSource,
-    PreparedDocument, VanillaIndexCache, WorkspaceError, WorkspaceScanToken,
+    IndexCache, PreparedDocument, WorkspaceError, WorkspaceScanToken,
 };
 use pdx_game::DiscoveryToken;
 use pdx_rules::{GameProfile, RuleSet};
@@ -37,7 +37,7 @@ use crate::text::{
 };
 use crate::transport::{read_message, write_message};
 use crate::uri::uri_to_path;
-use crate::vanilla::{run_auto_vanilla_setup, run_vanilla_cache_load};
+use crate::vanilla::{run_auto_vanilla_setup, run_index_cache_load};
 use crate::workspace::DependencyIndexCache;
 use crate::{
     DIAGNOSTIC_DEBOUNCE, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, JSON_RPC_VERSION,
@@ -126,7 +126,7 @@ pub(crate) struct PreparedInitialize {
     pub(crate) result: Value,
     pub(crate) warnings: Vec<String>,
     pub(crate) auto_vanilla: Option<AutoVanillaConfiguration>,
-    pub(crate) vanilla_cache: Option<PathBuf>,
+    pub(crate) index_cache: Option<PathBuf>,
     /// Dependencies configured with persistent index caches, loaded in the background after
     /// the initialize response is sent.
     pub(crate) dependency_caches: Vec<DependencyIndexCache>,
@@ -136,15 +136,13 @@ pub(crate) struct PreparedInitialize {
 }
 
 #[derive(Debug)]
-pub(crate) struct VanillaSetupResult {
-    result: Result<(VanillaIndexCache, String), String>,
+pub(crate) struct IndexSetupResult {
+    result: Result<(IndexCache, String), String>,
 }
 
 /// One dependency cache background result: the configured cache and its load/rebuild outcome.
-pub(crate) type DependencySetupOutcome = (
-    DependencyIndexCache,
-    Result<(VanillaIndexCache, String), String>,
-);
+pub(crate) type DependencySetupOutcome =
+    (DependencyIndexCache, Result<(IndexCache, String), String>);
 
 #[derive(Debug)]
 pub(crate) struct DependencySetupResult {
@@ -157,12 +155,12 @@ pub(crate) struct Progress {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct VanillaSetupCancellation {
+pub(crate) struct IndexSetupCancellation {
     pub(crate) discovery: DiscoveryToken,
     pub(crate) workspace: WorkspaceScanToken,
 }
 
-impl VanillaSetupCancellation {
+impl IndexSetupCancellation {
     pub(crate) fn new() -> Self {
         Self {
             discovery: DiscoveryToken::new(),
@@ -202,7 +200,7 @@ enum TransportEvent {
     Parse(ParseResult),
     Diagnostics(DiagnosticsResult),
     Request(SnapshotRequestResult),
-    VanillaSetup(VanillaSetupResult),
+    VanillaSetup(IndexSetupResult),
     DependencySetup(DependencySetupResult),
     Progress(Progress),
     DiskChanges(DiskChangesResult),
