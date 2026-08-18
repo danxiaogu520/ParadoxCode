@@ -38,8 +38,16 @@ check_release() {
     run bash scripts/check-release.sh
 }
 
+check_fuzz() {
+    # Stable-only gates for the standalone fuzz crate. The nightly/cargo-fuzz
+    # run loop lives in .github/workflows/ci.yml; this keeps the local
+    # pre-commit gate buildable without a nightly toolchain.
+    run cargo fmt --manifest-path fuzz/Cargo.toml -- --check
+    run cargo check --locked --manifest-path fuzz/Cargo.toml --all-targets
+}
+
 usage() {
-    echo "usage: $0 [all|core|grammars|scripts|zed|vscode|release]" >&2
+    echo "usage: $0 [all|core|grammars|scripts|zed|vscode|release|fuzz]" >&2
 }
 
 group=${1:-all}
@@ -50,6 +58,7 @@ case "$group" in
         check_zed
         check_vscode
         check_release
+        check_fuzz
         ;;
     core)
         check_core
@@ -65,6 +74,9 @@ case "$group" in
         ;;
     release)
         check_release
+        ;;
+    fuzz)
+        check_fuzz
         ;;
     *)
         usage

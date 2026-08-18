@@ -1,0 +1,17 @@
+country_event = {
+    title = EVT_TITLE
+    desc = EVT_DESC
+    trigger = {
+        is_at_war = yes
+        NOT = { stability = 1 }
+    }
+    option = {
+        name = OPTION_A
+        add_gold = 500
+        add_stability = 1
+    }
+    option = {
+        name = OPTION_B
+        add_prestige = 10
+    }
+}

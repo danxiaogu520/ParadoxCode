@@ -1,0 +1,4 @@
+effect = {
+    add_treasury = $value$
+    if = { limit = { $param$ = yes } }
+}

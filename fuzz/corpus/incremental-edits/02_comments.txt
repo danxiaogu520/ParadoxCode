@@ -1,0 +1,5 @@
+# leading comment
+effect = {
+    # inline comment
+    add_gold = 100 # trailing
+}

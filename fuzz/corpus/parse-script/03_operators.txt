@@ -1,0 +1,7 @@
+trigger = {
+    NOT = { has_idea = x }
+    OR = { AND = { a = 1 } b = 2 }
+    value > 3
+    value <= 3.5
+    @var = 5
+}

@@ -1,0 +1,5 @@
+trigger = {
+	NOT = {
+		has_idea = x
+	}
+}

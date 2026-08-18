@@ -1,0 +1,4 @@
+effect = {
+    add_gold = 100
+    if = { limit = { is_at_war = yes } add_stability = -1 }
+}

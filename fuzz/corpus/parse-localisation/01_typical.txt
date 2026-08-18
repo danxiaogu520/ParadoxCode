@@ -1,0 +1,3 @@
+TITLE:0 "Ruler of France"
+TITLE_FEMALE:1 "Ruler of France"
+EVTNAME:0 "Event $FROM$ fires"

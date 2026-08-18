@@ -1,0 +1,11 @@
+# typical EU4 script mix: comments, quoted keys, nesting, numbers
+effect = {
+    add_gold = 100.5
+    add_stability = -1
+    if = {
+        limit = { is_at_war = yes }
+        add_legitimacy = 10
+    }
+    "quoted key" = { nested = value }
+}
+date = 1444.11.11

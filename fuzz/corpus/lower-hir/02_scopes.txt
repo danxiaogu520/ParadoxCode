@@ -1,0 +1,5 @@
+on_actions = {
+    on_startup = {
+        owner = { add_gold = 5 }
+    }
+}
