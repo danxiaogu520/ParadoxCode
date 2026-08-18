@@ -63,8 +63,7 @@ source text
 
 The engine/profile boundary keeps workspace, indexing, analysis, LSP, and release infrastructure
 game-neutral while EU4 paths, scopes, commands, symbols, and special semantics remain in the EU4
-profile. See the [documentation index](docs/README.md), [architecture guide](docs/architecture.md), and
-[RFC 0012](docs/rfc/0012-generic-engine-eu4-first.md) for the current design.
+profile.
 
 ## Building from source
 
@@ -175,7 +174,7 @@ bash scripts/diagnose-current-mod.sh \
 ```
 
 The command exits non-zero when errors are found; use `--fail-on warning` or `--fail-on none` to
-change the automation threshold. See [`scripts/README.md`](scripts/README.md) for options.
+change the automation threshold. Use `--help` for all options.
 
 ## Repository layout
 
@@ -185,7 +184,6 @@ change the automation threshold. See [`scripts/README.md`](scripts/README.md) fo
 | `editors/zed/` | Thin Zed extension, language metadata, and queries |
 | `grammars/` | Editor-only Tree-sitter grammars and corpus tests |
 | `rules/` | Authoritative first-party EU4 source and generated artifact/manifest |
-| `docs/` | Current architecture, RFCs, rule matrix, and performance reproduction guide |
 | `fuzz/` | Parser, edit, formatter, and HIR fuzz targets |
 | `scripts/` | Reproducible quality checks and diagnostic workflows |
 
@@ -198,4 +196,4 @@ Contact the maintainer directly.
 
 ParadoxCode source code is available under the [MIT License](LICENSE). The repository does not
 redistribute EU4 game files, user Vanilla caches, or external rule corpora. Rule maintenance and
-redistribution boundaries are documented in [rules/README.md](rules/README.md).
+redistribution boundaries are enforced by `pdx-bake` validation and the repository quality gates.

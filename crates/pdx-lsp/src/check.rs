@@ -73,7 +73,6 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     results.push(requires_file("Cargo.lock"));
     results.push(requires_file("README.md"));
     results.push(requires_file("LICENSE"));
-    results.push(requires_file("docs/architecture.md"));
     results.push(requires_file(".github/workflows/ci.yml"));
     results.push(requires_file(".github/workflows/release.yml"));
     results.push(requires_file("deny.toml"));

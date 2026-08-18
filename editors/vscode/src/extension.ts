@@ -4,7 +4,7 @@ import {
     LanguageClientOptions,
     ServerOptions,
     State,
-} from 'vscode-languageclient/node';
+} from 'vscode-languageclient/lib/node/main';
 
 import { MissionPreviewPanel } from './previewPanel';
 import { readSharedConfig } from './sharedConfig';

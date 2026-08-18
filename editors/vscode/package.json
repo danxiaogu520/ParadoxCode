@@ -13,13 +13,18 @@
     "Programming Languages",
     "Visualization"
   ],
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "languages": [
       {
         "id": "eu4",
-        "aliases": ["Europa Universalis IV", "eu4"],
+        "aliases": [
+          "Europa Universalis IV",
+          "eu4"
+        ],
         "filenamePatterns": [
           "**/common/**/*.txt",
           "**/events/**/*.txt",
@@ -98,7 +103,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "~1.85.0",
     "typescript": "^5.4.0"
   }
 }

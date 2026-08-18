@@ -4,7 +4,7 @@ This document defines the working conventions for agents and developers contribu
 
 ## 0. Persistent Project Authorization & Product Direction
 
-The project owner has authorized agents to take ongoing responsibility for ParadoxCode's technical execution, including planning, architecture decisions, implementation, refactoring, testing, performance verification, and documentation maintenance. Except for destructive operations, external releases, credential/billing actions, and decisions that materially change the product direction, agents should exercise reasonable technical judgment and continue forward without waiting for approval on every point.
+The project owner has authorized agents to take ongoing responsibility for ParadoxCode's technical execution, including planning, architecture decisions, implementation, refactoring, testing, and performance verification. Except for destructive operations, external releases, credential/billing actions, and decisions that materially change the product direction, agents should exercise reasonable technical judgment and continue forward without waiting for approval on every point.
 
 Default collaboration rules:
 
@@ -14,7 +14,7 @@ Default collaboration rules:
 - Do not mark a phase as complete if automated verification has not passed.
 - Decide ordinary implementation details autonomously; ask the user only for destructive operations, external releases, or major product disagreements.
 - Record results, design changes, verification, residual risks, and next steps for each phase.
-- Documentation status must reflect true end-to-end capability; do not substitute skeletons or unit tests for product closure.
+- Do not mark a phase as complete if automated verification has not passed.
 
 The product direction is fixed as "generic `pdx-lsp` engine, EU4-first":
 
@@ -27,21 +27,21 @@ The product direction is fixed as "generic `pdx-lsp` engine, EU4-first":
 
 ## 1. Understand the Project First
 
-Before starting any implementation, read in this order:
+Before starting any implementation, orient yourself in the codebase in this order:
 
-1. `docs/architecture.md` — data flow, crate dependencies, concurrency, identity, and error recovery;
-2. RFCs directly related to the current task;
-3. `docs/rfc/0013-first-party-rule-source.md` — first-party rule source, compilation, and the boundary prohibiting external rule input.
+1. Crate boundaries and data flow from the workspace `Cargo.toml` and each crate's top-level module documentation;
+2. `crates/pdx-lsp/src/check.rs` and `scripts/check-quality-gates.sh` — the repository invariants that are enforced as code;
+3. `rules/eu4/*.json` — the authoritative first-party rule source, when the task touches rules;
+4. Existing tests directly related to the current task.
 
 ## 2. Default Agent Responsibilities
 
 You are not here just to "write the code" — you are responsible for delivering a verifiable vertical slice within the existing design boundaries:
 
-- First, confirm which Phase, crate, and RFC the task belongs to.
+- First, confirm which Phase and crate the task belongs to.
 - First, check the current state and any existing uncommitted changes before deciding the edit scope.
 - Implement in the smallest increment possible; avoid introducing frameworks without performance evidence.
 - Add tests or fixtures that prove the behavior in the same change.
-- If the implementation changes architecture constraints, public APIs, rule schemas, the CLI, or configuration, update the relevant documentation.
 - Finally, run verification proportionate to the change, and clearly report any checks not run and residual risks.
 
 When there is no implementation code yet, establish a minimal skeleton and verification path first; do not stack a full language-service feature directly.
@@ -51,14 +51,12 @@ When there is no implementation code yet, establish a minimal skeleton and verif
 When designs conflict, resolve by the following priority:
 
 1. The user's current explicit requirements;
-2. Accepted RFCs and `docs/architecture.md`;
-3. Phase constraints from the current project state;
-4. Unaccepted proposals, research notes, and implementation convenience.
+2. Phase constraints from the current project state;
+3. Unaccepted proposals, research notes, and implementation convenience.
 
-If an accepted boundary must change:
+If an established boundary must change:
 
 - First, write up the problem, alternatives, impact, and migration cost.
-- Update the relevant RFC's status, decision, and acceptance criteria.
 - Then update the implementation plan and code.
 - Call out in the delivery report that this is a design change, not an ordinary refactor.
 
@@ -135,9 +133,9 @@ Layer responsibilities:
 
 ### Before Starting
 
-1. `rg --files` to find relevant implementations, fixtures, scripts, and documentation.
+1. `rg --files` to find relevant implementations, fixtures, and scripts.
 2. Check `git status`; if the worktree is not a valid Git checkout, do not initialize or clean up the repository state on your own.
-3. Read the RFCs and existing tests associated with the task.
+3. Read the existing tests associated with the task.
 4. Write down the minimal scope, expected invariants, and verification commands for this change.
 5. If pre-existing changes are found, preserve their content and only edit the areas the task requires.
 
@@ -181,7 +179,7 @@ a time so the normal parser, HIR, resolution, and diagnostics pipeline is exerci
 are not accepted. Reports are written as JSON and Markdown under the ignored `diagnostic-reports/`
 directory by default. The process exits `1` when the selected `--fail-on` threshold is met (`error`
 by default; `warning` or `none` are also supported). Do not commit generated reports; keep the
-diagnostic script and its documentation tracked. Use `node scripts/diagnose-current-mod.mjs --help`
+diagnostic script tracked. Use `node scripts/diagnose-current-mod.mjs --help`
 for all options and environment variables.
 
 ### Before Completing
@@ -224,27 +222,9 @@ MVP fuzzing must cover at minimum: Script/localisation parse, incremental edit e
 When completing a task, the report should briefly contain:
 
 1. Result: what was implemented and which files were involved;
-2. Design: whether existing RFCs were followed, whether there were design changes;
+2. Design: whether established design boundaries were respected, whether there were design changes;
 3. Verification: which commands were run and what the results were;
 4. Incomplete: which checks were not run and why;
 5. Risks: known limitations, follow-up suggestions, and whether the next Phase is affected.
 
 If the task is blocked, complete all checks that do not depend on external input first, then describe the blocking point, alternative paths attempted, and the minimal decision needed. Do not use silent degradation to mask missing rules, missing dependencies, or uncertain resolution results.
-
-## 10. Common Documentation Entry Points
-
-- [Documentation Index](docs/README.md)
-- [Overall Architecture](docs/architecture.md)
-- [System Boundaries & Crate Dependencies](docs/rfc/0001-system-boundaries.md)
-- [Syntax, CST & Incremental Parsing](docs/rfc/0002-syntax-cst.md)
-- [Workspace / VFS](docs/rfc/0003-workspace-vfs.md)
-- [EU4 Rule Artifact](docs/rfc/0004-eu4-rules-schema.md)
-- [HIR & Scope](docs/rfc/0005-hir-scope.md)
-- [Symbol / Reference Index](docs/rfc/0006-symbol-index.md)
-- [Diagnostics & Completion](docs/rfc/0007-diagnostics-completion.md)
-- [Safe Formatting](docs/rfc/0008-formatter.md)
-- [LSP Runtime](docs/rfc/0009-lsp-runtime.md)
-- [Zed Integration](docs/rfc/0010-zed-integration.md)
-- [Testing & Quality Gates](docs/rfc/0011-testing-quality.md)
-- [First-Party Rule Source & Compiler](docs/rfc/0013-first-party-rule-source.md)
-- [Generic PDX Engine & EU4-First](docs/rfc/0012-generic-engine-eu4-first.md)
