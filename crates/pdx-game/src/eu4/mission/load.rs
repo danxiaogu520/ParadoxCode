@@ -6,7 +6,7 @@
 
 use pdx_parser::{CstKind, CstNode, ParsedFile};
 
-use crate::model::{Block, Mission, MissionFile, MissionTree, RawField};
+use super::model::{Block, Mission, MissionFile, MissionTree, RawField};
 
 /// Result of loading a mission file.
 #[derive(Clone, Debug)]

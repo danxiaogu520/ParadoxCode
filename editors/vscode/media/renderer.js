@@ -14,7 +14,7 @@
     const NODE_WIDTH = 104;
     const NODE_HEIGHT = 122;
 
-    // Arrow glyph world metrics, mirroring `pdx-mission-model::geometry`:
+    // Arrow glyph world metrics, mirroring `pdx_game::eu4::mission::geometry`:
     // horizontal tiles span one flush column width; vertical fallback tiles
     // span a node bottom edge to the end-offset level.
     const ARROW_TILE_HEIGHT = 20;

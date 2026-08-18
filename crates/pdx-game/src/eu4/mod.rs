@@ -1,4 +1,9 @@
 //! EU4 profile data layered on the game-independent rules runtime.
+//!
+//! Everything here is EU4-specific: installation discovery facts, script folder
+//! whitelist, first-party rules bootstrap, and the structured mission model.
+
+pub mod mission;
 
 use std::fs;
 use std::path::Path;
@@ -16,14 +21,14 @@ use pdx_rules::{
 };
 
 const FIRST_PARTY_SOURCE: SourceBundle<'static> = SourceBundle {
-    manifest: include_bytes!("../../../rules/eu4/manifest.json"),
-    catalog: include_bytes!("../../../rules/eu4/catalog.json"),
-    semantic_rules: include_bytes!("../../../rules/eu4/semantic-rules.json"),
-    enum_values: include_bytes!("../../../rules/eu4/enum-values.json"),
-    type_root_keys: include_bytes!("../../../rules/eu4/type-root-keys.json"),
-    type_root_scopes: include_bytes!("../../../rules/eu4/type-root-scopes.json"),
-    type_descriptors: include_bytes!("../../../rules/eu4/type-descriptors.json"),
-    localisation_bindings: include_bytes!("../../../rules/eu4/localisation-bindings.json"),
+    manifest: include_bytes!("../../../../rules/eu4/manifest.json"),
+    catalog: include_bytes!("../../../../rules/eu4/catalog.json"),
+    semantic_rules: include_bytes!("../../../../rules/eu4/semantic-rules.json"),
+    enum_values: include_bytes!("../../../../rules/eu4/enum-values.json"),
+    type_root_keys: include_bytes!("../../../../rules/eu4/type-root-keys.json"),
+    type_root_scopes: include_bytes!("../../../../rules/eu4/type-root-scopes.json"),
+    type_descriptors: include_bytes!("../../../../rules/eu4/type-descriptors.json"),
+    localisation_bindings: include_bytes!("../../../../rules/eu4/localisation-bindings.json"),
 };
 
 static RULE_CACHE_SEQUENCE: AtomicU64 = AtomicU64::new(0);

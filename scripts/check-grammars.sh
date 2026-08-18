@@ -20,6 +20,19 @@ for grammar in \
             tree_sitter="$grammar/node_modules/.bin/tree-sitter"
         fi
         "$tree_sitter" generate
+        # Generated artifacts (src/parser.c, grammar.json, node-types.json, ...)
+        # are committed; fail if `generate` would change them so stale checkins
+        # are caught instead of silently regenerated on every run.
+        if git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            grammar_rel="${grammar#"$root"/}"
+            if ! git -C "$root" diff --exit-code --quiet -- "$grammar_rel"; then
+                echo "tree-sitter generate produced uncommitted changes under $grammar_rel;" >&2
+                echo "regenerate the grammar and commit the generated artifacts." >&2
+                exit 1
+            fi
+        else
+            echo "warning: not a Git checkout; skipping generated-artifact drift check" >&2
+        fi
         if [[ ! -f "$tree_sitter_config/tree-sitter/config.json" ]]; then
             # On Windows the tree-sitter CLI uses %APPDATA% instead of XDG_CONFIG_HOME, so the
             # isolation check above never sees the file it would write. init-config refuses to

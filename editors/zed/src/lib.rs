@@ -613,11 +613,11 @@ id = "Chinese Language Mod for 1.37"
 path = "deps/han"
 
 [server]
-binary = "C:/Code/ParadoxCode/target/release/pdx-ls.exe"
+binary = "C:/tools/pdx-ls.exe"
 "#;
         assert_eq!(
             parse_shared_server_binary(config).expect("parse"),
-            Some("C:/Code/ParadoxCode/target/release/pdx-ls.exe".to_owned())
+            Some("C:/tools/pdx-ls.exe".to_owned())
         );
         // Backslashes are parsed like TOML, not regex-matched.
         let windows = r#"[server]

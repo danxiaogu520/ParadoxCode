@@ -129,7 +129,7 @@ pub(crate) struct PreparedInitialize {
     pub(crate) index_cache: Option<PathBuf>,
     /// Mission-preview texture store (game sprites), when a game installation
     /// was configured or discovered.
-    pub(crate) textures: Option<Arc<pdx_mission_model::TextureAssets>>,
+    pub(crate) textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
     /// Dependencies configured with persistent index caches, loaded in the background after
     /// the initialize response is sent.
     pub(crate) dependency_caches: Vec<DependencyIndexCache>,
@@ -223,7 +223,7 @@ pub struct LspServer {
     watcher_registration: Option<Value>,
     auto_vanilla: Option<AutoVanillaConfiguration>,
     /// Mission-preview texture store shared with snapshot requests.
-    textures: Option<Arc<pdx_mission_model::TextureAssets>>,
+    textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
     /// Whether the client advertises `window.workDoneProgress`, so server-initiated background
     /// work can be surfaced as a progress bar instead of only start/end messages.
     client_work_done_progress: bool,

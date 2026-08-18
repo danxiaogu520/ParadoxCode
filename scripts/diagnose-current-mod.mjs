@@ -22,6 +22,8 @@ import { dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { TextDecoder } from 'node:util';
 
+import { LspClient } from './lib/lsp-client.mjs';
+
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '..');
 const DEFAULT_OUTPUT_DIR = join(REPOSITORY_ROOT, 'diagnostic-reports');
@@ -34,7 +36,6 @@ const MAX_SOURCE_BYTES = 16 * 1024 * 1024;
 const MAX_SCAN_DEPTH = 64;
 const MAX_REPORTED_SYMLINKS = 256;
 const MAX_REPORTED_TOOL_ERRORS = 256;
-const JSON_RPC_VERSION = '2.0';
 const RELEVANT_EXTENSIONS = new Set(['.txt', '.gfx', '.yml', '.yaml']);
 const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true });
 const WINDOWS_1252_DECODER = new TextDecoder('windows-1252');
@@ -460,198 +461,6 @@ function diagnosticItemPath(item, root) {
     );
   }
   return candidate;
-}
-
-class LspClient {
-  constructor(child) {
-    this.child = child;
-    this.buffer = Buffer.alloc(0);
-    this.messages = [];
-    this.waiters = [];
-    this.pendingRequests = new Map();
-    this.closed = false;
-    this.nextId = 1;
-    this.serverMessages = [];
-    this.progress = new Map();
-    this.serverStderr = '';
-
-    child.stdout.on('data', (chunk) => this.consume(chunk));
-    child.stdout.on('end', () => this.failWaiters(new ProtocolError('pdx-ls closed stdout')));
-    child.on('error', (error) => this.failWaiters(error));
-    child.on('close', (code, signal) => {
-      this.closed = true;
-      if (code !== 0 || signal) {
-        this.failWaiters(new ProtocolError(`pdx-ls exited with code ${code ?? 'unknown'}${signal ? ` (${signal})` : ''}`));
-      } else {
-        this.failWaiters(new ProtocolError('pdx-ls exited before the expected response'));
-      }
-    });
-    child.stderr.on('data', (chunk) => {
-      this.serverStderr += chunk.toString();
-      if (this.serverStderr.length > 64 * 1024) {
-        this.serverStderr = this.serverStderr.slice(-64 * 1024);
-      }
-    });
-  }
-
-  consume(chunk) {
-    this.buffer = Buffer.concat([this.buffer, chunk]);
-    const separator = Buffer.from('\r\n\r\n');
-    while (true) {
-      const headerEnd = this.buffer.indexOf(separator);
-      if (headerEnd < 0) return;
-      const header = this.buffer.subarray(0, headerEnd).toString('ascii');
-      const lengthLine = header
-        .split(/\r?\n/)
-        .find((line) => line.toLowerCase().startsWith('content-length:'));
-      const length = lengthLine ? Number(lengthLine.slice(lengthLine.indexOf(':') + 1).trim()) : NaN;
-      if (!Number.isSafeInteger(length) || length < 0) {
-        this.failWaiters(new ProtocolError(`invalid LSP Content-Length header: ${header}`));
-        return;
-      }
-      const payloadStart = headerEnd + separator.length;
-      if (this.buffer.length < payloadStart + length) return;
-      const payload = this.buffer.subarray(payloadStart, payloadStart + length).toString('utf8');
-      this.buffer = this.buffer.subarray(payloadStart + length);
-      let message;
-      try {
-        message = JSON.parse(payload);
-      } catch (error) {
-        this.failWaiters(new ProtocolError(`invalid JSON from pdx-ls: ${error.message}`));
-        return;
-      }
-      this.enqueue(message);
-    }
-  }
-
-  enqueue(message) {
-    if (message.method && message.id !== undefined) {
-      this.handle(message);
-      return;
-    }
-    if (!message.method && message.id !== undefined) {
-      const key = JSON.stringify(message.id);
-      const pending = this.pendingRequests.get(key);
-      if (pending) {
-        this.pendingRequests.delete(key);
-        clearTimeout(pending.timer);
-        if (message.error) {
-          pending.reject(
-            new ProtocolError(`${pending.method} failed: ${JSON.stringify(message.error)}`),
-          );
-        } else {
-          pending.resolve(message.result);
-        }
-        return;
-      }
-    }
-    const waiter = this.waiters.shift();
-    if (waiter) {
-      clearTimeout(waiter.timer);
-      waiter.resolve(message);
-    } else {
-      this.messages.push(message);
-    }
-  }
-
-  failWaiters(error) {
-    for (const waiter of this.waiters.splice(0)) {
-      clearTimeout(waiter.timer);
-      waiter.reject(error);
-    }
-    for (const pending of this.pendingRequests.values()) {
-      clearTimeout(pending.timer);
-      pending.reject(error);
-    }
-    this.pendingRequests.clear();
-  }
-
-  async next(timeoutMs) {
-    if (this.messages.length) return this.messages.shift();
-    if (this.closed) throw new ProtocolError('pdx-ls is no longer running');
-    return new Promise((resolveMessage, reject) => {
-      const timer = setTimeout(() => {
-        const index = this.waiters.findIndex((candidate) => candidate.resolve === resolveMessage);
-        if (index >= 0) this.waiters.splice(index, 1);
-        reject(new ProtocolError(`timed out after ${timeoutMs} ms waiting for pdx-ls`));
-      }, timeoutMs);
-      this.waiters.push({ resolve: resolveMessage, reject, timer });
-    });
-  }
-
-  send(message) {
-    if (this.closed || this.child.stdin.destroyed) throw new ProtocolError('cannot write to stopped pdx-ls');
-    const payload = Buffer.from(JSON.stringify(message), 'utf8');
-    this.child.stdin.write(`Content-Length: ${payload.length}\r\n\r\n`);
-    this.child.stdin.write(payload);
-  }
-
-  notify(method, params) {
-    this.send({ jsonrpc: JSON_RPC_VERSION, method, ...(params === undefined ? {} : { params }) });
-  }
-
-  request(method, params, timeoutMs) {
-    const id = this.nextId;
-    this.nextId += 1;
-    const key = JSON.stringify(id);
-    return new Promise((resolveRequest, reject) => {
-      const timer = setTimeout(() => {
-        this.pendingRequests.delete(key);
-        reject(new ProtocolError(`timed out waiting for ${method}`));
-      }, timeoutMs);
-      this.pendingRequests.set(key, {
-        method,
-        resolve: resolveRequest,
-        reject,
-        timer,
-      });
-      try {
-        this.send({ jsonrpc: JSON_RPC_VERSION, id, method, params });
-      } catch (error) {
-        this.pendingRequests.delete(key);
-        clearTimeout(timer);
-        reject(error);
-      }
-    });
-  }
-
-  handle(message) {
-    if (message.method === '$/progress') {
-      const token = message.params?.token;
-      const value = message.params?.value;
-      if (token !== undefined && value) {
-        this.progress.set(String(token), value);
-      }
-    }
-    if (message.method === 'window/showMessage' || message.method === 'window/logMessage') {
-      const text = message.params?.message;
-      if (text) this.serverMessages.push(String(text));
-    }
-    if (message.method && message.id !== undefined) {
-      // The server sends these requests for dynamic watchers and work-done progress. The client
-      // does not need either feature, but must acknowledge the request to keep the transport live.
-      if (message.method === 'client/registerCapability' || message.method === 'window/workDoneProgress/create') {
-        this.send({ jsonrpc: JSON_RPC_VERSION, id: message.id, result: null });
-      } else {
-        this.send({
-          jsonrpc: JSON_RPC_VERSION,
-          id: message.id,
-          error: { code: -32601, message: `unsupported client request: ${message.method}` },
-        });
-      }
-    }
-  }
-
-  async waitFor(predicate, timeoutMs, description) {
-    const deadline = Date.now() + timeoutMs;
-    while (true) {
-      const remaining = deadline - Date.now();
-      if (remaining <= 0) throw new ProtocolError(`timed out waiting for ${description}`);
-      const message = await this.next(remaining);
-      this.handle(message);
-      if (predicate(message)) return message;
-    }
-  }
 }
 
 async function waitForVanillaReady(client, timeoutMs) {

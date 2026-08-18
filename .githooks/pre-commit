@@ -3,5 +3,33 @@ set -euo pipefail
 
 root=$(git rev-parse --show-toplevel)
 
-echo "Running ParadoxCode pre-commit quality gates..."
-exec "$root/scripts/check-quality-gates.sh"
+# Escape hatch for full verification on a scoped commit.
+if [ "${PDX_PRECOMMIT_ALL:-0}" = "1" ]; then
+    echo "PDX_PRECOMMIT_ALL=1: running full ParadoxCode pre-commit quality gates..."
+    exec "$root/scripts/check-quality-gates.sh" all
+fi
+
+staged=$(git -C "$root" diff --cached --name-only)
+if [ -z "$staged" ]; then
+    # Nothing staged (e.g. an amend); the full suite keeps the gate conservative.
+    exec "$root/scripts/check-quality-gates.sh" all
+fi
+
+# Run only the groups affected by the staged paths, in fast-to-slow order.
+groups=()
+if printf '%s\n' "$staged" | grep -q '^crates/'; then groups+=(core); fi
+if printf '%s\n' "$staged" | grep -q '^rules/'; then groups+=(core); fi
+if printf '%s\n' "$staged" | grep -q '^fuzz/'; then groups+=(fuzz); fi
+if printf '%s\n' "$staged" | grep -q '^grammars/'; then groups+=(grammars); fi
+if printf '%s\n' "$staged" | grep -q '^editors/zed/'; then groups+=(zed); fi
+if printf '%s\n' "$staged" | grep -q '^editors/vscode/'; then groups+=(vscode); fi
+
+if [ "${#groups[@]}" -eq 0 ]; then
+    # Shared or unrecognized paths (scripts, workflows, manifests, top-level
+    # docs) can affect every gate; run the full suite instead of guessing.
+    echo "Pre-commit scope covers shared files; running the full quality gates..."
+    exec "$root/scripts/check-quality-gates.sh" all
+fi
+
+echo "Running ParadoxCode pre-commit quality gates: ${groups[*]}"
+exec "$root/scripts/check-quality-gates.sh" "${groups[@]}"

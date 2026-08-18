@@ -1,0 +1,21 @@
+name: Security scan
+
+on:
+  schedule:
+    - cron: "17 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  advisories:
+    name: Cargo advisory scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@cargo-deny
+      # Full license/ban/source checks run on every CI push; the scheduled
+      # run only needs the advisory database, which changes between pushes.
+      - run: cargo deny check advisories

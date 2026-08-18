@@ -69,14 +69,13 @@ The following dependency direction must be maintained:
 ```text
 pdx-text
   -> pdx-parser -> pdx-engine -> pdx-analysis -> pdx-lsp
-pdx-mission-model -> pdx-parser + pdx-text
-  -> pdx-lsp
-pdx-game (with EU4 profile)
+pdx-game (EU4 profile + mission model) -> pdx-parser + pdx-text + pdx-rules
 pdx-rules -> pdx-bake
 pdx-rules + pdx-game -> pdx-engine / pdx-analysis
 ```
 
-The EU4 bootstrap/profile has been merged into the `eu4` module of `pdx-game`.
+The EU4 bootstrap/profile and the structured EU4 mission model have been merged into the `eu4`
+module of `pdx-game` (the mission model lives in `eu4::mission`).
 
 Layer responsibilities:
 
@@ -85,11 +84,10 @@ Layer responsibilities:
 | `pdx-text` | offsets, line index, UTF-8/UTF-16, URI/path primitives | EU4 rules, workspace state |
 | `pdx-parser` | loss-aware CST for Paradox script and localisation, incremental parse, syntax errors, safe formatter | game rule database, disk scanning, LSP types |
 | `pdx-rules` | generic source compiler core, rule schema, canonical view, `rule_hash`, read-only runtime API | concrete game name tables, external rule parsers, LSP, dynamic Mod symbols |
-| `pdx-game` | data-driven install flags, cross-platform discovery, minimal validation, user-level local config, EU4 profile | semantic rules, workspace index, editor API |
+| `pdx-game` | data-driven install flags, cross-platform discovery, minimal validation, user-level local config, EU4 profile, structured EU4 mission model (CST extraction, literal grid layout, EMT arrow geometry, write/encoding/validation logic) | semantic rules, workspace index, editor API, LSP types, GUI |
 | `pdx-bake` | developer CLI for strict first-party JSON validation and temporary artifact/manifest generation | CWT input, network sync, user rule overrides |
 | `pdx-engine` | HIR lowering, VFS, overlay, source roots, parse cache, index shards, snapshot | LSP protocol types |
 | `pdx-analysis` | snapshot-oriented diagnostics/completion/hover/navigation/rename queries | direct disk reads, editor client |
-| `pdx-mission-model` | structured EU4 mission model, CST extraction, literal grid layout, EMT arrow geometry, write/encoding/validation logic | workspace state, LSP types, GUI |
 | `pdx-lsp` | lifecycle, capability negotiation, protocol conversion, cancellation, publish diagnostics, read-only `pdx/missionPreview` preview data | EU4 name tables, business queries, rule interpretation, layout semantics |
 | `editors/zed` | language metadata, queries, server fetch/verify/launch, config forwarding | symbol extraction, scope derivation, EU4 rule implementation or rule artifact distribution |
 | `editors/vscode` | language client, shared-config forwarding, mission-tree preview webview (renders server-provided geometry only) | symbol extraction, scope derivation, layout computation, EU4 rule implementation |
@@ -140,7 +138,9 @@ Layer responsibilities:
 5. If pre-existing changes are found, preserve their content and only edit the areas the task requires.
 
 The checkout uses the repository-versioned `.githooks/pre-commit` as the local quality gate. Run
-`bash scripts/install-git-hooks.sh` after the first clone; when an agent discovers that `core.hooksPath` does not point to `.githooks`, it should install them itself. Normal commits run `git commit` directly, letting the hook invoke `scripts/check-quality-gates.sh` — there is no need to manually repeat the full suite of commands before committing. Only run the `core`, `grammars`, `scripts`, `zed`, or `release` groups individually when diagnosing a specific failure; CI continues to be responsible for environment-specific gates such as Windows, MSRV, and dependency policy.
+`bash scripts/install-git-hooks.sh` after the first clone; when an agent discovers that `core.hooksPath` does not point to `.githooks`, it should install them itself.
+Normal commits run `git commit` directly, letting the hook invoke only the `scripts/check-quality-gates.sh` groups affected by the staged paths (`core`/`fuzz`/`grammars`/`zed`/`vscode`); when the change touches shared files (`scripts/`, `.github/`, manifests, top-level docs) or the scope cannot be determined, the hook falls back to the full suite. Set `PDX_PRECOMMIT_ALL=1` to force the full suite on a scoped commit. There is no need to manually repeat the commands before committing.
+Only run the `core`, `grammars`, `zed`, `vscode`, or `release` groups individually when diagnosing a specific failure; CI continues to be responsible for environment-specific gates such as Windows, MSRV, and dependency policy.
 
 ### Git Publishing Convention
 

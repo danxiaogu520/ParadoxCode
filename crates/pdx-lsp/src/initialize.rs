@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use pdx_analysis::SemanticTokenType;
 use pdx_engine::{AnalysisHost, WorkspaceChange, WorkspaceScanToken};
+use pdx_game::eu4::mission::TextureAssets;
 use pdx_game::{DiscoveryOptions, DiscoveryToken, GameInstallDescriptor, UserPaths};
-use pdx_mission_model::TextureAssets;
 
 use crate::protocol::{RpcError, parse_file_uri_str, workspace_scan_error};
 use crate::server::PreparedInitialize;

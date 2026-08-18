@@ -8,7 +8,6 @@ members = [
     "crates/pdx-engine",
     "crates/pdx-analysis",
     "crates/pdx-lsp",
-    "crates/pdx-mission-model",
 ]
 
 # `pdx setup vanilla` is commonly exercised through `target/debug/pdx.exe` during development.

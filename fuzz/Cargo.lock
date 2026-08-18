@@ -277,7 +277,9 @@ dependencies = [
 name = "pdx-game"
 version = "0.1.0"
 dependencies = [
+ "pdx-parser",
  "pdx-rules",
+ "pdx-text",
  "serde",
  "tempfile",
  "toml",

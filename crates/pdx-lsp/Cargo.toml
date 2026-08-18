@@ -18,7 +18,6 @@ pdx-rules = { path = "../pdx-rules" }
 pdx-analysis = { path = "../pdx-analysis" }
 pdx-text = { path = "../pdx-text" }
 pdx-engine = { path = "../pdx-engine" }
-pdx-mission-model = { path = "../pdx-mission-model" }
 flate2 = "1"
 lsp-types = "0.97.0"
 serde = "1.0"

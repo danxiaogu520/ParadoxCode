@@ -12,7 +12,7 @@ use std::collections::HashSet;
 
 use pdx_text::TextRange;
 
-use crate::model::{Block, Mission, MissionFile, MissionTree};
+use super::model::{Block, Mission, MissionFile, MissionTree};
 
 /// Failure of an edit operation. All variants are user-presentable.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -208,7 +208,7 @@ impl MissionFile {
     /// Adds `required_id` as a prerequisite of `mission_id` in `tree_id`.
     ///
     /// Rejects self-references, duplicates, and edges that violate the spatial
-    /// legality rule (see [`crate::graph`]): a prerequisite must sit on the row
+    /// legality rule (see [`super::graph`]): a prerequisite must sit on the row
     /// directly above its dependent or directly above it in the same column.
     pub fn add_required(
         &mut self,
@@ -462,8 +462,8 @@ impl MissionFile {
     /// prerequisites are allowed — they may reference another file's mission
     /// (legal EU4) and are flagged by validation instead.
     fn check_edge_placement(&self, mission_id: &str, required_id: &str) -> Result<(), EditError> {
-        let locs = crate::graph::effective_layout(self);
-        let loc_of: std::collections::HashMap<&str, crate::graph::MissionLoc> = locs
+        let locs = super::graph::effective_layout(self);
+        let loc_of: std::collections::HashMap<&str, super::graph::MissionLoc> = locs
             .iter()
             .map(|loc| {
                 let id = self.trees[loc.tree].missions[loc.mission].id.as_str();
@@ -474,7 +474,7 @@ impl MissionFile {
         else {
             return Ok(()); // Unknown target: resolved by validation instead.
         };
-        if crate::graph::is_spatially_legal(prereq, dependent) {
+        if super::graph::is_spatially_legal(prereq, dependent) {
             Ok(())
         } else {
             Err(EditError::IllegalEdgePlacement {
@@ -517,7 +517,7 @@ pub enum TreeBlockField {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::load::parse_file;
+    use crate::eu4::mission::load::parse_file;
     use pdx_text::TextRange;
 
     fn empty_file() -> MissionFile {
@@ -690,10 +690,10 @@ mod tests {
     #[test]
     fn edited_file_round_trips_through_writer() {
         // The full pipeline: load fixture -> edit -> render -> parse -> compare.
-        let fixture = include_str!("../tests/fixtures/sample_missions.txt");
+        let fixture = include_str!("../../../tests/fixtures/sample_missions.txt");
         let loaded = parse_file(fixture);
         let mut file = loaded.file.clone();
-        let style = crate::write::detect_style(fixture);
+        let style = crate::eu4::mission::write::detect_style(fixture);
 
         file.add_mission("sam_main_tree", "sam_brand_new").unwrap();
         file.add_required("sam_main_tree", "sam_brand_new", "sam_first_mission")
@@ -704,7 +704,7 @@ mod tests {
             .unwrap();
 
         let tree = file.trees.iter().find(|t| t.id == "sam_main_tree").unwrap();
-        let rendered = crate::write::render_tree(tree, &style);
+        let rendered = crate::eu4::mission::write::render_tree(tree, &style);
         let reparsed = parse_file(&rendered).file;
         assert_eq!(reparsed.trees.len(), 1);
 

@@ -14,8 +14,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::graph;
-use crate::model::{MissionFile, MissionTree};
+use super::graph;
+use super::model::{MissionFile, MissionTree};
 
 /// Severity of a validation diagnostic.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -166,7 +166,7 @@ fn find_cycles(file: &MissionFile, diagnostics: &mut Vec<Diagnostic>) {
         marks: &mut HashMap<&'a str, Mark>,
         stack: &mut Vec<&'a str>,
         diagnostics: &mut Vec<Diagnostic>,
-        tree_of: &HashMap<&str, (&MissionTree, &crate::model::Mission)>,
+        tree_of: &HashMap<&str, (&MissionTree, &super::model::Mission)>,
     ) {
         match marks.get(node) {
             Some(Mark::Done) => return,
@@ -199,7 +199,7 @@ fn find_cycles(file: &MissionFile, diagnostics: &mut Vec<Diagnostic>) {
         marks.insert(node, Mark::Done);
     }
 
-    let tree_of: HashMap<&str, (&MissionTree, &crate::model::Mission)> =
+    let tree_of: HashMap<&str, (&MissionTree, &super::model::Mission)> =
         file.mission_ids().into_iter().collect();
     let all_ids: Vec<&str> = tree_of.keys().copied().collect();
     for id in all_ids {
@@ -221,7 +221,7 @@ fn mission_scoped(
     severity: Severity,
     code: &'static str,
     tree: &MissionTree,
-    mission: &crate::model::Mission,
+    mission: &super::model::Mission,
     message: String,
 ) -> Diagnostic {
     Diagnostic {

@@ -4,7 +4,7 @@
 //! missions (nodes) and dependency edges, never with trees. Trees are an
 //! implementation detail of the file format, so every operation here either
 //! works on missions/edges directly or derives tree membership from the flat
-//! view. The tree model in [`crate::model`] is untouched; this module only
+//! view. The tree model in [`super::model`] is untouched; this module only
 //! reads it.
 //!
 //! Two concepts are central:
@@ -25,7 +25,7 @@
 
 use std::collections::HashMap;
 
-use crate::model::MissionFile;
+use super::model::MissionFile;
 
 /// Effective grid location of one mission in a file.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -202,7 +202,7 @@ pub fn group_members(file: &MissionFile, tree_index: usize) -> Vec<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Mission, MissionTree};
+    use crate::eu4::mission::model::{Mission, MissionTree};
     use pdx_text::TextRange;
 
     fn tree(id: &str, slot: u32, missions: Vec<Mission>) -> MissionTree {

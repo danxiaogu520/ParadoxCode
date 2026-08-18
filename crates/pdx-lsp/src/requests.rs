@@ -18,8 +18,8 @@ use pdx_analysis::{
     text_diagnostics_with_cancellation, workspace_symbols_with_cancellation,
 };
 use pdx_engine::{AnalysisSnapshot, DocumentId, ParsedSource, SourceRootKind};
-use pdx_mission_model::Severity;
-use pdx_mission_model::geometry::{self, ArrowGlyph};
+use pdx_game::eu4::mission::Severity;
+use pdx_game::eu4::mission::geometry::{self, ArrowGlyph};
 use pdx_parser::format::format;
 use pdx_rules::ParserKind;
 use pdx_text::{LineIndex, LogicalPath, Position, TextRange};
@@ -96,7 +96,7 @@ pub(crate) struct SnapshotRequestContext {
     client_snippets: bool,
     /// Game sprite textures for the mission preview, when a game installation
     /// is available. `None` renders a texture-less preview.
-    textures: Option<Arc<pdx_mission_model::TextureAssets>>,
+    textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
 }
 
 impl SnapshotRequestContext {
@@ -104,7 +104,7 @@ impl SnapshotRequestContext {
         snapshot: AnalysisSnapshot,
         cancellation: CancellationToken,
         client_snippets: bool,
-        textures: Option<Arc<pdx_mission_model::TextureAssets>>,
+        textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
     ) -> Self {
         Self {
             snapshot,
@@ -214,10 +214,10 @@ impl SnapshotRequestContext {
                 format!("path is outside the active game profile: {}", params.path),
             ));
         }
-        let loaded = pdx_mission_model::parse_file(&params.text);
+        let loaded = pdx_game::eu4::mission::parse_file(&params.text);
         let file = &loaded.file;
         let layout = geometry::layout_file(file);
-        let diagnostics = pdx_mission_model::validate(file);
+        let diagnostics = pdx_game::eu4::mission::validate(file);
 
         // Resolve all `{mission_id}_title` keys in one workspace pass with the
         // same English-preferring symbol resolution as hover; missing keys
@@ -284,7 +284,7 @@ impl SnapshotRequestContext {
             .map(|segment| {
                 serde_json::json!({
                     "glyph": glyph_name(segment.glyph),
-                    "texture": pdx_mission_model::arrow_sprite_name(glyph_name(segment.glyph)),
+                    "texture": pdx_game::eu4::mission::arrow_sprite_name(glyph_name(segment.glyph)),
                     "x": segment.x,
                     "y": segment.y,
                 })
@@ -293,17 +293,15 @@ impl SnapshotRequestContext {
 
         // Game sprites the renderer needs: the mission frame, every node icon,
         // and every arrow glyph, deduplicated and resolved to data URLs.
-        let mut wanted = vec![pdx_mission_model::FRAME_SPRITE];
+        let mut wanted = vec![pdx_game::eu4::mission::FRAME_SPRITE];
         wanted.extend(layout.iter().filter_map(|pos| {
             file.trees[pos.tree_index].missions[pos.mission_index]
                 .icon
                 .as_deref()
         }));
-        wanted.extend(
-            segments.iter().filter_map(|segment| {
-                pdx_mission_model::arrow_sprite_name(glyph_name(segment.glyph))
-            }),
-        );
+        wanted.extend(segments.iter().filter_map(|segment| {
+            pdx_game::eu4::mission::arrow_sprite_name(glyph_name(segment.glyph))
+        }));
         wanted.sort_unstable();
         wanted.dedup();
         let mut textures = serde_json::Map::new();

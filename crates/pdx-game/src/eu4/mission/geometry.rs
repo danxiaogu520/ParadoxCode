@@ -11,7 +11,7 @@
 //! jumps. The geometry is texture-agnostic: it emits [`ArrowGlyph`] kinds and
 //! offsets, and the renderer maps kinds to its own sprites or drawings.
 
-use crate::model::MissionFile;
+use super::model::MissionFile;
 
 /// Canvas node size and spacing in world pixels. The node is the in-game
 /// mission frame texture (103x123) with EMT's logical 104x122 box; columns sit
@@ -228,8 +228,8 @@ pub fn arrow_geometry(file: &MissionFile, layout: &[NodePosition]) -> Vec<ArrowS
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Mission, MissionTree};
-    use crate::parse_file;
+    use crate::eu4::mission::model::{Mission, MissionTree};
+    use crate::eu4::mission::parse_file;
     use pdx_text::TextRange;
     use std::collections::HashMap;
 

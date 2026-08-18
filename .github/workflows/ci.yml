@@ -83,6 +83,24 @@ jobs:
           targets: wasm32-wasip1
       - run: bash scripts/check-quality-gates.sh zed
 
+  vscode:
+    name: VS Code extension package
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci --prefix editors/vscode --no-audit --no-fund
+      # The extension check compiles with tsc and smoke-tests the preview
+      # contract against a cargo-built pdx-ls, so both toolchains are present.
+      - run: bash scripts/check-quality-gates.sh vscode
+
   fuzz:
     name: Fuzz target compile and smoke
     runs-on: ubuntu-latest
@@ -100,11 +118,18 @@ jobs:
       - name: Build fuzz targets
         run: cargo +nightly fuzz build --dev --target x86_64-unknown-linux-gnu
       - name: Run invariant smoke over all targets
-        # -runs bounds each target; -seed keeps the run deterministic. Seed
-        # corpus under fuzz/corpus/<target>/ is replayed on startup, so
-        # regressions fixed into the corpus stay covered here.
+        # Enumerate targets from fuzz/Cargo.toml via `cargo fuzz list` so new
+        # fuzz targets are picked up automatically. -runs bounds each target;
+        # -seed keeps the run deterministic. Seed corpus under
+        # fuzz/corpus/<target>/ is replayed on startup, so regressions fixed
+        # into the corpus stay covered here.
         run: |
-          for target in parse-script parse-localisation incremental-edits format-script lower-hir quoted-script; do
+          targets="$(cargo +nightly fuzz list)"
+          if [ -z "$targets" ]; then
+            echo "cargo fuzz list returned no targets" >&2
+            exit 1
+          fi
+          for target in $targets; do
             cargo +nightly fuzz run --dev --target x86_64-unknown-linux-gnu "$target" -- -runs=200 -seed=1
           done
 

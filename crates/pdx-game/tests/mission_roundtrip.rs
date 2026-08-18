@@ -1,12 +1,12 @@
-//! Round-trip and validation tests for `pdx-mission-model`.
+//! Round-trip and validation tests for the EU4 mission model (`pdx_game::eu4::mission`).
 
-use pdx_mission_model::{
+use pdx_game::eu4::mission::{
     MissionTree, apply_tree_edit, detect_style, parse_file, render_tree, validate,
 };
 
 const FIXTURE: &str = include_str!("fixtures/sample_missions.txt");
 
-fn load(source: &str) -> pdx_mission_model::MissionFile {
+fn load(source: &str) -> pdx_game::eu4::mission::MissionFile {
     let loaded = parse_file(source);
     assert!(loaded.syntax_errors.is_empty(), "unexpected syntax errors");
     loaded.file
@@ -139,7 +139,7 @@ fn apply_tree_edit_only_touches_the_target_tree() {
 #[test]
 fn detects_style_from_source() {
     let style = detect_style(FIXTURE);
-    assert_eq!(style.indent, pdx_mission_model::Indent::Tab);
+    assert_eq!(style.indent, pdx_game::eu4::mission::Indent::Tab);
     // Fixture line endings depend on the platform; the style must match whatever
     // the file actually uses.
     let lf = FIXTURE.matches('\n').count();
@@ -148,7 +148,7 @@ fn detects_style_from_source() {
 
     let crlf_spaces = "tree_a = {\n\r\n    slot = 1\r\n}\r\n";
     let style = detect_style(crlf_spaces);
-    assert_eq!(style.indent, pdx_mission_model::Indent::Spaces(4));
+    assert_eq!(style.indent, pdx_game::eu4::mission::Indent::Spaces(4));
     assert_eq!(style.newline, "\r\n");
 }
 

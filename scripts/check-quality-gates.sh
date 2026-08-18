@@ -15,7 +15,7 @@ check_core() {
     run cargo check --locked --workspace --all-targets --all-features
     run cargo test --locked --workspace --all-targets --all-features
     run cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
-    run cargo doc --locked --workspace --no-deps
+    run env RUSTDOCFLAGS="-D warnings" cargo doc --locked --workspace --no-deps
 }
 
 check_grammars() {
@@ -47,42 +47,47 @@ check_fuzz() {
 }
 
 usage() {
-    echo "usage: $0 [all|core|grammars|scripts|zed|vscode|release|fuzz]" >&2
+    echo "usage: $0 [all|core|grammars|zed|vscode|release|fuzz] [group ...]" >&2
+    echo "       with no arguments, runs the full suite; multiple groups run in order" >&2
 }
 
-group=${1:-all}
-case "$group" in
-    all)
-        check_core
-        check_grammars
-        check_zed
-        check_vscode
-        check_release
-        check_fuzz
-        ;;
-    core)
-        check_core
-        ;;
-    grammars)
-        check_grammars
-        ;;
-    zed)
-        check_zed
-        ;;
-    vscode)
-        check_vscode
-        ;;
-    release)
-        check_release
-        ;;
-    fuzz)
-        check_fuzz
-        ;;
-    *)
-        usage
-        exit 2
-        ;;
-esac
-
-echo
-echo "ParadoxCode ${group} quality gates passed."
+groups=("$@")
+if [ ${#groups[@]} -eq 0 ]; then
+    groups=(all)
+fi
+for group in "${groups[@]}"; do
+    case "$group" in
+        all)
+            check_core
+            check_grammars
+            check_zed
+            check_vscode
+            check_release
+            check_fuzz
+            ;;
+        core)
+            check_core
+            ;;
+        grammars)
+            check_grammars
+            ;;
+        zed)
+            check_zed
+            ;;
+        vscode)
+            check_vscode
+            ;;
+        release)
+            check_release
+            ;;
+        fuzz)
+            check_fuzz
+            ;;
+        *)
+            usage
+            exit 2
+            ;;
+    esac
+    echo
+    echo "ParadoxCode ${group} quality gates passed."
+done

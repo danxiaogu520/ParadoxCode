@@ -1,14 +1,14 @@
 //! Structured EU4 mission-tree model shared by the language server's mission
 //! preview (`pdx-lsp` `pdx/missionPreview`) and future editing surfaces.
 //!
-//! This crate owns the boundary between raw Paradox script text and the
+//! This module owns the boundary between raw Paradox script text and the
 //! structured mission model:
 //!
 //! - [`load`] extracts a [`MissionFile`] from a loss-aware [`pdx_parser::ParsedFile`];
 //! - [`geometry`] computes the literal grid layout and EMT-compatible
 //!   dependency-arrow placements any renderer consumes;
-//! - [`write`] renders a tree back to script text with a stable field order;
-//! - [`validate`] reports structural problems (duplicate ids, dangling or cyclic
+//! - [`mod@write`] renders a tree back to script text with a stable field order;
+//! - [`validate()`] reports structural problems (duplicate ids, dangling or cyclic
 //!   `required_missions` references).
 //!
 //! The model is deliberately EU4-shaped: top-level blocks are mission trees, mission

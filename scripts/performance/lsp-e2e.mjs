@@ -23,6 +23,8 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
+import { LspClient } from '../lib/lsp-client.mjs';
+
 const execFileAsync = promisify(execFile);
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '..', '..');
@@ -434,113 +436,6 @@ function waitForExit(child, timeoutMs) {
   );
 }
 
-class JsonRpcClient {
-  constructor(child) {
-    this.child = child;
-    this.buffer = Buffer.alloc(0);
-    this.nextId = 1;
-    this.pending = new Map();
-    this.stderr = '';
-    this.diagnostics = [];
-    this.protocolError = undefined;
-    child.stdout.on('data', (chunk) => this.consume(chunk));
-    child.stderr.on('data', (chunk) => {
-      this.stderr = `${this.stderr}${chunk.toString('utf8')}`.slice(-16_384);
-    });
-    child.on('error', (error) => this.failPending(error));
-    child.on('exit', (code, signal) => {
-      if (code === 0 || signal === 'SIGTERM' || signal === 'SIGKILL') return;
-      this.failPending(new Error(`pdx-ls exited before completing a request (code=${code}, signal=${signal})`));
-    });
-  }
-
-  failPending(error) {
-    for (const pending of this.pending.values()) pending.reject(error);
-    this.pending.clear();
-  }
-
-  consume(chunk) {
-    this.buffer = Buffer.concat([this.buffer, chunk]);
-    for (;;) {
-      const headerEnd = this.buffer.indexOf('\r\n\r\n');
-      if (headerEnd < 0) return;
-      const header = this.buffer.subarray(0, headerEnd).toString('ascii');
-      const lengthMatch = /^Content-Length:\s*(\d+)\s*$/im.exec(header);
-      if (!lengthMatch) {
-        this.protocolError = new Error('pdx-ls sent a response without a valid Content-Length header');
-        this.failPending(this.protocolError);
-        return;
-      }
-      const bodyLength = Number(lengthMatch[1]);
-      const bodyStart = headerEnd + 4;
-      if (this.buffer.length < bodyStart + bodyLength) return;
-      const body = this.buffer.subarray(bodyStart, bodyStart + bodyLength);
-      this.buffer = this.buffer.subarray(bodyStart + bodyLength);
-      let message;
-      try {
-        message = JSON.parse(body.toString('utf8'));
-      } catch (error) {
-        this.protocolError = new Error(`pdx-ls sent invalid JSON: ${error.message}`);
-        this.failPending(this.protocolError);
-        return;
-      }
-      this.handleMessage(message);
-    }
-  }
-
-  handleMessage(message) {
-    if (message.method === 'textDocument/publishDiagnostics') {
-      this.diagnostics.push({
-        at: performance.now(),
-        count: Array.isArray(message.params?.diagnostics) ? message.params.diagnostics.length : 0,
-        uri: message.params?.uri,
-      });
-    }
-    if (message.id === undefined || message.id === null) return;
-    const pending = this.pending.get(message.id);
-    if (!pending) return;
-    this.pending.delete(message.id);
-    const elapsed = performance.now() - pending.started;
-    if (message.error) {
-      pending.reject(
-        new Error(`${pending.method} failed (${message.error.code}): ${message.error.message ?? 'unknown error'}`),
-      );
-      return;
-    }
-    pending.resolve({ elapsed, result: message.result });
-  }
-
-  send(message) {
-    if (!this.child.stdin.writable) throw new Error('pdx-ls stdin is not writable');
-    const body = Buffer.from(JSON.stringify(message), 'utf8');
-    const header = Buffer.from(`Content-Length: ${body.length}\r\n\r\n`, 'ascii');
-    this.child.stdin.write(Buffer.concat([header, body]));
-  }
-
-  notify(method, params) {
-    this.send({ jsonrpc: '2.0', method, params });
-  }
-
-  request(method, params) {
-    const id = this.nextId;
-    this.nextId += 1;
-    return new Promise((resolvePromise, rejectPromise) => {
-      this.pending.set(id, {
-        method,
-        started: performance.now(),
-        resolve: resolvePromise,
-        reject: rejectPromise,
-      });
-      try {
-        this.send({ jsonrpc: '2.0', id, method, params });
-      } catch (error) {
-        this.pending.delete(id);
-        rejectPromise(error);
-      }
-    });
-  }
-}
-
 async function sampleWorkingSet(pid) {
   if (!pid) return undefined;
   try {
@@ -613,16 +508,31 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GiB`;
 }
 
-async function waitForDiagnostic(client, uri, startIndex, timeoutMs, label) {
+async function timedRequest(client, method, params, timeoutMs) {
   const started = performance.now();
-  for (;;) {
-    const event = client.diagnostics.slice(startIndex).find((candidate) => candidate.uri === uri);
-    if (event) return event;
-    if (performance.now() - started >= timeoutMs) {
-      throw new Error(`timeout waiting for ${label} (${timeoutMs} ms)`);
-    }
-    await new Promise((resolvePromise) => setTimeout(resolvePromise, 10));
-  }
+  const result = await client.request(method, params, timeoutMs);
+  return { elapsed: performance.now() - started, result };
+}
+
+async function waitForDiagnostic(client, uri, timeoutMs, label) {
+  // Ignore publishDiagnostics that arrived before the triggering notification:
+  // the server may re-publish for an earlier document state while a slow
+  // request is in flight, and the shared client replays queued notifications.
+  const cutoff = performance.now();
+  const message = await client.waitFor(
+    (candidate) =>
+      candidate.method === 'textDocument/publishDiagnostics' &&
+      candidate.params?.uri === uri &&
+      (candidate._at ?? performance.now()) >= cutoff,
+    timeoutMs,
+    label,
+  );
+  return {
+    // _at is the receive-time stamp attached by the shared LspClient.
+    at: message._at ?? performance.now(),
+    count: Array.isArray(message.params?.diagnostics) ? message.params.diagnostics.length : 0,
+    uri: message.params?.uri,
+  };
 }
 
 function initializeParameters(root, initializationOptions) {
@@ -666,29 +576,28 @@ async function runMeasurement(options, workspace) {
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
   });
-  const client = new JsonRpcClient(server);
+  const client = new LspClient(server, { timeoutMs: options.timeoutMs });
   const sampler = new WorkingSetSampler(server.pid, options.memoryIntervalMs);
   sampler.start();
   try {
     await waitForSpawn(server, options.timeoutMs);
-    const init = await withTimeout(
-      client.request('initialize', initializeParameters(workspace.root, initializationOptions)),
+    const init = await timedRequest(
+      client,
+      'initialize',
+      initializeParameters(workspace.root, initializationOptions),
       options.timeoutMs,
-      'initialize response',
     );
     console.log(`cold start (spawn -> initialize response): ${(performance.now() - tSpawn).toFixed(2)} ms`);
     console.log(`initialize (request -> response): ${init.elapsed.toFixed(2)} ms`);
     client.notify('initialized', {});
 
     const tOpen = performance.now();
-    const beforeOpenDiagnostics = client.diagnostics.length;
     client.notify('textDocument/didOpen', {
       textDocument: { uri, languageId: 'eu4', version: 1, text: workspace.text },
     });
     const firstDiagnostics = await waitForDiagnostic(
       client,
       uri,
-      beforeOpenDiagnostics,
       options.timeoutMs,
       'first diagnostics',
     );
@@ -697,41 +606,30 @@ async function runMeasurement(options, workspace) {
     );
 
     const queryParams = { textDocument: { uri }, position };
-    const hover = await withTimeout(
-      client.request('textDocument/hover', queryParams),
-      options.timeoutMs,
-      'hover',
-    );
+    const hover = await timedRequest(client, 'textDocument/hover', queryParams, options.timeoutMs);
     console.log(`textDocument/hover: ${hover.elapsed.toFixed(2)} ms`);
-    const symbols = await withTimeout(
-      client.request('textDocument/documentSymbol', { textDocument: { uri } }),
+    const symbols = await timedRequest(
+      client,
+      'textDocument/documentSymbol',
+      { textDocument: { uri } },
       options.timeoutMs,
-      'documentSymbol',
     );
     const symbolCount = Array.isArray(symbols.result) ? symbols.result.length : 'n/a';
     console.log(`textDocument/documentSymbol: ${symbols.elapsed.toFixed(2)} ms (${symbolCount} symbols)`);
-    const definition = await withTimeout(
-      client.request('textDocument/definition', queryParams),
-      options.timeoutMs,
-      'definition',
-    );
+    const definition = await timedRequest(client, 'textDocument/definition', queryParams, options.timeoutMs);
     console.log(`textDocument/definition: ${definition.elapsed.toFixed(2)} ms`);
 
-    const steadyHover = await withTimeout(
-      client.request('textDocument/hover', queryParams),
-      options.timeoutMs,
-      'steady hover',
-    );
+    const steadyHover = await timedRequest(client, 'textDocument/hover', queryParams, options.timeoutMs);
     console.log(`textDocument/hover (steady): ${steadyHover.elapsed.toFixed(2)} ms`);
-    const steadyDefinition = await withTimeout(
-      client.request('textDocument/definition', queryParams),
+    const steadyDefinition = await timedRequest(
+      client,
+      'textDocument/definition',
+      queryParams,
       options.timeoutMs,
-      'steady definition',
     );
     console.log(`textDocument/definition (steady): ${steadyDefinition.elapsed.toFixed(2)} ms`);
 
     const tChange = performance.now();
-    const beforeChangeDiagnostics = client.diagnostics.length;
     client.notify('textDocument/didChange', {
       textDocument: { uri, version: 2 },
       contentChanges: [{ text: changed }],
@@ -739,7 +637,6 @@ async function runMeasurement(options, workspace) {
     const changedDiagnostics = await waitForDiagnostic(
       client,
       uri,
-      beforeChangeDiagnostics,
       options.timeoutMs,
       'changed diagnostics',
     );
@@ -747,7 +644,7 @@ async function runMeasurement(options, workspace) {
       `didChange -> publishDiagnostics: ${(changedDiagnostics.at - tChange).toFixed(2)} ms (${changedDiagnostics.count} diagnostics)`,
     );
 
-    await withTimeout(client.request('shutdown', null), 5_000, 'shutdown response').catch((error) => {
+    await client.request('shutdown', null, 5_000).catch((error) => {
       console.error(`shutdown warning: ${error.message}`);
     });
     client.notify('exit', null);
@@ -763,7 +660,7 @@ async function runMeasurement(options, workspace) {
     } else {
       console.log(`working set: unavailable on ${process.platform}; continuing without a child-process sample`);
     }
-    if (client.stderr.trim()) console.log(`stderr (truncated): ${client.stderr.slice(-2_000)}`);
+    if (client.serverStderr.trim()) console.log(`stderr (truncated): ${client.serverStderr.slice(-2_000)}`);
   }
 }
 

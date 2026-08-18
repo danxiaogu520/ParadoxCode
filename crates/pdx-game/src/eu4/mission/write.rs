@@ -7,7 +7,7 @@
 
 use pdx_text::TextRange;
 
-use crate::model::{Block, Mission, MissionTree, RawField};
+use super::model::{Block, Mission, MissionTree, RawField};
 
 /// Indentation style detected from the source file.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
