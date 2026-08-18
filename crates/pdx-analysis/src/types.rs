@@ -249,6 +249,77 @@ pub struct Hover {
     pub range: Option<TextRange>,
 }
 
+/// One source-ranged semantic token produced by the editor-neutral highlighting query.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SemanticToken {
+    /// Source range covered by the token.
+    pub range: TextRange,
+    /// Stable classification used by the protocol legend.
+    pub token_type: SemanticTokenType,
+    /// Whether this token introduces a local definition (an `@name` variable in key position).
+    pub definition: bool,
+}
+
+/// Stable semantic token types. The ordering of [`Self::ALL`] is the protocol legend contract:
+/// protocol adapters must preserve it and must not invent additional types.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[allow(clippy::upper_case_acronyms)]
+pub enum SemanticTokenType {
+    /// A line comment.
+    Comment,
+    /// A quoted or bare scalar value.
+    String,
+    /// A numeric scalar.
+    Number,
+    /// A `yes`/`no` scalar.
+    Boolean,
+    /// A script operator such as `=` or `==`.
+    Operator,
+    /// A property key that is not a rule-known key.
+    Property,
+    /// A property key known to the rule database or profile.
+    Function,
+    /// A header-block header such as `rgb { … }`.
+    Type,
+    /// An `@name` scripted variable.
+    Variable,
+    /// A `$name$` parameter or a parameter-block condition.
+    Parameter,
+}
+
+impl SemanticTokenType {
+    /// Legend order; clients receive indices into this list.
+    pub const ALL: [Self; 10] = [
+        Self::Comment,
+        Self::String,
+        Self::Number,
+        Self::Boolean,
+        Self::Operator,
+        Self::Property,
+        Self::Function,
+        Self::Type,
+        Self::Variable,
+        Self::Parameter,
+    ];
+
+    /// Returns the stable wire-facing legend name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Comment => "comment",
+            Self::String => "string",
+            Self::Number => "number",
+            Self::Boolean => "boolean",
+            Self::Operator => "operator",
+            Self::Property => "property",
+            Self::Function => "function",
+            Self::Type => "type",
+            Self::Variable => "variable",
+            Self::Parameter => "parameter",
+        }
+    }
+}
+
 /// The exact identifier range accepted by a prepare-rename request.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PrepareRenameResult {

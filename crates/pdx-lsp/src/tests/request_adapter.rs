@@ -3,7 +3,8 @@ use std::io::Cursor;
 
 use lsp_types::{
     CompletionItem, CompletionResponse, Diagnostic, DocumentSymbol, Hover, Location,
-    PrepareRenameResponse, SymbolInformation, SymbolKind, WorkspaceEdit,
+    PrepareRenameResponse, SemanticToken as LspSemanticToken, SemanticTokens as LspSemanticTokens,
+    SymbolInformation, SymbolKind, WorkspaceEdit,
 };
 use pdx_text::{LineIndex, Position};
 use serde_json::{Value, json};
@@ -466,6 +467,82 @@ fn memory_transport_delegates_phase5_requests_to_analysis() {
     let _: Vec<Diagnostic> = serde_json::from_value(diagnostics["params"]["diagnostics"].clone())
         .expect("diagnostic notification should use the standard LSP shape");
     fs::remove_dir_all(root_dir).expect("cleanup");
+}
+
+#[test]
+fn semantic_tokens_are_advertised_and_encoded_in_relative_order() {
+    let (root, root_uri) = temp_workspace_dir();
+    let uri = format!("{root_uri}/events/test.txt");
+    let text = "@cost = 100\ncountry_event = { favorable = yes }\n";
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri.clone(),"languageId":"eu4","version":1,"text":text}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/semanticTokens","params":{"textDocument":{"uri":uri.clone()}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/semanticTokens","params":{"textDocument":{"uri":format!("{root_uri}/events/closed.txt")}}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+
+    let initialize = responses
+        .iter()
+        .find(|value| value["id"] == 1)
+        .expect("initialize response");
+    let provider = &initialize["result"]["capabilities"]["semanticTokensProvider"];
+    let legend_types = provider["legend"]["tokenTypes"]
+        .as_array()
+        .expect("token types");
+    assert!(legend_types.contains(&json!("comment")));
+    assert!(legend_types.contains(&json!("function")));
+    assert!(legend_types.contains(&json!("variable")));
+    assert!(
+        provider["legend"]["tokenModifiers"]
+            .as_array()
+            .is_some_and(|modifiers| modifiers.contains(&json!("definition")))
+    );
+    assert_eq!(provider["full"], json!(true));
+
+    let tokens: LspSemanticTokens = typed_result(&responses, 2);
+    let index_of = |name: &str| {
+        legend_types
+            .iter()
+            .position(|candidate| candidate == name)
+            .expect("legend contains name") as u32
+    };
+    // `@cost` opens the document: line 0, column 0, length 5, variable + definition.
+    assert_eq!(tokens.data[0].delta_line, 0);
+    assert_eq!(tokens.data[0].delta_start, 0);
+    assert_eq!(tokens.data[0].length, 5);
+    assert_eq!(tokens.data[0].token_type, index_of("variable"));
+    assert_eq!(tokens.data[0].token_modifiers_bitset, 1);
+    // The `=` after `@cost` is on the same line, 6 characters in.
+    assert_eq!(tokens.data[1].delta_line, 0);
+    assert_eq!(tokens.data[1].delta_start, 6);
+    assert_eq!(tokens.data[1].token_type, index_of("operator"));
+    // `country_event` is a profile fallback key on the following line.
+    let second_line = tokens
+        .data
+        .iter()
+        .find(|token| token.delta_line == 1 && token.token_type == index_of("function"))
+        .expect("second line function");
+    assert_eq!(second_line.delta_start, 0);
+    assert_eq!(second_line.length, 13);
+    let _: LspSemanticToken = tokens.data[0];
+
+    // An unopened document is rejected with invalid-params semantics.
+    let unopened = responses
+        .iter()
+        .find(|value| value["id"] == 3)
+        .expect("unopened document response");
+    assert_eq!(unopened["error"]["code"], json!(INVALID_PARAMS));
+
+    fs::remove_dir_all(root).expect("cleanup");
 }
 
 #[test]

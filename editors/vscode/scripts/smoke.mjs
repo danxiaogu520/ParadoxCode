@@ -6,10 +6,15 @@
 // Default: `cargo run --quiet -p pdx-lsp --bin pdx-ls` (repo checkout).
 
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { parse } from 'smol-toml';
+// The extension's PATH fallback must detect a missing `pdx-ls` before launch,
+// so the user gets an actionable warning instead of a bare spawn ENOENT. The
+// helper lives in the compiled `out/` tree (check runs compile first).
+import { findExecutableOnPath } from '../out/serverPath.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = join(here, '..', '..', '..');
@@ -203,3 +208,24 @@ try {
 
 const failures = process.exitCode === 1;
 console.log(failures ? 'smoke FAILED' : 'smoke OK');
+
+const fakeDir = mkdtempSync(join(tmpdir(), 'paradoxcode-path-'));
+try {
+  const fakeName = process.platform === 'win32' ? 'pdxls-fake.exe' : 'pdxls-fake';
+  writeFileSync(join(fakeDir, fakeName), '');
+  const previousPath = process.env.PATH;
+  process.env.PATH = fakeDir + (previousPath ? delimiter + previousPath : '');
+  const found = findExecutableOnPath('pdxls-fake');
+  process.env.PATH = previousPath;
+  if (found !== join(fakeDir, fakeName)) {
+    fail(`findExecutableOnPath must resolve ${fakeName} from PATH`);
+  }
+  if (findExecutableOnPath('pdxls-definitely-missing') !== undefined) {
+    fail('findExecutableOnPath must return undefined for a name not on PATH');
+  }
+} finally {
+  rmSync(fakeDir, { recursive: true, force: true });
+}
+
+const pathFailures = process.exitCode === 1;
+console.log(pathFailures ? 'serverPath FAILED' : 'serverPath OK');

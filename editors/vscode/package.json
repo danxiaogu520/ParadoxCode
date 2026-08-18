@@ -25,6 +25,7 @@
           "Europa Universalis IV",
           "eu4"
         ],
+        "configuration": "./language-configuration.json",
         "filenamePatterns": [
           "**/common/**/*.txt",
           "**/events/**/*.txt",
@@ -32,12 +33,24 @@
           "**/missions/**/*.txt",
           "**/history/**/*.txt",
           "**/interface/**/*.gui",
-          "**/interface/**/*.gfx",
-          "**/localisation/**/*.yml",
-          "**/localisation/**/*.yaml"
+          "**/interface/**/*.gfx"
         ]
       }
     ],
+    "semanticTokenScopes": {
+      "scopes": {
+        "comment": ["comment", "comment.line.number-sign"],
+        "string": ["string"],
+        "number": ["constant.numeric"],
+        "boolean": ["constant.language.boolean"],
+        "operator": ["keyword.operator"],
+        "property": ["variable.other.property", "support.type.property-name"],
+        "function": ["entity.name.function"],
+        "type": ["entity.name.type"],
+        "variable": ["variable"],
+        "parameter": ["variable.parameter"]
+      }
+    },
     "commands": [
       {
         "command": "paradoxcode.showMissionPreview",
@@ -94,7 +107,7 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "check": "tsc --noEmit -p ./ && node scripts/smoke.mjs",
+    "check": "npm run compile && node scripts/smoke.mjs",
     "vscode:prepublish": "npm run compile"
   },
   "dependencies": {

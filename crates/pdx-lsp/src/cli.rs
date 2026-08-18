@@ -569,6 +569,7 @@ fn execute_check(sub: &str, args: &[String]) -> Result<String, CliError> {
             let mut all = Vec::new();
             all.extend(crate::check::check_project_policy(&root));
             all.extend(crate::check::check_zed_extension(&root));
+            all.extend(crate::check::check_editor_syntax_parity(&root));
             all.extend(crate::check::check_release_artifact(&root));
             all
         }

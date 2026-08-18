@@ -86,7 +86,6 @@ const MISSION_PATH_PATTERNS = [
     /[\\/]missions[\\/].+\.txt$/i,
     /[\\/]history[\\/].+\.txt$/i,
     /[\\/]interface[\\/].+\.(gui|gfx)$/i,
-    /[\\/]localisation[\\/].+\.(yml|yaml)$/i,
 ];
 
 function isPreviewDocument(document: vscode.TextDocument): boolean {

@@ -354,12 +354,7 @@ pub fn check_zed_extension(root: &Path) -> Vec<CheckResult> {
         "eu4",
         "tree-sitter-eu4",
         "test/corpus/eu4.txt",
-        &[
-            "highlights.scm",
-            "brackets.scm",
-            "indents.scm",
-            "outline.scm",
-        ][..],
+        &["highlights.scm", "brackets.scm", "indents.scm"][..],
     )];
 
     for (lang_dir_name, grammar_dir_name, sample_relative, query_names) in languages {
@@ -453,6 +448,160 @@ pub fn check_zed_extension(root: &Path) -> Vec<CheckResult> {
             "recommended settings are incomplete",
         ));
     }
+
+    results
+}
+
+/// Reads `{open, close}` object pairs from the canonical profile JSON.
+fn syntax_bracket_pairs(value: Option<&serde_json::Value>) -> Option<Vec<(String, String)>> {
+    object_bracket_pairs(value)
+}
+
+/// Reads bracket pairs that VSCode stores either as `[open, close]` arrays (its `brackets`
+/// contribution) or as `{open, close}` objects (its `autoClosingPairs` contribution).
+fn vscode_bracket_pairs(value: Option<&serde_json::Value>) -> Option<Vec<(String, String)>> {
+    let array = value?.as_array()?;
+    let mut pairs = Vec::with_capacity(array.len());
+    for item in array {
+        let pair = if let Some([open, close]) = item.as_array().map(Vec::as_slice) {
+            (open.as_str()?.to_owned(), close.as_str()?.to_owned())
+        } else {
+            (
+                item.get("open")?.as_str()?.to_owned(),
+                item.get("close")?.as_str()?.to_owned(),
+            )
+        };
+        pairs.push(pair);
+    }
+    Some(pairs)
+}
+
+fn object_bracket_pairs(value: Option<&serde_json::Value>) -> Option<Vec<(String, String)>> {
+    let array = value?.as_array()?;
+    let mut pairs = Vec::with_capacity(array.len());
+    for item in array {
+        pairs.push((
+            item.get("open")?.as_str()?.to_owned(),
+            item.get("close")?.as_str()?.to_owned(),
+        ));
+    }
+    Some(pairs)
+}
+
+/// Validates that the per-editor syntax artefacts (Zed `.scm` queries and the VSCode
+/// `language-configuration.json`) still match the canonical `editors/syntax-profile.json`.
+/// Bracket pairs, auto-closing pairs, the line comment marker, and indentation rules exist in
+/// two editors with no LSP protocol to share them, so drift here silently breaks parity.
+pub fn check_editor_syntax_parity(root: &Path) -> Vec<CheckResult> {
+    let mut results = Vec::new();
+    let profile_path = root.join("editors/syntax-profile.json");
+    let vscode_config_path = root.join("editors/vscode/language-configuration.json");
+    let brackets_scm = root.join("editors/zed/languages/eu4/brackets.scm");
+    let indents_scm = root.join("editors/zed/languages/eu4/indents.scm");
+    let highlights_scm = root.join("editors/zed/languages/eu4/highlights.scm");
+
+    let Ok(profile) = fs::read_to_string(&profile_path) else {
+        results.push(CheckResult::fail(
+            "editor syntax profile",
+            "editors/syntax-profile.json missing",
+        ));
+        return results;
+    };
+    let Ok(profile) = serde_json::from_str::<serde_json::Value>(&profile) else {
+        results.push(CheckResult::fail(
+            "editor syntax profile",
+            "editors/syntax-profile.json is not valid JSON",
+        ));
+        return results;
+    };
+    let expect = |name: &'static str, value: Option<&serde_json::Value>| -> CheckResult {
+        check(
+            value.is_some(),
+            name,
+            format!("editors/syntax-profile.json is missing {name}"),
+        )
+    };
+    let line_comment = profile.get("lineComment");
+    let brackets = profile.get("brackets");
+    let auto_closing_pairs = profile.get("autoClosingPairs");
+    let indentation = profile.get("indentationRules");
+    results.push(expect("lineComment", line_comment));
+    results.push(expect("brackets", brackets));
+    results.push(expect("autoClosingPairs", auto_closing_pairs));
+    results.push(expect("indentationRules", indentation));
+
+    // VSCode language-configuration.json must mirror the profile exactly.
+    if let Ok(source) = fs::read_to_string(&vscode_config_path)
+        && let Ok(vscode) = serde_json::from_str::<serde_json::Value>(&source)
+    {
+        results.push(check(
+            vscode.pointer("/comments/lineComment") == line_comment,
+            "vscode: line comment parity",
+            "VSCode language-configuration line comment differs from the syntax profile",
+        ));
+        // Both files name the same pairs in different shapes: the profile and VSCode's
+        // autoClosingPairs use `{open,close}` objects, VSCode's brackets use `[open,close]`.
+        results.push(check(
+            vscode_bracket_pairs(vscode.get("brackets")) == syntax_bracket_pairs(brackets),
+            "vscode: bracket parity",
+            "VSCode bracket pairs differ from the syntax profile",
+        ));
+        results.push(check(
+            vscode_bracket_pairs(vscode.get("autoClosingPairs"))
+                == syntax_bracket_pairs(auto_closing_pairs),
+            "vscode: auto-closing parity",
+            "VSCode autoClosingPairs differ from the syntax profile",
+        ));
+        results.push(check(
+            vscode.get("indentationRules") == indentation,
+            "vscode: indentation parity",
+            "VSCode indentation rules differ from the syntax profile",
+        ));
+    } else {
+        results.push(CheckResult::fail(
+            "vscode: language configuration",
+            "editors/vscode/language-configuration.json missing or invalid",
+        ));
+    }
+
+    // Zed `.scm` queries must recognize every bracket pair from the profile and keep the
+    // indentation captures that mirror the profile's indentation rules.
+    let bracket_captures = fs::read_to_string(&brackets_scm).unwrap_or_default();
+    let profile_brackets = brackets
+        .and_then(|value| value.as_array())
+        .map(|pairs| {
+            pairs
+                .iter()
+                .map(|pair| pair.get("open").and_then(serde_json::Value::as_str))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    results.push(check(
+        profile_brackets.iter().all(|open| {
+            open.is_some_and(|open| bracket_captures.contains(&format!("\"{open}\" @open")))
+        }),
+        "zed: bracket parity",
+        "Zed brackets.scm does not cover every syntax-profile bracket pair",
+    ));
+    let indents = fs::read_to_string(&indents_scm).unwrap_or_default();
+    results.push(check(
+        indents.contains("(block") && indents.contains("@indent"),
+        "zed: block indent capture",
+        "Zed indents.scm lost the block indent capture",
+    ));
+    results.push(check(
+        indents.contains("(parameter_block") && indents.contains("@end"),
+        "zed: parameter block indent capture",
+        "Zed indents.scm lost the parameter block indent capture",
+    ));
+
+    // Semantic classification moved to pdx-ls; the fallback query must stay syntax-only.
+    let highlights = fs::read_to_string(&highlights_scm).unwrap_or_default();
+    results.push(check(
+        !highlights.contains("#match?") && !highlights.contains("variable.special"),
+        "zed: syntax-only fallback",
+        "Zed highlights.scm still carries semantic regex captures that belong to pdx-ls",
+    ));
 
     results
 }
@@ -929,5 +1078,20 @@ mod tests {
             }
         }
         assert!(all_pass, "release artifact checks must pass");
+    }
+
+    #[test]
+    fn editor_syntax_parity_passes_on_this_repository() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let results = check_editor_syntax_parity(&root);
+        let all_pass = results
+            .iter()
+            .all(|r| matches!(r.outcome, CheckOutcome::Passed));
+        for result in &results {
+            if let CheckOutcome::Failed(ref msg) = result.outcome {
+                eprintln!("FAIL {}: {msg}", result.name);
+            }
+        }
+        assert!(all_pass, "editor syntax parity checks must pass");
     }
 }

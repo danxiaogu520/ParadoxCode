@@ -11,6 +11,7 @@ mod navigation;
 mod quoted_script;
 mod resolution;
 mod semantic;
+mod semantic_tokens;
 mod support;
 mod types;
 
@@ -26,10 +27,12 @@ pub use navigation::{
     rename, rename_with_cancellation, workspace_symbols, workspace_symbols_with_cancellation,
 };
 pub use resolution::localisation_values_by_key;
+pub use semantic_tokens::{semantic_tokens, semantic_tokens_with_cancellation};
 pub use types::{
     AnalysisResult, CancellationToken, Cancelled, CompletionItem, CompletionKind, CompletionResult,
     Diagnostic, DiagnosticCode, FileAnalysis, Hover, Location, PrepareRenameResult, ReferenceInfo,
-    RenameError, RenameFailure, Symbol, WorkspaceEditPlan, WorkspaceSymbol, WorkspaceTextEdit,
+    RenameError, RenameFailure, SemanticToken, SemanticTokenType, Symbol, WorkspaceEditPlan,
+    WorkspaceSymbol, WorkspaceTextEdit,
 };
 
 // These crate-visible re-exports keep the existing in-crate test and helper paths stable while

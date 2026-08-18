@@ -1,4 +1,8 @@
-; Europa Universalis IV syntax-only highlighting. EU4 command/scope semantics stay in the server.
+; Europa Universalis IV syntax-only fallback highlighting.
+; Semantic classification (@variables, $parameters$, numeric/boolean scalars, and rule-known
+; command keys) is provided by pdx-ls semantic tokens; this query only colours the editor-level
+; syntax so files still read correctly before the server reports. Keep it syntax-only: do not
+; reintroduce regex-based semantic captures here.
 
 (comment) @comment
 (property key: (key) @property)
@@ -8,17 +12,3 @@
 (bare_value) @string
 (header_block header: (bare_value) @type)
 (parameter_condition name: (bare_scalar) @variable.parameter)
-
-; Preserve useful visual distinctions for syntax-level special scalars without
-; embedding an EU4 command or context name table in the extension.
-((bare_scalar) @variable.special
-  (#match? @variable.special "^@"))
-
-((bare_scalar) @variable.parameter
-  (#match? @variable.parameter "^\\$[^$]+\\$$"))
-
-((bare_scalar) @number
-  (#match? @number "^-?[0-9]+(?:\\.[0-9]+)?$"))
-
-((bare_scalar) @boolean
-  (#match? @boolean "^(?:yes|no)$"))

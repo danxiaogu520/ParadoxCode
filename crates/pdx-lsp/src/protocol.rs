@@ -119,6 +119,7 @@ pub(crate) fn is_snapshot_request(method: &str) -> bool {
             | "textDocument/prepareRename"
             | "textDocument/rename"
             | "textDocument/documentSymbol"
+            | "textDocument/semanticTokens"
             | "textDocument/formatting"
             | "workspace/symbol"
             | "pdx/workspaceDiagnostics"

@@ -5,14 +5,16 @@ use lsp_types::{
     CompletionItem, CompletionList, CompletionResponse, CompletionTextEdit,
     DocumentFormattingParams, DocumentSymbol as LspDocumentSymbol, DocumentSymbolParams,
     Documentation, Hover as LspHover, HoverContents, InsertTextFormat, MarkupContent, MarkupKind,
-    PrepareRenameResponse, ReferenceParams, RenameParams, SymbolInformation,
-    TextDocumentPositionParams, TextEdit, Uri, WorkspaceEdit, WorkspaceSymbolParams,
+    PrepareRenameResponse, ReferenceParams, RenameParams, SemanticTokens as LspSemanticTokens,
+    SemanticTokensParams, SymbolInformation, TextDocumentPositionParams, TextEdit, Uri,
+    WorkspaceEdit, WorkspaceSymbolParams,
 };
 use pdx_analysis::{
-    CancellationToken, Cancelled, CompletionKind, complete_with_cancellation, completion_resolve,
-    definition_with_cancellation, document_symbols_with_cancellation, hover_with_cancellation,
-    localisation_values_by_key, prepare_rename_with_cancellation, references_with_cancellation,
-    rename_with_cancellation, source_file_diagnostics_with_cancellation,
+    CancellationToken, Cancelled, CompletionKind, SemanticToken, SemanticTokenType,
+    complete_with_cancellation, completion_resolve, definition_with_cancellation,
+    document_symbols_with_cancellation, hover_with_cancellation, localisation_values_by_key,
+    prepare_rename_with_cancellation, references_with_cancellation, rename_with_cancellation,
+    semantic_tokens_with_cancellation, source_file_diagnostics_with_cancellation,
     text_diagnostics_with_cancellation, workspace_symbols_with_cancellation,
 };
 use pdx_engine::{AnalysisSnapshot, DocumentId, ParsedSource, SourceRootKind};
@@ -122,6 +124,7 @@ impl SnapshotRequestContext {
             "textDocument/prepareRename" => self.prepare_rename(params),
             "textDocument/rename" => self.rename(params),
             "textDocument/documentSymbol" => self.document_symbols(params),
+            "textDocument/semanticTokens" => self.semantic_tokens(params),
             "textDocument/formatting" => self.formatting(params),
             "workspace/symbol" => self.workspace_symbols(params),
             "pdx/workspaceDiagnostics" => self.workspace_diagnostics(params),
@@ -704,6 +707,28 @@ impl SnapshotRequestContext {
         typed_value(result, "document symbols response")
     }
 
+    fn semantic_tokens(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = typed_params::<SemanticTokensParams>(params, "semantic tokens")?;
+        let id = DocumentId::new(params.text_document.uri.as_str());
+        let document = self
+            .snapshot
+            .document(&id)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
+        let result = semantic_tokens_with_cancellation(&self.snapshot, &id, &self.cancellation)
+            .map_err(cancelled_error)?;
+        self.ensure_active()?;
+        let line_index = document.line_index();
+        let text = document.text();
+        let data = encode_semantic_tokens(line_index, text, &result);
+        typed_value(
+            LspSemanticTokens {
+                result_id: None,
+                data,
+            },
+            "semantic tokens response",
+        )
+    }
+
     fn formatting(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<DocumentFormattingParams>(params, "document formatting")?;
         let id = DocumentId::new(params.text_document.uri.as_str());
@@ -787,6 +812,54 @@ pub(crate) fn bounded_results<T>(mut values: Vec<T>, maximum: usize) -> (Vec<T>,
     let incomplete = values.len() > maximum;
     values.truncate(maximum);
     (values, incomplete)
+}
+
+/// Encodes editor-neutral semantic tokens as LSP relative-encoding rows
+/// (delta line, delta character, length, token type index, modifier bitmask).
+/// Tokens are guaranteed single-line; any defensive multi-line token is skipped.
+pub(crate) fn encode_semantic_tokens(
+    line_index: &LineIndex,
+    text: &str,
+    tokens: &[SemanticToken],
+) -> Vec<lsp_types::SemanticToken> {
+    let mut data = Vec::with_capacity(tokens.len());
+    let mut previous_line = 0u32;
+    let mut previous_start = 0u32;
+    for token in tokens {
+        let (Some(start), Some(end)) = (
+            line_index.position(text, token.range.start()),
+            line_index.position(text, token.range.end()),
+        ) else {
+            continue;
+        };
+        if start.line != end.line {
+            continue;
+        }
+        let delta_line = start.line.saturating_sub(previous_line);
+        let delta_start = if start.line == previous_line {
+            start.character.saturating_sub(previous_start)
+        } else {
+            start.character
+        };
+        let length = end.character.saturating_sub(start.character);
+        data.push(lsp_types::SemanticToken {
+            delta_line,
+            delta_start,
+            length,
+            token_type: semantic_token_type_index(token.token_type),
+            token_modifiers_bitset: u32::from(token.definition),
+        });
+        previous_line = start.line;
+        previous_start = start.character;
+    }
+    data
+}
+
+fn semantic_token_type_index(token_type: SemanticTokenType) -> u32 {
+    SemanticTokenType::ALL
+        .iter()
+        .position(|candidate| *candidate == token_type)
+        .map_or(0, |index| u32::try_from(index).expect("legend fits u32"))
 }
 
 /// Removes LSP snippet placeholders (`$0`, `$1`, …) so a snippet-shaped insert text can be

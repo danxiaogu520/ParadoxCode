@@ -1,11 +1,15 @@
 use lsp_types::{
     CompletionOptions, HoverProviderCapability, InitializeParams, InitializeResult, OneOf,
-    RenameOptions, ServerCapabilities, ServerInfo, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
+    RenameOptions, SemanticTokenModifier as LspSemanticTokenModifier,
+    SemanticTokenType as LspSemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend,
+    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    WorkDoneProgressOptions,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use pdx_analysis::SemanticTokenType;
 use pdx_engine::{AnalysisHost, WorkspaceChange, WorkspaceScanToken};
 use pdx_game::{DiscoveryOptions, DiscoveryToken, GameInstallDescriptor, UserPaths};
 use pdx_mission_model::TextureAssets;
@@ -143,6 +147,20 @@ pub(crate) fn prepare_initialize_candidate(
             document_symbol_provider: Some(OneOf::Left(true)),
             document_formatting_provider: Some(OneOf::Left(true)),
             workspace_symbol_provider: Some(OneOf::Left(true)),
+            semantic_tokens_provider: Some(
+                SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
+                    legend: SemanticTokensLegend {
+                        token_types: SemanticTokenType::ALL
+                            .iter()
+                            .map(|token_type| LspSemanticTokenType::new(token_type.as_str()))
+                            .collect(),
+                        token_modifiers: vec![LspSemanticTokenModifier::DEFINITION],
+                    },
+                    range: Some(false),
+                    full: Some(SemanticTokensFullOptions::Bool(true)),
+                    work_done_progress_options: WorkDoneProgressOptions::default(),
+                }),
+            ),
             ..ServerCapabilities::default()
         },
         server_info: Some(ServerInfo {

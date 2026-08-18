@@ -8,6 +8,7 @@ import {
 
 import { MissionPreviewPanel } from './previewPanel';
 import { readSharedConfig } from './sharedConfig';
+import { findExecutableOnPath } from './serverPath';
 
 const EU4_LANGUAGE_ID = 'eu4';
 
@@ -62,15 +63,29 @@ function readInitializationOptions(): Record<string, unknown> {
     return options;
 }
 
+/** Result of resolving the pdx-ls launch command. `missingOnPath` is true when
+ * the fallback `$PATH` lookup produced a bare name that is not resolvable, so
+ * the start is expected to fail with ENOENT unless the OS resolves it another
+ * way. */
+interface ServerResolution {
+    command: string;
+    source: string;
+    missingOnPath: boolean;
+}
+
 /** Resolves the pdx-ls binary and records where it came from, so a missing
  * server is never silent. Precedence: `paradoxcode.pdxLsPath` setting >
  * `.pdx/project.toml [server].binary` > `pdx-ls` on `$PATH`. */
-function resolveServerCommand(): { command: string; source: string } {
+function resolveServerCommand(): ServerResolution {
     const configuredPath = vscode.workspace
         .getConfiguration('paradoxcode')
         .get<string>('pdxLsPath', '');
     if (configuredPath) {
-        return { command: configuredPath, source: 'setting paradoxcode.pdxLsPath' };
+        return {
+            command: configuredPath,
+            source: 'setting paradoxcode.pdxLsPath',
+            missingOnPath: false,
+        };
     }
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (workspaceFolder) {
@@ -80,6 +95,7 @@ function resolveServerCommand(): { command: string; source: string } {
                 return {
                     command: shared.binary,
                     source: `${workspaceFolder.uri.fsPath}/.pdx/project.toml [server].binary`,
+                    missingOnPath: false,
                 };
             }
         } catch (error) {
@@ -88,12 +104,24 @@ function resolveServerCommand(): { command: string; source: string } {
             void vscode.window.showWarningMessage(`ParadoxCode: ${message}`);
         }
     }
-    return { command: 'pdx-ls', source: '$PATH (pdx-ls)' };
+    return {
+        command: 'pdx-ls',
+        source: '$PATH (pdx-ls)',
+        missingOnPath: findExecutableOnPath('pdx-ls') === undefined,
+    };
 }
 
 function createClient(): LanguageClient {
-    const { command, source } = resolveServerCommand();
+    const { command, source, missingOnPath } = resolveServerCommand();
     log.appendLine(`pdx-ls binary: ${command} (from ${source})`);
+    if (missingOnPath) {
+        const message =
+            'pdx-ls was not found on PATH, so the language server will fail to start. ' +
+            'Set "paradoxcode.pdxLsPath" in settings, add [server].binary to a ' +
+            '.pdx/project.toml in the workspace, or install pdx-ls on PATH.';
+        log.appendLine(`WARNING: ${message}`);
+        void vscode.window.showWarningMessage(`ParadoxCode: ${message}`);
+    }
     const serverOptions: ServerOptions = { command };
 
     const clientOptions: LanguageClientOptions = {
@@ -109,8 +137,6 @@ function createClient(): LanguageClient {
             { pattern: '**/history/**/*.txt' },
             { pattern: '**/interface/**/*.gui' },
             { pattern: '**/interface/**/*.gfx' },
-            { pattern: '**/localisation/**/*.yml' },
-            { pattern: '**/localisation/**/*.yaml' },
         ],
         initializationOptions: readInitializationOptions(),
     };

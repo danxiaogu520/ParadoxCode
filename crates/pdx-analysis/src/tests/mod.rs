@@ -5,4 +5,5 @@ mod navigation;
 mod rename;
 mod scope;
 mod semantic;
+mod semantic_tokens;
 mod support;
