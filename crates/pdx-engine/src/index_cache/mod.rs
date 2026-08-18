@@ -5,30 +5,35 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use pdx_rules::{GameProfile, RuleSet};
 use pdx_text::{PositionRange, TextRange};
 use sha2::{Digest, Sha256};
 
 use crate::index::WorkspaceIndex;
 use crate::{
-    AnalysisSnapshot, LocalisationPreview, SourceFile, SourceFileId, SourceRoot, SourceRootId,
-    SourceRootKind, WorkspaceScanToken,
+    AnalysisSnapshot, LocalisationPreview, SourceFile, SourceFileId, SourceRoot, SourceRootKind,
+    WorkspaceScanToken,
 };
 
 mod codec;
+mod position_codec;
 mod preview;
 mod read;
+mod refresh;
 mod template_codec;
 mod write;
 
 /// Current on-disk cache schema.
 ///
-/// Schema 6 records the cached source root identity (`root_id` and `root_kind` metadata), which
-/// allows a single cache format to serve any game-data layer. Schema 5 caches remain loadable
-/// and are interpreted as Vanilla.
-pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 6;
+/// Schema 7 stores per-file content fingerprints, keeps navigation positions in one compact
+/// per-file payload, and records the cached source root identity (`root_id` and `root_kind`
+/// metadata). Schema 6 and older caches are rebuilt once by the CLI or LSP, the same way a
+/// rules update triggers a rebuild; the table shapes for source files and positions changed,
+/// so no legacy reader is retained.
+pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 7;
 
 /// Oldest on-disk cache schema this executable can still load.
-pub const MIN_SUPPORTED_CACHE_SCHEMA_VERSION: u32 = 5;
+pub const MIN_SUPPORTED_CACHE_SCHEMA_VERSION: u32 = 7;
 
 const APPLICATION_ID: i32 = 0x5044_5856;
 const MAX_CACHE_BYTES: u64 = 1024 * 1024 * 1024;
@@ -37,7 +42,12 @@ const MAX_CACHE_SYMBOLS: usize = 5_000_000;
 const MAX_TEXT_FIELD_BYTES: usize = 1024 * 1024;
 const MAX_MACRO_TEMPLATE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_MACRO_TEMPLATE_NODES: usize = 1_000_000;
-const VANILLA_ROOT_ID: SourceRootId = SourceRootId::new(0);
+/// One file can hold at most this many encoded navigation position bytes.
+const MAX_POSITION_PAYLOAD_BYTES: u64 = 256 * 1024 * 1024;
+/// Free pages are reclaimed from databases only when they hold at least this many bytes and
+/// this share of the file, so small rebuilds stay cheap.
+const FREELIST_TRIM_THRESHOLD_BYTES: i64 = 1024 * 1024;
+const FREELIST_TRIM_MIN_PERCENT: i64 = 5;
 
 type IndexParts = (
     IndexCacheMetadata,
@@ -53,6 +63,7 @@ type LoadedIndex = (
     WorkspaceIndex,
     BTreeMap<(SourceFileId, TextRange), PositionRange>,
     BTreeMap<(SourceFileId, TextRange), LocalisationPreview>,
+    BTreeMap<SourceFileId, String>,
 );
 
 /// Observable metadata recorded when an index cache is built manually.
@@ -62,7 +73,8 @@ pub struct IndexCacheMetadata {
     pub schema_version: u32,
     /// Stable game identity carried by the rules artifact.
     pub game_id: String,
-    /// Rules hash used to create the cache. A mismatch does not trigger an automatic rebuild.
+    /// Rules hash used to create the cache. Loading never rejects a mismatch; callers (the CLI
+    /// or LSP) compare it and decide whether a full reindex is warranted.
     pub rule_hash: String,
     /// Human-readable source directory identity.
     pub source_identity: String,
@@ -75,8 +87,8 @@ pub struct IndexCacheMetadata {
     pub indexed_files: usize,
 }
 
-/// A validated persistent index cache containing metadata, semantic shards, and bounded derived
-/// localisation previews, but no source text.
+/// A validated persistent index cache containing metadata, semantic shards, per-file content
+/// fingerprints, and bounded derived localisation previews, but no source text.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IndexCache {
     metadata: IndexCacheMetadata,
@@ -84,6 +96,7 @@ pub struct IndexCache {
     source_files: BTreeMap<SourceFileId, SourceFile>,
     index: WorkspaceIndex,
     localisation_previews: BTreeMap<(SourceFileId, TextRange), LocalisationPreview>,
+    file_fingerprints: BTreeMap<SourceFileId, String>,
 }
 
 impl IndexCache {
@@ -125,39 +138,26 @@ impl IndexCache {
         if snapshot.source_files().len() > MAX_CACHE_FILES {
             return Err(IndexCacheError::LimitExceeded("file", MAX_CACHE_FILES));
         }
-        if snapshot.index().definitions_iter().count() > MAX_CACHE_SYMBOLS {
-            return Err(IndexCacheError::LimitExceeded(
-                "definition",
-                MAX_CACHE_SYMBOLS,
-            ));
-        }
-        if snapshot.index().references_iter().count() > MAX_CACHE_SYMBOLS {
-            return Err(IndexCacheError::LimitExceeded(
-                "reference",
-                MAX_CACHE_SYMBOLS,
-            ));
-        }
-        let macro_definition_count = snapshot
-            .index()
-            .shards
-            .values()
-            .map(|shard| shard.macro_definitions.len())
-            .sum::<usize>();
-        let macro_parameter_count = snapshot
-            .index()
-            .shards
-            .values()
-            .flat_map(|shard| shard.macro_definitions.iter())
-            .map(|summary| summary.parameters.len())
-            .sum::<usize>();
-        if macro_definition_count > MAX_CACHE_SYMBOLS || macro_parameter_count > MAX_CACHE_SYMBOLS {
-            return Err(IndexCacheError::LimitExceeded(
-                "macro summary",
-                MAX_CACHE_SYMBOLS,
-            ));
-        }
+        validate_cache_limits(
+            snapshot.index().definitions_iter().count(),
+            snapshot.index().references_iter().count(),
+            snapshot
+                .index()
+                .shards
+                .values()
+                .map(|shard| shard.macro_definitions.len())
+                .sum::<usize>(),
+            snapshot
+                .index()
+                .shards
+                .values()
+                .flat_map(|shard| shard.macro_definitions.iter())
+                .map(|summary| summary.parameters.len())
+                .sum::<usize>(),
+        )?;
         let mut hasher = Sha256::new();
         hasher.update(b"paradoxcode/vanilla-source/v1\0");
+        let mut file_fingerprints = BTreeMap::new();
         for (id, file) in snapshot.source_files() {
             if file.root_id != root.id {
                 return Err(IndexCacheError::InvalidData(format!(
@@ -173,6 +173,10 @@ impl IndexCache {
             })?;
             put_fingerprint_field(&mut hasher, file.logical_path.as_str().as_bytes());
             put_fingerprint_field(&mut hasher, state.source().as_bytes());
+            file_fingerprints.insert(
+                *id,
+                format!("{:x}", Sha256::digest(state.source().as_bytes())),
+            );
         }
         let source_fingerprint = format!("{:x}", hasher.finalize());
         let localisation_previews = preview::collect_localisation_previews(snapshot)?;
@@ -195,7 +199,30 @@ impl IndexCache {
             source_files: snapshot.source_files().clone(),
             index: snapshot.index().clone(),
             localisation_previews,
+            file_fingerprints,
         })
+    }
+}
+
+impl IndexCache {
+    /// Reindexes this cache against its recorded source directory, parsing only files whose
+    /// content fingerprint changed.
+    ///
+    /// The rules must match the hash recorded in the cache: shard contents (kinds, macro
+    /// summaries, references) depend on the rules, so a different hash needs a full rebuild.
+    pub fn refresh(&self, rules: &RuleSet, profile: &GameProfile) -> Result<Self, IndexCacheError> {
+        refresh::refresh_cancellable(self, rules, profile, &WorkspaceScanToken::new(), None)
+    }
+
+    /// [`Self::refresh`] with cooperative cancellation and per-file `(done, total)` progress.
+    pub fn refresh_cancellable(
+        &self,
+        rules: &RuleSet,
+        profile: &GameProfile,
+        cancellation: &WorkspaceScanToken,
+        progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+    ) -> Result<Self, IndexCacheError> {
+        refresh::refresh_cancellable(self, rules, profile, cancellation, progress)
     }
 }
 
@@ -289,6 +316,12 @@ impl IndexCache {
     ) -> &BTreeMap<(SourceFileId, TextRange), LocalisationPreview> {
         &self.localisation_previews
     }
+
+    /// Returns the recorded content fingerprint for one cached source file.
+    #[must_use]
+    pub fn file_fingerprint(&self, file_id: SourceFileId) -> Option<&str> {
+        self.file_fingerprints.get(&file_id).map(String::as_str)
+    }
 }
 /// Errors raised while building, persisting, loading, or installing an index cache.
 #[derive(Debug)]
@@ -313,6 +346,8 @@ pub enum IndexCacheError {
     GameMismatch { expected: String, actual: String },
     /// The cached root conflicts with a configured source root.
     RootConflict { root: PathBuf, configured: PathBuf },
+    /// The cache was built with a different rules hash; a full reindex is required.
+    RuleHashMismatch { cached: String, active: String },
 }
 
 impl fmt::Display for IndexCacheError {
@@ -347,6 +382,10 @@ impl fmt::Display for IndexCacheError {
                 root.display(),
                 configured.display()
             ),
+            Self::RuleHashMismatch { cached, active } => write!(
+                formatter,
+                "index cache rules hash mismatch: cached {cached}, active {active}; a full reindex is required"
+            ),
         }
     }
 }
@@ -372,7 +411,27 @@ impl From<rusqlite::Error> for IndexCacheError {
     }
 }
 
-fn put_fingerprint_field(hasher: &mut Sha256, value: &[u8]) {
+/// Shared symbol/file budget checks for full builds and refreshes.
+fn validate_cache_limits(
+    definition_count: usize,
+    reference_count: usize,
+    macro_definition_count: usize,
+    macro_parameter_count: usize,
+) -> Result<(), IndexCacheError> {
+    for (label, count) in [
+        ("definition", definition_count),
+        ("reference", reference_count),
+        ("macro summary", macro_definition_count),
+        ("macro parameter", macro_parameter_count),
+    ] {
+        if count > MAX_CACHE_SYMBOLS {
+            return Err(IndexCacheError::LimitExceeded(label, MAX_CACHE_SYMBOLS));
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn put_fingerprint_field(hasher: &mut Sha256, value: &[u8]) {
     hasher.update(u64::try_from(value.len()).unwrap_or(u64::MAX).to_le_bytes());
     hasher.update(value);
 }

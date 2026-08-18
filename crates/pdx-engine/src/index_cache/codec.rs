@@ -17,10 +17,6 @@ pub(super) fn decode_range(start: i64, end: i64) -> Result<TextRange, IndexCache
         .ok_or_else(|| IndexCacheError::InvalidData("range end precedes start".to_owned()))
 }
 
-pub(super) fn decode_position_component(value: i64, label: &str) -> Result<u32, IndexCacheError> {
-    u32::try_from(value).map_err(|_| IndexCacheError::InvalidData(format!("{label} exceeds u32")))
-}
-
 pub(super) fn encode_file_id(id: SourceFileId) -> Vec<u8> {
     id.get().to_be_bytes().to_vec()
 }

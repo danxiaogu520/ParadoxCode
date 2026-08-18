@@ -13,7 +13,6 @@ fn schema(connection: &Connection) -> Result<(), RulesError> {
     connection.execute_batch(
         "PRAGMA foreign_keys = ON;
         CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS interned_names (id INTEGER PRIMARY KEY, value TEXT UNIQUE NOT NULL);
         CREATE TABLE IF NOT EXISTS file_categories (
             id TEXT PRIMARY KEY NOT NULL, parser TEXT NOT NULL, resolution TEXT NOT NULL,
             path_prefix TEXT, extensions TEXT NOT NULL, path_suffix TEXT, case_sensitive INTEGER NOT NULL
@@ -105,15 +104,17 @@ fn schema(connection: &Connection) -> Result<(), RulesError> {
             condition_key_prefix TEXT,
             explicit_field TEXT,
             PRIMARY KEY(type_name, field, subtype)
-        );
-        CREATE TABLE IF NOT EXISTS import_provenance (
-            source_path TEXT PRIMARY KEY NOT NULL, source_sha256 TEXT NOT NULL, importer_version TEXT NOT NULL
-        );")?;
+        );"
+    )?;
     ensure_semantic_columns(connection)?;
     Ok(())
 }
 
 fn ensure_semantic_columns(connection: &Connection) -> Result<(), RulesError> {
+    // `CREATE TABLE IF NOT EXISTS` never adds columns to an artifact written by an older
+    // importer, so the write path upgrades those artifacts in place before repopulating
+    // them. The load path still rejects any schema_version it does not recognize, which
+    // keeps the migration code below an internal detail of artifact regeneration.
     for (name, definition) in [
         ("child_context", "TEXT"),
         ("alternative_id", "TEXT"),
@@ -198,7 +199,7 @@ pub(crate) fn load(path: &Path) -> Result<RuleSet, RulesError> {
 fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), RulesError> {
     schema(connection)?;
     let transaction = connection.transaction()?;
-    transaction.execute_batch("DELETE FROM metadata; DELETE FROM interned_names; DELETE FROM file_categories; DELETE FROM symbol_descriptors; DELETE FROM enum_values; DELETE FROM type_root_keys; DELETE FROM type_root_scopes; DELETE FROM type_descriptors; DELETE FROM localisation_bindings; DELETE FROM semantic_rules; DELETE FROM rule_fields; DELETE FROM rule_records;")?;
+    transaction.execute_batch("DELETE FROM metadata; DELETE FROM file_categories; DELETE FROM symbol_descriptors; DELETE FROM enum_values; DELETE FROM type_root_keys; DELETE FROM type_root_scopes; DELETE FROM type_descriptors; DELETE FROM localisation_bindings; DELETE FROM semantic_rules; DELETE FROM rule_fields; DELETE FROM rule_records;")?;
     transaction.execute(
         "INSERT INTO metadata(key, value) VALUES ('schema_version', ?1), ('rule_hash', ?2), ('game_id', ?3)",
         params![rules.schema_version.to_string(), rules.rule_hash.to_hex(), rules.game_id()],
@@ -443,24 +444,53 @@ fn read_model(connection: &Connection) -> Result<RulesModel, RulesError> {
         descriptors.push(row?);
     }
     let mut records = Vec::new();
-    let mut statement = connection.prepare("SELECT table_name, logical_id, source_order FROM rule_records ORDER BY table_name, logical_id")?;
+    // One joined scan groups fields under their records without a per-record subquery
+    // (the previous N+1 pattern), and NULL field rows from `LEFT JOIN` keep records that
+    // carry no fields in the output.
+    let mut statement = connection.prepare(
+        "SELECT r.table_name, r.logical_id, r.source_order, f.field_name, f.field_value
+         FROM rule_records r
+         LEFT JOIN rule_fields f USING (table_name, logical_id)
+         ORDER BY r.table_name, r.logical_id, f.field_name",
+    )?;
     let rows = statement.query_map([], |row| {
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, String>(1)?,
             row.get::<_, u32>(2)?,
+            row.get::<_, Option<String>>(3)?,
+            row.get::<_, Option<String>>(4)?,
         ))
     })?;
+    let mut current: Option<(String, String, u32, BTreeMap<String, String>)> = None;
     for row in rows {
-        let (table, logical_id, source_order) = row?;
-        let mut fields = BTreeMap::new();
-        let mut fields_statement = connection.prepare("SELECT field_name, field_value FROM rule_fields WHERE table_name = ?1 AND logical_id = ?2 ORDER BY field_name")?;
-        for field in fields_statement.query_map(params![table, logical_id], |field| {
-            Ok((field.get::<_, String>(0)?, field.get::<_, String>(1)?))
-        })? {
-            let (key, value) = field?;
-            fields.insert(key, value);
+        let (table, logical_id, source_order, field_name, field_value) = row?;
+        match &mut current {
+            Some((current_table, current_id, _, fields))
+                if *current_table == table && *current_id == logical_id =>
+            {
+                if let (Some(field_name), Some(field_value)) = (field_name, field_value) {
+                    fields.insert(field_name, field_value);
+                }
+            }
+            _ => {
+                if let Some((table, logical_id, source_order, fields)) = current.take() {
+                    records.push(RuleRecord {
+                        table,
+                        logical_id,
+                        source_order,
+                        fields,
+                    });
+                }
+                let mut fields = BTreeMap::new();
+                if let (Some(field_name), Some(field_value)) = (field_name, field_value) {
+                    fields.insert(field_name, field_value);
+                }
+                current = Some((table, logical_id, source_order, fields));
+            }
         }
+    }
+    if let Some((table, logical_id, source_order, fields)) = current {
         records.push(RuleRecord {
             table,
             logical_id,

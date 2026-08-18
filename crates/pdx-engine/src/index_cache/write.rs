@@ -1,14 +1,16 @@
 //! Transactional Vanilla cache writes.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
+use pdx_text::{PositionRange, TextRange};
 use rusqlite::{Connection, Transaction, params};
 
 use super::codec::{encode_file_id, encode_path, resolution_name};
-use super::read::validate_database_identity;
-use super::template_codec;
 use super::{APPLICATION_ID, CURRENT_CACHE_SCHEMA_VERSION, IndexCache, IndexCacheError};
+use super::{position_codec, read::validate_database_identity, template_codec};
+use crate::SourceFileId;
 
 pub(super) fn save(cache: &IndexCache, path: &Path) -> Result<(), IndexCacheError> {
     save_with_progress(cache, path, None)
@@ -39,10 +41,41 @@ pub(super) fn save_with_progress(
     let mut connection = Connection::open(path)?;
     if existed && existing_len > 0 {
         validate_database_identity(&connection)?;
+    } else {
+        // Fresh databases are created in incremental auto-vacuum mode so repeated rebuilds
+        // reclaim dropped pages with a cheap `incremental_vacuum` instead of growing the file.
+        connection.pragma_update(None, "auto_vacuum", "INCREMENTAL")?;
     }
     let transaction = connection.transaction()?;
     write_cache(&transaction, cache, progress)?;
     transaction.commit()?;
+    trim_free_pages(&connection)?;
+    Ok(())
+}
+
+/// Reclaims free pages left behind by the DROP-and-rebuild transaction.
+///
+/// Dropped pages that the rebuild cannot reuse are scattered through the file, so only a full
+/// `VACUUM` (which also converts the database to incremental auto-vacuum for later rebuilds)
+/// actually shrinks it; it runs only when the freelist is large enough to matter. This is
+/// best-effort after the commit: a failed trim must not report a successful save as failed,
+/// the file is still complete and valid.
+fn trim_free_pages(connection: &Connection) -> Result<(), IndexCacheError> {
+    let freelist: i64 = connection.query_row("PRAGMA freelist_count", [], |row| row.get(0))?;
+    if freelist <= 0 {
+        return Ok(());
+    }
+    let page_count: i64 = connection.query_row("PRAGMA page_count", [], |row| row.get(0))?;
+    let page_size: i64 = connection.query_row("PRAGMA page_size", [], |row| row.get(0))?;
+    let bytes = freelist.saturating_mul(page_size);
+    let percent = freelist.saturating_mul(100) / page_count.max(1);
+    if bytes >= super::FREELIST_TRIM_THRESHOLD_BYTES && percent >= super::FREELIST_TRIM_MIN_PERCENT
+    {
+        // `VACUUM` honors the current auto-vacuum setting, so legacy databases are
+        // converted to incremental mode while being compacted.
+        let _ = connection.pragma_update(None, "auto_vacuum", "INCREMENTAL");
+        let _ = connection.execute_batch("VACUUM");
+    }
     Ok(())
 }
 
@@ -60,13 +93,15 @@ fn write_cache(
          DROP TABLE IF EXISTS localisation_previews;
          DROP TABLE IF EXISTS source_files;
          DROP TABLE IF EXISTS metadata;
-         CREATE TABLE metadata(key TEXT PRIMARY KEY, value BLOB NOT NULL);
+         -- Text values; platform path bytes may still be stored as BLOBs, which TEXT affinity preserves.
+         CREATE TABLE metadata(key TEXT PRIMARY KEY, value TEXT NOT NULL);
          CREATE TABLE source_files(
              file_id BLOB PRIMARY KEY CHECK(length(file_id) = 8),
              logical_path TEXT NOT NULL,
              category_id TEXT,
              resolution TEXT NOT NULL,
-             syntax_error_count INTEGER NOT NULL CHECK(syntax_error_count >= 0)
+             syntax_error_count INTEGER NOT NULL CHECK(syntax_error_count >= 0),
+             fingerprint TEXT NOT NULL CHECK(length(fingerprint) = 64)
          );
          CREATE TABLE definitions(
              file_id BLOB NOT NULL REFERENCES source_files(file_id),
@@ -108,14 +143,8 @@ fn write_cache(
              PRIMARY KEY(file_id, ordinal)
          );
          CREATE TABLE navigation_positions(
-             file_id BLOB NOT NULL REFERENCES source_files(file_id),
-             range_start INTEGER NOT NULL,
-             range_end INTEGER NOT NULL,
-             start_line INTEGER NOT NULL CHECK(start_line >= 0),
-             start_character INTEGER NOT NULL CHECK(start_character >= 0),
-             end_line INTEGER NOT NULL CHECK(end_line >= 0),
-             end_character INTEGER NOT NULL CHECK(end_character >= 0),
-             PRIMARY KEY(file_id, range_start, range_end)
+             file_id BLOB PRIMARY KEY REFERENCES source_files(file_id),
+             payload BLOB NOT NULL
          );
          CREATE TABLE localisation_previews(
              file_id BLOB NOT NULL REFERENCES source_files(file_id),
@@ -129,20 +158,22 @@ fn write_cache(
     transaction.pragma_update(None, "application_id", APPLICATION_ID)?;
     transaction.pragma_update(None, "user_version", CURRENT_CACHE_SCHEMA_VERSION)?;
     let (path_encoding, source_root) = encode_path(&cache.root.path)?;
+    // Values are written as byte strings; path data (Windows UTF-16) can be non-UTF-8.
+    // The column is declared TEXT for intent, and TEXT affinity preserves binary values.
     for (key, value) in [
         (
             "schema_version",
             cache.metadata.schema_version.to_string().into_bytes(),
         ),
-        ("game_id", cache.metadata.game_id.as_bytes().to_vec()),
-        ("rule_hash", cache.metadata.rule_hash.as_bytes().to_vec()),
+        ("game_id", cache.metadata.game_id.clone().into_bytes()),
+        ("rule_hash", cache.metadata.rule_hash.clone().into_bytes()),
         (
             "source_identity",
-            cache.metadata.source_identity.as_bytes().to_vec(),
+            cache.metadata.source_identity.clone().into_bytes(),
         ),
         (
             "source_fingerprint",
-            cache.metadata.source_fingerprint.as_bytes().to_vec(),
+            cache.metadata.source_fingerprint.clone().into_bytes(),
         ),
         (
             "created_unix_seconds",
@@ -155,9 +186,11 @@ fn write_cache(
         ("root_id", cache.root.id.get().to_le_bytes().to_vec()),
         (
             "root_kind",
-            super::root_kind_name(cache.root.kind).as_bytes().to_vec(),
+            super::root_kind_name(cache.root.kind)
+                .to_owned()
+                .into_bytes(),
         ),
-        ("path_encoding", path_encoding.as_bytes().to_vec()),
+        ("path_encoding", path_encoding.to_owned().into_bytes()),
         ("source_root", source_root),
     ] {
         transaction.execute(
@@ -166,8 +199,8 @@ fn write_cache(
         )?;
     }
     let mut insert_source_file = transaction.prepare(
-        "INSERT INTO source_files(file_id, logical_path, category_id, resolution, syntax_error_count)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO source_files(file_id, logical_path, category_id, resolution, syntax_error_count, fingerprint)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
     )?;
     let mut insert_definition = transaction.prepare(
         "INSERT INTO definitions(file_id, ordinal, kind, name, range_start, range_end, active)
@@ -201,6 +234,12 @@ fn write_cache(
             resolution_name(file.resolution),
             i64::try_from(shard.syntax_error_count).map_err(|_| {
                 IndexCacheError::InvalidData("syntax error count exceeds SQLite range".into())
+            })?,
+            cache.file_fingerprints.get(id).ok_or_else(|| {
+                IndexCacheError::InvalidData(format!(
+                    "no content fingerprint recorded for file {}",
+                    file.logical_path.as_str()
+                ))
             })?
         ])?;
         for (ordinal, definition) in shard.definitions.iter().enumerate() {
@@ -302,10 +341,7 @@ fn write_cache(
     drop(insert_reference);
     drop(insert_macro);
     drop(insert_macro_parameter);
-    let mut insert_position = transaction.prepare(
-        "INSERT INTO navigation_positions(file_id, range_start, range_end, start_line, start_character, end_line, end_character)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-    )?;
+    let mut by_file: BTreeMap<SourceFileId, Vec<(TextRange, PositionRange)>> = BTreeMap::new();
     for ((file_id, range), position) in cache.index.position_ranges() {
         if !cache.source_files.contains_key(file_id) {
             return Err(IndexCacheError::InvalidData(format!(
@@ -313,14 +349,17 @@ fn write_cache(
                 file_id.get()
             )));
         }
+        by_file
+            .entry(*file_id)
+            .or_default()
+            .push((*range, *position));
+    }
+    let mut insert_position = transaction
+        .prepare("INSERT INTO navigation_positions(file_id, payload) VALUES (?1, ?2)")?;
+    for (file_id, entries) in by_file {
         insert_position.execute(params![
-            encode_file_id(*file_id),
-            i64::from(range.start()),
-            i64::from(range.end()),
-            i64::from(position.start.line),
-            i64::from(position.start.character),
-            i64::from(position.end.line),
-            i64::from(position.end.character),
+            encode_file_id(file_id),
+            position_codec::encode(&entries)?
         ])?;
     }
     drop(insert_position);

@@ -8,7 +8,7 @@ use std::time::Instant;
 
 use pdx_engine::{
     AnalysisHost, IndexCache, IndexCacheError, SourceRoot, SourceRootId, SourceRootKind,
-    WorkspaceChange, WorkspaceError,
+    WorkspaceChange, WorkspaceError, WorkspaceScanToken,
 };
 use pdx_game::{
     DiscoveryDepth, DiscoveryOptions, DiscoveryOutcome, DiscoveryToken, GameInstallDescriptor,
@@ -392,7 +392,28 @@ fn build_cache(
 ) -> Result<String, CliError> {
     let started = Instant::now();
     let rules = pdx_game::eu4::first_party_rules()?;
-    let mut host = AnalysisHost::with_profile(rules, pdx_game::eu4::profile());
+    let profile = pdx_game::eu4::profile();
+    // An existing validated cache is refreshed in place: only files whose content fingerprint
+    // changed are reindexed. Any load or refresh failure (missing file, stale rules, corrupt
+    // data) falls back to a full scan and rebuild.
+    if let Ok(existing) =
+        IndexCache::load_cancellable_for_install(output, &WorkspaceScanToken::new())
+        && let Ok(cache) = existing.refresh(&rules, &profile)
+    {
+        let save_started = Instant::now();
+        cache.save(output)?;
+        let save_elapsed = save_started.elapsed();
+        return Ok(format!(
+            "{label} cache refreshed from {}\nindexed files: {}\nscan time: 0 ms\ncache save: {} ms\ntotal time: {} ms\nsource fingerprint: {}\nrules hash: {}",
+            output.display(),
+            cache.metadata().indexed_files,
+            save_elapsed.as_millis(),
+            started.elapsed().as_millis(),
+            cache.metadata().source_fingerprint,
+            cache.metadata().rule_hash
+        ));
+    }
+    let mut host = AnalysisHost::with_profile(rules, profile);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![root]));
     let scan_started = Instant::now();
     let report = host.refresh_source_roots()?;

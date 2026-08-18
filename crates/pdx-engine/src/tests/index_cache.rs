@@ -121,16 +121,255 @@ fn corrupted_navigation_position_is_rejected_without_symbol_table_scans() {
 
     let connection = rusqlite::Connection::open(&cache_path).expect("open cache for corruption");
     connection
-        .execute(
-            "UPDATE navigation_positions SET range_start = range_start + 1",
-            [],
-        )
-        .expect("corrupt navigation range");
+        .execute("UPDATE navigation_positions SET payload = X'00'", [])
+        .expect("corrupt navigation payload");
     drop(connection);
     assert!(matches!(
         IndexCache::load(&cache_path),
         Err(IndexCacheError::InvalidData(_))
     ));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn refreshed_cache_reindexes_changed_files_and_drops_deleted_ones() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-refresh-cache-{nonce}"));
+    let vanilla = root.join("vanilla");
+    fs::create_dir_all(vanilla.join("events")).expect("event directory");
+    fs::create_dir_all(vanilla.join("common/scripted_effects")).expect("macro directory");
+    fs::write(
+        vanilla.join("events/a.txt"),
+        "country_event = { id = refresh.1 }\n",
+    )
+    .expect("first fixture");
+    fs::write(
+        vanilla.join("events/b.txt"),
+        "country_event = { id = refresh.2 }\n",
+    )
+    .expect("second fixture");
+    fs::write(
+        vanilla.join("common/scripted_effects/effect.txt"),
+        "refresh_effect = { value = $amount$ }\n",
+    )
+    .expect("macro fixture");
+
+    let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    let mut host = AnalysisHost::with_profile(rules.clone(), pdx_game::eu4::profile());
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+    )]));
+    host.refresh_source_roots().expect("scan Vanilla");
+    let cache = IndexCache::from_snapshot(&host.snapshot()).expect("build cache");
+    let cache_path = root.join("cache/vanilla.pdxindex");
+    cache.save(&cache_path).expect("save cache");
+    let file_ids = cache.source_files().keys().copied().collect::<Vec<_>>();
+    assert_eq!(file_ids.len(), 3);
+
+    // Change one file, delete another, and add a third before refreshing.
+    fs::write(
+        vanilla.join("events/a.txt"),
+        "country_event = { id = refresh.1b }\n",
+    )
+    .expect("modified fixture");
+    fs::remove_file(vanilla.join("events/b.txt")).expect("remove fixture");
+    fs::write(
+        vanilla.join("events/c.txt"),
+        "country_event = { id = refresh.3 }\n",
+    )
+    .expect("added fixture");
+    let loaded = IndexCache::load(&cache_path).expect("load cache");
+    let refreshed = loaded
+        .refresh(&rules, &pdx_game::eu4::profile())
+        .expect("refresh");
+    assert_eq!(refreshed.metadata().indexed_files, 3);
+    assert_ne!(
+        refreshed.metadata().source_fingerprint,
+        loaded.metadata().source_fingerprint,
+        "the tree fingerprint must track the changed content"
+    );
+    // The refreshed cache round-trips through a save and a full load, which derives the
+    // symbol lookup maps exactly like a freshly built cache.
+    let refreshed_path = root.join("cache/refreshed.pdxindex");
+    refreshed
+        .save(&refreshed_path)
+        .expect("save refreshed cache");
+    let reloaded = IndexCache::load(&refreshed_path).expect("load refreshed cache");
+    assert_eq!(reloaded.metadata(), refreshed.metadata());
+    let definitions = reloaded
+        .index()
+        .definitions_iter()
+        .map(|definition| definition.name.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        definitions.contains(&"refresh.1b"),
+        "definitions: {definitions:?}"
+    );
+    assert!(
+        definitions.contains(&"refresh.3"),
+        "definitions: {definitions:?}"
+    );
+    assert!(
+        !definitions.contains(&"refresh.1"),
+        "definitions: {definitions:?}"
+    );
+    assert!(
+        !definitions.contains(&"refresh.2"),
+        "definitions: {definitions:?}"
+    );
+    assert!(
+        reloaded
+            .index()
+            .active_macro_definition("scripted_effect", "refresh_effect")
+            .is_some(),
+        "unchanged macro definition must survive the refresh"
+    );
+    // The unchanged file keeps its identity and fingerprint.
+    let unchanged = reloaded
+        .source_files()
+        .values()
+        .find(|file| file.logical_path.as_str() == "events/a.txt")
+        .expect("unchanged path stays indexed");
+    assert!(file_ids.contains(&unchanged.id));
+    assert!(reloaded.file_fingerprint(unchanged.id).is_some());
+    // Positions must be retained for every surviving symbol.
+    let definition = reloaded
+        .index()
+        .definitions_iter()
+        .find(|definition| definition.file_id == unchanged.id)
+        .expect("definition in refreshed file");
+    assert!(
+        reloaded
+            .index()
+            .position_for(unchanged.id, definition.range)
+            .is_some()
+    );
+    // A refresh with no changes reproduces the same tree fingerprint.
+    let refreshed_again = refreshed
+        .refresh(&rules, &pdx_game::eu4::profile())
+        .expect("idempotent refresh");
+    assert_eq!(
+        refreshed_again.metadata().source_fingerprint,
+        refreshed.metadata().source_fingerprint
+    );
+    assert_eq!(
+        refreshed_again.metadata().indexed_files,
+        refreshed.metadata().indexed_files
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn refresh_rejects_stale_rules_and_mismatched_games() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-refresh-reject-{nonce}"));
+    let vanilla = root.join("vanilla");
+    fs::create_dir_all(vanilla.join("events")).expect("event directory");
+    fs::write(
+        vanilla.join("events/a.txt"),
+        "country_event = { id = reject.1 }\n",
+    )
+    .expect("fixture");
+
+    let bootstrap = pdx_game::eu4::bootstrap_rules();
+    let mut host = AnalysisHost::with_profile(bootstrap.clone(), pdx_game::eu4::profile());
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+    )]));
+    host.refresh_source_roots().expect("scan Vanilla");
+    let cache = IndexCache::from_snapshot(&host.snapshot()).expect("build cache");
+    let cache_path = root.join("cache/vanilla.pdxindex");
+    cache.save(&cache_path).expect("save cache");
+    let loaded = IndexCache::load(&cache_path).expect("load cache");
+
+    let first_party = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    assert_ne!(
+        first_party.rule_hash().to_hex(),
+        loaded.metadata().rule_hash,
+        "bootstrap and first-party rules must differ for this test"
+    );
+    assert!(matches!(
+        loaded.refresh(&first_party, &pdx_game::eu4::profile()),
+        Err(IndexCacheError::RuleHashMismatch { .. })
+    ));
+    assert!(matches!(
+        loaded.refresh(&RuleSet::empty(), &pdx_game::eu4::profile()),
+        Err(IndexCacheError::GameMismatch { .. })
+    ));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn save_reclaims_free_pages_when_rebuilding_a_smaller_cache() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-shrink-cache-{nonce}"));
+    let cache_path = root.join("cache/vanilla.pdxindex");
+
+    let rules = pdx_game::eu4::bootstrap_rules();
+    let build_cache = |files: usize, suffix: &str| {
+        let vanilla = root.join(format!("vanilla-{suffix}"));
+        fs::create_dir_all(vanilla.join("events")).expect("event directory");
+        let mut body = String::new();
+        for index in 0..files {
+            body.push_str(&format!(
+                "country_event = {{ id = shrink.{suffix}.{index} }}\n"
+            ));
+        }
+        fs::write(vanilla.join("events/a.txt"), body).expect("fixture");
+        let mut host = AnalysisHost::with_profile(rules.clone(), pdx_game::eu4::profile());
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+        )]));
+        host.refresh_source_roots().expect("scan Vanilla");
+        IndexCache::from_snapshot(&host.snapshot()).expect("build cache")
+    };
+
+    let large = build_cache(20_000, "large");
+    large.save(&cache_path).expect("save large cache");
+    let large_len = fs::metadata(&cache_path)
+        .expect("large cache metadata")
+        .len();
+
+    let small = build_cache(100, "small");
+    small
+        .save(&cache_path)
+        .expect("overwrite with smaller cache");
+    let small_len = fs::metadata(&cache_path)
+        .expect("small cache metadata")
+        .len();
+    assert!(
+        small_len < large_len,
+        "rebuild must reclaim dropped pages: {small_len} bytes after {large_len} bytes"
+    );
+    let connection = rusqlite::Connection::open(&cache_path).expect("open cache");
+    let freelist: i64 = connection
+        .query_row("PRAGMA freelist_count", [], |row| row.get(0))
+        .expect("freelist count");
+    assert_eq!(freelist, 0, "no free pages may remain after the rebuild");
+    let auto_vacuum: i64 = connection
+        .pragma_query_value(None, "auto_vacuum", |row| row.get(0))
+        .expect("auto-vacuum mode");
+    assert_eq!(
+        auto_vacuum, 2,
+        "fresh caches must run in incremental auto-vacuum"
+    );
+    drop(connection);
+    IndexCache::load(&cache_path).expect("rebuilt cache loads");
     fs::remove_dir_all(root).expect("cleanup");
 }
 

@@ -9,10 +9,11 @@ use crate::workspace::DependencyIndexCache;
 
 /// Loads (or rebuilds) the persistent index cache for one configured dependency.
 ///
-/// A usable cache is loaded for installation. A missing, corrupt, or schema-incompatible cache
-/// is rebuilt from the configured dependency directory in place. A rules-hash mismatch triggers
-/// a regeneration attempt; if that fails the stale cache is still returned so the dependency
-/// keeps its symbols, mirroring the Vanilla cache policy.
+/// A usable cache is loaded for installation and refreshed against the dependency directory so
+/// symbol changes are picked up without a full reindex. A missing, corrupt, or
+/// schema-incompatible cache is rebuilt from the configured dependency directory in place. A
+/// rules-hash mismatch triggers a regeneration attempt; if that fails the stale cache is still
+/// returned so the dependency keeps its symbols, mirroring the Vanilla cache policy.
 pub(crate) fn run_dependency_cache_load(
     config: &DependencyIndexCache,
     rules: RuleSet,
@@ -62,14 +63,39 @@ pub(crate) fn run_dependency_cache_load(
         }
     };
     if loaded.metadata().rule_hash == current_rule_hash {
-        return Ok((
-            loaded,
-            format!(
-                "Dependency {} symbols loaded from {}",
-                config.root.path.display(),
-                config.index_path.display()
-            ),
-        ));
+        // The rules still match, so only the source files may have moved on: refresh the cache
+        // against the dependency directory (a fingerprint diff, not a reparse). A failed
+        // refresh — moved or unavailable source, cancellation — degrades to the cached
+        // symbols, and a save failure keeps the refreshed cache in memory with a warning.
+        return match loaded.refresh_cancellable(&rules, &profile, cancellation, progress) {
+            Ok(refreshed) => {
+                let save = refreshed.save_with_progress(&config.index_path, progress);
+                let suffix = match save {
+                    Ok(()) => String::new(),
+                    Err(error) => format!(
+                        "; refreshed content could not be saved to {}: {error}",
+                        config.index_path.display()
+                    ),
+                };
+                Ok((
+                    refreshed,
+                    format!(
+                        "Dependency {} symbols refreshed against {} and loaded from {}{suffix}",
+                        config.root.path.display(),
+                        config.root.path.display(),
+                        config.index_path.display()
+                    ),
+                ))
+            }
+            Err(error) => Ok((
+                loaded,
+                format!(
+                    "Dependency {} symbols loaded from {}; refresh skipped: {error}",
+                    config.root.path.display(),
+                    config.index_path.display()
+                ),
+            )),
+        };
     }
     let stale_hash = loaded.metadata().rule_hash.clone();
     let rebuilt = build_dependency_cache(

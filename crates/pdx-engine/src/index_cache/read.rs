@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
 
-use pdx_text::{LogicalPath, Position, PositionRange, TextRange};
+use pdx_text::{LogicalPath, PositionRange, TextRange};
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
 
 use crate::index::{
@@ -13,19 +13,17 @@ use crate::index::{
 };
 use crate::model::LocalisationPreview;
 use crate::scan::stable_file_id;
-use crate::{
-    SourceFile, SourceFileId, SourceRoot, SourceRootId, SourceRootKind, WorkspaceScanToken,
-};
+use crate::{SourceFile, SourceFileId, SourceRoot, SourceRootId, WorkspaceScanToken};
 
 use super::codec::{
-    decode_file_id, decode_path, decode_position_component, decode_range, join_logical_path,
-    parse_resolution,
+    decode_file_id, decode_path, decode_range, join_logical_path, parse_resolution,
 };
+use super::position_codec;
 use super::template_codec;
 use super::{
     APPLICATION_ID, CURRENT_CACHE_SCHEMA_VERSION, IndexCache, IndexCacheError, IndexCacheMetadata,
-    LoadedIndex, MAX_CACHE_BYTES, MAX_CACHE_FILES, MAX_CACHE_SYMBOLS, MAX_TEXT_FIELD_BYTES,
-    MIN_SUPPORTED_CACHE_SCHEMA_VERSION, VANILLA_ROOT_ID, parse_root_kind,
+    LoadedIndex, MAX_CACHE_BYTES, MAX_CACHE_FILES, MAX_CACHE_SYMBOLS, MAX_POSITION_PAYLOAD_BYTES,
+    MAX_TEXT_FIELD_BYTES, MIN_SUPPORTED_CACHE_SCHEMA_VERSION, parse_root_kind,
 };
 
 /// Row-count and text-length limits per table, in validation order.
@@ -33,17 +31,14 @@ const TABLE_LIMITS: [(&str, usize, &str); 7] = [
     (
         "source_files",
         MAX_CACHE_FILES,
-        "logical_path, category_id, resolution",
+        "logical_path, category_id, resolution, fingerprint",
     ),
     ("definitions", MAX_CACHE_SYMBOLS, "kind, name"),
     ("symbol_references", MAX_CACHE_SYMBOLS, "kind, name"),
     ("macro_definitions", MAX_CACHE_SYMBOLS, "kind, name"),
     ("macro_parameters", MAX_CACHE_SYMBOLS, "name"),
-    (
-        "navigation_positions",
-        MAX_CACHE_SYMBOLS,
-        "range_start, range_end, start_line, start_character, end_line, end_character",
-    ),
+    // Position payloads have their own byte budget below; the row count is per file.
+    ("navigation_positions", MAX_CACHE_FILES, ""),
     (
         "localisation_previews",
         MAX_CACHE_SYMBOLS,
@@ -158,21 +153,17 @@ fn load_connection(
         &metadata_blob(connection, "source_root")?,
         &metadata_text(connection, "path_encoding")?,
     )?;
-    // Schema 5 caches predate root-identity metadata and are by definition Vanilla.
-    let root = if schema_version >= 6 {
-        let root_id = u32::from_le_bytes(
-            metadata_blob(connection, "root_id")?
-                .try_into()
-                .map_err(|_| IndexCacheError::InvalidMetadata("root_id"))?,
-        );
-        SourceRoot::new(
-            SourceRootId::new(root_id),
-            parse_root_kind(&metadata_text(connection, "root_kind")?)?,
-            source_root,
-        )
-    } else {
-        SourceRoot::new(VANILLA_ROOT_ID, SourceRootKind::Vanilla, source_root)
-    };
+    // Schema 7 records the cached source root identity; older caches are rebuilt once.
+    let root_id = u32::from_le_bytes(
+        metadata_blob(connection, "root_id")?
+            .try_into()
+            .map_err(|_| IndexCacheError::InvalidMetadata("root_id"))?,
+    );
+    let root = SourceRoot::new(
+        SourceRootId::new(root_id),
+        parse_root_kind(&metadata_text(connection, "root_kind")?)?,
+        source_root,
+    );
     let game_id = metadata_text(connection, "game_id")?;
     let rule_hash = metadata_text(connection, "rule_hash")?;
     let source_identity = metadata_text(connection, "source_identity")?;
@@ -183,7 +174,7 @@ fn load_connection(
     let indexed_files = metadata_text(connection, "indexed_files")?
         .parse::<usize>()
         .map_err(|_| IndexCacheError::InvalidMetadata("indexed_files"))?;
-    let (source_files, index, positions, localisation_previews) =
+    let (source_files, index, positions, localisation_previews, file_fingerprints) =
         load_index(connection, &root, build_lookup_maps, &mut progress)?;
     if indexed_files != source_files.len() {
         return Err(IndexCacheError::InvalidData(format!(
@@ -207,6 +198,7 @@ fn load_connection(
         source_files,
         index,
         localisation_previews,
+        file_fingerprints,
     })
 }
 
@@ -278,20 +270,28 @@ impl LoadProgress<'_> {
 fn validate_table_limits(connection: &Connection) -> Result<[usize; 7], IndexCacheError> {
     // One scan per table returns both the row count and the longest text field, so the
     // bounds checks never rescan a table. The order matches TABLE_LIMITS so failures can
-    // name the offending table statically.
+    // name the offending table statically. Navigation payloads have their own budget.
     let mut counts = [0usize; 7];
     for (index, (table, limit, fields)) in TABLE_LIMITS.iter().enumerate() {
-        let fields = fields
-            .split(", ")
-            .map(|field| format!("COALESCE(length({field}), 0)"))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let query = format!(
-            "SELECT count(*), COALESCE(MAX(max_length), 0) FROM (SELECT max({fields}) AS max_length FROM {table})"
-        );
-        let (count, max) = connection.query_row(&query, [], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
-        })?;
+        let (count, max) = if fields.is_empty() {
+            let count =
+                connection.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
+                    row.get::<_, i64>(0)
+                })?;
+            (count, 0i64)
+        } else {
+            let fields = fields
+                .split(", ")
+                .map(|field| format!("COALESCE(length({field}), 0)"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let query = format!(
+                "SELECT count(*), COALESCE(MAX(max_length), 0) FROM (SELECT max({fields}) AS max_length FROM {table})"
+            );
+            connection.query_row(&query, [], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+            })?
+        };
         let limit = *limit;
         if count < 0 || usize::try_from(count).map_or(true, |count| count > limit) {
             return Err(IndexCacheError::LimitExceeded(TABLE_LIMITS[index].0, limit));
@@ -319,6 +319,20 @@ fn validate_table_limits(connection: &Connection) -> Result<[usize; 7], IndexCac
             super::MAX_MACRO_TEMPLATE_BYTES,
         ));
     }
+    let max_position_payload = connection.query_row(
+        "SELECT COALESCE(MAX(length(payload)), 0) FROM navigation_positions",
+        [],
+        |row| row.get::<_, i64>(0),
+    )?;
+    if max_position_payload < 0
+        || u64::try_from(max_position_payload)
+            .map_or(true, |bytes| bytes > MAX_POSITION_PAYLOAD_BYTES)
+    {
+        return Err(IndexCacheError::LimitExceeded(
+            "navigation position payload byte",
+            usize::try_from(MAX_POSITION_PAYLOAD_BYTES).unwrap_or(usize::MAX),
+        ));
+    }
     Ok(counts)
 }
 
@@ -330,8 +344,9 @@ fn load_index(
 ) -> Result<LoadedIndex, IndexCacheError> {
     let mut source_files = BTreeMap::new();
     let mut shards = BTreeMap::new();
+    let mut file_fingerprints = BTreeMap::new();
     let mut statement = connection.prepare(
-        "SELECT file_id, logical_path, category_id, resolution, syntax_error_count
+        "SELECT file_id, logical_path, category_id, resolution, syntax_error_count, fingerprint
          FROM source_files ORDER BY file_id",
     )?;
     let rows = statement.query_map([], |row| {
@@ -341,11 +356,18 @@ fn load_index(
             row.get::<_, Option<String>>(2)?,
             row.get::<_, String>(3)?,
             row.get::<_, i64>(4)?,
+            row.get::<_, String>(5)?,
         ))
     })?;
     for row in rows {
-        let (id, logical_path, category_id, resolution, syntax_error_count) = row?;
+        let (id, logical_path, category_id, resolution, syntax_error_count, fingerprint) = row?;
         let id = decode_file_id(&id)?;
+        if fingerprint.len() != 64 {
+            return Err(IndexCacheError::InvalidData(format!(
+                "file {} has a malformed fingerprint",
+                id.get()
+            )));
+        }
         let logical_path = LogicalPath::parse(&logical_path)
             .map_err(|error| IndexCacheError::InvalidData(error.to_string()))?;
         if stable_file_id(root.id, &logical_path) != id.get() {
@@ -367,6 +389,12 @@ fn load_index(
         if source_files.insert(id, file).is_some() {
             return Err(IndexCacheError::InvalidData(format!(
                 "duplicate source file id {}",
+                id.get()
+            )));
+        }
+        if file_fingerprints.insert(id, fingerprint).is_some() {
+            return Err(IndexCacheError::InvalidData(format!(
+                "duplicate source file fingerprint for {}",
                 id.get()
             )));
         }
@@ -440,6 +468,7 @@ fn load_index(
         },
         positions,
         localisation_previews,
+        file_fingerprints,
     ))
 }
 
@@ -723,38 +752,21 @@ fn load_references(
 fn load_navigation_positions(
     connection: &Connection,
 ) -> Result<BTreeMap<(SourceFileId, TextRange), PositionRange>, IndexCacheError> {
-    let mut statement = connection.prepare(
-        "SELECT file_id, range_start, range_end, start_line, start_character, end_line, end_character
-         FROM navigation_positions ORDER BY file_id, range_start, range_end",
-    )?;
+    let mut statement =
+        connection.prepare("SELECT file_id, payload FROM navigation_positions ORDER BY file_id")?;
     let rows = statement.query_map([], |row| {
-        Ok((
-            row.get::<_, Vec<u8>>(0)?,
-            row.get::<_, i64>(1)?,
-            row.get::<_, i64>(2)?,
-            row.get::<_, i64>(3)?,
-            row.get::<_, i64>(4)?,
-            row.get::<_, i64>(5)?,
-            row.get::<_, i64>(6)?,
-        ))
+        Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, Vec<u8>>(1)?))
     })?;
     let mut positions = BTreeMap::new();
     for row in rows {
-        let (file_id, start, end, start_line, start_character, end_line, end_character) = row?;
+        let (file_id, payload) = row?;
         let file_id = decode_file_id(&file_id)?;
-        let range = decode_range(start, end)?;
-        let start_line = decode_position_component(start_line, "start line")?;
-        let start_character = decode_position_component(start_character, "start character")?;
-        let end_line = decode_position_component(end_line, "end line")?;
-        let end_character = decode_position_component(end_character, "end character")?;
-        let position = PositionRange::new(
-            Position::new(start_line, start_character),
-            Position::new(end_line, end_character),
-        );
-        if positions.insert((file_id, range), position).is_some() {
-            return Err(IndexCacheError::InvalidData(
-                "duplicate navigation position".to_owned(),
-            ));
+        for (range, position) in position_codec::decode(&payload)? {
+            if positions.insert((file_id, range), position).is_some() {
+                return Err(IndexCacheError::InvalidData(
+                    "duplicate navigation position".to_owned(),
+                ));
+            }
         }
     }
     Ok(positions)

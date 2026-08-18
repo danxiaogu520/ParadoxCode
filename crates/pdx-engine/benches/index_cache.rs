@@ -89,8 +89,21 @@ fn main() {
     let (build, cache) =
         measured(|| IndexCache::from_snapshot(&builder.snapshot()).expect("build cache"));
     let (save, _) = measured(|| cache.save(&cache_path).expect("save cache"));
+    let position_entries = cache.index().position_ranges().len();
     drop(cache);
     drop(builder);
+
+    // Position payload compaction versus the naive six-i64-per-entry column layout.
+    let connection = rusqlite::Connection::open(&cache_path).expect("open cache for metrics");
+    let position_bytes: i64 = connection
+        .query_row(
+            "SELECT COALESCE(SUM(length(payload)), 0) FROM navigation_positions",
+            [],
+            |row| row.get(0),
+        )
+        .expect("position payload bytes");
+    drop(connection);
+    let naive_bytes = position_entries.saturating_mul(48);
 
     let (load, cache) = measured(|| {
         IndexCache::load_cancellable_for_install(&cache_path, &WorkspaceScanToken::new())
@@ -107,4 +120,13 @@ fn main() {
     println!("save cache:         {:>10.3} ms", display_millis(save));
     println!("load cache:         {:>10.3} ms", display_millis(load));
     println!("install cache:      {:>10.3} ms", display_millis(install));
+    println!("position entries:   {position_entries}");
+    println!(
+        "position payload:   {position_bytes} bytes ({:.1}% of the naive 6-column layout)",
+        if naive_bytes == 0 {
+            0.0
+        } else {
+            position_bytes as f64 * 100.0 / naive_bytes as f64
+        }
+    );
 }
