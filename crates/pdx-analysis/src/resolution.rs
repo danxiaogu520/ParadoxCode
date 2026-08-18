@@ -995,6 +995,34 @@ pub(crate) fn prefer_localisation_language(
     }
 }
 
+/// Resolves localisation keys to their displayed values in a single workspace
+/// pass, mirroring symbol resolution semantics: per-language variants prefer
+/// the English definition, and only keys with a non-empty active definition
+/// are returned. Keys without a definition are simply absent from the map.
+///
+/// Used by the LSP mission preview to resolve mission titles (`{id}_title`)
+/// with one `all_semantics` pass per request instead of one per mission.
+pub fn localisation_values_by_key<'a>(
+    snapshot: &AnalysisSnapshot,
+    keys: &'a [&'a str],
+    cancellation: &CancellationToken,
+) -> Result<HashMap<String, (Option<String>, String)>, Cancelled> {
+    let all = all_semantics(snapshot, cancellation)?;
+    let mut resolved = HashMap::new();
+    for &key in keys {
+        let Some(definition) = symbol_candidates(snapshot, &all, "localisation", key)
+            .into_iter()
+            .next()
+        else {
+            continue;
+        };
+        if let Some(preview) = crate::hover::localisation_preview(snapshot, &definition) {
+            resolved.insert(key.to_owned(), preview);
+        }
+    }
+    Ok(resolved)
+}
+
 pub(crate) struct DirectResolutionContext<'snapshot> {
     pub(crate) snapshot: &'snapshot AnalysisSnapshot,
     pub(crate) overlay_files: BTreeSet<SourceFileId>,

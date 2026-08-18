@@ -41,6 +41,7 @@ impl LspServer {
             self.host.snapshot(),
             cancellation.clone(),
             self.client_snippet_support,
+            self.textures.clone(),
         );
         let method = method.to_owned();
         let params = object.get("params").cloned();

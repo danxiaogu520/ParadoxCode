@@ -386,6 +386,7 @@ dependencies = [
  "pdx-analysis",
  "pdx-engine",
  "pdx-game",
+ "pdx-mission-model",
  "pdx-parser",
  "pdx-rules",
  "pdx-text",
@@ -397,6 +398,14 @@ dependencies = [
  "tempfile",
  "toml",
  "zip",
+]
+
+[[package]]
+name = "pdx-mission-model"
+version = "0.1.0"
+dependencies = [
+ "pdx-parser",
+ "pdx-text",
 ]
 
 [[package]]

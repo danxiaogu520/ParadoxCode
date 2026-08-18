@@ -27,6 +27,10 @@ pnpm-debug.log*
 /editors/zed/grammars/
 /editors/zed/bundled-rules/*.pdxrules
 
+# Generated VS Code extension assets
+/editors/vscode/out/
+*.vsix
+
 # Local indexes, caches, and generated rule artifacts
 *.pdxindex
 **/.pdx/cache/

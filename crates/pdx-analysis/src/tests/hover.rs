@@ -315,6 +315,46 @@ fn hover_prefers_nonempty_localisation_preview_over_empty_sibling() {
 }
 
 #[test]
+fn localisation_values_by_key_resolve_english_preferred_titles() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.open_document(
+        DocumentId::new("file:///tmp/localisation/l_english/test_l_english.yml"),
+        1,
+        "l_english:\nmission_one_title:0 \"Mission One Title\"\nmission_two_title:0 \"\"\n"
+            .to_owned(),
+        Some(std::path::PathBuf::from(
+            "/tmp/localisation/l_english/test_l_english.yml",
+        )),
+    )
+    .expect("open english localisation");
+    host.open_document(
+        DocumentId::new("file:///tmp/localisation/l_french/test_l_french.yml"),
+        1,
+        "l_french:\nmission_one_title:0 \"Titre Mission Un\"\n".to_owned(),
+        Some(std::path::PathBuf::from(
+            "/tmp/localisation/l_french/test_l_french.yml",
+        )),
+    )
+    .expect("open french localisation");
+
+    let snapshot = host.snapshot();
+    let resolved = crate::localisation_values_by_key(
+        &snapshot,
+        &["mission_one_title", "mission_two_title", "missing_key"],
+        &crate::CancellationToken::new(),
+    )
+    .expect("resolve titles");
+    let (language, value) = resolved
+        .get("mission_one_title")
+        .expect("active title definition");
+    assert_eq!(language.as_deref(), Some("l_english"));
+    assert_eq!(value, "Mission One Title");
+    // Empty values and unknown keys must not resolve.
+    assert!(!resolved.contains_key("mission_two_title"));
+    assert!(!resolved.contains_key("missing_key"));
+}
+
+#[test]
 fn custom_tooltip_hover_shows_localisation_preview_inside_mission_effects() {
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(

@@ -271,6 +271,7 @@ impl LspServer {
                                 Ok(prepared) if !task.cancellation.is_cancelled() => {
                                     self.host = prepared.host;
                                     self.state = ServerState::Initialized;
+                                    self.textures = prepared.textures;
                                     self.watcher_registration = prepared.watcher_registration;
                                     self.client_work_done_progress =
                                         prepared.client_work_done_progress;

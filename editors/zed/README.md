@@ -17,23 +17,28 @@ Install `editors/zed` as a Zed development extension. The static
 registered language; `.txt` is not claimed globally because it is shared by many languages. Files not
 covered by the fragment can be assigned manually in Zed.
 
-With no project configuration, the opened worktree is the Current Mod. For separate Mod and dependency
-roots, pass `.pdx/project.toml` through Zed initialization options:
+With no project configuration, the opened worktree is the Current Mod. A `.pdx/project.toml` next to
+	the workspace root is discovered automatically and shared by both Zed and VS Code: pdx-ls consumes
+	its source fields (Mod root, Vanilla cache, dependencies) and the extensions read its `[server]` table
+	for the server binary. Per-editor settings are optional overrides only.
 
-```json
-{
-  "lsp": {
-    "pdx-ls": {
-      "initialization_options": {
-        "projectConfig": ".pdx/project.toml"
-      }
-    }
-  }
-}
+```toml
+# worktree/.pdx/project.toml — one config for both editors
+mod_directory = "."
+vanilla_index_cache = ".pdx/vanilla.pdxindex"
+
+[[dependencies]]
+id = "My Dependency"
+path = "D:/Mods/dependency"
+
+[server]
+binary = "C:/Code/ParadoxCode/target/release/pdx-ls.exe"
 ```
 
-Alternatively configure the roots inline; the extension declares a JSON Schema for these options, so
-Zed offers completion, validation, and hover documentation while editing the settings file:
+The `[server]` table is consumed by the Zed and VS Code extensions (with the explicit editor setting
+as a higher-priority override and `$PATH` as the fallback); pdx-ls reads every other field itself.
+For editor-specific overrides, see the JSON Schema for these options, so Zed offers completion,
+validation, and hover documentation while editing the settings file:
 
 ```json
 {

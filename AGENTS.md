@@ -71,6 +71,8 @@ The following dependency direction must be maintained:
 ```text
 pdx-text
   -> pdx-parser -> pdx-engine -> pdx-analysis -> pdx-lsp
+pdx-mission-model -> pdx-parser + pdx-text
+  -> pdx-lsp
 pdx-game (with EU4 profile)
 pdx-rules -> pdx-bake
 pdx-rules + pdx-game -> pdx-engine / pdx-analysis
@@ -89,8 +91,10 @@ Layer responsibilities:
 | `pdx-bake` | developer CLI for strict first-party JSON validation and temporary artifact/manifest generation | CWT input, network sync, user rule overrides |
 | `pdx-engine` | HIR lowering, VFS, overlay, source roots, parse cache, index shards, snapshot | LSP protocol types |
 | `pdx-analysis` | snapshot-oriented diagnostics/completion/hover/navigation/rename queries | direct disk reads, editor client |
-| `pdx-lsp` | lifecycle, capability negotiation, protocol conversion, cancellation, publish diagnostics | EU4 name tables, business queries, rule interpretation |
+| `pdx-mission-model` | structured EU4 mission model, CST extraction, literal grid layout, EMT arrow geometry, write/encoding/validation logic | workspace state, LSP types, GUI |
+| `pdx-lsp` | lifecycle, capability negotiation, protocol conversion, cancellation, publish diagnostics, read-only `pdx/missionPreview` preview data | EU4 name tables, business queries, rule interpretation, layout semantics |
 | `editors/zed` | language metadata, queries, server fetch/verify/launch, config forwarding | symbol extraction, scope derivation, EU4 rule implementation or rule artifact distribution |
+| `editors/vscode` | language client, shared-config forwarding, mission-tree preview webview (renders server-provided geometry only) | symbol extraction, scope derivation, layout computation, EU4 rule implementation |
 
 `AnalysisHost` is the owner of mutable state; requests read immutable `AnalysisSnapshot` values and must not hold the host lock during queries. Background results must validate document version or snapshot identity before committing.
 

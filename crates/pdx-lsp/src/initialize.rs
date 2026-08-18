@@ -3,8 +3,12 @@ use lsp_types::{
     RenameOptions, ServerCapabilities, ServerInfo, TextDocumentSyncCapability,
     TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
+use std::path::PathBuf;
+use std::sync::Arc;
+
 use pdx_engine::{AnalysisHost, WorkspaceChange, WorkspaceScanToken};
-use pdx_game::{GameInstallDescriptor, UserPaths};
+use pdx_game::{DiscoveryOptions, DiscoveryToken, GameInstallDescriptor, UserPaths};
+use pdx_mission_model::TextureAssets;
 
 use crate::protocol::{RpcError, parse_file_uri_str, workspace_scan_error};
 use crate::server::PreparedInitialize;
@@ -73,6 +77,11 @@ pub(crate) fn prepare_initialize_candidate(
     let mut resolved =
         resolve_source_roots(client_root.as_deref(), initialization_options, cancellation)?;
     let mut warnings = Vec::new();
+    // The texture loader needs the profile descriptor for discovery. Capture it
+    // BEFORE the vanilla configuration pass: that pass legitimately returns
+    // `None` when the user configured an explicit `vanilla_index_cache`, but
+    // mission-preview textures must not depend on it.
+    let texture_descriptor = auto_vanilla.map(|config| config.descriptor);
     let auto_vanilla = apply_user_vanilla_configuration(
         &mut resolved,
         auto_vanilla,
@@ -98,6 +107,13 @@ pub(crate) fn prepare_initialize_candidate(
         // to automatic discovery and rebuilds the cache in place.
         Some(path) => Some(path),
     };
+    // Mission-preview textures: an explicitly configured game directory wins;
+    // otherwise a one-time quick discovery via the profile descriptor. This is
+    // independent of the Vanilla cache configuration — a configured
+    // `vanilla_index_cache` must not disable textures. Texture failures are
+    // silent — the preview simply renders without textures.
+    let textures =
+        resolve_texture_assets(resolved.game_directory.take(), texture_descriptor.as_ref());
     if cancellation.is_cancelled() {
         return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
     }
@@ -144,9 +160,32 @@ pub(crate) fn prepare_initialize_candidate(
         warnings,
         auto_vanilla,
         index_cache,
+        textures,
         dependency_caches: resolved.dependency_caches,
         watcher_registration,
         client_work_done_progress,
         client_snippet_support,
     })
+}
+
+/// Builds the mission-preview texture store for the active game installation.
+/// `configured` (explicit `gameDirectory`) wins; otherwise a one-time quick
+/// discovery using the profile descriptor is attempted.
+fn resolve_texture_assets(
+    configured: Option<PathBuf>,
+    descriptor: Option<&GameInstallDescriptor>,
+) -> Option<Arc<TextureAssets>> {
+    let root = if let Some(root) = configured {
+        Some(root)
+    } else if let Some(descriptor) = descriptor {
+        let report = pdx_game::discover_installations(
+            descriptor,
+            &DiscoveryOptions::default(),
+            &DiscoveryToken::new(),
+        );
+        report.installations.into_iter().next()
+    } else {
+        None
+    };
+    root.as_deref().and_then(TextureAssets::load).map(Arc::new)
 }

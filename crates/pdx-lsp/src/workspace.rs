@@ -17,6 +17,7 @@ struct WorkspaceInitializationOptions {
     mod_directory: Option<PathBuf>,
     dependencies: Option<Vec<DependencyConfiguration>>,
     vanilla_index_cache: Option<PathBuf>,
+    game_directory: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -38,6 +39,17 @@ struct ProjectConfiguration {
     dependencies: Option<Vec<DependencyConfiguration>>,
     #[serde(alias = "vanillaIndexCache")]
     vanilla_index_cache: Option<PathBuf>,
+    /// Game installation root whose `interface/*.gfx` and `gfx/interface/missions`
+    /// textures back the mission-tree preview. Optional: when absent, the
+    /// server performs a one-time quick discovery at initialize.
+    #[serde(alias = "gameDirectory")]
+    game_directory: Option<PathBuf>,
+    /// Extension-only `[server]` table (e.g. the language-server binary path
+    /// used by the Zed / VS Code toolkits). Declared so a single
+    /// `.pdx/project.toml` can serve both editors and pdx-ls, while
+    /// `deny_unknown_fields` still rejects genuine typos.
+    #[serde(default)]
+    server: Option<serde_json::Value>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -46,6 +58,9 @@ pub(crate) struct ResolvedSourceRoots {
     pub(crate) roots: Vec<SourceRoot>,
     pub(crate) index_cache: Option<PathBuf>,
     pub(crate) vanilla_explicit: bool,
+    /// Configured game installation root used by the mission-tree texture
+    /// loader, when the caller supplied one.
+    pub(crate) game_directory: Option<PathBuf>,
     /// Dependencies configured with a persistent index cache. These roots are excluded from
     /// live scanning and are installed from their cache files instead.
     pub(crate) dependency_caches: Vec<DependencyIndexCache>,
@@ -76,41 +91,23 @@ pub(crate) fn resolve_source_roots(
         },
     )?;
     let base = client_root.map(Path::to_path_buf);
-    let mut project = if let Some(path) = inline.project_config.as_deref() {
-        let path = resolve_path(path, base.as_deref(), "projectConfig")?;
+    let mut project = if let Some(project_config) = inline.project_config.as_deref() {
+        let path = resolve_path(project_config, base.as_deref(), "projectConfig")?;
         if !path.is_file() {
             return Err(RpcError::new(
                 INVALID_PARAMS,
                 format!("projectConfig is not a file: {}", path.display()),
             ));
         }
-        if cancellation.is_cancelled() {
-            return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
-        }
-        let file = fs::File::open(&path).map_err(|error| {
-            RpcError::new(
-                INVALID_PARAMS,
-                format!("cannot open projectConfig {}: {error}", path.display()),
-            )
-        })?;
-        let mut text = String::new();
-        file.take(PROJECT_CONFIG_MAX_BYTES + 1)
-            .read_to_string(&mut text)
-            .map_err(|error| {
-                RpcError::new(
-                    INVALID_PARAMS,
-                    format!("cannot read projectConfig {}: {error}", path.display()),
-                )
-            })?;
-        if text.len() as u64 > PROJECT_CONFIG_MAX_BYTES {
-            return Err(RpcError::new(INVALID_PARAMS, "projectConfig exceeds 1 MiB"));
-        }
-        toml::from_str::<ProjectConfiguration>(&text).map_err(|error| {
-            RpcError::new(
-                INVALID_PARAMS,
-                format!("invalid projectConfig TOML: {error}"),
-            )
-        })?
+        load_project_config(&path, cancellation)?
+    } else if let Some(workspace_root) = base.as_deref()
+        && workspace_root.join(".pdx/project.toml").is_file()
+    {
+        // Universal configuration: a `.pdx/project.toml` next to the workspace
+        // root is discovered automatically, so Zed and VS Code share the same
+        // config with no per-editor setup. An explicitly configured
+        // `projectConfig` always wins over this file.
+        load_project_config(&workspace_root.join(".pdx/project.toml"), cancellation)?
     } else {
         ProjectConfiguration::default()
     };
@@ -123,6 +120,14 @@ pub(crate) fn resolve_source_roots(
     if inline.vanilla_index_cache.is_some() {
         project.vanilla_index_cache = inline.vanilla_index_cache;
     }
+    if inline.game_directory.is_some() {
+        project.game_directory = inline.game_directory;
+    }
+    let game_directory = project
+        .game_directory
+        .as_deref()
+        .map(|path| resolve_directory(path, base.as_deref(), "gameDirectory"))
+        .transpose()?;
     let vanilla_index_cache = project
         .vanilla_index_cache
         .as_deref()
@@ -280,6 +285,7 @@ pub(crate) fn resolve_source_roots(
         roots,
         index_cache: vanilla_index_cache,
         vanilla_explicit,
+        game_directory,
         dependency_caches,
     })
 }
@@ -299,6 +305,41 @@ fn resolve_configured_path(
         )
     })?;
     Ok(base.join(path))
+}
+
+/// Loads and parses a `.pdx/project.toml` project configuration. Fails loudly
+/// on unreadable, oversized, or ill-formed config — never silently ignored.
+fn load_project_config(
+    path: &Path,
+    cancellation: &WorkspaceScanToken,
+) -> Result<ProjectConfiguration, RpcError> {
+    if cancellation.is_cancelled() {
+        return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
+    }
+    let file = fs::File::open(path).map_err(|error| {
+        RpcError::new(
+            INVALID_PARAMS,
+            format!("cannot open projectConfig {}: {error}", path.display()),
+        )
+    })?;
+    let mut text = String::new();
+    file.take(PROJECT_CONFIG_MAX_BYTES + 1)
+        .read_to_string(&mut text)
+        .map_err(|error| {
+            RpcError::new(
+                INVALID_PARAMS,
+                format!("cannot read projectConfig {}: {error}", path.display()),
+            )
+        })?;
+    if text.len() as u64 > PROJECT_CONFIG_MAX_BYTES {
+        return Err(RpcError::new(INVALID_PARAMS, "projectConfig exceeds 1 MiB"));
+    }
+    toml::from_str::<ProjectConfiguration>(&text).map_err(|error| {
+        RpcError::new(
+            INVALID_PARAMS,
+            format!("invalid projectConfig TOML: {error}"),
+        )
+    })
 }
 
 fn resolve_directory(

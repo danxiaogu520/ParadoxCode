@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use lsp_types::{
     CompletionItem, CompletionList, CompletionResponse, CompletionTextEdit,
@@ -10,11 +11,13 @@ use lsp_types::{
 use pdx_analysis::{
     CancellationToken, Cancelled, CompletionKind, complete_with_cancellation, completion_resolve,
     definition_with_cancellation, document_symbols_with_cancellation, hover_with_cancellation,
-    prepare_rename_with_cancellation, references_with_cancellation, rename_with_cancellation,
-    source_file_diagnostics_with_cancellation, text_diagnostics_with_cancellation,
-    workspace_symbols_with_cancellation,
+    localisation_values_by_key, prepare_rename_with_cancellation, references_with_cancellation,
+    rename_with_cancellation, source_file_diagnostics_with_cancellation,
+    text_diagnostics_with_cancellation, workspace_symbols_with_cancellation,
 };
 use pdx_engine::{AnalysisSnapshot, DocumentId, ParsedSource, SourceRootKind};
+use pdx_mission_model::Severity;
+use pdx_mission_model::geometry::{self, ArrowGlyph};
 use pdx_parser::format::format;
 use pdx_rules::ParserKind;
 use pdx_text::{LineIndex, LogicalPath, Position, TextRange};
@@ -31,6 +34,19 @@ use crate::{
     INVALID_PARAMS, MAX_COMPLETION_RESULTS, MAX_WORKSPACE_DIAGNOSTIC_FILES,
     MAX_WORKSPACE_SYMBOL_RESULTS, METHOD_NOT_FOUND,
 };
+
+fn glyph_name(glyph: ArrowGlyph) -> &'static str {
+    match glyph {
+        ArrowGlyph::VerticalTile => "verticalTile",
+        ArrowGlyph::VerticalSkipTier => "verticalSkipTier",
+        ArrowGlyph::HorizontalSkipSlot => "horizontalSkipSlot",
+        ArrowGlyph::LeftOut => "leftOut",
+        ArrowGlyph::LeftIn => "leftIn",
+        ArrowGlyph::RightOut => "rightOut",
+        ArrowGlyph::RightIn => "rightIn",
+        ArrowGlyph::End => "end",
+    }
+}
 
 const DEFAULT_WORKSPACE_DIAGNOSTIC_FILES: usize = 16;
 const MAX_CLASSIFIED_PATHS: usize = 4_096;
@@ -63,12 +79,22 @@ struct TextDiagnosticsParams {
     files: Vec<TextDiagnosticInput>,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct MissionPreviewParams {
+    path: String,
+    text: String,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct SnapshotRequestContext {
     snapshot: AnalysisSnapshot,
     cancellation: CancellationToken,
     /// Whether the client advertises snippet support for completion items.
     client_snippets: bool,
+    /// Game sprite textures for the mission preview, when a game installation
+    /// is available. `None` renders a texture-less preview.
+    textures: Option<Arc<pdx_mission_model::TextureAssets>>,
 }
 
 impl SnapshotRequestContext {
@@ -76,11 +102,13 @@ impl SnapshotRequestContext {
         snapshot: AnalysisSnapshot,
         cancellation: CancellationToken,
         client_snippets: bool,
+        textures: Option<Arc<pdx_mission_model::TextureAssets>>,
     ) -> Self {
         Self {
             snapshot,
             cancellation,
             client_snippets,
+            textures,
         }
     }
 
@@ -99,6 +127,7 @@ impl SnapshotRequestContext {
             "pdx/workspaceDiagnostics" => self.workspace_diagnostics(params),
             "pdx/classifyPaths" => self.classify_paths(params),
             "pdx/textDiagnostics" => self.text_diagnostics(params),
+            "pdx/missionPreview" => self.mission_preview(params),
             _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
         }
     }
@@ -154,6 +183,203 @@ impl SnapshotRequestContext {
             }));
         }
         Ok(Value::Array(results))
+    }
+
+    /// Mission-tree preview for caller-supplied document text: the same
+    /// literal grid layout and EMT arrow geometry the game uses, returned as
+    /// renderer-ready world coordinates and byte spans. This is the data
+    /// behind the VSCode mission-tree webview; renderers never recompute
+    /// layout semantics.
+    fn mission_preview(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = typed_params::<MissionPreviewParams>(params, "mission preview")?;
+        if params.text.is_empty() {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                "mission preview requires document text",
+            ));
+        }
+        if params.text.len() > MAX_TEXT_DIAGNOSTIC_BYTES {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!("mission preview is limited to {MAX_TEXT_DIAGNOSTIC_BYTES} bytes"),
+            ));
+        }
+        self.ensure_active()?;
+        if !self.snapshot.game_profile().allows_scan_file(&params.path) {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!("path is outside the active game profile: {}", params.path),
+            ));
+        }
+        let loaded = pdx_mission_model::parse_file(&params.text);
+        let file = &loaded.file;
+        let layout = geometry::layout_file(file);
+        let diagnostics = pdx_mission_model::validate(file);
+
+        // Resolve all `{mission_id}_title` keys in one workspace pass with the
+        // same English-preferring symbol resolution as hover; missing keys
+        // simply fall back to the raw id in the renderer.
+        let title_keys = layout
+            .iter()
+            .map(|pos| {
+                format!(
+                    "{}_title",
+                    file.trees[pos.tree_index].missions[pos.mission_index].id
+                )
+            })
+            .collect::<Vec<String>>();
+        let title_refs = title_keys.iter().map(String::as_str).collect::<Vec<_>>();
+        let titles = localisation_values_by_key(&self.snapshot, &title_refs, &self.cancellation)
+            .map_err(cancelled_error)?;
+
+        let nodes = layout
+            .iter()
+            .map(|pos| {
+                let tree = &file.trees[pos.tree_index];
+                let mission = &tree.missions[pos.mission_index];
+                let (x, y) = geometry::world_position(pos);
+                let is_root = mission
+                    .required
+                    .iter()
+                    .all(|r| file.trees.iter().all(|t| t.mission(r).is_none()));
+                // The game renders `{mission_id}_title`; resolve it through the
+                // active workspace localisation definition so mod overrides and
+                // Vanilla keys both work. The raw id remains as the fallback.
+                let title_key = format!("{}_title", mission.id);
+                let title = titles.get(&title_key).map(
+                    |(language, value)| serde_json::json!({ "language": language, "value": value }),
+                );
+                let has_severity = |severity| {
+                    diagnostics.iter().any(|d| {
+                        d.severity == severity && d.mission.as_deref() == Some(mission.id.as_str())
+                    })
+                };
+                let start = usize::try_from(mission.span.start()).unwrap_or(0);
+                let end = usize::try_from(mission.span.end()).unwrap_or(start);
+                serde_json::json!({
+                    "tree": pos.tree_index,
+                    "mission": pos.mission_index,
+                    "id": mission.id,
+                    "icon": mission.icon,
+                    "titleKey": title_key,
+                    "title": title,
+                    "required": mission.required,
+                    "x": x,
+                    "y": y,
+                    "start": start,
+                    "end": end,
+                    "isRoot": is_root,
+                    "hasError": has_severity(Severity::Error),
+                    "hasWarning": has_severity(Severity::Warning),
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let segments = geometry::arrow_geometry(file, &layout);
+        let arrows = segments
+            .iter()
+            .map(|segment| {
+                serde_json::json!({
+                    "glyph": glyph_name(segment.glyph),
+                    "texture": pdx_mission_model::arrow_sprite_name(glyph_name(segment.glyph)),
+                    "x": segment.x,
+                    "y": segment.y,
+                })
+            })
+            .collect::<Vec<_>>();
+
+        // Game sprites the renderer needs: the mission frame, every node icon,
+        // and every arrow glyph, deduplicated and resolved to data URLs.
+        let mut wanted = vec![pdx_mission_model::FRAME_SPRITE];
+        wanted.extend(layout.iter().filter_map(|pos| {
+            file.trees[pos.tree_index].missions[pos.mission_index]
+                .icon
+                .as_deref()
+        }));
+        wanted.extend(
+            segments.iter().filter_map(|segment| {
+                pdx_mission_model::arrow_sprite_name(glyph_name(segment.glyph))
+            }),
+        );
+        wanted.sort_unstable();
+        wanted.dedup();
+        let mut textures = serde_json::Map::new();
+        if let Some(assets) = &self.textures {
+            for name in wanted {
+                if let Some(url) = assets.data_url(name) {
+                    textures.insert(name.to_owned(), Value::String(url));
+                }
+            }
+        }
+
+        // Group labels above each column, stacked for same-column groups —
+        // identical placement to the editor canvas.
+        let mut per_column: HashMap<u32, Vec<usize>> = HashMap::new();
+        for (i, tree) in file.trees.iter().enumerate() {
+            per_column.entry(tree.slot).or_default().push(i);
+        }
+        let mut columns: Vec<(u32, Vec<usize>)> = per_column.into_iter().collect();
+        columns.sort_by_key(|(slot, _)| *slot);
+        let mut groups = Vec::new();
+        for (slot, trees) in columns {
+            for (i, tree_index) in trees.iter().enumerate() {
+                let tree = &file.trees[*tree_index];
+                let start = usize::try_from(tree.span.start()).unwrap_or(0);
+                let end = usize::try_from(tree.span.end()).unwrap_or(start);
+                groups.push(serde_json::json!({
+                    "tree": *tree_index,
+                    "label": tree.id,
+                    "x": geometry::ORIGIN.0
+                        + (slot - 1) as f32 * (geometry::NODE_WIDTH + geometry::GAP_X),
+                    "y": geometry::ORIGIN.1 - 30.0 - i as f32 * 18.0,
+                    "start": start,
+                    "end": end,
+                }));
+            }
+        }
+
+        // Cross-file prerequisite stubs ("↥ id" above the dependent node).
+        let in_file: HashSet<&str> = file
+            .trees
+            .iter()
+            .flat_map(|t| t.missions.iter().map(|m| m.id.as_str()))
+            .collect();
+        let mut external = Vec::new();
+        for (tree_index, tree) in file.trees.iter().enumerate() {
+            for (mission_index, mission) in tree.missions.iter().enumerate() {
+                for required in &mission.required {
+                    if !in_file.contains(required.as_str()) {
+                        external.push(serde_json::json!({
+                            "tree": tree_index,
+                            "mission": mission_index,
+                            "label": required,
+                        }));
+                    }
+                }
+            }
+        }
+
+        let diagnostics = diagnostics
+            .iter()
+            .map(|d| {
+                serde_json::json!({
+                    "severity": if d.severity == Severity::Error { 1 } else { 2 },
+                    "code": d.code,
+                    "message": d.message,
+                    "tree": d.tree,
+                    "mission": d.mission,
+                })
+            })
+            .collect::<Vec<_>>();
+
+        Ok(serde_json::json!({
+            "nodes": nodes,
+            "arrows": arrows,
+            "groups": groups,
+            "external": external,
+            "diagnostics": diagnostics,
+            "textures": textures,
+        }))
     }
 
     fn classify_paths(&self, params: Option<&Value>) -> Result<Value, RpcError> {

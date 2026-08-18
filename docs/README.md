@@ -19,8 +19,10 @@
 | `pdx-game` | [`crates/pdx-game/README.md`](../crates/pdx-game/README.md) |
 | `pdx-engine` | [`crates/pdx-engine/README.md`](../crates/pdx-engine/README.md) |
 | `pdx-analysis` | [`crates/pdx-analysis/README.md`](../crates/pdx-analysis/README.md) |
+| `pdx-mission-model` | [`docs/rfc/0014-mission-tree-editor.md`](rfc/0014-mission-tree-editor.md)（EU4 任务树预览数据面：模型/CST 提取/几何/校验） |
 | `pdx-lsp` | [`crates/pdx-lsp/README.md`](../crates/pdx-lsp/README.md) |
 | Zed extension | [`editors/zed/README.md`](../editors/zed/README.md) |
+| VS Code extension | [`editors/vscode/README.md`](../editors/vscode/README.md) |
 | Tree-sitter grammar | [`grammars/README.md`](../grammars/README.md) |
 | Fuzz targets | [`fuzz/README.md`](../fuzz/README.md) |
 
@@ -41,6 +43,7 @@
 | RFC 0011 | Current | 测试、fuzz、benchmark 和 CI quality gates |
 | RFC 0012 | Current | 通用 engine 与 EU4-first 边界 |
 | RFC 0013 | Current | 第一方规则 source、compiler 和 runtime authority |
+| RFC 0014 | Superseded | EU4 任务树编辑器：独立 GPUI 应用已退役，转为 VS Code 实时预览（`pdx/missionPreview` + `editors/vscode` webview） |
 
 RFC 中的 `Current` 表示内容与当前代码契约一致；`Partial` 表示设计和实现已经存在，但仍有明确未完成边界；`Superseded` 不定义新的行为。
 

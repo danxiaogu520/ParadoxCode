@@ -10,7 +10,8 @@
 
 ParadoxCode 是一个通用 PDX Mod 语言引擎，当前唯一完整支持和发布的 profile 是 EU4。EU4 的路径、文件分类、scope、command、symbol 和特殊 lowering 位于 `pdx-game::eu4` 与第一方规则 source 中；通用引擎不根据编辑器名称、binary 名称或硬编码 EU4 名称表启用语义。
 
-当前客户端是 Zed。Zed extension 只负责语言 metadata、Tree-sitter query、server 获取/校验/启动和配置转发；语义分析、symbol、scope、规则解释和 Vanilla indexing 位于 Rust core/server。
+当前客户端是 Zed 与 VS Code 扩展（`editors/zed`、`editors/vscode`），两者共用同一份语言服务器 `pdx-ls` 与通用配置。
+扩展只负责语言 metadata、Tree-sitter query（Zed）/基础 TextMate（VS Code）、server 获取/校验/启动和配置转发；语义分析、symbol、scope、规则解释和 Vanilla indexing 位于 Rust core/server。VS Code 扩展额外提供**任务树实时预览**：渲染端 webview 只消费服务端 `pdx/missionPreview` 输出的世界坐标几何，不重算布局。
 
 ## 数据流
 
@@ -67,10 +68,21 @@ pdx-parser  -> pdx-text
 pdx-rules   -> pdx-text
 pdx-game    -> pdx-rules
 pdx-bake    -> pdx-rules
+pdx-mission-model -> pdx-text + pdx-parser
 pdx-engine  -> pdx-text + pdx-parser + pdx-rules
 pdx-analysis -> pdx-engine + pdx-rules
-pdx-lsp     -> pdx-engine + pdx-analysis + pdx-parser + pdx-rules + pdx-game
+pdx-lsp     -> pdx-engine + pdx-analysis + pdx-parser + pdx-rules + pdx-game + pdx-mission-model
 ```
+
+`pdx-mission-model` 是任务树预览的数据面：它把 loss-aware CST 提取为结构化任务模型，计算字面网格与
+EMT 兼容箭头几何，并执行任务级校验；它还负责游戏界面纹理（`interface/*.gfx` spriteType 索引、
+DDS 解码、PNG data URL 编码）——渲染端拿到的每个节点图标/帧/箭头贴图都来自这里。它不依赖
+GPUI/编辑器 UI，GUI 逻辑不得进入该 crate。
+`pdx-lsp` 通过 `pdx/missionPreview` 暴露只读预览协议：调用方提交瞬时文本 `{path, text}`，服务端返回
+世界坐标节点/箭头 glyph/组标签、跨文件外部引用桩、任务级诊断 JSON 和去重后的纹理表（按 sprite
+名索引）；预览为单文档范围，跨文件 `required_missions` 以 `↥ id` 桩标注，不解析其他文件。
+游戏根目录通过 `gameDirectory` 初始化选项提供，缺失时启动期做一次快速自动发现；找不到游戏安装则
+预览退化为无纹理的示意图样式。渲染端不持有任何布局语义。
 
 | Package/module | 当前职责 | 不负责 |
 |---|---|---|
@@ -80,8 +92,10 @@ pdx-lsp     -> pdx-engine + pdx-analysis + pdx-parser + pdx-rules + pdx-game
 | `pdx-game` | 安装发现、用户配置，以及 `eu4` profile、catalog、embedded source、cache provider | 通用 workspace/index |
 | `pdx-engine` | VFS、source roots、overlay、parse/HIR state、per-file shard、snapshot | LSP protocol 类型 |
 | `pdx-analysis` | 基于 snapshot 的 diagnostics、completion、hover、navigation、symbols、rename | 直接读磁盘、editor client |
-| `pdx-lsp` | JSON-RPC/LSP 生命周期、capabilities、协议转换、取消、结果发布 | 规则解释、feature 算法 |
+| `pdx-mission-model` | EU4 任务模型、CST 提取、字面网格布局、EMT 兼容箭头几何、写回/编码/校验、DDS 纹理解码与 PNG data URL（游戏界面资产） | 工作区状态、LSP 协议类型、GUI |
+| `pdx-lsp` | JSON-RPC/LSP 生命周期、capabilities、协议转换、取消、结果发布、`pdx/missionPreview` 只读预览 | 规则解释、feature 算法、布局语义 |
 | `editors/zed` | Zed metadata、queries、server 获取/启动、配置转发 | symbol 提取、scope、规则实现 |
+| `editors/vscode` | VS Code 语言客户端、共享配置转发、任务树预览 webview（渲染服务端几何） | symbol 提取、scope 推导、布局计算、规则实现 |
 
 `pdx-bake` 是 `pdx-rules` package 中的维护者 binary，不是独立核心 crate。`editors/zed` 和 `fuzz` 是独立 Cargo package/workspace，不属于核心 workspace 依赖图。
 

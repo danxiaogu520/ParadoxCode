@@ -1,0 +1,60 @@
+# Sample mission file for the mission editor tests.
+# Written by hand; not part of any game data.
+
+sam_main_tree = {
+	
+	slot = 2
+	generic = no
+	ai = yes
+	potential_on_load = {
+		has_dlc = "Domination"
+	}
+	potential = {
+		OR = { tag = SAM tag = SAM2 }
+	}
+	has_country_shield = yes
+	custom_tree_flag = beta_only
+	
+	sam_first_mission = {
+		icon = mission_assemble_an_army
+		required_missions = { }
+		position = 1
+		
+		trigger = {
+			army_size_percentage = 1
+			manpower_percentage = 0.6
+		}
+		
+		effect = {
+			add_manpower = 5
+		}
+	}
+	
+	sam_second_mission = {
+		icon = mission_unite_region
+		required_missions = { sam_first_mission }
+		position = 2
+		completed_by = 1500.1.1
+		type = conquest
+		
+		trigger = {
+			owns_core = 1
+		}
+		
+		effect = {
+			add_prestige = 10
+		}
+	}
+}
+
+sam_other_tree = {
+	
+	slot = 1
+	generic = no
+	
+	sam_third_mission = {
+		icon = mission_build_up_to_force_limit
+		required_missions = { sam_first_mission }
+		position = 2
+	}
+}

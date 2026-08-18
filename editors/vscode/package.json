@@ -1,0 +1,104 @@
+{
+  "name": "paradoxcode-vscode",
+  "displayName": "ParadoxCode - EU4 Language Tools",
+  "description": "Independent, unofficial EU4 language tooling backed by pdx-ls, with a live mission-tree preview.",
+  "version": "0.1.0",
+  "publisher": "paradoxcode",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages",
+    "Visualization"
+  ],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "eu4",
+        "aliases": ["Europa Universalis IV", "eu4"],
+        "filenamePatterns": [
+          "**/common/**/*.txt",
+          "**/events/**/*.txt",
+          "**/decisions/**/*.txt",
+          "**/missions/**/*.txt",
+          "**/history/**/*.txt",
+          "**/interface/**/*.gui",
+          "**/interface/**/*.gfx",
+          "**/localisation/**/*.yml",
+          "**/localisation/**/*.yaml"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "paradoxcode.showMissionPreview",
+        "title": "Open Mission Tree Preview to the Side",
+        "category": "ParadoxCode",
+        "icon": "$(open-preview)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "paradoxcode.showMissionPreview",
+          "when": "resourceLangId == eu4",
+          "group": "navigation@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "ParadoxCode",
+      "properties": {
+        "paradoxcode.pdxLsPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to the `pdx-ls` server binary. When empty, the extension looks for `pdx-ls` on `PATH`."
+        },
+        "paradoxcode.projectConfig": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to a `.pdx/project.toml` whose fields are overridden by the inline options below. When empty, a `.pdx/project.toml` next to the workspace root is discovered automatically, so VS Code and Zed share the same project configuration with no per-editor setup."
+        },
+        "paradoxcode.modDirectory": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Directory of the current Mod being edited. Defaults to the workspace root. Mirrors `lsp.pdx-ls.initialization_options.modDirectory`."
+        },
+        "paradoxcode.vanillaIndexCache": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to a persistent Vanilla index cache (`.pdxindex`). When absent, `pdx-ls` attempts automatic discovery once. Mirrors `lsp.pdx-ls.initialization_options.vanillaIndexCache`."
+        },
+        "paradoxcode.dependencies": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "Dependency Mods in order from lowest to highest priority. Items are `{ id, path, index? }`. Mirrors `lsp.pdx-ls.initialization_options.dependencies`."
+        },
+        "paradoxcode.gameDirectory": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "EU4 installation root (the folder containing `eu4.exe`). Backs the mission-tree preview with real game textures (`interface/*.gfx` + `gfx/interface/missions`). When empty, the server attempts one-time automatic discovery. Mirrors `lsp.pdx-ls.initialization_options.gameDirectory`."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "check": "tsc --noEmit -p ./ && node scripts/smoke.mjs",
+    "vscode:prepublish": "npm run compile"
+  },
+  "dependencies": {
+    "smol-toml": "^1.4.0",
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}

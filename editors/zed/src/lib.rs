@@ -474,7 +474,12 @@ impl zed::Extension for ParadoxCodeExtension {
         let (configured_path, configured_args) = settings
             .binary
             .map_or((None, None), |binary| (binary.path, binary.arguments));
+        // The shared `.pdx/project.toml` `[server].binary` is the single
+        // editor-agnostic way to point both Zed and VS Code at pdx-ls; it is
+        // consulted after an explicit editor setting and before PATH.
+        let shared = shared_server_binary(worktree)?;
         let binary = configured_path
+            .or(shared)
             .or_else(|| worktree.which(LANGUAGE_SERVER_ID))
             .map_or_else(|| install_server(language_server_id), Ok)?;
         let args = configured_args.unwrap_or_default();
@@ -495,6 +500,31 @@ impl zed::Extension for ParadoxCodeExtension {
 
 zed::register_extension!(ParadoxCodeExtension);
 
+/// Returns the `[server].binary` of the shared `.pdx/project.toml` in the
+/// worktree, or `Ok(None)` when the file is absent. A present-but-invalid
+/// file fails loudly — the shared config must never be silently ignored.
+fn shared_server_binary(worktree: &zed::Worktree) -> zed::Result<Option<String>> {
+    let text = match worktree.read_text_file(".pdx/project.toml") {
+        Ok(text) => text,
+        Err(_) => return Ok(None),
+    };
+    parse_shared_server_binary(&text)
+}
+
+/// Extracts `[server].binary` from shared `.pdx/project.toml` text. The rest
+/// of the file belongs to pdx-ls (which auto-discovers the same file); the
+/// extension only needs the server path to launch it.
+fn parse_shared_server_binary(text: &str) -> zed::Result<Option<String>> {
+    let value: toml::Value =
+        toml::from_str(text).map_err(|error| format!("invalid .pdx/project.toml: {error}"))?;
+    let binary = value
+        .get("server")
+        .and_then(|server| server.get("binary"))
+        .and_then(|binary| binary.as_str())
+        .map(str::to_owned);
+    Ok(binary)
+}
+
 /// JSON Schema for `lsp.pdx-ls.initialization_options`.
 ///
 /// Mirrors the `WorkspaceInitializationOptions` accepted by `pdx-ls`: `projectConfig`,
@@ -508,7 +538,7 @@ fn initialization_options_schema() -> serde_json::Value {
         "properties": {
             "projectConfig": {
                 "type": "string",
-                "description": "Path to a `.pdx/project.toml` whose fields are overridden by the inline options below."
+                "description": "Path to a `.pdx/project.toml` whose fields are overridden by the inline options below. When absent, a `.pdx/project.toml` next to the workspace root is discovered automatically, so Zed and VS Code share the same project configuration with no per-editor setup."
             },
             "modDirectory": {
                 "type": "string",
@@ -539,6 +569,10 @@ fn initialization_options_schema() -> serde_json::Value {
                         }
                     }
                 }
+            },
+            "gameDirectory": {
+                "type": "string",
+                "description": "EU4 installation root (the folder containing `eu4.exe`). Backs the VS Code mission-tree preview with real game textures; the Zed extension does not render a preview. When empty, the server attempts one-time automatic discovery."
             }
         }
     })
@@ -566,8 +600,44 @@ mod tests {
     use super::{
         MAX_ARCHIVE_BYTES, MAX_CHECKSUM_BYTES, MAX_EXECUTABLE_BYTES, MAX_TAR_OVERHEAD_BYTES,
         VERSION, archive_name, cached_server_is_valid, expected_checksum, extract_tar_gz,
-        extract_tar_gz_with_limit, extract_zip, platform_artifact, read_limited, release_asset_url,
+        extract_tar_gz_with_limit, extract_zip, parse_shared_server_binary, platform_artifact,
+        read_limited, release_asset_url,
     };
+
+    #[test]
+    fn shared_server_binary_reads_the_server_table() {
+        let config = r#"
+mod_directory = "mod"
+[[dependencies]]
+id = "Chinese Language Mod for 1.37"
+path = "deps/han"
+
+[server]
+binary = "C:/Code/ParadoxCode/target/release/pdx-ls.exe"
+"#;
+        assert_eq!(
+            parse_shared_server_binary(config).expect("parse"),
+            Some("C:/Code/ParadoxCode/target/release/pdx-ls.exe".to_owned())
+        );
+        // Backslashes are parsed like TOML, not regex-matched.
+        let windows = r#"[server]
+binary = "C:\\tools\\pdx-ls.exe""#;
+        assert_eq!(
+            parse_shared_server_binary(windows).expect("parse"),
+            Some("C:\\tools\\pdx-ls.exe".to_owned())
+        );
+    }
+
+    #[test]
+    fn shared_server_binary_is_absent_without_a_server_table() {
+        let config = r#"mod_directory = "mod""#;
+        assert_eq!(parse_shared_server_binary(config).expect("parse"), None);
+    }
+
+    #[test]
+    fn shared_server_binary_fails_loudly_on_invalid_toml() {
+        assert!(parse_shared_server_binary("mod_directory = [").is_err());
+    }
 
     #[cfg(unix)]
     use super::{ensure_install_directory, remove_cache_file};

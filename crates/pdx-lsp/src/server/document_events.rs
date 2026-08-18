@@ -127,6 +127,7 @@ impl LspServer {
                 self.host.snapshot(),
                 CancellationToken::new(),
                 self.client_snippet_support,
+                self.textures.clone(),
             )
             .dispatch(method, params),
             _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
@@ -163,6 +164,7 @@ impl LspServer {
             &WorkspaceScanToken::new(),
         )?;
         self.host = prepared.host;
+        self.textures = prepared.textures;
         self.watcher_registration = prepared.watcher_registration;
         self.state = ServerState::Initialized;
         Ok(prepared.result)

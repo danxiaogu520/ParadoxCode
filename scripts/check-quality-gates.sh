@@ -30,12 +30,16 @@ check_zed() {
     run cargo clippy --locked --manifest-path editors/zed/Cargo.toml --all-targets -- -D warnings
 }
 
+check_vscode() {
+    run npm --prefix editors/vscode run check
+}
+
 check_release() {
     run bash scripts/check-release.sh
 }
 
 usage() {
-    echo "usage: $0 [all|core|grammars|scripts|zed|release]" >&2
+    echo "usage: $0 [all|core|grammars|scripts|zed|vscode|release]" >&2
 }
 
 group=${1:-all}
@@ -44,6 +48,7 @@ case "$group" in
         check_core
         check_grammars
         check_zed
+        check_vscode
         check_release
         ;;
     core)
@@ -54,6 +59,9 @@ case "$group" in
         ;;
     zed)
         check_zed
+        ;;
+    vscode)
+        check_vscode
         ;;
     release)
         check_release

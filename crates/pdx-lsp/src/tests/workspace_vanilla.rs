@@ -885,6 +885,7 @@ fn explicit_project_cache_precedes_user_discovery_configuration() {
         roots: Vec::new(),
         index_cache: Some(project_cache.clone()),
         vanilla_explicit: true,
+        game_directory: None,
         dependency_caches: Vec::new(),
     };
     let mut warnings = Vec::new();
@@ -937,6 +938,72 @@ fn unsuccessful_automatic_discovery_is_recorded_and_not_repeated() {
     )
     .expect_err("failed automatic search is not repeated");
     assert!(second.contains("already attempted"));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn project_config_is_auto_discovered_from_the_workspace_root() {
+    let (root, _) = temp_workspace_dir();
+    fs::create_dir_all(root.join("mod/common/events")).expect("current directory");
+    fs::create_dir_all(root.join("deps/low/common/events")).expect("low dependency");
+    fs::create_dir_all(root.join("deps/high/common/events")).expect("high dependency");
+    fs::create_dir_all(root.join(".pdx")).expect("config directory");
+    fs::write(
+        root.join(".pdx/project.toml"),
+        r#"mod_directory = "mod"
+
+[[dependencies]]
+id = "低优先级"
+path = "deps/low"
+
+[[dependencies]]
+id = "high priority"
+path = "deps/high"
+
+[server]
+binary = "C:/tools/pdx-ls.exe"
+"#,
+    )
+    .expect("write project config");
+    let canonical_root = fs::canonicalize(&root).expect("canonical root");
+    let resolved = super::resolve_source_roots(
+        Some(&canonical_root),
+        None,
+        &pdx_engine::WorkspaceScanToken::new(),
+    )
+    .expect("auto-discovered project config");
+    // Current mod + both dependencies become live roots in priority order
+    // without any per-editor `projectConfig` option.
+    assert_eq!(resolved.roots.len(), 3);
+    assert_eq!(resolved.roots[0].kind, SourceRootKind::Dependency);
+    assert_eq!(resolved.roots[0].order, 1);
+    assert_eq!(resolved.roots[0].path, canonical_root.join("deps/low"));
+    assert_eq!(resolved.roots[1].kind, SourceRootKind::Dependency);
+    assert_eq!(resolved.roots[1].order, 2);
+    assert_eq!(resolved.roots[1].path, canonical_root.join("deps/high"));
+    assert_eq!(resolved.roots[2].kind, SourceRootKind::CurrentMod);
+    assert_eq!(resolved.roots[2].order, 3);
+    assert_eq!(resolved.roots[2].path, canonical_root.join("mod"));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn invalid_auto_discovered_project_config_fails_loudly() {
+    let (root, _) = temp_workspace_dir();
+    fs::create_dir_all(root.join(".pdx")).expect("config directory");
+    fs::write(root.join(".pdx/project.toml"), "mod_directory = [").expect("write config");
+    let canonical_root = fs::canonicalize(&root).expect("canonical root");
+    let error = super::resolve_source_roots(
+        Some(&canonical_root),
+        None,
+        &pdx_engine::WorkspaceScanToken::new(),
+    )
+    .expect_err("invalid auto-discovered config must fail loudly");
+    assert!(
+        error.message.contains("projectConfig"),
+        "unexpected error: {:?}",
+        error.message
+    );
     fs::remove_dir_all(root).expect("cleanup");
 }
 

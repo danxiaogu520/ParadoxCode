@@ -124,6 +124,7 @@ pub(crate) fn is_snapshot_request(method: &str) -> bool {
             | "pdx/workspaceDiagnostics"
             | "pdx/classifyPaths"
             | "pdx/textDiagnostics"
+            | "pdx/missionPreview"
     )
 }
 

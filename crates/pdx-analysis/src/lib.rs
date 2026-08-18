@@ -25,6 +25,7 @@ pub use navigation::{
     prepare_rename, prepare_rename_with_cancellation, references, references_with_cancellation,
     rename, rename_with_cancellation, workspace_symbols, workspace_symbols_with_cancellation,
 };
+pub use resolution::localisation_values_by_key;
 pub use types::{
     AnalysisResult, CancellationToken, Cancelled, CompletionItem, CompletionKind, CompletionResult,
     Diagnostic, DiagnosticCode, FileAnalysis, Hover, Location, PrepareRenameResult, ReferenceInfo,
