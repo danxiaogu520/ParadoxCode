@@ -119,7 +119,7 @@ pub(crate) fn is_snapshot_request(method: &str) -> bool {
             | "textDocument/prepareRename"
             | "textDocument/rename"
             | "textDocument/documentSymbol"
-            | "textDocument/semanticTokens"
+            | "textDocument/semanticTokens/full"
             | "textDocument/formatting"
             | "workspace/symbol"
             | "pdx/workspaceDiagnostics"
@@ -451,5 +451,45 @@ impl RpcError {
             "id": id,
             "error": {"code": self.code, "message": self.message},
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_snapshot_request;
+    use lsp_types::request::Request;
+    use lsp_types::request::{
+        Completion, DocumentSymbolRequest, Formatting, GotoDefinition, HoverRequest,
+        PrepareRenameRequest, References, Rename, ResolveCompletionItem, SemanticTokensFullRequest,
+        WorkspaceSymbolRequest,
+    };
+
+    /// The snapshot-request routing table must agree with the wire method names the
+    /// real protocol library uses. Hardcoding a wrong spelling here silently breaks
+    /// real clients (`textDocument/semanticTokens` vs the real
+    /// `textDocument/semanticTokens/full`), so pin the routing strings to the
+    /// protocol constants instead of trusting hand-written copies.
+    #[test]
+    fn snapshot_routing_matches_protocol_method_names() {
+        for method in [
+            Completion::METHOD,
+            ResolveCompletionItem::METHOD,
+            SemanticTokensFullRequest::METHOD,
+            HoverRequest::METHOD,
+            GotoDefinition::METHOD,
+            References::METHOD,
+            PrepareRenameRequest::METHOD,
+            Rename::METHOD,
+            DocumentSymbolRequest::METHOD,
+            Formatting::METHOD,
+            WorkspaceSymbolRequest::METHOD,
+        ] {
+            assert!(
+                is_snapshot_request(method),
+                "snapshot route missing {method}"
+            );
+        }
+        // The bare, non-spec request name must not be mistaken for the full-token request.
+        assert!(!is_snapshot_request("textDocument/semanticTokens"));
     }
 }

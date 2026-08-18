@@ -124,7 +124,7 @@ impl SnapshotRequestContext {
             "textDocument/prepareRename" => self.prepare_rename(params),
             "textDocument/rename" => self.rename(params),
             "textDocument/documentSymbol" => self.document_symbols(params),
-            "textDocument/semanticTokens" => self.semantic_tokens(params),
+            "textDocument/semanticTokens/full" => self.semantic_tokens(params),
             "textDocument/formatting" => self.formatting(params),
             "workspace/symbol" => self.workspace_symbols(params),
             "pdx/workspaceDiagnostics" => self.workspace_diagnostics(params),

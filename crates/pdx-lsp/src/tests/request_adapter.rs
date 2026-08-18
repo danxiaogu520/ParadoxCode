@@ -478,8 +478,8 @@ fn semantic_tokens_are_advertised_and_encoded_in_relative_order() {
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri.clone(),"languageId":"eu4","version":1,"text":text}}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/semanticTokens","params":{"textDocument":{"uri":uri.clone()}}}),
-        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/semanticTokens","params":{"textDocument":{"uri":format!("{root_uri}/events/closed.txt")}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":uri.clone()}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":format!("{root_uri}/events/closed.txt")}}}),
         json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
     ]);

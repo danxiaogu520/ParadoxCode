@@ -37,20 +37,28 @@
         ]
       }
     ],
-    "semanticTokenScopes": {
-      "scopes": {
-        "comment": ["comment", "comment.line.number-sign"],
-        "string": ["string"],
-        "number": ["constant.numeric"],
-        "boolean": ["constant.language.boolean"],
-        "operator": ["keyword.operator"],
-        "property": ["variable.other.property", "support.type.property-name"],
-        "function": ["entity.name.function"],
-        "type": ["entity.name.type"],
-        "variable": ["variable"],
-        "parameter": ["variable.parameter"]
+    "configurationDefaults": {
+      "[eu4]": {
+        "editor.semanticHighlighting.enabled": true
       }
     },
+    "semanticTokenScopes": [
+      {
+        "language": "eu4",
+        "scopes": {
+          "comment": ["comment", "comment.line.number-sign"],
+          "string": ["string"],
+          "number": ["constant.numeric"],
+          "boolean": ["constant.language.boolean"],
+          "operator": ["keyword.operator"],
+          "property": ["variable.other.property", "support.type.property-name"],
+          "function": ["entity.name.function"],
+          "type": ["entity.name.type"],
+          "variable": ["variable"],
+          "parameter": ["variable.parameter"]
+        }
+      }
+    ],
     "commands": [
       {
         "command": "paradoxcode.showMissionPreview",

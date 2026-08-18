@@ -86,7 +86,21 @@ function run(serverArgs) {
       path: 'missions/smoke.txt',
       text: MISSION_TEXT,
     });
-    request(3, 'shutdown', {});
+    // The real client method for full-document semantic tokens is
+    // `textDocument/semanticTokens/full`; a server that only knows the bare
+    // `textDocument/semanticTokens` spelling answers -32601 and breaks theming.
+    const scriptUri = 'file:///tmp/paradoxcode-smoke/events/smoke.txt';
+    child.stdin.write(encode({
+      jsonrpc: '2.0',
+      method: 'textDocument/didOpen',
+      params: {
+        textDocument: { uri: scriptUri, languageId: 'eu4', version: 1, text: '# note\n@cost = 100\n' },
+      },
+    }));
+    request(3, 'textDocument/semanticTokens/full', {
+      textDocument: { uri: scriptUri },
+    });
+    request(4, 'shutdown', {});
     child.stdin.write(encode({ jsonrpc: '2.0', method: 'exit', params: {} }));
     child.stdin.end();
   });
@@ -113,6 +127,42 @@ const serverArgs = process.argv.length > 2
   : ['cargo', 'run', '--quiet', '-p', 'pdx-lsp', '--bin', 'pdx-ls'];
 
 const responses = await run(serverArgs);
+
+// The `contributes.semanticTokenScopes` manifest entry must be an array of
+// per-language `{ language, scopes }` objects; a plain object is rejected by
+// VS Code's contribution schema validation. Scope keys must name token types
+// the server actually advertises in its semantic-token legend.
+const manifestPath = join(here, '..', 'package.json');
+const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+const tokenScopes = manifest?.contributes?.semanticTokenScopes;
+if (!Array.isArray(tokenScopes) || tokenScopes.length === 0) {
+  fail('contributes.semanticTokenScopes must be a non-empty array');
+}
+
+// eu4 has no TextMate grammar: highlighting depends entirely on semantic tokens,
+// so the language must force `editor.semanticHighlighting.enabled` on instead of
+// inheriting the theme-dependent `configuredByTheme` default.
+const defaultConfig = manifest?.contributes?.configurationDefaults;
+if (defaultConfig?.['[eu4]']?.['editor.semanticHighlighting.enabled'] !== true) {
+  fail('configurationDefaults["[eu4]"].editor.semanticHighlighting.enabled must be true');
+}
+
+const initialize = responses.find((value) => value.id === 1);
+const legendTypes = new Set(
+  initialize?.result?.capabilities?.semanticTokensProvider?.legend?.tokenTypes ?? [],
+);
+for (const entry of tokenScopes) {
+  if (typeof entry?.language !== 'string' || typeof entry?.scopes !== 'object') {
+    fail('each semanticTokenScopes entry needs a language and a scopes map');
+    continue;
+  }
+  for (const tokenType of Object.keys(entry.scopes)) {
+    if (!legendTypes.has(tokenType)) {
+      fail(`semanticTokenScopes key "${tokenType}" is not in the server legend`);
+    }
+  }
+}
+
 const preview = responses.find((value) => value.id === 2);
 if (!preview) {
   fail('no pdx/missionPreview response received');
@@ -188,6 +238,17 @@ if (!preview) {
   if (result.groups.length !== 2) {
     fail(`expected 2 groups, got ${result.groups.length}`);
   }
+}
+
+// Full-document semantic tokens must be served under the real protocol method
+// name `textDocument/semanticTokens/full`; a -32601 here breaks VS Code theming.
+const semanticTokens = responses.find((value) => value.id === 3);
+if (!semanticTokens) {
+  fail('no textDocument/semanticTokens/full response received');
+} else if (semanticTokens.error) {
+  fail(`textDocument/semanticTokens/full failed: ${JSON.stringify(semanticTokens.error)}`);
+} else if (!Array.isArray(semanticTokens.result?.data) || semanticTokens.result.data.length < 1) {
+  fail('semanticTokens/full must return relative token data');
 }
 
 // The shared config TOML that both editors read must parse and yield the
