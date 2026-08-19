@@ -4,25 +4,37 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing version tag to publish (for example, v0.1.0)"
+        required: true
+        default: "v0.1.0"
+        type: string
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.release_tag || github.ref_name }}
   cancel-in-progress: false
 
 permissions:
   contents: read
 
+env:
+  RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+
 jobs:
   preflight:
-    name: Verify release credentials
+    name: Verify release tag
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    env:
-      VSCE_PAT: ${{ secrets.VSCE_PAT }}
     steps:
-      - name: Require VS Code Marketplace credentials
+      - name: Validate release tag
         shell: bash
-        run: ': "${VSCE_PAT:?VSCE_PAT Actions secret is required before tagging a release}"'
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must be a stable semantic version such as v0.1.0: $RELEASE_TAG" >&2
+            exit 1
+          fi
 
   build:
     name: Build ${{ matrix.target }}
@@ -50,6 +62,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -62,14 +76,14 @@ jobs:
       - name: Verify release version
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${RELEASE_TAG#v}"
           cargo run --locked --bin pdx -- check policy --root .
           binary="target/${{ matrix.target }}/release/${{ matrix.binary }}"
           test "$("$binary" --version)" = "pdx-ls $version"
       - name: Package server and checksum
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${RELEASE_TAG#v}"
           cargo run --locked --bin pdx -- release package \
             --version "$version" \
             --target "${{ matrix.target }}" \
@@ -92,6 +106,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: actions/download-artifact@v8
@@ -103,26 +119,27 @@ jobs:
         shell: bash
         run: |
           cargo run --locked --bin pdx -- release verify \
-            --version "${GITHUB_REF_NAME#v}" \
+            --version "${RELEASE_TAG#v}" \
             --directory dist \
             --root .
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
-        run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes
+        run: gh release create "$RELEASE_TAG" dist/* --verify-tag --generate-notes
 
   vscode:
     name: Publish VS Code Marketplace extension
     needs: publish
     permissions:
       contents: write
+      id-token: write
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    env:
-      VSCE_PAT: ${{ secrets.VSCE_PAT }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -132,7 +149,7 @@ jobs:
       - name: Verify extension and tag versions
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${RELEASE_TAG#v}"
           node -e '
             const packageJson = require("./editors/vscode/package.json");
             const packageLock = require("./editors/vscode/package-lock.json");
@@ -147,16 +164,19 @@ jobs:
         run: |
           npm run test:contract
           mkdir -p ../../dist
-          npm exec -- vsce package --out "../../dist/paradoxcode-vscode-${GITHUB_REF_NAME#v}.vsix"
+          version="${RELEASE_TAG#v}"
+          npm exec -- vsce package --out "../../dist/paradoxcode-vscode-${version}.vsix"
       - name: Attach VSIX to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
-        run: gh release upload "$GITHUB_REF_NAME" "dist/paradoxcode-vscode-${GITHUB_REF_NAME#v}.vsix"
-      - name: Publish the same VSIX to Visual Studio Marketplace
+        run: |
+          version="${RELEASE_TAG#v}"
+          gh release upload "$RELEASE_TAG" "dist/paradoxcode-vscode-${version}.vsix"
+      - name: Publish the same VSIX with Marketplace trusted publishing
         working-directory: editors/vscode
         shell: bash
         run: |
-          : "${VSCE_PAT:?VSCE_PAT Actions secret is required to publish the VS Code extension}"
-          npm exec -- vsce publish \
-            --packagePath "../../dist/paradoxcode-vscode-${GITHUB_REF_NAME#v}.vsix"
+          version="${RELEASE_TAG#v}"
+          npm exec -- vsce publish --oidc \
+            --packagePath "../../dist/paradoxcode-vscode-${version}.vsix"
