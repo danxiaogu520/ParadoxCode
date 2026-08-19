@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { LanguageClient } from 'vscode-languageclient/lib/node/main';
+import { LanguageClient } from 'vscode-languageclient/node';
 
 export interface WorkspaceFileRoot {
     id: number;

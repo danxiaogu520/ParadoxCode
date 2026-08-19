@@ -6,7 +6,7 @@ import {
     RevealOutputChannelOn,
     ServerOptions,
     State,
-} from 'vscode-languageclient/lib/node/main';
+} from 'vscode-languageclient/node';
 
 import { LoadedFilesProvider } from './fileExplorer';
 import { MissionPreviewPanel } from './previewPanel';
