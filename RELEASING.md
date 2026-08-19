@@ -8,8 +8,9 @@ account prerequisites before pushing it.
 
 1. Create or verify the `paradoxcode` publisher in Visual Studio Marketplace. The stable extension
    identity is `paradoxcode.paradoxcode-vscode`.
-2. Add a repository Actions secret named `VSCE_PAT` that can publish extensions for that publisher.
-   The release workflow never prints or passes the token on the command line.
+2. Configure Marketplace trusted publishing for GitHub repository `danxiaogu520/ParadoxCode` and
+   workflow `release.yml`. The release job uses `vsce publish --oidc`, so no Azure DevOps
+   organization or long-lived `VSCE_PAT` secret is required.
 3. Fork `zed-industries/extensions` in preparation for the Zed registry PR. Zed publication cannot
    happen solely from this repository: the registry requires a reviewed submodule entry.
 
@@ -38,8 +39,11 @@ git push origin v0.1.0
 
 The tag workflow builds and verifies all five native `pdx-ls` archives, creates the immutable
 GitHub Release, packages the VSIX, attaches it to that release, and publishes the same VSIX to the
-Visual Studio Marketplace. The VS Code job deliberately waits for the server release because a
-fresh extension install immediately downloads that matching asset.
+Visual Studio Marketplace through OIDC trusted publishing. The VS Code job deliberately waits for
+the server release because a fresh extension install immediately downloads that matching asset.
+
+For an already-pushed tag, use the workflow's manual dispatch input with the exact tag (for example
+`v0.1.0`). This runs the current release workflow while checking out the immutable tagged source.
 
 For Zed, open the required PR against `zed-industries/extensions` after the tagged commit is public.
 Use this repository as the HTTPS submodule, set `path = "editors/zed"`, and set the registry version
