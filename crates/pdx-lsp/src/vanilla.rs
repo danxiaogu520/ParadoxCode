@@ -34,6 +34,31 @@ pub(crate) fn run_index_cache_load(
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &IndexSetupCancellation,
 ) -> Result<(IndexCache, String), String> {
+    run_index_cache_load_with_options(
+        path,
+        rules,
+        profile,
+        current_rule_hash,
+        auto_vanilla,
+        log,
+        progress,
+        cancellation,
+        &DiscoveryOptions::default(),
+    )
+}
+
+#[allow(clippy::too_many_arguments)] // Cache load carries the immutable rules/profile plus worker plumbing.
+pub(crate) fn run_index_cache_load_with_options(
+    path: &Path,
+    rules: RuleSet,
+    profile: GameProfile,
+    current_rule_hash: String,
+    auto_vanilla: Option<&AutoVanillaConfiguration>,
+    log: Option<&(dyn Fn(&str) + Sync)>,
+    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+    cancellation: &IndexSetupCancellation,
+    discovery_options: &DiscoveryOptions,
+) -> Result<(IndexCache, String), String> {
     let started = std::time::Instant::now();
     let result = (|| {
         let load_started = std::time::Instant::now();
@@ -58,6 +83,7 @@ pub(crate) fn run_index_cache_load(
                     &rules,
                     &profile,
                     auto_vanilla,
+                    discovery_options,
                     log,
                     progress,
                     cancellation,
@@ -139,11 +165,13 @@ pub(crate) fn run_index_cache_load(
 /// are reported but never recorded in the user configuration, because an explicit
 /// cache path is a caller-owned location and must not mark the user-level
 /// automatic setup as attempted.
+#[allow(clippy::too_many_arguments)] // Rebuild carries the immutable rules/profile plus worker plumbing.
 fn rebuild_unavailable_cache(
     path: &Path,
     rules: &RuleSet,
     profile: &GameProfile,
     auto_vanilla: Option<&AutoVanillaConfiguration>,
+    discovery_options: &DiscoveryOptions,
     log: Option<&(dyn Fn(&str) + Sync)>,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &IndexSetupCancellation,
@@ -169,7 +197,7 @@ fn rebuild_unavailable_cache(
         None => {
             let report = discover_installations(
                 &auto_vanilla.descriptor,
-                &DiscoveryOptions::default(),
+                discovery_options,
                 &cancellation.discovery,
             );
             if report.cancelled {

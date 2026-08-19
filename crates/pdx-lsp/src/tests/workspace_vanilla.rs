@@ -737,7 +737,12 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
     fs::write(&explicit, b"not a vanilla cache").expect("corrupt cache fixture");
     let cancellation = IndexSetupCancellation::new();
 
-    let (cache, message) = run_index_cache_load(
+    let discovery_options = DiscoveryOptions {
+        roots: vec![root.join("library")],
+        include_platform_locations: false,
+        ..DiscoveryOptions::default()
+    };
+    let (cache, message) = run_index_cache_load_with_options(
         &explicit,
         rules.clone(),
         pdx_game::eu4::profile(),
@@ -746,6 +751,7 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
         None,
         None,
         &cancellation,
+        &discovery_options,
     )
     .expect("unavailable cache must rebuild");
     assert!(
@@ -757,7 +763,7 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
     assert_eq!(reloaded.metadata().rule_hash, rules.rule_hash().to_hex());
 
     // A second start finds a matching cache and loads it directly.
-    let (_, second) = run_index_cache_load(
+    let (_, second) = run_index_cache_load_with_options(
         &explicit,
         rules.clone(),
         pdx_game::eu4::profile(),
@@ -766,6 +772,7 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
         None,
         None,
         &cancellation,
+        &discovery_options,
     )
     .expect("rebuilt cache loads");
     assert!(second.contains("loaded from"), "{second}");
