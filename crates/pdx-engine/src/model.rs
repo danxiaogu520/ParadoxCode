@@ -225,6 +225,8 @@ pub enum WorkspaceScanIssueKind {
     InvalidUtf8,
     /// Decoded text is not human-readable source, likely game-only encoded.
     NonTextContent,
+    /// A recoverable encoding span was replaced while retaining the surrounding source.
+    EncodingRecovered,
 }
 
 /// One recoverable problem encountered during source-root discovery.

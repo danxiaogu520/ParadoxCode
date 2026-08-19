@@ -4,8 +4,13 @@ use crate::resolution::*;
 use crate::semantic::*;
 use crate::support::*;
 use crate::types::*;
-use pdx_engine::hir::{HirFile, HirParameterReferenceKind, Scope};
-use pdx_engine::{AnalysisSnapshot, DocumentId, DocumentSource, SourceFileId};
+use pdx_engine::hir::{
+    HirFile, HirParameterReferenceKind, MacroTemplate, MacroTemplateFragment, MacroTemplateItem,
+    MacroTemplateProperty, MacroTemplateToken, MacroTemplateValue, Scope,
+};
+use pdx_engine::{
+    AnalysisSnapshot, DocumentId, DocumentSource, MacroDefinitionSummary, SourceFileId,
+};
 use pdx_parser::{FileFormat, SyntaxError};
 use pdx_rules::RuleShape;
 use pdx_text::TextRange;
@@ -1114,6 +1119,10 @@ fn validate_scripted_macro_expansion(
             expansion.leave();
             return Ok(());
         }
+        Ok(Err(ExpansionFailure::OmitOptionalProperty)) => {
+            expansion.leave();
+            return Ok(());
+        }
         Ok(Err(ExpansionFailure::Limit(limit))) => {
             if expansion.should_report_limit() {
                 diagnostics.push(macro_expansion_limit(property.key_range, limit));
@@ -1219,6 +1228,7 @@ fn validate_scripted_macro_arguments(
         .iter()
         .filter(|parameter| {
             parameter.required
+                && !macro_parameter_is_runtime_optional(&summary, &parameter.name)
                 && !counts
                     .keys()
                     .any(|name| name.eq_ignore_ascii_case(&parameter.name))
@@ -1239,6 +1249,97 @@ fn validate_scripted_macro_arguments(
         return false;
     }
     true
+}
+
+/// Re-evaluates branch-local optionality from the persisted macro template. Vanilla macro
+/// signatures can come from an older index cache whose compact `required` flags predate runtime
+/// `if`/`else` branch awareness; the template remains sufficient to correct that metadata at the
+/// call site without changing the cache schema.
+fn macro_parameter_is_runtime_optional(summary: &MacroDefinitionSummary, name: &str) -> bool {
+    let Some(template) = summary.template.as_ref() else {
+        return false;
+    };
+    template_parameter_runtime_optional(template, name)
+}
+
+fn template_parameter_runtime_optional(template: &MacroTemplate, name: &str) -> bool {
+    fn visit_token(
+        token: &MacroTemplateToken,
+        name: &str,
+        runtime_guarded: bool,
+        seen: &mut bool,
+        unguarded: &mut bool,
+    ) {
+        for fragment in &token.fragments {
+            let MacroTemplateFragment::Parameter {
+                name: parameter, ..
+            } = fragment
+            else {
+                continue;
+            };
+            if parameter.eq_ignore_ascii_case(name) {
+                *seen = true;
+                *unguarded |= !runtime_guarded;
+            }
+        }
+    }
+
+    fn visit_items(
+        items: &[MacroTemplateItem],
+        name: &str,
+        runtime_guarded: bool,
+        seen: &mut bool,
+        unguarded: &mut bool,
+    ) {
+        for item in items {
+            match item {
+                MacroTemplateItem::Property(property) => {
+                    let property_guarded = runtime_guarded && !is_limit_property(property);
+                    visit_token(&property.key, name, property_guarded, seen, unguarded);
+                    match &property.value {
+                        MacroTemplateValue::Scalar(token) => {
+                            visit_token(token, name, property_guarded, seen, unguarded)
+                        }
+                        MacroTemplateValue::Block { items, .. } => visit_items(
+                            items,
+                            name,
+                            property_guarded || is_runtime_branch_key(&property.key),
+                            seen,
+                            unguarded,
+                        ),
+                    }
+                }
+                MacroTemplateItem::BareValue(token) => {
+                    visit_token(token, name, runtime_guarded, seen, unguarded);
+                }
+                MacroTemplateItem::Conditional(conditional) => {
+                    visit_items(&conditional.items, name, runtime_guarded, seen, unguarded)
+                }
+            }
+        }
+    }
+
+    let mut seen = false;
+    let mut unguarded = false;
+    visit_items(&template.items, name, false, &mut seen, &mut unguarded);
+    seen && !unguarded
+}
+
+fn is_limit_property(property: &MacroTemplateProperty) -> bool {
+    let [MacroTemplateFragment::Literal(key)] = property.key.fragments.as_slice() else {
+        return false;
+    };
+    key.trim().eq_ignore_ascii_case("limit")
+}
+
+fn is_runtime_branch_key(key: &MacroTemplateToken) -> bool {
+    let [MacroTemplateFragment::Literal(key)] = key.fragments.as_slice() else {
+        return false;
+    };
+    matches!(
+        key.trim().to_ascii_lowercase().as_str(),
+        "if" | "else_if" | "else"
+    )
 }
 pub(crate) fn syntax_diagnostics(input: &ParsedInput) -> Vec<Diagnostic> {
     match &input.parsed {

@@ -370,29 +370,20 @@ pub(crate) fn read_source_file_cancellable(
         return Ok(None);
     }
     let mut legacy = false;
+    let mut encoding_recovered = false;
     let text = match String::from_utf8(bytes) {
         Ok(text) => text,
         Err(error) => {
             let detail = error.to_string();
             let bytes = error.into_bytes();
-            if source_encoding == SourceEncoding::Windows1252
-                && looks_like_legacy_text(&bytes)
-                && windows1252_has_no_undefined_bytes(&bytes)
-            {
+            if source_encoding == SourceEncoding::Windows1252 && looks_like_legacy_text(&bytes) {
                 let (text, had_errors) = WINDOWS_1252.decode_without_bom_handling(&bytes);
-                if !had_errors {
-                    legacy = true;
-                    text.into_owned()
-                } else {
-                    record_scan_issue(
-                        report,
-                        limits,
-                        WorkspaceScanIssueKind::InvalidUtf8,
-                        path.to_owned(),
-                        detail,
-                    );
-                    return Ok(None);
-                }
+                legacy = true;
+                encoding_recovered = had_errors;
+                text.into_owned()
+            } else if looks_like_legacy_text(&bytes) {
+                encoding_recovered = true;
+                String::from_utf8_lossy(&bytes).into_owned()
             } else {
                 record_scan_issue(
                     report,
@@ -405,16 +396,19 @@ pub(crate) fn read_source_file_cancellable(
             }
         }
     };
-    if contains_control_characters(&text) {
-        record_scan_issue(
+    let (text, sanitized) = sanitize_recovered_text(text);
+    if sanitized {
+        encoding_recovered = true;
+    }
+    if encoding_recovered {
+        record_scan_notice(
             report,
             limits,
-            WorkspaceScanIssueKind::NonTextContent,
+            WorkspaceScanIssueKind::EncodingRecovered,
             path.to_owned(),
-            "decoded text contains control characters and is not human-readable source (likely game-only encoded)"
+            "one or more encoded source spans were replaced with whitespace; surrounding syntax was retained"
                 .to_owned(),
         );
-        return Ok(None);
     }
     if legacy {
         report.legacy_encoded_files = report.legacy_encoded_files.saturating_add(1);
@@ -422,9 +416,139 @@ pub(crate) fn read_source_file_cancellable(
     Ok(Some(text))
 }
 
-fn contains_control_characters(text: &str) -> bool {
-    text.chars()
-        .any(|character| character.is_control() && !matches!(character, '\t' | '\r' | '\n'))
+fn record_scan_notice(
+    report: &mut WorkspaceScanReport,
+    limits: WorkspaceScanLimits,
+    kind: WorkspaceScanIssueKind,
+    path: PathBuf,
+    detail: String,
+) {
+    if report.issues.len() < limits.max_reported_issues {
+        report
+            .issues
+            .push(WorkspaceScanIssue { kind, path, detail });
+    } else {
+        report.omitted_issues = report.omitted_issues.saturating_add(1);
+    }
+}
+
+/// Replaces malformed game-encoded spans without discarding the containing source file.
+///
+/// EU4 stores some localised text in a game-specific byte encoding. After decoding with
+/// replacement characters, the surrounding script/localisation structure is still useful to
+/// the index. Quoted values are blanked as one token, comments are blanked to the end of their
+/// line, and other malformed bare tokens are blanked up to a structural delimiter. Braces and
+/// line endings are retained, so an enclosing definition and its siblings remain parseable.
+fn sanitize_recovered_text(text: String) -> (String, bool) {
+    let mut chars = text.chars().collect::<Vec<_>>();
+    let mut bad = vec![false; chars.len()];
+    let mut has_bad = false;
+    for (index, character) in chars.iter().copied().enumerate() {
+        if character == '\u{fffd}'
+            || (character.is_control() && !matches!(character, '\t' | '\r' | '\n'))
+        {
+            bad[index] = true;
+            has_bad = true;
+        }
+    }
+    if !has_bad {
+        return (text, false);
+    }
+
+    let quote_spans = quoted_spans(&chars);
+    let mut masked = vec![false; chars.len()];
+    for (index, is_bad) in bad.iter().copied().enumerate() {
+        if !is_bad || masked[index] {
+            continue;
+        }
+        if let Some((start, end)) = quote_spans
+            .iter()
+            .copied()
+            .find(|(start, end)| *start <= index && index < *end)
+        {
+            for slot in start.saturating_add(1)..end {
+                if !matches!(chars[slot], '\r' | '\n') {
+                    chars[slot] = ' ';
+                }
+                masked[slot] = true;
+            }
+            continue;
+        }
+
+        let line_start = index
+            .checked_sub(1)
+            .and_then(|slot| {
+                chars[..=slot]
+                    .iter()
+                    .rposition(|character| *character == '\n')
+            })
+            .map_or(0, |slot| slot.saturating_add(1));
+        let line_end = chars[index..]
+            .iter()
+            .position(|character| *character == '\n')
+            .map_or(chars.len(), |offset| index.saturating_add(offset));
+        let comment_start = chars[line_start..index]
+            .iter()
+            .position(|character| *character == '#')
+            .map(|offset| line_start.saturating_add(offset));
+        let (start, end) = if let Some(comment_start) = comment_start {
+            (comment_start, line_end)
+        } else {
+            let start = chars[line_start..=index]
+                .iter()
+                .rposition(|character| {
+                    character.is_whitespace() || matches!(character, '=' | '{' | '}' | ':')
+                })
+                .map_or(line_start, |offset| {
+                    line_start.saturating_add(offset).saturating_add(1)
+                });
+            let end = chars[index..line_end]
+                .iter()
+                .position(|character| {
+                    character.is_whitespace() || matches!(character, '{' | '}' | '#')
+                })
+                .map_or(line_end, |offset| index.saturating_add(offset));
+            (start, end)
+        };
+        for slot in start..end {
+            if !matches!(chars[slot], '\r' | '\n' | '{' | '}') {
+                chars[slot] = ' ';
+            }
+            masked[slot] = true;
+        }
+    }
+    (chars.into_iter().collect(), true)
+}
+
+fn quoted_spans(chars: &[char]) -> Vec<(usize, usize)> {
+    let mut spans = Vec::new();
+    let mut opening = None;
+    let mut escaped = false;
+    let mut comment = false;
+    for (index, character) in chars.iter().copied().enumerate() {
+        if let Some(start) = opening {
+            if escaped {
+                escaped = false;
+            } else if character == '\\' {
+                escaped = true;
+            } else if character == '"' {
+                spans.push((start, index));
+                opening = None;
+            }
+        } else if comment {
+            if character == '\n' {
+                comment = false;
+            }
+        } else if character == '#' {
+            comment = true;
+        } else if character == '"' {
+            opening = Some(index);
+        }
+    }
+    if let Some(start) = opening {
+        spans.push((start, chars.len()));
+    }
+    spans
 }
 
 fn looks_like_legacy_text(bytes: &[u8]) -> bool {
@@ -432,12 +556,6 @@ fn looks_like_legacy_text(bytes: &[u8]) -> bool {
         && bytes
             .iter()
             .any(|byte| matches!(*byte, b'=' | b'{' | b'}' | b'#' | b'\n' | b':'))
-}
-
-fn windows1252_has_no_undefined_bytes(bytes: &[u8]) -> bool {
-    !bytes
-        .iter()
-        .any(|byte| matches!(*byte, 0x81 | 0x8d | 0x8f | 0x90 | 0x9d))
 }
 
 pub(crate) fn stable_file_id(root: SourceRootId, logical: &LogicalPath) -> u64 {

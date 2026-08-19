@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use pdx_parser::ParsedFile;
+use pdx_parser::{CstKind, CstNode, ParsedFile};
 use pdx_text::{TextRange, TextSize};
 
 /// A conservative semantic scope value.
@@ -475,9 +475,10 @@ impl HirFile {
     /// Returns whether a caller must provide one inferred local parameter.
     ///
     /// The compact signature can only express unconditional presence. A substitution is therefore
-    /// optional when every value/key/text use is protected by any conditional block; richer
-    /// cross-parameter requirements remain an analysis concern. A parameter used only as a
-    /// condition can always be omitted by the caller.
+    /// optional when every value/key/text use is protected by an explicit parameter conditional
+    /// or by the body of an ordinary `if`/`else_if`/`else` runtime branch; branch `limit` values
+    /// remain required because the game must evaluate them. A parameter used only as a condition
+    /// can always be omitted by the caller.
     #[must_use]
     pub fn parameter_is_required(&self, owner_range: TextRange, name: &str) -> bool {
         let owner_conditionals = self
@@ -500,9 +501,75 @@ impl HirFile {
                     && reference.range.end() <= conditional.range.end()
             });
             if !guarded
+                && !self.parameter_reference_is_runtime_guarded(reference)
                 && self.parameter_reference_occupies_token(reference)
                 && !self.parameter_reference_is_same_named_value(reference)
             {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Returns whether a substitution is only used in the body of an ordinary EU4 runtime
+    /// branch. Unlike the compact `[[parameter] ... ]` syntax, these branches are game-state
+    /// conditionals and therefore cannot be represented as a boolean signature requirement.
+    /// A value used by the branch's `limit` remains required because the game must evaluate that
+    /// condition before it can choose the branch.
+    fn parameter_reference_is_runtime_guarded(&self, reference: &HirParameterReference) -> bool {
+        fn containing_properties<'a>(
+            node: &'a CstNode,
+            range: TextRange,
+            ancestors: &mut Vec<&'a CstNode>,
+        ) -> bool {
+            if range.start() < node.range().start() || range.end() > node.range().end() {
+                return false;
+            }
+            let is_property = node.kind() == CstKind::Property;
+            if is_property {
+                ancestors.push(node);
+            }
+            if node
+                .children()
+                .iter()
+                .any(|child| containing_properties(child, range, ancestors))
+            {
+                return true;
+            }
+            if is_property {
+                ancestors.pop();
+            }
+            true
+        }
+
+        let mut ancestors = Vec::new();
+        if !containing_properties(self.syntax.root(), reference.range, &mut ancestors) {
+            return false;
+        }
+        for (index, ancestor) in ancestors.iter().enumerate() {
+            let key = ancestor
+                .children()
+                .iter()
+                .find(|child| child.kind() == CstKind::Key)
+                .and_then(|child| self.syntax.text(child.range()))
+                .map(str::trim);
+            let Some(key) = key else {
+                continue;
+            };
+            if !matches!(key.to_ascii_lowercase().as_str(), "if" | "else_if" | "else") {
+                continue;
+            }
+            let in_limit = ancestors
+                .get(index.saturating_add(1))
+                .and_then(|child| {
+                    child
+                        .children()
+                        .iter()
+                        .find(|node| node.kind() == CstKind::Key)
+                })
+                .and_then(|child| self.syntax.text(child.range()))
+                .is_some_and(|child| child.trim().eq_ignore_ascii_case("limit"));
+            if !in_limit {
                 return true;
             }
         }
