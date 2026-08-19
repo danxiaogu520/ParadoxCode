@@ -12,6 +12,15 @@ const nls = readJson('package.nls.json');
 const zh = readJson('package.nls.zh-cn.json');
 const grammar = readJson('syntaxes/eu4.tmLanguage.json');
 
+if (!manifest.files?.includes('node_modules/**')) {
+  fail('production node_modules must be included in the VSIX file allowlist');
+}
+for (const dependency of ['smol-toml', 'vscode-languageclient']) {
+  if (typeof manifest.dependencies?.[dependency] !== 'string') {
+    fail(`runtime dependency ${dependency} must remain in dependencies`);
+  }
+}
+
 if (manifest.contributes.languages?.length !== 1 || manifest.contributes.languages[0].id !== 'eu4') {
   fail('the explicit VS Code language scope must remain EU4 only');
 }
