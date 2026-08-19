@@ -47,12 +47,14 @@ struct RenderedToken {
 pub(crate) struct ExpandedContainer {
     pub(crate) properties: Vec<ScriptProperty>,
     pub(crate) bare_values: Vec<(String, TextRange)>,
+    omitted_optional: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ExpansionFailure {
     MissingParameter(String),
     InvalidArgument { name: String, range: TextRange },
+    OmitOptionalProperty,
     Limit(&'static str),
 }
 
@@ -117,9 +119,11 @@ impl MacroExpansionSession {
             cancellation,
             quoted_scripts,
             quoted_script_depth,
+            false,
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn expand_items(
         &mut self,
         items: &[MacroTemplateItem],
@@ -128,6 +132,7 @@ impl MacroExpansionSession {
         cancellation: &CancellationToken,
         quoted_scripts: &mut QuotedScriptSession<'_>,
         quoted_script_depth: usize,
+        runtime_guarded: bool,
     ) -> Result<Result<ExpandedContainer, ExpansionFailure>, Cancelled> {
         let mut expanded = ExpandedContainer::default();
         for item in items {
@@ -137,6 +142,7 @@ impl MacroExpansionSession {
             }
             match item {
                 MacroTemplateItem::Property(property) => {
+                    let property_guarded = runtime_guarded && !is_limit_property(property);
                     let property = match self.expand_property(
                         property,
                         bindings,
@@ -144,8 +150,15 @@ impl MacroExpansionSession {
                         cancellation,
                         quoted_scripts,
                         quoted_script_depth,
+                        property_guarded,
                     )? {
                         Ok(property) => property,
+                        Err(ExpansionFailure::OmitOptionalProperty) => {
+                            if !is_runtime_branch_property(property) {
+                                expanded.omitted_optional = true;
+                            }
+                            continue;
+                        }
                         Err(error) => return Ok(Err(error)),
                     };
                     if let Some(property) = property {
@@ -153,6 +166,10 @@ impl MacroExpansionSession {
                     }
                 }
                 MacroTemplateItem::BareValue(token) => {
+                    if runtime_guarded && missing_single_parameter(token, bindings) {
+                        expanded.omitted_optional = true;
+                        continue;
+                    }
                     let rendered = match self.render_token(token, bindings, fallback_range) {
                         Ok(value) => value,
                         Err(error) => return Ok(Err(error)),
@@ -191,12 +208,14 @@ impl MacroExpansionSession {
                             cancellation,
                             quoted_scripts,
                             quoted_script_depth,
+                            runtime_guarded,
                         )? {
                             Ok(nested) => nested,
                             Err(error) => return Ok(Err(error)),
                         };
                         expanded.properties.extend(nested.properties);
                         expanded.bare_values.extend(nested.bare_values);
+                        expanded.omitted_optional |= nested.omitted_optional;
                     }
                 }
             }
@@ -204,6 +223,7 @@ impl MacroExpansionSession {
         Ok(Ok(expanded))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn expand_property(
         &mut self,
         property: &MacroTemplateProperty,
@@ -212,21 +232,28 @@ impl MacroExpansionSession {
         cancellation: &CancellationToken,
         quoted_scripts: &mut QuotedScriptSession<'_>,
         quoted_script_depth: usize,
+        runtime_guarded: bool,
     ) -> Result<Result<Option<ScriptProperty>, ExpansionFailure>, Cancelled> {
+        let forwarding = is_forwarding_property(property, bindings);
+        if missing_single_parameter(&property.key, bindings) && (runtime_guarded || forwarding) {
+            // A key substitution with no binding cannot produce a meaningful property. The
+            // signature validator has already rejected missing required parameters; this path
+            // is for optional values that live in a runtime branch of the macro body.
+            return Ok(Err(ExpansionFailure::OmitOptionalProperty));
+        }
         let mut key = match self.render_token(&property.key, bindings, fallback_range) {
             Ok(key) => key,
             Err(error) => return Ok(Err(error)),
         };
         key.value = key.value.trim().to_owned();
         if let MacroTemplateValue::Scalar(token) = &property.value
-            && let [MacroTemplateFragment::Parameter { name, .. }] = token.fragments.as_slice()
-            && !bindings.contains_key(&name.to_ascii_lowercase())
-            && key.value.eq_ignore_ascii_case(name)
+            && missing_single_parameter(token, bindings)
+            && (runtime_guarded || forwarding)
         {
-            // EU4 macros forward optional arguments as `name = "$name$"`. When the caller omits
-            // one, the preprocessor omits the forwarding property so the nested conditional stays
-            // inactive instead of treating the forwarded substitution as required.
-            return Ok(Ok(None));
+            // EU4 macros commonly place optional substitutions in branch-local scalar values.
+            // Omitting that property preserves the surrounding definition and lets sibling
+            // branches validate normally.
+            return Ok(Err(ExpansionFailure::OmitOptionalProperty));
         }
         let (scalar, quoted, quoted_source, block_range, block, bare_values) = match &property.value
         {
@@ -253,10 +280,14 @@ impl MacroExpansionSession {
                     cancellation,
                     quoted_scripts,
                     quoted_script_depth,
+                    runtime_guarded || is_runtime_branch_key(&key.value),
                 )? {
                     Ok(nested) => nested,
                     Err(error) => return Ok(Err(error)),
                 };
+                if nested.omitted_optional {
+                    return Ok(Err(ExpansionFailure::OmitOptionalProperty));
+                }
                 (
                     None,
                     false,
@@ -364,6 +395,57 @@ impl MacroExpansionSession {
             true
         }
     }
+}
+
+fn missing_single_parameter(
+    token: &MacroTemplateToken,
+    bindings: &BTreeMap<String, BoundValue>,
+) -> bool {
+    matches!(
+        token.fragments.as_slice(),
+        [MacroTemplateFragment::Parameter { name, .. }]
+            if !bindings.contains_key(&name.to_ascii_lowercase())
+    )
+}
+
+fn is_forwarding_property(
+    property: &MacroTemplateProperty,
+    bindings: &BTreeMap<String, BoundValue>,
+) -> bool {
+    let MacroTemplateValue::Scalar(value) = &property.value else {
+        return false;
+    };
+    let [MacroTemplateFragment::Parameter { name, .. }] = value.fragments.as_slice() else {
+        return false;
+    };
+    if bindings.contains_key(&name.to_ascii_lowercase()) {
+        return false;
+    }
+    let [MacroTemplateFragment::Literal(key)] = property.key.fragments.as_slice() else {
+        return false;
+    };
+    key.trim().eq_ignore_ascii_case(name)
+}
+
+fn is_limit_property(property: &MacroTemplateProperty) -> bool {
+    let [MacroTemplateFragment::Literal(key)] = property.key.fragments.as_slice() else {
+        return false;
+    };
+    key.trim().eq_ignore_ascii_case("limit")
+}
+
+fn is_runtime_branch_key(key: &str) -> bool {
+    matches!(
+        key.trim().to_ascii_lowercase().as_str(),
+        "if" | "else_if" | "else"
+    )
+}
+
+fn is_runtime_branch_property(property: &MacroTemplateProperty) -> bool {
+    let [MacroTemplateFragment::Literal(key)] = property.key.fragments.as_slice() else {
+        return false;
+    };
+    is_runtime_branch_key(key)
 }
 
 fn bind_arguments(invocation: &ScriptProperty) -> BTreeMap<String, BoundValue> {

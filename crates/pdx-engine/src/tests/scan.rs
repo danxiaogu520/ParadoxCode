@@ -99,8 +99,8 @@ fn recoverable_file_failures_do_not_abort_the_workspace_scan() {
         .expect("recoverable file failures should not abort scanning");
 
     assert_eq!(report.discovered_files, 4);
-    assert_eq!(report.indexed_files, 1);
-    assert_eq!(report.skipped_entries, 3);
+    assert_eq!(report.indexed_files, 2);
+    assert_eq!(report.skipped_entries, 2);
     assert!(
         report
             .issues
@@ -111,10 +111,16 @@ fn recoverable_file_failures_do_not_abort_the_workspace_scan() {
         report
             .issues
             .iter()
+            .any(|issue| issue.kind == WorkspaceScanIssueKind::EncodingRecovered)
+    );
+    assert!(
+        report
+            .issues
+            .iter()
             .any(|issue| issue.kind == WorkspaceScanIssueKind::FileTooLarge)
     );
     assert_eq!(host.snapshot().scan_report(), &report);
-    assert_eq!(host.snapshot().source_files().len(), 1);
+    assert_eq!(host.snapshot().source_files().len(), 2);
     fs::remove_dir_all(root).expect("cleanup");
 }
 
@@ -168,7 +174,7 @@ fn eu4_legacy_windows1252_text_is_decoded_before_indexing() {
 }
 
 #[test]
-fn game_encoded_text_with_control_characters_is_not_loaded() {
+fn game_encoded_text_with_control_characters_keeps_surrounding_definitions() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -192,24 +198,67 @@ fn game_encoded_text_with_control_characters_is_not_loaded() {
     ]));
     let report = host.refresh_source_roots().expect("game-encoded scan");
 
-    assert_eq!(report.indexed_files, 0);
+    assert_eq!(report.indexed_files, 1);
     assert_eq!(report.legacy_encoded_files, 0);
-    assert_eq!(report.skipped_entries, 1);
+    assert_eq!(report.skipped_entries, 0);
     assert!(
         report.issues.iter().any(|issue| {
-            issue.kind == super::WorkspaceScanIssueKind::NonTextContent
+            issue.kind == super::WorkspaceScanIssueKind::EncodingRecovered
                 && issue.path.ends_with("events/encoded.txt")
         }),
-        "expected a NonTextContent issue: {:?}",
+        "expected an EncodingRecovered issue: {:?}",
         report.issues
     );
-    assert_eq!(host.snapshot().source_files().len(), 0);
+    assert_eq!(host.snapshot().source_files().len(), 1);
     assert!(
         host.snapshot()
             .index()
             .definitions("event", "encoded.1")
-            .is_empty()
+            .len()
+            == 1
     );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn malformed_quoted_value_does_not_discard_the_parent_or_sibling() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-encoded-block-{nonce}"));
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("event directory");
+    fs::write(
+        events.join("encoded.txt"),
+        b"country_event = { id = parent.1 title = \"bad\x01value\" option = { name = ok } }\ncountry_event = { id = sibling.1 }\n",
+    )
+    .expect("encoded events");
+
+    let mut host = eu4_host();
+    host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        ),
+    ]));
+    let report = host.refresh_source_roots().expect("encoded scan");
+
+    assert_eq!(report.indexed_files, 1);
+    assert_eq!(report.skipped_entries, 0);
+    let snapshot = host.snapshot();
+    let index = snapshot.index();
+    assert_eq!(index.definitions("event", "parent.1").len(), 1);
+    assert_eq!(index.definitions("event", "sibling.1").len(), 1);
+    let source = snapshot
+        .source_files()
+        .values()
+        .next()
+        .expect("encoded source");
+    let text = snapshot.source_text(source.id).expect("source text");
+    assert!(!text.contains('\u{1}'));
+    assert!(text.contains("title = \""));
     fs::remove_dir_all(root).expect("cleanup");
 }
 

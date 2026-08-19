@@ -313,6 +313,29 @@ fn profile_lowering_associates_local_parameter_definitions_and_uses() {
         !conditional_hir.parameter_is_required(conditional_owner, "amount"),
         "a compact boolean signature must not treat a cross-conditional dependency as unconditional"
     );
+
+    let runtime_branch_source = concat!(
+        "branch = { if = { limit = { government = $limit_government$ } ",
+        "add_republican_tradition = $republican_tradition$ } ",
+        "else = { add_legitimacy = $amount$ } }\n",
+    );
+    let runtime_branch_hir = lower_with_profile(
+        parse(FileFormat::Script, runtime_branch_source),
+        &path,
+        &bootstrap_rules(),
+        &profile(),
+    );
+    let runtime_branch_owner = runtime_branch_hir.parameter_definitions()[0].owner_range;
+    assert!(
+        !runtime_branch_hir.parameter_is_required(runtime_branch_owner, "amount")
+            && !runtime_branch_hir
+                .parameter_is_required(runtime_branch_owner, "republican_tradition"),
+        "mutually exclusive runtime branch values are optional at the macro call site"
+    );
+    assert!(
+        runtime_branch_hir.parameter_is_required(runtime_branch_owner, "limit_government"),
+        "a branch limit must still receive its parameter"
+    );
 }
 
 #[test]

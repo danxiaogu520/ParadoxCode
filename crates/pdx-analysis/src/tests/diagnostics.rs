@@ -171,6 +171,109 @@ fn scripted_macro_omits_missing_optional_forwarded_arguments() {
 }
 
 #[test]
+fn runtime_branch_macro_accepts_the_amount_only_legitimacy_call() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-legitimacy-branch-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&definitions).expect("definition directory");
+    std::fs::write(
+        definitions.join("00_legitimacy.txt"),
+        concat!(
+            "add_legitimacy_or_mil_power = { ",
+            "if = { limit = { government = republic } ",
+            "add_republican_tradition = $republican_tradition$ } ",
+            "else = { add_legitimacy = $amount$ } }\n",
+        ),
+    )
+    .expect("macro definition");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definition");
+    let id = DocumentId::new("file:///tmp/events/legitimacy-branch.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "country_event = { immediate = { add_legitimacy_or_mil_power = { amount = 5 } } }\n"
+            .to_owned(),
+        None,
+    )
+    .expect("open call");
+
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results.iter().all(|diagnostic| {
+            !diagnostic.message.contains("add_legitimacy_or_mil_power")
+                || (!diagnostic.message.contains("republican_tradition")
+                    && !diagnostic.message.contains("active branch"))
+        }),
+        "amount-only call should be accepted when the alternate parameter is branch-local: {results:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn cached_runtime_branch_macro_recomputes_optional_parameters_from_the_template() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-cached-legitimacy-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&definitions).expect("definition directory");
+    std::fs::write(
+        definitions.join("00_legitimacy.txt"),
+        concat!(
+            "add_legitimacy_or_mil_power = { ",
+            "if = { limit = { government = republic } ",
+            "add_republican_tradition = $republican_tradition$ } ",
+            "else = { add_legitimacy = $amount$ } }\n",
+        ),
+    )
+    .expect("macro definition");
+    let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    let mut vanilla_host = eu4_host(rules.clone());
+    vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        root.clone(),
+    )]));
+    vanilla_host
+        .refresh_source_roots()
+        .expect("scan definition");
+    let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
+    std::fs::remove_dir_all(&root).expect("discard source");
+
+    let mut host = eu4_host(rules);
+    host.install_index_cache(cache).expect("install cache");
+    let id = DocumentId::new("file:///tmp/events/cached-legitimacy.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "country_event = { immediate = { add_legitimacy_or_mil_power = { amount = 5 } } }\n"
+            .to_owned(),
+        None,
+    )
+    .expect("open call");
+
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results.iter().all(|diagnostic| {
+            !diagnostic.message.contains("add_legitimacy_or_mil_power")
+                || (!diagnostic.message.contains("republican_tradition")
+                    && !diagnostic.message.contains("active branch"))
+        }),
+        "cached template should carry enough branch information: {results:?}"
+    );
+}
+
+#[test]
 fn first_party_mission_trigger_and_effect_accept_quoted_script_forms() {
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
