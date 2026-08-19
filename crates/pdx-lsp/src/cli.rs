@@ -24,7 +24,9 @@ const SUPPORTED_GAME_INSTALLATIONS: &[GameInstallDescriptor] = &[pdx_game::eu4::
 /// Executes one `pdx` command and returns text intended for stdout.
 pub fn execute_pdx(args: &[String]) -> Result<String, CliError> {
     match args {
-        [argument] if argument == "--version" || argument == "-V" => Ok("pdx 0.1.0".to_owned()),
+        [argument] if argument == "--version" || argument == "-V" => {
+            Ok(format!("pdx {}", env!("CARGO_PKG_VERSION")))
+        }
         [index, vanilla, rest @ ..] if index == "index" && vanilla == "vanilla" => {
             index_vanilla(rest)
         }
@@ -813,7 +815,7 @@ mod tests {
     fn version_and_invalid_usage_have_stable_results() {
         assert_eq!(
             execute_pdx(&["--version".to_owned()]).expect("version"),
-            "pdx 0.1.0"
+            format!("pdx {}", env!("CARGO_PKG_VERSION"))
         );
         let error = execute_pdx(&[]).expect_err("missing command");
         assert!(matches!(error, CliError::Usage(_)));
