@@ -162,6 +162,11 @@ impl LspServer {
             !self.host.snapshot().rules().game_id().is_empty(),
             None,
             &WorkspaceScanToken::new(),
+            &InitializeCallbacks {
+                stage: None,
+                log: None,
+                progress: None,
+            },
         )?;
         self.host = prepared.host;
         self.textures = prepared.textures;

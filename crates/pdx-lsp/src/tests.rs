@@ -1,3 +1,4 @@
+pub(crate) use crate::initialize::InitializeCallbacks;
 pub(crate) use crate::{
     AutoVanillaConfiguration, CancellationToken, DocumentId, INVALID_PARAMS, InFlightInitialize,
     InFlightRequest, IndexSetupCancellation, InitializeOptions, LspError, LspServer,

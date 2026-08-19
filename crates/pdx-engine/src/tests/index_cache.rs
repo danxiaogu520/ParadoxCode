@@ -420,6 +420,7 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
             .is_some_and(|state| state.parsed().is_none() && state.hir().is_none())
     }));
     let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build cache");
+    let vanilla_positions = cache.index().position_ranges().clone();
     let cache_path = root.join("cache/vanilla.pdxindex");
     cache.save(&cache_path).expect("save cache");
     let cancelled = WorkspaceScanToken::new();
@@ -467,6 +468,7 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
         ),
     ]));
     host.refresh_source_roots().expect("scan current root");
+    let current_positions = host.snapshot().index().position_ranges().clone();
     host.install_index_cache(loaded)
         .expect("install cache without Vanilla source access");
     host.refresh_source_roots()
@@ -486,6 +488,18 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
             .root_id,
         SourceRootId::new(u32::MAX)
     );
+    assert_eq!(
+        snapshot.index().position_ranges().len(),
+        vanilla_positions.len() + current_positions.len(),
+        "install must retain both cached and live position ranges"
+    );
+    for (key, position) in vanilla_positions.iter().chain(current_positions.iter()) {
+        assert_eq!(
+            snapshot.index().position_ranges().get(key),
+            Some(position),
+            "position range must survive cache installation"
+        );
+    }
     let vanilla_definition = snapshot
         .index()
         .active_definition("event", "vanilla.1")
@@ -509,6 +523,54 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
     assert_eq!(preview.language.as_deref(), Some("l_english"));
     assert_eq!(preview.value, "Vanilla text");
     assert!(snapshot.file_state(vanilla_localisation.file_id).is_none());
+
+    // Installing another cache must retain positions from the first cache as well as the live
+    // workspace.  The old per-file replacement loop discarded previously installed cache ranges.
+    let dependency = root.join("dependency");
+    fs::create_dir_all(dependency.join("events")).expect("dependency events directory");
+    fs::write(
+        dependency.join("events/dependency.txt"),
+        "country_event = { id = dependency.1 }\n",
+    )
+    .expect("dependency definition");
+    let dependency_root = SourceRoot::new(
+        SourceRootId::new(7),
+        SourceRootKind::Dependency,
+        fs::canonicalize(&dependency).expect("canonical dependency root"),
+    );
+    let mut dependency_builder = eu4_host();
+    dependency_builder.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        dependency_root.clone(),
+    ]));
+    dependency_builder
+        .refresh_source_roots()
+        .expect("scan dependency");
+    let dependency_cache =
+        IndexCache::from_snapshot(&dependency_builder.snapshot()).expect("build dependency cache");
+    let dependency_positions = dependency_cache.index().position_ranges().clone();
+    let dependency_path = root.join("cache/dependency.pdxindex");
+    dependency_cache
+        .save(&dependency_path)
+        .expect("save dependency cache");
+    host.install_index_cache(IndexCache::load(&dependency_path).expect("load dependency cache"))
+        .expect("install dependency cache");
+    let after_dependency = host.snapshot();
+    assert_eq!(
+        after_dependency.index().position_ranges().len(),
+        vanilla_positions.len() + current_positions.len() + dependency_positions.len(),
+        "successive cache installs must retain all position ranges"
+    );
+    for (key, position) in vanilla_positions
+        .iter()
+        .chain(current_positions.iter())
+        .chain(dependency_positions.iter())
+    {
+        assert_eq!(
+            after_dependency.index().position_ranges().get(key),
+            Some(position),
+            "successive cache installation must preserve every position range"
+        );
+    }
     fs::remove_dir_all(root).expect("cleanup");
 }
 

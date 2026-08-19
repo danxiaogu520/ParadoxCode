@@ -1,80 +1,6 @@
-use super::*;
-
 use crate::dependency::run_dependency_cache_load;
 
-/// Monotonic nonce for work-done-progress tokens and their create-request ids.
-fn progress_nonce() -> u128 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |elapsed| elapsed.as_nanos())
-}
-
-/// Server-initiated work-done-progress create request; the client's response is ignored.
-fn work_done_progress_create(token: &str) -> Value {
-    json!({
-        "jsonrpc": JSON_RPC_VERSION,
-        "id": format!("pdx-progress-{token}"),
-        "method": "window/workDoneProgress/create",
-        "params": {"token": token},
-    })
-}
-
-fn work_done_progress_begin(token: &str, message: &str) -> Value {
-    json!({
-        "jsonrpc": JSON_RPC_VERSION,
-        "method": "$/progress",
-        "params": {
-            "token": token,
-            "value": {
-                "kind": "begin",
-                "title": "ParadoxCode",
-                "cancellable": false,
-                "message": message,
-                "percentage": 0,
-            },
-        },
-    })
-}
-
-fn work_done_progress_end(token: &str, message: &str) -> Value {
-    json!({
-        "jsonrpc": JSON_RPC_VERSION,
-        "method": "$/progress",
-        "params": {
-            "token": token,
-            "value": {"kind": "end", "message": message},
-        },
-    })
-}
-
-/// Builds the worker progress callback that forwards engine progress as `$/progress` reports.
-///
-/// `discovering` is shown while the work unit total is still unknown; `indexing` carries the
-/// running `(done/total)` counter once the engine knows the full scope.
-fn progress_sender(
-    sender: mpsc::Sender<TransportEvent>,
-    token: String,
-    discovering: &'static str,
-    indexing: &'static str,
-) -> impl Fn(usize, usize) {
-    move |done, total| {
-        let message = if total == 0 {
-            format!("{discovering}…")
-        } else {
-            format!("{indexing} ({done}/{total})…")
-        };
-        let mut value = json!({"kind": "report", "message": message});
-        if let Some(percent) = done
-            .checked_mul(100)
-            .and_then(|percent| percent.checked_div(total))
-        {
-            value["percentage"] = json!(u32::try_from(percent).unwrap_or(100));
-        }
-        let _ = sender.send(TransportEvent::Progress(Progress {
-            params: json!({"token": token, "value": value}),
-        }));
-    }
-}
+use super::*;
 
 impl LspServer {
     /// Runs the same framed transport over arbitrary streams.
@@ -110,6 +36,8 @@ impl LspServer {
             let mut in_flight = BTreeMap::<DocumentId, InFlightDiagnostics>::new();
             let mut in_flight_requests = HashMap::<RequestId, InFlightRequest>::new();
             let mut in_flight_initialize = None::<InFlightInitialize>;
+            let mut initialize_progress_token = None::<String>;
+            let mut ready_logged = false;
             let mut in_flight_index = None::<IndexSetupCancellation>;
             let mut index_cache_in_flight = false;
             let mut index_progress_token = None::<String>;
@@ -203,7 +131,9 @@ impl LspServer {
                                 &event_sender,
                                 &mut in_flight_initialize,
                                 &message,
-                            ) || self.spawn_snapshot_request(
+                                &mut output,
+                                &mut initialize_progress_token,
+                            )? || self.spawn_snapshot_request(
                                 scope,
                                 &event_sender,
                                 &mut in_flight_requests,
@@ -311,10 +241,32 @@ impl LspServer {
                                 }
                             };
                         write_message(&mut output, &response)?;
+                        if let Some(token) = initialize_progress_token.take() {
+                            let message = if response.get("result").is_some() {
+                                format!(
+                                    "Ready — {} source file(s) indexed",
+                                    self.host.snapshot().source_files().len()
+                                )
+                            } else if response.get("error").and_then(|error| error.get("code"))
+                                == Some(&json!(REQUEST_CANCELLED))
+                            {
+                                "Initialization cancelled".to_owned()
+                            } else {
+                                "Initialization failed".to_owned()
+                            };
+                            write_message(&mut output, &work_done_progress_end(&token, &message))?;
+                        }
                         for warning in warnings {
                             write_message(&mut output, &show_warning_notification(warning))?;
                         }
                         if let Some(path) = index_cache {
+                            write_message(
+                                &mut output,
+                                &log_message_notification(
+                                    MessageType::INFO,
+                                    format!("Vanilla index: loading cache from {}", path.display()),
+                                ),
+                            )?;
                             let cancellation = IndexSetupCancellation::new();
                             let sender = event_sender.clone();
                             let worker_cancellation = cancellation.clone();
@@ -361,13 +313,25 @@ impl LspServer {
                             // The user-level auto configuration survives `apply_user_vanilla_configuration`,
                             // so an unavailable configured cache can still fall back to discovery.
                             let auto_vanilla = self.auto_vanilla.clone();
+                            let log = {
+                                let sender = event_sender.clone();
+                                move |message: &str| {
+                                    let _ =
+                                        sender.send(TransportEvent::Log(log_message_notification(
+                                            MessageType::INFO,
+                                            message.to_owned(),
+                                        )));
+                                }
+                            };
                             scope.spawn(move || {
+                                let log_ref: &(dyn Fn(&str) + Sync) = &log;
                                 let result = run_index_cache_load(
                                     &path,
                                     rules,
                                     profile,
                                     current_rule_hash,
                                     auto_vanilla.as_ref(),
+                                    Some(log_ref),
                                     progress
                                         .as_deref()
                                         .map(|callback| callback as &(dyn Fn(usize, usize) + Sync)),
@@ -379,6 +343,14 @@ impl LspServer {
                                     }));
                             });
                         } else if let Some(configuration) = auto_vanilla {
+                            write_message(
+                                &mut output,
+                                &log_message_notification(
+                                    MessageType::INFO,
+                                    "Vanilla index: discovering installation and building cache…"
+                                        .to_owned(),
+                                ),
+                            )?;
                             let cancellation = IndexSetupCancellation::new();
                             let sender = event_sender.clone();
                             let rules = self.host.snapshot().rules().clone();
@@ -421,11 +393,23 @@ impl LspServer {
                             };
                             in_flight_index = Some(cancellation);
                             index_cache_in_flight = false;
+                            let log = {
+                                let sender = event_sender.clone();
+                                move |message: &str| {
+                                    let _ =
+                                        sender.send(TransportEvent::Log(log_message_notification(
+                                            MessageType::INFO,
+                                            message.to_owned(),
+                                        )));
+                                }
+                            };
                             scope.spawn(move || {
+                                let log_ref: &(dyn Fn(&str) + Sync) = &log;
                                 let result = run_auto_vanilla_setup(
                                     &configuration,
                                     rules,
                                     profile,
+                                    Some(log_ref),
                                     progress
                                         .as_deref()
                                         .map(|callback| callback as &(dyn Fn(usize, usize) + Sync)),
@@ -438,6 +422,16 @@ impl LspServer {
                             });
                         }
                         if !dependency_caches.is_empty() {
+                            write_message(
+                                &mut output,
+                                &log_message_notification(
+                                    MessageType::INFO,
+                                    format!(
+                                        "Dependency indexes: loading {} cache(s)…",
+                                        dependency_caches.len()
+                                    ),
+                                ),
+                            )?;
                             let cancellation = WorkspaceScanToken::new();
                             let sender = event_sender.clone();
                             let worker_cancellation = cancellation.clone();
@@ -481,6 +475,16 @@ impl LspServer {
                             };
                             in_flight_dependency = Some(cancellation);
                             dependency_cache_in_flight = true;
+                            let log = {
+                                let sender = event_sender.clone();
+                                move |message: &str| {
+                                    let _ =
+                                        sender.send(TransportEvent::Log(log_message_notification(
+                                            MessageType::INFO,
+                                            message.to_owned(),
+                                        )));
+                                }
+                            };
                             scope.spawn(move || {
                                 let results = dependency_caches
                                     .into_iter()
@@ -490,6 +494,7 @@ impl LspServer {
                                             rules.clone(),
                                             profile.clone(),
                                             current_rule_hash.clone(),
+                                            Some(&log),
                                             progress.as_deref().map(|callback| {
                                                 callback as &(dyn Fn(usize, usize) + Sync)
                                             }),
@@ -502,6 +507,19 @@ impl LspServer {
                                     DependencySetupResult { results },
                                 ));
                             });
+                        }
+                        if in_flight_index.is_none()
+                            && in_flight_dependency.is_none()
+                            && !ready_logged
+                        {
+                            write_message(
+                                &mut output,
+                                &log_message_notification(
+                                    MessageType::INFO,
+                                    "pdx-ls ready — workspace indexed".to_owned(),
+                                ),
+                            )?;
+                            ready_logged = true;
                         }
                     }
                     TransportEvent::Parse(result) => {
@@ -560,21 +578,28 @@ impl LspServer {
                             }),
                         )?;
                     }
+                    TransportEvent::Log(value) => {
+                        write_message(&mut output, &value)?;
+                    }
                     TransportEvent::DependencySetup(result) => {
                         in_flight_dependency = None;
                         dependency_cache_in_flight = false;
-                        if let Some(token) = dependency_progress_token.take() {
-                            let message = result
-                                .results
-                                .iter()
-                                .map(|(_, result)| match result {
-                                    Ok((_, message)) => message.clone(),
-                                    Err(message) => message.clone(),
-                                })
-                                .collect::<Vec<_>>()
-                                .join("\n");
-                            write_message(&mut output, &work_done_progress_end(&token, &message))?;
-                        }
+                        let outcome_message = result
+                            .results
+                            .iter()
+                            .map(|(_, result)| match result {
+                                Ok((_, message)) => message.clone(),
+                                Err(message) => message.clone(),
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        write_message(
+                            &mut output,
+                            &log_message_notification(
+                                MessageType::INFO,
+                                format!("Dependency indexes: {outcome_message}"),
+                            ),
+                        )?;
                         let mut diagnostics_dirty = false;
                         for (config, result) in result.results {
                             match result {
@@ -582,9 +607,20 @@ impl LspServer {
                                     let cache_rule_hash = cache.metadata().rule_hash.clone();
                                     let current_rule_hash =
                                         self.host.snapshot().rules().rule_hash().to_hex();
+                                    let installed = std::time::Instant::now();
                                     match self.host.install_index_cache(cache) {
                                         Ok(()) => {
                                             diagnostics_dirty = true;
+                                            write_message(
+                                                &mut output,
+                                                &log_message_notification(
+                                                    MessageType::INFO,
+                                                    format!(
+                                                        "Dependency index installed in {:.1} ms",
+                                                        installed.elapsed().as_secs_f64() * 1000.0
+                                                    ),
+                                                ),
+                                            )?;
                                             if cache_rule_hash != current_rule_hash {
                                                 write_message(
                                                     &mut output,
@@ -602,8 +638,9 @@ impl LspServer {
                                         Err(error) => write_message(
                                             &mut output,
                                             &show_warning_notification(format!(
-                                                "dependency cache for {} could not be enabled in this workspace: {error}",
-                                                config.root.path.display()
+                                                "dependency cache for {} could not be enabled in this workspace after {:.1} ms: {error}",
+                                                config.root.path.display(),
+                                                installed.elapsed().as_secs_f64() * 1000.0
                                             )),
                                         )?,
                                     }
@@ -612,6 +649,12 @@ impl LspServer {
                                     write_message(&mut output, &show_warning_notification(message))?
                                 }
                             }
+                        }
+                        if let Some(token) = dependency_progress_token.take() {
+                            write_message(
+                                &mut output,
+                                &work_done_progress_end(&token, &outcome_message),
+                            )?;
                         }
                         if diagnostics_dirty {
                             let open = self
@@ -631,24 +674,53 @@ impl LspServer {
                                 );
                             }
                         }
+                        if in_flight_index.is_none()
+                            && in_flight_dependency.is_none()
+                            && !ready_logged
+                        {
+                            write_message(
+                                &mut output,
+                                &log_message_notification(
+                                    MessageType::INFO,
+                                    "pdx-ls ready — workspace, Vanilla and dependency indexes loaded"
+                                        .to_owned(),
+                                ),
+                            )?;
+                            ready_logged = true;
+                        }
                     }
                     TransportEvent::VanillaSetup(result) => {
                         in_flight_index = None;
                         index_cache_in_flight = false;
-                        if let Some(token) = index_progress_token.take() {
-                            let message = match &result.result {
-                                Ok((_, message)) => message.clone(),
-                                Err(message) => message.clone(),
-                            };
-                            write_message(&mut output, &work_done_progress_end(&token, &message))?;
-                        }
+                        let outcome_message = match &result.result {
+                            Ok((_, message)) => message.clone(),
+                            Err(message) => message.clone(),
+                        };
+                        write_message(
+                            &mut output,
+                            &log_message_notification(
+                                MessageType::INFO,
+                                format!("Vanilla index: {outcome_message}"),
+                            ),
+                        )?;
                         match result.result {
                             Ok((cache, message)) => {
                                 let cache_rule_hash = cache.metadata().rule_hash.clone();
                                 let current_rule_hash =
                                     self.host.snapshot().rules().rule_hash().to_hex();
+                                let installed = std::time::Instant::now();
                                 match self.host.install_index_cache(cache) {
                                     Ok(()) => {
+                                        write_message(
+                                            &mut output,
+                                            &log_message_notification(
+                                                MessageType::INFO,
+                                                format!(
+                                                    "Vanilla index installed in {:.1} ms",
+                                                    installed.elapsed().as_secs_f64() * 1000.0
+                                                ),
+                                            ),
+                                        )?;
                                         if cache_rule_hash != current_rule_hash {
                                             write_message(
                                                 &mut output,
@@ -684,7 +756,8 @@ impl LspServer {
                                     Err(error) => write_message(
                                         &mut output,
                                         &show_warning_notification(format!(
-                                            "Vanilla cache was built but could not be enabled in this workspace: {error}"
+                                            "Vanilla cache was built but could not be enabled in this workspace after {:.1} ms: {error}",
+                                            installed.elapsed().as_secs_f64() * 1000.0
                                         )),
                                     )?,
                                 }
@@ -692,6 +765,26 @@ impl LspServer {
                             Err(message) => {
                                 write_message(&mut output, &show_warning_notification(message))?;
                             }
+                        }
+                        if let Some(token) = index_progress_token.take() {
+                            write_message(
+                                &mut output,
+                                &work_done_progress_end(&token, &outcome_message),
+                            )?;
+                        }
+                        if in_flight_index.is_none()
+                            && in_flight_dependency.is_none()
+                            && !ready_logged
+                        {
+                            write_message(
+                                &mut output,
+                                &log_message_notification(
+                                    MessageType::INFO,
+                                    "pdx-ls ready — workspace, Vanilla and dependency indexes loaded"
+                                        .to_owned(),
+                                ),
+                            )?;
+                            ready_logged = true;
                         }
                     }
                     TransportEvent::DiskChanges(result) => {

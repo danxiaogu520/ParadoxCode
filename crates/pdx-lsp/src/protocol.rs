@@ -249,6 +249,21 @@ pub(crate) fn diagnostics_notification(uri: &str, values: Value) -> Value {
     })
 }
 
+pub(crate) fn log_message_notification(typ: MessageType, message: String) -> Value {
+    let typ = match typ {
+        MessageType::ERROR => 1,
+        MessageType::WARNING => 2,
+        MessageType::INFO => 3,
+        MessageType::LOG => 4,
+        _ => 3,
+    };
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "method": "window/logMessage",
+        "params": {"type": typ, "message": message},
+    })
+}
+
 pub(crate) fn show_warning_notification(message: String) -> Value {
     let params = ShowMessageParams {
         typ: MessageType::WARNING,

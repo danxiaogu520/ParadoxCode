@@ -163,6 +163,25 @@ for (const entry of tokenScopes) {
   }
 }
 
+// The server must narrate its initialization over `window/logMessage`, so the
+// VS Code output panel shows what pdx-ls is doing instead of staying empty.
+// The client registers a handler that forwards these to the 'ParadoxCode'
+// channel and mirrors the latest stage into the status-bar tooltip.
+const serverLogs = responses.filter((value) => value.method === 'window/logMessage');
+if (serverLogs.length === 0) {
+  fail('no window/logMessage frames received during initialize');
+} else {
+  const messages = serverLogs
+    .map((log) => log?.params?.message)
+    .filter((message) => typeof message === 'string');
+  if (!messages.some((message) => message.includes('pdx-ls initializing'))) {
+    fail('initialize log trail must include the startup stage');
+  }
+  if (!messages.some((message) => message.includes('Initialization finished'))) {
+    fail('initialize log trail must include the completion stage');
+  }
+}
+
 const preview = responses.find((value) => value.id === 2);
 if (!preview) {
   fail('no pdx/missionPreview response received');

@@ -195,10 +195,25 @@ impl AnalysisHost {
         // One combined build sets the case policy and derives the lookup maps together, so the
         // merged cache + workspace shards are not rebuilt twice.
         let mut index = WorkspaceIndex::from_shards_with_rules(shards, self.rules.as_ref());
-        index.replace_all_position_ranges(cached_positions);
-        for (file_id, state) in self.file_states.iter() {
-            index.replace_position_ranges(*file_id, position_ranges_for_state(state));
-        }
+        // Source-file IDs were checked for collisions above, so the cached and existing position
+        // keys are disjoint.  Merge the existing snapshot positions in one pass: calling
+        // `replace_position_ranges` once per Current Mod file would retain over the complete
+        // (often-million-entry) BTreeMap for every file and turn cache installation quadratic.
+        let cached_position_count = cached_positions.len();
+        let existing_positions = self.index.position_ranges();
+        let existing_position_count = existing_positions.len();
+        let mut position_ranges = cached_positions;
+        position_ranges.extend(
+            existing_positions
+                .iter()
+                .map(|(key, position)| (*key, *position)),
+        );
+        debug_assert_eq!(
+            position_ranges.len(),
+            cached_position_count.saturating_add(existing_position_count),
+            "source-file collision validation should make position keys disjoint"
+        );
+        index.replace_all_position_ranges(position_ranges);
         let priorities = source_priorities(&roots, &files);
         index.resolve_priorities(&priorities, self.rules.as_ref());
 

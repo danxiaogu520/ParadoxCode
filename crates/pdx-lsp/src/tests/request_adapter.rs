@@ -936,3 +936,91 @@ fn memory_transport_rename_covers_current_mod_disk_references() {
     }));
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn initialize_reports_stages_via_log_message_and_work_done_progress() {
+    let (root, root_uri) = temp_workspace_dir();
+    let run = |capabilities: Value| {
+        let input = frames([
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri.clone(),"capabilities":capabilities}}),
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+            json!({"jsonrpc":"2.0","method":"exit"}),
+        ]);
+        let mut output = Vec::new();
+        let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+        server
+            .run_transport(Cursor::new(input), &mut output)
+            .expect("transport");
+        decode_frames(&output)
+    };
+    let responses = run(json!({"window":{"workDoneProgress":true}}));
+    let logs = responses
+        .iter()
+        .filter(|value| value["method"] == "window/logMessage")
+        .collect::<Vec<_>>();
+    assert!(
+        logs.iter().any(|log| {
+            log["params"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("pdx-ls initializing"))
+        }),
+        "initialize must log its start; got {logs:?}"
+    );
+    assert!(
+        logs.iter().any(|log| {
+            log["params"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("Initialization finished"))
+        }),
+        "initialize must log its completion; got {logs:?}"
+    );
+    let progress = responses
+        .iter()
+        .filter(|value| value["method"] == "$/progress")
+        .collect::<Vec<_>>();
+    let begin = progress
+        .iter()
+        .find(|value| value["params"]["value"]["kind"] == "begin")
+        .expect("progress begin");
+    assert_eq!(begin["params"]["value"]["message"], "Starting pdx-ls…");
+    assert_eq!(begin["params"]["value"]["title"], "ParadoxCode");
+    let end = progress
+        .iter()
+        .find(|value| value["params"]["value"]["kind"] == "end")
+        .expect("progress end");
+    assert!(
+        end["params"]["value"]["message"]
+            .as_str()
+            .is_some_and(|message| message.starts_with("Ready —")),
+        "progress end must announce readiness: {:?}",
+        end["params"]["value"]["message"]
+    );
+    // The create request must precede the begin report on the wire.
+    let create_index = responses
+        .iter()
+        .position(|value| value["method"] == "window/workDoneProgress/create")
+        .expect("create request");
+    let begin_index = responses
+        .iter()
+        .position(|value| {
+            value["method"] == "$/progress" && value["params"]["value"]["kind"] == "begin"
+        })
+        .expect("begin report");
+    assert!(create_index < begin_index, "create must precede begin");
+
+    // Without the window.workDoneProgress capability no $/progress is sent, but
+    // the detailed window/logMessage trail must still reach the client.
+    let plain = run(json!({}));
+    assert!(
+        !plain.iter().any(|value| value["method"] == "$/progress"),
+        "no work-done-progress without the client capability"
+    );
+    assert!(
+        plain
+            .iter()
+            .any(|value| value["method"] == "window/logMessage"),
+        "log trail must be sent even without progress capability"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}

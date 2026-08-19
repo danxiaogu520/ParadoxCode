@@ -80,6 +80,11 @@ impl TextureAssets {
         })
     }
 
+    /// Number of sprites indexed from `interface/*.gfx`, for status reporting.
+    pub fn sprite_count(&self) -> usize {
+        self.sprite_paths.len()
+    }
+
     /// Returns the data URL for a sprite name, decoding and caching on first
     /// use. `None` for unknown names, unreadable files, or decode failures.
     pub fn data_url(&self, name: &str) -> Option<String> {

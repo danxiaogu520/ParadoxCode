@@ -35,15 +35,37 @@ pub struct AutoVanillaConfiguration {
     /// Shared user configuration and cache locations.
     pub user_paths: UserPaths,
 }
+/// Progress-reporting callbacks for the initialize worker. Each is optional so
+/// in-memory transport paths (tests) can pass none; the stdio worker supplies
+/// all three. `stage` feeds the work-done-progress bar, `log` the
+/// `window/logMessage` trail, and `progress` the workspace-scan file counter.
+pub(crate) struct InitializeCallbacks<'a> {
+    pub(crate) stage: Option<&'a (dyn Fn(&str) + Sync)>,
+    pub(crate) log: Option<&'a (dyn Fn(&str) + Sync)>,
+    pub(crate) progress: Option<&'a (dyn Fn(usize, usize) + Sync)>,
+}
+
 pub(crate) fn prepare_initialize_candidate(
     mut host: AnalysisHost,
     params: InitializeParams,
     scan_workspace: bool,
     auto_vanilla: Option<&AutoVanillaConfiguration>,
     cancellation: &WorkspaceScanToken,
+    callbacks: &InitializeCallbacks<'_>,
 ) -> Result<PreparedInitialize, RpcError> {
     if cancellation.is_cancelled() {
         return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
+    }
+    let started = std::time::Instant::now();
+    let (rule_hash, game_id) = {
+        let snapshot = host.snapshot();
+        let rules = snapshot.rules();
+        (rules.rule_hash().to_hex(), rules.game_id().to_owned())
+    };
+    if let Some(log) = callbacks.log {
+        log(&format!(
+            "pdx-ls initializing (game profile '{game_id}', rules hash {rule_hash})"
+        ));
     }
     let initialization_options = params.initialization_options.clone();
     #[allow(deprecated)]
@@ -78,14 +100,37 @@ pub(crate) fn prepare_initialize_candidate(
         .and_then(|completion| completion.completion_item.as_ref())
         .and_then(|item| item.snippet_support)
         .unwrap_or(false);
+    if let Some(stage) = callbacks.stage {
+        stage("Loading workspace configuration…");
+    }
     let mut resolved =
         resolve_source_roots(client_root.as_deref(), initialization_options, cancellation)?;
+    if let Some(log) = callbacks.log {
+        log(&format!(
+            "Source roots resolved: workspace {}, {} source root(s), {} dependency cache(s)",
+            resolved
+                .workspace_root
+                .as_deref()
+                .map_or_else(|| "<none>".to_owned(), |path| path.display().to_string()),
+            resolved.roots.len(),
+            resolved.dependency_caches.len(),
+        ));
+    }
     let mut warnings = Vec::new();
     // The texture loader needs the profile descriptor for discovery. Capture it
     // BEFORE the vanilla configuration pass: that pass legitimately returns
     // `None` when the user configured an explicit `vanilla_index_cache`, but
     // mission-preview textures must not depend on it.
     let texture_descriptor = auto_vanilla.map(|config| config.descriptor);
+    if let Some(log) = callbacks.log {
+        match resolved.index_cache.as_ref() {
+            Some(path) => log(&format!(
+                "Vanilla index: configured cache {}",
+                path.display()
+            )),
+            None => log("Vanilla index: automatic discovery"),
+        }
+    }
     let auto_vanilla = apply_user_vanilla_configuration(
         &mut resolved,
         auto_vanilla,
@@ -95,8 +140,17 @@ pub(crate) fn prepare_initialize_candidate(
     host.apply_change(WorkspaceChange::SetWorkspaceRoot(resolved.workspace_root));
     host.apply_change(WorkspaceChange::SetSourceRoots(resolved.roots.clone()));
     if scan_workspace && !resolved.roots.is_empty() {
-        host.refresh_source_roots_cancellable(cancellation)
+        if let Some(stage) = callbacks.stage {
+            stage("Scanning workspace…");
+        }
+        host.refresh_source_roots_cancellable_with_progress(cancellation, callbacks.progress)
             .map_err(workspace_scan_error)?;
+        if let Some(log) = callbacks.log {
+            log(&format!(
+                "Workspace scan finished: {} source file(s)",
+                host.snapshot().source_files().len()
+            ));
+        }
     }
     let index_cache = match resolved.index_cache.take() {
         None => None,
@@ -118,11 +172,27 @@ pub(crate) fn prepare_initialize_candidate(
     // silent — the preview simply renders without textures.
     let textures =
         resolve_texture_assets(resolved.game_directory.take(), texture_descriptor.as_ref());
+    if let Some(log) = callbacks.log {
+        match textures.as_ref() {
+            Some(textures) => log(&format!(
+                "Mission textures ready: {} sprite(s) from the game installation",
+                textures.sprite_count()
+            )),
+            None => log("Mission textures: none (no game installation found)"),
+        }
+    }
     if cancellation.is_cancelled() {
         return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
     }
     let watcher_registration =
         watched_files_registration(&resolved.roots, watched_files_capability)?;
+    if let Some(log) = callbacks.log {
+        log(&format!(
+            "Initialization finished in {:.1} ms ({} source file(s) indexed)",
+            started.elapsed().as_secs_f64() * 1000.0,
+            host.snapshot().source_files().len()
+        ));
+    }
     let result = serde_json::to_value(InitializeResult {
         capabilities: ServerCapabilities {
             text_document_sync: Some(TextDocumentSyncCapability::Options(

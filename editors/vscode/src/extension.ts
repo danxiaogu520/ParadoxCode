@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import {
     LanguageClient,
     LanguageClientOptions,
+    LogMessageNotification,
     ServerOptions,
     State,
 } from 'vscode-languageclient/lib/node/main';
@@ -168,6 +169,14 @@ function startClient(): void {
     try {
         client = createClient();
         client.onDidChangeState((event) => updateStatus(event.newState));
+        // The server's `window/logMessage` trail (rules loading, workspace scan,
+        // Vanilla cache build, readiness) is forwarded to the ParadoxCode output
+        // channel and reflected in the status-bar tooltip, so "what is pdx-ls
+        // doing" is visible without opening any panel.
+        client.onNotification(LogMessageNotification.type, (params) => {
+            log.appendLine(`[pdx-ls] ${params.message}`);
+            statusBar.tooltip = `ParadoxCode: ${params.message}`;
+        });
         updateStatus(client.state);
         client.start();
         log.appendLine('language server client started');

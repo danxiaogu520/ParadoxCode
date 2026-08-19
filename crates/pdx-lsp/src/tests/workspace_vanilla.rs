@@ -417,6 +417,11 @@ fn initialize_defers_an_existing_vanilla_cache() {
         true,
         None,
         &pdx_engine::WorkspaceScanToken::new(),
+        &InitializeCallbacks {
+            stage: None,
+            log: None,
+            progress: None,
+        },
     )
     .expect("prepare initialize candidate");
 
@@ -619,6 +624,38 @@ fn valid_cache_load_reports_work_done_progress() {
         }),
         "a matching cache must be loaded without regeneration"
     );
+    let install_index = responses
+        .iter()
+        .position(|value| {
+            value["method"] == "window/logMessage"
+                && value["params"]["message"]
+                    .as_str()
+                    .is_some_and(|message| message.starts_with("Vanilla index installed in "))
+        })
+        .expect("cache installation log");
+    let cache_end_index = responses
+        .iter()
+        .position(|value| {
+            value["method"] == "$/progress"
+                && value["params"]["value"]["kind"] == "end"
+                && value["params"]["value"]["message"]
+                    .as_str()
+                    .is_some_and(|message| message.starts_with("Vanilla symbols loaded"))
+        })
+        .expect("Vanilla cache progress end");
+    let ready_index = responses
+        .iter()
+        .position(|value| {
+            value["method"] == "window/logMessage"
+                && value["params"]["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("pdx-ls ready"))
+        })
+        .expect("ready log");
+    assert!(
+        install_index < cache_end_index && cache_end_index < ready_index,
+        "cache progress must end only after installation and before ready: install={install_index}, end={cache_end_index}, ready={ready_index}"
+    );
     assert_eq!(server.snapshot().source_roots().len(), 2);
     fs::remove_dir_all(container).expect("cleanup");
 }
@@ -707,6 +744,7 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
         rules.rule_hash().to_hex(),
         Some(&automatic),
         None,
+        None,
         &cancellation,
     )
     .expect("unavailable cache must rebuild");
@@ -725,6 +763,7 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
         pdx_game::eu4::profile(),
         rules.rule_hash().to_hex(),
         Some(&automatic),
+        None,
         None,
         &cancellation,
     )
@@ -834,6 +873,7 @@ fn automatic_vanilla_setup_builds_cache_and_records_single_attempt() {
         pdx_game::eu4::first_party_rules().expect("rules"),
         pdx_game::eu4::profile(),
         None,
+        None,
         &IndexSetupCancellation::new(),
         &options,
     )
@@ -851,6 +891,7 @@ fn automatic_vanilla_setup_builds_cache_and_records_single_attempt() {
         &automatic,
         pdx_game::eu4::first_party_rules().expect("rules"),
         pdx_game::eu4::profile(),
+        None,
         None,
         &IndexSetupCancellation::new(),
         &options,
@@ -917,6 +958,7 @@ fn unsuccessful_automatic_discovery_is_recorded_and_not_repeated() {
         pdx_game::eu4::first_party_rules().expect("rules"),
         pdx_game::eu4::profile(),
         None,
+        None,
         &IndexSetupCancellation::new(),
         &options,
     )
@@ -932,6 +974,7 @@ fn unsuccessful_automatic_discovery_is_recorded_and_not_repeated() {
         &automatic,
         pdx_game::eu4::first_party_rules().expect("rules"),
         pdx_game::eu4::profile(),
+        None,
         None,
         &IndexSetupCancellation::new(),
         &options,

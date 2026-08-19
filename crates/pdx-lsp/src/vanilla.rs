@@ -23,77 +23,113 @@ use crate::{
     INTERNAL_ERROR, JSON_RPC_VERSION, WATCHED_FILES_REGISTRATION_ID, WATCHED_FILES_REQUEST_ID,
 };
 
+#[allow(clippy::too_many_arguments)] // Cache load carries the immutable rules/profile plus worker plumbing.
 pub(crate) fn run_index_cache_load(
     path: &Path,
     rules: RuleSet,
     profile: GameProfile,
     current_rule_hash: String,
     auto_vanilla: Option<&AutoVanillaConfiguration>,
+    log: Option<&(dyn Fn(&str) + Sync)>,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &IndexSetupCancellation,
 ) -> Result<(IndexCache, String), String> {
-    let loaded = match IndexCache::load_cancellable_for_install_with_progress(
-        path,
-        &cancellation.workspace,
-        progress,
-    ) {
-        Ok(loaded) => loaded,
-        Err(error) => {
-            // A missing, corrupt, or schema-incompatible cache (for example one built
-            // by an older test build) falls back to automatic discovery and rebuilds
-            // into the same explicit path, instead of silently losing Vanilla symbols.
-            if let Some(rebuilt) = rebuild_unavailable_cache(
-                path,
-                &rules,
-                &profile,
-                auto_vanilla,
-                progress,
-                cancellation,
-            )? {
-                return Ok((
-                    rebuilt,
-                    format!(
-                        "Vanilla cache {} was unavailable and has been rebuilt from the discovered installation",
+    let started = std::time::Instant::now();
+    let result = (|| {
+        let load_started = std::time::Instant::now();
+        let loaded = match IndexCache::load_cancellable_for_install_with_progress(
+            path,
+            &cancellation.workspace,
+            progress,
+        ) {
+            Ok(loaded) => loaded,
+            Err(error) => {
+                // A missing, corrupt, or schema-incompatible cache (for example one built
+                // by an older test build) falls back to automatic discovery and rebuilds
+                // into the same explicit path, instead of silently losing Vanilla symbols.
+                if let Some(log) = log {
+                    log(&format!(
+                        "Vanilla cache {} could not be loaded ({error}); attempting a rebuild",
                         path.display()
-                    ),
+                    ));
+                }
+                if let Some(rebuilt) = rebuild_unavailable_cache(
+                    path,
+                    &rules,
+                    &profile,
+                    auto_vanilla,
+                    log,
+                    progress,
+                    cancellation,
+                )? {
+                    return Ok((
+                        rebuilt,
+                        format!(
+                            "Vanilla cache {} was unavailable and has been rebuilt from the discovered installation",
+                            path.display()
+                        ),
+                    ));
+                }
+                return Err(format!(
+                    "Vanilla cache {} could not be loaded; continuing without Vanilla symbols: {error}",
+                    path.display()
                 ));
             }
-            return Err(format!(
-                "Vanilla cache {} could not be loaded; continuing without Vanilla symbols: {error}",
-                path.display()
+        };
+        if let Some(log) = log {
+            log(&format!(
+                "Vanilla cache decode: {:.1} ms ({} file(s), {} position(s) loaded)",
+                load_started.elapsed().as_secs_f64() * 1000.0,
+                loaded.source_files().len(),
+                loaded.index().position_ranges().len(),
             ));
         }
-    };
-    if loaded.metadata().rule_hash == current_rule_hash {
-        return Ok((
-            loaded,
-            format!("Vanilla symbols loaded from {}", path.display()),
+        if loaded.metadata().rule_hash == current_rule_hash {
+            return Ok((
+                loaded,
+                format!("Vanilla symbols loaded from {}", path.display()),
+            ));
+        }
+        let stale_hash = loaded.metadata().rule_hash.clone();
+        let source = loaded.source_root().path.clone();
+        if let Some(log) = log {
+            log(&format!(
+                "Vanilla cache {} is stale (rules hash {stale_hash} != {current_rule_hash}); regenerating from {}",
+                path.display(),
+                source.display()
+            ));
+        }
+        let rebuilt = build_cache_from_source(
+            &source,
+            path,
+            &rules,
+            &profile,
+            log,
+            progress,
+            cancellation,
+            "Vanilla cache regeneration",
+        );
+        match rebuilt {
+            Ok(cache) => Ok((
+                cache,
+                format!(
+                    "Vanilla cache was regenerated for the active rules hash {current_rule_hash} and loaded from {}",
+                    path.display()
+                ),
+            )),
+            Err(error) => Ok((
+                loaded,
+                format!("{error}; using the existing cache built with rules hash {stale_hash}"),
+            )),
+        }
+    })();
+    if let Some(log) = log {
+        log(&format!(
+            "Vanilla cache worker total: {:.1} ms",
+            started.elapsed().as_secs_f64() * 1000.0
         ));
     }
-    let stale_hash = loaded.metadata().rule_hash.clone();
-    let source = loaded.source_root().path.clone();
-    let rebuilt = build_cache_from_source(
-        &source,
-        path,
-        &rules,
-        &profile,
-        progress,
-        cancellation,
-        "Vanilla cache regeneration",
-    );
-    match rebuilt {
-        Ok(cache) => Ok((
-            cache,
-            format!(
-                "Vanilla cache was regenerated for the active rules hash {current_rule_hash} and loaded from {}",
-                path.display()
-            ),
-        )),
-        Err(error) => Ok((
-            loaded,
-            format!("{error}; using the existing cache built with rules hash {stale_hash}"),
-        )),
-    }
+    result
 }
 
 /// Rebuilds an explicit cache path when the cache file itself cannot be loaded.
@@ -108,6 +144,7 @@ fn rebuild_unavailable_cache(
     rules: &RuleSet,
     profile: &GameProfile,
     auto_vanilla: Option<&AutoVanillaConfiguration>,
+    log: Option<&(dyn Fn(&str) + Sync)>,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &IndexSetupCancellation,
 ) -> Result<Option<IndexCache>, String> {
@@ -117,6 +154,7 @@ fn rebuild_unavailable_cache(
     if cancellation.workspace.is_cancelled() {
         return Err("Vanilla cache rebuild was cancelled".to_owned());
     }
+    let discovery_started = std::time::Instant::now();
     let configured_source = UserConfiguration::load(&auto_vanilla.user_paths.config_file)
         .ok()
         .and_then(|configuration| {
@@ -155,6 +193,13 @@ fn rebuild_unavailable_cache(
             }
         }
     };
+    if let Some(log) = log {
+        log(&format!(
+            "Vanilla cache rebuild source resolved in {:.1} ms: {}",
+            discovery_started.elapsed().as_secs_f64() * 1000.0,
+            source.display()
+        ));
+    }
     // The old file is known to be unusable (missing, corrupt, or from an older
     // schema); remove it so the rebuild can write a fresh cache in its place.
     match fs::remove_file(path) {
@@ -172,6 +217,7 @@ fn rebuild_unavailable_cache(
         path,
         rules,
         profile,
+        log,
         progress,
         cancellation,
         "Vanilla cache rebuild",
@@ -179,11 +225,13 @@ fn rebuild_unavailable_cache(
     .map(Some)
 }
 
+#[allow(clippy::too_many_arguments)] // Vanilla rebuild carries the immutable rules/profile plus worker plumbing.
 fn build_cache_from_source(
     source: &Path,
     path: &Path,
     rules: &RuleSet,
     profile: &GameProfile,
+    log: Option<&(dyn Fn(&str) + Sync)>,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &IndexSetupCancellation,
     activity: &str,
@@ -194,16 +242,39 @@ fn build_cache_from_source(
         SourceRootKind::Vanilla,
         source.to_owned(),
     )]));
+    let scan_started = std::time::Instant::now();
     host.refresh_source_roots_cancellable_with_progress(&cancellation.workspace, progress)
         .map_err(|error| format!("{activity} failed while indexing {source:?}: {error}"))?;
+    if let Some(log) = log {
+        log(&format!(
+            "{activity}: scanned {} file(s) in {:.1} ms",
+            host.snapshot().source_files().len(),
+            scan_started.elapsed().as_secs_f64() * 1000.0
+        ));
+    }
+    let build_started = std::time::Instant::now();
     let cache = IndexCache::from_snapshot(&host.snapshot())
         .map_err(|error| format!("{activity} failed: {error}"))?;
+    if let Some(log) = log {
+        log(&format!(
+            "{activity}: cache built in {:.1} ms",
+            build_started.elapsed().as_secs_f64() * 1000.0
+        ));
+    }
+    let save_started = std::time::Instant::now();
     cache.save_with_progress(path, progress).map_err(|error| {
         format!(
             "{activity} could not be saved to {}: {error}",
             path.display()
         )
     })?;
+    if let Some(log) = log {
+        log(&format!(
+            "{activity}: saved to {} in {:.1} ms",
+            path.display(),
+            save_started.elapsed().as_secs_f64() * 1000.0
+        ));
+    }
     Ok(cache)
 }
 
@@ -317,6 +388,7 @@ pub(crate) fn run_auto_vanilla_setup(
     auto_vanilla: &AutoVanillaConfiguration,
     rules: RuleSet,
     profile: GameProfile,
+    log: Option<&(dyn Fn(&str) + Sync)>,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &IndexSetupCancellation,
 ) -> Result<(IndexCache, String), String> {
@@ -324,6 +396,7 @@ pub(crate) fn run_auto_vanilla_setup(
         auto_vanilla,
         rules,
         profile,
+        log,
         progress,
         cancellation,
         &DiscoveryOptions::default(),
@@ -334,134 +407,177 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
     auto_vanilla: &AutoVanillaConfiguration,
     rules: RuleSet,
     profile: GameProfile,
+    log: Option<&(dyn Fn(&str) + Sync)>,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &IndexSetupCancellation,
     discovery_options: &DiscoveryOptions,
 ) -> Result<(IndexCache, String), String> {
-    let descriptor = auto_vanilla.descriptor;
-    let mut configuration =
-        UserConfiguration::load(&auto_vanilla.user_paths.config_file).map_err(|error| {
-            format!("automatic Vanilla discovery could not load user configuration: {error}")
-        })?;
-    if configuration
-        .games
-        .get(descriptor.game_id)
-        .is_some_and(|game| game.auto_discovery_attempted)
-    {
-        return Err(format!(
-            "automatic {} discovery was skipped because it was already attempted",
-            descriptor.display_name
-        ));
-    }
-    let report = discover_installations(&descriptor, discovery_options, &cancellation.discovery);
-    if report.cancelled {
-        return Err(format!(
-            "automatic {} discovery was cancelled",
-            descriptor.display_name
-        ));
-    }
-    let source = match report.installations.as_slice() {
-        [source] => source.clone(),
-        [] => {
-            record_discovery_outcome(
-                &mut configuration,
-                descriptor.game_id,
-                DiscoveryOutcome::NotFound,
-                &auto_vanilla.user_paths,
-            )?;
+    let started = std::time::Instant::now();
+    let result = (|| {
+        let descriptor = auto_vanilla.descriptor;
+        let mut configuration = UserConfiguration::load(&auto_vanilla.user_paths.config_file)
+            .map_err(|error| {
+                format!("automatic Vanilla discovery could not load user configuration: {error}")
+            })?;
+        if configuration
+            .games
+            .get(descriptor.game_id)
+            .is_some_and(|game| game.auto_discovery_attempted)
+        {
             return Err(format!(
-                "{} was not found in common installation locations; run `pdx setup vanilla --game {} --deep` to search local disks",
-                descriptor.display_name, descriptor.game_id
+                "automatic {} discovery was skipped because it was already attempted",
+                descriptor.display_name
             ));
         }
-        candidates => {
-            record_discovery_outcome(
-                &mut configuration,
-                descriptor.game_id,
-                DiscoveryOutcome::MultipleCandidates,
-                &auto_vanilla.user_paths,
-            )?;
-            return Err(format!(
-                "multiple {} installations were found:\n{}\nrun `pdx setup vanilla --game {} --source <directory>` to choose one",
-                descriptor.display_name,
-                candidates
-                    .iter()
-                    .map(|path| format!("  {}", path.display()))
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-                descriptor.game_id
+        let discovery_started = std::time::Instant::now();
+        let report =
+            discover_installations(&descriptor, discovery_options, &cancellation.discovery);
+        if let Some(log) = log {
+            log(&format!(
+                "Vanilla discovery: {:.1} ms ({} candidate(s) found)",
+                discovery_started.elapsed().as_secs_f64() * 1000.0,
+                report.installations.len()
             ));
         }
-    };
-
-    let mut host = AnalysisHost::with_profile(rules, profile);
-    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-        SourceRootId::new(0),
-        SourceRootKind::Vanilla,
-        source.clone(),
-    )]));
-    let setup = (|| {
-        host.refresh_source_roots_cancellable_with_progress(&cancellation.workspace, progress)
-            .map_err(|error| format!("Vanilla indexing failed: {error}"))?;
-        let cache = IndexCache::from_snapshot(&host.snapshot())
-            .map_err(|error| format!("Vanilla cache creation failed: {error}"))?;
-        let cache_path = auto_vanilla.user_paths.vanilla_cache(descriptor.game_id);
-        cache
-            .save(&cache_path)
-            .map_err(|error| format!("Vanilla cache could not be saved: {error}"))?;
-        Ok::<_, String>((cache, cache_path))
-    })();
-    match setup {
-        Ok((cache, cache_path)) => {
-            let game = configuration
-                .games
-                .entry(descriptor.game_id.to_owned())
-                .or_default();
-            game.auto_discovery_attempted = true;
-            game.discovery_outcome = Some(DiscoveryOutcome::Configured);
-            game.vanilla_source = Some(source.clone());
-            game.vanilla_cache = Some(cache_path.clone());
-            configuration
-                .save(&auto_vanilla.user_paths.config_file)
-                .map_err(|error| {
-                    format!(
-                        "Vanilla cache was built but user configuration could not be saved: {error}"
-                    )
-                })?;
-            Ok((
-                cache,
-                format!(
-                    "{} Vanilla symbols are now enabled from {}",
-                    descriptor.display_name,
-                    source.display()
-                ),
-            ))
+        if report.cancelled {
+            return Err(format!(
+                "automatic {} discovery was cancelled",
+                descriptor.display_name
+            ));
         }
-        Err(error) => {
-            if cancellation.discovery.is_cancelled() || cancellation.workspace.is_cancelled() {
+        let source = match report.installations.as_slice() {
+            [source] => source.clone(),
+            [] => {
+                record_discovery_outcome(
+                    &mut configuration,
+                    descriptor.game_id,
+                    DiscoveryOutcome::NotFound,
+                    &auto_vanilla.user_paths,
+                )?;
                 return Err(format!(
-                    "automatic {} setup was cancelled",
-                    descriptor.display_name
+                    "{} was not found in common installation locations; run `pdx setup vanilla --game {} --deep` to search local disks",
+                    descriptor.display_name, descriptor.game_id
                 ));
             }
-            let game = configuration
-                .games
-                .entry(descriptor.game_id.to_owned())
-                .or_default();
-            game.auto_discovery_attempted = true;
-            game.discovery_outcome = Some(DiscoveryOutcome::Failed);
-            game.vanilla_source = Some(source);
-            let save_error = configuration
-                .save(&auto_vanilla.user_paths.config_file)
-                .err();
-            match save_error {
-                Some(save_error) => Err(format!(
-                    "{error}; failed to record the attempt: {save_error}"
-                )),
-                None => Err(error),
+            candidates => {
+                record_discovery_outcome(
+                    &mut configuration,
+                    descriptor.game_id,
+                    DiscoveryOutcome::MultipleCandidates,
+                    &auto_vanilla.user_paths,
+                )?;
+                return Err(format!(
+                    "multiple {} installations were found:\n{}\nrun `pdx setup vanilla --game {} --source <directory>` to choose one",
+                    descriptor.display_name,
+                    candidates
+                        .iter()
+                        .map(|path| format!("  {}", path.display()))
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                    descriptor.game_id
+                ));
+            }
+        };
+
+        let mut host = AnalysisHost::with_profile(rules, profile);
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            source.clone(),
+        )]));
+        let setup = (|| {
+            let scan_started = std::time::Instant::now();
+            host.refresh_source_roots_cancellable_with_progress(&cancellation.workspace, progress)
+                .map_err(|error| format!("Vanilla indexing failed: {error}"))?;
+            if let Some(log) = log {
+                log(&format!(
+                    "Vanilla scan: {} file(s) indexed in {:.1} ms",
+                    host.snapshot().source_files().len(),
+                    scan_started.elapsed().as_secs_f64() * 1000.0
+                ));
+            }
+            let build_started = std::time::Instant::now();
+            let cache = IndexCache::from_snapshot(&host.snapshot())
+                .map_err(|error| format!("Vanilla cache creation failed: {error}"))?;
+            if let Some(log) = log {
+                log(&format!(
+                    "Vanilla cache built in {:.1} ms",
+                    build_started.elapsed().as_secs_f64() * 1000.0
+                ));
+            }
+            let cache_path = auto_vanilla.user_paths.vanilla_cache(descriptor.game_id);
+            let save_started = std::time::Instant::now();
+            cache
+                .save(&cache_path)
+                .map_err(|error| format!("Vanilla cache could not be saved: {error}"))?;
+            if let Some(log) = log {
+                log(&format!(
+                    "Vanilla cache saved to {} in {:.1} ms",
+                    cache_path.display(),
+                    save_started.elapsed().as_secs_f64() * 1000.0
+                ));
+            }
+            Ok::<_, String>((cache, cache_path))
+        })();
+        match setup {
+            Ok((cache, cache_path)) => {
+                let game = configuration
+                    .games
+                    .entry(descriptor.game_id.to_owned())
+                    .or_default();
+                game.auto_discovery_attempted = true;
+                game.discovery_outcome = Some(DiscoveryOutcome::Configured);
+                game.vanilla_source = Some(source.clone());
+                game.vanilla_cache = Some(cache_path.clone());
+                configuration
+                    .save(&auto_vanilla.user_paths.config_file)
+                    .map_err(|error| {
+                        format!(
+                            "Vanilla cache was built but user configuration could not be saved: {error}"
+                        )
+                    })?;
+                Ok((
+                    cache,
+                    format!(
+                        "{} Vanilla symbols are now enabled from {}",
+                        descriptor.display_name,
+                        source.display()
+                    ),
+                ))
+            }
+            Err(error) => {
+                if cancellation.discovery.is_cancelled() || cancellation.workspace.is_cancelled() {
+                    return Err(format!(
+                        "automatic {} setup was cancelled",
+                        descriptor.display_name
+                    ));
+                }
+                let game = configuration
+                    .games
+                    .entry(descriptor.game_id.to_owned())
+                    .or_default();
+                game.auto_discovery_attempted = true;
+                game.discovery_outcome = Some(DiscoveryOutcome::Failed);
+                game.vanilla_source = Some(source);
+                let save_error = configuration
+                    .save(&auto_vanilla.user_paths.config_file)
+                    .err();
+                match save_error {
+                    Some(save_error) => Err(format!(
+                        "{error}; failed to record the attempt: {save_error}"
+                    )),
+                    None => Err(error),
+                }
             }
         }
+    })();
+    if let Some(log) = log {
+        log(&format!(
+            "Vanilla cache worker total: {:.1} ms",
+            started.elapsed().as_secs_f64() * 1000.0
+        ));
     }
+    result
 }
 
 fn record_discovery_outcome(

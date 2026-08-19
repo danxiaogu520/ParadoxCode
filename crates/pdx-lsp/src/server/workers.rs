@@ -81,34 +81,42 @@ impl LspServer {
         true
     }
 
-    pub(super) fn spawn_initialize_request<'scope, 'environment>(
+    pub(super) fn spawn_initialize_request<'scope, 'environment, W: Write>(
         &mut self,
         scope: &'scope std::thread::Scope<'scope, 'environment>,
         event_sender: &mpsc::Sender<TransportEvent>,
         in_flight: &mut Option<InFlightInitialize>,
         message: &Value,
-    ) -> bool {
+        output: &mut W,
+        initialize_progress_token: &mut Option<String>,
+    ) -> Result<bool, LspError> {
         if self.state != ServerState::Uninitialized || in_flight.is_some() {
-            return false;
+            return Ok(false);
         }
         let Some(object) = message.as_object() else {
-            return false;
+            return Ok(false);
         };
         if object.get("jsonrpc").and_then(Value::as_str) != Some(JSON_RPC_VERSION)
             || object.get("method").and_then(Value::as_str) != Some("initialize")
         {
-            return false;
+            return Ok(false);
         }
         let Some(id) = object.get("id").filter(|id| !id.is_null()) else {
-            return false;
+            return Ok(false);
         };
         let Ok(request_id) = RequestId::parse(id) else {
-            return false;
+            return Ok(false);
         };
         let Ok(params) = typed_params::<InitializeParams>(object.get("params"), "initialize")
         else {
-            return false;
+            return Ok(false);
         };
+        let client_work_done_progress = params
+            .capabilities
+            .window
+            .as_ref()
+            .and_then(|window| window.work_done_progress)
+            .unwrap_or(false);
 
         let cancellation = WorkspaceScanToken::new();
         if self.cancelled.contains(&request_id) {
@@ -119,12 +127,71 @@ impl LspServer {
         let auto_vanilla = self.auto_vanilla.clone();
         let sender = event_sender.clone();
         let id = id.clone();
+        // One progress token for the whole initialize phase: stage reports and
+        // the workspace-scan counter share it, and the event loop sends the
+        // terminal `end` report when the initialize worker completes.
+        let progress_token = format!("pdx-init-{}", progress_nonce());
+        if client_work_done_progress {
+            write_message(output, &work_done_progress_create(&progress_token))?;
+            write_message(
+                output,
+                &work_done_progress_begin(&progress_token, "Starting pdx-ls…"),
+            )?;
+            *initialize_progress_token = Some(progress_token.clone());
+        }
+        let stage = {
+            let sender = sender.clone();
+            let token = progress_token.clone();
+            move |message: &str| {
+                if client_work_done_progress {
+                    let _ = sender.send(TransportEvent::Progress(Progress {
+                        params: json!({
+                            "token": token,
+                            "value": {"kind": "report", "message": message},
+                        }),
+                    }));
+                }
+            }
+        };
+        let log = {
+            let sender = sender.clone();
+            move |message: &str| {
+                let _ = sender.send(TransportEvent::Log(log_message_notification(
+                    MessageType::INFO,
+                    message.to_owned(),
+                )));
+            }
+        };
+        let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> = if client_work_done_progress
+        {
+            Some(Box::new(progress_sender(
+                sender.clone(),
+                progress_token.clone(),
+                "Scanning workspace",
+                "Indexing workspace files",
+            )))
+        } else {
+            None
+        };
+        // Drop the `Send` auto-trait from the shared reference inside the
+        // worker closure; the callback itself is moved across threads, but
+        // `prepare_initialize_candidate` only needs a `Sync` view.
         self.state = ServerState::Initializing;
         *in_flight = Some(InFlightInitialize {
             request_id: request_id.clone(),
             cancellation: cancellation.clone(),
         });
         scope.spawn(move || {
+            let stage_ref: &(dyn Fn(&str) + Sync) = &stage;
+            let log_ref: &(dyn Fn(&str) + Sync) = &log;
+            let progress_ref: Option<&(dyn Fn(usize, usize) + Sync)> = progress
+                .as_deref()
+                .map(|f| f as &(dyn Fn(usize, usize) + Sync));
+            let callbacks = InitializeCallbacks {
+                stage: Some(stage_ref),
+                log: Some(log_ref),
+                progress: progress_ref,
+            };
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 prepare_initialize_candidate(
                     candidate,
@@ -132,6 +199,7 @@ impl LspServer {
                     scan_workspace,
                     auto_vanilla.as_ref(),
                     &cancellation,
+                    &callbacks,
                 )
             }))
             .unwrap_or_else(|_| {
@@ -146,7 +214,7 @@ impl LspServer {
                 result,
             })));
         });
-        true
+        Ok(true)
     }
 
     pub(super) fn spawn_pending_disk_changes<'scope, 'environment>(

@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use lsp_types::{
     CancelParams, DidChangeTextDocumentParams, DidChangeWatchedFilesParams,
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    FileChangeType, InitializeParams,
+    FileChangeType, InitializeParams, MessageType,
 };
 use pdx_analysis::CancellationToken;
 use pdx_engine::{
@@ -22,14 +22,14 @@ use pdx_text::LineIndex;
 use serde_json::{Value, json};
 
 use crate::initialize::{
-    AutoVanillaConfiguration, InitializeOptions, prepare_initialize_candidate,
+    AutoVanillaConfiguration, InitializeCallbacks, InitializeOptions, prepare_initialize_candidate,
 };
 use crate::protocol::{
     LspError, RequestId, RpcError, cancel_initialize_from_notification,
     cancel_request_from_notification, diagnostic_values, diagnostics_notification, document_error,
     is_initialize_control_message, is_snapshot_request, is_snapshot_request_message,
-    parse_file_uri_str, request_id_from_lsp, show_info_notification, show_warning_notification,
-    typed_params,
+    log_message_notification, parse_file_uri_str, request_id_from_lsp, show_info_notification,
+    show_warning_notification, typed_params,
 };
 use crate::requests::SnapshotRequestContext;
 use crate::text::{
@@ -47,6 +47,80 @@ use crate::{
 mod document_events;
 mod event_loop;
 mod workers;
+
+/// Monotonic nonce for work-done-progress tokens and their create-request ids.
+fn progress_nonce() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_nanos())
+}
+
+/// Server-initiated work-done-progress create request; the client's response is ignored.
+fn work_done_progress_create(token: &str) -> Value {
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "id": format!("pdx-progress-{token}"),
+        "method": "window/workDoneProgress/create",
+        "params": {"token": token},
+    })
+}
+
+fn work_done_progress_begin(token: &str, message: &str) -> Value {
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "method": "$/progress",
+        "params": {
+            "token": token,
+            "value": {
+                "kind": "begin",
+                "title": "ParadoxCode",
+                "cancellable": false,
+                "message": message,
+                "percentage": 0,
+            },
+        },
+    })
+}
+
+fn work_done_progress_end(token: &str, message: &str) -> Value {
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "method": "$/progress",
+        "params": {
+            "token": token,
+            "value": {"kind": "end", "message": message},
+        },
+    })
+}
+
+/// Builds the worker progress callback that forwards engine progress as `$/progress` reports.
+///
+/// `discovering` is shown while the work unit total is still unknown; `indexing` carries the
+/// running `(done/total)` counter once the engine knows the full scope.
+fn progress_sender(
+    sender: mpsc::Sender<TransportEvent>,
+    token: String,
+    discovering: &'static str,
+    indexing: &'static str,
+) -> impl Fn(usize, usize) {
+    move |done, total| {
+        let message = if total == 0 {
+            format!("{discovering}…")
+        } else {
+            format!("{indexing} ({done}/{total})…")
+        };
+        let mut value = json!({"kind": "report", "message": message});
+        if let Some(percent) = done
+            .checked_mul(100)
+            .and_then(|percent| percent.checked_div(total))
+        {
+            value["percentage"] = json!(u32::try_from(percent).unwrap_or(100));
+        }
+        let _ = sender.send(TransportEvent::Progress(Progress {
+            params: json!({"token": token, "value": value}),
+        }));
+    }
+}
 
 /// Lifecycle state of the server process.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -205,6 +279,8 @@ enum TransportEvent {
     Request(SnapshotRequestResult),
     VanillaSetup(IndexSetupResult),
     DependencySetup(DependencySetupResult),
+    /// A server-side `window/logMessage` notification produced by a worker.
+    Log(Value),
     Progress(Progress),
     DiskChanges(DiskChangesResult),
 }
