@@ -2,7 +2,7 @@
   "name": "paradoxcode-vscode",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "paradoxcode",
   "license": "MIT",
   "repository": {
@@ -343,7 +343,7 @@
     "watch": "tsc -watch -p ./",
     "check": "npm run compile && node scripts/smoke.mjs",
     "vscode:prepublish": "npm run compile",
-    "test:contract": "npm run compile && node scripts/extension-contract.mjs",
+    "test:contract": "npm run compile && node scripts/extension-contract.mjs && node scripts/package-contract.mjs",
     "test:package": "vsce package --out ../../target/paradoxcode-vscode-contract.vsix",
     "test:host": "npm run compile && node scripts/host-test.mjs",
     "package": "npm run compile && vsce package"
@@ -362,6 +362,7 @@
   },
   "files": [
     "out/**",
+    "node_modules/**",
     "media/**",
     "syntaxes/**",
     "language-configuration.json",
