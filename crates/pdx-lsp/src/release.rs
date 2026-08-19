@@ -288,7 +288,10 @@ pub fn package_target(
     let archive_path = output_dir.join(&archive_name);
     atomic_write(&archive_path, &archive_bytes)?;
 
-    let digest = format!("{:x}", Sha256::digest(&archive_bytes));
+    let digest: String = Sha256::digest(&archive_bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
     let sidecar_contents = format!("{digest}  {archive_name}\n");
     if sidecar_contents.len() as u64 > limits.checksum_bytes {
         return Err(ReleaseError::Limits(format!(
@@ -354,7 +357,10 @@ pub fn verify_archive(
             "sidecar filename mismatch: {name_in_sidecar} vs {expected_name}"
         )));
     }
-    let expected_digest = format!("{:x}", Sha256::digest(&archive_bytes));
+    let expected_digest: String = Sha256::digest(&archive_bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
     if digest_str != expected_digest {
         return Err(ReleaseError::Verification(format!(
             "checksum mismatch for {}",
