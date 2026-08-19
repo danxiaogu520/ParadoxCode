@@ -9,6 +9,6 @@
     "parse": "tree-sitter parse"
   },
   "devDependencies": {
-    "tree-sitter-cli": "^0.25.6"
+    "tree-sitter-cli": "^0.26.12"
   }
 }
