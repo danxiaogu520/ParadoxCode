@@ -20,6 +20,7 @@ suite('ParadoxCode VS Code extension host', () => {
         'paradoxcode.showMissionPreview',
         'paradoxcode.installServer',
         'paradoxcode.selectServer',
+        'paradoxcode.selectGameDirectory',
         'paradoxcode.reloadServer',
         'paradoxcode.openOutput',
       ]) {
@@ -29,5 +30,17 @@ suite('ParadoxCode VS Code extension host', () => {
       assert.equal(typeof config.get('diagnosticIgnoreCodes'), 'object');
       assert.equal(typeof config.get('preview.zoomSensitivity'), 'number');
     });
+  });
+
+  test('contributes the detailed Getting Started walkthrough', async () => {
+    const extension = vscode.extensions.getExtension('paradoxcode.paradoxcode-vscode');
+    assert.ok(extension, 'development extension must be discoverable');
+    const walkthrough = extension.packageJSON.contributes?.walkthroughs?.find(
+      (entry) => entry.id === 'paradoxcode.gettingStarted',
+    );
+    assert.ok(walkthrough, 'Getting Started walkthrough must be contributed');
+    assert.equal(walkthrough.steps.length, 6);
+    assert.equal(walkthrough.steps[3].id, 'vanillaData');
+    assert.deepEqual(walkthrough.steps[3].completionEvents, ['onContext:paradoxcodeVanillaReady']);
   });
 });

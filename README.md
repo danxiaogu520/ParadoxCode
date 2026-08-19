@@ -6,7 +6,7 @@
 
 ParadoxCode is an independent, open-source language toolkit for Paradox modding. It is built as a
 game-neutral PDX language engine with an EU4-first product scope. The first release targets Europa
-Universalis IV and the Zed editor.
+Universalis IV in VS Code and Zed.
 
 > [!IMPORTANT]
 > ParadoxCode is in alpha and has not published an end-user release. The core language features are
@@ -29,6 +29,7 @@ Paradox Interactive are trademarks of their respective owners.
 - A stdio Language Server (`pdx-ls`) with cancellation, stale-result protection, and immutable
   analysis snapshots, including targeted watched-file updates for live Mod roots.
 - A thin Zed extension with Tree-sitter grammars used only for editor-side highlighting.
+- A VS Code extension with zero-configuration, checksum-verified server setup and a live mission-tree preview.
 - Exact-version Zed server download with SHA-256 verification, restricted extraction, bounded
   streaming, and self-validating executable caches.
 
@@ -43,7 +44,7 @@ features and real JSON-RPC integration tests exist.
 Current release blockers include:
 
 - exercising and reviewing the first tag-driven five-target native release matrix;
-- a clean-machine smoke test against an actually published Zed extension and server release;
+- clean-machine smoke tests against the actually published VS Code and Zed extensions and server release;
 - completing workspace-dependent and conflicting-alternative scope transitions.
 
 No release date is promised until those checks pass.

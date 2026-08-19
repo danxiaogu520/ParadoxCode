@@ -26,6 +26,7 @@ fn main() -> Result<(), pdx_lsp::LspError> {
                 pdx_lsp::AutoVanillaConfiguration {
                     descriptor: pdx_lsp::INSTALL_DESCRIPTOR,
                     user_paths,
+                    source_override: None,
                 },
             )
         }

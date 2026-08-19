@@ -10,6 +10,7 @@ use pdx_engine::{
 };
 use pdx_game::{
     DiscoveryOptions, DiscoveryOutcome, UserConfiguration, UserPaths, discover_installations,
+    validate_installation_for_source,
 };
 use pdx_rules::{GameProfile, RuleSet};
 use serde_json::{Value, json};
@@ -401,7 +402,7 @@ pub(crate) fn apply_user_vanilla_configuration(
         resolved.index_cache = Some(cache.clone());
         return None;
     }
-    if game.auto_discovery_attempted {
+    if game.auto_discovery_attempted && auto_vanilla.source_override.is_none() {
         warnings.push(format!(
             "Automatic {} discovery was already attempted without a usable cache; run `pdx setup vanilla --game {active_game_id} --deep` to search again",
             auto_vanilla.descriptor.display_name
@@ -451,59 +452,71 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
             .games
             .get(descriptor.game_id)
             .is_some_and(|game| game.auto_discovery_attempted)
+            && auto_vanilla.source_override.is_none()
         {
             return Err(format!(
                 "automatic {} discovery was skipped because it was already attempted",
                 descriptor.display_name
             ));
         }
-        let discovery_started = std::time::Instant::now();
-        let report =
-            discover_installations(&descriptor, discovery_options, &cancellation.discovery);
-        if let Some(log) = log {
-            log(&format!(
-                "Vanilla discovery: {:.1} ms ({} candidate(s) found)",
-                discovery_started.elapsed().as_secs_f64() * 1000.0,
-                report.installations.len()
-            ));
-        }
-        if report.cancelled {
-            return Err(format!(
-                "automatic {} discovery was cancelled",
-                descriptor.display_name
-            ));
-        }
-        let source = match report.installations.as_slice() {
-            [source] => source.clone(),
-            [] => {
-                record_discovery_outcome(
-                    &mut configuration,
-                    descriptor.game_id,
-                    DiscoveryOutcome::NotFound,
-                    &auto_vanilla.user_paths,
-                )?;
+        let source = if let Some(source) = auto_vanilla.source_override.as_ref() {
+            if !validate_installation_for_source(source, &descriptor) {
                 return Err(format!(
-                    "{} was not found in common installation locations; run `pdx setup vanilla --game {} --deep` to search local disks",
-                    descriptor.display_name, descriptor.game_id
+                    "the selected {} directory is not a valid installation: {}",
+                    descriptor.display_name,
+                    source.display()
                 ));
             }
-            candidates => {
-                record_discovery_outcome(
-                    &mut configuration,
-                    descriptor.game_id,
-                    DiscoveryOutcome::MultipleCandidates,
-                    &auto_vanilla.user_paths,
-                )?;
-                return Err(format!(
-                    "multiple {} installations were found:\n{}\nrun `pdx setup vanilla --game {} --source <directory>` to choose one",
-                    descriptor.display_name,
-                    candidates
-                        .iter()
-                        .map(|path| format!("  {}", path.display()))
-                        .collect::<Vec<_>>()
-                        .join("\n"),
-                    descriptor.game_id
+            source.clone()
+        } else {
+            let discovery_started = std::time::Instant::now();
+            let report =
+                discover_installations(&descriptor, discovery_options, &cancellation.discovery);
+            if let Some(log) = log {
+                log(&format!(
+                    "Vanilla discovery: {:.1} ms ({} candidate(s) found)",
+                    discovery_started.elapsed().as_secs_f64() * 1000.0,
+                    report.installations.len()
                 ));
+            }
+            if report.cancelled {
+                return Err(format!(
+                    "automatic {} discovery was cancelled",
+                    descriptor.display_name
+                ));
+            }
+            match report.installations.as_slice() {
+                [source] => source.clone(),
+                [] => {
+                    record_discovery_outcome(
+                        &mut configuration,
+                        descriptor.game_id,
+                        DiscoveryOutcome::NotFound,
+                        &auto_vanilla.user_paths,
+                    )?;
+                    return Err(format!(
+                        "{} was not found in common installation locations; run `pdx setup vanilla --game {} --deep` to search local disks",
+                        descriptor.display_name, descriptor.game_id
+                    ));
+                }
+                candidates => {
+                    record_discovery_outcome(
+                        &mut configuration,
+                        descriptor.game_id,
+                        DiscoveryOutcome::MultipleCandidates,
+                        &auto_vanilla.user_paths,
+                    )?;
+                    return Err(format!(
+                        "multiple {} installations were found:\n{}\nrun `pdx setup vanilla --game {} --source <directory>` to choose one",
+                        descriptor.display_name,
+                        candidates
+                            .iter()
+                            .map(|path| format!("  {}", path.display()))
+                            .collect::<Vec<_>>()
+                            .join("\n"),
+                        descriptor.game_id
+                    ));
+                }
             }
         };
 

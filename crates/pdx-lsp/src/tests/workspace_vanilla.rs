@@ -730,6 +730,7 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
             config_file: root.join("user/config.toml"),
             cache_root: root.join("user/cache"),
         },
+        source_override: None,
     };
     let rules = pdx_game::eu4::first_party_rules().expect("rules");
     let explicit = root.join("explicit/vanilla.pdxindex");
@@ -797,6 +798,7 @@ fn unavailable_configured_cache_is_rebuilt_from_configured_source() {
             config_file,
             cache_root: root.join("user/cache"),
         },
+        source_override: None,
     };
 
     let input = frames([
@@ -869,6 +871,7 @@ fn automatic_vanilla_setup_builds_cache_and_records_single_attempt() {
             config_file: root.join("user/config.toml"),
             cache_root: root.join("user/cache"),
         },
+        source_override: None,
     };
     let options = DiscoveryOptions {
         roots: vec![root.join("library")],
@@ -909,6 +912,111 @@ fn automatic_vanilla_setup_builds_cache_and_records_single_attempt() {
 }
 
 #[test]
+fn selected_game_directory_retries_after_failed_automatic_discovery() {
+    let (root, _) = temp_workspace_dir();
+    let source = fixture_vanilla_source(&root);
+    let config_file = root.join("user/config.toml");
+    let mut configuration = UserConfiguration::default();
+    let game = configuration.games.entry("eu4".to_owned()).or_default();
+    game.auto_discovery_attempted = true;
+    game.discovery_outcome = Some(DiscoveryOutcome::NotFound);
+    configuration.save(&config_file).expect("configuration");
+
+    let automatic = AutoVanillaConfiguration {
+        descriptor: pdx_game::eu4::INSTALL_DESCRIPTOR,
+        user_paths: UserPaths {
+            config_file,
+            cache_root: root.join("user/cache"),
+        },
+        source_override: Some(source.clone()),
+    };
+    let options = DiscoveryOptions {
+        roots: Vec::new(),
+        include_platform_locations: false,
+        ..DiscoveryOptions::default()
+    };
+    let (_, message) = run_auto_vanilla_setup_with_options(
+        &automatic,
+        pdx_game::eu4::first_party_rules().expect("rules"),
+        pdx_game::eu4::profile(),
+        None,
+        None,
+        &IndexSetupCancellation::new(),
+        &options,
+    )
+    .expect("selected installation must retry setup");
+    assert!(message.contains("Vanilla symbols are now enabled"));
+    let configuration = UserConfiguration::load(&automatic.user_paths.config_file)
+        .expect("configuration after setup");
+    let game = configuration.games.get("eu4").expect("EU4 configuration");
+    assert_eq!(game.discovery_outcome, Some(DiscoveryOutcome::Configured));
+    assert_eq!(game.vanilla_source, Some(source));
+    assert!(automatic.user_paths.vanilla_cache("eu4").is_file());
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn initialize_game_directory_guides_a_previous_failed_discovery() {
+    let (root, _) = temp_workspace_dir();
+    let source = fixture_vanilla_source(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(&workspace).expect("workspace");
+    let config_file = root.join("user/config.toml");
+    let cache_path = root.join("user/cache/eu4/vanilla.pdxindex");
+    let mut configuration = UserConfiguration::default();
+    let game = configuration.games.entry("eu4".to_owned()).or_default();
+    game.auto_discovery_attempted = true;
+    game.discovery_outcome = Some(DiscoveryOutcome::NotFound);
+    configuration.save(&config_file).expect("configuration");
+    let automatic = AutoVanillaConfiguration {
+        descriptor: pdx_game::eu4::INSTALL_DESCRIPTOR,
+        user_paths: UserPaths {
+            config_file,
+            cache_root: root.join("user/cache"),
+        },
+        source_override: None,
+    };
+    let input = frames([
+        json!({
+            "jsonrpc":"2.0",
+            "id":1,
+            "method":"initialize",
+            "params":{
+                "rootUri":path_to_uri(&workspace),
+                "capabilities":{},
+                "initializationOptions":{"gameDirectory":source}
+            }
+        }),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions)
+        .expect("embedded rules")
+        .with_auto_vanilla(automatic);
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    assert!(
+        responses.iter().any(|value| {
+            value["method"] == "window/showMessage"
+                && value["params"]["type"] == 3
+                && value["params"]["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("Vanilla symbols are now enabled"))
+        }),
+        "the selected game directory must trigger a retry after a previous failure"
+    );
+    assert!(
+        cache_path.is_file(),
+        "guided setup must persist a Vanilla cache"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn explicit_project_cache_precedes_user_discovery_configuration() {
     let (root, _) = temp_workspace_dir();
     let automatic = AutoVanillaConfiguration {
@@ -917,6 +1025,7 @@ fn explicit_project_cache_precedes_user_discovery_configuration() {
             config_file: root.join("user/config.toml"),
             cache_root: root.join("user/cache"),
         },
+        source_override: None,
     };
     let mut configuration = UserConfiguration::default();
     let game = configuration.games.entry("eu4".to_owned()).or_default();
@@ -954,6 +1063,7 @@ fn unsuccessful_automatic_discovery_is_recorded_and_not_repeated() {
             config_file: root.join("user/config.toml"),
             cache_root: root.join("user/cache"),
         },
+        source_override: None,
     };
     let options = DiscoveryOptions {
         roots: Vec::new(),

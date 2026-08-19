@@ -9,16 +9,38 @@
     "type": "git",
     "url": "https://github.com/danxiaogu520/ParadoxCode"
   },
+  "homepage": "https://github.com/danxiaogu520/ParadoxCode#readme",
+  "bugs": {
+    "url": "https://github.com/danxiaogu520/ParadoxCode/issues"
+  },
   "engines": {
     "vscode": "^1.85.0"
+  },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "ParadoxCode downloads and runs the checksum-verified pdx-ls binary for the current platform."
+    }
   },
   "categories": [
     "Linters",
     "Programming Languages",
     "Visualization"
   ],
+  "keywords": [
+    "eu4",
+    "europa universalis iv",
+    "paradox",
+    "modding",
+    "language server",
+    "missions"
+  ],
   "activationEvents": [
-    "onStartupFinished"
+    "onLanguage:eu4",
+    "workspaceContains:.pdx/project.toml",
+    "workspaceContains:**/common/**/*.txt",
+    "workspaceContains:**/events/**/*.txt",
+    "workspaceContains:**/missions/**/*.txt"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -57,6 +79,83 @@
         }
       ]
     },
+    "walkthroughs": [
+      {
+        "id": "paradoxcode.gettingStarted",
+        "title": "%walkthrough.gettingStarted.title%",
+        "description": "%walkthrough.gettingStarted.description%",
+        "steps": [
+          {
+            "id": "trustWorkspace",
+            "title": "%walkthrough.trustWorkspace.title%",
+            "description": "%walkthrough.trustWorkspace.description%",
+            "media": {
+              "markdown": "media/getting-started.md"
+            },
+            "when": "!isWorkspaceTrusted",
+            "completionEvents": [
+              "onContext:isWorkspaceTrusted"
+            ]
+          },
+          {
+            "id": "openMod",
+            "title": "%walkthrough.openMod.title%",
+            "description": "%walkthrough.openMod.description%",
+            "media": {
+              "markdown": "media/getting-started.md"
+            },
+            "completionEvents": [
+              "onCommand:workbench.action.files.openFolder"
+            ]
+          },
+          {
+            "id": "prepareServer",
+            "title": "%walkthrough.prepareServer.title%",
+            "description": "%walkthrough.prepareServer.description%",
+            "media": {
+              "markdown": "media/getting-started.md"
+            },
+            "completionEvents": [
+              "onContext:paradoxcodeServerRunning"
+            ]
+          },
+          {
+            "id": "vanillaData",
+            "title": "%walkthrough.vanillaData.title%",
+            "description": "%walkthrough.vanillaData.description%",
+            "media": {
+              "markdown": "media/getting-started.md"
+            },
+            "when": "!paradoxcodeVanillaReady",
+            "completionEvents": [
+              "onContext:paradoxcodeVanillaReady"
+            ]
+          },
+          {
+            "id": "checkDiagnostics",
+            "title": "%walkthrough.checkDiagnostics.title%",
+            "description": "%walkthrough.checkDiagnostics.description%",
+            "media": {
+              "markdown": "media/getting-started.md"
+            },
+            "completionEvents": [
+              "onCommand:paradoxcode.exportDiagnostics"
+            ]
+          },
+          {
+            "id": "missionPreview",
+            "title": "%walkthrough.missionPreview.title%",
+            "description": "%walkthrough.missionPreview.description%",
+            "media": {
+              "markdown": "media/getting-started.md"
+            },
+            "completionEvents": [
+              "onCommand:paradoxcode.showMissionPreview"
+            ]
+          }
+        ]
+      }
+    ],
     "configurationDefaults": {
       "[eu4]": {
         "editor.semanticHighlighting.enabled": true,
@@ -167,19 +266,10 @@
           "default": "",
           "markdownDescription": "%configuration.pdxLsPath.description%"
         },
-        "paradoxcode.serverVersion": {
-          "type": "string",
-          "default": "0.1.0",
-          "markdownDescription": "%configuration.serverVersion.description%"
-        },
-        "paradoxcode.serverRepository": {
-          "type": "string",
-          "default": "danxiaogu520/ParadoxCode",
-          "markdownDescription": "%configuration.serverRepository.description%"
-        },
         "paradoxcode.serverInstallDirectory": {
           "type": "string",
           "default": "",
+          "scope": "machine",
           "markdownDescription": "%configuration.serverInstallDirectory.description%"
         },
         "paradoxcode.projectConfig": {
@@ -254,8 +344,9 @@
     "check": "npm run compile && node scripts/smoke.mjs",
     "vscode:prepublish": "npm run compile",
     "test:contract": "npm run compile && node scripts/extension-contract.mjs",
+    "test:package": "vsce package --out ../../target/paradoxcode-vscode-contract.vsix",
     "test:host": "npm run compile && node scripts/host-test.mjs",
-    "package": "npm run compile && npx --yes @vscode/vsce package"
+    "package": "npm run compile && vsce package"
   },
   "dependencies": {
     "smol-toml": "^1.4.0",
@@ -263,9 +354,9 @@
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
-    "@types/vscode": "~1.125.0",
-    "typescript": "^7.0.2",
+    "@types/vscode": "1.85.0",
     "@vscode/test-electron": "^2.4.1",
+    "typescript": "^7.0.2",
     "mocha": "^10.4.0",
     "@vscode/vsce": "^3.2.2"
   },
@@ -273,7 +364,6 @@
     "out/**",
     "media/**",
     "syntaxes/**",
-    "scripts/**",
     "language-configuration.json",
     "package.json",
     "package.nls*.json",

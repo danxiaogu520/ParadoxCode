@@ -13,8 +13,20 @@ permissions:
   contents: read
 
 jobs:
+  preflight:
+    name: Verify release credentials
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+    steps:
+      - name: Require VS Code Marketplace credentials
+        shell: bash
+        run: ': "${VSCE_PAT:?VSCE_PAT Actions secret is required before tagging a release}"'
+
   build:
     name: Build ${{ matrix.target }}
+    needs: preflight
     strategy:
       fail-fast: false
       matrix:
@@ -99,3 +111,52 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes
+
+  vscode:
+    name: Publish VS Code Marketplace extension
+    needs: publish
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+      - run: npm ci --prefix editors/vscode --no-audit --no-fund
+      - name: Verify extension and tag versions
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          node -e '
+            const packageJson = require("./editors/vscode/package.json");
+            const packageLock = require("./editors/vscode/package-lock.json");
+            const expected = process.argv[1];
+            if (packageJson.version !== expected || packageLock.version !== expected) {
+              throw new Error(`VS Code versions must equal tag ${expected}: package=${packageJson.version}, lock=${packageLock.version}`);
+            }
+          ' "$version"
+      - name: Check and package extension
+        working-directory: editors/vscode
+        shell: bash
+        run: |
+          npm run test:contract
+          mkdir -p ../../dist
+          npm exec -- vsce package --out "../../dist/paradoxcode-vscode-${GITHUB_REF_NAME#v}.vsix"
+      - name: Attach VSIX to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh release upload "$GITHUB_REF_NAME" "dist/paradoxcode-vscode-${GITHUB_REF_NAME#v}.vsix"
+      - name: Publish the same VSIX to Visual Studio Marketplace
+        working-directory: editors/vscode
+        shell: bash
+        run: |
+          : "${VSCE_PAT:?VSCE_PAT Actions secret is required to publish the VS Code extension}"
+          npm exec -- vsce publish \
+            --packagePath "../../dist/paradoxcode-vscode-${GITHUB_REF_NAME#v}.vsix"
