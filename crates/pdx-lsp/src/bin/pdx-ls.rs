@@ -4,7 +4,7 @@ fn main() -> Result<(), pdx_lsp::LspError> {
         .iter()
         .any(|argument| argument == "--version" || argument == "-V")
     {
-        println!("pdx-ls 0.1.0");
+        println!("pdx-ls {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
     if !args.is_empty() {
