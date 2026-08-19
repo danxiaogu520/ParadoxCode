@@ -126,7 +126,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
-        run: gh release create "$RELEASE_TAG" dist/* --verify-tag --generate-notes
+        run: |
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" dist/* --verify-tag --generate-notes
+          fi
 
   vscode:
     name: Publish VS Code Marketplace extension
@@ -182,7 +185,7 @@ jobs:
         shell: bash
         run: |
           version="${RELEASE_TAG#v}"
-          gh release upload "$RELEASE_TAG" "dist/paradoxcode-vscode-${version}.vsix"
+          gh release upload "$RELEASE_TAG" "dist/paradoxcode-vscode-${version}.vsix" --clobber
       - name: Publish the same VSIX with Marketplace trusted publishing
         working-directory: editors/vscode
         shell: bash
