@@ -123,6 +123,7 @@ pub(crate) fn is_snapshot_request(method: &str) -> bool {
             | "textDocument/formatting"
             | "workspace/symbol"
             | "pdx/workspaceDiagnostics"
+            | "pdx/workspaceFiles"
             | "pdx/classifyPaths"
             | "pdx/textDiagnostics"
             | "pdx/missionPreview"

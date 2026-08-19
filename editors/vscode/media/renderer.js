@@ -1,7 +1,7 @@
 // Mission-tree canvas renderer for the ParadoxCode preview webview.
 //
 // Consumes the `pdx/missionPreview` wire contract: world-space node/group
-// positions, arrow glyph placements, byte spans for jump-to-source, and
+// positions, arrow glyph placements, and UTF-16 source ranges for jump-to-source,
 // mission-scoped diagnostics. All geometry is presentation-only; the server
 // owns layout semantics — including every arrow segment (the renderer maps
 // glyph kinds to drawings and never recomputes layout).
@@ -29,21 +29,38 @@
     const EMT_TITLE_Y = 84;
     const EMT_TITLE_WIDTH = 96;
 
-    const COLORS = {
-        border: '#39414c',
-        borderSelected: '#4d7cfe',
-        error: '#d55c5c',
-        warning: '#d9a13b',
-        root: '#5fd58a',
-        text: getComputedStyle(document.body).color || '#d4d8dd',
-        dim: '#8a919c',
-        groupBg: 'rgba(42, 50, 64, 0.85)',
-        arrow: '#4d7cfe',
-        canvas: 'transparent',
-    };
+    function themeColor(name, fallback) {
+        const value = getComputedStyle(document.body).getPropertyValue(name).trim();
+        return value || fallback;
+    }
+
+    function readColors() {
+        const styles = getComputedStyle(document.body);
+        return {
+            border: themeColor('--vscode-editorIndentGuide-background', '#39414c'),
+            borderSelected: themeColor('--vscode-focusBorder', '#4d7cfe'),
+            error: themeColor('--vscode-editorError-foreground', '#d55c5c'),
+            warning: themeColor('--vscode-editorWarning-foreground', '#d9a13b'),
+            root: themeColor('--vscode-testing-iconPassed', '#5fd58a'),
+            text: styles.color || '#d4d8dd',
+            dim: themeColor('--vscode-descriptionForeground', '#8a919c'),
+            groupBg: themeColor('--vscode-editorWidget-background', 'rgba(42, 50, 64, 0.85)'),
+            arrow: themeColor('--vscode-charts-blue', '#4d7cfe'),
+            card: themeColor('--vscode-editorWidget-background', '#23282f'),
+            errorBg: themeColor('--vscode-inputValidation-errorBackground', 'rgba(58, 31, 31, 0.9)'),
+            rootBg: themeColor('--vscode-inputValidation-infoBackground', 'rgba(29, 58, 42, 0.9)'),
+            externalBg: themeColor('--vscode-editorHoverWidget-background', 'rgba(27, 30, 35, 0.8)'),
+            texturedText: themeColor('--vscode-editor-foreground', '#ffffff'),
+            canvas: 'transparent',
+        };
+    }
+
+    let COLORS = readColors();
 
     const canvas = document.getElementById('tree');
     const status = document.getElementById('status');
+    const tooltip = document.getElementById('tooltip');
+    const nodeList = document.getElementById('node-list');
     const ctx = canvas.getContext('2d');
 
     let preview = null;
@@ -51,8 +68,11 @@
     let pan = { x: 0, y: 0 };
     let zoom = 1;
     let dragging = null; // { startX, startY, panX, panY }
+    let keyboardIndex = -1;
+    let options = { zoomSensitivity: 1, showTextures: true };
 
     function resize() {
+        COLORS = readColors();
         const dpr = window.devicePixelRatio || 1;
         canvas.width = Math.round(canvas.clientWidth * dpr);
         canvas.height = Math.round(canvas.clientHeight * dpr);
@@ -182,7 +202,7 @@
     // A failed decode is cached as a miss so the schematic fallback stays
     // reachable (a failed `Image` still reports `complete === true`).
     function textureImage(name) {
-        if (!preview || !preview.textures || !name || failedTextures.has(name)) {
+        if (!options.showTextures || !preview || !preview.textures || !name || failedTextures.has(name)) {
             return null;
         }
         const url = preview.textures[name];
@@ -354,7 +374,7 @@
                 continue;
             }
             const label = `↥ ${ext.label}`;
-            ctx.fillStyle = 'rgba(27, 30, 35, 0.8)';
+            ctx.fillStyle = COLORS.externalBg;
             const width = ctx.measureText(label).width + 8;
             roundRect(pos.x, pos.y - 22 * zoom, width, 16, 3);
             ctx.fill();
@@ -378,7 +398,7 @@
             const slotX = pos.x + EMT_TITLE_X * zoom;
             const slotY = pos.y + EMT_TITLE_Y * zoom;
             const slotW = EMT_TITLE_WIDTH * zoom;
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = COLORS.texturedText;
             ctx.font = `bold ${Math.max(8, 10 * zoom)}px ${getComputedStyle(document.body).fontFamily}`;
             // Top-aligned like the game's title label: first line sits at the
             // slot's top edge, subsequent lines follow.
@@ -435,7 +455,7 @@
         const w = NODE_WIDTH * zoom;
         const h = NODE_HEIGHT * zoom;
         const isHovered = hovered && hovered.kind === 'node' && hovered.index === i;
-        ctx.fillStyle = node.hasError ? 'rgba(58, 31, 31, 0.9)' : node.isRoot ? 'rgba(29, 58, 42, 0.9)' : '#23282f';
+        ctx.fillStyle = node.hasError ? COLORS.errorBg : node.isRoot ? COLORS.rootBg : COLORS.card;
         roundRect(pos.x, pos.y, w, h, 6 * zoom);
         ctx.fill();
         ctx.strokeStyle = isHovered ? COLORS.borderSelected : nodeColor(node);
@@ -446,6 +466,7 @@
     }
 
     function draw() {
+        COLORS = readColors();
         ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
         if (!preview) {
             return;
@@ -480,17 +501,174 @@
         }
     }
 
+    function nodeLabel(node) {
+        const title = node.title && node.title.value ? node.title.value : node.id;
+        const flags = [];
+        if (node.hasError) flags.push('error');
+        if (node.hasWarning) flags.push('warning');
+        if (node.isRoot) flags.push('root');
+        return `${title}${flags.length ? ` · ${flags.join(', ')}` : ''}`;
+    }
+
+    function postJump(hit) {
+        if (!preview || !hit) {
+            return;
+        }
+        const node = hit.node;
+        vscode.postMessage({
+            type: hit.kind === 'group' ? 'openGroup' : 'jump',
+            uri: preview.documentUri || '',
+            range: node.sourceRange || null,
+            start: node.start,
+            end: node.end,
+        });
+    }
+
+    function renderNodeList() {
+        if (!nodeList) {
+            return;
+        }
+        nodeList.textContent = '';
+        if (!preview) {
+            return;
+        }
+        preview.nodes.forEach((node, index) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'node-entry';
+            if (node.hasError) button.classList.add('error');
+            else if (node.hasWarning) button.classList.add('warning');
+            else if (node.isRoot) button.classList.add('root');
+            button.textContent = nodeLabel(node);
+            button.title = node.titleKey || node.id;
+            button.setAttribute('role', 'listitem');
+            button.addEventListener('focus', () => {
+                keyboardIndex = index;
+                hovered = { kind: 'node', index, node, rect: null };
+                draw();
+            });
+            button.addEventListener('click', () => postJump({ kind: 'node', node, index }));
+            nodeList.appendChild(button);
+        });
+    }
+
+    function showTooltip(hit, clientX, clientY) {
+        if (!tooltip || !hit) {
+            return;
+        }
+        const node = hit.node;
+        tooltip.textContent = hit.kind === 'node'
+            ? `${nodeLabel(node)}\n${node.titleKey || node.id}`
+            : node.label;
+        tooltip.style.left = `${Math.min(clientX + 12, window.innerWidth - 380)}px`;
+        tooltip.style.top = `${Math.min(clientY + 12, window.innerHeight - 100)}px`;
+        tooltip.classList.add('visible');
+        tooltip.setAttribute('aria-hidden', 'false');
+    }
+
+    function hideTooltip() {
+        if (!tooltip) {
+            return;
+        }
+        tooltip.classList.remove('visible');
+        tooltip.setAttribute('aria-hidden', 'true');
+    }
+
+    function focusNode(index) {
+        if (!preview || preview.nodes.length === 0) {
+            return;
+        }
+        keyboardIndex = (index + preview.nodes.length) % preview.nodes.length;
+        const node = preview.nodes[keyboardIndex];
+        hovered = { kind: 'node', index: keyboardIndex, node, rect: null };
+        canvas.setAttribute('aria-label', `Mission ${nodeLabel(node)}`);
+        draw();
+    }
+
+    function exportJson() {
+        if (preview) {
+            vscode.postMessage({ type: 'exportJson', json: JSON.stringify(preview, null, 2) });
+        }
+    }
+
+    function exportPng() {
+        vscode.postMessage({ type: 'exportPng', dataUri: canvas.toDataURL('image/png') });
+    }
+
+    function escapeXml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+    }
+
+    function exportSvg() {
+        if (!preview) {
+            return;
+        }
+        let maxX = 640;
+        let maxY = 480;
+        for (const node of preview.nodes) {
+            maxX = Math.max(maxX, node.x + NODE_WIDTH + 32);
+            maxY = Math.max(maxY, node.y + NODE_HEIGHT + 32);
+        }
+        const parts = [
+            `<svg xmlns="http://www.w3.org/2000/svg" width="${maxX}" height="${maxY}" viewBox="0 0 ${maxX} ${maxY}">`,
+            `<rect width="100%" height="100%" fill="${escapeXml(themeColor('--vscode-editor-background', '#20252d'))}"/>`,
+        ];
+        for (const segment of preview.arrows) {
+            const x = Number(segment.x) || 0;
+            const y = Number(segment.y) || 0;
+            const stroke = `stroke="${escapeXml(COLORS.arrow)}" stroke-width="2.5" fill="${escapeXml(COLORS.arrow)}"`;
+            if (segment.glyph === 'verticalTile' || segment.glyph === 'verticalSkipTier') {
+                parts.push(`<line x1="${x}" y1="${y}" x2="${x}" y2="${y + ARROW_TILE_HEIGHT}" ${stroke}/>`);
+            } else if (segment.glyph === 'horizontalSkipSlot') {
+                parts.push(`<line x1="${x}" y1="${y}" x2="${x + ARROW_TILE_WIDTH}" y2="${y}" ${stroke}/>`);
+            } else if (segment.glyph === 'end') {
+                parts.push(`<path d="M ${x - 7} ${y - 4} L ${x + 7} ${y - 4} L ${x} ${y + 7} Z" ${stroke}/>`);
+            } else if (segment.glyph === 'rightOut' || segment.glyph === 'rightIn') {
+                parts.push(`<path d="M ${x - 4} ${y - 7} L ${x - 4} ${y + 7} L ${x + 7} ${y} Z" ${stroke}/>`);
+            } else if (segment.glyph === 'leftOut' || segment.glyph === 'leftIn') {
+                parts.push(`<path d="M ${x + 4} ${y - 7} L ${x + 4} ${y + 7} L ${x - 7} ${y} Z" ${stroke}/>`);
+            }
+        }
+        for (const group of preview.groups) {
+            parts.push(`<rect x="${group.x}" y="${group.y}" width="200" height="20" rx="4" fill="${escapeXml(COLORS.groupBg)}" stroke="${escapeXml(COLORS.border)}"/>`);
+            parts.push(`<text x="${group.x + 8}" y="${group.y + 14}" fill="${escapeXml(COLORS.dim)}" font-family="sans-serif" font-size="11">${escapeXml(group.label)}</text>`);
+        }
+        for (const node of preview.nodes) {
+            const stroke = node.hasError ? COLORS.error : node.hasWarning ? COLORS.warning : node.isRoot ? COLORS.root : COLORS.border;
+            const fill = node.hasError ? COLORS.errorBg : node.isRoot ? COLORS.rootBg : COLORS.card;
+            parts.push(`<rect x="${node.x}" y="${node.y}" width="${NODE_WIDTH}" height="${NODE_HEIGHT}" rx="6" fill="${escapeXml(fill)}" stroke="${escapeXml(stroke)}"/>`);
+            parts.push(`<text x="${node.x + NODE_WIDTH / 2}" y="${node.y + NODE_HEIGHT / 2}" text-anchor="middle" fill="${escapeXml(COLORS.text)}" font-family="sans-serif" font-size="11">${escapeXml(node.title?.value || node.id)}</text>`);
+        }
+        parts.push('</svg>');
+        vscode.postMessage({ type: 'exportSvg', svg: parts.join('') });
+    }
+
     window.addEventListener('message', (event) => {
         const message = event.data;
         if (message.type === 'preview') {
             preview = message.payload;
+            keyboardIndex = -1;
             fitView();
             hideStatus();
             draw();
+            renderNodeList();
             renderSummary();
         } else if (message.type === 'empty' || message.type === 'error') {
             preview = null;
+            renderNodeList();
+            hideTooltip();
             showStatus(message.message || 'No preview available.');
+        } else if (message.type === 'options') {
+            options = {
+                zoomSensitivity: Math.min(2, Math.max(0.5, Number(message.zoomSensitivity) || 1)),
+                showTextures: message.showTextures !== false,
+            };
+            draw();
         }
     });
 
@@ -499,10 +677,8 @@
         const sx = event.clientX - rect.left;
         const sy = event.clientY - rect.top;
         const hit = nodeAt(sx, sy);
-        if (hit && hit.kind === 'node') {
-            vscode.postMessage({ type: 'jump', start: hit.node.start, end: hit.node.end });
-        } else if (hit && hit.kind === 'group') {
-            vscode.postMessage({ type: 'openGroup', start: hit.node.start, end: hit.node.end });
+        if (hit) {
+            postJump(hit);
         } else {
             dragging = { startX: event.clientX, startY: event.clientY, panX: pan.x, panY: pan.y };
         }
@@ -523,18 +699,22 @@
             hovered = next;
             draw();
         }
+        if (next) showTooltip(next, event.clientX, event.clientY);
+        else hideTooltip();
     });
 
     window.addEventListener('mouseup', () => {
         dragging = null;
     });
 
+    canvas.addEventListener('mouseleave', hideTooltip);
+
     canvas.addEventListener('wheel', (event) => {
         event.preventDefault();
         const rect = canvas.getBoundingClientRect();
         const sx = event.clientX - rect.left;
         const sy = event.clientY - rect.top;
-        const factor = Math.pow(1.0015, -event.deltaY);
+        const factor = Math.pow(1.0015, -event.deltaY * options.zoomSensitivity);
         const nextZoom = Math.min(2.5, Math.max(0.35, zoom * factor));
         const world = toWorld(sx, sy);
         zoom = nextZoom;
@@ -547,6 +727,41 @@
         fitView();
         draw();
     });
+
+    canvas.addEventListener('keydown', (event) => {
+        if (!preview) {
+            return;
+        }
+        if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            focusNode(keyboardIndex + 1);
+        } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+            event.preventDefault();
+            focusNode(keyboardIndex - 1);
+        } else if (event.key === 'Enter' && keyboardIndex >= 0) {
+            event.preventDefault();
+            postJump({ kind: 'node', node: preview.nodes[keyboardIndex], index: keyboardIndex });
+        } else if (event.key === '+' || event.key === '=') {
+            event.preventDefault();
+            zoom = Math.min(2.5, zoom * 1.15);
+            draw();
+        } else if (event.key === '-') {
+            event.preventDefault();
+            zoom = Math.max(0.35, zoom / 1.15);
+            draw();
+        } else if (event.key.toLowerCase() === 'f') {
+            event.preventDefault();
+            fitView();
+            draw();
+        }
+    });
+
+    document.getElementById('fit')?.addEventListener('click', () => { fitView(); draw(); });
+    document.getElementById('zoom-in')?.addEventListener('click', () => { zoom = Math.min(2.5, zoom * 1.15); draw(); });
+    document.getElementById('zoom-out')?.addEventListener('click', () => { zoom = Math.max(0.35, zoom / 1.15); draw(); });
+    document.getElementById('export-png')?.addEventListener('click', exportPng);
+    document.getElementById('export-svg')?.addEventListener('click', exportSvg);
+    document.getElementById('export-json')?.addEventListener('click', exportJson);
 
     window.addEventListener('resize', resize);
     resize();

@@ -29,6 +29,7 @@ pnpm-debug.log*
 
 # Generated VS Code extension assets
 /editors/vscode/out/
+/editors/vscode/.vscode-test/
 *.vsix
 
 # Local indexes, caches, and generated rule artifacts

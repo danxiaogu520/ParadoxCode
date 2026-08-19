@@ -3,14 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy"
-          content="default-src 'none'; style-src {{cspSource}}; script-src {{cspSource}}; img-src data:;">
+          content="default-src 'none'; style-src {{cspSource}}; script-src {{cspSource}}; img-src data:; connect-src 'none';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{styleUri}}">
     <title>Mission Tree Preview</title>
 </head>
 <body>
-    <canvas id="tree"></canvas>
-    <div id="status" class="status"></div>
+    <header class="toolbar" aria-label="Mission preview controls">
+        <button id="fit" type="button" title="Fit mission tree (F)">Fit</button>
+        <button id="zoom-out" type="button" title="Zoom out (-)">−</button>
+        <button id="zoom-in" type="button" title="Zoom in (+)">+</button>
+        <button id="export-png" type="button" title="Export PNG">PNG</button>
+        <button id="export-svg" type="button" title="Export SVG">SVG</button>
+        <button id="export-json" type="button" title="Export JSON">JSON</button>
+        <details class="legend">
+            <summary>Legend</summary>
+            <div class="legend-content">
+                <span><i class="swatch root"></i>Root</span>
+                <span><i class="swatch warning"></i>Warning</span>
+                <span><i class="swatch error"></i>Error</span>
+                <span><i class="swatch selected"></i>Selected</span>
+            </div>
+        </details>
+        <details id="mission-list" class="mission-list">
+            <summary>Mission list</summary>
+            <div id="node-list" role="list" aria-label="Mission nodes"></div>
+        </details>
+    </header>
+    <canvas id="tree" tabindex="0" role="img" aria-label="Mission tree preview"></canvas>
+    <div id="tooltip" class="tooltip" role="tooltip" aria-hidden="true"></div>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
     <script src="{{scriptUri}}"></script>
 </body>
 </html>

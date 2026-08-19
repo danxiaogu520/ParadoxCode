@@ -1,0 +1,82 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Europa Universalis IV",
+  "scopeName": "source.eu4",
+  "fileTypes": ["txt", "gui", "gfx"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#string" },
+    { "include": "#variable" },
+    { "include": "#scope" },
+    { "include": "#boolean" },
+    { "include": "#number" },
+    { "include": "#key" },
+    { "include": "#operator" },
+    { "include": "#punctuation" },
+    { "include": "#bare" }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        { "name": "comment.line.number-sign.eu4", "match": "#.*$" }
+      ]
+    },
+    "string": {
+      "name": "string.quoted.double.eu4",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        { "name": "constant.character.escape.eu4", "match": "\\\\." }
+      ]
+    },
+    "variable": {
+      "patterns": [
+        { "name": "variable.other.definition.eu4", "match": "@[A-Za-z_][A-Za-z0-9_.-]*" }
+      ]
+    },
+    "scope": {
+      "patterns": [
+        {
+          "name": "variable.language.scope.eu4",
+          "match": "\\b(?:ROOT|FROM|PREV|PREVPREV|PREVPREVPREV|THIS|ROOT\\.FROM|FROM\\.FROM)\\b"
+        }
+      ]
+    },
+    "boolean": {
+      "patterns": [
+        { "name": "constant.language.boolean.eu4", "match": "\\b(?:yes|no|true|false)\\b" }
+      ]
+    },
+    "number": {
+      "patterns": [
+        { "name": "constant.numeric.eu4", "match": "(?<![A-Za-z0-9_.-])-?\\b[0-9]+(?:\\.[0-9]+)?\\b" }
+      ]
+    },
+    "key": {
+      "patterns": [
+        {
+          "match": "(^|[\\[{;\\s])([A-Za-z_][A-Za-z0-9_.-]*)(?=\\s*=)",
+          "captures": {
+            "2": { "name": "entity.name.tag.eu4" }
+          }
+        }
+      ]
+    },
+    "operator": {
+      "patterns": [
+        { "name": "keyword.operator.assignment.eu4", "match": "(?:=|<|>)" }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        { "name": "punctuation.section.block.begin.eu4", "match": "[\\[{]" },
+        { "name": "punctuation.section.block.end.eu4", "match": "[\\]}]" }
+      ]
+    },
+    "bare": {
+      "patterns": [
+        { "name": "variable.other.eu4", "match": "\\b[A-Za-z_][A-Za-z0-9_.-]*\\b" }
+      ]
+    }
+  }
+}

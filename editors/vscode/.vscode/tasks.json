@@ -7,6 +7,20 @@
             "script": "compile",
             "group": "build",
             "problemMatcher": "$tsc"
+        },
+        {
+            "label": "npm: test:contract",
+            "type": "npm",
+            "script": "test:contract",
+            "group": "test",
+            "problemMatcher": "$tsc"
+        },
+        {
+            "label": "npm: test:host",
+            "type": "npm",
+            "script": "test:host",
+            "group": "test",
+            "problemMatcher": "$tsc"
         }
     ]
 }

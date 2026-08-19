@@ -81,7 +81,7 @@ fn mission_preview_returns_renderer_ready_tree_data() {
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":format!("{root_uri}/localisation/titles_l_english.yml"),"languageId":"eu4","version":1,"text":"l_english:\n a1_title:0 \"Alpha One\"\n a2_title:0 \"Alpha Two\"\n"}}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"pdx/missionPreview","params":{"path":"missions/test.txt","text":"main_tree = {\n\tslot = 1\n\ta1 = { position = 1 icon = mission_alpha }\n\ta2 = { position = 2 required_missions = { a1 } }\n}\n\nbranch_tree = {\n\tslot = 2\n\tb1 = { position = 1 required_missions = { external_id } }\n}\n"}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdx/missionPreview","params":{"path":"missions/test.txt","uri":format!("{root_uri}/missions/test.txt"),"version":7,"text":"main_tree = {\n\tslot = 1\n\ta1 = { position = 1 icon = mission_alpha }\n\ta2 = { position = 2 required_missions = { a1 } }\n}\n\nbranch_tree = {\n\tslot = 2\n\tb1 = { position = 1 required_missions = { external_id } }\n}\n"}}),
         json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
     ]);
@@ -97,6 +97,11 @@ fn mission_preview_returns_renderer_ready_tree_data() {
         .expect("mission preview response");
     let nodes = response["result"]["nodes"].as_array().expect("nodes");
     assert_eq!(nodes.len(), 3);
+    assert_eq!(
+        response["result"]["documentUri"],
+        format!("{root_uri}/missions/test.txt")
+    );
+    assert_eq!(response["result"]["documentVersion"], 7);
     // Without a game installation the texture table is empty but present, and
     // every node/arrow still carries its sprite identity for textured runs.
     assert!(
@@ -126,6 +131,10 @@ fn mission_preview_returns_renderer_ready_tree_data() {
     let start = a2["start"].as_u64().expect("a2 start");
     let end = a2["end"].as_u64().expect("a2 end");
     assert!(start < end, "mission block carries a real byte span");
+    assert!(a2["sourceRange"]["start"]["line"].is_u64());
+    assert!(a2["sourceRange"]["start"]["character"].is_u64());
+    assert!(a2["sourceRange"]["end"]["line"].is_u64());
+    assert!(a2["sourceRange"]["end"]["character"].is_u64());
     assert_eq!(a2["required"], json!(["a1"]), "edges reachable from ids");
     // Mission titles resolve from the open localisation overlay via
     // active workspace definitions; unknown keys fall back to the raw id.
@@ -148,6 +157,10 @@ fn mission_preview_returns_renderer_ready_tree_data() {
     assert!(arrows.iter().any(|a| a["glyph"] == "end"));
     let groups = response["result"]["groups"].as_array().expect("groups");
     assert_eq!(groups.len(), 2);
+    assert!(groups.iter().all(|group| {
+        group["sourceRange"]["start"]["line"].is_u64()
+            && group["sourceRange"]["end"]["character"].is_u64()
+    }));
     // Cross-file prerequisite surfaces as an external stub, not a node.
     let external = response["result"]["external"].as_array().expect("external");
     assert_eq!(external.len(), 1);
@@ -208,6 +221,53 @@ fn workspace_diagnostics_batches_indexed_disk_files_without_opening_overlays() {
     assert!(second["result"]["nextOffset"].is_null());
     assert_eq!(second["result"]["items"][0]["logicalPath"], "events/b.txt");
     assert!(second["result"]["items"][0]["diagnostics"].is_array());
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn workspace_files_exposes_active_source_roots_without_contents() {
+    let (root, root_uri) = temp_workspace_dir();
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("events directory");
+    fs::write(
+        events.join("loaded.txt"),
+        "country_event = { id = loaded.1 }\n",
+    )
+    .expect("source file");
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"pdx/workspaceFiles"}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let response = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("workspace files response");
+    let roots = response["result"]["roots"].as_array().expect("roots");
+    assert!(roots.iter().any(|root| root["kind"] == "currentMod"));
+    let files = response["result"]["files"].as_array().expect("files");
+    let loaded = files
+        .iter()
+        .find(|file| file["logicalPath"] == "events/loaded.txt")
+        .expect("loaded source file");
+    assert!(loaded["active"].as_bool().unwrap_or(false));
+    assert!(
+        loaded["uri"]
+            .as_str()
+            .is_some_and(|uri| uri.starts_with("file:"))
+    );
+    assert!(
+        loaded.get("text").is_none(),
+        "workspace files must not return contents"
+    );
     fs::remove_dir_all(root).expect("cleanup");
 }
 

@@ -1,10 +1,14 @@
 {
   "name": "paradoxcode-vscode",
-  "displayName": "ParadoxCode - EU4 Language Tools",
-  "description": "Independent, unofficial EU4 language tooling backed by pdx-ls, with a live mission-tree preview.",
+  "displayName": "%extension.displayName%",
+  "description": "%extension.description%",
   "version": "0.1.0",
   "publisher": "paradoxcode",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/danxiaogu520/ParadoxCode"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -37,9 +41,34 @@
         ]
       }
     ],
+    "grammars": [
+      {
+        "language": "eu4",
+        "scopeName": "source.eu4",
+        "path": "./syntaxes/eu4.tmLanguage.json"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "paradoxcode.loadedFiles",
+          "name": "%views.loadedFiles.name%",
+          "when": "paradoxcodeServerRunning"
+        }
+      ]
+    },
     "configurationDefaults": {
       "[eu4]": {
-        "editor.semanticHighlighting.enabled": true
+        "editor.semanticHighlighting.enabled": true,
+        "files.autoGuessEncoding": true,
+        "editor.quickSuggestions": {
+          "other": true,
+          "comments": false,
+          "strings": true
+        },
+        "editor.insertSpaces": false,
+        "editor.acceptSuggestionOnEnter": "off",
+        "editor.suggest.insertMode": "replace"
       }
     },
     "semanticTokenScopes": [
@@ -62,16 +91,70 @@
     "commands": [
       {
         "command": "paradoxcode.showMissionPreview",
-        "title": "Open Mission Tree Preview to the Side",
+        "title": "%commands.showMissionPreview.title%",
         "category": "ParadoxCode",
         "icon": "$(open-preview)"
+      },
+      {
+        "command": "paradoxcode.refreshMissionPreview",
+        "title": "%commands.refreshMissionPreview.title%",
+        "category": "ParadoxCode",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "paradoxcode.installServer",
+        "title": "%commands.installServer.title%",
+        "category": "ParadoxCode"
+      },
+      {
+        "command": "paradoxcode.selectServer",
+        "title": "%commands.selectServer.title%",
+        "category": "ParadoxCode"
+      },
+      {
+        "command": "paradoxcode.selectGameDirectory",
+        "title": "%commands.selectGameDirectory.title%",
+        "category": "ParadoxCode"
+      },
+      {
+        "command": "paradoxcode.reloadServer",
+        "title": "%commands.reloadServer.title%",
+        "category": "ParadoxCode"
+      },
+      {
+        "command": "paradoxcode.exportDiagnostics",
+        "title": "%commands.exportDiagnostics.title%",
+        "category": "ParadoxCode"
+      },
+      {
+        "command": "paradoxcode.openOutput",
+        "title": "%commands.openOutput.title%",
+        "category": "ParadoxCode"
+      },
+      {
+        "command": "paradoxcode.refreshLoadedFiles",
+        "title": "%commands.refreshLoadedFiles.title%",
+        "category": "ParadoxCode",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
       "editor/title": [
         {
           "command": "paradoxcode.showMissionPreview",
-          "when": "resourceLangId == eu4",
+          "when": "paradoxcodeMissionFile",
+          "group": "navigation@1"
+        },
+        {
+          "command": "paradoxcode.refreshMissionPreview",
+          "when": "paradoxcodeMissionFile",
+          "group": "navigation@2"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "paradoxcode.refreshLoadedFiles",
+          "when": "view == paradoxcode.loadedFiles",
           "group": "navigation@1"
         }
       ]
@@ -82,32 +165,85 @@
         "paradoxcode.pdxLsPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path to the `pdx-ls` server binary. When empty, the extension looks for `pdx-ls` on `PATH`."
+          "markdownDescription": "%configuration.pdxLsPath.description%"
+        },
+        "paradoxcode.serverVersion": {
+          "type": "string",
+          "default": "0.1.0",
+          "markdownDescription": "%configuration.serverVersion.description%"
+        },
+        "paradoxcode.serverRepository": {
+          "type": "string",
+          "default": "danxiaogu520/ParadoxCode",
+          "markdownDescription": "%configuration.serverRepository.description%"
+        },
+        "paradoxcode.serverInstallDirectory": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "%configuration.serverInstallDirectory.description%"
         },
         "paradoxcode.projectConfig": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path to a `.pdx/project.toml` whose fields are overridden by the inline options below. When empty, a `.pdx/project.toml` next to the workspace root is discovered automatically, so VS Code and Zed share the same project configuration with no per-editor setup."
+          "markdownDescription": "%configuration.projectConfig.description%"
         },
         "paradoxcode.modDirectory": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Directory of the current Mod being edited. Defaults to the workspace root. Mirrors `lsp.pdx-ls.initialization_options.modDirectory`."
+          "markdownDescription": "%configuration.modDirectory.description%"
         },
         "paradoxcode.vanillaIndexCache": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path to a persistent Vanilla index cache (`.pdxindex`). When absent, `pdx-ls` attempts automatic discovery once. Mirrors `lsp.pdx-ls.initialization_options.vanillaIndexCache`."
+          "markdownDescription": "%configuration.vanillaIndexCache.description%"
         },
         "paradoxcode.dependencies": {
           "type": "array",
           "default": [],
-          "markdownDescription": "Dependency Mods in order from lowest to highest priority. Items are `{ id, path, index? }`. Mirrors `lsp.pdx-ls.initialization_options.dependencies`."
+          "markdownDescription": "%configuration.dependencies.description%",
+          "items": {
+            "type": "object",
+            "required": ["id", "path"],
+            "properties": {
+              "id": { "type": "string" },
+              "path": { "type": "string" },
+              "index": { "type": "string" }
+            }
+          }
         },
         "paradoxcode.gameDirectory": {
           "type": "string",
           "default": "",
-          "markdownDescription": "EU4 installation root (the folder containing `eu4.exe`). Backs the mission-tree preview with real game textures (`interface/*.gfx` + `gfx/interface/missions`). When empty, the server attempts one-time automatic discovery. Mirrors `lsp.pdx-ls.initialization_options.gameDirectory`."
+          "markdownDescription": "%configuration.gameDirectory.description%"
+        },
+        "paradoxcode.diagnosticIgnoreCodes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "markdownDescription": "%configuration.diagnosticIgnoreCodes.description%"
+        },
+        "paradoxcode.diagnosticIgnoreFiles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "markdownDescription": "%configuration.diagnosticIgnoreFiles.description%"
+        },
+        "paradoxcode.diagnosticLogging": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "%configuration.diagnosticLogging.description%"
+        },
+        "paradoxcode.preview.zoomSensitivity": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 2,
+          "default": 1,
+          "markdownDescription": "%configuration.preview.zoomSensitivity.description%"
+        },
+        "paradoxcode.preview.showTextures": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%configuration.preview.showTextures.description%"
         }
       }
     }
@@ -116,7 +252,10 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "check": "npm run compile && node scripts/smoke.mjs",
-    "vscode:prepublish": "npm run compile"
+    "vscode:prepublish": "npm run compile",
+    "test:contract": "npm run compile && node scripts/extension-contract.mjs",
+    "test:host": "npm run compile && node scripts/host-test.mjs",
+    "package": "npm run compile && npx --yes @vscode/vsce package"
   },
   "dependencies": {
     "smol-toml": "^1.4.0",
@@ -125,6 +264,20 @@
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "~1.85.0",
-    "typescript": "^5.4.0"
-  }
+    "typescript": "^5.4.0",
+    "@vscode/test-electron": "^2.4.1",
+    "mocha": "^10.4.0",
+    "@vscode/vsce": "^3.2.2"
+  },
+  "files": [
+    "out/**",
+    "media/**",
+    "syntaxes/**",
+    "scripts/**",
+    "language-configuration.json",
+    "package.json",
+    "package.nls*.json",
+    "README.md",
+    "LICENSE"
+  ]
 }

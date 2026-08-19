@@ -8,6 +8,17 @@
             "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
             "outFiles": ["${workspaceFolder}/out/**/*.js"],
             "preLaunchTask": "npm: compile"
+        },
+        {
+            "name": "Run Extension Host Tests",
+            "type": "node",
+            "request": "launch",
+            "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/node",
+            "runtimeArgs": ["scripts/host-test.mjs"],
+            "env": { "RUN_VSCODE_HOST_TESTS": "1" },
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "npm: compile",
+            "console": "integratedTerminal"
         }
     ]
 }

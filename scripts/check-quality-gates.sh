@@ -32,6 +32,7 @@ check_zed() {
 
 check_vscode() {
     run npm --prefix editors/vscode run check
+    run npm --prefix editors/vscode run test:contract
 }
 
 check_release() {

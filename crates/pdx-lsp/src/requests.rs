@@ -52,6 +52,7 @@ fn glyph_name(glyph: ArrowGlyph) -> &'static str {
 
 const DEFAULT_WORKSPACE_DIAGNOSTIC_FILES: usize = 16;
 const MAX_CLASSIFIED_PATHS: usize = 4_096;
+const MAX_WORKSPACE_FILES: usize = 32_768;
 const MAX_TEXT_DIAGNOSTIC_FILES: usize = 16;
 const MAX_TEXT_DIAGNOSTIC_BYTES: usize = 16 * 1024 * 1024;
 
@@ -86,6 +87,12 @@ struct TextDiagnosticsParams {
 struct MissionPreviewParams {
     path: String,
     text: String,
+    /// The client document identity is echoed into the preview payload so a click can never
+    /// accidentally navigate the currently focused, but unrelated, editor.
+    uri: Option<String>,
+    /// The client document version captured together with `text`.  The VS Code client uses this
+    /// to discard a response that was computed for an older edit.
+    version: Option<i32>,
 }
 
 #[derive(Clone, Debug)]
@@ -128,6 +135,7 @@ impl SnapshotRequestContext {
             "textDocument/formatting" => self.formatting(params),
             "workspace/symbol" => self.workspace_symbols(params),
             "pdx/workspaceDiagnostics" => self.workspace_diagnostics(params),
+            "pdx/workspaceFiles" => self.workspace_files(params),
             "pdx/classifyPaths" => self.classify_paths(params),
             "pdx/textDiagnostics" => self.text_diagnostics(params),
             "pdx/missionPreview" => self.mission_preview(params),
@@ -218,6 +226,7 @@ impl SnapshotRequestContext {
         let file = &loaded.file;
         let layout = geometry::layout_file(file);
         let diagnostics = pdx_game::eu4::mission::validate(file);
+        let line_index = LineIndex::new(&params.text);
 
         // Resolve all `{mission_id}_title` keys in one workspace pass with the
         // same English-preferring symbol resolution as hover; missing keys
@@ -259,6 +268,21 @@ impl SnapshotRequestContext {
                 };
                 let start = usize::try_from(mission.span.start()).unwrap_or(0);
                 let end = usize::try_from(mission.span.end()).unwrap_or(start);
+                let source_range =
+                    line_index
+                        .position_range(&params.text, mission.span)
+                        .map(|range| {
+                            serde_json::json!({
+                                "start": {
+                                    "line": range.start.line,
+                                    "character": range.start.character,
+                                },
+                                "end": {
+                                    "line": range.end.line,
+                                    "character": range.end.character,
+                                },
+                            })
+                        });
                 serde_json::json!({
                     "tree": pos.tree_index,
                     "mission": pos.mission_index,
@@ -271,6 +295,7 @@ impl SnapshotRequestContext {
                     "y": y,
                     "start": start,
                     "end": end,
+                    "sourceRange": source_range,
                     "isRoot": is_root,
                     "hasError": has_severity(Severity::Error),
                     "hasWarning": has_severity(Severity::Warning),
@@ -327,6 +352,21 @@ impl SnapshotRequestContext {
                 let tree = &file.trees[*tree_index];
                 let start = usize::try_from(tree.span.start()).unwrap_or(0);
                 let end = usize::try_from(tree.span.end()).unwrap_or(start);
+                let source_range =
+                    line_index
+                        .position_range(&params.text, tree.span)
+                        .map(|range| {
+                            serde_json::json!({
+                                "start": {
+                                    "line": range.start.line,
+                                    "character": range.start.character,
+                                },
+                                "end": {
+                                    "line": range.end.line,
+                                    "character": range.end.character,
+                                },
+                            })
+                        });
                 groups.push(serde_json::json!({
                     "tree": *tree_index,
                     "label": tree.id,
@@ -335,6 +375,7 @@ impl SnapshotRequestContext {
                     "y": geometry::ORIGIN.1 - 30.0 - i as f32 * 18.0,
                     "start": start,
                     "end": end,
+                    "sourceRange": source_range,
                 }));
             }
         }
@@ -374,6 +415,8 @@ impl SnapshotRequestContext {
             .collect::<Vec<_>>();
 
         Ok(serde_json::json!({
+            "documentUri": params.uri,
+            "documentVersion": params.version,
             "nodes": nodes,
             "arrows": arrows,
             "groups": groups,
@@ -488,6 +531,85 @@ impl SnapshotRequestContext {
             "nextOffset": (end < total).then_some(end),
             "total": total,
             "items": items,
+        }))
+    }
+
+    /// Returns the immutable source-root/file view used by the VS Code Explorer contribution.
+    /// The response contains no file contents: it is only a stable, read-only navigation model
+    /// for current Mod, dependency, and Vanilla roots.
+    fn workspace_files(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        if params.is_some() {
+            // Keep this request intentionally parameterless so clients cannot turn it into an
+            // unbounded file enumeration protocol.
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                "workspace files does not accept parameters",
+            ));
+        }
+        self.ensure_active()?;
+        let roots = self
+            .snapshot
+            .source_roots()
+            .iter()
+            .map(|root| {
+                let kind = match root.kind {
+                    SourceRootKind::Vanilla => "vanilla",
+                    SourceRootKind::Dependency => "dependency",
+                    SourceRootKind::CurrentMod => "currentMod",
+                };
+                serde_json::json!({
+                    "id": root.id.get(),
+                    "kind": kind,
+                    "path": root.path,
+                    "order": root.order,
+                    "writable": root.writable,
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut files = self.snapshot.source_files().values().collect::<Vec<_>>();
+        if files.len() > MAX_WORKSPACE_FILES {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!("workspace files are limited to {MAX_WORKSPACE_FILES} entries"),
+            ));
+        }
+        files.sort_by(|left, right| {
+            left.root_id
+                .cmp(&right.root_id)
+                .then_with(|| left.logical_path.as_str().cmp(right.logical_path.as_str()))
+                .then_with(|| left.physical_path.cmp(&right.physical_path))
+        });
+        let mut resolved_paths = HashSet::new();
+        let mut active_files = HashSet::new();
+        for file in &files {
+            if resolved_paths.insert(file.logical_path.clone()) {
+                for candidate in self.snapshot.resolve(&file.logical_path) {
+                    if candidate.active
+                        && let Some(file_id) = candidate.file_id
+                    {
+                        active_files.insert(file_id);
+                    }
+                }
+            }
+        }
+        let items = files
+            .into_iter()
+            .map(|file| {
+                let active = active_files.contains(&file.id);
+                serde_json::json!({
+                    "id": file.id.get(),
+                    "rootId": file.root_id.get(),
+                    "logicalPath": file.logical_path.as_str(),
+                    "uri": path_to_uri(&file.physical_path),
+                    "category": file.category_id,
+                    "active": active,
+                })
+            })
+            .collect::<Vec<_>>();
+        Ok(serde_json::json!({
+            "revision": self.snapshot.revision(),
+            "roots": roots,
+            "files": items,
         }))
     }
 

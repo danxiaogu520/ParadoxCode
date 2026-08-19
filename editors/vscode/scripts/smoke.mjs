@@ -85,6 +85,8 @@ function run(serverArgs) {
     request(2, 'pdx/missionPreview', {
       path: 'missions/smoke.txt',
       text: MISSION_TEXT,
+      uri: 'file:///tmp/paradoxcode-smoke/missions/smoke.txt',
+      version: 7,
     });
     // The real client method for full-document semantic tokens is
     // `textDocument/semanticTokens/full`; a server that only knows the bare
@@ -100,6 +102,7 @@ function run(serverArgs) {
     request(3, 'textDocument/semanticTokens/full', {
       textDocument: { uri: scriptUri },
     });
+    request(5, 'pdx/workspaceFiles');
     request(4, 'shutdown', {});
     child.stdin.write(encode({ jsonrpc: '2.0', method: 'exit', params: {} }));
     child.stdin.end();
@@ -139,9 +142,8 @@ if (!Array.isArray(tokenScopes) || tokenScopes.length === 0) {
   fail('contributes.semanticTokenScopes must be a non-empty array');
 }
 
-// eu4 has no TextMate grammar: highlighting depends entirely on semantic tokens,
-// so the language must force `editor.semanticHighlighting.enabled` on instead of
-// inheriting the theme-dependent `configuredByTheme` default.
+// Semantic tokens remain enabled even with the local TextMate fallback grammar, so a
+// theme can overlay rule-aware classifications once pdx-ls is ready.
 const defaultConfig = manifest?.contributes?.configurationDefaults;
 if (defaultConfig?.['[eu4]']?.['editor.semanticHighlighting.enabled'] !== true) {
   fail('configurationDefaults["[eu4]"].editor.semanticHighlighting.enabled must be true');
@@ -200,7 +202,7 @@ if (!preview) {
   if (!a1) {
     fail('node a1 missing');
   } else {
-    for (const field of ['x', 'y', 'start', 'end', 'isRoot', 'hasError', 'hasWarning', 'icon', 'titleKey']) {
+    for (const field of ['x', 'y', 'start', 'end', 'sourceRange', 'isRoot', 'hasError', 'hasWarning', 'icon', 'titleKey']) {
       if (!(field in a1)) {
         fail(`node a1 missing field ${field}`);
       }
@@ -210,6 +212,15 @@ if (!preview) {
     }
     if (typeof a1.x !== 'number' || typeof a1.y !== 'number') {
       fail('node coordinates must be numbers');
+    }
+    if (
+      !a1.sourceRange ||
+      typeof a1.sourceRange.start?.line !== 'number' ||
+      typeof a1.sourceRange.start?.character !== 'number' ||
+      typeof a1.sourceRange.end?.line !== 'number' ||
+      typeof a1.sourceRange.end?.character !== 'number'
+    ) {
+      fail('node sourceRange must be an LSP UTF-16 range');
     }
     if (!Array.isArray(a1.required)) {
       fail('node.required must be an array');
@@ -257,6 +268,12 @@ if (!preview) {
   if (result.groups.length !== 2) {
     fail(`expected 2 groups, got ${result.groups.length}`);
   }
+  if (result.groups.some((group) => !group.sourceRange?.start || !group.sourceRange?.end)) {
+    fail('mission groups must expose UTF-16 source ranges');
+  }
+  if (result.documentUri !== 'file:///tmp/paradoxcode-smoke/missions/smoke.txt' || result.documentVersion !== 7) {
+    fail('mission preview must echo document URI and version');
+  }
 }
 
 // Full-document semantic tokens must be served under the real protocol method
@@ -268,6 +285,15 @@ if (!semanticTokens) {
   fail(`textDocument/semanticTokens/full failed: ${JSON.stringify(semanticTokens.error)}`);
 } else if (!Array.isArray(semanticTokens.result?.data) || semanticTokens.result.data.length < 1) {
   fail('semanticTokens/full must return relative token data');
+}
+
+const workspaceFiles = responses.find((value) => value.id === 5);
+if (!workspaceFiles) {
+  fail('no pdx/workspaceFiles response received');
+} else if (workspaceFiles.error) {
+  fail(`pdx/workspaceFiles failed: ${JSON.stringify(workspaceFiles.error)}`);
+} else if (!Array.isArray(workspaceFiles.result?.roots) || !Array.isArray(workspaceFiles.result?.files)) {
+  fail('pdx/workspaceFiles must return roots and files arrays');
 }
 
 // The shared config TOML that both editors read must parse and yield the

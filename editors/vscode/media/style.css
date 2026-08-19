@@ -7,17 +7,148 @@ body {
     overflow: hidden;
     background: var(--vscode-editor-background);
     color: var(--vscode-editor-foreground);
+    font-family: var(--vscode-font-family, sans-serif);
 }
 
 #tree {
     display: block;
     width: 100%;
     height: 100%;
+    outline: none;
+    cursor: grab;
 }
+
+#tree:focus-visible {
+    outline: 2px solid var(--vscode-focusBorder, #4d7cfe);
+    outline-offset: -2px;
+}
+
+.toolbar {
+    position: fixed;
+    z-index: 3;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    pointer-events: none;
+}
+
+.toolbar > * {
+    pointer-events: auto;
+}
+
+button,
+summary {
+    border: 1px solid var(--vscode-button-border, var(--vscode-widget-border, transparent));
+    border-radius: 3px;
+    padding: 3px 8px;
+    background: var(--vscode-button-secondaryBackground, var(--vscode-editorWidget-background));
+    color: var(--vscode-button-secondaryForeground, var(--vscode-editorWidget-foreground));
+    font: inherit;
+    cursor: pointer;
+}
+
+button:hover,
+summary:hover {
+    background: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
+}
+
+button:focus-visible,
+summary:focus-visible {
+    outline: 2px solid var(--vscode-focusBorder, #4d7cfe);
+    outline-offset: 1px;
+}
+
+.legend,
+.mission-list {
+    position: relative;
+}
+
+.legend-content {
+    position: absolute;
+    top: 28px;
+    left: 0;
+    min-width: 140px;
+    padding: 8px;
+    display: grid;
+    gap: 5px;
+    background: var(--vscode-editorWidget-background);
+    color: var(--vscode-editorWidget-foreground);
+    border: 1px solid var(--vscode-widget-border, transparent);
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, .35));
+}
+
+.legend-content span {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.swatch {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 1px solid var(--vscode-editor-foreground);
+}
+
+.swatch.root { background: var(--vscode-testing-iconPassed, #5fd58a); }
+.swatch.warning { background: var(--vscode-editorWarning-foreground, #d9a13b); }
+.swatch.error { background: var(--vscode-editorError-foreground, #d55c5c); }
+.swatch.selected { background: var(--vscode-focusBorder, #4d7cfe); }
+
+.mission-list {
+    margin-left: auto;
+}
+
+#node-list {
+    position: absolute;
+    top: 28px;
+    right: 0;
+    width: min(360px, 70vw);
+    max-height: min(60vh, 480px);
+    overflow: auto;
+    padding: 6px;
+    background: var(--vscode-editorWidget-background);
+    border: 1px solid var(--vscode-widget-border, transparent);
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, .35));
+}
+
+.node-entry {
+    display: block;
+    width: 100%;
+    margin: 2px 0;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.node-entry.error { border-left: 3px solid var(--vscode-editorError-foreground, #d55c5c); }
+.node-entry.warning { border-left: 3px solid var(--vscode-editorWarning-foreground, #d9a13b); }
+.node-entry.root { border-left: 3px solid var(--vscode-testing-iconPassed, #5fd58a); }
+
+.tooltip {
+    position: fixed;
+    z-index: 4;
+    display: none;
+    max-width: 360px;
+    padding: 7px 9px;
+    border: 1px solid var(--vscode-widget-border, transparent);
+    border-radius: 4px;
+    background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+    color: var(--vscode-editorHoverWidget-foreground, var(--vscode-editorWidget-foreground));
+    box-shadow: 0 2px 10px var(--vscode-widget-shadow, rgba(0, 0, 0, .35));
+    pointer-events: none;
+    white-space: pre-wrap;
+}
+
+.tooltip.visible { display: block; }
 
 .status {
     position: fixed;
-    top: 8px;
+    top: 48px;
     left: 8px;
     right: 8px;
     padding: 6px 10px;
@@ -29,6 +160,7 @@ body {
     border: 1px solid var(--vscode-widget-border, transparent);
     display: none;
     white-space: pre-wrap;
+    pointer-events: none;
 }
 
 .status.visible {
