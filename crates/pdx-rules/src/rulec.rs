@@ -338,7 +338,10 @@ pub fn compile(
         game_id: source_manifest.game_id,
         target_game_version: source_manifest.target_game_version,
         rule_hash: loaded.rule_hash().to_hex(),
-        artifact_sha256: format!("{:x}", Sha256::digest(&bytes)),
+        artifact_sha256: Sha256::digest(&bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect(),
         semantic_rule_count: loaded.model().semantic.rules.len(),
         file_category_count: loaded.model().file_categories.len(),
         symbol_descriptor_count: loaded.model().symbol_descriptors.len(),
