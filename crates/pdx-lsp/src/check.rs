@@ -675,8 +675,13 @@ pub fn check_release_artifact(root: &Path) -> Vec<CheckResult> {
                     generated_manifest.rule_hash
                 ),
             ));
-            let actual_sha = fs::read(&generated_path)
-                .map(|bytes| format!("{:x}", Sha256::digest(&bytes)))
+            let actual_sha: String = fs::read(&generated_path)
+                .map(|bytes| {
+                    Sha256::digest(&bytes)
+                        .iter()
+                        .map(|byte| format!("{byte:02x}"))
+                        .collect()
+                })
                 .unwrap_or_default();
             results.push(check(
                 actual_sha == generated_manifest.artifact_sha256,

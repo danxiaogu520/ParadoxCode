@@ -175,10 +175,17 @@ impl IndexCache {
             put_fingerprint_field(&mut hasher, state.source().as_bytes());
             file_fingerprints.insert(
                 *id,
-                format!("{:x}", Sha256::digest(state.source().as_bytes())),
+                Sha256::digest(state.source().as_bytes())
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect(),
             );
         }
-        let source_fingerprint = format!("{:x}", hasher.finalize());
+        let source_fingerprint: String = hasher
+            .finalize()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
         let localisation_previews = preview::collect_localisation_previews(snapshot)?;
         let created_unix_seconds = SystemTime::now()
             .duration_since(UNIX_EPOCH)
