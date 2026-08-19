@@ -101,7 +101,7 @@ fn load_cancellable_with(
     }
     let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let cancellation = cancellation.clone();
-    connection.progress_handler(1_000, Some(move || cancellation.is_cancelled()));
+    let _ = connection.progress_handler(1_000, Some(move || cancellation.is_cancelled()));
     load_connection(&connection, build_lookup_maps, progress).map_err(map_interrupted)
 }
 
