@@ -106,7 +106,10 @@ pub(super) fn refresh_cancellable(
         };
         put_fingerprint_field(&mut hasher, logical.as_str().as_bytes());
         put_fingerprint_field(&mut hasher, source.as_bytes());
-        let digest = format!("{:x}", Sha256::digest(source.as_bytes()));
+        let digest: String = Sha256::digest(source.as_bytes())
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
         retained.insert(*id, ());
         let unchanged = files
             .get(id)
@@ -184,7 +187,11 @@ pub(super) fn refresh_cancellable(
             .sum(),
     )?;
     let indexed_files = files.len();
-    let source_fingerprint = format!("{:x}", hasher.finalize());
+    let source_fingerprint: String = hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
     let created_unix_seconds = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|error| IndexCacheError::InvalidData(error.to_string()))?
