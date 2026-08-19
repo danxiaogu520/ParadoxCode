@@ -72,11 +72,14 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     results.push(requires_file("Cargo.toml"));
     results.push(requires_file("Cargo.lock"));
     results.push(requires_file("README.md"));
+    results.push(requires_file("RELEASING.md"));
     results.push(requires_file("LICENSE"));
     results.push(requires_file(".github/workflows/ci.yml"));
     results.push(requires_file(".github/workflows/release.yml"));
     results.push(requires_file("deny.toml"));
     results.push(requires_file("editors/zed/extension.toml"));
+    results.push(requires_file("editors/vscode/package.json"));
+    results.push(requires_file("editors/vscode/package-lock.json"));
     results.push(requires_dir("grammars/tree-sitter-eu4"));
     results.push(requires_dir("fuzz"));
     results.push(requires_file(".githooks/pre-commit"));
@@ -227,6 +230,42 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
                 zc_version == workspace_version,
                 "Zed Cargo version",
                 format!("Zed Cargo version {zc_version} != workspace {workspace_version}"),
+            ));
+        }
+        if let Ok(text) = fs::read_to_string(root.join("editors/vscode/package.json"))
+            && let Ok(package) = serde_json::from_str::<serde_json::Value>(&text)
+        {
+            let version = package.get("version").and_then(|value| value.as_str());
+            results.push(check(
+                version == Some(workspace_version.as_str()),
+                "VS Code extension version",
+                format!(
+                    "VS Code extension version {} != workspace {workspace_version}",
+                    version.unwrap_or("<missing>")
+                ),
+            ));
+            results.push(check(
+                package.get("publisher").and_then(|value| value.as_str()) == Some("paradoxcode"),
+                "VS Code publisher id",
+                "published VS Code publisher id must remain paradoxcode",
+            ));
+            results.push(check(
+                package.get("name").and_then(|value| value.as_str()) == Some("paradoxcode-vscode"),
+                "VS Code extension id",
+                "published VS Code extension name must remain paradoxcode-vscode",
+            ));
+        }
+        if let Ok(text) = fs::read_to_string(root.join("editors/vscode/package-lock.json"))
+            && let Ok(package_lock) = serde_json::from_str::<serde_json::Value>(&text)
+        {
+            let version = package_lock.get("version").and_then(|value| value.as_str());
+            results.push(check(
+                version == Some(workspace_version.as_str()),
+                "VS Code lockfile version",
+                format!(
+                    "VS Code lockfile version {} != workspace {workspace_version}",
+                    version.unwrap_or("<missing>")
+                ),
             ));
         }
     }

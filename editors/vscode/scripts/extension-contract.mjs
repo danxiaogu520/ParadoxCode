@@ -19,6 +19,20 @@ const eu4Patterns = manifest.contributes.languages[0].filenamePatterns ?? [];
 if (eu4Patterns.some((pattern) => /\.ya?ml|\.asset|\.sfx/i.test(pattern))) {
   fail('P0-4/P0-5 exclusions must not be reintroduced into the language contribution');
 }
+if (manifest.activationEvents?.includes('onStartupFinished')) {
+  fail('the extension must not activate and download pdx-ls in unrelated workspaces');
+}
+if (!manifest.activationEvents?.includes('onLanguage:eu4')) {
+  fail('opening an EU4 document must activate the zero-configuration startup path');
+}
+if (manifest.capabilities?.untrustedWorkspaces?.supported !== false) {
+  fail('automatic server download and execution must be disabled in untrusted workspaces');
+}
+for (const setting of ['paradoxcode.serverVersion', 'paradoxcode.serverRepository']) {
+  if (Object.hasOwn(manifest.contributes.configuration?.properties ?? {}, setting)) {
+    fail(`${setting} must not let a workspace redirect automatic executable downloads`);
+  }
+}
 for (const command of [
   'paradoxcode.showMissionPreview',
   'paradoxcode.installServer',
@@ -35,6 +49,13 @@ for (const command of [
 if (!manifest.contributes.views?.explorer?.some((entry) => entry.id === 'paradoxcode.loadedFiles')) {
   fail('loaded files Explorer view is missing');
 }
+const walkthrough = manifest.contributes.walkthroughs?.find((entry) => entry.id === 'paradoxcode.gettingStarted');
+if (!walkthrough || !Array.isArray(walkthrough.steps) || walkthrough.steps.length < 6) {
+  fail('the detailed Getting Started walkthrough is missing or incomplete');
+}
+if (walkthrough.steps.some((step) => step.media?.markdown !== 'media/getting-started.md')) {
+  fail('every Getting Started step must reference the packaged onboarding media');
+}
 if (!manifest.contributes.grammars?.some((entry) => entry.path === './syntaxes/eu4.tmLanguage.json')) {
   fail('EU4 TextMate fallback grammar is missing');
 }
@@ -43,6 +64,8 @@ if (manifest.contributes.configurationDefaults?.['[eu4]']?.['editor.semanticHigh
 }
 for (const key of [
   'extension.displayName',
+  'walkthrough.gettingStarted.title',
+  'walkthrough.vanillaData.description',
   'commands.showMissionPreview.title',
   'configuration.pdxLsPath.description',
 ]) {
@@ -60,13 +83,25 @@ for (const marker of ['show(extensionUri: vscode.Uri, client?: LanguageClient)',
     fail(`Preview reliability marker missing: ${marker}`);
   }
 }
+const extensionSource = readFileSync(join(root, 'src', 'extension.ts'), 'utf8');
+for (const marker of [
+  'context.extension.packageJSON.version',
+  'context.extensionMode !== vscode.ExtensionMode.Production',
+  'installPdxLs(context, options, progress)',
+  'automatic checksum-verified ParadoxCode installation',
+  'paradoxcodeVanillaReady',
+]) {
+  if (!extensionSource.includes(marker)) {
+    fail(`Automatic server setup marker missing: ${marker}`);
+  }
+}
 const rendererSource = readFileSync(join(root, 'media', 'renderer.js'), 'utf8');
 for (const marker of ['exportPng', 'exportSvg', 'exportJson', 'addEventListener(\'keydown\'', 'renderNodeList', 'readColors']) {
   if (!rendererSource.includes(marker)) {
     fail(`Preview UX marker missing: ${marker}`);
   }
 }
-for (const relative of ['README.md', 'package.nls.json', 'package.nls.zh-cn.json', 'LICENSE']) {
+for (const relative of ['README.md', 'package.nls.json', 'package.nls.zh-cn.json', 'media/getting-started.md', 'LICENSE']) {
   if (!existsSync(join(root, relative))) {
     fail(`packaged asset missing: ${relative}`);
   }

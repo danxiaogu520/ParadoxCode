@@ -34,6 +34,9 @@ pub struct AutoVanillaConfiguration {
     pub descriptor: GameInstallDescriptor,
     /// Shared user configuration and cache locations.
     pub user_paths: UserPaths,
+    /// Optional user-selected installation root from an editor-guided setup. This takes
+    /// precedence over one-time platform discovery.
+    pub source_override: Option<PathBuf>,
 }
 /// Progress-reporting callbacks for the initialize worker. Each is optional so
 /// in-memory transport paths (tests) can pass none; the stdio worker supplies
@@ -131,9 +134,17 @@ pub(crate) fn prepare_initialize_candidate(
             None => log("Vanilla index: automatic discovery"),
         }
     }
+    let selected_game_directory = resolved.game_directory.clone();
+    let auto_vanilla_with_source = auto_vanilla.map(|configuration| {
+        let mut configuration = configuration.clone();
+        if let Some(source) = selected_game_directory {
+            configuration.source_override = Some(source);
+        }
+        configuration
+    });
     let auto_vanilla = apply_user_vanilla_configuration(
         &mut resolved,
-        auto_vanilla,
+        auto_vanilla_with_source.as_ref(),
         host.snapshot().rules().game_id(),
         &mut warnings,
     );

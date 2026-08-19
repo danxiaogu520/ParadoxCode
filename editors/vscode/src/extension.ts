@@ -14,7 +14,6 @@ import { readSharedConfig } from './sharedConfig';
 import { findExecutableOnPath } from './serverPath';
 import {
     DEFAULT_SERVER_REPOSITORY,
-    DEFAULT_SERVER_VERSION,
     cachedServerPath,
     defaultInstallDirectory,
     installPdxLs,
@@ -28,7 +27,6 @@ const SERVER_SETTING_KEYS = [
     'vanillaIndexCache',
     'dependencies',
     'gameDirectory',
-    'serverVersion',
     'serverInstallDirectory',
 ] as const;
 
@@ -48,7 +46,7 @@ statusBar.tooltip = 'ParadoxCode: pdx-ls not running';
 
 let client: LanguageClient | undefined;
 let missingServerWarningShown = false;
-let extensionContext: vscode.ExtensionContext | undefined;
+let clientStartSequence = 0;
 
 /** Debounce helper: `delay` ms after the last call, then run once. */
 function debounce(fn: () => void, delay: number): () => void {
@@ -77,6 +75,27 @@ function updateMissionContext(document: vscode.TextDocument | undefined): void {
     void vscode.commands.executeCommand('setContext', 'paradoxcodeMissionFile', isMissionDocument(document));
 }
 
+function setVanillaContext(ready: boolean): void {
+    void vscode.commands.executeCommand('setContext', 'paradoxcodeVanillaReady', ready);
+}
+
+/** Converts the server's user-facing Vanilla setup trail into a walkthrough state. */
+function updateVanillaContext(message: string): void {
+    if (/Vanilla symbols (?:are now enabled|loaded from)/i.test(message)
+        || /Vanilla cache was regenerated .* loaded from/i.test(message)
+        || /rebuilt from the discovered installation/i.test(message)) {
+        setVanillaContext(true);
+        return;
+    }
+    if (/continuing without Vanilla symbols/i.test(message)
+        || /not a valid installation/i.test(message)
+        || /(?:was|were) not found in common installation locations/i.test(message)
+        || /multiple .* installations were found/i.test(message)
+        || /discovery was skipped because it was already attempted/i.test(message)) {
+        setVanillaContext(false);
+    }
+}
+
 /** Maps `paradoxcode.*` settings onto the shared LSP initialization options contract. */
 function readInitializationOptions(): Record<string, unknown> {
     const config = vscode.workspace.getConfiguration('paradoxcode');
@@ -102,9 +121,22 @@ interface ServerResolution {
     missingOnPath: boolean;
 }
 
+function installOptions(context: vscode.ExtensionContext) {
+    const config = vscode.workspace.getConfiguration('paradoxcode');
+    const packageVersion = context.extension.packageJSON.version;
+    if (typeof packageVersion !== 'string' || !/^[0-9A-Za-z][0-9A-Za-z.+-]*$/.test(packageVersion)) {
+        throw new Error('The ParadoxCode extension manifest has an invalid version.');
+    }
+    return {
+        version: packageVersion,
+        repository: DEFAULT_SERVER_REPOSITORY,
+        installDirectory: config.get<string>('serverInstallDirectory', '') || defaultInstallDirectory(context),
+    };
+}
+
 /** Resolves the pdx-ls binary. Explicit user/workspace configuration always wins over the
  * optional downloaded cache and PATH fallback. */
-function resolveServerCommand(): ServerResolution {
+function resolveServerCommand(context: vscode.ExtensionContext): ServerResolution {
     const configuredPath = vscode.workspace
         .getConfiguration('paradoxcode')
         .get<string>('pdxLsPath', '');
@@ -132,19 +164,14 @@ function resolveServerCommand(): ServerResolution {
             void vscode.window.showWarningMessage(`ParadoxCode: ${message}`);
         }
     }
-    if (extensionContext) {
-        const config = vscode.workspace.getConfiguration('paradoxcode');
-        const cached = cachedServerPath(extensionContext, {
-            version: config.get<string>('serverVersion', DEFAULT_SERVER_VERSION),
-            installDirectory: config.get<string>('serverInstallDirectory', '') || defaultInstallDirectory(extensionContext),
-        });
-        if (cached) {
-            return {
-                command: cached,
-                source: 'ParadoxCode checksum-verified server cache',
-                missingOnPath: false,
-            };
-        }
+    const options = installOptions(context);
+    const cached = cachedServerPath(context, options);
+    if (cached) {
+        return {
+            command: cached,
+            source: 'ParadoxCode checksum-verified server cache',
+            missingOnPath: false,
+        };
     }
     return {
         command: 'pdx-ls',
@@ -215,14 +242,15 @@ function diagnosticsMiddleware(): NonNullable<LanguageClientOptions['middleware'
     };
 }
 
-function showMissingServerActions(): void {
+function showMissingServerActions(automaticInstallError?: string): void {
     if (missingServerWarningShown) {
         return;
     }
     missingServerWarningShown = true;
-    const message =
-        'pdx-ls was not found. Install it from the ParadoxCode release cache, select a binary, ' +
-        'or add [server].binary to .pdx/project.toml.';
+    const message = automaticInstallError
+        ? `The automatic pdx-ls installation failed: ${automaticInstallError}`
+        : 'pdx-ls was not found. Install it from the ParadoxCode release cache, select a binary, ' +
+          'or add [server].binary to .pdx/project.toml.';
     log.appendLine(`WARNING: ${message}`);
     void vscode.window.showWarningMessage(
         `ParadoxCode: ${message}`,
@@ -240,14 +268,9 @@ function showMissingServerActions(): void {
     });
 }
 
-function createClient(): LanguageClient {
-    const { command, source, missingOnPath } = resolveServerCommand();
+function createClient({ command, source }: ServerResolution): LanguageClient {
     log.appendLine(`pdx-ls binary: ${command} (from ${source})`);
-    if (missingOnPath) {
-        showMissingServerActions();
-    } else {
-        missingServerWarningShown = false;
-    }
+    missingServerWarningShown = false;
     const serverOptions: ServerOptions = { command };
     const clientOptions: LanguageClientOptions = {
         // P0-4/P0-5 are intentionally not added here: localisation YAML and asset/sfx language
@@ -296,9 +319,57 @@ function updateStatus(state: State): void {
     }
 }
 
-function startClient(loadedFiles?: LoadedFilesProvider): void {
+async function resolveOrInstallServer(context: vscode.ExtensionContext): Promise<ServerResolution | undefined> {
+    const resolution = resolveServerCommand(context);
+    if (!resolution.missingOnPath) {
+        return resolution;
+    }
+
+    // Marketplace installs should work without asking users to understand or install a language
+    // server. Development/Test extension hosts keep the old explicit behavior so local tests do
+    // not unexpectedly download release binaries.
+    if (context.extensionMode !== vscode.ExtensionMode.Production) {
+        showMissingServerActions();
+        return undefined;
+    }
+
+    const options = installOptions(context);
+    log.appendLine(`pdx-ls was not found; installing the matching ${options.version} release automatically`);
+    statusBar.text = 'PDX ↓';
+    statusBar.tooltip = 'ParadoxCode: installing the language server…';
     try {
-        client = createClient();
+        const binary = await vscode.window.withProgress(
+            {
+                location: vscode.ProgressLocation.Window,
+                title: 'ParadoxCode: preparing language support',
+                cancellable: false,
+            },
+            (progress) => installPdxLs(context, options, progress),
+        );
+        log.appendLine(`pdx-ls ${options.version} installed and verified: ${binary}`);
+        return {
+            command: binary,
+            source: 'automatic checksum-verified ParadoxCode installation',
+            missingOnPath: false,
+        };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        log.appendLine(`ERROR installing pdx-ls automatically: ${message}`);
+        updateStatus(State.Stopped);
+        showMissingServerActions(message);
+        return undefined;
+    }
+}
+
+async function startClient(context: vscode.ExtensionContext, loadedFiles?: LoadedFilesProvider): Promise<void> {
+    const sequence = ++clientStartSequence;
+    setVanillaContext(false);
+    try {
+        const resolution = await resolveOrInstallServer(context);
+        if (!resolution || sequence !== clientStartSequence) {
+            return;
+        }
+        client = createClient(resolution);
         client.onDidChangeState((event) => {
             updateStatus(event.newState);
             if (event.newState === State.Running) {
@@ -308,6 +379,7 @@ function startClient(loadedFiles?: LoadedFilesProvider): void {
         client.onNotification(LogMessageNotification.type, (params) => {
             log.appendLine(`[pdx-ls] ${params.message}`);
             statusBar.tooltip = `ParadoxCode: ${params.message}`;
+            updateVanillaContext(params.message);
         });
         updateStatus(client.state);
         client.start();
@@ -320,6 +392,7 @@ function startClient(loadedFiles?: LoadedFilesProvider): void {
 }
 
 function stopClient(loadedFiles?: LoadedFilesProvider): void {
+    clientStartSequence += 1;
     if (client) {
         const previous = client;
         client = undefined;
@@ -357,7 +430,7 @@ async function chooseGameDirectory(): Promise<void> {
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
-        openLabel: 'Use EU4 installation',
+        openLabel: 'Use EU4 installation for Vanilla data',
     });
     if (!selected?.[0]) {
         return;
@@ -370,7 +443,10 @@ async function chooseGameDirectory(): Promise<void> {
         selected[0].fsPath,
         target,
     );
-    void vscode.window.showInformationMessage(`ParadoxCode: using EU4 installation ${selected[0].fsPath}`);
+    setVanillaContext(false);
+    void vscode.window.showInformationMessage(
+        'ParadoxCode: EU4 installation selected. The language server will validate it and build Vanilla data in the background.',
+    );
 }
 
 async function exportDiagnostics(): Promise<void> {
@@ -397,11 +473,8 @@ async function exportDiagnostics(): Promise<void> {
     }
 }
 
-async function installServer(context: vscode.ExtensionContext): Promise<void> {
-    const config = vscode.workspace.getConfiguration('paradoxcode');
-    const version = config.get<string>('serverVersion', DEFAULT_SERVER_VERSION);
-    const repository = config.get<string>('serverRepository', DEFAULT_SERVER_REPOSITORY);
-    const installDirectory = config.get<string>('serverInstallDirectory', '') || defaultInstallDirectory(context);
+async function installServer(context: vscode.ExtensionContext): Promise<boolean> {
+    const options = installOptions(context);
     try {
         const binary = await vscode.window.withProgress(
             {
@@ -409,13 +482,11 @@ async function installServer(context: vscode.ExtensionContext): Promise<void> {
                 title: 'ParadoxCode: installing pdx-ls',
                 cancellable: false,
             },
-            (progress) => installPdxLs(context, { version, repository, installDirectory }, progress),
+            (progress) => installPdxLs(context, options, progress),
         );
-        const target = vscode.workspace.workspaceFolders
-            ? vscode.ConfigurationTarget.Workspace
-            : vscode.ConfigurationTarget.Global;
-        await config.update('pdxLsPath', binary, target);
-        void vscode.window.showInformationMessage(`ParadoxCode: pdx-ls ${version} installed.`);
+        log.appendLine(`pdx-ls ${options.version} installed and verified: ${binary}`);
+        void vscode.window.showInformationMessage(`ParadoxCode: pdx-ls ${options.version} is ready.`);
+        return true;
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         log.appendLine(`ERROR installing pdx-ls: ${message}`);
@@ -425,19 +496,20 @@ async function installServer(context: vscode.ExtensionContext): Promise<void> {
             'Open Output',
         );
         if (choice === 'Open Releases') {
-            await vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${repository}/releases`));
+            await vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${options.repository}/releases`));
         } else if (choice === 'Open Output') {
             log.show(true);
         }
+        return false;
     }
 }
 
 let loadedFilesProvider: LoadedFilesProvider;
 
 export function activate(context: vscode.ExtensionContext): void {
-    extensionContext = context;
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? 'none';
     log.appendLine(`ParadoxCode extension activated (workspace root: ${root})`);
+    setVanillaContext(false);
     context.subscriptions.push(log, statusBar);
     statusBar.show();
 
@@ -447,14 +519,12 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.registerTreeDataProvider('paradoxcode.loadedFiles', loadedFilesProvider),
     );
 
-    startClient(loadedFilesProvider);
-
     const refresh = debounce(() => {
         void MissionPreviewPanel.refresh(client);
     }, 150);
     const restart = () => {
         stopClient(loadedFilesProvider);
-        startClient(loadedFilesProvider);
+        void startClient(context, loadedFilesProvider);
         void MissionPreviewPanel.refresh(client);
     };
 
@@ -464,7 +534,11 @@ export function activate(context: vscode.ExtensionContext): void {
         }),
         vscode.commands.registerCommand('paradoxcode.openOutput', () => log.show(true)),
         vscode.commands.registerCommand('paradoxcode.selectServer', () => chooseServerPath()),
-        vscode.commands.registerCommand('paradoxcode.installServer', () => installServer(context)),
+        vscode.commands.registerCommand('paradoxcode.installServer', async () => {
+            if (await installServer(context)) {
+                restart();
+            }
+        }),
         vscode.commands.registerCommand('paradoxcode.selectGameDirectory', () => chooseGameDirectory()),
         vscode.commands.registerCommand('paradoxcode.reloadServer', restart),
         vscode.commands.registerCommand('paradoxcode.exportDiagnostics', () => exportDiagnostics()),
@@ -496,11 +570,12 @@ export function activate(context: vscode.ExtensionContext): void {
             }
         }),
     );
+
+    void startClient(context, loadedFilesProvider);
 }
 
 export function deactivate(): void {
     stopClient(loadedFilesProvider);
     MissionPreviewPanel.dispose();
     statusBar.hide();
-    extensionContext = undefined;
 }

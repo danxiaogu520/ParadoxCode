@@ -12,7 +12,6 @@ const execFileAsync = promisify(execFile);
 /** The release repository is deliberately explicit: an installer must never follow a user
  * supplied arbitrary URL or silently import a third-party server. */
 export const DEFAULT_SERVER_REPOSITORY = 'danxiaogu520/ParadoxCode';
-export const DEFAULT_SERVER_VERSION = '0.1.0';
 const MAX_CHECKSUM_BYTES = 1_024;
 const MAX_ARCHIVE_BYTES = 64 * 1024 * 1024;
 const MAX_EXECUTABLE_BYTES = 128 * 1024 * 1024;

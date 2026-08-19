@@ -40,8 +40,9 @@ struct ProjectConfiguration {
     #[serde(alias = "vanillaIndexCache")]
     vanilla_index_cache: Option<PathBuf>,
     /// Game installation root whose `interface/*.gfx` and `gfx/interface/missions`
-    /// textures back the mission-tree preview. Optional: when absent, the
-    /// server performs a one-time quick discovery at initialize.
+    /// textures back the mission-tree preview. When supplied by an editor, this
+    /// path also becomes the explicit source for the guided Vanilla setup.
+    /// Optional: when absent, the server performs a one-time quick discovery at initialize.
     #[serde(alias = "gameDirectory")]
     game_directory: Option<PathBuf>,
     /// Extension-only `[server]` table (e.g. the language-server binary path
@@ -59,7 +60,7 @@ pub(crate) struct ResolvedSourceRoots {
     pub(crate) index_cache: Option<PathBuf>,
     pub(crate) vanilla_explicit: bool,
     /// Configured game installation root used by the mission-tree texture
-    /// loader, when the caller supplied one.
+    /// loader and editor-guided Vanilla setup, when the caller supplied one.
     pub(crate) game_directory: Option<PathBuf>,
     /// Dependencies configured with a persistent index cache. These roots are excluded from
     /// live scanning and are installed from their cache files instead.
