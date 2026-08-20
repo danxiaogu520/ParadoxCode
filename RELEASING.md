@@ -33,8 +33,8 @@ prerequisites before pushing it.
 Create and push an annotated version tag only after the commit on `main` has passed CI:
 
 ```bash
-git tag -a v0.1.0 -m "ParadoxCode 0.1.0"
-git push origin v0.1.0
+git tag -a v0.1.2 -m "ParadoxCode 0.1.2"
+git push origin v0.1.2
 ```
 
 The tag workflow builds and verifies all five native `pdx-ls` archives, creates the immutable
@@ -44,7 +44,7 @@ release and upload it manually from the publisher management page. The VS Code j
 the server release because a fresh extension install immediately downloads that matching asset.
 
 For an already-pushed tag, use the workflow's manual dispatch input with the exact tag (for example
-`v0.1.0`). This runs the current release workflow while checking out the immutable tagged source.
+`v0.1.2`). This runs the current release workflow while checking out the immutable tagged source.
 
 For Zed, open the required PR against `zed-industries/extensions` after the tagged commit is public.
 Use this repository as the HTTPS submodule, set `path = "editors/zed"`, and set the registry version

@@ -7,12 +7,36 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-20
+
+Maintenance release focused on editor readiness, workspace loading performance, and release
+reliability.
+
+### Added
+
+- The language server emits a `pdx/ready` notification after initial workspace and index setup,
+  allowing clients to distinguish a completed startup from a finished protocol handshake.
+- Mission-tree preview titles now resolve from active workspace localisation definitions, including
+  Mod overrides.
+- Dependency index caches can be installed in one batched operation without changing source-priority
+  semantics.
+
+### Changed
+
+- Mission-tree preview rendering now caches layout measurements, avoids unnecessary work outside the
+  viewport, and coalesces high-frequency redraws for large trees.
+- VS Code shows an explicit loading/ready state, refreshes open files after the server is ready, and
+  serializes language-server restarts to avoid stale clients.
+- Release downloads use longer timeouts and retry transient network or HTTP failures before archive
+  verification.
+- Release workflow no longer publishes to the VS Code Marketplace automatically; the VSIX remains
+  attached to the GitHub Release for manual publication.
+
 ### Fixed
 
 - Completion snippet indentation in generated insert text.
 - Completion inside `if`/`limit` clause blocks where the clause context was lost.
 - VS Code token scopes and highlighting for EU4 localisation and script.
-- Transient release-download failures are now retried during server bootstrap.
 
 ## [0.1.1] - 2026-08-19
 
@@ -55,6 +79,7 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/danxiaogu520/ParadoxCode/releases/tag/v0.1.0
