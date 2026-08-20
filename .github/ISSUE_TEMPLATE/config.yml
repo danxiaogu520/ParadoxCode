@@ -1,0 +1,4 @@
+# Blank issues stay enabled so maintainers and users can open meta-issues
+# (maintenance, moderation, or release coordination) that do not fit a template.
+# Keep the templates above as the default path for bugs and feature requests.
+blank_issues_enabled: true

@@ -1,0 +1,90 @@
+name: Bug report
+description: Report a reproducible problem with ParadoxCode (crashes, wrong diagnostics/completion, editor integration issues).
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please fill in as much of this form as you can.
+        **Security issues must not be filed here** — see [SECURITY.md](../../SECURITY.md).
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the project has the problem?
+      options:
+        - Language server (pdx-ls / pdx CLI)
+        - Parser / HIR / analysis
+        - Rules database (rules/eu4)
+        - VS Code extension
+        - Zed extension
+        - Release / build / CI
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ParadoxCode version
+      description: e.g. v0.1.1, or the commit hash if building from source
+      placeholder: v0.1.1
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Windows
+        - macOS (Intel)
+        - macOS (Apple Silicon)
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: |
+        Minimum steps to trigger the bug. If it involves a specific file, reduce it to the
+        smallest snippet that still reproduces — the smaller, the faster we can fix it.
+      placeholder: |
+        1. Open a mod with `...`
+        2. Type `...`
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened, including the exact error text, crash, or wrong result.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server logs / output
+      description: |
+        Paste relevant `pdx-ls` or editor output (Language Server / Output panel). Redact any
+        personal information such as full user profile paths and mod names if you prefer.
+      render: text
+  - type: checkboxes
+    id: checked
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched for an existing issue and the templates are not suitable (report was
+            already closed as not-reproducible, or this is clearly a regression)
+          required: false
+        - label: I tested with the latest version on `main` (or the latest release) and the bug
+            still reproduces
+          required: false
