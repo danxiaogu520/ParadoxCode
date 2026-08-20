@@ -1295,6 +1295,15 @@ fn existing_dependency_index_cache_is_installed_in_the_background() {
         "expected a cache-load notification"
     );
     assert!(
+        responses.iter().any(|value| {
+            value["method"] == "window/logMessage"
+                && value["params"]["message"]
+                    .as_str()
+                    .is_some_and(|message| message.starts_with("Dependency indexes installed in "))
+        }),
+        "expected one batched dependency-install timing log"
+    );
+    assert!(
         server
             .snapshot()
             .index()

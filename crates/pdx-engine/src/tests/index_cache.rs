@@ -674,6 +674,79 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
 }
 
 #[test]
+fn batch_dependency_cache_install_rebuilds_the_workspace_index_once() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-batch-dependency-cache-{nonce}"));
+    let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    let mut caches = Vec::new();
+    for (id, name) in [(1_u32, "first"), (2_u32, "second")] {
+        let dependency = root.join(name);
+        fs::create_dir_all(dependency.join("events")).expect("dependency events directory");
+        fs::write(
+            dependency.join("events/definition.txt"),
+            format!("country_event = {{ id = {name}.1 }}\n"),
+        )
+        .expect("dependency definition");
+        let dependency_path = fs::canonicalize(&dependency).expect("canonical dependency root");
+        let dependency_root = SourceRoot::new(
+            SourceRootId::new(id),
+            SourceRootKind::Dependency,
+            dependency_path,
+        );
+        let mut builder = AnalysisHost::with_profile(rules.clone(), pdx_game::eu4::profile());
+        builder.apply_change(WorkspaceChange::SetSourceRoots(vec![dependency_root]));
+        builder.refresh_source_roots().expect("scan dependency");
+        caches.push(IndexCache::from_snapshot(&builder.snapshot()).expect("build cache"));
+    }
+
+    let current = root.join("current");
+    fs::create_dir_all(current.join("events")).expect("current mod directory");
+    fs::write(
+        current.join("events/current.txt"),
+        "country_event = { id = current.1 }\n",
+    )
+    .expect("current mod definition");
+    let current_root = SourceRoot::new(
+        SourceRootId::new(u32::MAX),
+        SourceRootKind::CurrentMod,
+        fs::canonicalize(&current).expect("canonical current mod root"),
+    );
+    let mut host = AnalysisHost::with_profile(rules, pdx_game::eu4::profile());
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![current_root]));
+    host.refresh_source_roots().expect("scan current mod");
+    let before_install = host.snapshot().revision();
+
+    host.install_index_caches(caches)
+        .expect("install dependency caches as one batch");
+    let snapshot = host.snapshot();
+    assert_eq!(snapshot.revision(), before_install + 1);
+    assert!(
+        snapshot
+            .index()
+            .active_definition("event", "first.1")
+            .is_some()
+    );
+    assert!(
+        snapshot
+            .index()
+            .active_definition("event", "second.1")
+            .is_some()
+    );
+    assert_eq!(
+        snapshot
+            .source_roots()
+            .iter()
+            .filter(|root| root.kind == SourceRootKind::Dependency)
+            .count(),
+        2
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn dependency_index_cache_rejects_an_unrelated_configured_root() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

@@ -603,52 +603,66 @@ impl LspServer {
                             ),
                         )?;
                         let mut diagnostics_dirty = false;
+                        let current_rule_hash = self.host.snapshot().rules().rule_hash().to_hex();
+                        let mut install_metadata = Vec::new();
+                        let mut install_caches = Vec::new();
                         for (config, result) in result.results {
                             match result {
                                 Ok((cache, message)) => {
-                                    let cache_rule_hash = cache.metadata().rule_hash.clone();
-                                    let current_rule_hash =
-                                        self.host.snapshot().rules().rule_hash().to_hex();
-                                    let installed = std::time::Instant::now();
-                                    match self.host.install_index_cache(cache) {
-                                        Ok(()) => {
-                                            diagnostics_dirty = true;
-                                            write_message(
-                                                &mut output,
-                                                &log_message_notification(
-                                                    MessageType::INFO,
-                                                    format!(
-                                                        "Dependency index installed in {:.1} ms",
-                                                        installed.elapsed().as_secs_f64() * 1000.0
-                                                    ),
-                                                ),
-                                            )?;
-                                            if cache_rule_hash != current_rule_hash {
-                                                write_message(
-                                                    &mut output,
-                                                    &show_warning_notification(format!(
-                                                        "{message}; the installed dependency cache was built with rules hash {cache_rule_hash}, but the active rules hash is {current_rule_hash}"
-                                                    )),
-                                                )?;
-                                            } else {
-                                                write_message(
-                                                    &mut output,
-                                                    &show_info_notification(message),
-                                                )?;
-                                            }
-                                        }
-                                        Err(error) => write_message(
-                                            &mut output,
-                                            &show_warning_notification(format!(
-                                                "dependency cache for {} could not be enabled in this workspace after {:.1} ms: {error}",
-                                                config.root.path.display(),
-                                                installed.elapsed().as_secs_f64() * 1000.0
-                                            )),
-                                        )?,
-                                    }
+                                    install_metadata.push((
+                                        config,
+                                        cache.metadata().rule_hash.clone(),
+                                        message,
+                                    ));
+                                    install_caches.push(cache);
                                 }
                                 Err(message) => {
                                     write_message(&mut output, &show_warning_notification(message))?
+                                }
+                            }
+                        }
+                        if !install_caches.is_empty() {
+                            let installed = std::time::Instant::now();
+                            match self.host.install_index_caches(install_caches) {
+                                Ok(()) => {
+                                    diagnostics_dirty = true;
+                                    write_message(
+                                        &mut output,
+                                        &log_message_notification(
+                                            MessageType::INFO,
+                                            format!(
+                                                "Dependency indexes installed in {:.1} ms",
+                                                installed.elapsed().as_secs_f64() * 1000.0
+                                            ),
+                                        ),
+                                    )?;
+                                    for (_, cache_rule_hash, message) in install_metadata {
+                                        if cache_rule_hash != current_rule_hash {
+                                            write_message(
+                                                &mut output,
+                                                &show_warning_notification(format!(
+                                                    "{message}; the installed dependency cache was built with rules hash {cache_rule_hash}, but the active rules hash is {current_rule_hash}"
+                                                )),
+                                            )?;
+                                        } else {
+                                            write_message(
+                                                &mut output,
+                                                &show_info_notification(message),
+                                            )?;
+                                        }
+                                    }
+                                }
+                                Err(error) => {
+                                    let elapsed = installed.elapsed().as_secs_f64() * 1000.0;
+                                    for (config, _, _) in install_metadata {
+                                        write_message(
+                                            &mut output,
+                                            &show_warning_notification(format!(
+                                                "dependency cache for {} could not be enabled in this workspace after {elapsed:.1} ms: {error}",
+                                                config.root.path.display()
+                                            )),
+                                        )?;
+                                    }
                                 }
                             }
                         }
