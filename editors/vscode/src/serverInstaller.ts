@@ -16,6 +16,12 @@ const MAX_CHECKSUM_BYTES = 1_024;
 const MAX_ARCHIVE_BYTES = 64 * 1024 * 1024;
 const MAX_EXECUTABLE_BYTES = 128 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
+// GitHub release downloads may spend a while establishing the signed asset URL on slow or
+// intermittently connected networks. A single short timeout made a transient stall look like a
+// broken release and prevented the installer from ever reaching archive verification.
+const DOWNLOAD_TIMEOUT_MS = 90_000;
+const MAX_DOWNLOAD_ATTEMPTS = 3;
+const DOWNLOAD_RETRY_DELAYS_MS = [1_000, 3_000] as const;
 
 export interface ServerArtifact {
     target: string;
@@ -84,7 +90,40 @@ function sha256(bytes: Buffer): string {
     return crypto.createHash('sha256').update(bytes).digest('hex');
 }
 
-async function fetchBytes(url: string, maximum: number, label: string, redirects = 0): Promise<Buffer> {
+interface DownloadError extends Error {
+    statusCode?: number;
+}
+
+function isRetryableDownloadError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+        return false;
+    }
+    const candidate = error as { code?: unknown; statusCode?: unknown; message?: unknown };
+    if (
+        typeof candidate.statusCode === 'number'
+        && (candidate.statusCode === 408
+            || candidate.statusCode === 425
+            || candidate.statusCode === 429
+            || candidate.statusCode >= 500)
+    ) {
+        return true;
+    }
+    if (
+        candidate.code === 'ECONNABORTED'
+        || candidate.code === 'ECONNRESET'
+        || candidate.code === 'ECONNREFUSED'
+        || candidate.code === 'EHOSTUNREACH'
+        || candidate.code === 'ENETUNREACH'
+        || candidate.code === 'EAI_AGAIN'
+        || candidate.code === 'ETIMEDOUT'
+    ) {
+        return true;
+    }
+    return typeof candidate.message === 'string'
+        && candidate.message.startsWith('Timed out downloading ');
+}
+
+async function fetchBytesOnce(url: string, maximum: number, label: string, redirects: number): Promise<Buffer> {
     if (redirects > MAX_REDIRECTS) {
         throw new Error(`Too many redirects while downloading ${label}.`);
     }
@@ -98,13 +137,15 @@ async function fetchBytes(url: string, maximum: number, label: string, redirects
             const status = response.statusCode ?? 0;
             if (status >= 300 && status < 400 && response.headers.location) {
                 response.resume();
-                void fetchBytes(new URL(response.headers.location, parsed).toString(), maximum, label, redirects + 1)
+                void fetchBytesOnce(new URL(response.headers.location, parsed).toString(), maximum, label, redirects + 1)
                     .then(resolve, reject);
                 return;
             }
             if (status < 200 || status >= 300) {
                 response.resume();
-                reject(new Error(`Downloading ${label} failed with HTTP ${status}.`));
+                const error: DownloadError = new Error(`Downloading ${label} failed with HTTP ${status}.`);
+                error.statusCode = status;
+                reject(error);
                 return;
             }
             const chunks: Buffer[] = [];
@@ -120,9 +161,31 @@ async function fetchBytes(url: string, maximum: number, label: string, redirects
             response.on('end', () => resolve(Buffer.concat(chunks)));
             response.on('error', reject);
         });
-        request.setTimeout(30_000, () => request.destroy(new Error(`Timed out downloading ${label}.`)));
+        request.setTimeout(
+            DOWNLOAD_TIMEOUT_MS,
+            () => request.destroy(new Error(`Timed out downloading ${label}.`)),
+        );
         request.on('error', reject);
     });
+}
+
+async function fetchBytes(url: string, maximum: number, label: string): Promise<Buffer> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < MAX_DOWNLOAD_ATTEMPTS; attempt += 1) {
+        try {
+            return await fetchBytesOnce(url, maximum, label, 0);
+        } catch (error) {
+            lastError = error;
+            if (!isRetryableDownloadError(error) || attempt + 1 >= MAX_DOWNLOAD_ATTEMPTS) {
+                throw error;
+            }
+            await new Promise<void>((resolve) => {
+                setTimeout(resolve, DOWNLOAD_RETRY_DELAYS_MS[attempt] ?? DOWNLOAD_RETRY_DELAYS_MS.at(-1));
+            });
+        }
+    }
+    // The loop either returns or throws. Keep an explicit guard for TypeScript and future edits.
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 async function extractArchive(archive: string, destination: string, artifact: ServerArtifact): Promise<void> {

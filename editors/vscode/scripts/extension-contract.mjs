@@ -104,6 +104,20 @@ for (const marker of [
     fail(`Automatic server setup marker missing: ${marker}`);
   }
 }
+const installerSource = readFileSync(join(root, 'src', 'serverInstaller.ts'), 'utf8');
+const timeoutMatch = /const DOWNLOAD_TIMEOUT_MS = ([0-9_]+)/.exec(installerSource);
+if (!timeoutMatch || Number(timeoutMatch[1].replaceAll('_', '')) < 60_000) {
+  fail('server installer must allow at least 60 seconds for a release download');
+}
+const attemptsMatch = /const MAX_DOWNLOAD_ATTEMPTS = ([0-9_]+)/.exec(installerSource);
+if (!attemptsMatch || Number(attemptsMatch[1].replaceAll('_', '')) < 2) {
+  fail('server installer must retry transient release download failures');
+}
+for (const marker of ['fetchBytesOnce', 'ECONNRESET', 'Timed out downloading ']) {
+  if (!installerSource.includes(marker)) {
+    fail(`server installer resilience marker missing: ${marker}`);
+  }
+}
 const rendererSource = readFileSync(join(root, 'media', 'renderer.js'), 'utf8');
 for (const marker of ['exportPng', 'exportSvg', 'exportJson', 'addEventListener(\'keydown\'', 'renderNodeList', 'readColors']) {
   if (!rendererSource.includes(marker)) {
