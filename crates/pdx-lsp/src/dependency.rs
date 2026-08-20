@@ -1,11 +1,88 @@
 //! Background load and rebuild of dependency index caches.
 
 use std::fs;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use pdx_engine::{AnalysisHost, IndexCache, WorkspaceChange, WorkspaceScanToken};
 use pdx_rules::{GameProfile, RuleSet};
 
 use crate::workspace::DependencyIndexCache;
+
+const MAX_DEPENDENCY_WORKERS: usize = 4;
+
+/// One dependency cache and the result of loading or rebuilding it.
+pub(crate) type DependencySetupOutcome =
+    (DependencyIndexCache, Result<(IndexCache, String), String>);
+
+/// Loads dependency caches with bounded parallelism while preserving configuration order.
+///
+/// Loading and refreshing each dependency is independent. The event loop still installs the
+/// returned caches in the original order, so source priority remains deterministic even when
+/// disk work completes out of order.
+pub(crate) fn run_dependency_cache_loads(
+    configs: Vec<DependencyIndexCache>,
+    rules: RuleSet,
+    profile: GameProfile,
+    current_rule_hash: String,
+    log: Option<&(dyn Fn(&str) + Sync)>,
+    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+    cancellation: &WorkspaceScanToken,
+) -> Vec<DependencySetupOutcome> {
+    if configs.is_empty() {
+        return Vec::new();
+    }
+
+    let configs = Arc::new(configs);
+    let next = Arc::new(AtomicUsize::new(0));
+    let results = Arc::new(Mutex::new(
+        (0..configs.len())
+            .map(|_| None)
+            .collect::<Vec<Option<DependencySetupOutcome>>>(),
+    ));
+    let worker_count = configs.len().min(MAX_DEPENDENCY_WORKERS);
+
+    std::thread::scope(|scope| {
+        for _ in 0..worker_count {
+            let configs = Arc::clone(&configs);
+            let next = Arc::clone(&next);
+            let results = Arc::clone(&results);
+            let worker_rules = rules.clone();
+            let worker_profile = profile.clone();
+            let worker_rule_hash = current_rule_hash.clone();
+            scope.spawn(move || {
+                loop {
+                    let index = next.fetch_add(1, Ordering::Relaxed);
+                    let Some(config) = configs.get(index) else {
+                        break;
+                    };
+                    let result = run_dependency_cache_load(
+                        config,
+                        worker_rules.clone(),
+                        worker_profile.clone(),
+                        worker_rule_hash.clone(),
+                        log,
+                        progress,
+                        cancellation,
+                    );
+                    results
+                        .lock()
+                        .unwrap_or_else(|_| panic!("dependency result mutex poisoned"))[index] =
+                        Some((config.clone(), result));
+                }
+            });
+        }
+    });
+
+    let results = Arc::try_unwrap(results)
+        .unwrap_or_else(|_| panic!("dependency result workers still exist"))
+        .into_inner()
+        .unwrap_or_else(|_| panic!("dependency result mutex poisoned"));
+    results
+        .into_iter()
+        .map(|result| result.expect("every dependency cache must produce a result"))
+        .collect()
+}
 
 /// Loads (or rebuilds) the persistent index cache for one configured dependency.
 ///
@@ -218,4 +295,67 @@ fn build_dependency_cache(
         ));
     }
     Ok(cache)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind};
+    use pdx_game::eu4::{first_party_rules, profile};
+    use tempfile::tempdir;
+
+    #[test]
+    fn parallel_loader_preserves_configuration_order() {
+        let container = tempdir().expect("temporary dependency container");
+        let mut configs = Vec::new();
+        for (index, name) in [(1_u32, "first"), (2, "second")] {
+            let root = container.path().join(name);
+            fs::create_dir_all(root.join("common/events")).expect("dependency directory");
+            fs::write(
+                root.join("common/events/events.txt"),
+                format!("country_event = {{ id = {name}.1 }}\n"),
+            )
+            .expect("dependency source");
+            configs.push(DependencyIndexCache {
+                root: SourceRoot::new(
+                    SourceRootId::new(index),
+                    SourceRootKind::Dependency,
+                    fs::canonicalize(root).expect("canonical dependency root"),
+                ),
+                index_path: container.path().join(format!("{name}.pdxindex")),
+            });
+        }
+
+        let rules = first_party_rules().expect("embedded rules");
+        let results = run_dependency_cache_loads(
+            configs,
+            rules.clone(),
+            profile(),
+            rules.rule_hash().to_hex(),
+            None,
+            None,
+            &WorkspaceScanToken::new(),
+        );
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(
+            results
+                .iter()
+                .map(|(config, _)| config.root.id)
+                .collect::<Vec<_>>(),
+            vec![SourceRootId::new(1), SourceRootId::new(2)]
+        );
+        for (config, result) in results {
+            assert!(
+                result.is_ok(),
+                "dependency {} failed: {result:?}",
+                config.root.path.display()
+            );
+            assert!(
+                config.index_path.is_file(),
+                "cache was saved for {}",
+                config.root.path.display()
+            );
+        }
+    }
 }

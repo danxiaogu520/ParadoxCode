@@ -21,6 +21,7 @@ use pdx_rules::{GameProfile, RuleSet};
 use pdx_text::LineIndex;
 use serde_json::{Value, json};
 
+use crate::dependency::DependencySetupOutcome;
 use crate::initialize::{
     AutoVanillaConfiguration, InitializeCallbacks, InitializeOptions, prepare_initialize_candidate,
 };
@@ -233,10 +234,6 @@ pub(crate) struct PreparedInitialize {
 pub(crate) struct IndexSetupResult {
     result: Result<(IndexCache, String), String>,
 }
-
-/// One dependency cache background result: the configured cache and its load/rebuild outcome.
-pub(crate) type DependencySetupOutcome =
-    (DependencyIndexCache, Result<(IndexCache, String), String>);
 
 #[derive(Debug)]
 pub(crate) struct DependencySetupResult {
