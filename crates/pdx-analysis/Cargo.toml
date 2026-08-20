@@ -30,3 +30,7 @@ harness = false
 [[bench]]
 name = "interactive_queries"
 harness = false
+
+[[bench]]
+name = "mission_preview"
+harness = false

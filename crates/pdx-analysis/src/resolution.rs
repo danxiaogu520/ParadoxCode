@@ -1000,19 +1000,23 @@ pub(crate) fn prefer_localisation_language(
 /// the English definition, and only keys with a non-empty active definition
 /// are returned. Keys without a definition are simply absent from the map.
 ///
-/// Used by the LSP mission preview to resolve mission titles (`{id}_title`)
-/// with one `all_semantics` pass per request instead of one per mission.
+/// Used by the LSP mission preview to resolve mission titles (`{id}_title`).
+/// Each key is resolved with a targeted overlay scan plus an exact index lookup
+/// (mirroring `symbol_candidates_for_hover`), so a request never rebuilds the
+/// full workspace semantics — resolving a handful of titles against an
+/// EU4-scale index stays cheap.
 pub fn localisation_values_by_key<'a>(
     snapshot: &AnalysisSnapshot,
     keys: &'a [&'a str],
     cancellation: &CancellationToken,
 ) -> Result<HashMap<String, (Option<String>, String)>, Cancelled> {
-    let all = all_semantics(snapshot, cancellation)?;
     let mut resolved = HashMap::new();
     for &key in keys {
-        let Some(definition) = symbol_candidates(snapshot, &all, "localisation", key)
-            .into_iter()
-            .next()
+        cancellation.checkpoint()?;
+        let Some(definition) =
+            symbol_candidates_for_hover(snapshot, "localisation", key, cancellation)?
+                .into_iter()
+                .next()
         else {
             continue;
         };

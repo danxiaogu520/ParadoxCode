@@ -355,6 +355,97 @@ fn localisation_values_by_key_resolve_english_preferred_titles() {
 }
 
 #[test]
+fn localisation_values_by_key_uses_index_priority_and_english_preference() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-localisation-values-{nonce}"));
+    let vanilla = root.join("vanilla");
+    let current = root.join("current");
+    std::fs::create_dir_all(vanilla.join("localisation")).expect("Vanilla directory");
+    std::fs::create_dir_all(current.join("localisation")).expect("current directory");
+    std::fs::write(
+        vanilla.join("localisation/l_english.yml"),
+        "l_english:\nshared_title:0 \"English Vanilla\"\nvanilla_only_title:0 \"Vanilla Only Title\"\nlang_title:0 \"English Vanilla\"\n",
+    )
+    .expect("Vanilla English localisation");
+    std::fs::write(
+        vanilla.join("localisation/l_french.yml"),
+        "l_french:\nlang_title:0 \"French Vanilla\"\n",
+    )
+    .expect("Vanilla French localisation");
+    std::fs::write(
+        current.join("localisation/l_english.yml"),
+        "l_english:\nshared_title:0 \"English Mod\"\ncurrent_only_title:0 \"Current Only Title\"\n",
+    )
+    .expect("Current Mod localisation");
+
+    // Vanilla runs through the same cache-installed path the LSP uses, which is
+    // what retains its localisation previews for the derived text lookup.
+    let mut vanilla_host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        vanilla,
+    )]));
+    vanilla_host.refresh_source_roots().expect("scan Vanilla");
+    let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build Vanilla cache");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        current,
+    )]));
+    host.install_index_cache(cache)
+        .expect("install Vanilla cache");
+    host.refresh_source_roots().expect("scan Current Mod");
+
+    let snapshot = host.snapshot();
+    crate::ALL_SEMANTICS_CALLS.with(|calls| calls.set(0));
+    let resolved = crate::localisation_values_by_key(
+        &snapshot,
+        &[
+            "shared_title",
+            "vanilla_only_title",
+            "current_only_title",
+            "lang_title",
+            "missing_title",
+        ],
+        &crate::CancellationToken::new(),
+    )
+    .expect("resolve title keys");
+    crate::ALL_SEMANTICS_CALLS.with(|calls| {
+        assert_eq!(
+            calls.get(),
+            0,
+            "title resolution must not rebuild the full workspace semantics"
+        );
+    });
+
+    // A Current Mod override beats the installed Vanilla definition at higher priority.
+    let (_, value) = resolved.get("shared_title").expect("mod override");
+    assert_eq!(value, "English Mod");
+    // Keys defined only in one root still resolve from the index.
+    let (_, value) = resolved
+        .get("vanilla_only_title")
+        .expect("vanilla-only title");
+    assert_eq!(value, "Vanilla Only Title");
+    let (_, value) = resolved
+        .get("current_only_title")
+        .expect("current-only title");
+    assert_eq!(value, "Current Only Title");
+    // With per-language candidates, the English variant wins.
+    let (language, value) = resolved.get("lang_title").expect("language preference");
+    assert_eq!(value, "English Vanilla");
+    assert_eq!(language.as_deref(), Some("l_english"));
+    // Unknown keys remain absent.
+    assert!(!resolved.contains_key("missing_title"));
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn custom_tooltip_hover_shows_localisation_preview_inside_mission_effects() {
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
