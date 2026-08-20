@@ -1,16 +1,16 @@
 # Releasing ParadoxCode
 
-This checklist keeps the `0.1.x` server and editor extensions versioned and published as one
-release. Creating a tag is an external release operation: review the exact commit and complete the
-account prerequisites before pushing it.
+This checklist keeps the `0.1.x` server and editor extensions versioned as one release. GitHub
+Release publication is automated; Visual Studio Marketplace publication is temporarily manual.
+Creating a tag is an external release operation: review the exact commit and complete the account
+prerequisites before pushing it.
 
 ## One-time publisher setup
 
 1. Create or verify the `paradoxcode` publisher in Visual Studio Marketplace. The stable extension
    identity is `paradoxcode.paradoxcode-vscode`.
-2. Configure Marketplace trusted publishing for GitHub repository `danxiaogu520/ParadoxCode` and
-   workflow `release.yml`. The release job uses `vsce publish --oidc`, so no Azure DevOps
-   organization or long-lived `VSCE_PAT` secret is required.
+2. Marketplace publication is temporarily manual. After a release, download the attached VSIX and
+   upload it from the `paradoxcode` publisher management page.
 3. Fork `zed-industries/extensions` in preparation for the Zed registry PR. Zed publication cannot
    happen solely from this repository: the registry requires a reviewed submodule entry.
 
@@ -38,8 +38,9 @@ git push origin v0.1.0
 ```
 
 The tag workflow builds and verifies all five native `pdx-ls` archives, creates the immutable
-GitHub Release, packages the VSIX, attaches it to that release, and publishes the same VSIX to the
-Visual Studio Marketplace through OIDC trusted publishing. The VS Code job deliberately waits for
+GitHub Release, packages the VSIX, and attaches it to that release. It deliberately does not publish
+to the Visual Studio Marketplace for now. Download `paradoxcode-vscode-<version>.vsix` from the
+release and upload it manually from the publisher management page. The VS Code job still waits for
 the server release because a fresh extension install immediately downloads that matching asset.
 
 For an already-pushed tag, use the workflow's manual dispatch input with the exact tag (for example
@@ -54,7 +55,8 @@ merged.
 
 1. Confirm all five server archives and checksum sidecars plus the VSIX are attached to the GitHub
    Release.
-2. Subscribe to the public Marketplace extension from a clean VS Code profile and repeat the
+2. Upload the VSIX manually to the Visual Studio Marketplace, then subscribe to the public
+   Marketplace extension from a clean VS Code profile and repeat the
    installation smoke test. Do not rely on a previously populated global server cache.
 3. After the Zed registry PR merges, install ParadoxCode from Zed's Extension Gallery and repeat the
    clean-profile server-start smoke test.

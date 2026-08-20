@@ -132,11 +132,10 @@ jobs:
           fi
 
   vscode:
-    name: Publish VS Code Marketplace extension
+    name: Package VS Code extension
     needs: publish
     permissions:
       contents: write
-      id-token: write
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -148,16 +147,6 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: editors/vscode/package-lock.json
-      - name: Build OIDC-enabled vsce
-        shell: bash
-        run: |
-          vsce_root="${RUNNER_TEMP}/vscode-vsce"
-          git clone --depth 1 https://github.com/microsoft/vscode-vsce.git "$vsce_root"
-          git -C "$vsce_root" fetch --depth 1 origin c998e2a8604ba07d2b6a364d1742c1bc38e7d8ff
-          git -C "$vsce_root" checkout --detach c998e2a8604ba07d2b6a364d1742c1bc38e7d8ff
-          npm ci --prefix "$vsce_root" --no-audit --no-fund
-          npm run build --prefix "$vsce_root"
-          echo "VSCE_ROOT=$vsce_root" >> "$GITHUB_ENV"
       - run: npm ci --prefix editors/vscode --no-audit --no-fund
       - name: Verify extension and tag versions
         shell: bash
@@ -186,10 +175,6 @@ jobs:
         run: |
           version="${RELEASE_TAG#v}"
           gh release upload "$RELEASE_TAG" "dist/paradoxcode-vscode-${version}.vsix" --clobber
-      - name: Publish the same VSIX with Marketplace trusted publishing
-        working-directory: editors/vscode
+      - name: Marketplace publication is manual
         shell: bash
-        run: |
-          version="${RELEASE_TAG#v}"
-          node "$VSCE_ROOT/vsce" publish --oidc \
-            --packagePath "../../dist/paradoxcode-vscode-${version}.vsix"
+        run: echo "Marketplace publication is temporarily disabled; upload the attached VSIX manually."
