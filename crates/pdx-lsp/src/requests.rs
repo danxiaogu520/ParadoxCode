@@ -231,18 +231,47 @@ impl SnapshotRequestContext {
         // Resolve all `{mission_id}_title` keys in one workspace pass with the
         // same English-preferring symbol resolution as hover; missing keys
         // simply fall back to the raw id in the renderer.
-        let title_keys = layout
-            .iter()
-            .map(|pos| {
-                format!(
-                    "{}_title",
-                    file.trees[pos.tree_index].missions[pos.mission_index].id
-                )
-            })
-            .collect::<Vec<String>>();
+        // Different nodes can produce the same localisation key (and malformed
+        // files may repeat ids). Deduplicating here avoids resolving the same
+        // definition repeatedly while preserving the response for every node.
+        let mut title_keys = Vec::with_capacity(layout.len());
+        let mut seen_title_keys = HashSet::with_capacity(layout.len());
+        for pos in &layout {
+            let key = format!(
+                "{}_title",
+                file.trees[pos.tree_index].missions[pos.mission_index].id
+            );
+            if seen_title_keys.insert(key.clone()) {
+                title_keys.push(key);
+            }
+        }
         let title_refs = title_keys.iter().map(String::as_str).collect::<Vec<_>>();
         let titles = localisation_values_by_key(&self.snapshot, &title_refs, &self.cancellation)
             .map_err(cancelled_error)?;
+
+        // Build the mission-id and diagnostic lookup sets once. The previous
+        // per-node closures scanned every tree and every diagnostic, which made
+        // preview latency grow quadratically on large mission files.
+        let in_file: HashSet<&str> = file
+            .trees
+            .iter()
+            .flat_map(|tree| tree.missions.iter().map(|mission| mission.id.as_str()))
+            .collect();
+        let mut error_missions = HashSet::new();
+        let mut warning_missions = HashSet::new();
+        for diagnostic in &diagnostics {
+            let Some(mission) = diagnostic.mission.as_deref() else {
+                continue;
+            };
+            match diagnostic.severity {
+                Severity::Error => {
+                    error_missions.insert(mission);
+                }
+                Severity::Warning => {
+                    warning_missions.insert(mission);
+                }
+            }
+        }
 
         let nodes = layout
             .iter()
@@ -253,7 +282,7 @@ impl SnapshotRequestContext {
                 let is_root = mission
                     .required
                     .iter()
-                    .all(|r| file.trees.iter().all(|t| t.mission(r).is_none()));
+                    .all(|required| !in_file.contains(required.as_str()));
                 // The game renders `{mission_id}_title`; resolve it through the
                 // active workspace localisation definition so mod overrides and
                 // Vanilla keys both work. The raw id remains as the fallback.
@@ -261,11 +290,6 @@ impl SnapshotRequestContext {
                 let title = titles.get(&title_key).map(
                     |(language, value)| serde_json::json!({ "language": language, "value": value }),
                 );
-                let has_severity = |severity| {
-                    diagnostics.iter().any(|d| {
-                        d.severity == severity && d.mission.as_deref() == Some(mission.id.as_str())
-                    })
-                };
                 let start = usize::try_from(mission.span.start()).unwrap_or(0);
                 let end = usize::try_from(mission.span.end()).unwrap_or(start);
                 let source_range =
@@ -297,8 +321,8 @@ impl SnapshotRequestContext {
                     "end": end,
                     "sourceRange": source_range,
                     "isRoot": is_root,
-                    "hasError": has_severity(Severity::Error),
-                    "hasWarning": has_severity(Severity::Warning),
+                    "hasError": error_missions.contains(mission.id.as_str()),
+                    "hasWarning": warning_missions.contains(mission.id.as_str()),
                 })
             })
             .collect::<Vec<_>>();
@@ -381,11 +405,6 @@ impl SnapshotRequestContext {
         }
 
         // Cross-file prerequisite stubs ("↥ id" above the dependent node).
-        let in_file: HashSet<&str> = file
-            .trees
-            .iter()
-            .flat_map(|t| t.missions.iter().map(|m| m.id.as_str()))
-            .collect();
         let mut external = Vec::new();
         for (tree_index, tree) in file.trees.iter().enumerate() {
             for (mission_index, mission) in tree.missions.iter().enumerate() {

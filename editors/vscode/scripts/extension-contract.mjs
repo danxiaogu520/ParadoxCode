@@ -119,7 +119,17 @@ for (const marker of ['fetchBytesOnce', 'ECONNRESET', 'Timed out downloading '])
   }
 }
 const rendererSource = readFileSync(join(root, 'media', 'renderer.js'), 'utf8');
-for (const marker of ['exportPng', 'exportSvg', 'exportJson', 'addEventListener(\'keydown\'', 'renderNodeList', 'readColors']) {
+for (const marker of [
+  'exportPng',
+  'exportSvg',
+  'exportJson',
+  'addEventListener(\'keydown\'',
+  'renderNodeList',
+  'readColors',
+  'requestAnimationFrame',
+  'replaceChildren',
+  'worldRectVisible',
+]) {
   if (!rendererSource.includes(marker)) {
     fail(`Preview UX marker missing: ${marker}`);
   }

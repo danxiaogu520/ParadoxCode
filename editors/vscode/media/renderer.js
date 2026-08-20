@@ -29,13 +29,9 @@
     const EMT_TITLE_Y = 84;
     const EMT_TITLE_WIDTH = 96;
 
-    function themeColor(name, fallback) {
-        const value = getComputedStyle(document.body).getPropertyValue(name).trim();
-        return value || fallback;
-    }
-
     function readColors() {
         const styles = getComputedStyle(document.body);
+        const themeColor = (name, fallback) => styles.getPropertyValue(name).trim() || fallback;
         return {
             border: themeColor('--vscode-editorIndentGuide-background', '#39414c'),
             borderSelected: themeColor('--vscode-focusBorder', '#4d7cfe'),
@@ -56,6 +52,7 @@
     }
 
     let COLORS = readColors();
+    let FONT_FAMILY = getComputedStyle(document.body).fontFamily || 'sans-serif';
 
     const canvas = document.getElementById('tree');
     const status = document.getElementById('status');
@@ -70,14 +67,49 @@
     let dragging = null; // { startX, startY, panX, panY }
     let keyboardIndex = -1;
     let options = { zoomSensitivity: 1, showTextures: true };
+    let drawPending = false;
+    let groupWidths = new WeakMap();
+    let externalWidths = new Map();
+    let externalByNode = new Map();
+
+    // Pointer and wheel events can arrive much faster than the browser can
+    // paint. Coalescing them into one frame keeps a large tree from being
+    // rendered once per event while preserving the latest pan/zoom/hover
+    // state.
+    function scheduleDraw() {
+        if (drawPending) {
+            return;
+        }
+        drawPending = true;
+        window.requestAnimationFrame(() => {
+            drawPending = false;
+            drawFrame();
+        });
+    }
+
+    function refreshTheme() {
+        COLORS = readColors();
+        FONT_FAMILY = getComputedStyle(document.body).fontFamily || 'sans-serif';
+        groupWidths = new WeakMap();
+        externalWidths.clear();
+    }
+
+    // VS Code changes the webview theme by updating body attributes. Refresh
+    // the small theme cache only when that happens, rather than on every paint.
+    if (typeof MutationObserver !== 'undefined') {
+        new MutationObserver(() => {
+            refreshTheme();
+            scheduleDraw();
+        }).observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] });
+    }
 
     function resize() {
-        COLORS = readColors();
+        refreshTheme();
         const dpr = window.devicePixelRatio || 1;
         canvas.width = Math.round(canvas.clientWidth * dpr);
         canvas.height = Math.round(canvas.clientHeight * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        draw();
+        scheduleDraw();
     }
 
     function toScreen(wx, wy) {
@@ -86,6 +118,14 @@
 
     function toWorld(sx, sy) {
         return { x: (sx - pan.x) / zoom, y: (sy - pan.y) / zoom };
+    }
+
+    function worldRectVisible(x, y, width, height, padding = 32) {
+        const left = (-pan.x - padding) / zoom;
+        const top = (-pan.y - padding) / zoom;
+        const right = (canvas.clientWidth - pan.x + padding) / zoom;
+        const bottom = (canvas.clientHeight - pan.y + padding) / zoom;
+        return x + width >= left && x <= right && y + height >= top && y <= bottom;
     }
 
     function fitView() {
@@ -167,6 +207,46 @@
         return COLORS.border;
     }
 
+    function groupWidth(group) {
+        let width = groupWidths.get(group);
+        if (width === undefined) {
+            ctx.font = `11px ${FONT_FAMILY}`;
+            width = Math.max(ctx.measureText(group.label).width + 16, 60);
+            groupWidths.set(group, width);
+        }
+        return width;
+    }
+
+    function externalLabelWidth(label) {
+        let width = externalWidths.get(label);
+        if (width === undefined) {
+            ctx.font = `10px ${FONT_FAMILY}`;
+            width = ctx.measureText(label).width + 8;
+            externalWidths.set(label, width);
+        }
+        return width;
+    }
+
+    function nodeKey(node) {
+        return `${node.tree}:${node.mission}`;
+    }
+
+    function setPreview(next) {
+        preview = next;
+        externalByNode = new Map();
+        for (const external of next.external || []) {
+            const key = `${external.tree}:${external.mission}`;
+            const entries = externalByNode.get(key);
+            if (entries) {
+                entries.push(external);
+            } else {
+                externalByNode.set(key, [external]);
+            }
+        }
+        groupWidths = new WeakMap();
+        externalWidths.clear();
+    }
+
     function nodeAt(sx, sy) {
         if (!preview) {
             return null;
@@ -183,7 +263,7 @@
         for (let i = 0; i < preview.groups.length; i += 1) {
             const group = preview.groups[i];
             const pos = toScreen(group.x, group.y);
-            const w = Math.max(ctx.measureText(group.label).width + 16, 60) * zoom;
+            const w = groupWidth(group) * zoom;
             const h = 20 * zoom;
             if (sx >= pos.x && sx <= pos.x + w && sy >= pos.y && sy <= pos.y + h) {
                 return { kind: 'group', index: i, node: group, rect: { x: pos.x, y: pos.y, w, h } };
@@ -212,11 +292,11 @@
         let image = textureImages.get(name);
         if (!image) {
             image = new Image();
-            image.onload = () => draw();
+            image.onload = () => scheduleDraw();
             image.onerror = () => {
                 failedTextures.add(name);
                 textureImages.delete(name);
-                draw();
+                scheduleDraw();
             };
             image.src = url;
             textureImages.set(name, image);
@@ -263,6 +343,11 @@
 
     // Runs a vertical stroke between two glyph anchors (world coordinates).
     function strokeVertical(from, to) {
+        const minY = Math.min(from.y, to.y);
+        const maxY = Math.max(from.y, to.y);
+        if (!worldRectVisible(from.x - 2, minY, 4, maxY - minY)) {
+            return;
+        }
         const a = toScreen(from.x, from.y);
         const b = toScreen(to.x, to.y);
         ctx.strokeStyle = COLORS.arrow;
@@ -275,9 +360,16 @@
 
     // Draws one server-placed arrow segment: its game texture when the server
     // supplied one (EMT-style tile assembly), or a schematic stroke otherwise.
-    function drawArrowSegment(segment) {
-        if (textureImage(segment.texture)) {
-            drawImageWorld(textureImage(segment.texture), segment.x, segment.y);
+    function drawArrowSegment(segment, image = textureImage(segment.texture)) {
+        const width = segment.glyph === 'horizontalSkipSlot' ? ARROW_TILE_WIDTH : 14;
+        const height = segment.glyph === 'verticalTile' || segment.glyph === 'verticalSkipTier'
+            ? ARROW_TILE_HEIGHT
+            : 14;
+        if (!worldRectVisible(segment.x, segment.y, width, height)) {
+            return;
+        }
+        if (image) {
+            drawImageWorld(image, segment.x, segment.y);
             return;
         }
         const pos = toScreen(segment.x, segment.y);
@@ -322,9 +414,10 @@
         }
         let chain = null; // { x, y } of the previous vertical glyph in this run
         for (const segment of preview.arrows) {
-            if (textureImage(segment.texture)) {
+            const image = textureImage(segment.texture);
+            if (image) {
                 chain = null;
-                drawArrowSegment(segment);
+                drawArrowSegment(segment, image);
             } else if (segment.glyph === 'verticalTile' || segment.glyph === 'verticalSkipTier') {
                 if (chain) {
                     strokeVertical(chain, segment);
@@ -335,10 +428,10 @@
                     strokeVertical(chain, segment);
                 }
                 chain = null;
-                drawArrowSegment(segment);
+                drawArrowSegment(segment, null);
             } else {
                 chain = null; // heads and horizontal tiles end any vertical chain
-                drawArrowSegment(segment);
+                drawArrowSegment(segment, null);
             }
         }
     }
@@ -347,9 +440,13 @@
         if (!preview) {
             return;
         }
+        ctx.font = `11px ${FONT_FAMILY}`;
         for (const group of preview.groups) {
+            const width = groupWidth(group);
+            if (!worldRectVisible(group.x, group.y, width, 18)) {
+                continue;
+            }
             const pos = toScreen(group.x, group.y);
-            const width = ctx.measureText(group.label).width + 16;
             const hoveredGroup = hovered && hovered.kind === 'group' && hovered.node === group;
             ctx.fillStyle = COLORS.groupBg;
             roundRect(pos.x, pos.y, width, 18, 4);
@@ -358,7 +455,6 @@
             ctx.lineWidth = 1;
             ctx.stroke();
             ctx.fillStyle = COLORS.dim;
-            ctx.font = `11px ${getComputedStyle(document.body).fontFamily}`;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
             ctx.fillText(group.label, pos.x + 8, pos.y + 10);
@@ -369,17 +465,18 @@
         if (!preview) {
             return;
         }
-        for (const ext of preview.external) {
-            if (ext.tree !== node.tree || ext.mission !== node.mission) {
-                continue;
-            }
+        const external = externalByNode.get(nodeKey(node));
+        if (!external) {
+            return;
+        }
+        ctx.font = `10px ${FONT_FAMILY}`;
+        for (const ext of external) {
             const label = `↥ ${ext.label}`;
             ctx.fillStyle = COLORS.externalBg;
-            const width = ctx.measureText(label).width + 8;
+            const width = externalLabelWidth(label);
             roundRect(pos.x, pos.y - 22 * zoom, width, 16, 3);
             ctx.fill();
             ctx.fillStyle = COLORS.warning;
-            ctx.font = `10px ${getComputedStyle(document.body).fontFamily}`;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
             ctx.fillText(label, pos.x + 4, pos.y - 22 * zoom + 8);
@@ -399,7 +496,7 @@
             const slotY = pos.y + EMT_TITLE_Y * zoom;
             const slotW = EMT_TITLE_WIDTH * zoom;
             ctx.fillStyle = COLORS.texturedText;
-            ctx.font = `bold ${Math.max(8, 10 * zoom)}px ${getComputedStyle(document.body).fontFamily}`;
+            ctx.font = `bold ${Math.max(8, 10 * zoom)}px ${FONT_FAMILY}`;
             // Top-aligned like the game's title label: first line sits at the
             // slot's top edge, subsequent lines follow.
             const lines = wrapText(label, slotW).slice(0, 2);
@@ -411,7 +508,7 @@
         }
         const h = NODE_HEIGHT * zoom;
         ctx.fillStyle = COLORS.text;
-        ctx.font = `${Math.max(9, 11 * zoom)}px ${getComputedStyle(document.body).fontFamily}`;
+        ctx.font = `${Math.max(9, 11 * zoom)}px ${FONT_FAMILY}`;
         const lines = wrapText(label, w - 12).slice(0, 2);
         const lineHeight = 13 * zoom;
         const blockHeight = lines.length * lineHeight;
@@ -421,7 +518,7 @@
         });
         if (title) {
             ctx.fillStyle = COLORS.dim;
-            ctx.font = `${Math.max(8, 9 * zoom)}px ${getComputedStyle(document.body).fontFamily}`;
+            ctx.font = `${Math.max(8, 9 * zoom)}px ${FONT_FAMILY}`;
             ctx.fillText(node.id, pos.x + w / 2, startY + blockHeight + lineHeight);
         }
     }
@@ -444,9 +541,11 @@
         drawExternal(node, pos);
     }
 
-    function drawNode(node, i) {
+    function drawNode(node, i, frame) {
+        if (!worldRectVisible(node.x, node.y, NODE_WIDTH, NODE_HEIGHT, 36)) {
+            return;
+        }
         const pos = toScreen(node.x, node.y);
-        const frame = textureImage('GFX_mission_icons_frame');
         if (frame) {
             drawNodeTextured(node, i, pos, frame);
             return;
@@ -465,21 +564,21 @@
         drawExternal(node, pos);
     }
 
-    function draw() {
-        COLORS = readColors();
+    function drawFrame() {
         ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
         if (!preview) {
             return;
         }
         drawArrows();
         drawGroups();
-        preview.nodes.forEach(drawNode);
+        const frame = textureImage('GFX_mission_icons_frame');
+        preview.nodes.forEach((node, index) => drawNode(node, index, frame));
     }
 
     function showStatus(message) {
         status.textContent = message;
         status.classList.add('visible');
-        draw();
+        scheduleDraw();
     }
 
     function hideStatus() {
@@ -528,10 +627,11 @@
         if (!nodeList) {
             return;
         }
-        nodeList.textContent = '';
         if (!preview) {
+            nodeList.replaceChildren();
             return;
         }
+        const fragment = document.createDocumentFragment();
         preview.nodes.forEach((node, index) => {
             const button = document.createElement('button');
             button.type = 'button';
@@ -542,15 +642,34 @@
             button.textContent = nodeLabel(node);
             button.title = node.titleKey || node.id;
             button.setAttribute('role', 'listitem');
-            button.addEventListener('focus', () => {
-                keyboardIndex = index;
-                hovered = { kind: 'node', index, node, rect: null };
-                draw();
-            });
-            button.addEventListener('click', () => postJump({ kind: 'node', node, index }));
-            nodeList.appendChild(button);
+            button.dataset.nodeIndex = String(index);
+            fragment.appendChild(button);
         });
+        nodeList.replaceChildren(fragment);
     }
+
+    // Delegate list events once instead of allocating two closures per node
+    // on every preview refresh. This matters for large mission files and also
+    // lets the browser replace the list in one DOM operation.
+    nodeList?.addEventListener('focusin', (event) => {
+        const button = event.target.closest?.('button[data-node-index]');
+        const index = button ? Number(button.dataset.nodeIndex) : -1;
+        if (!preview || !Number.isInteger(index) || index < 0 || index >= preview.nodes.length) {
+            return;
+        }
+        keyboardIndex = index;
+        hovered = { kind: 'node', index, node: preview.nodes[index], rect: null };
+        scheduleDraw();
+    });
+
+    nodeList?.addEventListener('click', (event) => {
+        const button = event.target.closest?.('button[data-node-index]');
+        const index = button ? Number(button.dataset.nodeIndex) : -1;
+        if (!preview || !Number.isInteger(index) || index < 0 || index >= preview.nodes.length) {
+            return;
+        }
+        postJump({ kind: 'node', node: preview.nodes[index], index });
+    });
 
     function showTooltip(hit, clientX, clientY) {
         if (!tooltip || !hit) {
@@ -582,7 +701,7 @@
         const node = preview.nodes[keyboardIndex];
         hovered = { kind: 'node', index: keyboardIndex, node, rect: null };
         canvas.setAttribute('aria-label', `Mission ${nodeLabel(node)}`);
-        draw();
+        scheduleDraw();
     }
 
     function exportJson() {
@@ -651,11 +770,11 @@
     window.addEventListener('message', (event) => {
         const message = event.data;
         if (message.type === 'preview') {
-            preview = message.payload;
+            setPreview(message.payload);
             keyboardIndex = -1;
             fitView();
             hideStatus();
-            draw();
+            scheduleDraw();
             renderNodeList();
             renderSummary();
         } else if (message.type === 'empty' || message.type === 'error') {
@@ -668,7 +787,7 @@
                 zoomSensitivity: Math.min(2, Math.max(0.5, Number(message.zoomSensitivity) || 1)),
                 showTextures: message.showTextures !== false,
             };
-            draw();
+            scheduleDraw();
         }
     });
 
@@ -688,7 +807,7 @@
         if (dragging) {
             pan.x = dragging.panX + (event.clientX - dragging.startX);
             pan.y = dragging.panY + (event.clientY - dragging.startY);
-            draw();
+            scheduleDraw();
             return;
         }
         const rect = canvas.getBoundingClientRect();
@@ -697,7 +816,7 @@
             (hovered && next && hovered.index !== next.index);
         if (changed) {
             hovered = next;
-            draw();
+            scheduleDraw();
         }
         if (next) showTooltip(next, event.clientX, event.clientY);
         else hideTooltip();
@@ -720,12 +839,12 @@
         zoom = nextZoom;
         pan.x = sx - world.x * zoom;
         pan.y = sy - world.y * zoom;
-        draw();
+        scheduleDraw();
     }, { passive: false });
 
     canvas.addEventListener('dblclick', () => {
         fitView();
-        draw();
+        scheduleDraw();
     });
 
     canvas.addEventListener('keydown', (event) => {
@@ -744,21 +863,21 @@
         } else if (event.key === '+' || event.key === '=') {
             event.preventDefault();
             zoom = Math.min(2.5, zoom * 1.15);
-            draw();
+            scheduleDraw();
         } else if (event.key === '-') {
             event.preventDefault();
             zoom = Math.max(0.35, zoom / 1.15);
-            draw();
+            scheduleDraw();
         } else if (event.key.toLowerCase() === 'f') {
             event.preventDefault();
             fitView();
-            draw();
+            scheduleDraw();
         }
     });
 
-    document.getElementById('fit')?.addEventListener('click', () => { fitView(); draw(); });
-    document.getElementById('zoom-in')?.addEventListener('click', () => { zoom = Math.min(2.5, zoom * 1.15); draw(); });
-    document.getElementById('zoom-out')?.addEventListener('click', () => { zoom = Math.max(0.35, zoom / 1.15); draw(); });
+    document.getElementById('fit')?.addEventListener('click', () => { fitView(); scheduleDraw(); });
+    document.getElementById('zoom-in')?.addEventListener('click', () => { zoom = Math.min(2.5, zoom * 1.15); scheduleDraw(); });
+    document.getElementById('zoom-out')?.addEventListener('click', () => { zoom = Math.max(0.35, zoom / 1.15); scheduleDraw(); });
     document.getElementById('export-png')?.addEventListener('click', exportPng);
     document.getElementById('export-svg')?.addEventListener('click', exportSvg);
     document.getElementById('export-json')?.addEventListener('click', exportJson);
