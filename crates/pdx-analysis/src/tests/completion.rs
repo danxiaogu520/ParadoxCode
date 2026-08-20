@@ -1832,3 +1832,177 @@ fn key_completion_inserts_equals_for_scalars_and_skeletons_for_blocks() {
         .expect("block rule item");
     assert_eq!(bar.insert_text, "bar = {\n\t\t$0\n\t}");
 }
+
+#[test]
+fn if_limit_trigger_context_completes_trigger_keys() {
+    let text = concat!(
+        "country_event = {\n",
+        "  trigger = {\n",
+        "    if = {\n",
+        "      limit = {\n",
+        "        has_glob\n",
+        "      }\n",
+        "    }\n",
+        "  }\n",
+        "}\n",
+    );
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/if-limit-trigger.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open");
+    let snapshot = host.snapshot();
+    let offset = text.find("has_glob").expect("completion prefix");
+    let position = u32::try_from(offset).expect("position").saturating_add(8);
+    let input = input_for_document(&snapshot, &id).expect("analysis input");
+    let context = semantic_completion_context(&snapshot, &input, position)
+        .expect("semantic completion context");
+    let completion = complete(&snapshot, &id, position);
+    assert!(
+        completion
+            .items
+            .iter()
+            .any(|item| item.label == "has_global_flag"),
+        "trigger-side if/limit block must complete trigger keys: context={} path={:?} items={:?}",
+        context.context,
+        context.parent_path,
+        completion
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn if_limit_effect_context_completes_trigger_keys() {
+    let text = concat!(
+        "country_event = {\n",
+        "  option = {\n",
+        "    if = {\n",
+        "      limit = {\n",
+        "        has_glob\n",
+        "      }\n",
+        "      add_prestige = 1\n",
+        "    }\n",
+        "  }\n",
+        "}\n",
+    );
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/if-limit-effect.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open");
+    let snapshot = host.snapshot();
+    let offset = text.find("has_glob").expect("completion prefix");
+    let position = u32::try_from(offset).expect("position").saturating_add(8);
+    let input = input_for_document(&snapshot, &id).expect("analysis input");
+    let context = semantic_completion_context(&snapshot, &input, position)
+        .expect("semantic completion context");
+    let completion = complete(&snapshot, &id, position);
+    assert!(
+        completion
+            .items
+            .iter()
+            .any(|item| item.label == "has_global_flag"),
+        "effect-side if/limit trigger block must complete trigger keys: context={} path={:?} items={:?}",
+        context.context,
+        context.parent_path,
+        completion
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn scope_link_limit_clauses_complete_trigger_keys() {
+    let limit_blocks = [
+        "while = { limit = { has_glob } }",
+        "else_if = { limit = { has_glob } }",
+        "every_province = { limit = { has_glob } }",
+        "random_owned_province = { limit = { has_glob } }",
+    ];
+    for line in limit_blocks {
+        let text = format!("country_event = {{ option = {{ {line} }} }}\n");
+        let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+        let id = DocumentId::new("file:///tmp/events/scope-link-limit.txt");
+        host.open_document(id.clone(), 1, text.to_owned(), None)
+            .expect("open");
+        let snapshot = host.snapshot();
+        let offset = text.find("has_glob").expect("completion prefix");
+        let position = u32::try_from(offset).expect("position").saturating_add(8);
+        let completion = complete(&snapshot, &id, position);
+        assert!(
+            completion
+                .items
+                .iter()
+                .any(|item| item.label == "has_global_flag"),
+            "limit clause under `{line}` must complete trigger keys: {:?}",
+            completion
+                .items
+                .iter()
+                .map(|item| item.label.as_str())
+                .collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
+fn limit_clause_value_position_completes_bool_values() {
+    let text = concat!(
+        "country_event = {\n",
+        "  option = {\n",
+        "    if = {\n",
+        "      limit = { always = \n",
+        "    }\n",
+        "  }\n",
+        "}\n",
+    );
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/limit-value.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open");
+    let snapshot = host.snapshot();
+    let offset = text.find("always = ").expect("value position");
+    let position = u32::try_from(offset).expect("position").saturating_add(9);
+    let completion = complete(&snapshot, &id, position);
+    assert!(
+        completion.items.iter().any(|item| item.label == "yes"),
+        "bool value must complete after a trigger key inside a limit clause: {:?}",
+        completion
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn if_block_key_completion_still_offers_limit_clause() {
+    let text = concat!(
+        "country_event = {\n",
+        "  option = {\n",
+        "    if = {\n",
+        "      li\n",
+        "    }\n",
+        "  }\n",
+        "}\n",
+    );
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/if-level-key.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open");
+    let snapshot = host.snapshot();
+    let offset = text.find("li").expect("completion prefix");
+    let position = u32::try_from(offset).expect("position").saturating_add(2);
+    let completion = complete(&snapshot, &id, position);
+    assert!(
+        completion.items.iter().any(|item| item.label == "limit"),
+        "key completion inside an `if` block (before its body) must still offer `limit`: {:?}",
+        completion
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
+}

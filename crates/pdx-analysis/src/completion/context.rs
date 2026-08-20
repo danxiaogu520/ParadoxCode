@@ -127,21 +127,28 @@ pub(crate) fn semantic_completion_container(
             && snapshot
                 .game_profile()
                 .is_transparent_scope_wrapper(&property.key);
-        let next_rules = semantic_rules_for_container(snapshot, &context, &parent_path, &scope)
-            .into_iter()
-            .filter(|rule| {
-                !matches!(rule.shape, RuleShape::LeafValue)
-                    && semantic_rule_key_matches(snapshot, rule, &parent_path, &property.key)
-                    && semantic_scope_allows(rule, &scope)
-            })
-            .collect::<Vec<_>>();
+        // Transition rules for this property come from the current container *and* the
+        // structural containers. After a scope link such as `if` moves to its target, the
+        // block's `parent_path` is reset, but clause rules like `limit` (parent_path
+        // `["if"]`) live under the pushed structural path; without those, descending into
+        // such a clause block yields no candidates. Each rule keeps the source path used to
+        // compute its destination, mirroring the diagnostics structural/transition split.
+        let next_rules = property_transition_rules(
+            snapshot,
+            &context,
+            &parent_path,
+            &structural_containers,
+            &scope,
+            property,
+        );
+        let next_rule_refs = next_rules.iter().map(|(rule, _)| *rule).collect::<Vec<_>>();
         let cached_child_fact = cached_scope_fact_for_property(
             snapshot,
             hir,
             &context,
             &parent_path,
             property,
-            &next_rules,
+            &next_rule_refs,
             None,
             &scope,
             transparent_wrapper,
@@ -229,17 +236,21 @@ pub(crate) fn semantic_completion_container(
                 );
             }
         }
-        let next_rules = semantic_transition_candidates(&next_rules, None, property, &scope);
+        let selected = semantic_transition_candidates(&next_rule_refs, None, property, &scope);
+        let next_rules = next_rules
+            .into_iter()
+            .filter(|(rule, _)| selected.iter().any(|selected| selected.id == rule.id))
+            .collect::<Vec<_>>();
         let quoted_script_rule = next_rules
             .iter()
-            .copied()
-            .find(|rule| matches!(rule.shape, RuleShape::QuotedScript));
+            .find(|(rule, _)| matches!(rule.shape, RuleShape::QuotedScript))
+            .map(|(rule, _)| *rule);
         let mut destinations = Vec::<SemanticCompletionContainer>::new();
-        for rule in next_rules {
+        for (rule, source_path) in &next_rules {
             let (destination_context, destination_path) =
                 rule.child_context.as_deref().map_or_else(
                     || {
-                        let mut path = parent_path.clone();
+                        let mut path = source_path.clone();
                         if !transparent_wrapper {
                             path.push(property.key.clone());
                         }
@@ -374,6 +385,43 @@ pub(crate) fn semantic_completion_containers_equal(
             .zip(&right.parent_path)
             .all(|(left, right)| left.eq_ignore_ascii_case(right))
         && left.scope == right.scope
+}
+
+/// Returns the transition rules that can drive one property's block, drawing on both the
+/// current container and the structural containers carried by the enclosing block. After a
+/// scope link such as `if` moves to its target, `parent_path` is reset, so clause rules like
+/// `limit` (parent_path `["if"]`) are only reachable through the pushed structural path. Each
+/// rule is paired with the source path used to compute its destination.
+pub(crate) fn property_transition_rules<'rule>(
+    snapshot: &'rule AnalysisSnapshot,
+    context: &str,
+    parent_path: &[String],
+    structural_containers: &[(String, Vec<String>)],
+    scope: &ScopeContext,
+    property: &ScriptProperty,
+) -> Vec<(&'rule pdx_rules::SemanticRule, Vec<String>)> {
+    let mut out = Vec::new();
+    let mut seen = Vec::new();
+    for (source_context, source_path) in structural_containers
+        .iter()
+        .map(|(container_context, container_path)| {
+            (container_context.as_str(), container_path.as_slice())
+        })
+        .chain(std::iter::once((context, parent_path)))
+    {
+        for rule in semantic_rules_for_container(snapshot, source_context, source_path, scope) {
+            if matches!(rule.shape, RuleShape::LeafValue)
+                || !semantic_rule_key_matches(snapshot, rule, source_path, &property.key)
+                || !semantic_scope_allows(rule, scope)
+                || seen.iter().any(|id| id == &rule.id)
+            {
+                continue;
+            }
+            seen.push(rule.id.clone());
+            out.push((rule, source_path.to_vec()));
+        }
+    }
+    out
 }
 
 #[allow(clippy::too_many_arguments)]
