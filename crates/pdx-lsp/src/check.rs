@@ -92,9 +92,9 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
             "README disclaimer is missing",
         ));
         results.push(check(
-            readme.contains("has not published an end-user release"),
-            "README alpha status",
-            "README alpha status is missing",
+            readme.contains("Latest release:"),
+            "README release status",
+            "README release status is missing",
         ));
     }
 

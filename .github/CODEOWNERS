@@ -1,0 +1,38 @@
+# CODEOWNERS
+#
+# Owners are automatically requested for review when a PR touches their path.
+# Right now the project is a single-maintainer effort; as maintainers are added,
+# split the fine-grained entries below instead of widening the global default.
+
+# Default owner for everything not matched below
+* @danxiaogu520
+
+# Core Rust crates (engine layers, dependency direction: text -> parser -> engine -> analysis -> lsp)
+/crates/pdx-text/ @danxiaogu520
+/crates/pdx-parser/ @danxiaogu520
+/crates/pdx-rules/ @danxiaogu520
+/crates/pdx-game/  @danxiaogu520
+/crates/pdx-engine/ @danxiaogu520
+/crates/pdx-analysis/ @danxiaogu520
+/crates/pdx-lsp/ @danxiaogu520
+
+# First-party EU4 rules (sole authoritative rule source)
+/rules/ @danxiaogu520
+
+# Editor integrations
+/editors/zed/ @danxiaogu520
+/editors/vscode/ @danxiaogu520
+
+# Tooling, quality gates, and releases
+/scripts/ @danxiaogu520
+/.github/ @danxiaogu520
+
+# Grammar assets and fuzz targets
+/grammars/ @danxiaogu520
+/fuzz/ @danxiaogu520
+
+# Contributing and release process documentation
+/CONTRIBUTING.md @danxiaogu520
+/SECURITY.md @danxiaogu520
+/RELEASING.md @danxiaogu520
+/CHANGELOG.md @danxiaogu520

@@ -1,0 +1,53 @@
+name: Feature request
+description: Suggest a new capability or improvement for ParadoxCode.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Before opening, please search for an existing issue or
+        discussion with the same idea and add a 👍 reaction instead of a duplicate.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the project should this affect?
+      options:
+        - Language server (pdx-ls / pdx CLI)
+        - Parser / HIR / analysis
+        - Rules database (rules/eu4)
+        - VS Code extension
+        - Zed extension
+        - Release / build / CI
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What can users not do today that this feature would enable?
+      placeholder: As a mod author, I want to ... because ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How you imagine the feature working. Sketches, examples, or mock screenshots help a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds exist today, and why are they not good enough?
+  - type: textarea
+    id: game
+    attributes:
+      label: Game scope
+      description: |
+        ParadoxCode is EU4-first and keeps the core engine game-neutral. If this is EU4-specific
+        (scopes, commands, symbols, special semantics), say so — that determines whether it belongs
+        in the EU4 profile or the generic engine.
+      placeholder: "EU4 only / generic engine / unsure"
