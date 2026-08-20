@@ -652,9 +652,21 @@ fn valid_cache_load_reports_work_done_progress() {
                     .is_some_and(|message| message.contains("pdx-ls ready"))
         })
         .expect("ready log");
+    let ready_notification_index = responses
+        .iter()
+        .position(|value| value["method"] == "pdx/ready")
+        .expect("ready notification");
+    let ready_notification = &responses[ready_notification_index];
+    assert_eq!(ready_notification["params"]["state"], "ready");
+    assert!(ready_notification["params"]["revision"].is_u64());
+    assert!(ready_notification["params"]["sourceFiles"].is_u64());
     assert!(
         install_index < cache_end_index && cache_end_index < ready_index,
         "cache progress must end only after installation and before ready: install={install_index}, end={cache_end_index}, ready={ready_index}"
+    );
+    assert!(
+        ready_index < ready_notification_index,
+        "the explicit ready notification must follow the ready log"
     );
     assert_eq!(server.snapshot().source_roots().len(), 2);
     fs::remove_dir_all(container).expect("cleanup");

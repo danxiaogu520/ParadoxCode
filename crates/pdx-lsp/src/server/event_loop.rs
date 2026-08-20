@@ -519,6 +519,14 @@ impl LspServer {
                                     "pdx-ls ready — workspace indexed".to_owned(),
                                 ),
                             )?;
+                            let snapshot = self.host.snapshot();
+                            write_message(
+                                &mut output,
+                                &ready_notification(
+                                    snapshot.revision(),
+                                    snapshot.source_files().len(),
+                                ),
+                            )?;
                             ready_logged = true;
                         }
                     }
@@ -686,6 +694,14 @@ impl LspServer {
                                         .to_owned(),
                                 ),
                             )?;
+                            let snapshot = self.host.snapshot();
+                            write_message(
+                                &mut output,
+                                &ready_notification(
+                                    snapshot.revision(),
+                                    snapshot.source_files().len(),
+                                ),
+                            )?;
                             ready_logged = true;
                         }
                     }
@@ -782,6 +798,14 @@ impl LspServer {
                                     MessageType::INFO,
                                     "pdx-ls ready — workspace, Vanilla and dependency indexes loaded"
                                         .to_owned(),
+                                ),
+                            )?;
+                            let snapshot = self.host.snapshot();
+                            write_message(
+                                &mut output,
+                                &ready_notification(
+                                    snapshot.revision(),
+                                    snapshot.source_files().len(),
                                 ),
                             )?;
                             ready_logged = true;
