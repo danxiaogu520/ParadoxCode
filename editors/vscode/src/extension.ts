@@ -85,6 +85,18 @@ function setServerReady(ready: boolean): void {
     void vscode.commands.executeCommand('setContext', 'paradoxcodeServerReady', ready);
 }
 
+function handleServerReady(
+    readyClient: LanguageClient,
+    loadedFiles?: LoadedFilesProvider,
+): void {
+    const wasReady = serverReady;
+    setServerReady(true);
+    updateStatus(readyClient.state);
+    if (!wasReady && readyClient.state === State.Running) {
+        void loadedFiles?.refresh(readyClient);
+    }
+}
+
 /** Converts the server's user-facing Vanilla setup trail into a walkthrough state. */
 function updateVanillaContext(message: string): void {
     if (/Vanilla symbols (?:are now enabled|loaded from)/i.test(message)
@@ -385,7 +397,7 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
                 return;
             }
             updateStatus(event.newState);
-            if (event.newState === State.Running) {
+            if (event.newState === State.Running && serverReady) {
                 void loadedFiles?.refresh(currentClient);
             }
         });
@@ -399,16 +411,14 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
             // Keep older user-selected pdx-ls binaries usable while they do not yet emit the
             // explicit readiness notification.
             if (/pdx-ls ready/i.test(params.message)) {
-                setServerReady(true);
-                updateStatus(client?.state ?? State.Stopped);
+                handleServerReady(currentClient, loadedFiles);
             }
         });
         currentClient.onNotification('pdx/ready', () => {
             if (client !== currentClient) {
                 return;
             }
-            setServerReady(true);
-            updateStatus(currentClient.state);
+            handleServerReady(currentClient, loadedFiles);
         });
         updateStatus(currentClient.state);
         currentClient.start();
