@@ -119,68 +119,123 @@ impl AnalysisHost {
     /// order. The cache's rule hash is intentionally not required to match; it remains observable
     /// in metadata so the caller can decide whether to refresh.
     pub fn install_index_cache(&mut self, cache: IndexCache) -> Result<(), IndexCacheError> {
-        if cache.metadata().game_id != self.rules.game_id()
-            || cache.metadata().game_id != self.profile.game_id
-        {
-            return Err(IndexCacheError::GameMismatch {
-                expected: self.profile.game_id.clone(),
-                actual: cache.metadata().game_id.clone(),
-            });
-        }
-        let cached_root = cache.source_root().clone();
-        let mut roots = self.roots.to_vec();
-        match roots.iter_mut().find(|root| root.id == cached_root.id) {
-            Some(configured) => {
-                if configured.kind != cached_root.kind {
-                    return Err(IndexCacheError::InvalidData(format!(
-                        "cached root kind {:?} does not match configured root {} for id {}",
-                        cached_root.kind,
-                        configured.path.display(),
-                        cached_root.id.get()
-                    )));
-                }
-                if !paths_match(&configured.path, &cached_root.path) {
-                    return Err(IndexCacheError::InvalidData(format!(
-                        "cached root path {} does not match configured root {}",
-                        cached_root.path.display(),
-                        configured.path.display()
-                    )));
-                }
-                // The configured root keeps its caller-assigned order; only its index data
-                // is replaced.
-            }
-            None => {
-                for root in roots.iter() {
-                    if root.kind == cached_root.kind {
-                        return Err(IndexCacheError::InvalidData(format!(
-                            "a {:?} source root is already configured",
-                            cached_root.kind
-                        )));
-                    }
-                    if cached_root.path.starts_with(&root.path)
-                        || root.path.starts_with(&cached_root.path)
-                    {
-                        return Err(IndexCacheError::RootConflict {
-                            root: cached_root.path.clone(),
-                            configured: root.path.clone(),
-                        });
-                    }
-                }
-                roots.insert(0, cached_root.clone());
-            }
-        }
-        if let Some(file) = cache
-            .source_files()
-            .values()
-            .find(|file| !self.profile.allows_scan_file(file.logical_path.as_str()))
-        {
-            return Err(IndexCacheError::InvalidData(format!(
-                "cache file {} is outside the active profile scan whitelist",
-                file.logical_path.as_str()
-            )));
+        self.install_index_caches([cache])
+    }
+
+    /// Installs several validated persistent index caches and rebuilds the combined workspace
+    /// index only once.
+    ///
+    /// Cache validation and source-file collision checks happen before mutating the host. The
+    /// input order is retained for root validation and the final source-priority calculation, so
+    /// batching does not change the configured overlay semantics.
+    pub fn install_index_caches(
+        &mut self,
+        caches: impl IntoIterator<Item = IndexCache>,
+    ) -> Result<(), IndexCacheError> {
+        let caches = caches.into_iter().collect::<Vec<_>>();
+        if caches.is_empty() {
+            return Ok(());
         }
 
-        let (_, _, mut files, cached_index, cached_positions, cached_previews) = cache.into_parts();
+        let mut roots = self.roots.to_vec();
+        let mut files = BTreeMap::new();
+        let mut shards = Vec::new();
+        let mut cached_positions = BTreeMap::new();
+        let mut cached_previews = BTreeMap::new();
+        let mut cached_root_ids = BTreeSet::new();
+
+        for cache in caches {
+            if cache.metadata().game_id != self.rules.game_id()
+                || cache.metadata().game_id != self.profile.game_id
+            {
+                return Err(IndexCacheError::GameMismatch {
+                    expected: self.profile.game_id.clone(),
+                    actual: cache.metadata().game_id.clone(),
+                });
+            }
+            let (_, cached_root, cache_files, cached_index, cache_positions, cache_previews) =
+                cache.into_parts();
+            match roots.iter().find(|root| root.id == cached_root.id) {
+                Some(configured) => {
+                    if configured.kind != cached_root.kind {
+                        return Err(IndexCacheError::InvalidData(format!(
+                            "cached root kind {:?} does not match configured root {} for id {}",
+                            cached_root.kind,
+                            configured.path.display(),
+                            cached_root.id.get()
+                        )));
+                    }
+                    if !paths_match(&configured.path, &cached_root.path) {
+                        return Err(IndexCacheError::InvalidData(format!(
+                            "cached root path {} does not match configured root {}",
+                            cached_root.path.display(),
+                            configured.path.display()
+                        )));
+                    }
+                    // The configured root keeps its caller-assigned order; only its index data
+                    // is replaced.
+                }
+                None => {
+                    for root in roots.iter() {
+                        if root.kind == cached_root.kind
+                            && cached_root.kind != SourceRootKind::Dependency
+                        {
+                            return Err(IndexCacheError::InvalidData(format!(
+                                "a {:?} source root is already configured",
+                                cached_root.kind
+                            )));
+                        }
+                        if cached_root.path.starts_with(&root.path)
+                            || root.path.starts_with(&cached_root.path)
+                        {
+                            return Err(IndexCacheError::RootConflict {
+                                root: cached_root.path.clone(),
+                                configured: root.path.clone(),
+                            });
+                        }
+                    }
+                    if cached_root.kind == SourceRootKind::Vanilla {
+                        roots.insert(0, cached_root.clone());
+                    } else {
+                        let insert_at = roots
+                            .iter()
+                            .position(|root| root.order > cached_root.order)
+                            .unwrap_or(roots.len());
+                        roots.insert(insert_at, cached_root.clone());
+                    }
+                }
+            }
+            if !cached_root_ids.insert(cached_root.id) {
+                return Err(IndexCacheError::InvalidData(format!(
+                    "duplicate cached source root id {}",
+                    cached_root.id.get()
+                )));
+            }
+
+            if let Some(file) = cache_files
+                .values()
+                .find(|file| !self.profile.allows_scan_file(file.logical_path.as_str()))
+            {
+                return Err(IndexCacheError::InvalidData(format!(
+                    "cache file {} is outside the active profile scan whitelist",
+                    file.logical_path.as_str()
+                )));
+            }
+            for (id, file) in cache_files {
+                let current_path = file.physical_path.clone();
+                if let Some(previous) = files.insert(id, file) {
+                    return Err(IndexCacheError::InvalidData(format!(
+                        "file id collision between {} and {}",
+                        previous.physical_path.display(),
+                        current_path.display()
+                    )));
+                }
+            }
+            shards.extend(cached_index.shards.into_values());
+            cached_positions.extend(cache_positions);
+            cached_previews.extend(cache_previews);
+        }
+
         for (id, file) in self.source_files.iter() {
             if let Some(cached) = files.insert(*id, file.clone()) {
                 return Err(IndexCacheError::InvalidData(format!(
@@ -190,7 +245,6 @@ impl AnalysisHost {
                 )));
             }
         }
-        let mut shards = cached_index.shards.into_values().collect::<Vec<_>>();
         shards.extend(self.index.shards.values().cloned());
         // One combined build sets the case policy and derives the lookup maps together, so the
         // merged cache + workspace shards are not rebuilt twice.
@@ -224,7 +278,7 @@ impl AnalysisHost {
         self.source_file_paths = Arc::new(source_file_paths(&self.source_files));
         self.index = Arc::new(index);
         self.localisation_previews = Arc::new(localisation_previews);
-        self.installed_caches.insert(cached_root.id);
+        self.installed_caches.extend(cached_root_ids);
         self.revision = self.revision.saturating_add(1);
         Ok(())
     }
