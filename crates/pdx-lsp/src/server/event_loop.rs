@@ -1,4 +1,4 @@
-use crate::dependency::run_dependency_cache_load;
+use crate::dependency::run_dependency_cache_loads;
 
 use super::*;
 
@@ -486,23 +486,17 @@ impl LspServer {
                                 }
                             };
                             scope.spawn(move || {
-                                let results = dependency_caches
-                                    .into_iter()
-                                    .map(|config| {
-                                        let result = run_dependency_cache_load(
-                                            &config,
-                                            rules.clone(),
-                                            profile.clone(),
-                                            current_rule_hash.clone(),
-                                            Some(&log),
-                                            progress.as_deref().map(|callback| {
-                                                callback as &(dyn Fn(usize, usize) + Sync)
-                                            }),
-                                            &worker_cancellation,
-                                        );
-                                        (config, result)
-                                    })
-                                    .collect();
+                                let results = run_dependency_cache_loads(
+                                    dependency_caches,
+                                    rules,
+                                    profile,
+                                    current_rule_hash,
+                                    Some(&log),
+                                    progress
+                                        .as_deref()
+                                        .map(|callback| callback as &(dyn Fn(usize, usize) + Sync)),
+                                    &worker_cancellation,
+                                );
                                 let _ = sender.send(TransportEvent::DependencySetup(
                                     DependencySetupResult { results },
                                 ));
