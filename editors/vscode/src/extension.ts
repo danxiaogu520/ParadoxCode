@@ -47,6 +47,7 @@ statusBar.tooltip = 'ParadoxCode: pdx-ls not running';
 let client: LanguageClient | undefined;
 let missingServerWarningShown = false;
 let clientStartSequence = 0;
+let serverReady = false;
 
 /** Debounce helper: `delay` ms after the last call, then run once. */
 function debounce(fn: () => void, delay: number): () => void {
@@ -77,6 +78,11 @@ function updateMissionContext(document: vscode.TextDocument | undefined): void {
 
 function setVanillaContext(ready: boolean): void {
     void vscode.commands.executeCommand('setContext', 'paradoxcodeVanillaReady', ready);
+}
+
+function setServerReady(ready: boolean): void {
+    serverReady = ready;
+    void vscode.commands.executeCommand('setContext', 'paradoxcodeServerReady', ready);
 }
 
 /** Converts the server's user-facing Vanilla setup trail into a walkthrough state. */
@@ -303,8 +309,10 @@ function createClient({ command, source }: ServerResolution): LanguageClient {
 function updateStatus(state: State): void {
     switch (state) {
         case State.Running:
-            statusBar.text = 'PDX ●';
-            statusBar.tooltip = 'ParadoxCode: pdx-ls running (click to open output)';
+            statusBar.text = serverReady ? 'PDX ●' : 'PDX ◐';
+            statusBar.tooltip = serverReady
+                ? 'ParadoxCode: pdx-ls ready (click to open output)'
+                : 'ParadoxCode: pdx-ls running; indexes are loading…';
             void vscode.commands.executeCommand('setContext', 'paradoxcodeServerRunning', true);
             break;
         case State.Starting:
@@ -363,6 +371,7 @@ async function resolveOrInstallServer(context: vscode.ExtensionContext): Promise
 
 async function startClient(context: vscode.ExtensionContext, loadedFiles?: LoadedFilesProvider): Promise<void> {
     const sequence = ++clientStartSequence;
+    setServerReady(false);
     setVanillaContext(false);
     try {
         const resolution = await resolveOrInstallServer(context);
@@ -370,19 +379,39 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
             return;
         }
         client = createClient(resolution);
-        client.onDidChangeState((event) => {
+        const currentClient = client;
+        currentClient.onDidChangeState((event) => {
+            if (client !== currentClient) {
+                return;
+            }
             updateStatus(event.newState);
             if (event.newState === State.Running) {
-                void loadedFiles?.refresh(client);
+                void loadedFiles?.refresh(currentClient);
             }
         });
-        client.onNotification(LogMessageNotification.type, (params) => {
+        currentClient.onNotification(LogMessageNotification.type, (params) => {
+            if (client !== currentClient) {
+                return;
+            }
             log.appendLine(`[pdx-ls] ${params.message}`);
             statusBar.tooltip = `ParadoxCode: ${params.message}`;
             updateVanillaContext(params.message);
+            // Keep older user-selected pdx-ls binaries usable while they do not yet emit the
+            // explicit readiness notification.
+            if (/pdx-ls ready/i.test(params.message)) {
+                setServerReady(true);
+                updateStatus(client?.state ?? State.Stopped);
+            }
         });
-        updateStatus(client.state);
-        client.start();
+        currentClient.onNotification('pdx/ready', () => {
+            if (client !== currentClient) {
+                return;
+            }
+            setServerReady(true);
+            updateStatus(currentClient.state);
+        });
+        updateStatus(currentClient.state);
+        currentClient.start();
         log.appendLine('language server client started');
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -393,6 +422,7 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
 
 function stopClient(loadedFiles?: LoadedFilesProvider): void {
     clientStartSequence += 1;
+    setServerReady(false);
     if (client) {
         const previous = client;
         client = undefined;

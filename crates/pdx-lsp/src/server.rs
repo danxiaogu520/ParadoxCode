@@ -93,6 +93,23 @@ fn work_done_progress_end(token: &str, message: &str) -> Value {
     })
 }
 
+/// Announces that the initial workspace/index setup has completed.
+///
+/// `LanguageClient` reaching `Running` only means that the LSP handshake finished.  Vanilla and
+/// dependency indexes may still be loading in the background, so editors need a separate,
+/// protocol-level signal before presenting the server as fully ready.
+fn ready_notification(revision: u64, source_files: usize) -> Value {
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "method": "pdx/ready",
+        "params": {
+            "state": "ready",
+            "revision": revision,
+            "sourceFiles": source_files,
+        },
+    })
+}
+
 /// Builds the worker progress callback that forwards engine progress as `$/progress` reports.
 ///
 /// `discovering` is shown while the work unit total is still unknown; `indexing` carries the
