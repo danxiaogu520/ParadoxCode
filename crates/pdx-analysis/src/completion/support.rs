@@ -81,27 +81,6 @@ pub(crate) fn completion_value_context(input: &ParsedInput, position: TextSize) 
     equals.is_some_and(|equals| open.is_none_or(|open| equals > open))
 }
 
-/// Returns the leading spaces and tabs on the line containing a completion position.
-///
-/// Completion snippets replace only the current word. When a snippet contains newlines, each
-/// generated line must receive the existing line indentation explicitly because the LSP text edit
-/// does not include the indentation before the replacement range.
-pub(crate) fn line_indent(source: &str, position: TextSize) -> String {
-    let mut offset = usize::try_from(position)
-        .unwrap_or(source.len())
-        .min(source.len());
-    while offset > 0 && !source.is_char_boundary(offset) {
-        offset -= 1;
-    }
-    let line_start = source[..offset].rfind('\n').map_or(0, |index| index + 1);
-    let prefix = &source[line_start..offset];
-    if prefix.bytes().all(|byte| matches!(byte, b' ' | b'\t')) {
-        prefix.to_owned()
-    } else {
-        String::new()
-    }
-}
-
 pub(crate) fn localisation_language_header(input: &ParsedInput, position: TextSize) -> bool {
     if input.format != FileFormat::Localisation {
         return false;

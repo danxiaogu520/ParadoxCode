@@ -1098,21 +1098,20 @@ fn macro_summary_in_hir(
     }
 }
 
-/// Builds the canonical invocation snippet for a resolved scripted macro signature.
+/// Builds the canonical invocation snippet for a resolved scripted macro signature. Snippet bodies
+/// use relative indentation only; the client re-indents multi-line snippets to the insertion line.
 pub(crate) fn scripted_definition_snippet(
     snapshot: &AnalysisSnapshot,
     kind_name: &str,
     definition_name: &str,
-    base_indent: &str,
 ) -> String {
     let Some(summary) = macro_definition_summary(snapshot, kind_name, definition_name) else {
-        let inner_indent = format!("{base_indent}\t");
-        return format!("{definition_name} = {{\n{inner_indent}$0\n{base_indent}}}");
+        return format!("{definition_name} = {{\n\t$0\n}}");
     };
     if summary.parameters.is_empty() {
         return format!("{definition_name} = yes");
     }
-    let inner_indent = format!("{base_indent}\t");
+    let inner_indent = "\t";
     let mut body = String::new();
     for (index, parameter) in summary
         .parameters
@@ -1126,7 +1125,7 @@ pub(crate) fn scripted_definition_snippet(
             index + 1
         ));
     }
-    format!("{definition_name} = {{\n{body}{inner_indent}$0\n{base_indent}}}")
+    format!("{definition_name} = {{\n{body}{inner_indent}$0\n}}")
 }
 
 pub(crate) fn semantic_key_matches(
