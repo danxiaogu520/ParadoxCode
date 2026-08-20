@@ -195,7 +195,7 @@ bash scripts/diagnose-current-mod.sh \
 
 ## 发布
 
-发布由标签驱动且全自动：推送 `v0.x.y` 标签后，流水线会构建并验证全部五个原生 `pdx-ls` 归档、创建不可变的 GitHub Release、打包并附加 VSIX，并通过 OIDC 可信发布将同一 VSIX 发布到 Visual Studio Marketplace。版本历史与各版本变更记录在 [CHANGELOG.md](CHANGELOG.md)；完整发布检查清单见 [RELEASING.md](RELEASING.md)。
+发布由标签驱动：推送 `v0.x.y` 标签后，流水线会构建并验证全部五个原生 `pdx-ls` 归档、创建不可变的 GitHub Release，并打包和附加 VSIX。Visual Studio Marketplace 发布暂时改为手动：从 Release 下载附加的 VSIX，再通过发布者管理页面上传。版本历史与各版本变更记录在 [CHANGELOG.md](CHANGELOG.md)；完整发布检查清单见 [RELEASING.md](RELEASING.md)。
 
 ## 贡献
 

@@ -246,11 +246,11 @@ categories, 2,674 symbol descriptors).
 
 ## Releases
 
-Releases are tag-driven and fully automated: pushing a `v0.x.y` tag builds and verifies all five
-native `pdx-ls` archives, creates the immutable GitHub Release, packages and attaches the VSIX,
-and publishes the same VSIX to the Visual Studio Marketplace through OIDC trusted publishing.
-Version history and per-release changes are tracked in [CHANGELOG.md](CHANGELOG.md); the full
-release checklist lives in [RELEASING.md](RELEASING.md).
+Releases are tag-driven: pushing a `v0.x.y` tag builds and verifies all five native `pdx-ls`
+archives, creates the immutable GitHub Release, and packages and attaches the VSIX. Visual Studio
+Marketplace publication is temporarily manual; download the attached VSIX and upload it from the
+publisher management page. Version history and per-release changes are tracked in
+[CHANGELOG.md](CHANGELOG.md); the full release checklist lives in [RELEASING.md](RELEASING.md).
 
 ## Contributing
 
