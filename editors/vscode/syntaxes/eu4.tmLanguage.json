@@ -5,12 +5,14 @@
   "fileTypes": ["txt", "gui", "gfx"],
   "patterns": [
     { "include": "#comment" },
+    { "include": "#quoted-key" },
     { "include": "#string" },
     { "include": "#variable" },
-    { "include": "#scope" },
+    { "include": "#parameter" },
     { "include": "#boolean" },
     { "include": "#number" },
     { "include": "#key" },
+    { "include": "#header" },
     { "include": "#operator" },
     { "include": "#punctuation" },
     { "include": "#bare" }
@@ -19,6 +21,14 @@
     "comment": {
       "patterns": [
         { "name": "comment.line.number-sign.eu4", "match": "#.*$" }
+      ]
+    },
+    "quoted-key": {
+      "patterns": [
+        {
+          "name": "variable.other.property.eu4",
+          "match": "(\"(?:[^\"\\\\]|\\\\.)*\")(?=\\s*=)"
+        }
       ]
     },
     "string": {
@@ -34,12 +44,9 @@
         { "name": "variable.other.definition.eu4", "match": "@[A-Za-z_][A-Za-z0-9_.-]*" }
       ]
     },
-    "scope": {
+    "parameter": {
       "patterns": [
-        {
-          "name": "variable.language.scope.eu4",
-          "match": "\\b(?:ROOT|FROM|PREV|PREVPREV|PREVPREVPREV|THIS|ROOT\\.FROM|FROM\\.FROM)\\b"
-        }
+        { "name": "variable.parameter.eu4", "match": "\\$[A-Za-z_][A-Za-z0-9_.-]*\\$" }
       ]
     },
     "boolean": {
@@ -55,10 +62,16 @@
     "key": {
       "patterns": [
         {
-          "match": "(^|[\\[{;\\s])([A-Za-z_][A-Za-z0-9_.-]*)(?=\\s*=)",
-          "captures": {
-            "2": { "name": "entity.name.tag.eu4" }
-          }
+          "name": "entity.name.tag.eu4",
+          "match": "(^|[\\[{;\\s])([A-Za-z_][A-Za-z0-9_.-]*)(?=\\s*=)"
+        }
+      ]
+    },
+    "header": {
+      "patterns": [
+        {
+          "name": "entity.name.type.eu4",
+          "match": "(^|[\\[{;\\s])([A-Za-z_][A-Za-z0-9_.-]*)(?=\\s*\\{)"
         }
       ]
     },
@@ -75,7 +88,7 @@
     },
     "bare": {
       "patterns": [
-        { "name": "variable.other.eu4", "match": "\\b[A-Za-z_][A-Za-z0-9_.-]*\\b" }
+        { "name": "string.unquoted.eu4", "match": "\\b[A-Za-z_][A-Za-z0-9_.-]*\\b" }
       ]
     }
   }
