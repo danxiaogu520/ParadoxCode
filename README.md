@@ -73,7 +73,7 @@ EU4 rule source and never imports external rule files.
 
 ## Project status
 
-**Latest release: v0.1.1** (19 Aug 2026). The core EU4 language features are implemented, tested,
+**Latest release: v0.1.2** (20 Aug 2026). The core EU4 language features are implemented, tested,
 and released through the tag-driven release pipeline (see [Releases](#releases)). Early adopters
 should expect rough edges while 0.1.x matures; please report problems through the issue templates
 so they can be fixed in the next release.
