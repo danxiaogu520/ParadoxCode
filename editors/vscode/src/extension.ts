@@ -430,15 +430,20 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
     }
 }
 
-function stopClient(loadedFiles?: LoadedFilesProvider): void {
+async function stopClient(loadedFiles?: LoadedFilesProvider): Promise<void> {
     clientStartSequence += 1;
     setServerReady(false);
     if (client) {
         const previous = client;
         client = undefined;
-        void previous.stop();
         updateStatus(State.Stopped);
         log.appendLine('language server client stopped');
+        try {
+            await previous.stop();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            log.appendLine(`WARNING stopping pdx-ls: ${message}`);
+        }
     }
     loadedFiles?.clear();
 }
@@ -562,10 +567,18 @@ export function activate(context: vscode.ExtensionContext): void {
     const refresh = debounce(() => {
         void MissionPreviewPanel.refresh(client);
     }, 150);
+    let restartTask = Promise.resolve();
     const restart = () => {
-        stopClient(loadedFilesProvider);
-        void startClient(context, loadedFilesProvider);
-        void MissionPreviewPanel.refresh(client);
+        restartTask = restartTask
+            .catch((error: unknown) => {
+                const message = error instanceof Error ? error.message : String(error);
+                log.appendLine(`WARNING previous pdx-ls restart failed: ${message}`);
+            })
+            .then(async () => {
+                await stopClient(loadedFilesProvider);
+                await startClient(context, loadedFilesProvider);
+                await MissionPreviewPanel.refresh(client);
+            });
     };
 
     context.subscriptions.push(
@@ -614,8 +627,8 @@ export function activate(context: vscode.ExtensionContext): void {
     void startClient(context, loadedFilesProvider);
 }
 
-export function deactivate(): void {
-    stopClient(loadedFilesProvider);
+export function deactivate(): Promise<void> {
     MissionPreviewPanel.dispose();
     statusBar.hide();
+    return stopClient(loadedFilesProvider);
 }
