@@ -394,7 +394,6 @@ fn completion_traversal_uses_hir_to_disambiguate_nested_rule_contexts() {
         TextRange::empty(position),
         "",
         true,
-        "",
     );
     assert!(all_key_items.iter().any(|item| item.label == "always"));
     assert!(all_key_items.iter().any(|item| item.label == "factor"));
@@ -582,29 +581,18 @@ fn scripted_definition_completion_snippet_includes_parameters() {
         .expect("scripted effect item");
     assert_eq!(snippet.insert_text, "apply = {\n\tzeta = $1\n\t$0\n}");
     assert_eq!(
-        crate::semantic::scripted_definition_snippet(
-            &host.snapshot(),
-            "scripted_effect",
-            "plain",
-            ""
-        ),
+        crate::semantic::scripted_definition_snippet(&host.snapshot(), "scripted_effect", "plain"),
         "plain = yes"
     );
     assert_eq!(
-        crate::semantic::scripted_definition_snippet(
-            &host.snapshot(),
-            "scripted_effect",
-            "scalar",
-            ""
-        ),
+        crate::semantic::scripted_definition_snippet(&host.snapshot(), "scripted_effect", "scalar"),
         "scalar = {\n\tamount = $1\n\t$0\n}"
     );
     assert_eq!(
         crate::semantic::scripted_definition_snippet(
             &host.snapshot(),
             "scripted_effect",
-            "optional_only",
-            ""
+            "optional_only"
         ),
         "optional_only = {\n\t$0\n}"
     );
@@ -1830,7 +1818,7 @@ fn key_completion_inserts_equals_for_scalars_and_skeletons_for_blocks() {
         .iter()
         .find(|item| item.label == "bar")
         .expect("block rule item");
-    assert_eq!(bar.insert_text, "bar = {\n\t\t$0\n\t}");
+    assert_eq!(bar.insert_text, "bar = {\n\t$0\n}");
 }
 
 #[test]

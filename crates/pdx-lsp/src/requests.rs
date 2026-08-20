@@ -631,7 +631,11 @@ impl SnapshotRequestContext {
                 let insert_text = if snippet_supported {
                     item.insert_text
                 } else {
-                    strip_snippet_placeholders(&item.insert_text)
+                    let start = usize::try_from(item.replacement_range.start())
+                        .unwrap_or(0)
+                        .min(document.text().len());
+                    let base_indent = line_base_indent(document.text(), start);
+                    strip_snippet_placeholders(&item.insert_text, &base_indent)
                 };
                 CompletionItem {
                     label: item.label,
@@ -985,7 +989,11 @@ fn semantic_token_type_index(token_type: SemanticTokenType) -> u32 {
 /// Removes LSP snippet placeholders (`$0`, `$1`, …) so a snippet-shaped insert text can be
 /// delivered as plain text to clients without snippet support. Placeholder lines left empty by
 /// the removal are dropped so the block skeleton stays tidy.
-pub(crate) fn strip_snippet_placeholders(text: &str) -> String {
+///
+/// Snippet bodies carry relative indentation only, because snippet-capable clients re-indent
+/// multi-line snippets to the insertion line. A plain-text edit has no such re-indenting, so the
+/// absolute leading whitespace of the insertion line is re-applied to every continuation line.
+pub(crate) fn strip_snippet_placeholders(text: &str, base_indent: &str) -> String {
     let mut stripped = String::with_capacity(text.len());
     let mut chars = text.chars().peekable();
     while let Some(character) = chars.next() {
@@ -999,7 +1007,30 @@ pub(crate) fn strip_snippet_placeholders(text: &str) -> String {
     }
     stripped
         .lines()
-        .filter(|line| !line.trim().is_empty())
+        .enumerate()
+        .filter(|(_, line)| !line.trim().is_empty())
+        .map(|(index, line)| {
+            if index == 0 {
+                line.to_owned()
+            } else {
+                format!("{base_indent}{line}")
+            }
+        })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// Returns the leading spaces and tabs on the line containing a byte offset.
+fn line_base_indent(source: &str, position: usize) -> String {
+    let mut position = position.min(source.len());
+    while position > 0 && !source.is_char_boundary(position) {
+        position -= 1;
+    }
+    let line_start = source[..position].rfind('\n').map_or(0, |index| index + 1);
+    let prefix = &source[line_start..position];
+    if prefix.bytes().all(|byte| matches!(byte, b' ' | b'\t')) {
+        prefix.to_owned()
+    } else {
+        String::new()
+    }
 }

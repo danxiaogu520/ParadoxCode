@@ -682,14 +682,27 @@ fn memory_transport_preserves_hir_disambiguated_mixed_context_completion() {
 #[test]
 fn snippet_placeholders_are_stripped_for_plain_text_fallbacks() {
     assert_eq!(
-        strip_snippet_placeholders("name = {\n    $0\n}"),
+        strip_snippet_placeholders("name = {\n    $0\n}", ""),
         "name = {\n}"
     );
     assert_eq!(
-        strip_snippet_placeholders("apply = {\n    amount = $1\n    optional = $2\n    $0\n}"),
+        strip_snippet_placeholders(
+            "apply = {\n    amount = $1\n    optional = $2\n    $0\n}",
+            ""
+        ),
         "apply = {\n    amount = \n    optional = \n}"
     );
-    assert_eq!(strip_snippet_placeholders("plain"), "plain");
+    assert_eq!(strip_snippet_placeholders("plain", ""), "plain");
+    // The absolute line indent is re-applied to continuation lines so a plain-text edit that
+    // starts at column 0 still produces an aligned block skeleton.
+    assert_eq!(
+        strip_snippet_placeholders("apply = {\n\t$0\n}", "\t\t"),
+        "apply = {\n\t\t}"
+    );
+    assert_eq!(
+        strip_snippet_placeholders("apply = {\n\tamount = $1\n\t$0\n}", "\t"),
+        "apply = {\n\t\tamount = \n\t}"
+    );
 }
 
 #[test]
