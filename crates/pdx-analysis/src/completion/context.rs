@@ -72,6 +72,11 @@ pub(crate) fn semantic_completion_context_with_cancellation(
             continue;
         }
         let scope = semantic_initial_scope(snapshot, input, &context, &root.key, root.key_range);
+        // A type descriptor with `skip_root_paths` exposes the children at that path as type
+        // instances. The HIR and diagnostics paths already keep those instance keys out of the
+        // semantic parent path; completion must do the same before traversing the first child.
+        let skip_type_instance =
+            semantic_completion_skips_type_instances(snapshot, &context, &root.key);
         return semantic_completion_container(
             snapshot,
             input.hir.as_deref(),
@@ -80,6 +85,7 @@ pub(crate) fn semantic_completion_context_with_cancellation(
             Vec::new(),
             Vec::new(),
             None,
+            skip_type_instance,
             root.block,
             root.bare_values,
             scope,
@@ -102,6 +108,7 @@ pub(crate) fn semantic_completion_container(
     structural_containers: Vec<(String, Vec<String>)>,
     alternative_containers: Vec<SemanticCompletionContainer>,
     container_property: Option<ScriptProperty>,
+    skip_type_instance: bool,
     properties: Vec<ScriptProperty>,
     _bare_values: Vec<(String, TextRange)>,
     scope: ScopeContext,
@@ -122,6 +129,27 @@ pub(crate) fn semantic_completion_container(
         };
         if !contains(block_range, position) {
             continue;
+        }
+        if skip_type_instance
+            && semantic_completion_is_type_instance_child(snapshot, &context, &property.key)
+        {
+            return semantic_completion_container(
+                snapshot,
+                hir,
+                context.clone(),
+                parent_path.clone(),
+                structural_containers,
+                alternative_containers,
+                Some(property.clone()),
+                false,
+                property.block.clone(),
+                property.bare_values.clone(),
+                scope.clone(),
+                position,
+                quoted_depth,
+                embedded_value_context,
+                quoted_scripts,
+            );
         }
         let transparent_wrapper = context.eq_ignore_ascii_case("trigger")
             && snapshot
@@ -172,6 +200,7 @@ pub(crate) fn semantic_completion_container(
                 structural_containers,
                 Vec::new(),
                 Some(property.clone()),
+                false,
                 property.block.clone(),
                 property.bare_values.clone(),
                 scope_context_from_hir(snapshot.game_profile_handle(), &fact.state),
@@ -226,6 +255,7 @@ pub(crate) fn semantic_completion_container(
                     Vec::new(),
                     alternatives,
                     Some(property.clone()),
+                    false,
                     quoted_properties,
                     quoted_values,
                     primary.scope.clone(),
@@ -317,6 +347,7 @@ pub(crate) fn semantic_completion_container(
                 structural_containers,
                 alternative_containers,
                 Some(property.clone()),
+                false,
                 quoted_properties,
                 quoted_values,
                 primary.scope,
@@ -334,6 +365,7 @@ pub(crate) fn semantic_completion_container(
             structural_containers,
             alternative_containers,
             Some(property.clone()),
+            false,
             property.block.clone(),
             property.bare_values.clone(),
             primary.scope,
@@ -360,6 +392,57 @@ pub(crate) fn semantic_completion_container(
         quoted_depth,
         embedded_value_context,
     })
+}
+
+fn semantic_completion_skips_type_instances(
+    snapshot: &AnalysisSnapshot,
+    context: &str,
+    root_key: &str,
+) -> bool {
+    let Some(type_name) = context.strip_prefix("type:") else {
+        return false;
+    };
+    snapshot
+        .rules()
+        .model()
+        .semantic
+        .type_descriptors
+        .get(type_name)
+        .is_some_and(|descriptor| {
+            descriptor.skip_root_paths.iter().any(|path| {
+                path.first().is_some_and(|head| {
+                    head.eq_ignore_ascii_case("any") || head.eq_ignore_ascii_case(root_key)
+                })
+            })
+        })
+}
+
+fn semantic_completion_is_type_instance_child(
+    snapshot: &AnalysisSnapshot,
+    context: &str,
+    child_key: &str,
+) -> bool {
+    let Some(type_name) = context.strip_prefix("type:") else {
+        return false;
+    };
+    let Some(descriptor) = snapshot
+        .rules()
+        .model()
+        .semantic
+        .type_descriptors
+        .get(type_name)
+    else {
+        return false;
+    };
+    descriptor
+        .type_key_filter
+        .as_ref()
+        .is_none_or(|(values, negate)| {
+            values
+                .iter()
+                .any(|value| value.eq_ignore_ascii_case(child_key))
+                != *negate
+        })
 }
 
 fn script_line_value_context(source: &str, position: TextSize) -> bool {

@@ -133,6 +133,33 @@ fn semantic_hover_explains_scope_transition() {
 }
 
 #[test]
+fn decision_hover_skips_type_instance_wrapper() {
+    use std::path::PathBuf;
+
+    let text = concat!(
+        "country_decisions = {\n",
+        "  my_decision = {\n",
+        "    potential = { }\n",
+        "  }\n",
+        "}\n",
+    );
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/common/decisions/hover.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(PathBuf::from("common/decisions/hover.txt")),
+    )
+    .expect("open decision document");
+    let position =
+        u32::try_from(text.find("potential").expect("potential key") + 1).expect("position");
+    let result = hover(&host.snapshot(), &id, position).expect("decision semantic hover");
+    assert!(result.contents.contains("### PDX property `potential`"));
+    assert!(result.contents.contains("- at least 1"), "{result:?}");
+}
+
+#[test]
 fn hover_ignores_unknown_property_and_plain_text() {
     let (host, id) = semantic_snapshot("trigger = { unknown_property = yes }\n");
     let analysis_snapshot = host.snapshot();

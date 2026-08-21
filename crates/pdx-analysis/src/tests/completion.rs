@@ -419,6 +419,63 @@ fn completion_traversal_uses_hir_to_disambiguate_nested_rule_contexts() {
 }
 
 #[test]
+fn decision_completion_skips_type_instance_wrapper() {
+    use std::path::PathBuf;
+
+    let text = concat!(
+        "country_decisions = {\n",
+        "  my_decision = {\n",
+        "    \n",
+        "    potential = {\n",
+        "      \n",
+        "    }\n",
+        "  }\n",
+        "}\n",
+    );
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/common/decisions/completion.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(PathBuf::from("common/decisions/completion.txt")),
+    )
+    .expect("open decision document");
+    let snapshot = host.snapshot();
+    let input = input_for_document(&snapshot, &id).expect("analysis input");
+    let position =
+        u32::try_from(text.find("    \n").expect("blank decision body") + 4).expect("position");
+    let context = semantic_completion_context(&snapshot, &input, position)
+        .expect("semantic completion context");
+    assert_eq!(context.context, "type:decision");
+    assert!(
+        context.parent_path.is_empty(),
+        "decision instance names must not become semantic parent paths: {context:?}"
+    );
+
+    let result = complete(&snapshot, &id, position);
+    for label in ["potential", "allow", "effect"] {
+        assert!(
+            result.items.iter().any(|item| item.label == label),
+            "decision key `{label}` was not completed: {:?}",
+            result.items
+        );
+    }
+
+    let nested_position = u32::try_from(text.find("      \n").expect("blank potential body") + 6)
+        .expect("nested position");
+    let nested_result = complete(&snapshot, &id, nested_position);
+    assert!(
+        nested_result
+            .items
+            .iter()
+            .any(|item| item.label == "has_country_flag"),
+        "potential must enter the trigger context: {:?}",
+        nested_result.items
+    );
+}
+
+#[test]
 fn empty_ambiguous_block_completion_unions_possible_rule_destinations() {
     let text = concat!(
         "country_event = {\n",
