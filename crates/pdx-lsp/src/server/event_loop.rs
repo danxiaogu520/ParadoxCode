@@ -420,6 +420,15 @@ impl LspServer {
                                         result,
                                     }));
                             });
+                        } else {
+                            write_message(
+                                &mut output,
+                                &log_message_notification(
+                                    MessageType::INFO,
+                                    "Vanilla index: no cache or automatic discovery worker scheduled; continuing without Vanilla symbols"
+                                        .to_owned(),
+                                ),
+                            )?;
                         }
                         if !dependency_caches.is_empty() {
                             write_message(
@@ -501,6 +510,14 @@ impl LspServer {
                                     DependencySetupResult { results },
                                 ));
                             });
+                        } else {
+                            write_message(
+                                &mut output,
+                                &log_message_notification(
+                                    MessageType::INFO,
+                                    "Dependency indexes: none configured".to_owned(),
+                                ),
+                            )?;
                         }
                         if in_flight_index.is_none()
                             && in_flight_dependency.is_none()
@@ -622,6 +639,26 @@ impl LspServer {
                             }
                         }
                         if !install_caches.is_empty() {
+                            let cached_files = install_caches
+                                .iter()
+                                .map(|cache| cache.source_files().len())
+                                .sum::<usize>();
+                            let cached_positions = install_caches
+                                .iter()
+                                .map(|cache| cache.index().position_ranges().len())
+                                .sum::<usize>();
+                            write_message(
+                                &mut output,
+                                &log_message_notification(
+                                    MessageType::INFO,
+                                    format!(
+                                        "Dependency index phase: merging {} cache(s) ({} file(s), {} position(s)) into the workspace",
+                                        install_caches.len(),
+                                        cached_files,
+                                        cached_positions
+                                    ),
+                                ),
+                            )?;
                             let installed = std::time::Instant::now();
                             match self.host.install_index_caches(install_caches) {
                                 Ok(()) => {
@@ -730,8 +767,20 @@ impl LspServer {
                         match result.result {
                             Ok((cache, message)) => {
                                 let cache_rule_hash = cache.metadata().rule_hash.clone();
+                                let cached_files = cache.source_files().len();
+                                let cached_positions = cache.index().position_ranges().len();
                                 let current_rule_hash =
                                     self.host.snapshot().rules().rule_hash().to_hex();
+                                write_message(
+                                    &mut output,
+                                    &log_message_notification(
+                                        MessageType::INFO,
+                                        format!(
+                                            "Vanilla index phase: merging {} file(s) and {} position(s) into the workspace",
+                                            cached_files, cached_positions
+                                        ),
+                                    ),
+                                )?;
                                 let installed = std::time::Instant::now();
                                 match self.host.install_index_cache(cache) {
                                     Ok(()) => {

@@ -41,6 +41,13 @@ pub(crate) fn run_dependency_cache_loads(
             .collect::<Vec<Option<DependencySetupOutcome>>>(),
     ));
     let worker_count = configs.len().min(MAX_DEPENDENCY_WORKERS);
+    if let Some(log) = log {
+        log(&format!(
+            "Dependency index phase: loading {} cache(s) with {} worker(s)",
+            configs.len(),
+            worker_count
+        ));
+    }
 
     std::thread::scope(|scope| {
         for _ in 0..worker_count {
@@ -103,13 +110,33 @@ pub(crate) fn run_dependency_cache_load(
     let started = std::time::Instant::now();
     let result = (|| {
         let load_started = std::time::Instant::now();
+        if let Some(log) = log {
+            let size = fs::metadata(&config.index_path)
+                .ok()
+                .filter(|metadata| metadata.is_file())
+                .map_or_else(
+                    || "size unknown".to_owned(),
+                    |metadata| format!("{} bytes", metadata.len()),
+                );
+            log(&format!(
+                "Dependency cache phase: opening {} ({size}) for source {}",
+                config.index_path.display(),
+                config.root.path.display()
+            ));
+        }
         let loaded = match IndexCache::load_cancellable_for_install_with_progress(
             &config.index_path,
             cancellation,
             progress,
         ) {
             Ok(loaded) => loaded,
-            Err(_) => {
+            Err(error) => {
+                if let Some(log) = log {
+                    log(&format!(
+                        "Dependency cache phase: {} could not be loaded ({error}); rebuilding",
+                        config.index_path.display()
+                    ));
+                }
                 // The old file is unusable (missing, corrupt, or from an older schema); remove it so
                 // the rebuild can write a fresh cache in its place.
                 match fs::remove_file(&config.index_path) {
@@ -154,11 +181,23 @@ pub(crate) fn run_dependency_cache_load(
             ));
         }
         if loaded.metadata().rule_hash == current_rule_hash {
+            if let Some(log) = log {
+                log(&format!(
+                    "Dependency cache phase: active rules hash matches for {}; refreshing fingerprints",
+                    config.root.path.display()
+                ));
+            }
             // The rules still match, so only the source files may have moved on: refresh the cache
             // against the dependency directory (a fingerprint diff, not a reparse). A failed
             // refresh — moved or unavailable source, cancellation — degrades to the cached
             // symbols, and a save failure keeps the refreshed cache in memory with a warning.
             let refresh_started = std::time::Instant::now();
+            if let Some(log) = log {
+                log(&format!(
+                    "Dependency refresh phase: checking source files under {}",
+                    config.root.path.display()
+                ));
+            }
             return match loaded.refresh_cancellable(&rules, &profile, cancellation, progress) {
                 Ok(refreshed) => {
                     if let Some(log) = log {
@@ -252,10 +291,17 @@ fn build_dependency_cache(
     if cancellation.is_cancelled() {
         return Err("dependency index build was cancelled".to_owned());
     }
+    if let Some(log) = log {
+        log(&format!(
+            "{activity} phase: scanning and parsing whitelisted files under {}",
+            config.root.path.display()
+        ));
+    }
     let mut host = AnalysisHost::with_profile(rules.clone(), profile.clone());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![config.root.clone()]));
     let scan_started = std::time::Instant::now();
-    host.refresh_source_roots_cancellable_with_progress(cancellation, progress)
+    let scan_report = host
+        .refresh_source_roots_cancellable_with_progress(cancellation, progress)
         .map_err(|error| {
             format!(
                 "{activity} failed while indexing {}: {error}",
@@ -264,12 +310,22 @@ fn build_dependency_cache(
         })?;
     if let Some(log) = log {
         log(&format!(
-            "{activity}: scanned {} file(s) in {:.1} ms",
+            "{activity}: scanned in {:.1} ms (discovered={}, indexed={}, legacy-encoded={}, skipped={}, issues={}, active={})",
+            scan_started.elapsed().as_secs_f64() * 1000.0,
+            scan_report.discovered_files,
+            scan_report.indexed_files,
+            scan_report.legacy_encoded_files,
+            scan_report.skipped_entries,
+            scan_report.issues.len() + scan_report.omitted_issues,
             host.snapshot().source_files().len(),
-            scan_started.elapsed().as_secs_f64() * 1000.0
         ));
     }
     let build_started = std::time::Instant::now();
+    if let Some(log) = log {
+        log(&format!(
+            "{activity} phase: materializing the persistent index representation"
+        ));
+    }
     let cache = IndexCache::from_snapshot(&host.snapshot())
         .map_err(|error| format!("{activity} failed: {error}"))?;
     if let Some(log) = log {
@@ -279,6 +335,12 @@ fn build_dependency_cache(
         ));
     }
     let save_started = std::time::Instant::now();
+    if let Some(log) = log {
+        log(&format!(
+            "{activity} phase: writing cache file {}",
+            config.index_path.display()
+        ));
+    }
     cache
         .save_with_progress(&config.index_path, progress)
         .map_err(|error| {

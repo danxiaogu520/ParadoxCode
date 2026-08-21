@@ -63,6 +63,19 @@ pub(crate) fn run_index_cache_load_with_options(
     let started = std::time::Instant::now();
     let result = (|| {
         let load_started = std::time::Instant::now();
+        if let Some(log) = log {
+            let size = fs::metadata(path)
+                .ok()
+                .filter(|metadata| metadata.is_file())
+                .map_or_else(
+                    || "size unknown".to_owned(),
+                    |metadata| format!("{} bytes", metadata.len()),
+                );
+            log(&format!(
+                "Vanilla cache phase: opening SQLite index {} ({size}); validating schema, metadata, and indexed rows",
+                path.display()
+            ));
+        }
         let loaded = match IndexCache::load_cancellable_for_install_with_progress(
             path,
             &cancellation.workspace,
@@ -112,6 +125,11 @@ pub(crate) fn run_index_cache_load_with_options(
             ));
         }
         if loaded.metadata().rule_hash == current_rule_hash {
+            if let Some(log) = log {
+                log(&format!(
+                    "Vanilla cache phase: active rules hash matches ({current_rule_hash}); no rebuild required"
+                ));
+            }
             return Ok((
                 loaded,
                 format!("Vanilla symbols loaded from {}", path.display()),
@@ -184,6 +202,9 @@ fn rebuild_unavailable_cache(
         return Err("Vanilla cache rebuild was cancelled".to_owned());
     }
     let discovery_started = std::time::Instant::now();
+    if let Some(log) = log {
+        log("Vanilla cache rebuild phase: resolving a usable game installation");
+    }
     let configured_source = UserConfiguration::load(&auto_vanilla.user_paths.config_file)
         .ok()
         .and_then(|configuration| {
@@ -241,6 +262,13 @@ fn rebuild_unavailable_cache(
             ));
         }
     }
+    if let Some(log) = log {
+        log(&format!(
+            "Vanilla cache rebuild phase: indexing source {} and replacing {}",
+            source.display(),
+            path.display()
+        ));
+    }
     build_cache_from_source(
         &source,
         path,
@@ -271,14 +299,26 @@ fn build_cache_from_source(
         SourceRootKind::Vanilla,
         source.to_owned(),
     )]));
+    if let Some(log) = log {
+        log(&format!(
+            "{activity} phase: scanning and parsing whitelisted files under {}",
+            source.display()
+        ));
+    }
     let scan_started = std::time::Instant::now();
-    host.refresh_source_roots_cancellable_with_progress(&cancellation.workspace, progress)
+    let scan_report = host
+        .refresh_source_roots_cancellable_with_progress(&cancellation.workspace, progress)
         .map_err(|error| format!("{activity} failed while indexing {source:?}: {error}"))?;
     if let Some(log) = log {
         log(&format!(
-            "{activity}: scanned {} file(s) in {:.1} ms",
+            "{activity}: scanned in {:.1} ms (discovered={}, indexed={}, legacy-encoded={}, skipped={}, issues={}, active={})",
+            scan_started.elapsed().as_secs_f64() * 1000.0,
+            scan_report.discovered_files,
+            scan_report.indexed_files,
+            scan_report.legacy_encoded_files,
+            scan_report.skipped_entries,
+            scan_report.issues.len() + scan_report.omitted_issues,
             host.snapshot().source_files().len(),
-            scan_started.elapsed().as_secs_f64() * 1000.0
         ));
     }
     let build_started = std::time::Instant::now();
@@ -444,6 +484,12 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
     let started = std::time::Instant::now();
     let result = (|| {
         let descriptor = auto_vanilla.descriptor;
+        if let Some(log) = log {
+            log(&format!(
+                "Vanilla setup phase: loading user configuration from {}",
+                auto_vanilla.user_paths.config_file.display()
+            ));
+        }
         let mut configuration = UserConfiguration::load(&auto_vanilla.user_paths.config_file)
             .map_err(|error| {
                 format!("automatic Vanilla discovery could not load user configuration: {error}")
@@ -460,6 +506,12 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
             ));
         }
         let source = if let Some(source) = auto_vanilla.source_override.as_ref() {
+            if let Some(log) = log {
+                log(&format!(
+                    "Vanilla setup phase: validating explicitly selected installation {}",
+                    source.display()
+                ));
+            }
             if !validate_installation_for_source(source, &descriptor) {
                 return Err(format!(
                     "the selected {} directory is not a valid installation: {}",
@@ -469,6 +521,12 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
             }
             source.clone()
         } else {
+            if let Some(log) = log {
+                log(&format!(
+                    "Vanilla setup phase: discovering {} installation locations",
+                    descriptor.display_name
+                ));
+            }
             let discovery_started = std::time::Instant::now();
             let report =
                 discover_installations(&descriptor, discovery_options, &cancellation.discovery);
@@ -519,6 +577,12 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
                 }
             }
         };
+        if let Some(log) = log {
+            log(&format!(
+                "Vanilla setup phase: selected source {}",
+                source.display()
+            ));
+        }
 
         let mut host = AnalysisHost::with_profile(rules, profile);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -527,15 +591,30 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
             source.clone(),
         )]));
         let setup = (|| {
+            if let Some(log) = log {
+                log(&format!(
+                    "Vanilla setup phase: scanning and parsing whitelisted files under {}",
+                    source.display()
+                ));
+            }
             let scan_started = std::time::Instant::now();
-            host.refresh_source_roots_cancellable_with_progress(&cancellation.workspace, progress)
+            let scan_report = host
+                .refresh_source_roots_cancellable_with_progress(&cancellation.workspace, progress)
                 .map_err(|error| format!("Vanilla indexing failed: {error}"))?;
             if let Some(log) = log {
                 log(&format!(
-                    "Vanilla scan: {} file(s) indexed in {:.1} ms",
+                    "Vanilla scan finished in {:.1} ms: discovered={}, indexed={}, legacy-encoded={}, skipped={}, issues={}, active={}",
+                    scan_started.elapsed().as_secs_f64() * 1000.0,
+                    scan_report.discovered_files,
+                    scan_report.indexed_files,
+                    scan_report.legacy_encoded_files,
+                    scan_report.skipped_entries,
+                    scan_report.issues.len() + scan_report.omitted_issues,
                     host.snapshot().source_files().len(),
-                    scan_started.elapsed().as_secs_f64() * 1000.0
                 ));
+            }
+            if let Some(log) = log {
+                log("Vanilla setup phase: materializing the in-memory index cache");
             }
             let build_started = std::time::Instant::now();
             let cache = IndexCache::from_snapshot(&host.snapshot())
@@ -547,9 +626,15 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
                 ));
             }
             let cache_path = auto_vanilla.user_paths.vanilla_cache(descriptor.game_id);
+            if let Some(log) = log {
+                log(&format!(
+                    "Vanilla setup phase: writing persistent cache to {}",
+                    cache_path.display()
+                ));
+            }
             let save_started = std::time::Instant::now();
             cache
-                .save(&cache_path)
+                .save_with_progress(&cache_path, progress)
                 .map_err(|error| format!("Vanilla cache could not be saved: {error}"))?;
             if let Some(log) = log {
                 log(&format!(
@@ -577,6 +662,12 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
                             "Vanilla cache was built but user configuration could not be saved: {error}"
                         )
                     })?;
+                if let Some(log) = log {
+                    log(&format!(
+                        "Vanilla setup phase: recorded the selected source and cache in {}",
+                        auto_vanilla.user_paths.config_file.display()
+                    ));
+                }
                 Ok((
                     cache,
                     format!(

@@ -611,6 +611,24 @@ fn valid_cache_load_reports_work_done_progress() {
     );
     assert!(
         responses.iter().any(|value| {
+            value["method"] == "window/logMessage"
+                && value["params"]["message"].as_str().is_some_and(|message| {
+                    message.contains("Vanilla cache phase: opening SQLite index")
+                })
+        }),
+        "the cache load must explain its SQLite validation phase"
+    );
+    assert!(
+        responses.iter().any(|value| {
+            value["method"] == "window/logMessage"
+                && value["params"]["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("active rules hash matches"))
+        }),
+        "the cache load must explain why a rebuild was not needed"
+    );
+    assert!(
+        responses.iter().any(|value| {
             value["method"] == "$/progress" && value["params"]["value"]["kind"] == "end"
         }),
         "an end report must be emitted once the worker finishes"

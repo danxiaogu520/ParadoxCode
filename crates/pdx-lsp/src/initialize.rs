@@ -106,11 +106,16 @@ pub(crate) fn prepare_initialize_candidate(
     if let Some(stage) = callbacks.stage {
         stage("Loading workspace configuration…");
     }
+    if let Some(log) = callbacks.log {
+        log("Initialization phase: resolving project configuration and source roots");
+    }
+    let roots_started = std::time::Instant::now();
     let mut resolved =
         resolve_source_roots(client_root.as_deref(), initialization_options, cancellation)?;
     if let Some(log) = callbacks.log {
         log(&format!(
-            "Source roots resolved: workspace {}, {} source root(s), {} dependency cache(s)",
+            "Source roots resolved in {:.1} ms: workspace {}, {} live source root(s), {} dependency cache(s)",
+            roots_started.elapsed().as_secs_f64() * 1000.0,
             resolved
                 .workspace_root
                 .as_deref()
@@ -118,6 +123,24 @@ pub(crate) fn prepare_initialize_candidate(
             resolved.roots.len(),
             resolved.dependency_caches.len(),
         ));
+        for root in &resolved.roots {
+            log(&format!(
+                "  live root: id={}, kind={:?}, order={}, path={}",
+                root.id.get(),
+                root.kind,
+                root.order,
+                root.path.display()
+            ));
+        }
+        for cache in &resolved.dependency_caches {
+            log(&format!(
+                "  cached dependency: id={}, order={}, source={}, index={}",
+                cache.root.id.get(),
+                cache.root.order,
+                cache.root.path.display(),
+                cache.index_path.display()
+            ));
+        }
     }
     let mut warnings = Vec::new();
     // The texture loader needs the profile descriptor for discovery. Capture it
@@ -128,10 +151,10 @@ pub(crate) fn prepare_initialize_candidate(
     if let Some(log) = callbacks.log {
         match resolved.index_cache.as_ref() {
             Some(path) => log(&format!(
-                "Vanilla index: configured cache {}",
+                "Vanilla index candidate from project configuration: {}",
                 path.display()
             )),
-            None => log("Vanilla index: automatic discovery"),
+            None => log("Vanilla index candidate: automatic discovery or user configuration"),
         }
     }
     let selected_game_directory = resolved.game_directory.clone();
@@ -142,26 +165,62 @@ pub(crate) fn prepare_initialize_candidate(
         }
         configuration
     });
+    if let Some(log) = callbacks.log {
+        log("Initialization phase: applying user-level Vanilla configuration");
+    }
+    let user_vanilla_started = std::time::Instant::now();
     let auto_vanilla = apply_user_vanilla_configuration(
         &mut resolved,
         auto_vanilla_with_source.as_ref(),
         host.snapshot().rules().game_id(),
         &mut warnings,
     );
+    if let Some(log) = callbacks.log {
+        let selection = match (resolved.index_cache.as_ref(), auto_vanilla.is_some()) {
+            (Some(path), _) => format!("cache selected at {}", path.display()),
+            (None, true) => "automatic discovery/build selected".to_owned(),
+            (None, false) => "no Vanilla cache worker selected".to_owned(),
+        };
+        log(&format!(
+            "User-level Vanilla configuration applied in {:.1} ms: {selection}",
+            user_vanilla_started.elapsed().as_secs_f64() * 1000.0
+        ));
+    }
     host.apply_change(WorkspaceChange::SetWorkspaceRoot(resolved.workspace_root));
     host.apply_change(WorkspaceChange::SetSourceRoots(resolved.roots.clone()));
     if scan_workspace && !resolved.roots.is_empty() {
         if let Some(stage) = callbacks.stage {
-            stage("Scanning workspace…");
+            stage("Discovering and indexing workspace files…");
         }
-        host.refresh_source_roots_cancellable_with_progress(cancellation, callbacks.progress)
+        if let Some(log) = callbacks.log {
+            log(&format!(
+                "Initialization phase: scanning {} live source root(s)",
+                resolved.roots.len()
+            ));
+        }
+        let scan_started = std::time::Instant::now();
+        let scan_report = host
+            .refresh_source_roots_cancellable_with_progress(cancellation, callbacks.progress)
             .map_err(workspace_scan_error)?;
         if let Some(log) = callbacks.log {
             log(&format!(
-                "Workspace scan finished: {} source file(s)",
-                host.snapshot().source_files().len()
+                "Workspace scan finished in {:.1} ms: discovered={}, indexed={}, legacy-encoded={}, skipped={}, issues={}, source file(s) active={}",
+                scan_started.elapsed().as_secs_f64() * 1000.0,
+                scan_report.discovered_files,
+                scan_report.indexed_files,
+                scan_report.legacy_encoded_files,
+                scan_report.skipped_entries,
+                scan_report.issues.len() + scan_report.omitted_issues,
+                host.snapshot().source_files().len(),
             ));
         }
+    } else if let Some(log) = callbacks.log {
+        let reason = if !scan_workspace {
+            "the active rules profile has no game-specific scan"
+        } else {
+            "no live source roots were configured"
+        };
+        log(&format!("Workspace scan skipped: {reason}"));
     }
     let index_cache = match resolved.index_cache.take() {
         None => None,
@@ -181,26 +240,51 @@ pub(crate) fn prepare_initialize_candidate(
     // independent of the Vanilla cache configuration — a configured
     // `vanilla_index_cache` must not disable textures. Texture failures are
     // silent — the preview simply renders without textures.
+    if let Some(stage) = callbacks.stage {
+        stage("Preparing mission preview textures…");
+    }
+    if let Some(log) = callbacks.log {
+        log("Initialization phase: discovering and indexing mission-preview textures");
+    }
+    let texture_started = std::time::Instant::now();
     let textures =
         resolve_texture_assets(resolved.game_directory.take(), texture_descriptor.as_ref());
     if let Some(log) = callbacks.log {
         match textures.as_ref() {
             Some(textures) => log(&format!(
-                "Mission textures ready: {} sprite(s) from the game installation",
-                textures.sprite_count()
+                "Mission textures ready in {:.1} ms: {} sprite(s) from the game installation",
+                texture_started.elapsed().as_secs_f64() * 1000.0,
+                textures.sprite_count(),
             )),
-            None => log("Mission textures: none (no game installation found)"),
+            None => log(&format!(
+                "Mission textures unavailable after {:.1} ms (no usable game installation found)",
+                texture_started.elapsed().as_secs_f64() * 1000.0
+            )),
         }
     }
     if cancellation.is_cancelled() {
         return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
     }
+    if let Some(stage) = callbacks.stage {
+        stage("Registering source-root file watchers…");
+    }
+    let watcher_started = std::time::Instant::now();
     let watcher_registration =
         watched_files_registration(&resolved.roots, watched_files_capability)?;
     if let Some(log) = callbacks.log {
         log(&format!(
-            "Initialization finished in {:.1} ms ({} source file(s) indexed)",
+            "Source-root watcher registration prepared in {:.1} ms: {}",
+            watcher_started.elapsed().as_secs_f64() * 1000.0,
+            if watcher_registration.is_some() {
+                "client registration request will be sent"
+            } else {
+                "client capability not available or no live roots"
+            }
+        ));
+        log(&format!(
+            "Initialization finished in {:.1} ms (revision {}, {} source file(s) indexed)",
             started.elapsed().as_secs_f64() * 1000.0,
+            host.snapshot().revision(),
             host.snapshot().source_files().len()
         ));
     }

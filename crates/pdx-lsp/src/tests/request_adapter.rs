@@ -1021,7 +1021,9 @@ fn initialize_reports_stages_via_log_message_and_work_done_progress() {
             json!({"jsonrpc":"2.0","method":"exit"}),
         ]);
         let mut output = Vec::new();
-        let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+        let mut server = eu4_server(InitializeOptions)
+            .expect("embedded rules")
+            .with_startup_log(vec!["startup: first-party rules already loaded".to_owned()]);
         server
             .run_transport(Cursor::new(input), &mut output)
             .expect("transport");
@@ -1048,6 +1050,23 @@ fn initialize_reports_stages_via_log_message_and_work_done_progress() {
         }),
         "initialize must log its completion; got {logs:?}"
     );
+    for expected in [
+        "startup: first-party rules already loaded",
+        "initialize request accepted:",
+        "Initialization phase: resolving project configuration and source roots",
+        "Initialization phase: scanning",
+        "Workspace scan finished",
+        "Source-root watcher registration prepared",
+    ] {
+        assert!(
+            logs.iter().any(|log| {
+                log["params"]["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains(expected))
+            }),
+            "initialize log trail must include {expected:?}; got {logs:?}"
+        );
+    }
     let progress = responses
         .iter()
         .filter(|value| value["method"] == "$/progress")
