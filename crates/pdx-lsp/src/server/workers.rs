@@ -125,8 +125,29 @@ impl LspServer {
         let candidate = self.host.clone();
         let scan_workspace = !self.host.snapshot().rules().game_id().is_empty();
         let auto_vanilla = self.auto_vanilla.clone();
+        let startup_log = std::mem::take(&mut self.startup_log);
         let sender = event_sender.clone();
         let id = id.clone();
+        #[allow(deprecated)]
+        let root_hint = params
+            .root_uri
+            .as_ref()
+            .map_or_else(|| "<none>".to_owned(), |uri| uri.to_string());
+        let workspace_folder_count = params.workspace_folders.as_ref().map_or(0, Vec::len);
+        let initialization_options = if params.initialization_options.is_some() {
+            "present"
+        } else {
+            "absent"
+        };
+        let initialize_message = format!(
+            "initialize request accepted: rootUri={root_hint}, workspaceFolders={workspace_folder_count}, initializationOptions={initialization_options}, workDoneProgress={client_work_done_progress}, watchedFiles={}",
+            params
+                .capabilities
+                .workspace
+                .as_ref()
+                .and_then(|workspace| workspace.did_change_watched_files.as_ref())
+                .is_some()
+        );
         // One progress token for the whole initialize phase: stage reports and
         // the workspace-scan counter share it, and the event loop sends the
         // terminal `end` report when the initialize worker completes.
@@ -187,6 +208,10 @@ impl LspServer {
             let progress_ref: Option<&(dyn Fn(usize, usize) + Sync)> = progress
                 .as_deref()
                 .map(|f| f as &(dyn Fn(usize, usize) + Sync));
+            for message in startup_log {
+                log_ref(&message);
+            }
+            log_ref(&initialize_message);
             let callbacks = InitializeCallbacks {
                 stage: Some(stage_ref),
                 log: Some(log_ref),

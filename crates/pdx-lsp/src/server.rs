@@ -320,6 +320,10 @@ pub struct LspServer {
     /// Whether the client advertises snippet support for completion items. When absent, snippet
     /// placeholders are stripped so the inserted text stays valid plain text.
     client_snippet_support: bool,
+    /// Process-start messages collected before an LSP client can receive
+    /// `window/logMessage`. They are replayed at the beginning of the first
+    /// initialize worker so the editor's log has no unexplained pre-initialize gap.
+    startup_log: Vec<String>,
     clean_exit: bool,
 }
 
@@ -352,8 +356,18 @@ impl LspServer {
             textures: None,
             client_work_done_progress: false,
             client_snippet_support: false,
+            startup_log: Vec::new(),
             clean_exit: false,
         })
+    }
+
+    /// Adds process-start diagnostics that will be replayed through the LSP log channel when the
+    /// first client initialize request arrives. Stdio startup diagnostics are still emitted by
+    /// the composition root, because no LSP client is available before `initialize`.
+    #[must_use]
+    pub fn with_startup_log(mut self, messages: Vec<String>) -> Self {
+        self.startup_log = messages;
+        self
     }
 
     /// Enables one-time user-level Vanilla discovery for a game composition root.
@@ -419,9 +433,20 @@ impl LspServer {
         rules: RuleSet,
         profile: GameProfile,
     ) -> Result<(), LspError> {
+        Self::run_stdio_with_profile_and_startup_log(options, rules, profile, Vec::new())
+    }
+
+    /// Runs stdio with explicit game-profile interpretation and process-start diagnostics.
+    pub fn run_stdio_with_profile_and_startup_log(
+        options: InitializeOptions,
+        rules: RuleSet,
+        profile: GameProfile,
+        startup_log: Vec<String>,
+    ) -> Result<(), LspError> {
         let stdin = io::stdin();
         let stdout = io::stdout();
-        let mut server = Self::try_new_with_rules(options, rules, profile)?;
+        let mut server =
+            Self::try_new_with_rules(options, rules, profile)?.with_startup_log(startup_log);
         server.run_transport(stdin, stdout.lock())
     }
 
@@ -432,10 +457,29 @@ impl LspServer {
         profile: GameProfile,
         auto_vanilla: AutoVanillaConfiguration,
     ) -> Result<(), LspError> {
+        Self::run_stdio_with_profile_and_auto_vanilla_with_startup_log(
+            options,
+            rules,
+            profile,
+            auto_vanilla,
+            Vec::new(),
+        )
+    }
+
+    /// Runs stdio with a selected game profile, automatic Vanilla discovery, and process-start
+    /// diagnostics that are replayed through `window/logMessage` after initialize.
+    pub fn run_stdio_with_profile_and_auto_vanilla_with_startup_log(
+        options: InitializeOptions,
+        rules: RuleSet,
+        profile: GameProfile,
+        auto_vanilla: AutoVanillaConfiguration,
+        startup_log: Vec<String>,
+    ) -> Result<(), LspError> {
         let stdin = io::stdin();
         let stdout = io::stdout();
         let mut server =
             Self::try_new_with_rules(options, rules, profile)?.with_auto_vanilla(auto_vanilla);
+        server.startup_log = startup_log;
         server.run_transport(stdin, stdout.lock())
     }
 }
