@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use crate::completion::*;
 use crate::resolution::*;
@@ -37,16 +38,14 @@ pub fn hover_with_cancellation(
         return Ok(None);
     };
     if let Some((definition, reference)) = local_parameter_target(&input, position) {
-        let owner_name = input
-            .hir
-            .as_deref()
-            .and_then(|_| {
-                semantic_data(snapshot, &input)
-                    .definitions
-                    .into_iter()
-                    .find(|candidate| candidate.symbol.range == definition.owner_range)
-            })
-            .map(|definition| definition.name);
+        // The owner name lives directly on the HIR definition with the same range; going through
+        // `semantic_data` here would lower the whole file just to recover one spelling.
+        let owner_name = input.hir.as_deref().and_then(|hir| {
+            hir.definitions()
+                .iter()
+                .find(|candidate| candidate.range == definition.owner_range)
+                .map(|candidate| candidate.name.clone())
+        });
         let occurrences = input
             .hir
             .as_deref()
@@ -69,12 +68,12 @@ pub fn hover_with_cancellation(
         };
         let owner = owner_name.map_or_else(
             || "scripted definition".to_owned(),
-            |name| format!("scripted definition `{name}`"),
+            |name| format!("scripted definition {}", code_span(&name)),
         );
         return Ok(Some(Hover {
             contents: format!(
-                "### parameter `{}`\n\n- Local to {owner}; inferred from its first use\n- Presence: `{}`\n- Syntax: `{syntax}`\n- Occurrences in owner: {occurrences}",
-                definition.name,
+                "### parameter {}\n\n- Local to {owner}; inferred from its first use\n- Presence: `{}`\n- Syntax: `{syntax}`\n- Occurrences in owner: {occurrences}",
+                code_span(&definition.name),
                 if optional {
                     "optional"
                 } else {
@@ -100,7 +99,7 @@ pub fn hover_with_cancellation(
     });
     if let Some(first) = references.next() {
         let mut best = hover_for_symbol(snapshot, &first.kind, &first.name, range, cancellation)?;
-        if !best.contents.contains("#### Localisation preview") {
+        if !best.has_localisation_preview {
             for reference in references {
                 let hover = hover_for_symbol(
                     snapshot,
@@ -109,48 +108,61 @@ pub fn hover_with_cancellation(
                     range,
                     cancellation,
                 )?;
-                if hover.contents.contains("#### Localisation preview") {
+                if hover.has_localisation_preview {
                     best = hover;
                     break;
                 }
             }
         }
-        return Ok(Some(best));
+        return Ok(Some(best.into_hover_with_range(range)));
     }
     if let Some(definition) = semantic.definitions.iter().find(|definition| {
         definition.document.as_ref() == Some(document)
             && contains(definition.symbol.selection_range, position)
     }) {
-        return Ok(Some(hover_for_symbol(
-            snapshot,
-            &definition.kind,
-            &definition.name,
-            range,
-            cancellation,
-        )?));
+        return Ok(Some(
+            hover_for_symbol(
+                snapshot,
+                &definition.kind,
+                &definition.name,
+                range,
+                cancellation,
+            )?
+            .into_hover_with_range(range),
+        ));
     }
     cancellation.checkpoint()?;
     if let Some(details) = semantic_rule_hover_at(snapshot, &input, position, cancellation)? {
         return Ok(Some(Hover {
-            contents: format!("### PDX property `{word}`\n\n{details}"),
+            contents: format!("### PDX property {}\n\n{details}", code_span(&word)),
             range: Some(range),
         }));
     }
     if let Some(details) = semantic_value_hover_at(snapshot, &input, position, cancellation)? {
         return Ok(Some(Hover {
-            contents: format!("### PDX value `{word}`\n\n{details}"),
+            contents: format!("### PDX value {}\n\n{details}", code_span(&word)),
             range: Some(range),
         }));
     }
     if is_property_key_at(&input, position) {
-        let known = known_keys(snapshot);
-        if known.iter().any(|key| key.eq_ignore_ascii_case(&word)) {
+        if known_keys(snapshot)
+            .iter()
+            .any(|key| key.eq_ignore_ascii_case(&word))
+        {
             let contents = semantic_rule_documentation(snapshot, &word).map_or_else(
-                || format!("### PDX property `{word}`"),
-                |details| format!("### PDX property `{word}`\n\n{details}"),
+                || format!("### PDX property {}", code_span(&word)),
+                |details| format!("### PDX property {}\n\n{details}", code_span(&word)),
             );
             return Ok(Some(Hover {
                 contents,
+                range: Some(range),
+            }));
+        }
+        // The key may still be covered by a non-exact first-party matcher (type member, enum
+        // member, date, or dynamic set). Surface that provenance instead of returning nothing.
+        if let Some(hint) = semantic_pattern_rule_hint(snapshot, &word) {
+            return Ok(Some(Hover {
+                contents: format!("### PDX property {}\n\n{}", code_span(&word), hint),
                 range: Some(range),
             }));
         }
@@ -295,7 +307,7 @@ pub(crate) fn semantic_rule_hover_for_candidates(
         if let Some(documentation) = shared_documentation {
             sections.push(format!(
                 "#### Documentation\n\n{}",
-                documentation.join("  \n")
+                truncate_documentation(&documentation)
             ));
         }
         return sections.join("\n\n");
@@ -313,7 +325,7 @@ pub(crate) fn semantic_rule_hover_for_candidates(
     if !rule.documentation.is_empty() {
         sections.push(format!(
             "#### Documentation\n\n{}",
-            rule.documentation.join("  \n")
+            truncate_documentation(&rule.documentation)
         ));
     }
     sections.join("\n\n")
@@ -329,7 +341,7 @@ fn semantic_hover_candidate_summary(
     if include_documentation && !candidate.rule.documentation.is_empty() {
         details.push(format!(
             "- documentation: {}",
-            candidate.rule.documentation.join("  \n")
+            truncate_documentation(&candidate.rule.documentation)
         ));
     }
     details.join("\n")
@@ -508,6 +520,29 @@ pub(crate) fn semantic_rule_documentation(
     semantic_rule_documentation_for_rule(rule)
 }
 
+/// Renders first-party documentation lines, truncating the total so a pathological declaration
+/// cannot produce an unbounded tooltip.
+fn truncate_documentation(documentation: &[String]) -> String {
+    const MAX_DOCUMENTATION_CHARS: usize = 1_200;
+    let mut rendered = String::new();
+    let mut overflow = false;
+    for line in documentation {
+        let line = truncate_hover_text(line);
+        if rendered.chars().count() + line.chars().count() > MAX_DOCUMENTATION_CHARS {
+            overflow = true;
+            break;
+        }
+        if !rendered.is_empty() {
+            rendered.push_str("  \n");
+        }
+        rendered.push_str(&line);
+    }
+    if overflow || rendered.chars().count() > MAX_DOCUMENTATION_CHARS {
+        rendered.push_str("  \n…");
+    }
+    rendered
+}
+
 pub(crate) fn semantic_rule_documentation_for_rule(
     rule: &pdx_rules::SemanticRule,
 ) -> Option<String> {
@@ -515,7 +550,7 @@ pub(crate) fn semantic_rule_documentation_for_rule(
     if !rule.documentation.is_empty() {
         sections.push(format!(
             "#### Documentation\n\n{}",
-            rule.documentation.join("  \n")
+            truncate_documentation(&rule.documentation)
         ));
     }
 
@@ -547,16 +582,37 @@ pub(crate) fn semantic_rule_documentation_for_rule(
 
     (!sections.is_empty()).then(|| sections.join("\n\n"))
 }
+/// Maximum number of candidate paths rendered before the list is truncated.
+const MAX_HOVER_CANDIDATES: usize = 8;
+
+/// Structured result of one symbol hover. Rendering to Markdown is deferred so callers can
+/// branch on resolution facts (for example preferring a variant with a localisation preview)
+/// without string-matching rendered headings.
+pub(crate) struct SymbolHover {
+    contents: String,
+    has_localisation_preview: bool,
+}
+
+impl SymbolHover {
+    fn into_hover_with_range(self, range: TextRange) -> Hover {
+        Hover {
+            contents: self.contents,
+            range: Some(range),
+        }
+    }
+}
+
 pub(crate) fn hover_for_symbol(
     snapshot: &AnalysisSnapshot,
     kind: &str,
     name: &str,
-    range: TextRange,
+    _range: TextRange,
     cancellation: &CancellationToken,
-) -> Result<Hover, Cancelled> {
+) -> Result<SymbolHover, Cancelled> {
     let candidates = symbol_candidates_for_hover(snapshot, kind, name, cancellation)?;
     let policy = symbol_resolution_policy(snapshot, kind);
-    let mut sections = vec![format!("### {} `{}`", kind, name)];
+    let mut sections = vec![format!("### {} {}", kind, code_span(name))];
+    let mut has_localisation_preview = false;
     if candidates.is_empty() {
         sections.push(format!("#### unresolved {kind} symbol"));
     } else {
@@ -609,6 +665,7 @@ pub(crate) fn hover_for_symbol(
             if kind.eq_ignore_ascii_case("localisation")
                 && let Some((language, value)) = localisation_preview(snapshot, definition)
             {
+                has_localisation_preview = true;
                 sections.push(format!(
                     "#### Localisation preview\n\n- Localisation{}: \"{}\"",
                     language
@@ -621,24 +678,48 @@ pub(crate) fn hover_for_symbol(
                 sections.push(macro_signature_hover(&summary));
             }
         } else {
-            sections.push(format!("#### ambiguous {kind} symbol"));
-            sections.push(format!(
-                "#### Candidates:\n\n{}",
-                candidates
-                    .iter()
-                    .map(|candidate| format!(
+            // Ambiguous symbols still deserve a preview when any candidate carries localisation
+            // text; that is exactly the case where the user most wants to see the translations.
+            if kind.eq_ignore_ascii_case("localisation") {
+                for candidate in &candidates {
+                    if let Some((language, value)) = localisation_preview(snapshot, candidate) {
+                        if value.is_empty() {
+                            continue;
+                        }
+                        has_localisation_preview = true;
+                        sections.push(format!(
+                            "#### Localisation preview\n\n- Localisation{}: \"{}\"",
+                            language
+                                .as_deref()
+                                .map_or_else(String::new, |language| format!(" ({language})")),
+                            value
+                        ));
+                        break;
+                    }
+                }
+            }
+            let shown = candidates.len().min(MAX_HOVER_CANDIDATES);
+            let mut lines = candidates
+                .iter()
+                .take(shown)
+                .map(|candidate| {
+                    format!(
                         "- {}: `{}`",
                         symbol_source_root(snapshot, &candidate.location),
                         symbol_location_path(&candidate.location),
-                    ))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            ));
+                    )
+                })
+                .collect::<Vec<_>>();
+            if candidates.len() > shown {
+                lines.push(format!("- … and {} more", candidates.len() - shown));
+            }
+            sections.push(format!("#### ambiguous {kind} symbol"));
+            sections.push(format!("#### Candidates:\n\n{}", lines.join("\n")));
         }
     }
-    Ok(Hover {
+    Ok(SymbolHover {
         contents: sections.join("\n\n"),
-        range: Some(range),
+        has_localisation_preview,
     })
 }
 
@@ -732,21 +813,50 @@ pub(crate) fn localisation_preview(
 }
 
 pub(crate) fn find_cst_node(node: &CstNode, kind: CstKind, range: TextRange) -> Option<&CstNode> {
+    find_cst_node_bounded(node, kind, range, MAX_CST_SEARCH_DEPTH)
+}
+
+/// Nesting bound for CST lookups; localisation files are flat, so this only guards against
+/// pathological or corrupted trees, mirroring the bounded-scan rule for workspace scanning.
+const MAX_CST_SEARCH_DEPTH: usize = 64;
+
+fn find_cst_node_bounded(
+    node: &CstNode,
+    kind: CstKind,
+    range: TextRange,
+    depth: usize,
+) -> Option<&CstNode> {
     if node.kind() == kind && node.range() == range {
         return Some(node);
     }
+    if depth == 0 {
+        return None;
+    }
     node.children()
         .iter()
-        .find_map(|child| find_cst_node(child, kind, range))
+        .find_map(|child| find_cst_node_bounded(child, kind, range, depth - 1))
 }
 
 pub(crate) fn truncate_hover_text(value: &str) -> String {
     const MAX_CHARS: usize = 240;
-    let mut truncated = value.chars().take(MAX_CHARS).collect::<String>();
-    if value.chars().count() > MAX_CHARS {
+    let mut truncated = String::new();
+    let mut overflow = false;
+    for (index, character) in value.chars().enumerate() {
+        if index == MAX_CHARS {
+            overflow = true;
+            break;
+        }
+        truncated.push(character);
+    }
+    if overflow {
         truncated.push('…');
     }
     truncated
+}
+
+/// Renders a symbol spelling as an inline code span without breaking out of the backtick fence.
+fn code_span(value: &str) -> String {
+    format!("`{}`", value.replace('`', "'"))
 }
 
 pub(crate) fn symbol_location_path(location: &Location) -> String {
@@ -782,7 +892,17 @@ pub(crate) fn symbol_source_root(snapshot: &AnalysisSnapshot, location: &Locatio
         None => "Unknown source root".to_owned(),
     }
 }
-pub(crate) fn known_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
+pub(crate) fn known_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<String>> {
+    // The key set is a pure function of the immutable snapshot but is consulted on every
+    // property-key hover; memoize per revision instead of rebuilding it each time.
+    let revision = snapshot.revision();
+    let key = "hover-known-keys";
+    if let Some(cached) = snapshot
+        .query_cache()
+        .get::<BTreeSet<String>>(revision, key)
+    {
+        return cached;
+    }
     let mut keys = snapshot
         .game_profile()
         .fallback_keys
@@ -803,5 +923,40 @@ pub(crate) fn known_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
             .iter()
             .map(|descriptor| descriptor.kind_id.to_ascii_lowercase()),
     );
+    let keys = Arc::new(keys);
+    snapshot
+        .query_cache()
+        .insert(revision, key.to_owned(), Arc::clone(&keys));
     keys
+}
+
+/// Describes which non-exact first-party matcher family covers a property key. Used by the
+/// hover fallback so keys matched through type members, enums, or dates still get provenance
+/// instead of silently returning no tooltip. Open-ended matchers (`AnyScalar`, `Dynamic`) are
+/// deliberately excluded: they accept every key and would otherwise manufacture tooltips for
+/// genuinely unknown properties.
+pub(crate) fn semantic_pattern_rule_hint(
+    snapshot: &AnalysisSnapshot,
+    word: &str,
+) -> Option<String> {
+    let model = &snapshot.rules().model().semantic;
+    let mut families: BTreeSet<&'static str> = BTreeSet::new();
+    for rule in &model.rules {
+        let family = match &rule.key {
+            KeyMatcher::Exact(_) | KeyMatcher::AnyScalar | KeyMatcher::Dynamic(_) => continue,
+            KeyMatcher::Type(_) => "a workspace member of its declared type",
+            KeyMatcher::Enum(_) => "a member of a first-party enum",
+            KeyMatcher::Date => "a campaign date",
+        };
+        if semantic_key_matches(snapshot, &rule.key, word) {
+            families.insert(family);
+        }
+    }
+    if families.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "- matched by first-party rules as {}",
+        families.into_iter().collect::<Vec<_>>().join(" / ")
+    ))
 }
