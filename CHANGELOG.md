@@ -7,6 +7,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-08-22
+
+Maintenance release focused on formatting canonicalization, completion quality, and hover
+reliability.
+
+### Added
+
+- Detailed startup and index-cache progress logs in `pdx-ls` make server bootstrap state visible to
+  clients.
+- Decision completion and hover work again after the semantic-context traversal rework.
+
+### Changed
+
+- The formatter canonicalizes the fixed script keywords `AND`/`OR`/`NOT` and
+  `ROOT`/`FROM`/`PREV`/`THIS` to capitals, including scope references used as values; quoted text
+  is not rewritten.
+- Completion now suggests the uppercase intrinsic spellings (`THIS`, `ROOT`, `FROM`, `PREV`) and no
+  longer offers lowercase variants.
+- Control-flow keywords are highlighted as code keywords in both editors, with aligned semantic
+  token layers.
+- Hover is faster and safer: known-key sets are memoized per snapshot revision and richer
+  formatting is cached.
+
 ## [0.1.2] - 2026-08-20
 
 Maintenance release focused on editor readiness, workspace loading performance, and release
@@ -79,7 +102,8 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/danxiaogu520/ParadoxCode/releases/tag/v0.1.0
