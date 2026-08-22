@@ -877,7 +877,7 @@ fn scripted_macro_argument_value_inference_handles_conditionals_scope_and_confli
 
     let scoped = complete_argument(&host, "scoped", "scoped = { WHO =  }");
     assert!(
-        scoped.iter().any(|item| item.label == "this"),
+        scoped.iter().any(|item| item.label == "THIS"),
         "call-site scope candidates missing: {scoped:?}"
     );
 
@@ -894,7 +894,7 @@ fn scripted_macro_argument_value_inference_handles_conditionals_scope_and_confli
         u32::try_from(nested_scope_text.find("=  }").expect("empty value") + 2).expect("position");
     let nested_scoped = complete(&host.snapshot(), &nested_scope_id, nested_scope_position).items;
     assert!(
-        nested_scoped.iter().any(|item| item.label == "this"),
+        nested_scoped.iter().any(|item| item.label == "THIS"),
         "macro body scope transition was not applied: {nested_scoped:?}"
     );
 
@@ -905,7 +905,7 @@ fn scripted_macro_argument_value_inference_handles_conditionals_scope_and_confli
     );
     let cycle = complete_argument(&host, "cycle", "cycle_a = { VALUE =  }");
     assert!(
-        cycle.iter().any(|item| item.label == "this"),
+        cycle.iter().any(|item| item.label == "THIS"),
         "cyclic inference must fall back to rule-backed scope candidates: {cycle:?}"
     );
     assert!(
@@ -1089,7 +1089,7 @@ fn vanilla_cache_macro_templates_preserve_nested_conditional_and_scope_semantics
         "cached_scoped = { WHO =  }",
     );
     assert!(
-        scoped.iter().any(|item| item.label == "this"),
+        scoped.iter().any(|item| item.label == "THIS"),
         "scope transition was not restored from cached template: {scoped:?}"
     );
 }
@@ -1330,7 +1330,7 @@ fn scope_value_completion_offers_intrinsics_links_and_chains() {
         .collect::<Vec<_>>();
     assert!(labels.iter().any(|label| label == "province"), "{labels:?}");
     assert!(
-        labels.iter().any(|label| label == "this"),
+        labels.iter().any(|label| label == "THIS"),
         "intrinsics must stay visible: {labels:?}"
     );
     assert!(
@@ -1626,7 +1626,7 @@ fn dynamic_value_completion_covers_scope_expressions_and_same_named_enums() {
         u32::try_from(scope_text.len()).expect("position"),
     );
     assert!(
-        scope_result.items.iter().any(|item| item.label == "root"),
+        scope_result.items.iter().any(|item| item.label == "ROOT"),
         "a scope_field dynamic value must complete scope expressions: {:?}",
         scope_result
             .items

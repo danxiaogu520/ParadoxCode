@@ -2,8 +2,9 @@
 //!
 //! The formatter is intentionally non-configurable. Script uses tabs, LF line endings,
 //! recursive block layout, and no layout blank lines. Ordinary scalar spelling is preserved;
-//! multiline quoted strings are formatted recursively only when their decoded payload is
-//! demonstrably valid, non-empty Script.
+//! the fixed keyword spelling (`AND`/`OR`/`NOT`, `ROOT`/`FROM`/`PREV`/`THIS`) is
+//! canonicalized to capitals. Multiline quoted strings are formatted recursively only when
+//! their decoded payload is demonstrably valid, non-empty Script.
 
 use crate::{FileFormat, ParsedFile, parse};
 use common::skipped;

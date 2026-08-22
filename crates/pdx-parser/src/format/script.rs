@@ -144,7 +144,7 @@ impl<'file> PdxFormatter<'file> {
         let prefix = format!(
             "{}{} {} ",
             indent(depth),
-            self.text(key),
+            canonical_keyword(self.text(key)),
             self.text(operator).trim()
         );
         let mut layout = self.value(value, depth, false, false);
@@ -163,7 +163,7 @@ impl<'file> PdxFormatter<'file> {
         let Some((header, block)) = header_parts(node) else {
             return vec![format!("{}{}", indent(depth), self.text(node).trim())];
         };
-        let prefix = format!("{}{} ", indent(depth), self.text(header));
+        let prefix = format!("{}{} ", indent(depth), canonical_keyword(self.text(header)));
         let mut layout = self.block(block, depth, false, false);
         if let ValueLayout::Inline {
             text,
@@ -205,12 +205,12 @@ impl<'file> PdxFormatter<'file> {
             node
         };
         match node.kind() {
-            CstKind::BareValue => ValueLayout::inline(self.text(node)),
+            CstKind::BareValue => ValueLayout::inline(canonical_keyword(self.text(node))),
             CstKind::QuotedString => self.quoted(node, depth, compact, force_expand),
             CstKind::Block => self.block(node, depth, compact, force_expand),
             CstKind::HeaderBlock => self.header_value(node, depth, compact, force_expand),
             CstKind::ParameterBlock => self.parameter(node, depth, compact),
-            _ => ValueLayout::inline(self.text(node).trim()),
+            _ => ValueLayout::inline(canonical_keyword(self.text(node).trim())),
         }
     }
 
@@ -224,7 +224,7 @@ impl<'file> PdxFormatter<'file> {
         let Some((header, block)) = header_parts(node) else {
             return ValueLayout::inline(self.text(node).trim());
         };
-        let header = self.text(header);
+        let header = canonical_keyword(self.text(header));
         match self.block(block, depth, compact, force_expand) {
             ValueLayout::Inline {
                 text,
@@ -312,7 +312,7 @@ impl<'file> PdxFormatter<'file> {
 
     fn inline_item(&self, node: &CstNode, depth: usize) -> Option<String> {
         match node.kind() {
-            CstKind::BareValue => Some(self.text(node).to_owned()),
+            CstKind::BareValue => Some(canonical_keyword(self.text(node)).to_owned()),
             CstKind::QuotedString => match self.quoted(node, depth, false, false) {
                 ValueLayout::Inline { text, .. } if !contains_line_break(&text) => Some(text),
                 _ => None,
@@ -322,7 +322,7 @@ impl<'file> PdxFormatter<'file> {
                 let (header, block) = header_parts(node)?;
                 match self.block(block, depth, false, false) {
                     ValueLayout::Inline { text, .. } if !contains_line_break(&text) => {
-                        Some(format!("{} {text}", self.text(header)))
+                        Some(format!("{} {text}", canonical_keyword(self.text(header))))
                     }
                     _ => None,
                 }
@@ -345,14 +345,18 @@ impl<'file> PdxFormatter<'file> {
             ValueLayout::Inline { text, .. } if !contains_line_break(&text) => text,
             _ => return None,
         };
-        let property = format!("{} {} {value}", self.text(key), self.text(operator).trim());
+        let property = format!(
+            "{} {} {value}",
+            canonical_keyword(self.text(key)),
+            self.text(operator).trim()
+        );
         fits_line(&property).then_some(property)
     }
 
     fn compact_item(&self, node: &CstNode, depth: usize) -> Option<String> {
         match node.kind() {
             CstKind::Comment | CstKind::Bom => None,
-            CstKind::BareValue => Some(self.text(node).to_owned()),
+            CstKind::BareValue => Some(canonical_keyword(self.text(node)).to_owned()),
             CstKind::QuotedString => match self.quoted(node, depth, true, false) {
                 ValueLayout::Inline { text, .. } => Some(text),
                 _ => None,
@@ -365,7 +369,7 @@ impl<'file> PdxFormatter<'file> {
                 };
                 Some(format!(
                     "{} {} {value}",
-                    self.text(key),
+                    canonical_keyword(self.text(key)),
                     self.text(operator).trim()
                 ))
             }
@@ -375,7 +379,7 @@ impl<'file> PdxFormatter<'file> {
                     ValueLayout::Inline { text, .. } => text,
                     _ => return None,
                 };
-                Some(format!("{} {value}", self.text(header)))
+                Some(format!("{} {value}", canonical_keyword(self.text(header))))
             }
             CstKind::Block => match self.block(node, depth, true, false) {
                 ValueLayout::Inline { text, .. } => Some(text),
@@ -481,6 +485,30 @@ fn compose(prefix: String, layout: ValueLayout) -> Vec<String> {
             lines.push(closer);
             lines
         }
+    }
+}
+
+/// Canonical spelling of the fixed script keywords Paradox convention writes in capitals.
+/// Any other token is returned unchanged; matching is case-insensitive so mixed spellings
+/// normalize to the canonical form. A leading byte order mark (the lexer attaches it to the
+/// first key token of a BOM-prefixed file) is preserved and skipped for matching.
+pub(super) fn canonical_keyword(text: &str) -> &str {
+    match text {
+        _ if text.eq_ignore_ascii_case("and") => "AND",
+        _ if text.eq_ignore_ascii_case("or") => "OR",
+        _ if text.eq_ignore_ascii_case("not") => "NOT",
+        _ if text.eq_ignore_ascii_case("root") => "ROOT",
+        _ if text.eq_ignore_ascii_case("from") => "FROM",
+        _ if text.eq_ignore_ascii_case("prev") => "PREV",
+        _ if text.eq_ignore_ascii_case("this") => "THIS",
+        _ if text.eq_ignore_ascii_case("\u{feff}and") => "\u{feff}AND",
+        _ if text.eq_ignore_ascii_case("\u{feff}or") => "\u{feff}OR",
+        _ if text.eq_ignore_ascii_case("\u{feff}not") => "\u{feff}NOT",
+        _ if text.eq_ignore_ascii_case("\u{feff}root") => "\u{feff}ROOT",
+        _ if text.eq_ignore_ascii_case("\u{feff}from") => "\u{feff}FROM",
+        _ if text.eq_ignore_ascii_case("\u{feff}prev") => "\u{feff}PREV",
+        _ if text.eq_ignore_ascii_case("\u{feff}this") => "\u{feff}THIS",
+        _ => text,
     }
 }
 

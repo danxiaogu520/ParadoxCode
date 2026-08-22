@@ -572,10 +572,10 @@ pub fn profile() -> GameProfile {
         .map(str::to_owned)
         .collect(),
         scope_completions: [
-            "root",
-            "this",
-            "from",
-            "prev",
+            "ROOT",
+            "THIS",
+            "FROM",
+            "PREV",
             "country",
             "province",
             "trade_node",
@@ -602,9 +602,9 @@ pub fn profile() -> GameProfile {
             .map(str::to_owned)
             .collect(),
         control_flow_keys: [
-            "and",
-            "or",
-            "not",
+            "AND",
+            "OR",
+            "NOT",
             "if",
             "else",
             "limit",

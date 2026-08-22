@@ -39,7 +39,7 @@ fn canonical_block_layout_is_recursive_and_idempotent() {
 #[test]
 fn comments_expand_blocks_and_first_leading_comment_joins_opener() {
     let source = "root = {\n\n# header\n# second\nchild=yes # tail\n}\n";
-    let expected = "root = { # header\n\t# second\n\tchild = yes # tail\n}\n";
+    let expected = "ROOT = { # header\n\t# second\n\tchild = yes # tail\n}\n";
     assert_eq!(formatted(FileFormat::Script, source), expected);
 }
 
@@ -87,7 +87,7 @@ fn formatting_uses_tabs_lf_no_blank_lines_and_one_final_newline() {
     let source = "\u{feff}root = {\r\n  child = yes\r\n\r\n}\r\n\r\n";
     assert_eq!(
         formatted(FileFormat::Script, source),
-        "\u{feff}root = { child = yes }\n"
+        "\u{feff}ROOT = { child = yes }\n"
     );
 }
 
@@ -95,7 +95,7 @@ fn formatting_uses_tabs_lf_no_blank_lines_and_one_final_newline() {
 fn line_width_expands_properties_but_never_scalar_only_blocks() {
     let long_key = "界".repeat(58);
     let property_source = format!("root = {{ {long_key} = yes }}\n");
-    let property_expected = format!("root = {{\n\t{long_key} = yes\n}}\n");
+    let property_expected = format!("ROOT = {{\n\t{long_key} = yes\n}}\n");
     assert_eq!(
         formatted(FileFormat::Script, &property_source),
         property_expected
@@ -154,6 +154,28 @@ fn formatter_emits_precise_non_overlapping_edits() {
     );
     assert_eq!(
         apply(source, &result.edits),
-        "root = {\n\ta = 1\n\tb = 2\n}\n"
+        "ROOT = {\n\ta = 1\n\tb = 2\n}\n"
     );
+}
+
+#[test]
+fn script_keyword_spelling_is_canonicalized_to_capitals() {
+    let source = concat!(
+        "trigger = { and = { not = { root = this } } }\n",
+        "effect = { or = { from = prev } }\n",
+        "name = root\n",
+        "description = \"root or this stays quoted\"\n",
+        "and = { value = yes }\n",
+    );
+    let expected = concat!(
+        "trigger = { AND = { NOT = { ROOT = THIS } } }\n",
+        "effect = { OR = { FROM = PREV } }\n",
+        "name = ROOT\n",
+        "description = \"root or this stays quoted\"\n",
+        "AND = { value = yes }\n",
+    );
+    let output = formatted(FileFormat::Script, source);
+    assert_eq!(output, expected);
+    // The canonical form is already uppercase: formatting is idempotent and emits no edits.
+    assert!(format(&parse(FileFormat::Script, &output)).edits.is_empty());
 }
