@@ -949,7 +949,7 @@ fn memory_transport_formats_safe_text_and_refuses_recovered_syntax() {
             .expect("format edit end");
         formatted.replace_range(start as usize..end as usize, &edit.new_text);
     }
-    assert_eq!(formatted, "root = {\n\tname = \"汉😀\"\n\tother = yes\n}\n");
+    assert_eq!(formatted, "ROOT = {\n\tname = \"汉😀\"\n\tother = yes\n}\n");
     let unsafe_edits = typed_result::<Vec<lsp_types::TextEdit>>(&responses, 3);
     assert!(unsafe_edits.is_empty());
 }

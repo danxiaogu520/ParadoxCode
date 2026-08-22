@@ -970,12 +970,16 @@ pub(crate) fn scope_expression_candidates(
             || compatible(resolved)
     };
     for label in &profile.scope_completions {
-        let resolved = match label.as_str() {
-            "root" => Some(scope.root.as_str()),
-            "this" => Some(scope.current.as_str()),
-            "from" => scope.from.first().map(String::as_str),
-            "prev" => scope.previous.first().map(String::as_str),
-            _ => None,
+        let resolved = if label.eq_ignore_ascii_case("root") {
+            Some(scope.root.as_str())
+        } else if label.eq_ignore_ascii_case("this") {
+            Some(scope.current.as_str())
+        } else if label.eq_ignore_ascii_case("from") {
+            scope.from.first().map(String::as_str)
+        } else if label.eq_ignore_ascii_case("prev") {
+            scope.previous.first().map(String::as_str)
+        } else {
+            None
         };
         let keep = match resolved {
             Some(resolved) => intrinsic_compatible(resolved),
