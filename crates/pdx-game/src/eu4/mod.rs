@@ -601,6 +601,24 @@ pub fn profile() -> GameProfile {
             .into_iter()
             .map(str::to_owned)
             .collect(),
+        control_flow_keys: [
+            "and",
+            "or",
+            "not",
+            "if",
+            "else",
+            "limit",
+            "trigger",
+            "effect",
+            "hidden_effect",
+            "random_list",
+            "modifier",
+            "option",
+            "immediate",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect(),
         semantic_context_inheritance: [
             ("type:advisor_type", vec!["modifier"]),
             ("type:ancestor_personalities", vec!["modifier"]),
@@ -1016,6 +1034,8 @@ mod tests {
                 .any(|key| key == "add_treasury")
         );
         assert!(profile.enum_extra_member("scripted_effect_params", "scaled_skill"));
+        assert!(profile.is_control_flow_key("limit"));
+        assert!(!profile.is_control_flow_key("add_core"));
     }
 
     #[test]

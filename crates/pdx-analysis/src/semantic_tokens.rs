@@ -41,9 +41,17 @@ pub fn semantic_tokens_with_cancellation(
         return Ok(Vec::new());
     }
     let keys = semantic_keys(snapshot);
+    let profile = snapshot.game_profile();
     let ParsedContent::Text(parsed) = &input.parsed;
     let mut tokens = Vec::new();
-    collect_tokens(parsed, parsed.root(), &keys, &mut tokens, cancellation)?;
+    collect_tokens(
+        parsed,
+        parsed.root(),
+        &keys,
+        profile,
+        &mut tokens,
+        cancellation,
+    )?;
     Ok(tokens)
 }
 
@@ -78,6 +86,7 @@ fn collect_tokens(
     parsed: &ParsedFile,
     node: &CstNode,
     keys: &BTreeSet<String>,
+    profile: &pdx_rules::GameProfile,
     tokens: &mut Vec<SemanticToken>,
     cancellation: &CancellationToken,
 ) -> Result<(), Cancelled> {
@@ -86,7 +95,7 @@ fn collect_tokens(
         CstKind::Comment => tokens.push(token(node.range(), SemanticTokenType::Comment, false)),
         CstKind::Key => {
             if let Some(text) = parsed.text(node.range()) {
-                let (token_type, definition) = classify_identifier(text, true, keys);
+                let (token_type, definition) = classify_identifier(text, true, keys, profile);
                 tokens.push(token(node.range(), token_type, definition));
             }
         }
@@ -97,11 +106,11 @@ fn collect_tokens(
                 if header.kind() == CstKind::BareValue {
                     tokens.push(token(header.range(), SemanticTokenType::Type, false));
                 } else {
-                    collect_tokens(parsed, header, keys, tokens, cancellation)?;
+                    collect_tokens(parsed, header, keys, profile, tokens, cancellation)?;
                 }
             }
             for child in node.children().iter().skip(1) {
-                collect_tokens(parsed, child, keys, tokens, cancellation)?;
+                collect_tokens(parsed, child, keys, profile, tokens, cancellation)?;
             }
         }
         CstKind::ParameterCondition => {
@@ -110,13 +119,13 @@ fn collect_tokens(
                 if child.kind() == CstKind::BareValue {
                     tokens.push(token(child.range(), SemanticTokenType::Parameter, false));
                 } else {
-                    collect_tokens(parsed, child, keys, tokens, cancellation)?;
+                    collect_tokens(parsed, child, keys, profile, tokens, cancellation)?;
                 }
             }
         }
         CstKind::BareValue | CstKind::QuotedString => {
             if let Some(text) = parsed.text(node.range()) {
-                let (token_type, definition) = classify_identifier(text, false, keys);
+                let (token_type, definition) = classify_identifier(text, false, keys, profile);
                 tokens.push(token(node.range(), token_type, definition));
             }
         }
@@ -127,7 +136,7 @@ fn collect_tokens(
         | CstKind::Document
         | CstKind::Error => {
             for child in node.children() {
-                collect_tokens(parsed, child, keys, tokens, cancellation)?;
+                collect_tokens(parsed, child, keys, profile, tokens, cancellation)?;
             }
         }
         // The BOM and localisation node kinds never reach a Script document walk.
@@ -144,11 +153,13 @@ fn collect_tokens(
 }
 
 /// Classifies a scalar by spelling. `is_key` selects the key-position rules: quoted keys stay
-/// data properties, `@name` keys are variable definitions, and rule-known keys are functions.
+/// data properties, `@name` keys are variable definitions, control-flow keys are keywords, and
+/// rule-known keys are functions.
 fn classify_identifier(
     text: &str,
     is_key: bool,
     keys: &BTreeSet<String>,
+    profile: &pdx_rules::GameProfile,
 ) -> (SemanticTokenType, bool) {
     if text.starts_with('"') {
         return if is_key {
@@ -165,6 +176,9 @@ fn classify_identifier(
         return (SemanticTokenType::Parameter, false);
     }
     if is_key {
+        if profile.is_control_flow_key(text) {
+            return (SemanticTokenType::Keyword, false);
+        }
         return if keys.contains(text.to_ascii_lowercase().as_str()) {
             (SemanticTokenType::Function, false)
         } else {
@@ -174,7 +188,11 @@ fn classify_identifier(
     if is_number_spelling(text) {
         return (SemanticTokenType::Number, false);
     }
-    if text.eq_ignore_ascii_case("yes") || text.eq_ignore_ascii_case("no") {
+    if text.eq_ignore_ascii_case("yes")
+        || text.eq_ignore_ascii_case("no")
+        || text.eq_ignore_ascii_case("true")
+        || text.eq_ignore_ascii_case("false")
+    {
         return (SemanticTokenType::Boolean, false);
     }
     (SemanticTokenType::String, false)

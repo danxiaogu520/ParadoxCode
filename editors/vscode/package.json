@@ -179,9 +179,10 @@
           "number": ["constant.numeric"],
           "boolean": ["constant.language.boolean"],
           "operator": ["keyword.operator"],
-          "property": ["variable.other.property", "support.type.property-name", "entity.name.tag"],
-          "function": ["entity.name.function", "entity.name.tag"],
-          "type": ["entity.name.type", "entity.name.tag"],
+          "property": ["variable.other.property"],
+          "function": ["support.function", "entity.name.function"],
+          "keyword": ["keyword.control", "keyword"],
+          "type": ["entity.name.type"],
           "variable": ["variable", "variable.other.definition"],
           "parameter": ["variable.parameter", "variable"]
         }

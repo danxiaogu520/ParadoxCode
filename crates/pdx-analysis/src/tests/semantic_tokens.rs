@@ -66,6 +66,21 @@ fn variable_definitions_and_parameter_usages_are_distinguished() {
 }
 
 #[test]
+fn boolean_spellings_match_the_syntax_layer() {
+    // The TextMate grammar colours true/false as booleans; the semantic layer must agree so
+    // highlighting does not change when the language server becomes ready.
+    let text = "a = true b = false c = yes d = no\n";
+    let (host, id) = snapshot(text);
+    let tokens = token_spellings(&host, &id, text);
+    for spelling in ["true", "false", "yes", "no"] {
+        assert!(
+            tokens.contains(&(spelling.to_owned(), SemanticTokenType::Boolean, false)),
+            "{spelling} should be a boolean token"
+        );
+    }
+}
+
+#[test]
 fn headers_and_parameter_conditions_use_type_and_parameter_tokens() {
     let text = "rgb { 1 2 3 }\n[[!country] foo = bar ]\n";
     let (host, id) = snapshot(text);
@@ -75,6 +90,23 @@ fn headers_and_parameter_conditions_use_type_and_parameter_tokens() {
     assert!(tokens.contains(&("country".to_owned(), SemanticTokenType::Parameter, false)));
     assert!(tokens.contains(&("foo".to_owned(), SemanticTokenType::Property, false)));
     assert!(tokens.contains(&("bar".to_owned(), SemanticTokenType::String, false)));
+}
+
+#[test]
+fn control_flow_keys_are_keywords_above_functions() {
+    // Profile control-flow keys take precedence over the rule-known Function classification so
+    // the script skeleton (if/limit/not/...) reads differently from effects and triggers.
+    let text = "country_event = {\n  id = test.1\n  trigger = { NOT = { has_dlc = \"x\" } }\n  immediate = { limit = { always = yes } }\n}\n";
+    let (host, id) = snapshot(text);
+    let tokens = token_spellings(&host, &id, text);
+    for spelling in ["trigger", "NOT", "immediate", "limit"] {
+        assert!(
+            tokens.contains(&(spelling.to_owned(), SemanticTokenType::Keyword, false)),
+            "{spelling} should be a keyword token"
+        );
+    }
+    // `always` is a profile fallback key, so it stays Function-colored.
+    assert!(tokens.contains(&("always".to_owned(), SemanticTokenType::Function, false)));
 }
 
 #[test]
