@@ -93,8 +93,10 @@ pub(super) fn decode_path(bytes: &[u8], encoding: &str) -> Result<PathBuf, Index
         )));
     }
     let units = bytes
-        .chunks_exact(2)
-        .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|unit| u16::from_le_bytes(*unit))
         .collect::<Vec<_>>();
     Ok(PathBuf::from(OsString::from_wide(&units)))
 }
