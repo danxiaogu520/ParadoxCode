@@ -279,6 +279,8 @@ pub enum SemanticTokenType {
     Property,
     /// A property key known to the rule database or profile.
     Function,
+    /// A control-flow key such as `if`, `limit`, or `not`.
+    Keyword,
     /// A header-block header such as `rgb { … }`.
     Type,
     /// An `@name` scripted variable.
@@ -289,7 +291,7 @@ pub enum SemanticTokenType {
 
 impl SemanticTokenType {
     /// Legend order; clients receive indices into this list.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::Comment,
         Self::String,
         Self::Number,
@@ -297,6 +299,7 @@ impl SemanticTokenType {
         Self::Operator,
         Self::Property,
         Self::Function,
+        Self::Keyword,
         Self::Type,
         Self::Variable,
         Self::Parameter,
@@ -313,6 +316,7 @@ impl SemanticTokenType {
             Self::Operator => "operator",
             Self::Property => "property",
             Self::Function => "function",
+            Self::Keyword => "keyword",
             Self::Type => "type",
             Self::Variable => "variable",
             Self::Parameter => "parameter",

@@ -278,6 +278,8 @@ pub struct GameProfile {
     pub member_name_suffixes: Vec<ProfileMemberNameSuffixRule>,
     /// Profile fallback keys used when no imported semantic rule selects a property.
     pub fallback_keys: Vec<String>,
+    /// Control-flow keys highlighted as keywords (for example `if`, `limit`, `not`).
+    pub control_flow_keys: Vec<String>,
     /// Additional static enum members supplied by the profile.
     pub enum_extra_members: BTreeMap<String, Vec<String>>,
 }
@@ -311,6 +313,7 @@ impl GameProfile {
             member_kind_aliases: BTreeMap::new(),
             member_name_suffixes: Vec::new(),
             fallback_keys: Vec::new(),
+            control_flow_keys: Vec::new(),
             enum_extra_members: BTreeMap::new(),
         }
     }
@@ -526,6 +529,14 @@ impl GameProfile {
         self.transparent_scope_wrappers
             .iter()
             .any(|wrapper| wrapper.eq_ignore_ascii_case(key))
+    }
+
+    /// Returns whether a key is a profile control-flow keyword.
+    #[must_use]
+    pub fn is_control_flow_key(&self, key: &str) -> bool {
+        self.control_flow_keys
+            .iter()
+            .any(|candidate| candidate.eq_ignore_ascii_case(key))
     }
 
     /// Returns the workspace symbol kind aliased by one semantic member name.
