@@ -22,6 +22,9 @@ and Paradox Interactive are trademarks of their respective owners.
   analysis: parsing produces a loss-aware syntax tree, and unrecognized constructs lower to
   `Unknown*` nodes instead of crashing.
 - Syntax and semantic diagnostics driven by a validated first-party EU4 rules database.
+- Diagnostics expose stable PascalCase IDs such as `UnknownKey`, `UnknownBareValue`,
+  `UnknownScope`, and `TargetWrongScope`; severity is typed internally and LSP metadata carries
+  certainty and rule provenance (with a legacy code in `data` for migration).
 - Completion, hover, go-to-definition, references, and document/workspace symbols.
 - Conflict-aware rename restricted to writable Mod sources.
 - A conservative formatter that refuses to rewrite unsafe or malformed files.

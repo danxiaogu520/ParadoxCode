@@ -275,7 +275,7 @@ fn eu4_normal_type_selector_applies_mission_rules_to_custom_root_names() {
     );
     assert!(
         results.iter().any(|item| {
-            item.code == DiagnosticCode::InvalidValue && item.message.contains("potential")
+            item.code == DiagnosticCode::UnknownBareValue && item.message.contains("potential")
         }),
         "negative type_key_filter was not applied to <mission>: {results:?}"
     );

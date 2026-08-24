@@ -694,19 +694,96 @@ pub(crate) fn semantic_parent_path_matches(
 pub(crate) fn semantic_rule_severity<'a>(
     rules: impl IntoIterator<Item = &'a pdx_rules::SemanticRule>,
     fallback: DiagnosticCode,
-) -> u8 {
+) -> Severity {
     rules
         .into_iter()
         .filter_map(|rule| rule.severity)
         .min()
+        .map(Severity::from_rule_number)
         .unwrap_or_else(|| fallback.severity())
 }
 
-pub(crate) fn semantic_min_cardinality_severity(rule: &pdx_rules::SemanticRule) -> u8 {
+/// Selects the severity for a bare value that did not match any leaf-value rule.
+///
+/// An unmatched bare value is normally an error even when a rule carries a softer severity:
+/// the value is not understood by the semantic contract. The one intentional exception is a
+/// numeric value outside an explicitly bounded numeric rule. EU4 clamps those values at runtime
+/// (the first-party colour rules use this to keep Vanilla files usable), so their configured
+/// warning/info severity remains meaningful.
+pub(crate) fn semantic_bare_value_severity<'a>(
+    rules: impl IntoIterator<Item = &'a pdx_rules::SemanticRule>,
+    value: &str,
+) -> Severity {
+    let leaf_rules = rules
+        .into_iter()
+        .filter(|rule| matches!(rule.shape, RuleShape::LeafValue))
+        .collect::<Vec<_>>();
+    let soft_severities = leaf_rules
+        .iter()
+        .filter_map(|rule| {
+            let severity = rule.severity.filter(|severity| *severity > 1)?;
+            numeric_range_overflow(&rule.value, value).then_some(severity)
+        })
+        .collect::<Vec<_>>();
+    let has_hard_mismatch = leaf_rules.iter().any(|rule| {
+        !numeric_range_overflow(&rule.value, value)
+            || rule.severity.is_none_or(|severity| severity <= 1)
+    });
+    if !has_hard_mismatch {
+        soft_severities
+            .into_iter()
+            .min()
+            .map(Severity::from_rule_number)
+            .unwrap_or(Severity::Error)
+    } else {
+        DiagnosticCode::UnknownBareValue.severity()
+    }
+}
+
+/// Selects the diagnostic category for an unmatched bare value. Values outside an explicit
+/// numeric range are known values with a bounded violation; all other unmatched scalars are
+/// unknown bare values and therefore hard errors.
+pub(crate) fn semantic_bare_value_code<'a>(
+    rules: impl IntoIterator<Item = &'a pdx_rules::SemanticRule>,
+    value: &str,
+) -> DiagnosticCode {
+    let has_numeric_overflow = rules
+        .into_iter()
+        .filter(|rule| matches!(rule.shape, RuleShape::LeafValue))
+        .any(|rule| numeric_range_overflow(&rule.value, value));
+    if has_numeric_overflow {
+        DiagnosticCode::InvalidValue
+    } else {
+        DiagnosticCode::UnknownBareValue
+    }
+}
+
+fn numeric_range_overflow(matcher: &ValueMatcher, value: &str) -> bool {
+    match matcher {
+        ValueMatcher::Int { min, max } => {
+            let Ok(value) = value.parse::<i64>() else {
+                return false;
+            };
+            min.is_some_and(|min| value < min) || max.is_some_and(|max| value > max)
+        }
+        ValueMatcher::Float { min, max } => {
+            let Ok(value) = value.parse::<f64>() else {
+                return false;
+            };
+            let lower = min.as_deref().and_then(|min| min.parse::<f64>().ok());
+            let upper = max.as_deref().and_then(|max| max.parse::<f64>().ok());
+            lower.is_some_and(|min| value < min) || upper.is_some_and(|max| value > max)
+        }
+        _ => false,
+    }
+}
+
+pub(crate) fn semantic_min_cardinality_severity(rule: &pdx_rules::SemanticRule) -> Severity {
     if !rule.strict_min {
-        2
+        Severity::Warning
     } else {
         rule.severity
+            .map(Severity::from_rule_number)
             .unwrap_or(DiagnosticCode::Cardinality.severity())
     }
 }
@@ -1223,6 +1300,46 @@ pub(crate) fn semantic_property_matches(
             && scope_member(snapshot, None, value, scope_context))
 }
 
+/// Classification used by diagnostics when a rule's value matcher is scope-based.
+///
+/// The ordinary matcher remains a boolean API for rule applicability, while this result keeps
+/// enough information to distinguish a misspelled scope from a valid target in the wrong scope.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum ScopeValueMatch {
+    NotScopeRule,
+    Known {
+        actual: String,
+        expected: Option<String>,
+        compatible: bool,
+    },
+    Dynamic,
+    Unresolved,
+    Unknown,
+}
+
+pub(crate) fn semantic_scope_value_match(
+    snapshot: &AnalysisSnapshot,
+    rule: &pdx_rules::SemanticRule,
+    value: &str,
+    scope_context: &ScopeContext,
+) -> ScopeValueMatch {
+    let ValueMatcher::Scope(expected) = &rule.value else {
+        return ScopeValueMatch::NotScopeRule;
+    };
+    match resolve_scope_member(snapshot, value, scope_context) {
+        ScopeResolution::Known { scope: actual } => ScopeValueMatch::Known {
+            compatible: expected
+                .as_deref()
+                .is_none_or(|expected| scope_context.profile.scopes_compatible(&actual, expected)),
+            actual,
+            expected: expected.clone(),
+        },
+        ScopeResolution::Dynamic => ScopeValueMatch::Dynamic,
+        ScopeResolution::Unresolved => ScopeValueMatch::Unresolved,
+        ScopeResolution::Unknown => ScopeValueMatch::Unknown,
+    }
+}
+
 /// Returns whether a property satisfies the rule shape and operator independently of its scalar
 /// spelling. Macro definition placeholders use this to defer only the binding-dependent matcher.
 pub(crate) fn semantic_property_structure_matches(
@@ -1557,28 +1674,43 @@ fn enum_member_uncached(snapshot: &AnalysisSnapshot, enum_name: &str, member: &s
         || workspace_member(snapshot, enum_name, member)
 }
 
-pub(crate) fn scope_member(
+/// Result of resolving a scope expression without applying an expected target scope.
+///
+/// This deliberately distinguishes a runtime-dynamic expression and an untracked register from
+/// an actually unknown spelling. Callers can therefore suppress false positives while still
+/// reporting a misspelled static scope as an error.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum ScopeResolution {
+    Known { scope: String },
+    Dynamic,
+    Unresolved,
+    Unknown,
+}
+
+pub(crate) fn resolve_scope_member(
     snapshot: &AnalysisSnapshot,
-    scope: Option<&str>,
     member: &str,
     context: &ScopeContext,
-) -> bool {
+) -> ScopeResolution {
     let member = member.trim();
     if context.profile.is_dynamic_scope_expression(member) {
         // Runtime event targets may resolve to any concrete scope. Their existence and concrete
         // type cannot be disproved from a static workspace snapshot.
-        return true;
+        return ScopeResolution::Dynamic;
     }
     let lowered = member.to_ascii_lowercase().replace('_', "");
     if matches!(
         lowered.as_str(),
         "owner" | "controller" | "emperor" | "overlord"
     ) {
-        return scope.is_none_or(|expected| context.profile.scopes_compatible("country", expected));
+        return ScopeResolution::Known {
+            scope: "country".to_owned(),
+        };
     }
     if matches!(lowered.as_str(), "capital" | "capitalscope" | "location") {
-        return scope
-            .is_none_or(|expected| context.profile.scopes_compatible("province", expected));
+        return ScopeResolution::Known {
+            scope: "province".to_owned(),
+        };
     }
     if let Some(destination) = snapshot
         .rules()
@@ -1589,8 +1721,9 @@ pub(crate) fn scope_member(
                 .or_else(|| (!rule.replace_scope.is_empty()).then_some("any"))
         })
     {
-        return scope
-            .is_none_or(|expected| context.profile.scopes_compatible(destination, expected));
+        return ScopeResolution::Known {
+            scope: destination.to_owned(),
+        };
     }
     let resolved = if lowered == "root" {
         Some(context.root.as_str())
@@ -1608,12 +1741,37 @@ pub(crate) fn scope_member(
     let Some(resolved) = resolved else {
         // FROM/PREV registers are not tracked in every context; an unknown register is
         // a legitimate scope reference that the analysis cannot disprove.
-        return true;
+        return ScopeResolution::Unresolved;
     };
     if !context.profile.is_scope(resolved) {
         // Country tags are valid scope references, e.g. `who = TRP`.
-        return context.profile.enum_extra_member("country_tags", member)
-            || workspace_member(snapshot, "country_tag", member);
+        return if context.profile.enum_extra_member("country_tags", member)
+            || workspace_member(snapshot, "country_tag", member)
+        {
+            ScopeResolution::Known {
+                scope: "country".to_owned(),
+            }
+        } else {
+            ScopeResolution::Unknown
+        };
     }
-    scope.is_none_or(|expected| context.profile.scopes_compatible(resolved, expected))
+    ScopeResolution::Known {
+        scope: resolved.to_owned(),
+    }
+}
+
+pub(crate) fn scope_member(
+    snapshot: &AnalysisSnapshot,
+    expected: Option<&str>,
+    member: &str,
+    context: &ScopeContext,
+) -> bool {
+    match resolve_scope_member(snapshot, member, context) {
+        ScopeResolution::Known { scope } => {
+            expected.is_none_or(|expected| context.profile.scopes_compatible(&scope, expected))
+        }
+        // Dynamic targets and untracked registers are valid but cannot be checked statically.
+        ScopeResolution::Dynamic | ScopeResolution::Unresolved => true,
+        ScopeResolution::Unknown => false,
+    }
 }

@@ -30,9 +30,9 @@ pub use resolution::localisation_values_by_key;
 pub use semantic_tokens::{semantic_tokens, semantic_tokens_with_cancellation};
 pub use types::{
     AnalysisResult, CancellationToken, Cancelled, CompletionItem, CompletionKind, CompletionResult,
-    Diagnostic, DiagnosticCode, FileAnalysis, Hover, Location, PrepareRenameResult, ReferenceInfo,
-    RenameError, RenameFailure, SemanticToken, SemanticTokenType, Symbol, WorkspaceEditPlan,
-    WorkspaceSymbol, WorkspaceTextEdit,
+    Diagnostic, DiagnosticCertainty, DiagnosticCode, DiagnosticProvenance, FileAnalysis, Hover,
+    Location, PrepareRenameResult, ReferenceInfo, RenameError, RenameFailure, SemanticToken,
+    SemanticTokenType, Severity, Symbol, WorkspaceEditPlan, WorkspaceSymbol, WorkspaceTextEdit,
 };
 
 // These crate-visible re-exports keep the existing in-crate test and helper paths stable while

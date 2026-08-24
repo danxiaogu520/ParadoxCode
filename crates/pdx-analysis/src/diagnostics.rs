@@ -17,6 +17,41 @@ use pdx_text::TextRange;
 
 const MAX_EXPANDED_DIAGNOSTICS_PER_INVOCATION: usize = 32;
 
+/// Single finalization point for diagnostics emitted by syntax, semantic, and reference passes.
+///
+/// Keeping deduplication here prevents each producer from inventing slightly different identity
+/// rules. Until every producer exposes a structured subject (the exact symbol or key), the
+/// message remains part of identity so two independent symbol failures sharing a range survive.
+#[derive(Default)]
+struct DiagnosticCollector {
+    values: Vec<Diagnostic>,
+}
+
+impl DiagnosticCollector {
+    fn new(values: Vec<Diagnostic>) -> Self {
+        Self { values }
+    }
+
+    fn push(&mut self, diagnostic: Diagnostic) {
+        self.values.push(diagnostic);
+    }
+
+    fn finish(mut self) -> Vec<Diagnostic> {
+        self.values.sort_by_key(|diagnostic| {
+            (
+                diagnostic.range.start(),
+                diagnostic.range.end(),
+                diagnostic.code,
+                diagnostic.severity,
+            )
+        });
+        self.values.dedup_by(|left, right| {
+            left.code == right.code && left.range == right.range && left.message == right.message
+        });
+        self.values
+    }
+}
+
 /// Runs diagnostics for all open overlays.  Disk-only files are intentionally excluded from push
 /// diagnostics; they still participate in navigation and workspace-symbol queries.
 #[must_use]
@@ -136,9 +171,10 @@ pub(crate) fn analyze_input_with_cancellation(
     let semantic = semantic_data(snapshot, input);
     cancellation.checkpoint()?;
     let resolution = DirectResolutionContext::new(snapshot);
-    let mut diagnostics = syntax_diagnostics(input);
-    diagnostics.extend(semantic_rule_diagnostics(snapshot, input, cancellation)?);
-    let mut unknown_scope_reported = false;
+    let mut diagnostics = DiagnosticCollector::new(syntax_diagnostics(input));
+    diagnostics
+        .values
+        .extend(semantic_rule_diagnostics(snapshot, input, cancellation)?);
     for property in properties(input) {
         cancellation.checkpoint()?;
         if property.key.eq_ignore_ascii_case("scope")
@@ -150,15 +186,16 @@ pub(crate) fn analyze_input_with_cancellation(
                 value,
                 &ScopeContext::new(snapshot.game_profile_handle()),
             )
-            && !unknown_scope_reported
+            && !diagnostics.values.iter().any(|diagnostic| {
+                diagnostic.code == DiagnosticCode::UnknownScope && diagnostic.range == *range
+            })
         {
-            diagnostics.push(Diagnostic {
-                code: DiagnosticCode::UnknownScope,
-                severity: DiagnosticCode::UnknownScope.severity(),
-                range: *range,
-                message: format!("unknown scope `{value}`"),
-            });
-            unknown_scope_reported = true;
+            diagnostics.push(Diagnostic::new(
+                DiagnosticCode::UnknownScope,
+                DiagnosticCode::UnknownScope.severity(),
+                *range,
+                format!("unknown scope `{value}`"),
+            ));
         }
     }
     for reference in &semantic.references {
@@ -183,18 +220,18 @@ pub(crate) fn analyze_input_with_cancellation(
                         input,
                         reference.range,
                     ) => {}
-            Resolution::Missing => diagnostics.push(Diagnostic {
-                code: DiagnosticCode::UnknownSymbol,
+            Resolution::Missing => diagnostics.push(Diagnostic::new(
+                DiagnosticCode::UnknownSymbol,
                 // The game renders a missing localisation key as its raw spelling, so a
                 // missing key is a data-quality hint rather than a script error.
-                severity: if reference.kind.eq_ignore_ascii_case("localisation") {
-                    2
+                if reference.kind.eq_ignore_ascii_case("localisation") {
+                    Severity::Warning
                 } else {
                     DiagnosticCode::UnknownSymbol.severity()
                 },
-                range: reference.range,
-                message: format!("unknown {} symbol `{}`", reference.kind, reference.name),
-            }),
+                reference.range,
+                format!("unknown {} symbol `{}`", reference.kind, reference.name),
+            )),
             // Localisation is merged across languages and may be repeated by replace files.
             // Existence is enough for diagnostics; navigation retains the candidate set.
             // The game resolves same-name definitions deterministically by source priority,
@@ -203,19 +240,7 @@ pub(crate) fn analyze_input_with_cancellation(
             Resolution::Unique(_) => {}
         }
     }
-    diagnostics.sort_by_key(|diagnostic| {
-        (
-            diagnostic.range.start(),
-            diagnostic.range.end(),
-            diagnostic.code,
-        )
-    });
-    diagnostics.dedup_by(|left, right| {
-        left.code == right.code
-            && left.severity == right.severity
-            && left.range == right.range
-            && left.message == right.message
-    });
+    let diagnostics = diagnostics.finish();
     cancellation.checkpoint()?;
     Ok(FileAnalysis {
         revision: snapshot.revision(),
@@ -405,14 +430,14 @@ pub(crate) fn semantic_rule_diagnostics(
             )?;
         }
         if fallback_context {
-            // Only key/scope classification depends on the guessed context; value and
-            // cardinality diagnostics fire from matched rules and stay trustworthy.
+            // A path-only context is still enough to establish that an authored key is not
+            // accepted by the selected rule set: the game silently ignores such a key. Keep
+            // unknown keys as errors; only scope availability remains uncertain until a more
+            // specific root/context match is available.
             for diagnostic in &mut container_diagnostics {
-                if matches!(
-                    diagnostic.code,
-                    DiagnosticCode::UnknownKey | DiagnosticCode::WrongScope
-                ) {
+                if diagnostic.code == DiagnosticCode::RuleWrongScope {
                     diagnostic.severity = diagnostic.severity.saturating_add(1);
+                    diagnostic.certainty = DiagnosticCertainty::Inferred;
                 }
             }
         }
@@ -420,6 +445,22 @@ pub(crate) fn semantic_rule_diagnostics(
     }
     Ok(diagnostics)
 }
+
+fn semantic_diagnostic(
+    code: DiagnosticCode,
+    severity: Severity,
+    range: TextRange,
+    message: String,
+    rule: &pdx_rules::SemanticRule,
+) -> Diagnostic {
+    Diagnostic::new(code, severity, range, message).with_provenance(DiagnosticProvenance {
+        rule_id: Some(rule.id.clone()),
+        context: Some(rule.context.clone()),
+        source_file: Some(rule.source_file.clone()),
+        source_line: Some(rule.line),
+    })
+}
+
 #[allow(clippy::too_many_arguments)] // Recursive validation carries explicit semantic state.
 pub(crate) fn validate_semantic_container(
     snapshot: &AnalysisSnapshot,
@@ -489,15 +530,15 @@ pub(crate) fn validate_semantic_container(
             // EU4 logical wrappers retain their parent context. Owner-local parameter keys are
             // likewise deferred until a call site supplies the concrete key spelling.
         } else if matching.is_empty() {
-            diagnostics.push(Diagnostic {
-                code: DiagnosticCode::UnknownKey,
-                severity: DiagnosticCode::UnknownKey.severity(),
-                range: property.key_range,
-                message: format!(
+            diagnostics.push(Diagnostic::new(
+                DiagnosticCode::UnknownKey,
+                DiagnosticCode::UnknownKey.severity(),
+                property.key_range,
+                format!(
                     "unexpected key `{}` in rule context `{context}`",
                     property.key
                 ),
-            });
+            ));
         } else {
             let scoped_matching = matching
                 .iter()
@@ -505,20 +546,21 @@ pub(crate) fn validate_semantic_container(
                 .copied()
                 .collect::<Vec<_>>();
             if scoped_matching.is_empty() {
-                diagnostics.push(Diagnostic {
-                    code: DiagnosticCode::WrongScope,
-                    severity: semantic_rule_severity(
+                diagnostics.push(semantic_diagnostic(
+                    DiagnosticCode::RuleWrongScope,
+                    semantic_rule_severity(
                         matching.iter().copied(),
-                        DiagnosticCode::WrongScope,
+                        DiagnosticCode::RuleWrongScope,
                     ),
-                    range: property.key_range,
-                    message: format!(
+                    property.key_range,
+                    format!(
                         "`{}` is not available in game scope `{}` ({})",
                         property.key,
                         scope.current,
                         semantic_rule_provenance(matching[0])
                     ),
-                });
+                    matching[0],
+                ));
             }
             let applicable = if scoped_matching.is_empty() {
                 &matching
@@ -539,22 +581,78 @@ pub(crate) fn validate_semantic_container(
                     || (parameterized_scalar && semantic_property_structure_matches(rule, property))
             });
             if !valid {
-                diagnostics.push(Diagnostic {
-                    code: DiagnosticCode::InvalidValue,
-                    severity: semantic_rule_severity(
-                        applicable.iter().copied(),
-                        DiagnosticCode::InvalidValue,
+                let scope_value = property.scalar.as_ref().and_then(|(value, _)| {
+                    applicable
+                        .iter()
+                        .map(|rule| semantic_scope_value_match(snapshot, rule, value, scope))
+                        .find(|result| !matches!(result, ScopeValueMatch::NotScopeRule))
+                });
+                let diagnostic_code = match scope_value.as_ref() {
+                    Some(ScopeValueMatch::Unknown)
+                        if property.key.eq_ignore_ascii_case("scope") =>
+                    {
+                        DiagnosticCode::InvalidScopeCommand
+                    }
+                    Some(ScopeValueMatch::Unknown) => DiagnosticCode::InvalidTarget,
+                    Some(ScopeValueMatch::Known {
+                        compatible: false, ..
+                    }) => DiagnosticCode::TargetWrongScope,
+                    _ => DiagnosticCode::InvalidValue,
+                };
+                let range = property
+                    .scalar
+                    .as_ref()
+                    .map_or(property.key_range, |(_, range)| *range);
+                let message = match scope_value.as_ref() {
+                    Some(ScopeValueMatch::Unknown)
+                        if property.key.eq_ignore_ascii_case("scope") =>
+                    {
+                        format!(
+                            "invalid scope command target `{}` ({})",
+                            property.scalar.as_ref().map_or("", |(value, _)| value),
+                            semantic_rule_provenance(applicable[0])
+                        )
+                    }
+                    Some(ScopeValueMatch::Unknown) => format!(
+                        "invalid target `{}`: scope expression is not recognised ({})",
+                        property.scalar.as_ref().map_or("", |(value, _)| value),
+                        semantic_rule_provenance(applicable[0])
                     ),
-                    range: property
-                        .scalar
-                        .as_ref()
-                        .map_or(property.key_range, |(_, range)| *range),
-                    message: format!(
+                    Some(ScopeValueMatch::Known {
+                        actual, expected, ..
+                    }) => format!(
+                        "target `{}` resolves to scope `{actual}`, expected {} ({})",
+                        property.scalar.as_ref().map_or("", |(value, _)| value),
+                        expected.as_deref().unwrap_or("any scope"),
+                        semantic_rule_provenance(applicable[0])
+                    ),
+                    _ => format!(
                         "value of `{}` does not match the semantic rule ({})",
                         property.key,
                         semantic_rule_provenance(applicable[0])
                     ),
+                };
+                let certainty = match diagnostic_code {
+                    DiagnosticCode::UnknownScope
+                    | DiagnosticCode::InvalidTarget
+                    | DiagnosticCode::InvalidScopeCommand => DiagnosticCertainty::Certain,
+                    DiagnosticCode::TargetWrongScope => DiagnosticCertainty::Contextual,
+                    _ => DiagnosticCertainty::Certain,
+                };
+                let mut diagnostic = Diagnostic::new(
+                    diagnostic_code,
+                    semantic_rule_severity(applicable.iter().copied(), diagnostic_code),
+                    range,
+                    message,
+                )
+                .with_certainty(certainty);
+                diagnostic.provenance = Some(DiagnosticProvenance {
+                    rule_id: Some(applicable[0].id.clone()),
+                    context: Some(applicable[0].context.clone()),
+                    source_file: Some(applicable[0].source_file.clone()),
+                    source_line: Some(applicable[0].line),
                 });
+                diagnostics.push(diagnostic);
             }
             let parameterized_invocation = hir.is_some_and(|hir| {
                 owner_local_parameter_in_range(
@@ -610,18 +708,19 @@ pub(crate) fn validate_semantic_container(
             if let Some(max_occurs) = max_occurs
                 && *count > max_occurs
             {
-                diagnostics.push(Diagnostic {
-                    code: DiagnosticCode::Cardinality,
-                    severity: 2,
-                    range: property.key_range,
-                    message: format!(
+                diagnostics.push(semantic_diagnostic(
+                    DiagnosticCode::Cardinality,
+                    Severity::Warning,
+                    property.key_range,
+                    format!(
                         "`{}` occurs {} times, but rule cardinality allows at most {} ({})",
                         property.key,
                         count,
                         max_occurs,
                         semantic_rule_provenance(applicable[0])
                     ),
-                });
+                    applicable[0],
+                ));
             }
         }
         let cached_child_fact = cached_scope_fact_for_property(
@@ -837,17 +936,15 @@ pub(crate) fn validate_semantic_container(
             )
         });
         if matching.is_empty() && !parameterized_value {
-            diagnostics.push(Diagnostic {
-                code: DiagnosticCode::InvalidValue,
-                severity: semantic_rule_severity(
-                    rules.iter().copied(),
-                    DiagnosticCode::InvalidValue,
-                ),
-                range: *value_range,
-                message: format!(
-                    "bare value `{value}` does not match the semantic rule value clause"
-                ),
-            });
+            let code = semantic_bare_value_code(rules.iter().copied(), value);
+            let severity = semantic_bare_value_severity(rules.iter().copied(), value);
+            let message =
+                format!("bare value `{value}` does not match the semantic rule value clause");
+            let diagnostic = rules.first().map_or_else(
+                || Diagnostic::new(code, severity, *value_range, message.clone()),
+                |rule| semantic_diagnostic(code, severity, *value_range, message.clone(), rule),
+            );
+            diagnostics.push(diagnostic);
         }
     }
     let empty_range = properties.first().map_or_else(
@@ -889,29 +986,31 @@ pub(crate) fn validate_semantic_container(
                 if let Some(min_occurs) = semantic_min_occurs(rule)
                     && count < min_occurs
                 {
-                    diagnostics.push(Diagnostic {
-                    code: DiagnosticCode::Cardinality,
-                    severity: semantic_min_cardinality_severity(rule),
-                    range: empty_range,
-                    message: format!(
+                    diagnostics.push(semantic_diagnostic(
+                    DiagnosticCode::Cardinality,
+                    semantic_min_cardinality_severity(rule),
+                    empty_range,
+                    format!(
                         "semantic rule value clause requires at least {min_occurs} value(s), but `{}` occurs {count} times ({})",
                         semantic_value_matcher_label(&rule.value),
                         semantic_rule_provenance(rule)
                     ),
-                });
+                    rule,
+                ));
                 }
                 if let Some(max_occurs) = rule.max_occurs
                     && count > max_occurs
                 {
-                    diagnostics.push(Diagnostic {
-                    code: DiagnosticCode::Cardinality,
-                    severity: 2,
-                    range: bare_values.first().map_or(empty_range, |(_, range)| *range),
-                    message: format!(
+                    diagnostics.push(semantic_diagnostic(
+                    DiagnosticCode::Cardinality,
+                    Severity::Warning,
+                    bare_values.first().map_or(empty_range, |(_, range)| *range),
+                    format!(
                         "semantic rule value clause allows at most {max_occurs} value(s), but found {count} ({})",
                         semantic_rule_provenance(rule)
                     ),
-                });
+                    rule,
+                ));
                 }
                 continue;
             }
@@ -925,16 +1024,17 @@ pub(crate) fn validate_semantic_container(
                 .count();
             let count = u32::try_from(count).unwrap_or(u32::MAX);
             if count < min_occurs {
-                diagnostics.push(Diagnostic {
-                code: DiagnosticCode::Cardinality,
-                severity: semantic_min_cardinality_severity(rule),
-                range: empty_range,
-                message: format!(
+                diagnostics.push(semantic_diagnostic(
+                DiagnosticCode::Cardinality,
+                semantic_min_cardinality_severity(rule),
+                empty_range,
+                format!(
                     "semantic rule requires at least {min_occurs} occurrence(s), but `{}` occurs {count} times ({})",
                     semantic_matcher_label(&rule.key),
                     semantic_rule_provenance(rule)
                 ),
-            });
+                rule,
+            ));
             }
         }
     }
@@ -978,21 +1078,21 @@ fn validate_quoted_script(
     let script = match quoted_scripts.parse(origin.source(), depth)? {
         QuotedScriptParse::Parsed(script) => script,
         QuotedScriptParse::Opaque => {
-            diagnostics.push(Diagnostic {
-                code: DiagnosticCode::InvalidValue,
-                severity: DiagnosticCode::InvalidValue.severity(),
+            diagnostics.push(Diagnostic::new(
+                DiagnosticCode::InvalidValue,
+                DiagnosticCode::InvalidValue.severity(),
                 range,
-                message: "quoted Script payload could not be decoded".to_owned(),
-            });
+                "quoted Script payload could not be decoded".to_owned(),
+            ));
             return Ok(());
         }
         QuotedScriptParse::Limited(limit) => {
-            diagnostics.push(Diagnostic {
-                code: DiagnosticCode::InvalidValue,
-                severity: DiagnosticCode::InvalidValue.severity(),
+            diagnostics.push(Diagnostic::new(
+                DiagnosticCode::InvalidValue,
+                DiagnosticCode::InvalidValue.severity(),
                 range,
-                message: limit.message().to_owned(),
-            });
+                limit.message().to_owned(),
+            ));
             return Ok(());
         }
     };
@@ -1001,12 +1101,12 @@ fn validate_quoted_script(
         let Some(range) = origin.map_decoded_range(&script, error.range) else {
             continue;
         };
-        diagnostics.push(Diagnostic {
-            code: DiagnosticCode::Syntax,
-            severity: DiagnosticCode::Syntax.severity(),
+        diagnostics.push(Diagnostic::new(
+            DiagnosticCode::Syntax,
+            DiagnosticCode::Syntax.severity(),
             range,
-            message: error.message.clone(),
-        });
+            error.message.clone(),
+        ));
     }
     let (properties, bare_values) = quoted_script_container(&script, origin);
     validate_semantic_container(
@@ -1073,12 +1173,12 @@ fn validate_scripted_macro_expansion(
     match expansion.enter(&resolved) {
         Ok(()) => {}
         Err(ExpansionEnterFailure::Cycle(chain)) => {
-            diagnostics.push(Diagnostic {
-                code: DiagnosticCode::MacroExpansionCycle,
-                severity: DiagnosticCode::MacroExpansionCycle.severity(),
-                range: property.key_range,
-                message: format!("scripted macro expansion cycle: {}", chain.join(" -> ")),
-            });
+            diagnostics.push(Diagnostic::new(
+                DiagnosticCode::MacroExpansionCycle,
+                DiagnosticCode::MacroExpansionCycle.severity(),
+                property.key_range,
+                format!("scripted macro expansion cycle: {}", chain.join(" -> ")),
+            ));
             return Ok(());
         }
         Err(ExpansionEnterFailure::Limit(limit)) => {
@@ -1097,25 +1197,25 @@ fn validate_scripted_macro_expansion(
     ) {
         Ok(Ok(expanded)) => expanded,
         Ok(Err(ExpansionFailure::MissingParameter(name))) => {
-            diagnostics.push(Diagnostic {
-                code: DiagnosticCode::Cardinality,
-                severity: DiagnosticCode::Cardinality.severity(),
-                range: property.key_range,
-                message: format!(
+            diagnostics.push(Diagnostic::new(
+                DiagnosticCode::Cardinality,
+                DiagnosticCode::Cardinality.severity(),
+                property.key_range,
+                format!(
                     "macro `{}` expansion requires parameter `{name}` in the active branch",
                     resolved.summary.name
                 ),
-            });
+            ));
             expansion.leave();
             return Ok(());
         }
         Ok(Err(ExpansionFailure::InvalidArgument { name, range })) => {
-            diagnostics.push(Diagnostic {
-                code: DiagnosticCode::InvalidValue,
-                severity: DiagnosticCode::InvalidValue.severity(),
+            diagnostics.push(Diagnostic::new(
+                DiagnosticCode::InvalidValue,
+                DiagnosticCode::InvalidValue.severity(),
                 range,
-                message: format!("macro parameter `{name}` must be a scalar token for expansion"),
-            });
+                format!("macro parameter `{name}` must be a scalar token for expansion"),
+            ));
             expansion.leave();
             return Ok(());
         }
@@ -1158,12 +1258,15 @@ fn validate_scripted_macro_expansion(
     if expanded_diagnostic_count > MAX_EXPANDED_DIAGNOSTICS_PER_INVOCATION {
         let omitted = expanded_diagnostic_count - MAX_EXPANDED_DIAGNOSTICS_PER_INVOCATION;
         diagnostics.truncate(first_expanded_diagnostic + MAX_EXPANDED_DIAGNOSTICS_PER_INVOCATION);
-        diagnostics.push(Diagnostic {
-            code: DiagnosticCode::MacroExpansionLimit,
-            severity: DiagnosticCode::MacroExpansionLimit.severity(),
-            range: property.key_range,
-            message: format!("scripted macro expansion omitted {omitted} additional diagnostic(s)"),
-        });
+        diagnostics.push(
+            Diagnostic::new(
+                DiagnosticCode::AnalysisIncomplete,
+                DiagnosticCode::AnalysisIncomplete.severity(),
+                property.key_range,
+                format!("scripted macro expansion omitted {omitted} additional diagnostic(s)"),
+            )
+            .with_certainty(DiagnosticCertainty::Unresolved),
+        );
     }
     for diagnostic in &mut diagnostics[first_expanded_diagnostic..] {
         diagnostic.message = format!(
@@ -1175,12 +1278,13 @@ fn validate_scripted_macro_expansion(
 }
 
 fn macro_expansion_limit(range: TextRange, limit: &'static str) -> Diagnostic {
-    Diagnostic {
-        code: DiagnosticCode::MacroExpansionLimit,
-        severity: DiagnosticCode::MacroExpansionLimit.severity(),
+    Diagnostic::new(
+        DiagnosticCode::AnalysisIncomplete,
+        DiagnosticCode::AnalysisIncomplete.severity(),
         range,
-        message: format!("scripted macro expansion exceeded the {limit} limit"),
-    }
+        format!("scripted macro expansion exceeded the {limit} limit"),
+    )
+    .with_certainty(DiagnosticCertainty::Unresolved)
 }
 
 fn validate_scripted_macro_arguments(
@@ -1212,15 +1316,15 @@ fn validate_scripted_macro_arguments(
         let count = counts.entry(argument.key.to_ascii_lowercase()).or_default();
         *count = count.saturating_add(1);
         if *count > 1 {
-            diagnostics.push(Diagnostic {
-                code: DiagnosticCode::Cardinality,
-                severity: 2,
-                range: argument.key_range,
-                message: format!(
+            diagnostics.push(Diagnostic::new(
+                DiagnosticCode::Cardinality,
+                Severity::Warning,
+                argument.key_range,
+                format!(
                     "macro parameter `{}` is provided more than once",
                     argument.key
                 ),
-            });
+            ));
         }
     }
     let missing = summary
@@ -1236,16 +1340,16 @@ fn validate_scripted_macro_arguments(
         .map(|parameter| format!("`{}`", parameter.name))
         .collect::<Vec<_>>();
     if !missing.is_empty() {
-        diagnostics.push(Diagnostic {
-            code: DiagnosticCode::Cardinality,
-            severity: DiagnosticCode::Cardinality.severity(),
-            range: property.key_range,
-            message: format!(
+        diagnostics.push(Diagnostic::new(
+            DiagnosticCode::Cardinality,
+            DiagnosticCode::Cardinality.severity(),
+            property.key_range,
+            format!(
                 "macro `{}` is missing required parameter(s): {}",
                 summary.name,
                 missing.join(", ")
             ),
-        });
+        ));
         return false;
     }
     true
@@ -1348,10 +1452,10 @@ pub(crate) fn syntax_diagnostics(input: &ParsedInput) -> Vec<Diagnostic> {
 }
 
 pub(crate) fn diagnostic_from_syntax(error: &SyntaxError) -> Diagnostic {
-    Diagnostic {
-        code: DiagnosticCode::Syntax,
-        severity: DiagnosticCode::Syntax.severity(),
-        range: error.range,
-        message: error.message.clone(),
-    }
+    Diagnostic::new(
+        DiagnosticCode::Syntax,
+        DiagnosticCode::Syntax.severity(),
+        error.range,
+        error.message.clone(),
+    )
 }
