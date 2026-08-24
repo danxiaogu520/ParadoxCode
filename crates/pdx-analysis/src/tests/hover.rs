@@ -511,6 +511,201 @@ fn custom_tooltip_hover_shows_localisation_preview_inside_mission_effects() {
 }
 
 #[test]
+fn typed_symbol_hover_shows_definition_localisation_preview() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        std::path::PathBuf::from("/tmp"),
+    )]));
+    let localisation = DocumentId::new("file:///tmp/localisation/test.yml");
+    host.open_document(
+        localisation,
+        1,
+        "l_english:\nevent_title:0 \"Event Title\"\n".to_owned(),
+        Some(std::path::PathBuf::from("/tmp/localisation/test.yml")),
+    )
+    .expect("open localisation");
+    let event = DocumentId::new("file:///tmp/events/test.txt");
+    let text = "country_event = { id = test.1 title = event_title }\n";
+    host.open_document(
+        event.clone(),
+        1,
+        text.to_owned(),
+        Some(std::path::PathBuf::from("/tmp/events/test.txt")),
+    )
+    .expect("open event");
+    let use_id = DocumentId::new("file:///tmp/events/use.txt");
+    let use_text = "event = test.1\n";
+    host.open_document(
+        use_id.clone(),
+        1,
+        use_text.to_owned(),
+        Some(std::path::PathBuf::from("/tmp/events/use.txt")),
+    )
+    .expect("open event use");
+    let position =
+        u32::try_from(use_text.find("test.1").expect("event reference") + 1).expect("position");
+    let result = hover(&host.snapshot(), &use_id, position).expect("event hover");
+    assert!(
+        result
+            .contents
+            .contains("Localisation (l_english): \"Event Title\""),
+        "typed symbol hover should include its definition's localisation: {}",
+        result.contents
+    );
+}
+
+#[test]
+fn optional_type_localisation_hover_shows_existing_preview() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        std::path::PathBuf::from("/tmp"),
+    )]));
+    host.open_document(
+        DocumentId::new("file:///tmp/localisation/test.yml"),
+        1,
+        "l_english:\nregion_one:0 \"Region One\"\n".to_owned(),
+        Some(std::path::PathBuf::from("/tmp/localisation/test.yml")),
+    )
+    .expect("open localisation");
+    let definition = DocumentId::new("file:///tmp/common/colonial_regions/test.txt");
+    let source = "region_one = { }\n";
+    host.open_document(
+        definition.clone(),
+        1,
+        source.to_owned(),
+        Some(std::path::PathBuf::from(
+            "/tmp/common/colonial_regions/test.txt",
+        )),
+    )
+    .expect("open colonial region");
+    let position =
+        u32::try_from(source.find("region_one").expect("region name") + 1).expect("position");
+    let result = hover(&host.snapshot(), &definition, position).expect("region hover");
+    assert!(
+        result
+            .contents
+            .contains("Localisation (l_english): \"Region One\""),
+        "optional type mappings should contribute existing localisation previews: {}",
+        result.contents
+    );
+}
+
+#[test]
+fn same_name_type_localisation_hover_shows_existing_preview() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        std::path::PathBuf::from("/tmp"),
+    )]));
+    host.open_document(
+        DocumentId::new("file:///tmp/localisation/test.yml"),
+        1,
+        "l_english:\neurope:0 \"Europe\"\n".to_owned(),
+        Some(std::path::PathBuf::from("/tmp/localisation/test.yml")),
+    )
+    .expect("open localisation");
+    let definition = DocumentId::new("file:///tmp/map/continent.txt");
+    let source = "europe = { }\n";
+    host.open_document(
+        definition.clone(),
+        1,
+        source.to_owned(),
+        Some(std::path::PathBuf::from("/tmp/map/continent.txt")),
+    )
+    .expect("open continent");
+    let position =
+        u32::try_from(source.find("europe").expect("continent name") + 1).expect("position");
+    let result = hover(&host.snapshot(), &definition, position).expect("continent hover");
+    assert!(
+        result
+            .contents
+            .contains("Localisation (l_english): \"Europe\""),
+        "same-name type localisations should contribute existing previews: {}",
+        result.contents
+    );
+}
+
+#[test]
+fn cache_only_optional_type_hover_shows_existing_preview() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-optional-hover-{nonce}"));
+    let vanilla = root.join("vanilla");
+    let current = root.join("current");
+    std::fs::create_dir_all(vanilla.join("common/colonial_regions")).expect("Vanilla directory");
+    std::fs::create_dir_all(vanilla.join("localisation")).expect("Vanilla localisation directory");
+    std::fs::create_dir_all(current.join("events")).expect("Current directory");
+    std::fs::write(
+        vanilla.join("common/colonial_regions/test.txt"),
+        "region_one = { }\n",
+    )
+    .expect("Vanilla colonial region");
+    std::fs::write(
+        vanilla.join("localisation/test_l_english.yml"),
+        "l_english:\nregion_one:0 \"Region One\"\n",
+    )
+    .expect("Vanilla localisation");
+
+    let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    let mut profile = pdx_game::eu4::profile();
+    profile.references.insert(
+        0,
+        pdx_rules::ProfileReferenceRule {
+            key: ProfileTextMatcher::insensitive(ProfileMatchMode::Exact, "custom_region"),
+            kind: "colonial_region".to_owned(),
+            excluded_keys: Vec::new(),
+            excluded_paths: Vec::new(),
+        },
+    );
+    let mut vanilla_host = AnalysisHost::with_profile(rules.clone(), profile.clone());
+    vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        vanilla.clone(),
+    )]));
+    vanilla_host
+        .refresh_source_roots()
+        .expect("scan Vanilla for cache");
+    let cache = IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build Vanilla cache");
+
+    let mut host = AnalysisHost::with_profile(rules, profile);
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        current.clone(),
+    )]));
+    host.install_index_cache(cache)
+        .expect("install Vanilla cache");
+    let document = DocumentId::new("file:///current/events/use.txt");
+    let text = "trigger = { custom_region = region_one }\n";
+    host.open_document(
+        document.clone(),
+        1,
+        text.to_owned(),
+        Some(current.join("events/use.txt")),
+    )
+    .expect("open use");
+    let position =
+        u32::try_from(text.find("region_one").expect("region reference") + 1).expect("position");
+    let result = hover(&host.snapshot(), &document, position).expect("cached hover");
+    assert!(
+        result
+            .contents
+            .contains("Localisation (l_english): \"Region One\""),
+        "cache-only optional mappings should contribute existing previews: {}",
+        result.contents
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn vanilla_cache_localisation_hover_shows_derived_text_without_source_state() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

@@ -89,6 +89,7 @@ fn lower_shared_impl(
         syntax.root().range(),
         logical_path,
         rules,
+        false,
     ));
     let mut seen_references = std::collections::BTreeSet::new();
     references.retain(|reference| {
@@ -128,6 +129,27 @@ fn lower_shared_impl(
         parameter_references,
         macro_templates,
     }
+}
+
+/// Returns all type-instance localisation mappings for hover/navigation queries.
+///
+/// Required mappings are part of the normal HIR reference set because they also drive missing
+/// localisation diagnostics. Optional mappings are intentionally kept out of that set: a missing
+/// optional key is valid game data. Hover can still ask for the complete mapping set and resolve
+/// only keys that actually exist in the workspace.
+#[must_use]
+pub fn derived_localisation_references_for_hover(
+    hir: &HirFile,
+    logical_path: &LogicalPath,
+    rules: &RuleSet,
+) -> Vec<HirReference> {
+    semantics::derived_localisation_references(
+        &hir.properties,
+        hir.syntax.root().range(),
+        Some(logical_path),
+        rules,
+        true,
+    )
 }
 
 #[cfg(test)]

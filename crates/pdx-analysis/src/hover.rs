@@ -662,8 +662,8 @@ pub(crate) fn hover_for_symbol(
                         .join("\n")
                 ));
             }
-            if kind.eq_ignore_ascii_case("localisation")
-                && let Some((language, value)) = localisation_preview(snapshot, definition)
+            if let Some((language, value)) =
+                symbol_localisation_preview(snapshot, kind, name, definition, cancellation)?
             {
                 has_localisation_preview = true;
                 sections.push(format!(
@@ -686,6 +686,22 @@ pub(crate) fn hover_for_symbol(
                         if value.is_empty() {
                             continue;
                         }
+                        has_localisation_preview = true;
+                        sections.push(format!(
+                            "#### Localisation preview\n\n- Localisation{}: \"{}\"",
+                            language
+                                .as_deref()
+                                .map_or_else(String::new, |language| format!(" ({language})")),
+                            value
+                        ));
+                        break;
+                    }
+                }
+            } else {
+                for candidate in &candidates {
+                    if let Some((language, value)) =
+                        symbol_localisation_preview(snapshot, kind, name, candidate, cancellation)?
+                    {
                         has_localisation_preview = true;
                         sections.push(format!(
                             "#### Localisation preview\n\n- Localisation{}: \"{}\"",
@@ -810,6 +826,148 @@ pub(crate) fn localisation_preview(
         }
     }
     Some((language, value))
+}
+
+/// Finds the first non-empty localisation attached to a non-localisation symbol definition.
+///
+/// Type-instance localisation mappings are indexed as ordinary localisation references at the
+/// instance's source range.  Looking those references up from the resolved definition lets a
+/// hover over `event = foo.1` (or another typed symbol use) show the same preview as hovering its
+/// generated localisation key. Type descriptors may also use the implicit same-name convention
+/// without a localisation-binding row. Cache-only roots retain required references; optional
+/// templates are conservatively tried from the rule data and only shown when an actual key
+/// resolves.
+fn symbol_localisation_preview(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    symbol_name: &str,
+    definition: &ResolutionDefinition,
+    cancellation: &CancellationToken,
+) -> Result<Option<(Option<String>, String)>, Cancelled> {
+    if kind.eq_ignore_ascii_case("localisation") {
+        return Ok(localisation_preview(snapshot, definition));
+    }
+    let semantic = &snapshot.rules().model().semantic;
+    let has_binding = semantic
+        .localisation_bindings
+        .iter()
+        .any(|binding| binding.type_name.eq_ignore_ascii_case(kind));
+    let is_type_definition = semantic
+        .type_descriptors
+        .keys()
+        .any(|type_name| type_name.eq_ignore_ascii_case(kind));
+    if !has_binding && !is_type_definition {
+        return Ok(None);
+    }
+
+    let full_range = definition.location.range;
+    let selection_range = definition.selection_range;
+    let mut references = Vec::<(String, TextRange)>::new();
+    let mut cache_only = false;
+    if let Some(document) = definition.location.document.as_ref() {
+        if let Some(input) = input_for_document(snapshot, document) {
+            references.extend(localisation_references_for_hover(
+                snapshot,
+                &input,
+                cancellation,
+            )?);
+        }
+    } else if let Some(file) = definition.location.file {
+        if let Some(input) = input_for_source_file(snapshot, file) {
+            references.extend(localisation_references_for_hover(
+                snapshot,
+                &input,
+                cancellation,
+            )?);
+        } else {
+            cache_only = true;
+            references.extend(
+                snapshot
+                    .index()
+                    .references(file)
+                    .iter()
+                    .filter(|reference| reference.kind.eq_ignore_ascii_case("localisation"))
+                    .map(|reference| (reference.name.clone(), reference.range)),
+            );
+        }
+    }
+    references.retain(|(_, range)| text_range_within(*range, full_range));
+    references.sort_by_key(|(_, range)| {
+        (
+            if *range == selection_range { 0 } else { 1 },
+            range.start(),
+            range.end(),
+        )
+    });
+    references.dedup();
+    for (name, _) in references {
+        cancellation.checkpoint()?;
+        for candidate in symbol_candidates_for_hover(snapshot, "localisation", &name, cancellation)?
+        {
+            if let Some(preview) = localisation_preview(snapshot, &candidate) {
+                return Ok(Some(preview));
+            }
+        }
+    }
+    if is_type_definition {
+        cancellation.checkpoint()?;
+        for candidate in
+            symbol_candidates_for_hover(snapshot, "localisation", symbol_name, cancellation)?
+        {
+            if let Some(preview) = localisation_preview(snapshot, &candidate) {
+                return Ok(Some(preview));
+            }
+        }
+    }
+    if cache_only && !symbol_name.contains('.') {
+        for binding in semantic
+            .localisation_bindings
+            .iter()
+            .filter(|binding| binding.type_name.eq_ignore_ascii_case(kind))
+        {
+            let Some(template) = binding.template.as_deref() else {
+                continue;
+            };
+            let name = template.replace('$', symbol_name);
+            cancellation.checkpoint()?;
+            for candidate in
+                symbol_candidates_for_hover(snapshot, "localisation", &name, cancellation)?
+            {
+                if let Some(preview) = localisation_preview(snapshot, &candidate) {
+                    return Ok(Some(preview));
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn localisation_references_for_hover(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    cancellation: &CancellationToken,
+) -> Result<Vec<(String, TextRange)>, Cancelled> {
+    let derived = input
+        .hir
+        .as_deref()
+        .zip(input.path.as_ref())
+        .map(|(hir, path)| {
+            pdx_engine::hir::derived_localisation_references_for_hover(hir, path, snapshot.rules())
+        })
+        .unwrap_or_default();
+    let semantic = semantic_data_with_cancellation(snapshot, input, cancellation)?;
+    let mut references = semantic
+        .references
+        .into_iter()
+        .filter(|reference| reference.kind.eq_ignore_ascii_case("localisation"))
+        .map(|reference| (reference.name, reference.range))
+        .collect::<Vec<_>>();
+    references.extend(
+        derived
+            .into_iter()
+            .map(|reference| (reference.name, reference.range)),
+    );
+    Ok(references)
 }
 
 pub(crate) fn find_cst_node(node: &CstNode, kind: CstKind, range: TextRange) -> Option<&CstNode> {

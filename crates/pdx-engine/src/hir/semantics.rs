@@ -930,6 +930,7 @@ pub(super) fn derived_localisation_references(
     root_range: TextRange,
     logical_path: Option<&LogicalPath>,
     rules: &RuleSet,
+    include_optional: bool,
 ) -> Vec<HirReference> {
     if !logical_path.is_some_and(|path| path.as_str().contains('/')) {
         return Vec::new();
@@ -951,7 +952,11 @@ pub(super) fn derived_localisation_references(
                 .localisation_bindings
                 .iter()
                 .filter(|binding| binding.type_name.eq_ignore_ascii_case(&descriptor.name))
-                .filter(|binding| binding.required)
+                // Required generated templates participate in diagnostics. Explicit fields are
+                // already present in source and validated by their normal localisation rule;
+                // hover asks for those associations (and optional generated templates) through
+                // the `include_optional` path, but they stay out of diagnostics.
+                .filter(|binding| include_optional || binding.required)
                 .filter(|binding| {
                     localisation_subtype_applies(
                         properties,
@@ -962,13 +967,45 @@ pub(super) fn derived_localisation_references(
                     )
                 })
             {
-                let Some(template) = binding.template.as_deref() else {
+                if let Some(template) = binding.template.as_deref() {
+                    references.push(HirReference {
+                        kind: "localisation".to_owned(),
+                        name: template.replace('$', &name),
+                        range,
+                        origin: HirReferenceOrigin::DerivedLocalisation,
+                    });
+                    continue;
+                }
+                // An explicit field mapping (for example an event's `title`) does not
+                // have a generated key.  It still belongs to the type instance, so retain
+                // the field value as a localisation reference at its own source range.  The
+                // ordinary semantic/profile lowering already validates this value; this
+                // derived entry only associates it with the instance for navigation and hover.
+                let Some(field) = binding.explicit_field.as_deref() else {
                     continue;
                 };
+                let Some(instance) = properties
+                    .iter()
+                    .find(|property| property.range == instance_range)
+                else {
+                    continue;
+                };
+                let Some(field_property) = nested_property(properties, instance, field) else {
+                    continue;
+                };
+                let Some(field_value) = field_property.scalar.as_ref() else {
+                    continue;
+                };
+                if field_value.quoted
+                    || field_value.value.is_empty()
+                    || field_value.value.contains('$')
+                {
+                    continue;
+                }
                 references.push(HirReference {
                     kind: "localisation".to_owned(),
-                    name: template.replace('$', &name),
-                    range,
+                    name: field_value.value.clone(),
+                    range: field_value.range,
                     origin: HirReferenceOrigin::DerivedLocalisation,
                 });
             }
