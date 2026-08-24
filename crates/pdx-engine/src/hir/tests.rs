@@ -180,6 +180,48 @@ fn required_type_localisation_templates_expand_from_dynamic_members() {
 }
 
 #[test]
+fn explicit_type_localisation_fields_are_associated_with_instances() {
+    let path = LogicalPath::parse("events/test.txt").expect("logical path");
+    let mut model = first_party_rules()
+        .expect("first-party rules")
+        .model()
+        .clone();
+    model.semantic.rules.retain(|rule| {
+        !(rule.context.eq_ignore_ascii_case("root:event")
+            && matches!(&rule.key, KeyMatcher::Exact(key) if key.eq_ignore_ascii_case("title"))
+            && matches!(rule.value, ValueMatcher::Localisation))
+    });
+    let rules = RuleSet::from_model(model);
+    let hir = lower_with_profile(
+        parse(
+            FileFormat::Script,
+            "country_event = { id = event_one title = event_one_title }\n",
+        ),
+        &path,
+        &rules,
+        &GameProfile::empty(rules.game_id()),
+    );
+    let title_range = hir
+        .properties()
+        .iter()
+        .find(|property| property.key == "title")
+        .and_then(|property| property.scalar.as_ref())
+        .map(|scalar| scalar.range)
+        .expect("event title range");
+    let hover_references = super::derived_localisation_references_for_hover(&hir, &path, &rules);
+    assert!(hover_references.iter().any(|reference| {
+        reference.kind == "localisation"
+            && reference.name == "event_one_title"
+            && reference.range == title_range
+    }));
+    assert!(hover_references.iter().any(|reference| {
+        reference.origin == HirReferenceOrigin::DerivedLocalisation
+            && reference.name == "event_one_title"
+            && reference.range == title_range
+    }));
+}
+
+#[test]
 fn subtype_conditions_gate_type_localisation_templates() {
     let path = LogicalPath::parse("common/ideas/subtypes.txt").expect("logical path");
     let hir = lower_with_profile(
