@@ -325,7 +325,7 @@ pub struct Diagnostic {
     pub message: String,
     /// Confidence in the conclusion, independent of severity.
     pub certainty: DiagnosticCertainty,
-    /// Optional rule/source provenance for explainability and clients.
+    /// Optional internal rule/source provenance for explainability.
     pub provenance: Option<DiagnosticProvenance>,
 }
 
