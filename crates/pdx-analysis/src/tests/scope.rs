@@ -261,7 +261,7 @@ fn eu4_replace_scope_links_populate_from_intrinsics() {
     assert!(
         diagnostics(&host.snapshot(), &invalid_id)
             .iter()
-            .any(|item| item.code == DiagnosticCode::InvalidValue)
+            .any(|item| item.code == DiagnosticCode::TargetWrongScope)
     );
     fs::remove_dir_all(root).expect("cleanup");
 }

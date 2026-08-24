@@ -15,6 +15,9 @@ ParadoxCode **与 Paradox Interactive 无任何关联，也未获得其背书**�
 
 - 容错的 Paradox 脚本与 EU4 本地化解析器。语法错误不会阻断分析：解析器始终生成损失感知（loss-aware）语法树，无法识别的结构降级为 `Unknown*` 节点而不会崩溃。
 - 由经过校验的第一方 EU4 规则数据库驱动的语法与语义诊断。
+- 诊断使用稳定的 PascalCase ID（例如 `UnknownKey`、`UnknownBareValue`、`UnknownScope`、
+  `TargetWrongScope`）；严重度在分析层类型化，LSP 元数据提供确定性与规则来源，并在 `data`
+  中保留旧 code 以便客户端迁移。
 - 补全、悬停、跳转定义、查找引用、文档/工作区符号。
 - 冲突感知的重命名（仅限可写的 Mod 源）。
 - 保守的格式化器，拒绝改写不安全或残缺的文件。

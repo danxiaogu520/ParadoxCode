@@ -209,30 +209,45 @@ pub(crate) fn diagnostic_values_for_text(
         .into_iter()
         .take(retained)
         .map(|diagnostic| {
-            LspDiagnostic::new(
+            let severity = match diagnostic.severity.lsp_number() {
+                1 => Some(DiagnosticSeverity::ERROR),
+                2 => Some(DiagnosticSeverity::WARNING),
+                3 => Some(DiagnosticSeverity::INFORMATION),
+                4 => Some(DiagnosticSeverity::HINT),
+                _ => None,
+            };
+            let provenance = diagnostic.provenance.as_ref().map(|provenance| {
+                json!({
+                    "ruleId": provenance.rule_id,
+                    "context": provenance.context,
+                    "sourceFile": provenance.source_file,
+                    "sourceLine": provenance.source_line,
+                })
+            });
+            let mut value = LspDiagnostic::new(
                 range_to_lsp(line_index, text, diagnostic.range),
-                match diagnostic.severity {
-                    1 => Some(DiagnosticSeverity::ERROR),
-                    2 => Some(DiagnosticSeverity::WARNING),
-                    3 => Some(DiagnosticSeverity::INFORMATION),
-                    4 => Some(DiagnosticSeverity::HINT),
-                    _ => None,
-                },
+                severity,
                 Some(NumberOrString::String(diagnostic.code.as_str().to_owned())),
                 Some("pdx-analysis".to_owned()),
                 diagnostic.message,
                 None,
                 None,
-            )
+            );
+            // The new PascalCase code is primary. The legacy spelling and semantic confidence
+            // remain in data so clients can migrate without duplicating diagnostics.
+            value.data = Some(json!({
+                "legacyCode": diagnostic.code.legacy_str(),
+                "certainty": diagnostic.certainty.as_str(),
+                "provenance": provenance,
+            }));
+            value
         })
         .collect::<Vec<_>>();
     if omitted > 0 {
         values.push(LspDiagnostic::new(
             LspRange::default(),
             Some(DiagnosticSeverity::INFORMATION),
-            Some(NumberOrString::String(
-                "pdx-diagnostics-truncated".to_owned(),
-            )),
+            Some(NumberOrString::String("DiagnosticsTruncated".to_owned())),
             Some("pdx-lsp".to_owned()),
             format!("{omitted} additional diagnostics were omitted"),
             None,

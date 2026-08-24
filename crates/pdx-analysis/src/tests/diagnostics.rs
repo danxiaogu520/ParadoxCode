@@ -1,6 +1,112 @@
 #![allow(unused_imports)]
 
 use super::support::*;
+use crate::{Diagnostic, DiagnosticCertainty, DiagnosticProvenance, Severity};
+
+#[test]
+fn diagnostic_ids_are_pascal_case_and_metadata_is_structured() {
+    assert_eq!(DiagnosticCode::UnknownKey.as_str(), "UnknownKey");
+    assert_eq!(
+        DiagnosticCode::UnknownBareValue.as_str(),
+        "UnknownBareValue"
+    );
+    assert_eq!(
+        DiagnosticCode::TargetWrongScope.as_str(),
+        "TargetWrongScope"
+    );
+    assert_eq!(DiagnosticCode::UnknownKey.legacy_str(), "pdx-unknown-key");
+
+    let diagnostic = Diagnostic::new(
+        DiagnosticCode::TargetWrongScope,
+        Severity::Error,
+        TextRange::new(2, 5).expect("range"),
+        "target has the wrong scope".to_owned(),
+    )
+    .with_certainty(DiagnosticCertainty::Contextual)
+    .with_provenance(DiagnosticProvenance {
+        rule_id: Some("fixture:target".to_owned()),
+        context: Some("effect".to_owned()),
+        source_file: Some("fixture.json".to_owned()),
+        source_line: Some(7),
+    });
+    assert_eq!(diagnostic.severity, Severity::Error);
+    assert_eq!(diagnostic.certainty, DiagnosticCertainty::Contextual);
+    assert_eq!(diagnostic.provenance.as_ref().unwrap().source_line, Some(7));
+}
+
+#[test]
+fn scope_target_failures_use_distinct_categories() {
+    let mut model = pdx_game::eu4::bootstrap_model();
+    model.semantic.rules.extend([
+        SemanticRule {
+            id: "fixture:trigger:target".to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("target".to_owned()),
+            operator: None,
+            value: ValueMatcher::Scope(Some("country".to_owned())),
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 10,
+        },
+        SemanticRule {
+            id: "fixture:trigger:scope-command".to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("scope".to_owned()),
+            operator: None,
+            value: ValueMatcher::Scope(Some("country".to_owned())),
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 11,
+        },
+    ]);
+    let mut host = eu4_host(RuleSet::from_model(model));
+    let id = DocumentId::new("file:///tmp/common/events/scope-targets.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "trigger = { target = NOWHERE scope = NOWHERE target = capital }\n".to_owned(),
+        None,
+    )
+    .expect("open scope target fixture");
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == DiagnosticCode::InvalidTarget && diagnostic.message.contains("NOWHERE")
+    }));
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == DiagnosticCode::InvalidScopeCommand
+            && diagnostic.message.contains("NOWHERE")
+    }));
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == DiagnosticCode::TargetWrongScope
+            && diagnostic.message.contains("capital")
+    }));
+}
 
 #[test]
 fn quoted_script_diagnostics_reuse_semantic_validation_with_exact_ranges() {
@@ -1872,6 +1978,55 @@ fn severity_review_unknown_keys_are_errors_and_known_keys_are_accepted() {
         unknown.severity, 1,
         "unknown keys are errors: {technology_results:?}"
     );
+}
+
+#[test]
+fn severity_review_fallback_unknown_keys_and_unknown_bare_values_are_errors() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+
+    // `natives_test` is selected through the path-only type fallback. That uncertainty must not
+    // turn a key the game ignores into a warning.
+    let unknown_key = DocumentId::new("file:///tmp/common/natives/unknown-key.txt");
+    host.open_document(
+        unknown_key.clone(),
+        1,
+        "natives_test = { definitely_wrong = yes }\n".to_owned(),
+        Some(std::path::PathBuf::from(
+            "/tmp/common/natives/unknown-key.txt",
+        )),
+    )
+    .expect("open fallback-context key fixture");
+    let key_diagnostics = diagnostics(&host.snapshot(), &unknown_key);
+    let unknown = key_diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.code == DiagnosticCode::UnknownKey
+                && diagnostic.message.contains("definitely_wrong")
+        })
+        .unwrap_or_else(|| panic!("unknown key must be reported: {key_diagnostics:?}"));
+    assert_eq!(unknown.severity, 1, "unknown keys are errors");
+
+    // A numeric range overflow is an intentional first-party warning, but a non-numeric value
+    // that cannot be understood by the same leaf-value clause is an error.
+    let unknown_bare = DocumentId::new("file:///tmp/common/natives/unknown-bare.txt");
+    host.open_document(
+        unknown_bare.clone(),
+        1,
+        "natives_test = { color = { not_a_color_component } }\n".to_owned(),
+        Some(std::path::PathBuf::from(
+            "/tmp/common/natives/unknown-bare.txt",
+        )),
+    )
+    .expect("open unknown bare value fixture");
+    let bare_diagnostics = diagnostics(&host.snapshot(), &unknown_bare);
+    let bare = bare_diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.code == DiagnosticCode::UnknownBareValue
+                && diagnostic.message.contains("not_a_color_component")
+        })
+        .unwrap_or_else(|| panic!("unknown bare value must be reported: {bare_diagnostics:?}"));
+    assert_eq!(bare.severity, 1, "unknown bare values are errors");
 }
 
 #[test]

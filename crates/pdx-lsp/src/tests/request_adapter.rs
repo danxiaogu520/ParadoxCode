@@ -67,7 +67,7 @@ fn text_diagnostics_analyzes_caller_supplied_files_without_opening_overlays() {
     assert!(
         files[0]["diagnostics"]
             .as_array()
-            .is_some_and(|items| items.iter().any(|item| item["code"] == "pdx-unknown-scope"))
+            .is_some_and(|items| items.iter().any(|item| item["code"] == "UnknownScope"))
     );
     assert_eq!(files[1]["path"], "events/valid.txt");
     assert!(files[1]["diagnostics"].is_array());
@@ -212,7 +212,7 @@ fn workspace_diagnostics_batches_indexed_disk_files_without_opening_overlays() {
     assert!(
         first["result"]["items"][0]["diagnostics"]
             .as_array()
-            .is_some_and(|items| items.iter().any(|item| item["code"] == "pdx-unknown-scope"))
+            .is_some_and(|items| items.iter().any(|item| item["code"] == "UnknownScope"))
     );
     let second = responses
         .iter()
@@ -513,7 +513,7 @@ fn memory_transport_delegates_phase5_requests_to_analysis() {
     assert!(
         diagnostics["params"]["diagnostics"]
             .as_array()
-            .is_some_and(|items| { items.iter().any(|item| item["code"] == "pdx-unknown-scope") })
+            .is_some_and(|items| { items.iter().any(|item| item["code"] == "UnknownScope") })
     );
 
     let _: CompletionResponse = typed_result(&responses, 2);
@@ -665,15 +665,13 @@ fn memory_transport_preserves_hir_disambiguated_mixed_context_completion() {
         .as_array()
         .expect("diagnostics");
     assert!(
-        diagnostics
-            .iter()
-            .all(|item| item["code"] != "pdx-unknown-key"),
+        diagnostics.iter().all(|item| item["code"] != "UnknownKey"),
         "known mixed-context keys were rejected: {diagnostics:?}"
     );
     assert!(
         diagnostics
             .iter()
-            .any(|item| item["code"] == "pdx-invalid-value"),
+            .any(|item| item["code"] == "InvalidValue"),
         "invalid trigger value was not diagnosed: {diagnostics:?}"
     );
     fs::remove_dir_all(root_dir).expect("cleanup");

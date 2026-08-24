@@ -69,7 +69,7 @@ fn rapid_changes_debounce_and_publish_only_the_latest_diagnostics() {
     assert!(
         published[0]["params"]["diagnostics"]
             .as_array()
-            .is_some_and(|items| items.iter().all(|item| item["code"] != "pdx-unknown-scope"))
+            .is_some_and(|items| items.iter().all(|item| item["code"] != "UnknownScope"))
     );
     let snapshot = server.snapshot();
     let document = snapshot

@@ -104,52 +104,210 @@ pub enum DiagnosticCode {
     UnknownScope,
     /// A scalar or block does not satisfy the selected semantic matcher.
     InvalidValue,
+    /// A bare scalar has no matching rule value, rather than merely having the wrong shape.
+    UnknownBareValue,
     /// A semantic rule cardinality constraint was violated.
     Cardinality,
     /// A key or value is known to the semantic rule set but is used from the wrong game scope.
-    WrongScope,
+    RuleWrongScope,
+    /// A target expression is syntactically valid but cannot be resolved to a target.
+    InvalidTarget,
+    /// A target resolves, but its scope is incompatible with the rule's expected scope.
+    TargetWrongScope,
+    /// A scope-changing command is not valid in the current scope context.
+    InvalidScopeCommand,
     /// Recursive scripted-macro expansion reached a definition already on the active stack.
     MacroExpansionCycle,
     /// Scripted-macro expansion exceeded a bounded work or size limit.
-    MacroExpansionLimit,
+    AnalysisIncomplete,
 }
 
 impl DiagnosticCode {
+    /// Compatibility alias for the pre-refactor name. New producers should use
+    /// [`DiagnosticCode::RuleWrongScope`].
+    #[allow(non_upper_case_globals)]
+    pub const WrongScope: Self = Self::RuleWrongScope;
+
+    /// Compatibility alias for the pre-refactor name. New producers should use
+    /// [`DiagnosticCode::AnalysisIncomplete`].
+    #[allow(non_upper_case_globals)]
+    pub const MacroExpansionLimit: Self = Self::AnalysisIncomplete;
+
     /// Returns the stable wire-facing code.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Syntax => "SyntaxError",
+            Self::UnknownKey => "UnknownKey",
+            Self::UnknownSymbol => "UnknownSymbol",
+            Self::AmbiguousSymbol => "AmbiguousSymbol",
+            Self::UnknownScope => "UnknownScope",
+            Self::InvalidValue => "InvalidValue",
+            Self::UnknownBareValue => "UnknownBareValue",
+            Self::Cardinality => "Cardinality",
+            Self::RuleWrongScope => "RuleWrongScope",
+            Self::InvalidTarget => "InvalidTarget",
+            Self::TargetWrongScope => "TargetWrongScope",
+            Self::InvalidScopeCommand => "InvalidScopeCommand",
+            Self::MacroExpansionCycle => "MacroExpansionCycle",
+            Self::AnalysisIncomplete => "AnalysisIncomplete",
+        }
+    }
+
+    /// Returns the legacy wire-facing code used by clients before the PascalCase migration.
+    #[must_use]
+    pub const fn legacy_str(self) -> &'static str {
         match self {
             Self::Syntax => "pdx-parser",
             Self::UnknownKey => "pdx-unknown-key",
             Self::UnknownSymbol => "pdx-unknown-symbol",
             Self::AmbiguousSymbol => "pdx-ambiguous-symbol",
             Self::UnknownScope => "pdx-unknown-scope",
-            Self::InvalidValue => "pdx-invalid-value",
+            Self::InvalidValue | Self::UnknownBareValue => "pdx-invalid-value",
             Self::Cardinality => "pdx-cardinality",
-            Self::WrongScope => "pdx-wrong-scope",
+            Self::RuleWrongScope => "pdx-wrong-scope",
+            Self::InvalidTarget => "pdx-invalid-target",
+            Self::TargetWrongScope => "pdx-target-wrong-scope",
+            Self::InvalidScopeCommand => "pdx-invalid-scope-command",
             Self::MacroExpansionCycle => "pdx-macro-expansion-cycle",
-            Self::MacroExpansionLimit => "pdx-macro-expansion-limit",
+            Self::AnalysisIncomplete => "pdx-macro-expansion-limit",
         }
     }
 
-    /// Returns the conservative LSP severity number (1 error, 2 warning, 3 information).
+    /// Returns the default severity for this category.
     #[must_use]
-    pub const fn severity(self) -> u8 {
+    pub const fn severity(self) -> Severity {
         match self {
             // An unknown key is silently ignored by the game, so the authored line is
             // ineffective code; it is an error once the surrounding context is known.
-            Self::UnknownKey => 1,
+            Self::UnknownKey
+            | Self::UnknownBareValue
+            | Self::InvalidTarget
+            | Self::TargetWrongScope
+            | Self::InvalidScopeCommand => Severity::Error,
             // Expansion limits are analysis-side work bounds; reaching one means this
             // file was not fully validated, not that the file itself is wrong.
-            Self::MacroExpansionLimit => 3,
+            Self::AnalysisIncomplete => Severity::Information,
             Self::Syntax
             | Self::UnknownSymbol
             | Self::AmbiguousSymbol
             | Self::UnknownScope
             | Self::InvalidValue
             | Self::Cardinality
-            | Self::WrongScope
-            | Self::MacroExpansionCycle => 1,
+            | Self::RuleWrongScope
+            | Self::MacroExpansionCycle => Severity::Error,
+        }
+    }
+}
+
+/// Severity used by editor-neutral diagnostics.
+///
+/// Keeping this as a domain type prevents rule/compiler integer values from leaking through the
+/// analysis API. Conversion to the LSP's numeric representation happens in `pdx-lsp`.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum Severity {
+    Error,
+    Warning,
+    Information,
+    Hint,
+}
+
+impl Severity {
+    /// Converts to the LSP diagnostic severity numbering.
+    #[must_use]
+    pub const fn lsp_number(self) -> u8 {
+        match self {
+            Self::Error => 1,
+            Self::Warning => 2,
+            Self::Information => 3,
+            Self::Hint => 4,
+        }
+    }
+
+    /// Converts a validated rule severity (1..=3), conservatively treating unknown values as
+    /// errors at the analysis boundary.
+    #[must_use]
+    pub const fn from_rule_number(value: u8) -> Self {
+        match value {
+            2 => Self::Warning,
+            3 => Self::Information,
+            4 => Self::Hint,
+            _ => Self::Error,
+        }
+    }
+
+    /// Downgrades a diagnostic by one level, preserving the information/hint ceiling.
+    #[must_use]
+    pub const fn saturating_add(self, amount: u8) -> Self {
+        let mut number = self.lsp_number();
+        let mut remaining = amount;
+        while remaining > 0 && number < 4 {
+            number += 1;
+            remaining -= 1;
+        }
+        match number {
+            2 => Self::Warning,
+            3 => Self::Information,
+            4 => Self::Hint,
+            _ => Self::Error,
+        }
+    }
+}
+
+impl PartialEq<u8> for Severity {
+    fn eq(&self, other: &u8) -> bool {
+        self.lsp_number() == *other
+    }
+}
+
+impl PartialEq<Severity> for u8 {
+    fn eq(&self, other: &Severity) -> bool {
+        *self == other.lsp_number()
+    }
+}
+
+/// Confidence in the diagnostic's semantic conclusion.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum DiagnosticCertainty {
+    /// The parser/rule set proves the issue for the current context.
+    Certain,
+    /// The conclusion depends on a known but context-sensitive scope transition.
+    Contextual,
+    /// The conclusion was inferred from a fallback, path, or dynamic symbol.
+    Inferred,
+    /// Analysis could not establish enough information to decide.
+    Unresolved,
+}
+
+impl DiagnosticCertainty {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Certain => "certain",
+            Self::Contextual => "contextual",
+            Self::Inferred => "inferred",
+            Self::Unresolved => "unresolved",
+        }
+    }
+}
+
+/// Structured provenance attached to a semantic diagnostic.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DiagnosticProvenance {
+    pub rule_id: Option<String>,
+    pub context: Option<String>,
+    pub source_file: Option<String>,
+    pub source_line: Option<u32>,
+}
+
+impl DiagnosticProvenance {
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self {
+            rule_id: None,
+            context: None,
+            source_file: None,
+            source_line: None,
         }
     }
 }
@@ -159,12 +317,50 @@ impl DiagnosticCode {
 pub struct Diagnostic {
     /// Stable category.
     pub code: DiagnosticCode,
-    /// LSP severity (1 error, 2 warning, 3 information).
-    pub severity: u8,
+    /// Domain severity. Protocol adapters convert this to their wire representation.
+    pub severity: Severity,
     /// Source range.
     pub range: TextRange,
     /// Human-readable message.
     pub message: String,
+    /// Confidence in the conclusion, independent of severity.
+    pub certainty: DiagnosticCertainty,
+    /// Optional rule/source provenance for explainability and clients.
+    pub provenance: Option<DiagnosticProvenance>,
+}
+
+impl Diagnostic {
+    /// Creates a diagnostic with conservative, certain defaults.
+    #[must_use]
+    pub fn new(
+        code: DiagnosticCode,
+        severity: Severity,
+        range: TextRange,
+        message: String,
+    ) -> Self {
+        Self {
+            code,
+            severity,
+            range,
+            message,
+            certainty: DiagnosticCertainty::Certain,
+            provenance: None,
+        }
+    }
+
+    /// Sets the confidence independently from the severity.
+    #[must_use]
+    pub const fn with_certainty(mut self, certainty: DiagnosticCertainty) -> Self {
+        self.certainty = certainty;
+        self
+    }
+
+    /// Attaches structured provenance.
+    #[must_use]
+    pub fn with_provenance(mut self, provenance: DiagnosticProvenance) -> Self {
+        self.provenance = Some(provenance);
+        self
+    }
 }
 
 /// An editor-neutral source location.
