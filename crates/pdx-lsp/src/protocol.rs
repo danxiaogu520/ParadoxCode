@@ -216,14 +216,6 @@ pub(crate) fn diagnostic_values_for_text(
                 4 => Some(DiagnosticSeverity::HINT),
                 _ => None,
             };
-            let provenance = diagnostic.provenance.as_ref().map(|provenance| {
-                json!({
-                    "ruleId": provenance.rule_id,
-                    "context": provenance.context,
-                    "sourceFile": provenance.source_file,
-                    "sourceLine": provenance.source_line,
-                })
-            });
             let mut value = LspDiagnostic::new(
                 range_to_lsp(line_index, text, diagnostic.range),
                 severity,
@@ -233,12 +225,12 @@ pub(crate) fn diagnostic_values_for_text(
                 None,
                 None,
             );
-            // The new PascalCase code is primary. The legacy spelling and semantic confidence
-            // remain in data so clients can migrate without duplicating diagnostics.
+            // The new PascalCase code is primary. Only the legacy spelling and semantic
+            // confidence are public compatibility metadata; internal rule provenance never
+            // crosses the LSP boundary.
             value.data = Some(json!({
                 "legacyCode": diagnostic.code.legacy_str(),
                 "certainty": diagnostic.certainty.as_str(),
-                "provenance": provenance,
             }));
             value
         })
@@ -487,13 +479,15 @@ impl RpcError {
 
 #[cfg(test)]
 mod tests {
-    use super::is_snapshot_request;
+    use super::{LineIndex, diagnostic_values_for_text, is_snapshot_request};
     use lsp_types::request::Request;
     use lsp_types::request::{
         Completion, DocumentSymbolRequest, Formatting, GotoDefinition, HoverRequest,
         PrepareRenameRequest, References, Rename, ResolveCompletionItem, SemanticTokensFullRequest,
         WorkspaceSymbolRequest,
     };
+    use pdx_analysis::{Diagnostic, DiagnosticCode, DiagnosticProvenance, Severity};
+    use pdx_text::TextRange;
 
     /// The snapshot-request routing table must agree with the wire method names the
     /// real protocol library uses. Hardcoding a wrong spelling here silently breaks
@@ -522,5 +516,30 @@ mod tests {
         }
         // The bare, non-spec request name must not be mistaken for the full-token request.
         assert!(!is_snapshot_request("textDocument/semanticTokens"));
+    }
+
+    #[test]
+    fn lsp_diagnostics_do_not_expose_internal_rule_provenance() {
+        let diagnostic = Diagnostic::new(
+            DiagnosticCode::UnknownKey,
+            Severity::Error,
+            TextRange::new(0, 1).expect("range"),
+            "unknown key".to_owned(),
+        )
+        .with_provenance(DiagnosticProvenance {
+            rule_id: Some("internal:rule".to_owned()),
+            context: Some("internal-context".to_owned()),
+            source_file: Some("internal.json".to_owned()),
+            source_line: Some(7),
+        });
+        let values = diagnostic_values_for_text(vec![diagnostic], &LineIndex::new("x"), "x");
+        let value = serde_json::to_value(&values[0]).expect("diagnostic JSON");
+
+        assert_eq!(value["data"]["legacyCode"], "pdx-unknown-key");
+        assert_eq!(value["data"]["certainty"], "certain");
+        assert!(value["data"].get("provenance").is_none());
+        let serialized = value.to_string();
+        assert!(!serialized.contains("ruleId"));
+        assert!(!serialized.contains("internal.json"));
     }
 }
