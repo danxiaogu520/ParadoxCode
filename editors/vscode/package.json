@@ -671,6 +671,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "check": "npm run compile && node scripts/smoke.mjs",
+    "test:ci": "npm run compile && node scripts/smoke.mjs && node scripts/extension-contract.mjs && node scripts/package-contract.mjs && npm run test:package",
     "vscode:prepublish": "npm run compile",
     "test:contract": "npm run compile && node scripts/extension-contract.mjs && node scripts/package-contract.mjs",
     "test:package": "vsce package --out ../../target/paradoxcode-vscode-contract.vsix",

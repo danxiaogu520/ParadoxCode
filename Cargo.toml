@@ -16,6 +16,15 @@ members = [
 [profile.dev]
 opt-level = 3
 
+# Tests do not need the optimized development profile. Keeping test builds
+# unoptimized avoids spending several minutes optimizing test binaries on CI;
+# benchmark runs use the separate bench profile below.
+[profile.test]
+opt-level = 0
+
+[profile.bench]
+opt-level = 3
+
 [workspace.package]
 version = "0.1.3"
 edition = "2024"

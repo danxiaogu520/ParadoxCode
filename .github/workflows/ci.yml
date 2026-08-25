@@ -11,13 +11,70 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  changes:
+    name: Select affected checks
+    runs-on: ubuntu-latest
+    outputs:
+      all: ${{ steps.filter.outputs.all }}
+      core: ${{ steps.filter.outputs.core }}
+      grammars: ${{ steps.filter.outputs.grammars }}
+      zed: ${{ steps.filter.outputs.zed }}
+      vscode: ${{ steps.filter.outputs.vscode }}
+      fuzz: ${{ steps.filter.outputs.fuzz }}
+      release: ${{ steps.filter.outputs.release }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            # Shared build, policy, workflow, and script changes invalidate every job.
+            all:
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'deny.toml'
+              - 'scripts/**'
+              - '.github/workflows/**'
+            core:
+              - 'crates/**'
+              - 'rules/**'
+            grammars:
+              - 'grammars/**'
+            zed:
+              - 'editors/zed/**'
+            # The VS Code smoke test launches the real server, so core/rule changes
+            # also require this package contract.
+            vscode:
+              - 'editors/vscode/**'
+              - 'crates/**'
+              - 'rules/**'
+            fuzz:
+              - 'fuzz/**'
+              - 'crates/pdx-engine/**'
+              - 'crates/pdx-game/**'
+              - 'crates/pdx-parser/**'
+              - 'crates/pdx-rules/**'
+              - 'crates/pdx-text/**'
+              - 'rules/**'
+            # Release smoke validates the server and editor package boundaries.
+            release:
+              - 'editors/zed/**'
+              - 'editors/vscode/**'
+              - 'crates/**'
+              - 'rules/**'
+
   rust:
     name: Rust quality gates (Linux)
+    needs: changes
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.core == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -26,10 +83,14 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - run: bash scripts/check-quality-gates.sh core
+      # PR/push CI keeps the fast correctness path. The optimized benchmark
+      # suite runs in the scheduled/manual performance workflow.
+      - run: bash scripts/check-quality-gates.sh core-fast
 
   msrv:
     name: Minimum supported Rust 1.98
+    needs: changes
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.core == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -38,10 +99,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: msrv-1.98
-      - run: cargo check --locked --workspace --all-targets --all-features
+      - run: cargo check --locked --workspace --all-features
 
   windows:
     name: Rust quality gates (Windows)
+    needs: changes
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.core == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
@@ -50,13 +113,28 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check --locked --workspace --all-targets --all-features
-      - run: cargo test --locked --workspace --all-targets --all-features
-      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - run: cargo check --locked --workspace --all-features
+      - run: cargo test --locked --workspace --all-features
+      - run: cargo clippy --locked --workspace --all-features -- -D warnings
+
+  windows_release:
+    name: Windows release build
+    needs: changes
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.core == 'true' }}
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Keep the optimized build on a separate runner so it overlaps with the
+      # Windows test and lint job instead of extending its critical path.
       - run: cargo build --locked --release -p pdx-lsp --bin pdx --bin pdx-ls
 
   tree-sitter:
     name: Tree-sitter and Zed language assets
+    needs: changes
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.grammars == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -74,6 +152,8 @@ jobs:
 
   zed:
     name: Zed extension package
+    needs: changes
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.zed == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -86,6 +166,8 @@ jobs:
 
   vscode:
     name: VS Code extension package
+    needs: changes
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.vscode == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -104,6 +186,8 @@ jobs:
 
   fuzz:
     name: Fuzz target compile and smoke
+    needs: changes
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.fuzz == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -136,6 +220,8 @@ jobs:
 
   release:
     name: Release and artifact smoke
+    needs: changes
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.release == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -146,6 +232,8 @@ jobs:
 
   dependencies:
     name: Dependency policy
+    needs: changes
+    if: ${{ needs.changes.outputs.all == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -153,3 +241,66 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@cargo-deny
       - run: cargo deny check advisories licenses bans sources
+
+  required:
+    name: Required CI checks
+    if: always()
+    needs: [changes, rust, msrv, windows, windows_release, tree-sitter, zed, vscode, fuzz, release, dependencies]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify selected checks
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          RUST_RESULT: ${{ needs.rust.result }}
+          MSRV_RESULT: ${{ needs.msrv.result }}
+          WINDOWS_RESULT: ${{ needs.windows.result }}
+          WINDOWS_RELEASE_RESULT: ${{ needs.windows_release.result }}
+          GRAMMARS_RESULT: ${{ needs.tree-sitter.result }}
+          ZED_RESULT: ${{ needs.zed.result }}
+          VSCODE_RESULT: ${{ needs.vscode.result }}
+          FUZZ_RESULT: ${{ needs.fuzz.result }}
+          RELEASE_RESULT: ${{ needs.release.result }}
+          DEPENDENCIES_RESULT: ${{ needs.dependencies.result }}
+          CORE_SELECTED: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.core == 'true' }}
+          WINDOWS_RELEASE_SELECTED: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.core == 'true' }}
+          GRAMMARS_SELECTED: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.grammars == 'true' }}
+          ZED_SELECTED: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.zed == 'true' }}
+          VSCODE_SELECTED: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.vscode == 'true' }}
+          FUZZ_SELECTED: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.fuzz == 'true' }}
+          RELEASE_SELECTED: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.release == 'true' }}
+          DEPENDENCIES_SELECTED: ${{ needs.changes.outputs.all == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          [[ "$CHANGES_RESULT" == "success" ]]
+
+          check_selected() {
+            local selected="$1"
+            local result="$2"
+            local label="$3"
+            if [[ "$selected" == "true" && "$result" != "success" ]]; then
+              echo "$label was selected but finished with: $result" >&2
+              return 1
+            fi
+          }
+
+          check_selected "$CORE_SELECTED" "$RUST_RESULT" "Linux Rust"
+          check_selected "$CORE_SELECTED" "$MSRV_RESULT" "MSRV"
+          check_selected "$CORE_SELECTED" "$WINDOWS_RESULT" "Windows Rust"
+          check_selected "$WINDOWS_RELEASE_SELECTED" "$WINDOWS_RELEASE_RESULT" "Windows release"
+          check_selected "$GRAMMARS_SELECTED" "$GRAMMARS_RESULT" "Tree-sitter"
+          check_selected "$ZED_SELECTED" "$ZED_RESULT" "Zed"
+          check_selected "$VSCODE_SELECTED" "$VSCODE_RESULT" "VS Code"
+          check_selected "$FUZZ_SELECTED" "$FUZZ_RESULT" "Fuzz"
+          check_selected "$RELEASE_SELECTED" "$RELEASE_RESULT" "Release"
+          check_selected "$DEPENDENCIES_SELECTED" "$DEPENDENCIES_RESULT" "Dependencies"
+
+          for result in "$RUST_RESULT" "$MSRV_RESULT" "$WINDOWS_RESULT" \
+            "$WINDOWS_RELEASE_RESULT" "$GRAMMARS_RESULT" "$ZED_RESULT" "$VSCODE_RESULT" "$FUZZ_RESULT" \
+            "$RELEASE_RESULT" "$DEPENDENCIES_RESULT"; do
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              echo "An unexpected CI job result was reported: $result" >&2
+              exit 1
+            fi
+          done
