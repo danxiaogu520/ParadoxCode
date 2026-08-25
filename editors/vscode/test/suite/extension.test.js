@@ -94,6 +94,36 @@ suite('ParadoxCode VS Code extension host', () => {
     });
   });
 
+  test('marks assignment and empty-block completions for a follow-up retrigger', () => {
+    const {
+      attachFollowupCompletionTrigger,
+      shouldTriggerFollowupCompletion,
+      FOLLOWUP_COMPLETION_TRIGGER_COMMAND,
+    } = require('../../out/completionMiddleware.js');
+    const item = { insertText: 'national_focus = ' };
+    assert.equal(shouldTriggerFollowupCompletion(item), true);
+    attachFollowupCompletionTrigger(item, 'file:///tmp/events/test.txt');
+    assert.deepEqual(item.command, {
+      title: 'Trigger follow-up completion',
+      command: FOLLOWUP_COMPLETION_TRIGGER_COMMAND,
+      arguments: [{ uri: 'file:///tmp/events/test.txt' }],
+    });
+
+    const block = { insertText: { value: 'country_event = {\n\t$0\n}' } };
+    assert.equal(shouldTriggerFollowupCompletion(block), true);
+    attachFollowupCompletionTrigger(block);
+    assert.equal(block.command.command, FOLLOWUP_COMPLETION_TRIGGER_COMMAND);
+
+    const parameterSnippet = { insertText: { value: 'apply = {\n\tamount = $1\n\t$0\n}' } };
+    assert.equal(shouldTriggerFollowupCompletion(parameterSnippet), false);
+    attachFollowupCompletionTrigger(parameterSnippet);
+    assert.equal(parameterSnippet.command, undefined);
+
+    const existing = { insertText: 'foo = ', command: { title: 'keep', command: 'keep' } };
+    attachFollowupCompletionTrigger(existing);
+    assert.deepEqual(existing.command, { title: 'keep', command: 'keep' });
+  });
+
   test('contributes the detailed Getting Started walkthrough', async () => {
     const extension = vscode.extensions.getExtension('paradoxcode.paradoxcode-vscode');
     assert.ok(extension, 'development extension must be discoverable');
