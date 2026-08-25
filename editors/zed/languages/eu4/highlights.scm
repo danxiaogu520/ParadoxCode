@@ -1,12 +1,12 @@
 ; Europa Universalis IV syntax-only fallback highlighting.
-; Semantic classification (rule-known command keys, control-flow keys, @variables,
+; Semantic classification (rule-known command keys, indexed scripted macro names, control-flow keys, @variables,
 ; $parameters$, numeric/boolean scalars) is provided by pdx-ls semantic tokens; this query only
 ; colours the editor-level syntax so files still read correctly before the server reports.
 ;
 ; Alignment contract: every capture below must produce the same visual category as the VS Code
 ; TextMate grammar (editors/vscode/syntaxes/eu4.tmLanguage.json) and the pdx-ls semantic token
 ; mapping (editors/vscode/package.json semanticTokenScopes). The only intended differences are
-; rule-known keys (upgraded from @property to @function, mapped to support.function because many
+; rule-known keys and indexed scripted macro names (upgraded from @property to @function, mapped to support.function because many
 ; themes italicize entity.name.function and ~80% of keys are function-classified) and
 ; control-flow keys (upgraded to @keyword); both are provided by the semantic layer only. Keep
 ; this query syntax-only: no regex or literal-list captures that reclassify scalars by spelling.

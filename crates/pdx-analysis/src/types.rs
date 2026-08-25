@@ -417,14 +417,24 @@ pub struct CompletionItem {
 /// Broad completion item categories independent of LSP enum values.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CompletionKind {
-    /// A command or property key.
+    /// A property or structural key.
     Key,
-    /// A scalar value or enum member.
+    /// A script command or trigger predicate.
+    Command,
+    /// A workspace-defined `scripted_effect` or `scripted_trigger` macro.
+    ScriptedMacro,
+    /// A scalar value without a more specific semantic category.
     Value,
+    /// A member of a statically declared enum.
+    EnumMember,
+    /// A scope expression such as `this`, `root`, or a scope link.
+    Scope,
     /// A symbol from the workspace index.
     Symbol,
     /// A localisation key.
     Localisation,
+    /// A parameter declared by a scripted macro.
+    MacroParameter,
 }
 
 /// Completion query output.
