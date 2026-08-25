@@ -24,18 +24,38 @@ use crate::{
     INTERNAL_ERROR, JSON_RPC_VERSION, WATCHED_FILES_REGISTRATION_ID, WATCHED_FILES_REQUEST_ID,
 };
 
-#[allow(clippy::too_many_arguments)] // Cache load carries the immutable rules/profile plus worker plumbing.
+pub(crate) struct IndexCacheLoadRequest<'a> {
+    pub(crate) path: &'a Path,
+    pub(crate) rules: RuleSet,
+    pub(crate) profile: GameProfile,
+    pub(crate) current_rule_hash: String,
+    pub(crate) auto_vanilla: Option<&'a AutoVanillaConfiguration>,
+    pub(crate) log: Option<&'a (dyn Fn(&str) + Sync)>,
+    pub(crate) progress: Option<&'a (dyn Fn(usize, usize) + Sync)>,
+    pub(crate) cancellation: &'a IndexSetupCancellation,
+}
+
+struct VanillaIndexContext<'a> {
+    rules: &'a RuleSet,
+    profile: &'a GameProfile,
+    auto_vanilla: Option<&'a AutoVanillaConfiguration>,
+    discovery_options: &'a DiscoveryOptions,
+    log: Option<&'a (dyn Fn(&str) + Sync)>,
+    progress: Option<&'a (dyn Fn(usize, usize) + Sync)>,
+    cancellation: &'a IndexSetupCancellation,
+}
+
 pub(crate) fn run_index_cache_load(
-    path: &Path,
-    rules: RuleSet,
-    profile: GameProfile,
-    current_rule_hash: String,
-    auto_vanilla: Option<&AutoVanillaConfiguration>,
-    log: Option<&(dyn Fn(&str) + Sync)>,
-    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
-    cancellation: &IndexSetupCancellation,
+    request: IndexCacheLoadRequest<'_>,
 ) -> Result<(IndexCache, String), String> {
-    run_index_cache_load_with_options(
+    run_index_cache_load_with_options(request, &DiscoveryOptions::default())
+}
+
+pub(crate) fn run_index_cache_load_with_options(
+    request: IndexCacheLoadRequest<'_>,
+    discovery_options: &DiscoveryOptions,
+) -> Result<(IndexCache, String), String> {
+    let IndexCacheLoadRequest {
         path,
         rules,
         profile,
@@ -44,22 +64,16 @@ pub(crate) fn run_index_cache_load(
         log,
         progress,
         cancellation,
-        &DiscoveryOptions::default(),
-    )
-}
-
-#[allow(clippy::too_many_arguments)] // Cache load carries the immutable rules/profile plus worker plumbing.
-pub(crate) fn run_index_cache_load_with_options(
-    path: &Path,
-    rules: RuleSet,
-    profile: GameProfile,
-    current_rule_hash: String,
-    auto_vanilla: Option<&AutoVanillaConfiguration>,
-    log: Option<&(dyn Fn(&str) + Sync)>,
-    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
-    cancellation: &IndexSetupCancellation,
-    discovery_options: &DiscoveryOptions,
-) -> Result<(IndexCache, String), String> {
+    } = request;
+    let context = VanillaIndexContext {
+        rules: &rules,
+        profile: &profile,
+        auto_vanilla,
+        discovery_options,
+        log,
+        progress,
+        cancellation,
+    };
     let started = std::time::Instant::now();
     let result = (|| {
         let load_started = std::time::Instant::now();
@@ -92,16 +106,7 @@ pub(crate) fn run_index_cache_load_with_options(
                         path.display()
                     ));
                 }
-                if let Some(rebuilt) = rebuild_unavailable_cache(
-                    path,
-                    &rules,
-                    &profile,
-                    auto_vanilla,
-                    discovery_options,
-                    log,
-                    progress,
-                    cancellation,
-                )? {
+                if let Some(rebuilt) = rebuild_unavailable_cache(path, &context)? {
                     return Ok((
                         rebuilt,
                         format!(
@@ -144,16 +149,8 @@ pub(crate) fn run_index_cache_load_with_options(
                 source.display()
             ));
         }
-        let rebuilt = build_cache_from_source(
-            &source,
-            path,
-            &rules,
-            &profile,
-            log,
-            progress,
-            cancellation,
-            "Vanilla cache regeneration",
-        );
+        let rebuilt =
+            build_cache_from_source(&source, path, &context, "Vanilla cache regeneration");
         match rebuilt {
             Ok(cache) => Ok((
                 cache,
@@ -184,25 +181,18 @@ pub(crate) fn run_index_cache_load_with_options(
 /// are reported but never recorded in the user configuration, because an explicit
 /// cache path is a caller-owned location and must not mark the user-level
 /// automatic setup as attempted.
-#[allow(clippy::too_many_arguments)] // Rebuild carries the immutable rules/profile plus worker plumbing.
 fn rebuild_unavailable_cache(
     path: &Path,
-    rules: &RuleSet,
-    profile: &GameProfile,
-    auto_vanilla: Option<&AutoVanillaConfiguration>,
-    discovery_options: &DiscoveryOptions,
-    log: Option<&(dyn Fn(&str) + Sync)>,
-    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
-    cancellation: &IndexSetupCancellation,
+    context: &VanillaIndexContext<'_>,
 ) -> Result<Option<IndexCache>, String> {
-    let Some(auto_vanilla) = auto_vanilla else {
+    let Some(auto_vanilla) = context.auto_vanilla else {
         return Ok(None);
     };
-    if cancellation.workspace.is_cancelled() {
+    if context.cancellation.workspace.is_cancelled() {
         return Err("Vanilla cache rebuild was cancelled".to_owned());
     }
     let discovery_started = std::time::Instant::now();
-    if let Some(log) = log {
+    if let Some(log) = context.log {
         log("Vanilla cache rebuild phase: resolving a usable game installation");
     }
     let configured_source = UserConfiguration::load(&auto_vanilla.user_paths.config_file)
@@ -219,8 +209,8 @@ fn rebuild_unavailable_cache(
         None => {
             let report = discover_installations(
                 &auto_vanilla.descriptor,
-                discovery_options,
-                &cancellation.discovery,
+                context.discovery_options,
+                &context.cancellation.discovery,
             );
             if report.cancelled {
                 return Err("Vanilla cache rebuild discovery was cancelled".to_owned());
@@ -243,7 +233,7 @@ fn rebuild_unavailable_cache(
             }
         }
     };
-    if let Some(log) = log {
+    if let Some(log) = context.log {
         log(&format!(
             "Vanilla cache rebuild source resolved in {:.1} ms: {}",
             discovery_started.elapsed().as_secs_f64() * 1000.0,
@@ -262,44 +252,29 @@ fn rebuild_unavailable_cache(
             ));
         }
     }
-    if let Some(log) = log {
+    if let Some(log) = context.log {
         log(&format!(
             "Vanilla cache rebuild phase: indexing source {} and replacing {}",
             source.display(),
             path.display()
         ));
     }
-    build_cache_from_source(
-        &source,
-        path,
-        rules,
-        profile,
-        log,
-        progress,
-        cancellation,
-        "Vanilla cache rebuild",
-    )
-    .map(Some)
+    build_cache_from_source(&source, path, context, "Vanilla cache rebuild").map(Some)
 }
 
-#[allow(clippy::too_many_arguments)] // Vanilla rebuild carries the immutable rules/profile plus worker plumbing.
 fn build_cache_from_source(
     source: &Path,
     path: &Path,
-    rules: &RuleSet,
-    profile: &GameProfile,
-    log: Option<&(dyn Fn(&str) + Sync)>,
-    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
-    cancellation: &IndexSetupCancellation,
+    context: &VanillaIndexContext<'_>,
     activity: &str,
 ) -> Result<IndexCache, String> {
-    let mut host = AnalysisHost::with_profile(rules.clone(), profile.clone());
+    let mut host = AnalysisHost::with_profile(context.rules.clone(), context.profile.clone());
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
         source.to_owned(),
     )]));
-    if let Some(log) = log {
+    if let Some(log) = context.log {
         log(&format!(
             "{activity} phase: scanning and parsing whitelisted files under {}",
             source.display()
@@ -307,9 +282,12 @@ fn build_cache_from_source(
     }
     let scan_started = std::time::Instant::now();
     let scan_report = host
-        .refresh_source_roots_cancellable_with_progress(&cancellation.workspace, progress)
+        .refresh_source_roots_cancellable_with_progress(
+            &context.cancellation.workspace,
+            context.progress,
+        )
         .map_err(|error| format!("{activity} failed while indexing {source:?}: {error}"))?;
-    if let Some(log) = log {
+    if let Some(log) = context.log {
         log(&format!(
             "{activity}: scanned in {:.1} ms (discovered={}, indexed={}, legacy-encoded={}, skipped={}, issues={}, active={})",
             scan_started.elapsed().as_secs_f64() * 1000.0,
@@ -324,20 +302,22 @@ fn build_cache_from_source(
     let build_started = std::time::Instant::now();
     let cache = IndexCache::from_snapshot(&host.snapshot())
         .map_err(|error| format!("{activity} failed: {error}"))?;
-    if let Some(log) = log {
+    if let Some(log) = context.log {
         log(&format!(
             "{activity}: cache built in {:.1} ms",
             build_started.elapsed().as_secs_f64() * 1000.0
         ));
     }
     let save_started = std::time::Instant::now();
-    cache.save_with_progress(path, progress).map_err(|error| {
-        format!(
-            "{activity} could not be saved to {}: {error}",
-            path.display()
-        )
-    })?;
-    if let Some(log) = log {
+    cache
+        .save_with_progress(path, context.progress)
+        .map_err(|error| {
+            format!(
+                "{activity} could not be saved to {}: {error}",
+                path.display()
+            )
+        })?;
+    if let Some(log) = context.log {
         log(&format!(
             "{activity}: saved to {} in {:.1} ms",
             path.display(),

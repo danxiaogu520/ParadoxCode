@@ -1,5 +1,3 @@
-#![allow(unused_imports)]
-
 pub(crate) use crate::{
     CancellationToken, Cancelled, CompletionKind, DiagnosticCode, RenameError, RenameFailure,
     complete, complete_with_cancellation, definition, diagnostics, diagnostics_with_cancellation,

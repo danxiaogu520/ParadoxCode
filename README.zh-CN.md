@@ -16,8 +16,8 @@ ParadoxCode **与 Paradox Interactive 无任何关联，也未获得其背书**�
 - 容错的 Paradox 脚本与 EU4 本地化解析器。语法错误不会阻断分析：解析器始终生成损失感知（loss-aware）语法树，无法识别的结构降级为 `Unknown*` 节点而不会崩溃。
 - 由经过校验的第一方 EU4 规则数据库驱动的语法与语义诊断。
 - 诊断使用稳定的 PascalCase ID（例如 `UnknownKey`、`UnknownBareValue`、`UnknownScope`、
-  `TargetWrongScope`）；严重度在分析层类型化，LSP 元数据提供确定性与规则来源，并在 `data`
-  中保留旧 code 以便客户端迁移。
+  `TargetWrongScope`）；严重度在分析层类型化，LSP 元数据提供确定性，不暴露内部规则来源
+  或旧版本迁移字段。
 - 补全、悬停、跳转定义、查找引用、文档/工作区符号。
 - 冲突感知的重命名（仅限可写的 Mod 源）。
 - 保守的格式化器，拒绝改写不安全或残缺的文件。
@@ -114,6 +114,9 @@ cargo run -p pdx-rules --bin pdx-bake -- build \
 ```
 
 官方 `pdx-ls` 二进制内嵌第一方 JSON 规则源，并在首次使用或源 `rule_hash` 变化时，在用户缓存中生成经过校验的 SQLite 规则工件。生成工件不会提交到仓库。
+
+`pdx-ls` 要求现代 LSP 客户端在 initialize 请求中提供至少一个 `workspaceFolders` 条目。仅发送已弃用
+`rootUri` 的旧客户端不受支持，并会收到 `INVALID_PARAMS`；请升级编辑器或语言客户端。
 
 ## 开发环境
 

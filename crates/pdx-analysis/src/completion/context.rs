@@ -8,7 +8,7 @@ use crate::{
 use pdx_engine::AnalysisSnapshot;
 use pdx_engine::hir::HirFile;
 use pdx_rules::RuleShape;
-use pdx_text::{TextRange, TextSize};
+use pdx_text::TextSize;
 
 use crate::semantic::{
     cached_scope_fact_for_property, scope_context_from_hir, semantic_child_scope,
@@ -79,19 +79,20 @@ pub(crate) fn semantic_completion_context_with_cancellation(
             semantic_completion_skips_type_instances(snapshot, &context, &root.key);
         return semantic_completion_container(
             snapshot,
-            input.hir.as_deref(),
-            context,
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            None,
-            skip_type_instance,
-            root.block,
-            root.bare_values,
-            scope,
-            position,
-            0,
-            None,
+            SemanticCompletionContainerInput {
+                hir: input.hir.as_deref(),
+                context,
+                parent_path: Vec::new(),
+                structural_containers: Vec::new(),
+                alternative_containers: Vec::new(),
+                container_property: None,
+                skip_type_instance,
+                properties: root.block,
+                scope,
+                position,
+                quoted_depth: 0,
+                embedded_value_context: None,
+            },
             &mut quoted_scripts,
         )
         .map(Some);
@@ -99,10 +100,8 @@ pub(crate) fn semantic_completion_context_with_cancellation(
     Ok(None)
 }
 
-#[allow(clippy::too_many_arguments)] // Recursive traversal carries immutable HIR and semantic state.
-pub(crate) fn semantic_completion_container(
-    snapshot: &AnalysisSnapshot,
-    hir: Option<&HirFile>,
+struct SemanticCompletionContainerInput<'a> {
+    hir: Option<&'a HirFile>,
     context: String,
     parent_path: Vec<String>,
     structural_containers: Vec<(String, Vec<String>)>,
@@ -110,13 +109,31 @@ pub(crate) fn semantic_completion_container(
     container_property: Option<ScriptProperty>,
     skip_type_instance: bool,
     properties: Vec<ScriptProperty>,
-    _bare_values: Vec<(String, TextRange)>,
     scope: ScopeContext,
     position: TextSize,
     quoted_depth: usize,
     embedded_value_context: Option<bool>,
+}
+
+fn semantic_completion_container(
+    snapshot: &AnalysisSnapshot,
+    input: SemanticCompletionContainerInput<'_>,
     quoted_scripts: &mut QuotedScriptSession<'_>,
 ) -> Result<SemanticCompletionContext, Cancelled> {
+    let SemanticCompletionContainerInput {
+        hir,
+        context,
+        parent_path,
+        structural_containers,
+        alternative_containers,
+        container_property,
+        skip_type_instance,
+        properties,
+        scope,
+        position,
+        quoted_depth,
+        embedded_value_context,
+    } = input;
     for property in &properties {
         let container_range = property.block_range.or_else(|| {
             property
@@ -135,19 +152,20 @@ pub(crate) fn semantic_completion_container(
         {
             return semantic_completion_container(
                 snapshot,
-                hir,
-                context.clone(),
-                parent_path.clone(),
-                structural_containers,
-                alternative_containers,
-                Some(property.clone()),
-                false,
-                property.block.clone(),
-                property.bare_values.clone(),
-                scope.clone(),
-                position,
-                quoted_depth,
-                embedded_value_context,
+                SemanticCompletionContainerInput {
+                    hir,
+                    context: context.clone(),
+                    parent_path: parent_path.clone(),
+                    structural_containers,
+                    alternative_containers,
+                    container_property: Some(property.clone()),
+                    skip_type_instance: false,
+                    properties: property.block.clone(),
+                    scope: scope.clone(),
+                    position,
+                    quoted_depth,
+                    embedded_value_context,
+                },
                 quoted_scripts,
             );
         }
@@ -170,43 +188,51 @@ pub(crate) fn semantic_completion_container(
             property,
         );
         let next_rule_refs = next_rules.iter().map(|(rule, _)| *rule).collect::<Vec<_>>();
-        let cached_child_fact = cached_scope_fact_for_property(
+        let cached_child_fact = cached_scope_fact_for_property(CachedScopeFactInput {
             snapshot,
             hir,
-            &context,
-            &parent_path,
+            context: &context,
+            parent_path: &parent_path,
             property,
-            &next_rule_refs,
-            None,
-            &scope,
+            matching: &next_rule_refs,
+            selected_alternative: None,
+            scope: &scope,
             transparent_wrapper,
-        );
+        });
         if let Some(fact) = cached_child_fact {
+            let current = SemanticCompletionContainer {
+                context: context.clone(),
+                parent_path: parent_path.clone(),
+                scope: scope.clone(),
+            };
+            let next = SemanticCompletionContainer {
+                context: fact.context.clone(),
+                parent_path: fact.parent_path.clone(),
+                scope: scope.clone(),
+            };
             let structural_containers = completion_structural_containers(
                 snapshot,
-                &context,
-                &parent_path,
+                &current,
                 &property.key,
                 transparent_wrapper,
-                &fact.context,
-                &fact.parent_path,
-                &scope,
+                &next,
             );
             return semantic_completion_container(
                 snapshot,
-                hir,
-                fact.context.clone(),
-                fact.parent_path.clone(),
-                structural_containers,
-                Vec::new(),
-                Some(property.clone()),
-                false,
-                property.block.clone(),
-                property.bare_values.clone(),
-                scope_context_from_hir(snapshot.game_profile_handle(), &fact.state),
-                position,
-                quoted_depth,
-                embedded_value_context,
+                SemanticCompletionContainerInput {
+                    hir,
+                    context: fact.context.clone(),
+                    parent_path: fact.parent_path.clone(),
+                    structural_containers,
+                    alternative_containers: Vec::new(),
+                    container_property: Some(property.clone()),
+                    skip_type_instance: false,
+                    properties: property.block.clone(),
+                    scope: scope_context_from_hir(snapshot.game_profile_handle(), &fact.state),
+                    position,
+                    quoted_depth,
+                    embedded_value_context,
+                },
                 quoted_scripts,
             );
         }
@@ -235,7 +261,7 @@ pub(crate) fn semantic_completion_container(
                     quoted_scripts.parse(origin.source(), quoted_depth)?
                 && let Some(decoded_position) = origin.decoded_position(&script, position)
             {
-                let (quoted_properties, quoted_values) = quoted_script_container(&script, origin);
+                let (quoted_properties, _) = quoted_script_container(&script, origin);
                 let value_context =
                     script_line_value_context(script.parsed().source(), decoded_position);
                 let alternatives = inferred
@@ -249,19 +275,20 @@ pub(crate) fn semantic_completion_container(
                     .collect();
                 return semantic_completion_container(
                     snapshot,
-                    None,
-                    primary.context.clone(),
-                    primary.parent_path.clone(),
-                    Vec::new(),
-                    alternatives,
-                    Some(property.clone()),
-                    false,
-                    quoted_properties,
-                    quoted_values,
-                    primary.scope.clone(),
-                    position,
-                    quoted_depth.saturating_add(1),
-                    Some(value_context),
+                    SemanticCompletionContainerInput {
+                        hir: None,
+                        context: primary.context.clone(),
+                        parent_path: primary.parent_path.clone(),
+                        structural_containers: Vec::new(),
+                        alternative_containers: alternatives,
+                        container_property: Some(property.clone()),
+                        skip_type_instance: false,
+                        properties: quoted_properties,
+                        scope: primary.scope.clone(),
+                        position,
+                        quoted_depth: quoted_depth.saturating_add(1),
+                        embedded_value_context: Some(value_context),
+                    },
                     quoted_scripts,
                 );
             }
@@ -312,15 +339,17 @@ pub(crate) fn semantic_completion_container(
             }
         });
         let alternative_containers = destinations.into_iter().skip(1).collect::<Vec<_>>();
+        let current = SemanticCompletionContainer {
+            context: context.clone(),
+            parent_path: parent_path.clone(),
+            scope: scope.clone(),
+        };
         let structural_containers = completion_structural_containers(
             snapshot,
-            &context,
-            &parent_path,
+            &current,
             &property.key,
             transparent_wrapper,
-            &primary.context,
-            &primary.parent_path,
-            &scope,
+            &primary,
         );
         let quoted_script = if quoted_script_rule.is_some()
             && property.block_range.is_none()
@@ -336,42 +365,44 @@ pub(crate) fn semantic_completion_container(
         if let Some((origin, script)) = quoted_script
             && let Some(decoded_position) = origin.decoded_position(&script, position)
         {
-            let (quoted_properties, quoted_values) = quoted_script_container(&script, origin);
+            let (quoted_properties, _) = quoted_script_container(&script, origin);
             let value_context =
                 script_line_value_context(script.parsed().source(), decoded_position);
             return semantic_completion_container(
                 snapshot,
-                None,
-                primary.context,
-                primary.parent_path,
-                structural_containers,
-                alternative_containers,
-                Some(property.clone()),
-                false,
-                quoted_properties,
-                quoted_values,
-                primary.scope,
-                position,
-                quoted_depth.saturating_add(1),
-                Some(value_context),
+                SemanticCompletionContainerInput {
+                    hir: None,
+                    context: primary.context,
+                    parent_path: primary.parent_path,
+                    structural_containers,
+                    alternative_containers,
+                    container_property: Some(property.clone()),
+                    skip_type_instance: false,
+                    properties: quoted_properties,
+                    scope: primary.scope,
+                    position,
+                    quoted_depth: quoted_depth.saturating_add(1),
+                    embedded_value_context: Some(value_context),
+                },
                 quoted_scripts,
             );
         }
         return semantic_completion_container(
             snapshot,
-            hir,
-            primary.context,
-            primary.parent_path,
-            structural_containers,
-            alternative_containers,
-            Some(property.clone()),
-            false,
-            property.block.clone(),
-            property.bare_values.clone(),
-            primary.scope,
-            position,
-            quoted_depth,
-            embedded_value_context,
+            SemanticCompletionContainerInput {
+                hir,
+                context: primary.context,
+                parent_path: primary.parent_path,
+                structural_containers,
+                alternative_containers,
+                container_property: Some(property.clone()),
+                skip_type_instance: false,
+                properties: property.block.clone(),
+                scope: primary.scope,
+                position,
+                quoted_depth,
+                embedded_value_context,
+            },
             quoted_scripts,
         );
     }
@@ -507,33 +538,36 @@ pub(crate) fn property_transition_rules<'rule>(
     out
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn completion_structural_containers(
     snapshot: &AnalysisSnapshot,
-    context: &str,
-    parent_path: &[String],
+    current: &SemanticCompletionContainer,
     property_key: &str,
     transparent_wrapper: bool,
-    next_context: &str,
-    next_path: &[String],
-    scope: &ScopeContext,
+    next: &SemanticCompletionContainer,
 ) -> Vec<(String, Vec<String>)> {
-    let mut structural_path = parent_path.to_vec();
+    let mut structural_path = current.parent_path.clone();
     if !transparent_wrapper {
         structural_path.push(property_key.to_owned());
     }
-    let destination_is_structural = next_context.eq_ignore_ascii_case(context)
-        && next_path.len() == structural_path.len()
-        && next_path
+    let destination_is_structural = next.context.eq_ignore_ascii_case(&current.context)
+        && next.parent_path.len() == structural_path.len()
+        && next
+            .parent_path
             .iter()
             .zip(&structural_path)
             .all(|(left, right)| left.eq_ignore_ascii_case(right));
     if destination_is_structural
-        || semantic_rules_for_container(snapshot, context, &structural_path, scope).is_empty()
+        || semantic_rules_for_container(
+            snapshot,
+            &current.context,
+            &structural_path,
+            &current.scope,
+        )
+        .is_empty()
     {
         Vec::new()
     } else {
-        vec![(context.to_owned(), structural_path)]
+        vec![(current.context.clone(), structural_path)]
     }
 }
 

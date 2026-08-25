@@ -698,7 +698,7 @@ fn roots_overlay_and_shards_preserve_shadowed_semantic_definitions() {
             .is_empty()
     );
 
-    let logical = LogicalPath::new("events/foo.txt");
+    let logical = LogicalPath::parse("events/foo.txt").expect("path");
     assert_eq!(
         snapshot
             .resolve(&logical)

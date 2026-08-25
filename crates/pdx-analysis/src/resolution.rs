@@ -196,197 +196,210 @@ fn collect_quoted_semantics(
     }
     let ParsedContent::Text(parsed) = &input.parsed;
     let mut quoted_scripts = QuotedScriptSession::new(cancellation);
+    let mut collector = QuotedSemanticCollector {
+        snapshot,
+        input,
+        data,
+        quoted_scripts: &mut quoted_scripts,
+    };
     for root in script_properties(input, parsed.root()) {
-        cancellation.checkpoint()?;
+        collector.quoted_scripts.cancellation().checkpoint()?;
         let Some(context) = semantic_root_context(snapshot, &root.key, input.path.as_ref()) else {
             continue;
         };
         let scope = semantic_initial_scope(snapshot, input, &context, &root.key, root.key_range);
-        collect_quoted_semantic_container(
-            snapshot,
-            input,
-            &context,
-            &[],
-            &scope,
-            &root.block,
-            false,
-            None,
-            None,
-            data,
-            cancellation,
-            &mut quoted_scripts,
-            0,
-        )?;
+        collector.collect(QuotedSemanticContainer {
+            context: &context,
+            parent_path: &[],
+            scope: &scope,
+            properties: &root.block,
+            embedded: false,
+            container_key: None,
+            container_property: None,
+            quoted_depth: 0,
+        })?;
     }
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-fn collect_quoted_semantic_container(
-    snapshot: &AnalysisSnapshot,
-    input: &ParsedInput,
-    context: &str,
-    parent_path: &[String],
-    scope: &ScopeContext,
-    properties: &[ScriptProperty],
+struct QuotedSemanticCollector<'snapshot, 'input, 'data, 'session, 'cancel> {
+    snapshot: &'snapshot AnalysisSnapshot,
+    input: &'input ParsedInput,
+    data: &'data mut SemanticFile,
+    quoted_scripts: &'session mut QuotedScriptSession<'cancel>,
+}
+
+struct QuotedSemanticContainer<'a> {
+    context: &'a str,
+    parent_path: &'a [String],
+    scope: &'a ScopeContext,
+    properties: &'a [ScriptProperty],
     embedded: bool,
-    container_key: Option<&str>,
-    container_property: Option<&ScriptProperty>,
-    data: &mut SemanticFile,
-    cancellation: &CancellationToken,
-    quoted_scripts: &mut QuotedScriptSession<'_>,
+    container_key: Option<&'a str>,
+    container_property: Option<&'a ScriptProperty>,
     quoted_depth: usize,
-) -> Result<(), Cancelled> {
-    for property in properties {
-        cancellation.checkpoint()?;
-        if embedded {
-            collect_embedded_property_semantics(
-                snapshot,
-                input,
-                context,
-                parent_path,
-                scope,
-                container_key,
-                property,
-                data,
-            );
-        }
-        if property.block_range.is_none()
-            && let Some(origin) = property.quoted_source.as_ref()
-            && let Some(invocation) = container_property
-        {
-            let inference_context = SemanticCompletionContext {
-                context: context.to_owned(),
-                parent_path: parent_path.to_vec(),
-                structural_containers: Vec::new(),
-                alternative_containers: Vec::new(),
-                scope: scope.clone(),
-                container_property: Some(invocation.clone()),
-                property: Some(property.clone()),
-                quoted_depth,
-                embedded_value_context: None,
-            };
-            let inferred = infer_macro_quoted_script_constraints(
-                snapshot,
-                &inference_context,
-                property,
-                cancellation,
-            )?;
-            if !inferred.is_empty() {
-                if let QuotedScriptParse::Parsed(script) =
-                    quoted_scripts.parse(origin.source(), quoted_depth)?
-                {
-                    let (quoted_properties, _) = quoted_script_container(&script, origin);
-                    for site in inferred {
-                        collect_quoted_semantic_container(
-                            snapshot,
-                            input,
-                            &site.context,
-                            &site.parent_path,
-                            &site.scope,
-                            &quoted_properties,
-                            true,
-                            None,
-                            None,
-                            data,
-                            cancellation,
-                            quoted_scripts,
-                            quoted_depth.saturating_add(1),
-                        )?;
+}
+
+impl QuotedSemanticCollector<'_, '_, '_, '_, '_> {
+    fn collect(&mut self, container: QuotedSemanticContainer<'_>) -> Result<(), Cancelled> {
+        for property in container.properties {
+            self.quoted_scripts.cancellation().checkpoint()?;
+            if container.embedded {
+                collect_embedded_property_semantics(
+                    EmbeddedSemanticInput {
+                        snapshot: self.snapshot,
+                        input: self.input,
+                        data: self.data,
+                    },
+                    container.context,
+                    container.parent_path,
+                    container.scope,
+                    container.container_key,
+                    property,
+                );
+            }
+            if property.block_range.is_none()
+                && let Some(origin) = property.quoted_source.as_ref()
+                && let Some(invocation) = container.container_property
+            {
+                let inference_context = SemanticCompletionContext {
+                    context: container.context.to_owned(),
+                    parent_path: container.parent_path.to_vec(),
+                    structural_containers: Vec::new(),
+                    alternative_containers: Vec::new(),
+                    scope: container.scope.clone(),
+                    container_property: Some(invocation.clone()),
+                    property: Some(property.clone()),
+                    quoted_depth: container.quoted_depth,
+                    embedded_value_context: None,
+                };
+                let inferred = infer_macro_quoted_script_constraints(
+                    self.snapshot,
+                    &inference_context,
+                    property,
+                    self.quoted_scripts.cancellation(),
+                )?;
+                if !inferred.is_empty() {
+                    if let QuotedScriptParse::Parsed(script) = self
+                        .quoted_scripts
+                        .parse(origin.source(), container.quoted_depth)?
+                    {
+                        let (quoted_properties, _) = quoted_script_container(&script, origin);
+                        for site in inferred {
+                            self.collect(QuotedSemanticContainer {
+                                context: &site.context,
+                                parent_path: &site.parent_path,
+                                scope: &site.scope,
+                                properties: &quoted_properties,
+                                embedded: true,
+                                container_key: None,
+                                container_property: None,
+                                quoted_depth: container.quoted_depth.saturating_add(1),
+                            })?;
+                        }
                     }
+                    continue;
                 }
+            }
+            let transparent = container.context.eq_ignore_ascii_case("trigger")
+                && self
+                    .snapshot
+                    .game_profile()
+                    .is_transparent_scope_wrapper(&property.key);
+            let matching = semantic_rules_for_container_key(
+                self.snapshot,
+                container.context,
+                container.parent_path,
+                &property.key,
+            )
+            .into_iter()
+            .filter(|rule| {
+                !matches!(rule.shape, RuleShape::LeafValue)
+                    && semantic_rule_key_matches(
+                        self.snapshot,
+                        rule,
+                        container.parent_path,
+                        &property.key,
+                    )
+            })
+            .collect::<Vec<_>>();
+            let Some(selected) = semantic_selected_transition(SemanticTransitionInput {
+                snapshot: self.snapshot,
+                matching: &matching,
+                selected_alternative: None,
+                context: container.context,
+                parent_path: container.parent_path,
+                property,
+                scope: container.scope,
+                transparent_wrapper: transparent,
+            }) else {
                 continue;
+            };
+            let (next_context, next_path) = semantic_transition_destination(
+                selected,
+                container.context,
+                container.parent_path,
+                &property.key,
+                transparent,
+            );
+            let next_scope = semantic_child_scope(self.snapshot, container.scope, selected);
+            if matches!(selected.shape, pdx_rules::RuleShape::QuotedScript) {
+                let Some(origin) = property.quoted_source.as_ref() else {
+                    continue;
+                };
+                let QuotedScriptParse::Parsed(script) = self
+                    .quoted_scripts
+                    .parse(origin.source(), container.quoted_depth)?
+                else {
+                    continue;
+                };
+                let (quoted_properties, _) = quoted_script_container(&script, origin);
+                self.collect(QuotedSemanticContainer {
+                    context: &next_context,
+                    parent_path: &next_path,
+                    scope: &next_scope,
+                    properties: &quoted_properties,
+                    embedded: true,
+                    container_key: None,
+                    container_property: None,
+                    quoted_depth: container.quoted_depth.saturating_add(1),
+                })?;
+            } else if property.block_range.is_some() {
+                self.collect(QuotedSemanticContainer {
+                    context: &next_context,
+                    parent_path: &next_path,
+                    scope: &next_scope,
+                    properties: &property.block,
+                    embedded: container.embedded,
+                    container_key: Some(&property.key),
+                    container_property: Some(property),
+                    quoted_depth: container.quoted_depth,
+                })?;
             }
         }
-        let transparent = context.eq_ignore_ascii_case("trigger")
-            && snapshot
-                .game_profile()
-                .is_transparent_scope_wrapper(&property.key);
-        let matching =
-            semantic_rules_for_container_key(snapshot, context, parent_path, &property.key)
-                .into_iter()
-                .filter(|rule| {
-                    !matches!(rule.shape, RuleShape::LeafValue)
-                        && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
-                })
-                .collect::<Vec<_>>();
-        let Some(selected) = semantic_selected_transition(
-            snapshot,
-            &matching,
-            None,
-            context,
-            parent_path,
-            property,
-            scope,
-            transparent,
-        ) else {
-            continue;
-        };
-        let (next_context, next_path) = semantic_transition_destination(
-            selected,
-            context,
-            parent_path,
-            &property.key,
-            transparent,
-        );
-        let next_scope = semantic_child_scope(snapshot, scope, selected);
-        if matches!(selected.shape, RuleShape::QuotedScript) {
-            let Some(origin) = property.quoted_source.as_ref() else {
-                continue;
-            };
-            let QuotedScriptParse::Parsed(script) =
-                quoted_scripts.parse(origin.source(), quoted_depth)?
-            else {
-                continue;
-            };
-            let (quoted_properties, _) = quoted_script_container(&script, origin);
-            collect_quoted_semantic_container(
-                snapshot,
-                input,
-                &next_context,
-                &next_path,
-                &next_scope,
-                &quoted_properties,
-                true,
-                None,
-                None,
-                data,
-                cancellation,
-                quoted_scripts,
-                quoted_depth.saturating_add(1),
-            )?;
-        } else if property.block_range.is_some() {
-            collect_quoted_semantic_container(
-                snapshot,
-                input,
-                &next_context,
-                &next_path,
-                &next_scope,
-                &property.block,
-                embedded,
-                Some(&property.key),
-                Some(property),
-                data,
-                cancellation,
-                quoted_scripts,
-                quoted_depth,
-            )?;
-        }
+        Ok(())
     }
-    Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+struct EmbeddedSemanticInput<'a> {
+    snapshot: &'a AnalysisSnapshot,
+    input: &'a ParsedInput,
+    data: &'a mut SemanticFile,
+}
+
 fn collect_embedded_property_semantics(
-    snapshot: &AnalysisSnapshot,
-    input: &ParsedInput,
+    source: EmbeddedSemanticInput<'_>,
     context: &str,
     parent_path: &[String],
     scope: &ScopeContext,
     container_key: Option<&str>,
     property: &ScriptProperty,
-    data: &mut SemanticFile,
 ) {
+    let EmbeddedSemanticInput {
+        snapshot,
+        input,
+        data,
+    } = source;
     if let Some((value, range)) = property.scalar.as_ref() {
         if let Some(kind) = input.profile.reference_kind(&property.key)
             && !value.is_empty()

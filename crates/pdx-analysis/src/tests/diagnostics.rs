@@ -1,5 +1,3 @@
-#![allow(unused_imports)]
-
 use super::support::*;
 use crate::{Diagnostic, DiagnosticCertainty, DiagnosticProvenance, Severity};
 
@@ -14,8 +12,6 @@ fn diagnostic_ids_are_pascal_case_and_metadata_is_structured() {
         DiagnosticCode::TargetWrongScope.as_str(),
         "TargetWrongScope"
     );
-    assert_eq!(DiagnosticCode::UnknownKey.legacy_str(), "pdx-unknown-key");
-
     let diagnostic = Diagnostic::new(
         DiagnosticCode::TargetWrongScope,
         Severity::Error,
@@ -1139,7 +1135,7 @@ fn scripted_macro_expansion_enforces_a_global_expansion_depth_limit() {
         results.iter().any(|diagnostic| {
             // Expansion limits mean this file was not fully validated (info), not that
             // the script is wrong.
-            diagnostic.code == DiagnosticCode::MacroExpansionLimit
+            diagnostic.code == DiagnosticCode::AnalysisIncomplete
                 && diagnostic.severity == 3
                 && diagnostic.message.contains("expansion depth")
         }),

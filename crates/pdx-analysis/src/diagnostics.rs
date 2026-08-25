@@ -331,22 +331,22 @@ pub(crate) fn semantic_rule_diagnostics(
             |property| (property.key.as_str(), property.key_range),
         );
         let scope = semantic_initial_scope(snapshot, input, &context, root_key, key_range);
-        validate_semantic_container(
+        validate_semantic_container(SemanticValidationInput {
             snapshot,
-            &context,
-            &[],
-            &roots,
-            &root_bare_values,
-            &scope,
-            input.hir.as_deref(),
-            &mut diagnostics,
+            context: &context,
+            parent_path: &[],
+            properties: &roots,
+            bare_values: &root_bare_values,
+            scope: &scope,
+            hir: input.hir.as_deref(),
+            diagnostics: &mut diagnostics,
             cancellation,
-            true,
-            parsed.root().range(),
-            &mut expansion,
-            &mut quoted_scripts,
-            0,
-        )?;
+            block_container: true,
+            container_range: parsed.root().range(),
+            expansion: &mut expansion,
+            quoted_scripts: &mut quoted_scripts,
+            quoted_script_depth: 0,
+        })?;
         return Ok(diagnostics);
     }
     for property in roots {
@@ -394,40 +394,40 @@ pub(crate) fn semantic_rule_diagnostics(
                 }
                 let child_scope =
                     semantic_initial_scope(snapshot, input, &context, &child.key, child.key_range);
-                validate_semantic_container(
+                validate_semantic_container(SemanticValidationInput {
                     snapshot,
-                    &context,
-                    &[],
-                    &child.block,
-                    &child.bare_values,
-                    &child_scope,
-                    input.hir.as_deref(),
-                    &mut container_diagnostics,
+                    context: &context,
+                    parent_path: &[],
+                    properties: &child.block,
+                    bare_values: &child.bare_values,
+                    scope: &child_scope,
+                    hir: input.hir.as_deref(),
+                    diagnostics: &mut container_diagnostics,
                     cancellation,
-                    child.block_range.is_some(),
-                    child.block_range.unwrap_or(child.key_range),
-                    &mut expansion,
-                    &mut quoted_scripts,
-                    0,
-                )?;
+                    block_container: child.block_range.is_some(),
+                    container_range: child.block_range.unwrap_or(child.key_range),
+                    expansion: &mut expansion,
+                    quoted_scripts: &mut quoted_scripts,
+                    quoted_script_depth: 0,
+                })?;
             }
         } else {
-            validate_semantic_container(
+            validate_semantic_container(SemanticValidationInput {
                 snapshot,
-                &context,
-                &[],
-                &property.block,
-                &property.bare_values,
-                &scope,
-                input.hir.as_deref(),
-                &mut container_diagnostics,
+                context: &context,
+                parent_path: &[],
+                properties: &property.block,
+                bare_values: &property.bare_values,
+                scope: &scope,
+                hir: input.hir.as_deref(),
+                diagnostics: &mut container_diagnostics,
                 cancellation,
-                property.block_range.is_some(),
-                property.block_range.unwrap_or(property.key_range),
-                &mut expansion,
-                &mut quoted_scripts,
-                0,
-            )?;
+                block_container: property.block_range.is_some(),
+                container_range: property.block_range.unwrap_or(property.key_range),
+                expansion: &mut expansion,
+                quoted_scripts: &mut quoted_scripts,
+                quoted_script_depth: 0,
+            })?;
         }
         if fallback_context {
             // A path-only context is still enough to establish that an authored key is not
@@ -461,23 +461,42 @@ fn semantic_diagnostic(
     })
 }
 
-#[allow(clippy::too_many_arguments)] // Recursive validation carries explicit semantic state.
-pub(crate) fn validate_semantic_container(
-    snapshot: &AnalysisSnapshot,
-    context: &str,
-    parent_path: &[String],
-    properties: &[ScriptProperty],
-    bare_values: &[(String, TextRange)],
-    scope: &ScopeContext,
-    hir: Option<&HirFile>,
-    diagnostics: &mut Vec<Diagnostic>,
-    cancellation: &CancellationToken,
+struct SemanticValidationInput<'data, 'hir, 'session, 'cancel> {
+    snapshot: &'data AnalysisSnapshot,
+    context: &'data str,
+    parent_path: &'data [String],
+    properties: &'data [ScriptProperty],
+    bare_values: &'data [(String, TextRange)],
+    scope: &'data ScopeContext,
+    hir: Option<&'hir HirFile>,
+    diagnostics: &'data mut Vec<Diagnostic>,
+    cancellation: &'data CancellationToken,
     block_container: bool,
     container_range: TextRange,
-    expansion: &mut MacroExpansionSession,
-    quoted_scripts: &mut QuotedScriptSession<'_>,
+    expansion: &'data mut MacroExpansionSession,
+    quoted_scripts: &'session mut QuotedScriptSession<'cancel>,
     quoted_script_depth: usize,
+}
+
+fn validate_semantic_container(
+    input: SemanticValidationInput<'_, '_, '_, '_>,
 ) -> Result<(), Cancelled> {
+    let SemanticValidationInput {
+        snapshot,
+        context,
+        parent_path,
+        properties,
+        bare_values,
+        scope,
+        hir,
+        diagnostics,
+        cancellation,
+        block_container,
+        container_range,
+        expansion,
+        quoted_scripts,
+        quoted_script_depth,
+    } = input;
     cancellation.checkpoint()?;
     let rules = semantic_rules_for_container(snapshot, context, parent_path, scope);
     if rules.is_empty() {
@@ -677,14 +696,16 @@ pub(crate) fn validate_semantic_container(
                 && !parameterized_invocation
             {
                 validate_scripted_macro_expansion(
-                    snapshot,
+                    ValidationState {
+                        snapshot,
+                        diagnostics,
+                        cancellation,
+                        expansion,
+                        quoted_scripts,
+                    },
                     applicable,
                     property,
                     scope,
-                    diagnostics,
-                    cancellation,
-                    expansion,
-                    quoted_scripts,
                     quoted_script_depth,
                 )?;
             }
@@ -723,17 +744,17 @@ pub(crate) fn validate_semantic_container(
                 ));
             }
         }
-        let cached_child_fact = cached_scope_fact_for_property(
+        let cached_child_fact = cached_scope_fact_for_property(CachedScopeFactInput {
             snapshot,
             hir,
             context,
             parent_path,
             property,
-            &matching,
-            selected_alternative.as_deref(),
+            matching: &matching,
+            selected_alternative: selected_alternative.as_deref(),
             scope,
             transparent_wrapper,
-        );
+        });
         let destination = if let Some(fact) = cached_child_fact {
             Some((
                 fact.context.clone(),
@@ -750,16 +771,16 @@ pub(crate) fn validate_semantic_container(
             next_scope.current = "any".to_owned();
             Some((context.to_owned(), parent_path.to_vec(), next_scope))
         } else {
-            semantic_selected_transition(
+            semantic_selected_transition(SemanticTransitionInput {
                 snapshot,
-                &matching,
-                selected_alternative.as_deref(),
+                matching: &matching,
+                selected_alternative: selected_alternative.as_deref(),
                 context,
                 parent_path,
                 property,
                 scope,
                 transparent_wrapper,
-            )
+            })
             .map(|rule| {
                 let (next_context, child_path) = semantic_transition_destination(
                     rule,
@@ -780,47 +801,49 @@ pub(crate) fn validate_semantic_container(
             let structural_rules =
                 semantic_rules_for_container(snapshot, context, &structural_path, scope);
             if !structural_rules.is_empty() {
-                validate_semantic_container(
+                validate_semantic_container(SemanticValidationInput {
                     snapshot,
                     context,
-                    &structural_path,
-                    &property.block,
-                    &property.bare_values,
+                    parent_path: &structural_path,
+                    properties: &property.block,
+                    bare_values: &property.bare_values,
                     scope,
                     hir,
                     diagnostics,
                     cancellation,
-                    property.block_range.is_some(),
-                    property.block_range.unwrap_or(property.key_range),
+                    block_container: property.block_range.is_some(),
+                    container_range: property.block_range.unwrap_or(property.key_range),
                     expansion,
                     quoted_scripts,
                     quoted_script_depth,
-                )?;
+                })?;
             }
             continue;
         };
-        let quoted_transition = semantic_selected_transition(
+        let quoted_transition = semantic_selected_transition(SemanticTransitionInput {
             snapshot,
-            &matching,
-            selected_alternative.as_deref(),
+            matching: &matching,
+            selected_alternative: selected_alternative.as_deref(),
             context,
             parent_path,
             property,
             scope,
             transparent_wrapper,
-        )
+        })
         .filter(|rule| matches!(rule.shape, RuleShape::QuotedScript));
         if quoted_transition.is_some() {
             validate_quoted_script(
-                snapshot,
+                ValidationState {
+                    snapshot,
+                    diagnostics,
+                    cancellation,
+                    expansion,
+                    quoted_scripts,
+                },
                 &next_context,
                 &child_path,
                 &next_scope,
                 property,
-                diagnostics,
-                cancellation,
-                expansion,
-                quoted_scripts,
                 quoted_script_depth,
             )?;
             continue;
@@ -866,57 +889,57 @@ pub(crate) fn validate_semantic_container(
                                 && semantic_leaf_value_matches(snapshot, rule, value, &next_scope)
                         })
                     });
-                validate_semantic_container(
+                validate_semantic_container(SemanticValidationInput {
                     snapshot,
                     context,
-                    &structural_path,
-                    &structural_properties,
-                    &structural_values,
-                    &next_scope,
+                    parent_path: &structural_path,
+                    properties: &structural_properties,
+                    bare_values: &structural_values,
+                    scope: &next_scope,
                     hir,
                     diagnostics,
                     cancellation,
-                    true,
-                    property.block_range.unwrap_or(property.key_range),
+                    block_container: true,
+                    container_range: property.block_range.unwrap_or(property.key_range),
                     expansion,
                     quoted_scripts,
                     quoted_script_depth,
-                )?;
-                validate_semantic_container(
+                })?;
+                validate_semantic_container(SemanticValidationInput {
                     snapshot,
-                    &next_context,
-                    &child_path,
-                    &transition_properties,
-                    &transition_values,
-                    &next_scope,
+                    context: &next_context,
+                    parent_path: &child_path,
+                    properties: &transition_properties,
+                    bare_values: &transition_values,
+                    scope: &next_scope,
                     hir,
                     diagnostics,
                     cancellation,
-                    true,
-                    property.block_range.unwrap_or(property.key_range),
+                    block_container: true,
+                    container_range: property.block_range.unwrap_or(property.key_range),
                     expansion,
                     quoted_scripts,
                     quoted_script_depth,
-                )?;
+                })?;
                 continue;
             }
         }
-        validate_semantic_container(
+        validate_semantic_container(SemanticValidationInput {
             snapshot,
-            &next_context,
-            &child_path,
-            &property.block,
-            &property.bare_values,
-            &next_scope,
+            context: &next_context,
+            parent_path: &child_path,
+            properties: &property.block,
+            bare_values: &property.bare_values,
+            scope: &next_scope,
             hir,
             diagnostics,
             cancellation,
-            property.block_range.is_some(),
-            property.block_range.unwrap_or(property.key_range),
+            block_container: property.block_range.is_some(),
+            container_range: property.block_range.unwrap_or(property.key_range),
             expansion,
             quoted_scripts,
             quoted_script_depth,
-        )?;
+        })?;
     }
     for (value, value_range) in bare_values {
         cancellation.checkpoint()?;
@@ -1054,19 +1077,29 @@ fn property_contains_parameter_token(property: &ScriptProperty) -> bool {
         || property.block.iter().any(property_contains_parameter_token)
 }
 
-#[allow(clippy::too_many_arguments)]
+struct ValidationState<'data, 'session, 'cancel> {
+    snapshot: &'data AnalysisSnapshot,
+    diagnostics: &'data mut Vec<Diagnostic>,
+    cancellation: &'data CancellationToken,
+    expansion: &'data mut MacroExpansionSession,
+    quoted_scripts: &'session mut QuotedScriptSession<'cancel>,
+}
+
 fn validate_quoted_script(
-    snapshot: &AnalysisSnapshot,
+    state: ValidationState<'_, '_, '_>,
     context: &str,
     parent_path: &[String],
     scope: &ScopeContext,
     property: &ScriptProperty,
-    diagnostics: &mut Vec<Diagnostic>,
-    cancellation: &CancellationToken,
-    expansion: &mut MacroExpansionSession,
-    quoted_scripts: &mut QuotedScriptSession<'_>,
     depth: usize,
 ) -> Result<(), Cancelled> {
+    let ValidationState {
+        snapshot,
+        diagnostics,
+        cancellation,
+        expansion,
+        quoted_scripts,
+    } = state;
     cancellation.checkpoint()?;
     let range = property
         .scalar
@@ -1109,22 +1142,22 @@ fn validate_quoted_script(
         ));
     }
     let (properties, bare_values) = quoted_script_container(&script, origin);
-    validate_semantic_container(
+    validate_semantic_container(SemanticValidationInput {
         snapshot,
         context,
         parent_path,
-        &properties,
-        &bare_values,
+        properties: &properties,
+        bare_values: &bare_values,
         scope,
-        None,
+        hir: None,
         diagnostics,
         cancellation,
-        true,
-        range,
+        block_container: true,
+        container_range: range,
         expansion,
         quoted_scripts,
-        depth.saturating_add(1),
-    )
+        quoted_script_depth: depth.saturating_add(1),
+    })
 }
 
 fn owner_local_parameter_in_range(
@@ -1142,18 +1175,20 @@ fn owner_local_parameter_in_range(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn validate_scripted_macro_expansion(
-    snapshot: &AnalysisSnapshot,
+    state: ValidationState<'_, '_, '_>,
     rules: &[&pdx_rules::SemanticRule],
     property: &ScriptProperty,
     scope: &ScopeContext,
-    diagnostics: &mut Vec<Diagnostic>,
-    cancellation: &CancellationToken,
-    expansion: &mut MacroExpansionSession,
-    quoted_scripts: &mut QuotedScriptSession<'_>,
     quoted_script_depth: usize,
 ) -> Result<(), Cancelled> {
+    let ValidationState {
+        snapshot,
+        diagnostics,
+        cancellation,
+        expansion,
+        quoted_scripts,
+    } = state;
     let Some(type_name) = rules.iter().find_map(|rule| match &rule.key {
         pdx_rules::KeyMatcher::Type(type_name) | pdx_rules::KeyMatcher::Dynamic(type_name)
             if scripted_macro_type(snapshot, type_name) =>
@@ -1236,22 +1271,22 @@ fn validate_scripted_macro_expansion(
         }
     };
     let first_expanded_diagnostic = diagnostics.len();
-    let validation = validate_semantic_container(
+    let validation = validate_semantic_container(SemanticValidationInput {
         snapshot,
-        &resolved.body_context,
-        &[],
-        &expanded.properties,
-        &expanded.bare_values,
+        context: &resolved.body_context,
+        parent_path: &[],
+        properties: &expanded.properties,
+        bare_values: &expanded.bare_values,
         scope,
-        None,
+        hir: None,
         diagnostics,
         cancellation,
-        true,
-        property.key_range,
+        block_container: true,
+        container_range: property.key_range,
         expansion,
         quoted_scripts,
-        0,
-    );
+        quoted_script_depth: 0,
+    });
     expansion.leave();
     validation?;
     let expanded_diagnostic_count = diagnostics.len().saturating_sub(first_expanded_diagnostic);

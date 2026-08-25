@@ -24,7 +24,7 @@ and Paradox Interactive are trademarks of their respective owners.
 - Syntax and semantic diagnostics driven by a validated first-party EU4 rules database.
 - Diagnostics expose stable PascalCase IDs such as `UnknownKey`, `UnknownBareValue`,
   `UnknownScope`, and `TargetWrongScope`; severity is typed internally and LSP metadata carries
-  certainty and rule provenance (with a legacy code in `data` for migration).
+  certainty without exposing internal rule provenance or legacy migration fields.
 - Completion, hover, go-to-definition, references, and document/workspace symbols.
 - Conflict-aware rename restricted to writable Mod sources.
 - A conservative formatter that refuses to rewrite unsafe or malformed files.
@@ -77,6 +77,10 @@ Standalone `pdx` / `pdx-ls` binaries for Linux (x86_64, aarch64), macOS (x86_64,
 Windows (x86_64) are attached to each [GitHub Release](https://github.com/danxiaogu520/ParadoxCode/releases)
 as `.tar.gz`/`.zip` archives with `.sha256` sidecars. The language server embeds the first-party
 EU4 rule source and never imports external rule files.
+
+`pdx-ls` requires modern LSP initialization with at least one `workspaceFolders` entry. Clients
+that send only the deprecated `rootUri` field are intentionally unsupported and receive an
+`INVALID_PARAMS` response; use a current LSP client or upgrade the editor integration.
 
 ## Project status
 

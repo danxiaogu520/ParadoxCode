@@ -198,7 +198,7 @@ impl SnapshotRequestContext {
 
     /// Mission-tree preview for caller-supplied document text: the same
     /// literal grid layout and EMT arrow geometry the game uses, returned as
-    /// renderer-ready world coordinates and byte spans. This is the data
+    /// renderer-ready world coordinates and UTF-16 source ranges. This is the data
     /// behind the VSCode mission-tree webview; renderers never recompute
     /// layout semantics.
     fn mission_preview(&self, params: Option<&Value>) -> Result<Value, RpcError> {
@@ -290,8 +290,6 @@ impl SnapshotRequestContext {
                 let title = titles.get(&title_key).map(
                     |(language, value)| serde_json::json!({ "language": language, "value": value }),
                 );
-                let start = usize::try_from(mission.span.start()).unwrap_or(0);
-                let end = usize::try_from(mission.span.end()).unwrap_or(start);
                 let source_range =
                     line_index
                         .position_range(&params.text, mission.span)
@@ -317,8 +315,6 @@ impl SnapshotRequestContext {
                     "required": mission.required,
                     "x": x,
                     "y": y,
-                    "start": start,
-                    "end": end,
                     "sourceRange": source_range,
                     "isRoot": is_root,
                     "hasError": error_missions.contains(mission.id.as_str()),
@@ -374,8 +370,6 @@ impl SnapshotRequestContext {
         for (slot, trees) in columns {
             for (i, tree_index) in trees.iter().enumerate() {
                 let tree = &file.trees[*tree_index];
-                let start = usize::try_from(tree.span.start()).unwrap_or(0);
-                let end = usize::try_from(tree.span.end()).unwrap_or(start);
                 let source_range =
                     line_index
                         .position_range(&params.text, tree.span)
@@ -397,8 +391,6 @@ impl SnapshotRequestContext {
                     "x": geometry::ORIGIN.0
                         + (slot - 1) as f32 * (geometry::NODE_WIDTH + geometry::GAP_X),
                     "y": geometry::ORIGIN.1 - 30.0 - i as f32 * 18.0,
-                    "start": start,
-                    "end": end,
                     "sourceRange": source_range,
                 }));
             }
@@ -798,7 +790,7 @@ impl SnapshotRequestContext {
         )
     }
 
-    #[allow(clippy::mutable_key_type)] // lsp_types::Uri contains an internal parse cache.
+    #[expect(clippy::mutable_key_type)] // URI is the protocol's stable document key; lsp_types::Uri contains an internal parse cache.
     fn rename(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<RenameParams>(params, "rename")?;
         let (id, position) = self.offset_for(&params.text_document_position)?;
@@ -824,7 +816,7 @@ impl SnapshotRequestContext {
         typed_value(WorkspaceEdit::new(changes), "rename response")
     }
 
-    #[allow(deprecated)]
+    #[expect(deprecated)] // LSP response types retain this optional field for wire-shape completeness.
     fn document_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<DocumentSymbolParams>(params, "document symbols")?;
         let id = DocumentId::new(params.text_document.uri.as_str());
@@ -897,7 +889,7 @@ impl SnapshotRequestContext {
         typed_value(edits, "formatting response")
     }
 
-    #[allow(deprecated)]
+    #[expect(deprecated)] // LSP response types retain this optional field for wire-shape completeness.
     fn workspace_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<WorkspaceSymbolParams>(params, "workspace symbols")?;
         let result =

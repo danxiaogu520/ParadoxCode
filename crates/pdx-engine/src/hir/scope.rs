@@ -16,7 +16,13 @@ pub(super) fn lower_scope_facts(
         return Vec::new();
     };
     let property_children = property_children(properties);
-    let mut facts = Vec::new();
+    let mut lowering = ScopeFactLowering {
+        properties,
+        property_children: &property_children,
+        rules,
+        profile,
+        facts: Vec::new(),
+    };
     for (property_index, property) in properties
         .iter()
         .enumerate()
@@ -25,29 +31,20 @@ pub(super) fn lower_scope_facts(
         let Some(context) = semantic_root_context(rules, logical_path, &property.key) else {
             continue;
         };
-        facts.push(ScopeFact {
+        lowering.facts.push(ScopeFact {
             range: property.key_range,
             state: initial_scope_state(rules, profile, &context, &property.key),
             context: context.clone(),
             parent_path: Vec::new(),
         });
-        let initial = facts
+        let initial = lowering
+            .facts
             .last()
             .expect("root fact was just inserted")
             .state
             .clone();
         let Some(type_name) = context.strip_prefix("type:") else {
-            lower_nested_scope_facts(
-                properties,
-                &property_children,
-                property_index,
-                rules,
-                profile,
-                &context,
-                &[],
-                &initial,
-                &mut facts,
-            );
+            lowering.lower_nested(property_index, &context, &[], &initial);
             continue;
         };
         let skip_root = rules
@@ -63,43 +60,23 @@ pub(super) fn lower_scope_facts(
                 })
             });
         if !skip_root {
-            lower_nested_scope_facts(
-                properties,
-                &property_children,
-                property_index,
-                rules,
-                profile,
-                &context,
-                &[],
-                &initial,
-                &mut facts,
-            );
+            lowering.lower_nested(property_index, &context, &[], &initial);
             continue;
         }
         for &child_index in &property_children[property_index] {
             let child = &properties[child_index];
             let child_state = initial_scope_state(rules, profile, &context, &child.key);
-            facts.push(ScopeFact {
+            lowering.facts.push(ScopeFact {
                 range: child.key_range,
                 state: child_state.clone(),
                 context: context.clone(),
                 parent_path: Vec::new(),
             });
-            lower_nested_scope_facts(
-                properties,
-                &property_children,
-                child_index,
-                rules,
-                profile,
-                &context,
-                &[],
-                &child_state,
-                &mut facts,
-            );
+            lowering.lower_nested(child_index, &context, &[], &child_state);
         }
     }
-    facts.sort_by_key(|fact| fact.range);
-    facts
+    lowering.facts.sort_by_key(|fact| fact.range);
+    lowering.facts
 }
 
 pub(crate) fn property_children(properties: &[HirProperty]) -> Vec<Vec<usize>> {
@@ -180,90 +157,100 @@ fn scope_transition_rules<'rule>(
     if strong.is_empty() { weak } else { strong }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn lower_nested_scope_facts(
-    properties: &[HirProperty],
-    property_children: &[Vec<usize>],
-    parent_index: usize,
-    rules: &RuleSet,
-    profile: &GameProfile,
-    context: &str,
-    parent_path: &[String],
-    state: &ScopeState,
-    facts: &mut Vec<ScopeFact>,
-) {
-    for &property_index in &property_children[parent_index] {
-        let property = &properties[property_index];
-        let matching =
-            scope_transition_rules(rules, context, parent_path, &property.key, profile, state);
-        facts.push(ScopeFact {
-            range: property.key_range,
-            context: context.to_owned(),
-            parent_path: parent_path.to_vec(),
-            state: state.clone(),
-        });
-        let transparent = context.eq_ignore_ascii_case("trigger")
-            && profile.is_transparent_scope_wrapper(&property.key);
-        let Some(rule) = statically_selected_transition(
-            &matching,
-            properties,
-            property_children,
-            property_index,
-            rules,
-            context,
-            parent_path,
-            transparent,
-        ) else {
-            continue;
-        };
-        let (next_context, next_path) =
-            transition_destination(rule, context, parent_path, &property.key, transparent);
-        let next_state = child_scope_state(state, rule, rules, profile);
-        lower_nested_scope_facts(
-            properties,
-            property_children,
-            property_index,
-            rules,
-            profile,
-            &next_context,
-            &next_path,
-            &next_state,
-            facts,
-        );
+struct ScopeFactLowering<'a> {
+    properties: &'a [HirProperty],
+    property_children: &'a [Vec<usize>],
+    rules: &'a RuleSet,
+    profile: &'a GameProfile,
+    facts: Vec<ScopeFact>,
+}
+
+impl ScopeFactLowering<'_> {
+    fn lower_nested(
+        &mut self,
+        parent_index: usize,
+        context: &str,
+        parent_path: &[String],
+        state: &ScopeState,
+    ) {
+        for &property_index in &self.property_children[parent_index] {
+            let property = &self.properties[property_index];
+            let matching = scope_transition_rules(
+                self.rules,
+                context,
+                parent_path,
+                &property.key,
+                self.profile,
+                state,
+            );
+            self.facts.push(ScopeFact {
+                range: property.key_range,
+                context: context.to_owned(),
+                parent_path: parent_path.to_vec(),
+                state: state.clone(),
+            });
+            let transparent = context.eq_ignore_ascii_case("trigger")
+                && self.profile.is_transparent_scope_wrapper(&property.key);
+            let Some(rule) = statically_selected_transition(StaticTransitionInput {
+                matching: &matching,
+                properties: self.properties,
+                property_children: self.property_children,
+                property_index,
+                rules: self.rules,
+                context,
+                parent_path,
+                transparent,
+            }) else {
+                continue;
+            };
+            let (next_context, next_path) =
+                transition_destination(rule, context, parent_path, &property.key, transparent);
+            let next_state = child_scope_state(state, rule, self.rules, self.profile);
+            self.lower_nested(property_index, &next_context, &next_path, &next_state);
+        }
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+pub(crate) struct StaticTransitionInput<'data, 'rule> {
+    pub(crate) matching: &'data [&'rule SemanticRule],
+    pub(crate) properties: &'data [HirProperty],
+    pub(crate) property_children: &'data [Vec<usize>],
+    pub(crate) property_index: usize,
+    pub(crate) rules: &'data RuleSet,
+    pub(crate) context: &'data str,
+    pub(crate) parent_path: &'data [String],
+    pub(crate) transparent: bool,
+}
+
 pub(crate) fn statically_selected_transition<'rule>(
-    matching: &[&'rule SemanticRule],
-    properties: &[HirProperty],
-    property_children: &[Vec<usize>],
-    property_index: usize,
-    rules: &RuleSet,
-    context: &str,
-    parent_path: &[String],
-    transparent: bool,
+    input: StaticTransitionInput<'_, 'rule>,
 ) -> Option<&'rule SemanticRule> {
-    if let Some(rule) = equivalent_transition(matching) {
+    if let Some(rule) = equivalent_transition(input.matching) {
         return Some(rule);
     }
-    let children = &property_children[property_index];
+    let children = &input.property_children[input.property_index];
     if children.is_empty() {
         return None;
     }
-    let property = &properties[property_index];
-    let possible = matching
+    let property = &input.properties[input.property_index];
+    let possible = input
+        .matching
         .iter()
         .copied()
         .filter(|candidate| {
-            let (child_context, child_path) =
-                transition_destination(candidate, context, parent_path, &property.key, transparent);
+            let (child_context, child_path) = transition_destination(
+                candidate,
+                input.context,
+                input.parent_path,
+                &property.key,
+                input.transparent,
+            );
             children.iter().all(|child_index| {
                 child_key_may_match(
-                    rules,
+                    input.rules,
                     &child_context,
                     &child_path,
-                    &properties[*child_index].key,
+                    &input.properties[*child_index].key,
                 )
             })
         })

@@ -90,7 +90,7 @@ fn memory_transport_runs_real_json_rpc_lifecycle_and_sync() {
     let uri = path_to_uri(&path);
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"shutdown","params":{}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"rootUri":uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"workspaceFolders":[{"uri":uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({
             "jsonrpc":"2.0",
@@ -174,8 +174,8 @@ fn memory_transport_runs_real_json_rpc_lifecycle_and_sync() {
 #[test]
 fn typed_protocol_rejects_malformed_params_without_corrupting_lifecycle() {
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp"}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":"file:///tmp","name":"test"}]}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"workspaceFolders":[{"uri":"file:///tmp","name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{}}),
         json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
@@ -210,5 +210,45 @@ fn typed_protocol_rejects_malformed_params_without_corrupting_lifecycle() {
         .find(|value| value["id"] == 3)
         .expect("invalid hover");
     assert_eq!(malformed_hover["error"]["code"], INVALID_PARAMS);
+    assert_eq!(server.state(), ServerState::Exited);
+}
+
+#[test]
+fn initialize_rejects_root_uri_only_clients() {
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"workspaceFolders":[{"uri":"file:///tmp","name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("server");
+
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+
+    let responses = decode_frames(&output);
+    let initialize = responses
+        .iter()
+        .find(|value| value["id"] == 1)
+        .expect("initialize response");
+    assert_eq!(initialize["error"]["code"], INVALID_PARAMS);
+    assert_eq!(
+        initialize["error"]["message"],
+        "initialize requires at least one workspace folder; rootUri-only clients are not supported"
+    );
+    assert!(
+        responses
+            .iter()
+            .find(|value| value["id"] == 2)
+            .is_some_and(|value| value["result"]["capabilities"].is_object())
+    );
+    assert!(
+        responses
+            .iter()
+            .any(|value| value["id"] == 3 && value["result"].is_null())
+    );
     assert_eq!(server.state(), ServerState::Exited);
 }

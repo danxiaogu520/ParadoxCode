@@ -186,67 +186,76 @@ pub(crate) fn semantic_file_root_context(
 ) -> Option<String> {
     hir_semantic_file_root_context(snapshot.rules(), logical_path)
 }
-#[allow(clippy::too_many_arguments)]
+pub(crate) struct CachedScopeFactInput<'data, 'hir> {
+    pub(crate) snapshot: &'data AnalysisSnapshot,
+    pub(crate) hir: Option<&'hir HirFile>,
+    pub(crate) context: &'data str,
+    pub(crate) parent_path: &'data [String],
+    pub(crate) property: &'data ScriptProperty,
+    pub(crate) matching: &'data [&'hir pdx_rules::SemanticRule],
+    pub(crate) selected_alternative: Option<&'data str>,
+    pub(crate) scope: &'data ScopeContext,
+    pub(crate) transparent_wrapper: bool,
+}
+
 pub(crate) fn cached_scope_fact_for_property<'hir>(
-    snapshot: &AnalysisSnapshot,
-    hir: Option<&'hir HirFile>,
-    context: &str,
-    parent_path: &[String],
-    property: &ScriptProperty,
-    matching: &[&pdx_rules::SemanticRule],
-    selected_alternative: Option<&str>,
-    scope: &ScopeContext,
-    transparent_wrapper: bool,
+    input: CachedScopeFactInput<'_, 'hir>,
 ) -> Option<&'hir pdx_engine::hir::ScopeFact> {
-    let fact = property
+    let fact = input
+        .property
         .block
         .iter()
-        .find_map(|child| hir.and_then(|hir| hir.scope_fact_at(child.key_range)))?;
+        .find_map(|child| input.hir.and_then(|hir| hir.scope_fact_at(child.key_range)))?;
 
     // HIR cannot inspect the workspace while lowering, so a cached dynamic transition is only
     // authoritative once analysis confirms the member. A missing index member is accepted only
     // when the first-party descriptor's negative/positive key filter proves it structurally.
-    let mut transition_matching = matching.to_vec();
+    let mut transition_matching = input.matching.to_vec();
     if transition_matching.is_empty() {
-        transition_matching =
-            semantic_rules_for_container_key(snapshot, context, parent_path, &property.key)
-                .into_iter()
-                .filter(|rule| {
-                    !matches!(rule.shape, RuleShape::LeafValue)
-                        && semantic_scope_allows(rule, scope)
-                        && match &rule.key {
-                            KeyMatcher::Type(type_name) => {
-                                match workspace_type_member(snapshot, type_name, &property.key) {
-                                    WorkspaceTypeMember::Present => true,
-                                    WorkspaceTypeMember::Absent => false,
-                                    WorkspaceTypeMember::Unknown => type_member_provably_valid(
-                                        snapshot,
-                                        type_name,
-                                        &property.key,
-                                    ),
-                                }
-                            }
-                            _ => false,
+        transition_matching = semantic_rules_for_container_key(
+            input.snapshot,
+            input.context,
+            input.parent_path,
+            &input.property.key,
+        )
+        .into_iter()
+        .filter(|rule| {
+            !matches!(rule.shape, RuleShape::LeafValue)
+                && semantic_scope_allows(rule, input.scope)
+                && match &rule.key {
+                    KeyMatcher::Type(type_name) => {
+                        match workspace_type_member(input.snapshot, type_name, &input.property.key)
+                        {
+                            WorkspaceTypeMember::Present => true,
+                            WorkspaceTypeMember::Absent => false,
+                            WorkspaceTypeMember::Unknown => type_member_provably_valid(
+                                input.snapshot,
+                                type_name,
+                                &input.property.key,
+                            ),
                         }
-                })
-                .collect();
+                    }
+                    _ => false,
+                }
+        })
+        .collect();
     }
-    let selected = semantic_selected_transition(
-        snapshot,
-        &transition_matching,
-        selected_alternative,
-        context,
-        parent_path,
-        property,
-        scope,
-        transparent_wrapper,
-    )?;
+    let selected = semantic_selected_transition(SemanticTransitionInput {
+        snapshot: input.snapshot,
+        matching: &transition_matching,
+        selected_alternative: input.selected_alternative,
+        context: input.context,
+        parent_path: input.parent_path,
+        property: input.property,
+        scope: input.scope,
+        transparent_wrapper: input.transparent_wrapper,
+    })?;
     let (expected_context, expected_path) = semantic_transition_destination(
         selected,
-        context,
-        parent_path,
-        &property.key,
-        transparent_wrapper,
+        input.context,
+        input.parent_path,
+        &input.property.key,
+        input.transparent_wrapper,
     );
     (fact.context.eq_ignore_ascii_case(&expected_context)
         && fact.parent_path.len() == expected_path.len()
@@ -279,50 +288,68 @@ pub(crate) fn semantic_rule_is_alias_definition(rule: &pdx_rules::SemanticRule) 
     rule.alternative_id.as_deref() == Some(rule.id.as_str())
 }
 
-#[allow(clippy::too_many_arguments)]
+pub(crate) struct SemanticTransitionInput<'data, 'rule> {
+    pub(crate) snapshot: &'data AnalysisSnapshot,
+    pub(crate) matching: &'data [&'rule pdx_rules::SemanticRule],
+    pub(crate) selected_alternative: Option<&'data str>,
+    pub(crate) context: &'data str,
+    pub(crate) parent_path: &'data [String],
+    pub(crate) property: &'data ScriptProperty,
+    pub(crate) scope: &'data ScopeContext,
+    pub(crate) transparent_wrapper: bool,
+}
+
 pub(crate) fn semantic_selected_transition<'rule>(
-    snapshot: &AnalysisSnapshot,
-    matching: &[&'rule pdx_rules::SemanticRule],
-    selected_alternative: Option<&str>,
-    context: &str,
-    parent_path: &[String],
-    property: &ScriptProperty,
-    scope: &ScopeContext,
-    transparent_wrapper: bool,
+    input: SemanticTransitionInput<'_, 'rule>,
 ) -> Option<&'rule pdx_rules::SemanticRule> {
-    let applicable =
-        semantic_transition_candidates(matching, selected_alternative, property, scope);
+    let applicable = semantic_transition_candidates(
+        input.matching,
+        input.selected_alternative,
+        input.property,
+        input.scope,
+    );
     if semantic_transitions_equivalent(&applicable) {
         return applicable.first().copied();
     }
-    if property.block.is_empty() && property.bare_values.is_empty() {
+    if input.property.block.is_empty() && input.property.bare_values.is_empty() {
         return None;
     }
 
-    let mut structural_path = parent_path.to_vec();
-    if !transparent_wrapper {
-        structural_path.push(property.key.clone());
+    let mut structural_path = input.parent_path.to_vec();
+    if !input.transparent_wrapper {
+        structural_path.push(input.property.key.clone());
     }
     // Leaf-value rules are matched against bare values, which are not keys; build their lists
     // lazily because properties without bare values (the common case) never consult them.
-    let has_bare_values = !property.bare_values.is_empty();
+    let has_bare_values = !input.property.bare_values.is_empty();
     let structural_leaf_rules = if has_bare_values {
-        semantic_leaf_rules_for_container(snapshot, context, &structural_path, scope)
+        semantic_leaf_rules_for_container(
+            input.snapshot,
+            input.context,
+            &structural_path,
+            input.scope,
+        )
     } else {
         Vec::new()
     };
     // Whether the structural container covers each block child is candidate-independent;
     // compute it once so the per-candidate filter only re-checks the destination container.
-    let structural_child_checks = property
+    let structural_child_checks = input
+        .property
         .block
         .iter()
         .map(|child| {
-            semantic_rules_for_container_key(snapshot, context, &structural_path, &child.key)
-                .iter()
-                .any(|rule| {
-                    !matches!(rule.shape, RuleShape::LeafValue)
-                        && semantic_rule_key_matches(snapshot, rule, &structural_path, &child.key)
-                })
+            semantic_rules_for_container_key(
+                input.snapshot,
+                input.context,
+                &structural_path,
+                &child.key,
+            )
+            .iter()
+            .any(|rule| {
+                !matches!(rule.shape, RuleShape::LeafValue)
+                    && semantic_rule_key_matches(input.snapshot, rule, &structural_path, &child.key)
+            })
         })
         .collect::<Vec<_>>();
     let possible = applicable
@@ -331,15 +358,15 @@ pub(crate) fn semantic_selected_transition<'rule>(
         .filter(|candidate| {
             let (child_context, child_path) = semantic_transition_destination(
                 candidate,
-                context,
-                parent_path,
-                &property.key,
-                transparent_wrapper,
+                input.context,
+                input.parent_path,
+                &input.property.key,
+                input.transparent_wrapper,
             );
-            let child_scope = semantic_child_scope(snapshot, scope, candidate);
+            let child_scope = semantic_child_scope(input.snapshot, input.scope, candidate);
             let child_leaf_rules = if has_bare_values {
                 semantic_leaf_rules_for_container(
-                    snapshot,
+                    input.snapshot,
                     &child_context,
                     &child_path,
                     &child_scope,
@@ -347,14 +374,15 @@ pub(crate) fn semantic_selected_transition<'rule>(
             } else {
                 Vec::new()
             };
-            property
+            input
+                .property
                 .block
                 .iter()
                 .zip(&structural_child_checks)
                 .all(|(child, structural_ok)| {
                     *structural_ok
                         || semantic_rules_for_container_key(
-                            snapshot,
+                            input.snapshot,
                             &child_context,
                             &child_path,
                             &child.key,
@@ -363,20 +391,19 @@ pub(crate) fn semantic_selected_transition<'rule>(
                         .any(|rule| {
                             !matches!(rule.shape, RuleShape::LeafValue)
                                 && semantic_rule_key_matches(
-                                    snapshot,
+                                    input.snapshot,
                                     rule,
                                     &child_path,
                                     &child.key,
                                 )
                         })
                 })
-                && property.bare_values.iter().all(|(value, _)| {
-                    structural_leaf_rules
-                        .iter()
-                        .any(|rule| semantic_leaf_value_matches(snapshot, rule, value, scope))
-                        || child_leaf_rules.iter().any(|rule| {
-                            semantic_leaf_value_matches(snapshot, rule, value, &child_scope)
-                        })
+                && input.property.bare_values.iter().all(|(value, _)| {
+                    structural_leaf_rules.iter().any(|rule| {
+                        semantic_leaf_value_matches(input.snapshot, rule, value, input.scope)
+                    }) || child_leaf_rules.iter().any(|rule| {
+                        semantic_leaf_value_matches(input.snapshot, rule, value, &child_scope)
+                    })
                 })
         })
         .collect::<Vec<_>>();

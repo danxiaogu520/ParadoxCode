@@ -225,11 +225,9 @@ pub(crate) fn diagnostic_values_for_text(
                 None,
                 None,
             );
-            // The new PascalCase code is primary. Only the legacy spelling and semantic
-            // confidence are public compatibility metadata; internal rule provenance never
+            // Certainty is current client-facing metadata; internal rule provenance never
             // crosses the LSP boundary.
             value.data = Some(json!({
-                "legacyCode": diagnostic.code.legacy_str(),
                 "certainty": diagnostic.certainty.as_str(),
             }));
             value
@@ -584,8 +582,8 @@ mod tests {
         let values = diagnostic_values_for_text(vec![diagnostic], &LineIndex::new("x"), "x");
         let value = serde_json::to_value(&values[0]).expect("diagnostic JSON");
 
-        assert_eq!(value["data"]["legacyCode"], "pdx-unknown-key");
         assert_eq!(value["data"]["certainty"], "certain");
+        assert!(value["data"].get("legacyCode").is_none());
         assert!(value["data"].get("provenance").is_none());
         let serialized = value.to_string();
         assert!(!serialized.contains("ruleId"));

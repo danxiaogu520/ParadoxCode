@@ -36,7 +36,6 @@ pub use snapshot::AnalysisSnapshot;
 
 #[cfg(test)]
 thread_local! {
-    #[allow(clippy::missing_const_for_thread_local)]
     static PIPELINE_COUNTS: Cell<(usize, usize)> = const { Cell::new((0, 0)) };
 }
 

@@ -20,9 +20,7 @@ export interface MissionNode {
     title: { language: string | null; value: string } | null;
     x: number;
     y: number;
-    start: number;
-    end: number;
-    /** UTF-16 LSP range supplied by pdx-ls. Kept separate from legacy byte spans. */
+    /** UTF-16 LSP range supplied by pdx-ls. */
     sourceRange: SourceRange | null;
     isRoot: boolean;
     hasError: boolean;
@@ -42,8 +40,6 @@ export interface MissionGroup {
     label: string;
     x: number;
     y: number;
-    start: number;
-    end: number;
     sourceRange: SourceRange | null;
 }
 
@@ -55,8 +51,8 @@ export interface MissionExternal {
 
 export interface MissionPreview {
     /** URI/version of the document used to compute this payload. */
-    documentUri?: string | null;
-    documentVersion?: number | null;
+    documentUri: string;
+    documentVersion: number;
     nodes: MissionNode[];
     arrows: MissionArrow[];
     groups: MissionGroup[];
@@ -85,8 +81,8 @@ type OutboundMessage =
 
 /** Webview messages received from the renderer. */
 type InboundMessage =
-    | { type: 'jump'; uri: string; range: SourceRange | null; start?: number; end?: number }
-    | { type: 'openGroup'; uri: string; range: SourceRange | null; start?: number; end?: number }
+    | { type: 'jump'; uri: string; range: SourceRange | null }
+    | { type: 'openGroup'; uri: string; range: SourceRange | null }
     | { type: 'exportPng'; dataUri: string }
     | { type: 'exportJson'; json: string }
     | { type: 'exportSvg'; svg: string };
@@ -308,7 +304,7 @@ export class MissionPreviewPanel {
             switch (message.type) {
                 case 'jump':
                 case 'openGroup':
-                    void MissionPreviewPanel.jump(message.uri, message.range, message.start, message.end);
+                    void MissionPreviewPanel.jump(message.uri, message.range);
                     return;
                 case 'exportPng':
                     void MissionPreviewPanel.exportPng(message.dataUri);
@@ -389,8 +385,6 @@ export class MissionPreviewPanel {
             if (!current || current.version !== documentVersion) {
                 return;
             }
-            payload.documentUri = payload.documentUri ?? documentUri;
-            payload.documentVersion = payload.documentVersion ?? documentVersion;
             MissionPreviewPanel.previewUri = documentUri;
             MissionPreviewPanel.previewVersion = documentVersion;
             MissionPreviewPanel.post(panel, { type: 'preview', payload });
@@ -418,8 +412,6 @@ export class MissionPreviewPanel {
     private static async jump(
         uri: string,
         sourceRange: SourceRange | null,
-        start?: number,
-        end?: number,
     ): Promise<void> {
         if (uri && MissionPreviewPanel.previewUri && uri !== MissionPreviewPanel.previewUri) {
             return;
@@ -443,22 +435,16 @@ export class MissionPreviewPanel {
             );
             return;
         }
-        const range = sourceRange
-            ? new vscode.Range(
-                  new vscode.Position(sourceRange.start.line, sourceRange.start.character),
-                  new vscode.Position(sourceRange.end.line, sourceRange.end.character),
-              )
-            : (() => {
-                  // Compatibility fallback for older pdx-ls binaries.  New servers always send
-                  // sourceRange, which is already UTF-16 and therefore safe for VS Code.
-                  const text = editor.document.getText();
-                  const safeStart = Math.min(start ?? 0, text.length);
-                  const safeEnd = Math.min(Math.max(end ?? safeStart + 1, safeStart + 1), text.length);
-                  return new vscode.Range(
-                      editor.document.positionAt(safeStart),
-                      editor.document.positionAt(safeEnd),
-                  );
-              })();
+        if (!sourceRange) {
+            void vscode.window.showWarningMessage(
+                'ParadoxCode: the language server did not return a UTF-16 source range for this item.',
+            );
+            return;
+        }
+        const range = new vscode.Range(
+            new vscode.Position(sourceRange.start.line, sourceRange.start.character),
+            new vscode.Position(sourceRange.end.line, sourceRange.end.character),
+        );
         editor.selection = new vscode.Selection(range.start, range.end);
         editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
     }

@@ -18,7 +18,7 @@ use crate::protocol::{RpcError, parse_file_uri_str, workspace_scan_error};
 use crate::server::PreparedInitialize;
 use crate::vanilla::{apply_user_vanilla_configuration, watched_files_registration};
 use crate::workspace::resolve_source_roots;
-use crate::{INTERNAL_ERROR, REQUEST_CANCELLED};
+use crate::{INTERNAL_ERROR, INVALID_PARAMS, REQUEST_CANCELLED};
 
 /// Explicit process-level options passed by an editor or CLI.
 ///
@@ -71,19 +71,19 @@ pub(crate) fn prepare_initialize_candidate(
         ));
     }
     let initialization_options = params.initialization_options.clone();
-    #[allow(deprecated)]
-    let root_uri = params.root_uri;
-    let root = root_uri
-        .as_ref()
-        .map(|uri| parse_file_uri_str(uri.as_str()))
-        .transpose()?;
     let workspace_root = params
         .workspace_folders
         .as_ref()
         .and_then(|folders| folders.first())
         .map(|folder| parse_file_uri_str(folder.uri.as_str()))
-        .transpose()?;
-    let client_root = root.or(workspace_root);
+        .transpose()?
+        .ok_or_else(|| {
+            RpcError::new(
+                INVALID_PARAMS,
+                "initialize requires at least one workspace folder; rootUri-only clients are not supported",
+            )
+        })?;
+    let client_root = workspace_root;
     let watched_files_capability = params
         .capabilities
         .workspace
@@ -110,8 +110,11 @@ pub(crate) fn prepare_initialize_candidate(
         log("Initialization phase: resolving project configuration and source roots");
     }
     let roots_started = std::time::Instant::now();
-    let mut resolved =
-        resolve_source_roots(client_root.as_deref(), initialization_options, cancellation)?;
+    let mut resolved = resolve_source_roots(
+        Some(client_root.as_path()),
+        initialization_options,
+        cancellation,
+    )?;
     if let Some(log) = callbacks.log {
         log(&format!(
             "Source roots resolved in {:.1} ms: workspace {}, {} live source root(s), {} dependency cache(s)",

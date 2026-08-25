@@ -42,7 +42,7 @@ fn lowering_retains_property_paths_scalars_and_top_level_identity() {
 #[test]
 fn shared_type_paths_use_the_top_level_key_filter() {
     let rules = first_party_rules().expect("first-party rules");
-    let path = LogicalPath::new("common/estate_crown_land/00_interactions.txt");
+    let path = LogicalPath::parse("common/estate_crown_land/00_interactions.txt").expect("path");
 
     assert_eq!(
         semantic_root_context(&rules, Some(&path), "interaction").as_deref(),
@@ -902,16 +902,16 @@ fn equivalent_rule_alternatives_share_one_cached_transition() {
         })
         .collect::<Vec<_>>();
     assert!(
-        super::statically_selected_transition(
-            &candidates,
-            empty.properties(),
-            &children,
-            empty_index,
-            &rules,
-            "type:event",
-            &[],
-            false,
-        )
+        super::statically_selected_transition(super::StaticTransitionInput {
+            matching: &candidates,
+            properties: empty.properties(),
+            property_children: &children,
+            property_index: empty_index,
+            rules: &rules,
+            context: "type:event",
+            parent_path: &[],
+            transparent: false,
+        })
         .is_none(),
         "an empty block must not guess between conflicting transitions"
     );

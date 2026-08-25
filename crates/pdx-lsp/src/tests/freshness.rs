@@ -44,7 +44,7 @@ fn stale_diagnostics_do_not_replace_newer_results() {
 fn rapid_changes_debounce_and_publish_only_the_latest_diagnostics() {
     let uri = "file:///tmp/debounced-diagnostics.txt";
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":"file:///tmp","name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":"scope = nowhere\n"}}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":uri,"version":2},"contentChanges":[{"text":"scope = country\n"}]}}),
@@ -125,8 +125,8 @@ fn initialize_cancellation_is_forwarded_and_a_retry_can_succeed() {
 
     let input = frames([
         json!({"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":1}}),
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp/cancelled","capabilities":{}}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"rootUri":"file:///tmp/retry","capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":"file:///tmp/cancelled","name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"workspaceFolders":[{"uri":"file:///tmp/retry","name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),

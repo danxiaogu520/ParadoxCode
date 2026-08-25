@@ -616,10 +616,8 @@
         const node = hit.node;
         vscode.postMessage({
             type: hit.kind === 'group' ? 'openGroup' : 'jump',
-            uri: preview.documentUri || '',
+            uri: preview.documentUri,
             range: node.sourceRange || null,
-            start: node.start,
-            end: node.end,
         });
     }
 

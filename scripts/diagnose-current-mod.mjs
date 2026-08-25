@@ -1097,7 +1097,6 @@ async function run(rawOptions) {
     const initializeParams = {
       processId: process.pid,
       clientInfo: { name: 'paradoxcode-current-mod-diagnostics', version: '1' },
-      rootUri: fileUri(options.workspace),
       workspaceFolders: [{ uri: fileUri(options.workspace), name: 'diagnostic-workspace' }],
       capabilities: {
         window: { workDoneProgress: true },
