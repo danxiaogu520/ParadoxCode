@@ -10,6 +10,10 @@ import {
 
 import { LoadedFilesProvider } from './fileExplorer';
 import { MissionPreviewPanel } from './previewPanel';
+import {
+    attachFollowupCompletionTrigger,
+    FOLLOWUP_COMPLETION_TRIGGER_COMMAND,
+} from './completionMiddleware';
 import { readSharedConfig } from './sharedConfig';
 import { findExecutableOnPath } from './serverPath';
 import {
@@ -233,8 +237,30 @@ function pathRelative(root: string, file: string): string {
         : normalizedFile;
 }
 
-function diagnosticsMiddleware(): NonNullable<LanguageClientOptions['middleware']> {
+function clientMiddleware(): NonNullable<LanguageClientOptions['middleware']> {
     return {
+        provideCompletionItem(document, position, context, token, next) {
+            return Promise.resolve(next(document, position, context, token)).then((result) => {
+                if (!result) {
+                    return result;
+                }
+                const items = Array.isArray(result) ? result : result.items;
+                for (const item of items) {
+                    attachFollowupCompletionTrigger(item, document.uri.toString());
+                }
+                return result;
+            });
+        },
+        resolveCompletionItem(item, token, next) {
+            return Promise.resolve(next(item, token)).then((resolved) => {
+                if (resolved) {
+                    // VS Code may resolve an item before applying it. Re-attach the command to
+                    // the resolved object because the server's resolve response is authoritative.
+                    attachFollowupCompletionTrigger(resolved);
+                }
+                return resolved;
+            });
+        },
         handleDiagnostics(uri, diagnostics, next) {
             const config = vscode.workspace.getConfiguration('paradoxcode');
             const ignoredCodes = new Set(
@@ -447,7 +473,7 @@ function createClient({ command, source }: ServerResolution): LanguageClient {
         },
         initializationOptions: readInitializationOptions(),
         revealOutputChannelOn: RevealOutputChannelOn.Error,
-        middleware: diagnosticsMiddleware(),
+        middleware: clientMiddleware(),
     };
     return new LanguageClient(
         'pdx-ls',
@@ -518,6 +544,30 @@ async function resolveOrInstallServer(context: vscode.ExtensionContext): Promise
         showMissingServerActions(message);
         return undefined;
     }
+}
+
+function completionDocumentUri(argument: unknown): string | undefined {
+    if (!argument || typeof argument !== 'object' || !('uri' in argument)) {
+        return undefined;
+    }
+    const uri = (argument as { uri?: unknown }).uri;
+    return typeof uri === 'string' ? uri : undefined;
+}
+
+/**
+ * Requests a follow-up list after an assignment or block inserted by a completion has reached the
+ * editor document. The timer yields once so the language client's didChange notification is sent
+ * before the follow-up completion request observes the new text.
+ */
+function triggerFollowupCompletion(argument?: unknown): void {
+    const expectedUri = completionDocumentUri(argument);
+    setTimeout(() => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor || (expectedUri && editor.document.uri.toString() !== expectedUri)) {
+            return;
+        }
+        void vscode.commands.executeCommand('editor.action.triggerSuggest');
+    }, 0);
 }
 
 async function startClient(context: vscode.ExtensionContext, loadedFiles?: LoadedFilesProvider): Promise<void> {
@@ -719,6 +769,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('paradoxcode.showMissionPreview', () => {
             MissionPreviewPanel.show(context.extensionUri, client);
         }),
+        vscode.commands.registerCommand(FOLLOWUP_COMPLETION_TRIGGER_COMMAND, triggerFollowupCompletion),
         vscode.commands.registerCommand('paradoxcode.openOutput', () => log.show(true)),
         vscode.commands.registerCommand('paradoxcode.selectServer', () => chooseServerPath()),
         vscode.commands.registerCommand('paradoxcode.installServer', async () => {
