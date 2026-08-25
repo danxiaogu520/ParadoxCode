@@ -605,6 +605,7 @@ fn scripted_definition_completion_snippet_includes_parameters() {
 
     let root = std::env::temp_dir().join(format!("pdx-analysis-snippet-{}", std::process::id()));
     fs::create_dir_all(root.join("common/scripted_effects")).expect("effect directory");
+    fs::create_dir_all(root.join("common/scripted_triggers")).expect("trigger directory");
     fs::write(
         root.join("common/scripted_effects/00_test.txt"),
         concat!(
@@ -615,6 +616,11 @@ fn scripted_definition_completion_snippet_includes_parameters() {
         ),
     )
     .expect("scripted effect definition");
+    fs::write(
+        root.join("common/scripted_triggers/00_test.txt"),
+        "check = { always = yes }\n",
+    )
+    .expect("scripted trigger definition");
     let rules = pdx_game::eu4::first_party_rules().expect("load first-party rules");
     let mut host = eu4_host(rules);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot {
@@ -636,7 +642,25 @@ fn scripted_definition_completion_snippet_includes_parameters() {
         .iter()
         .find(|item| item.label == "apply")
         .expect("scripted effect item");
+    assert_eq!(snippet.kind, CompletionKind::ScriptedMacro);
     assert_eq!(snippet.insert_text, "apply = {\n\tzeta = $1\n\t$0\n}");
+
+    let trigger_id = DocumentId::new("file:///tmp/events/snippet-trigger.txt");
+    let trigger_text = "country_event = { trigger = { ch";
+    host.open_document(trigger_id.clone(), 1, trigger_text.to_owned(), None)
+        .expect("open trigger completion document");
+    let trigger_completion = complete(
+        &host.snapshot(),
+        &trigger_id,
+        u32::try_from(trigger_text.find("ch").expect("trigger prefix") + 1)
+            .expect("trigger position"),
+    );
+    let trigger_macro = trigger_completion
+        .items
+        .iter()
+        .find(|item| item.label == "check")
+        .expect("scripted trigger item");
+    assert_eq!(trigger_macro.kind, CompletionKind::ScriptedMacro);
     assert_eq!(
         crate::semantic::scripted_definition_snippet(&host.snapshot(), "scripted_effect", "plain"),
         "plain = yes"
@@ -691,7 +715,7 @@ fn scripted_macro_call_block_completes_only_the_owners_parameter_keys() {
         .iter()
         .find(|item| item.label == "AMOUNT")
         .unwrap_or_else(|| panic!("missing owner parameter completion: {items:?}"));
-    assert_eq!(amount.kind, CompletionKind::Key);
+    assert_eq!(amount.kind, CompletionKind::MacroParameter);
     assert_eq!(amount.detail, "parameter");
     assert!(items.iter().all(|item| item.label != "OTHER"), "{items:?}");
     std::fs::remove_dir_all(root).expect("cleanup");
@@ -1253,7 +1277,7 @@ fn scripted_macro_dollar_completion_marks_key_usage() {
         .into_iter()
         .find(|item| item.label == "$EFFECT$")
         .expect("key parameter completion");
-    assert_eq!(item.kind, CompletionKind::Key);
+    assert_eq!(item.kind, CompletionKind::MacroParameter);
     assert_eq!(item.detail, "macro parameter (key)");
 }
 
@@ -1441,6 +1465,7 @@ fn completion_detail_uses_bare_categories() {
         .find(|item| item.label == "foo")
         .expect("trigger rule item");
     assert_eq!(foo.detail, "trigger");
+    assert_eq!(foo.kind, CompletionKind::Command);
 
     let mut effect_model = pdx_game::eu4::bootstrap_model();
     effect_model.semantic.rules.push(SemanticRule {
@@ -1482,6 +1507,7 @@ fn completion_detail_uses_bare_categories() {
         .find(|item| item.label == "bar")
         .expect("effect rule item");
     assert_eq!(bar.detail, "effect");
+    assert_eq!(bar.kind, CompletionKind::Command);
 
     let mut root_model = pdx_game::eu4::bootstrap_model();
     root_model.semantic.rules.push(SemanticRule {
@@ -1523,6 +1549,7 @@ fn completion_detail_uses_bare_categories() {
         .find(|item| item.label == "baz")
         .expect("root rule item");
     assert_eq!(baz.detail, "government_reform");
+    assert_eq!(baz.kind, CompletionKind::Key);
 
     let mut enum_model = pdx_game::eu4::bootstrap_model();
     enum_model
@@ -1568,6 +1595,7 @@ fn completion_detail_uses_bare_categories() {
         .find(|item| item.label == "member_a")
         .expect("enum member item");
     assert_eq!(member.detail, "fixture_enum");
+    assert_eq!(member.kind, CompletionKind::EnumMember);
 }
 
 #[test]
@@ -1634,6 +1662,15 @@ fn dynamic_value_completion_covers_scope_expressions_and_same_named_enums() {
             .map(|item| item.label.as_str())
             .collect::<Vec<_>>()
     );
+    assert!(
+        scope_result
+            .items
+            .iter()
+            .filter(|item| item.label == "ROOT")
+            .all(|item| item.kind == CompletionKind::Scope),
+        "scope expressions must use the scope completion kind: {:?}",
+        scope_result.items
+    );
 
     // A dynamic value with a same-named static enum completes the enum members.
     let enum_text = "trigger = { dynamic_enum = memb";
@@ -1666,6 +1703,15 @@ fn dynamic_value_completion_covers_scope_expressions_and_same_named_enums() {
             .items
             .iter()
             .any(|item| item.label == "member_b")
+    );
+    assert!(
+        enum_result
+            .items
+            .iter()
+            .filter(|item| item.label == "member_a" || item.label == "member_b")
+            .all(|item| item.kind == CompletionKind::EnumMember),
+        "enum members must use the enum completion kind: {:?}",
+        enum_result.items
     );
 
     // An ordinary value rule also completes when the cursor sits directly after `key = ` at

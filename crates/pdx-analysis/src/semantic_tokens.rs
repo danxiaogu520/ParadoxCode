@@ -1,9 +1,10 @@
 //! Editor-neutral semantic token queries.
 //!
 //! Highlighting is a deterministic single pass over the loss-aware CST plus a flat set of
-//! rule-known keys. Classification never depends on diagnostics validity: a document with syntax
-//! errors still produces tokens from every recoverable node. The stable legend contract lives in
-//! [`crate::SemanticTokenType`]; protocol adapters only convert ranges and legend indices.
+//! rule-known keys and active scripted macro names. Classification never depends on diagnostics
+//! validity: a document with syntax errors still produces tokens from every recoverable node. The
+//! stable legend contract lives in [`crate::SemanticTokenType`]; protocol adapters only convert
+//! ranges and legend indices.
 
 use std::collections::BTreeSet;
 
@@ -12,6 +13,7 @@ use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile};
 use pdx_rules::KeyMatcher;
 use pdx_text::TextRange;
 
+use crate::semantic::effective_workspace_member_names;
 use crate::support::{ParsedContent, input_for_document};
 use crate::types::{CancellationToken, Cancelled, SemanticToken, SemanticTokenType, uncancelled};
 
@@ -56,8 +58,8 @@ pub fn semantic_tokens_with_cancellation(
 }
 
 /// Builds the flat set of rule-known script keys: profile fallback keys, exact semantic-rule
-/// keys, and symbol descriptor kinds. Record table column names are deliberately excluded so CWT
-/// metadata never colors script text.
+/// keys, symbol descriptor kinds, and active workspace-defined scripted macro names. Record table
+/// column names are deliberately excluded so CWT metadata never colors script text.
 fn semantic_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
     let mut keys = snapshot
         .game_profile()
@@ -78,6 +80,30 @@ fn semantic_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
             .iter()
             .map(|descriptor| descriptor.kind_id.to_ascii_lowercase()),
     );
+    // Completion classifies workspace-defined scripted macros as callable functions. Reuse the
+    // same effective (overlay-aware and source-priority-aware) member view for source coloring so
+    // a macro does not switch back to the generic property color after insertion.
+    let macro_types = snapshot
+        .rules()
+        .model()
+        .semantic
+        .type_descriptors
+        .iter()
+        .filter_map(|(type_name, descriptor)| {
+            descriptor
+                .scripted_macro
+                .as_ref()
+                .filter(|macro_descriptor| macro_descriptor.macro_enabled)
+                .map(|_| type_name.clone())
+        })
+        .collect::<Vec<_>>();
+    for type_name in macro_types {
+        keys.extend(
+            effective_workspace_member_names(snapshot, &type_name)
+                .into_iter()
+                .map(|name| name.to_ascii_lowercase()),
+        );
+    }
     keys
 }
 

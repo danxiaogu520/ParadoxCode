@@ -169,11 +169,7 @@ fn macro_parameter_completion(
         let label = format!("${}$", parameter.name);
         items.push(CompletionItem {
             label: label.clone(),
-            kind: if value_context {
-                CompletionKind::Value
-            } else {
-                CompletionKind::Key
-            },
+            kind: CompletionKind::MacroParameter,
             detail: if value_context {
                 "macro parameter (value)".to_owned()
             } else {

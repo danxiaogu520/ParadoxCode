@@ -72,6 +72,35 @@ impl CompletionMemberCache {
     }
 }
 
+/// Returns whether a rule's key behaves like a callable script command or trigger predicate.
+///
+/// The rule source deliberately keeps these as ordinary semantic contexts.  Keeping the
+/// presentation hint here lets the LSP layer stay a protocol adapter instead of having to infer
+/// game semantics from a completion item's detail text.
+fn is_command_context(context: &str) -> bool {
+    context.eq_ignore_ascii_case("effect") || context.eq_ignore_ascii_case("trigger")
+}
+
+fn key_completion_kind(
+    snapshot: &AnalysisSnapshot,
+    rule: &pdx_rules::SemanticRule,
+) -> CompletionKind {
+    match &rule.key {
+        KeyMatcher::Enum(_) => CompletionKind::EnumMember,
+        KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
+            if scripted_macro_type(snapshot, type_name) =>
+        {
+            CompletionKind::ScriptedMacro
+        }
+        KeyMatcher::Exact(_) | KeyMatcher::Type(_) | KeyMatcher::Dynamic(_)
+            if is_command_context(&rule.context) =>
+        {
+            CompletionKind::Command
+        }
+        _ => CompletionKind::Key,
+    }
+}
+
 pub(crate) fn semantic_rules_for_completion<'rule, 'path>(
     snapshot: &'rule AnalysisSnapshot,
     context: &'path SemanticCompletionContext,
@@ -171,7 +200,7 @@ pub(crate) fn add_semantic_key_items(
                 items,
                 CompletionItem {
                     label: label.clone(),
-                    kind: CompletionKind::Key,
+                    kind: key_completion_kind(snapshot, rule),
                     detail: rule_context_detail(rule),
                     documentation,
                     replacement_range,
@@ -198,7 +227,7 @@ pub(crate) fn add_semantic_key_items(
                         items,
                         CompletionItem {
                             label: label.clone(),
-                            kind: CompletionKind::Key,
+                            kind: key_completion_kind(snapshot, rule),
                             detail: type_name.clone(),
                             documentation: documentation.clone(),
                             replacement_range,
@@ -219,7 +248,7 @@ pub(crate) fn add_semantic_key_items(
                                 items,
                                 CompletionItem {
                                     label: label.clone(),
-                                    kind: CompletionKind::Key,
+                                    kind: CompletionKind::MacroParameter,
                                     detail: "parameter".to_owned(),
                                     documentation: documentation.clone(),
                                     replacement_range,
@@ -239,7 +268,7 @@ pub(crate) fn add_semantic_key_items(
                                 items,
                                 CompletionItem {
                                     label: label.clone(),
-                                    kind: CompletionKind::Key,
+                                    kind: CompletionKind::EnumMember,
                                     detail: enum_name.clone(),
                                     documentation: documentation.clone(),
                                     replacement_range,
@@ -260,7 +289,7 @@ pub(crate) fn add_semantic_key_items(
                         items,
                         CompletionItem {
                             label: label.clone(),
-                            kind: CompletionKind::Key,
+                            kind: key_completion_kind(snapshot, rule),
                             detail: kind.clone(),
                             documentation: documentation.clone(),
                             replacement_range,
@@ -336,7 +365,7 @@ fn add_leaf_value_member_items(
                     items,
                     CompletionItem {
                         label: label.clone(),
-                        kind: CompletionKind::Key,
+                        kind: CompletionKind::EnumMember,
                         detail: enum_name.clone(),
                         documentation: documentation.clone(),
                         replacement_range,
@@ -626,7 +655,7 @@ pub(crate) fn add_semantic_value_items(
             }
             ValueMatcher::Enum(enum_name) => {
                 for label in member_cache.enum_member_names(snapshot, enum_name, prefix) {
-                    add_value_completion(
+                    add_enum_member_completion(
                         items,
                         label,
                         enum_name,
@@ -641,7 +670,7 @@ pub(crate) fn add_semantic_value_items(
                 for (label, detail) in
                     scope_expression_candidates(snapshot, context, expected.as_deref())
                 {
-                    add_value_completion(
+                    add_scope_completion(
                         items,
                         &label,
                         detail,
@@ -671,7 +700,7 @@ pub(crate) fn add_semantic_value_items(
                 // and same-named static enum members at runtime.
                 if kind.eq_ignore_ascii_case("scope_field") {
                     for (label, detail) in scope_expression_candidates(snapshot, context, None) {
-                        add_value_completion(
+                        add_scope_completion(
                             items,
                             &label,
                             detail,
@@ -708,7 +737,7 @@ pub(crate) fn add_semantic_value_items(
                     );
                 }
                 for (label, detail) in scope_expression_candidates(snapshot, context, None) {
-                    add_value_completion(
+                    add_scope_completion(
                         items,
                         &label,
                         detail,
@@ -719,7 +748,7 @@ pub(crate) fn add_semantic_value_items(
                     );
                 }
                 for label in member_cache.enum_member_names(snapshot, kind, prefix) {
-                    add_value_completion(
+                    add_enum_member_completion(
                         items,
                         label,
                         kind,
@@ -891,7 +920,7 @@ fn add_inferred_matcher_items(
         }
         ValueMatcher::Enum(enum_name) => {
             for label in member_cache.enum_member_names(snapshot, enum_name, prefix) {
-                add_value_completion(
+                add_enum_member_completion(
                     items,
                     label,
                     enum_name,
@@ -906,7 +935,7 @@ fn add_inferred_matcher_items(
             for (label, detail) in
                 scope_expression_candidates(snapshot, context, expected.as_deref())
             {
-                add_value_completion(
+                add_scope_completion(
                     items,
                     &label,
                     detail,
@@ -1073,11 +1102,76 @@ pub(crate) fn add_value_completion(
     prefix: &str,
     deprecated: bool,
 ) {
+    add_typed_value_completion(
+        items,
+        label,
+        detail,
+        documentation,
+        replacement_range,
+        prefix,
+        deprecated,
+        CompletionKind::Value,
+    );
+}
+
+fn add_enum_member_completion(
+    items: &mut Vec<CompletionItem>,
+    label: &str,
+    detail: &str,
+    documentation: Option<String>,
+    replacement_range: TextRange,
+    prefix: &str,
+    deprecated: bool,
+) {
+    add_typed_value_completion(
+        items,
+        label,
+        detail,
+        documentation,
+        replacement_range,
+        prefix,
+        deprecated,
+        CompletionKind::EnumMember,
+    );
+}
+
+fn add_scope_completion(
+    items: &mut Vec<CompletionItem>,
+    label: &str,
+    detail: &str,
+    documentation: Option<String>,
+    replacement_range: TextRange,
+    prefix: &str,
+    deprecated: bool,
+) {
+    add_typed_value_completion(
+        items,
+        label,
+        detail,
+        documentation,
+        replacement_range,
+        prefix,
+        deprecated,
+        CompletionKind::Scope,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn add_typed_value_completion(
+    items: &mut Vec<CompletionItem>,
+    label: &str,
+    detail: &str,
+    documentation: Option<String>,
+    replacement_range: TextRange,
+    prefix: &str,
+    deprecated: bool,
+    kind: CompletionKind,
+) {
     push_completion(
         items,
         CompletionItem {
             label: label.to_owned(),
-            kind: CompletionKind::Value,
+            kind,
             detail: detail.to_owned(),
             documentation,
             replacement_range,

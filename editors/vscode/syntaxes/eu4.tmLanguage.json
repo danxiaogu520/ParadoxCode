@@ -3,7 +3,7 @@
   "name": "Europa Universalis IV",
   "scopeName": "source.eu4",
   "fileTypes": ["txt", "gui", "gfx"],
-  "//": "Fallback highlighting only: scopes here must match the pdx-ls semanticTokenScopes mapping in package.json so colours are stable before and after the server is ready. The only intended difference is rule-known keys, which the semantic layer upgrades from property to function (support.function).",
+  "//": "Fallback highlighting only: scopes here must match the pdx-ls semanticTokenScopes mapping in package.json so colours are stable before and after the server is ready. The only intended difference is rule-known keys and indexed scripted macro names, which the semantic layer upgrades from property to function (support.function).",
   "patterns": [
     { "include": "#comment" },
     { "include": "#quoted-key" },

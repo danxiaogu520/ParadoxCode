@@ -299,9 +299,15 @@ pub(crate) fn show_info_notification(message: String) -> Value {
 pub(crate) fn completion_kind(kind: CompletionKind) -> CompletionItemKind {
     match kind {
         CompletionKind::Key => CompletionItemKind::PROPERTY,
+        CompletionKind::Command => CompletionItemKind::METHOD,
+        // LSP has no dedicated macro kind; scripted macros are callable definitions.
+        CompletionKind::ScriptedMacro => CompletionItemKind::FUNCTION,
         CompletionKind::Value => CompletionItemKind::VALUE,
+        CompletionKind::EnumMember => CompletionItemKind::ENUM_MEMBER,
+        CompletionKind::Scope => CompletionItemKind::VARIABLE,
         CompletionKind::Symbol => CompletionItemKind::FUNCTION,
         CompletionKind::Localisation => CompletionItemKind::REFERENCE,
+        CompletionKind::MacroParameter => CompletionItemKind::VARIABLE,
     }
 }
 
@@ -479,14 +485,17 @@ impl RpcError {
 
 #[cfg(test)]
 mod tests {
-    use super::{LineIndex, diagnostic_values_for_text, is_snapshot_request};
+    use super::{LineIndex, completion_kind, diagnostic_values_for_text, is_snapshot_request};
+    use lsp_types::CompletionItemKind;
     use lsp_types::request::Request;
     use lsp_types::request::{
         Completion, DocumentSymbolRequest, Formatting, GotoDefinition, HoverRequest,
         PrepareRenameRequest, References, Rename, ResolveCompletionItem, SemanticTokensFullRequest,
         WorkspaceSymbolRequest,
     };
-    use pdx_analysis::{Diagnostic, DiagnosticCode, DiagnosticProvenance, Severity};
+    use pdx_analysis::{
+        CompletionKind, Diagnostic, DiagnosticCode, DiagnosticProvenance, Severity,
+    };
     use pdx_text::TextRange;
 
     /// The snapshot-request routing table must agree with the wire method names the
@@ -516,6 +525,46 @@ mod tests {
         }
         // The bare, non-spec request name must not be mistaken for the full-token request.
         assert!(!is_snapshot_request("textDocument/semanticTokens"));
+    }
+
+    #[test]
+    fn completion_kinds_preserve_semantic_icon_categories() {
+        assert_eq!(
+            completion_kind(CompletionKind::Key),
+            CompletionItemKind::PROPERTY
+        );
+        assert_eq!(
+            completion_kind(CompletionKind::Command),
+            CompletionItemKind::METHOD
+        );
+        assert_eq!(
+            completion_kind(CompletionKind::ScriptedMacro),
+            CompletionItemKind::FUNCTION
+        );
+        assert_eq!(
+            completion_kind(CompletionKind::Value),
+            CompletionItemKind::VALUE
+        );
+        assert_eq!(
+            completion_kind(CompletionKind::EnumMember),
+            CompletionItemKind::ENUM_MEMBER
+        );
+        assert_eq!(
+            completion_kind(CompletionKind::Scope),
+            CompletionItemKind::VARIABLE
+        );
+        assert_eq!(
+            completion_kind(CompletionKind::Symbol),
+            CompletionItemKind::FUNCTION
+        );
+        assert_eq!(
+            completion_kind(CompletionKind::Localisation),
+            CompletionItemKind::REFERENCE
+        );
+        assert_eq!(
+            completion_kind(CompletionKind::MacroParameter),
+            CompletionItemKind::VARIABLE
+        );
     }
 
     #[test]

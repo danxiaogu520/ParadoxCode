@@ -51,6 +51,53 @@ fn script_tokens_cover_comments_operators_keys_and_scalars() {
 }
 
 #[test]
+fn indexed_scripted_macro_names_use_the_function_token_color() {
+    use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+    use std::fs;
+
+    let root = std::env::temp_dir().join(format!(
+        "pdx-analysis-semantic-macro-colors-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(root.join("common/scripted_effects")).expect("effect directory");
+    fs::create_dir_all(root.join("common/scripted_triggers")).expect("trigger directory");
+    fs::write(
+        root.join("common/scripted_effects/00_test.txt"),
+        "apply = { add_prestige = 1 }\n",
+    )
+    .expect("scripted effect definition");
+    fs::write(
+        root.join("common/scripted_triggers/00_test.txt"),
+        "check = { always = yes }\n",
+    )
+    .expect("scripted trigger definition");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("index scripted macros");
+
+    let id = DocumentId::new("file:///tmp/events/semantic-macros.txt");
+    let text = "country_event = { immediate = { apply = yes } trigger = { check = yes } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open source document");
+    let tokens = token_spellings(&host, &id, text);
+    assert!(
+        tokens.contains(&("apply".to_owned(), SemanticTokenType::Function, false)),
+        "scripted_effect calls should use the function token: {tokens:?}"
+    );
+    assert!(
+        tokens.contains(&("check".to_owned(), SemanticTokenType::Function, false)),
+        "scripted_trigger calls should use the function token: {tokens:?}"
+    );
+
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn variable_definitions_and_parameter_usages_are_distinguished() {
     let text = "@cost = 100\nlimit = { has_manpower = @cost }\n$name$ = { trigger = $name$ }\n";
     let (host, id) = snapshot(text);
