@@ -713,6 +713,7 @@ pub fn profile() -> GameProfile {
             ("type:customideas", vec!["modifier"]),
             ("type:country_history", vec!["effect"]),
             ("type:cult", vec!["modifier"]),
+            ("type:event_modifier", vec!["modifier"]),
             ("type:government_ranks", vec!["modifier"]),
             ("type:leader_personality", vec!["modifier"]),
             ("type:on_action", vec!["effect"]),

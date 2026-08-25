@@ -1,6 +1,35 @@
 use super::support::*;
 
 #[test]
+fn event_modifier_completion_inherits_generic_modifier_keys() {
+    let text = "my_modifier = {\n  dis\n}\n";
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/common/event_modifiers/test.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(std::path::PathBuf::from("common/event_modifiers/test.txt")),
+    )
+    .expect("open event modifier");
+    let position = u32::try_from(text.find("dis").expect("completion prefix") + 3)
+        .expect("completion position");
+    let completion = complete(&host.snapshot(), &id, position);
+    assert!(
+        completion
+            .items
+            .iter()
+            .any(|item| item.label == "discipline"),
+        "event modifiers must complete generic modifier keys: {:?}",
+        completion
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn leaf_value_container_completion_offers_typed_workspace_members() {
     use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use std::fs;
