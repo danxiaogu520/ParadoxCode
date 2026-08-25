@@ -18,6 +18,18 @@ check_core() {
     run env RUSTDOCFLAGS="-D warnings" cargo doc --locked --workspace --no-deps
 }
 
+check_core_fast() {
+    run cargo fmt --all -- --check
+    run cargo check --locked --workspace --all-features
+    run cargo test --locked --workspace --all-features
+    run cargo clippy --locked --workspace --all-features -- -D warnings
+    run env RUSTDOCFLAGS="-D warnings" cargo doc --locked --workspace --no-deps
+}
+
+check_perf() {
+    run cargo bench --locked --workspace --all-features --benches
+}
+
 check_grammars() {
     run bash scripts/check-grammars.sh
 }
@@ -31,9 +43,9 @@ check_zed() {
 }
 
 check_vscode() {
-    run npm --prefix editors/vscode run check
-    run npm --prefix editors/vscode run test:contract
-    run npm --prefix editors/vscode run test:package
+    # Compile TypeScript once for the smoke and source contracts. `vsce package`
+    # invokes the package's prepublish hook once more as part of packaging.
+    run npm --prefix editors/vscode run test:ci
 }
 
 check_release() {
@@ -49,7 +61,7 @@ check_fuzz() {
 }
 
 usage() {
-    echo "usage: $0 [all|core|grammars|zed|vscode|release|fuzz] [group ...]" >&2
+    echo "usage: $0 [all|core|core-fast|perf|grammars|zed|vscode|release|fuzz] [group ...]" >&2
     echo "       with no arguments, runs the full suite; multiple groups run in order" >&2
 }
 
@@ -69,6 +81,12 @@ for group in "${groups[@]}"; do
             ;;
         core)
             check_core
+            ;;
+        core-fast)
+            check_core_fast
+            ;;
+        perf)
+            check_perf
             ;;
         grammars)
             check_grammars

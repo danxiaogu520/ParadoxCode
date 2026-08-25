@@ -50,7 +50,20 @@ Run the complete quality gates explicitly:
 bash scripts/check-quality-gates.sh
 ```
 
-or a single group to diagnose a failure: `core`, `grammars`, `zed`, `vscode`, `release`.
+or a single group to diagnose a failure: `core`, `core-fast`, `perf`, `grammars`, `zed`, `vscode`,
+`release`, `fuzz`.
+
+Pull-request CI uses `core-fast` and leaves the optimized benchmark suite to the scheduled/manual
+`perf` workflow. Run the latter explicitly when changing performance-sensitive code:
+
+```bash
+bash scripts/check-quality-gates.sh perf
+```
+
+CI selects the editor, grammar, fuzz, and dependency jobs from changed paths. Fuzz is limited to
+its direct runtime dependencies, and the Windows release build runs in parallel with Windows
+tests and clippy. Branch protection should require the stable `Required CI checks` aggregate rather
+than every conditional job.
 
 Validate and compile the first-party EU4 rule source with `pdx-bake`:
 

@@ -139,11 +139,18 @@ bash scripts/install-git-hooks.sh
 ```
 
 Run the quality gates explicitly, or diagnose one group (`core`, `grammars`, `zed`, `vscode`,
-`release`, `fuzz`):
+`release`, `fuzz`, `core-fast`, `perf`):
 
 ```bash
 bash scripts/check-quality-gates.sh
 ```
+
+The pull-request CI uses the `core-fast` group, which keeps correctness checks but excludes
+benchmark targets. The optimized benchmark suite is retained under the `perf` group and runs in
+the scheduled/manual Performance workflow. CI also selects editor, grammar, fuzz, and dependency
+jobs from changed paths; fuzz is limited to its direct runtime dependencies, while the Windows
+release build runs in parallel with the Windows test/lint job. The `Required CI checks` job is the
+stable aggregate for branch protection.
 
 Validate and compile the developer-maintained first-party rule source with `pdx-bake`; the output
 can be placed in the ignored build directory for inspection:

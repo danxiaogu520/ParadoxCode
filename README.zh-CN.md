@@ -98,11 +98,17 @@ cargo test --locked --workspace --all-targets
 bash scripts/install-git-hooks.sh
 ```
 
-显式运行质量门禁套件，或只诊断某个分组（`core`、`grammars`、`zed`、`vscode`、`release`、`fuzz`）：
+显式运行质量门禁套件，或只诊断某个分组（`core`、`grammars`、`zed`、`vscode`、`release`、`fuzz`、`core-fast`、`perf`）：
 
 ```bash
 bash scripts/check-quality-gates.sh
 ```
+
+Pull Request CI 使用 `core-fast` 分组：保留正确性检查，但不编译或运行 benchmark 目标。
+优化后的 benchmark 套件仍保留在 `perf` 分组中，由定时或手动触发的 Performance workflow 运行。
+CI 还会根据变更路径选择编辑器、语法、fuzz 和依赖检查；fuzz 只绑定其直接运行时依赖，
+Windows release 构建则与 Windows 测试和 clippy 并行执行。分支保护应将 `Required CI checks`
+作为稳定的聚合必需检查。
 
 使用 `pdx-bake` 校验并编译开发者维护的第一方规则源；产物可放入被忽略的构建目录以供检视：
 
