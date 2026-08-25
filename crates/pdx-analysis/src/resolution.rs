@@ -267,6 +267,8 @@ impl QuotedSemanticCollector<'_, '_, '_, '_, '_> {
                     parent_path: container.parent_path.to_vec(),
                     structural_containers: Vec::new(),
                     alternative_containers: Vec::new(),
+                    existing_keys: Vec::new(),
+                    macro_inferred: false,
                     scope: container.scope.clone(),
                     container_property: Some(invocation.clone()),
                     property: Some(property.clone()),

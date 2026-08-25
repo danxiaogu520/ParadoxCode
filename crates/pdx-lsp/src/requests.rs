@@ -654,7 +654,10 @@ impl SnapshotRequestContext {
                     detail: Some(item.detail),
                     documentation: item.documentation.map(Documentation::String),
                     deprecated: Some(item.deprecated),
-                    sort_text: Some(format!("{:03}", item.sort_score)),
+                    // `sort_score` is a packed lexicographic rank. Keep a fixed-width decimal
+                    // representation so clients that compare `sortText` as strings preserve
+                    // the same order as the analysis result.
+                    sort_text: Some(format!("{:08}", item.sort_score)),
                     insert_text: Some(insert_text.clone()),
                     insert_text_format: Some(if snippet_supported && insert_text.contains('$') {
                         InsertTextFormat::SNIPPET

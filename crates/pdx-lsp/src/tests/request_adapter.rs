@@ -398,6 +398,12 @@ fn memory_transport_completes_macro_argument_values_from_body_constraints() {
         .expect("completion items");
     assert!(items.iter().any(|item| item["label"] == "yes"), "{items:?}");
     assert!(items.iter().any(|item| item["label"] == "no"), "{items:?}");
+    assert!(
+        items.iter().all(|item| item["sortText"]
+            .as_str()
+            .is_some_and(|sort_text| sort_text.len() == 8)),
+        "completion sortText must use fixed-width packed ranks: {items:?}"
+    );
     let _: CompletionResponse = typed_result(&responses, 2);
     fs::remove_dir_all(root_dir).expect("cleanup");
 }

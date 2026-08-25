@@ -69,7 +69,7 @@ pub fn complete_with_cancellation(
             localisation_key_completion(snapshot, replacement_range, &prefix, cancellation)
         };
     }
-    let mut items = Vec::new();
+    let mut items = Vec::<RankedCompletionItem>::new();
     let mut member_cache = CompletionMemberCache::default();
     let semantic_context =
         semantic_completion_context_with_cancellation(snapshot, &input, position, cancellation)?;
@@ -108,7 +108,7 @@ pub fn complete_with_cancellation(
                 .property
                 .as_ref()
                 .is_none_or(|property| property.operator.is_none());
-            add_semantic_key_items(
+            add_semantic_key_items_ranked(
                 snapshot,
                 context,
                 &mut member_cache,
@@ -119,8 +119,7 @@ pub fn complete_with_cancellation(
             );
         }
     }
-    items.sort_by_key(|item| (item.sort_score, item.label.to_ascii_lowercase()));
-    items.dedup_by(|left, right| left.label == right.label && left.kind == right.kind);
+    let mut items = finalize_completion_items(items);
     if let Some(context) = semantic_context.as_ref() {
         for _ in 0..context.quoted_depth {
             for item in &mut items {
@@ -237,15 +236,20 @@ pub(crate) fn localisation_key_completion(
                 documentation: None,
                 replacement_range,
                 insert_text: definition_name,
-                sort_score: 10,
+                sort_score: 0,
                 deprecated: false,
                 resolve_data: None,
             },
             prefix,
+            CompletionRankContext::new(
+                CompletionSchemaTier::CurrentContext,
+                CompletionSpecificity::Localisation,
+                false,
+                false,
+            ),
         );
     }
-    items.sort_by_key(|item| (item.sort_score, item.label.to_ascii_lowercase()));
-    items.dedup_by(|left, right| left.label == right.label && left.kind == right.kind);
+    let items = finalize_completion_items(items);
     cancellation.checkpoint()?;
     Ok(CompletionResult {
         revision: snapshot.revision(),
@@ -262,7 +266,7 @@ pub(crate) fn localisation_value_completion(
     prefix: &str,
     cancellation: &CancellationToken,
 ) -> Result<CompletionResult, Cancelled> {
-    let mut items = Vec::new();
+    let mut items = Vec::<RankedCompletionItem>::new();
     for (kind_name, definition_name) in
         completion_definitions_for_kinds(snapshot, prefix, &["localisation"], cancellation)?
     {
@@ -277,15 +281,20 @@ pub(crate) fn localisation_value_completion(
                 documentation: None,
                 replacement_range,
                 insert_text: definition_name,
-                sort_score: 20,
+                sort_score: 0,
                 deprecated: false,
                 resolve_data: None,
             },
             prefix,
+            CompletionRankContext::new(
+                CompletionSchemaTier::CurrentContext,
+                CompletionSpecificity::Localisation,
+                false,
+                false,
+            ),
         );
     }
-    items.sort_by_key(|item| (item.sort_score, item.label.to_ascii_lowercase()));
-    items.dedup_by(|left, right| left.label == right.label && left.kind == right.kind);
+    let items = finalize_completion_items(items);
     cancellation.checkpoint()?;
     Ok(CompletionResult {
         revision: snapshot.revision(),
