@@ -39,20 +39,20 @@ pub use types::{
 // allowing the implementation to live in responsibility-oriented modules.
 #[cfg(test)]
 pub(crate) use completion::semantic_completion_context;
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) use completion::{
     CompletionMemberCache, SemanticCompletionContext, add_semantic_key_items,
     scope_expression_candidates,
 };
 #[cfg(test)]
 pub(crate) use resolution::ALL_SEMANTICS_CALLS;
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) use semantic::{
-    parameter_names_for_owner, repeated_scope_register_depth, resolve_scope_expression_context,
-    scope_context_from_hir, semantic_child_scope, semantic_root_context,
-    semantic_selected_alternative, semantic_selected_transition,
+    SemanticTransitionInput, parameter_names_for_owner, repeated_scope_register_depth,
+    resolve_scope_expression_context, scope_context_from_hir, semantic_child_scope,
+    semantic_root_context, semantic_selected_alternative, semantic_selected_transition,
 };
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) use support::{ScopeContext, ScriptProperty, input_for_document};
 #[cfg(test)]
 mod tests;

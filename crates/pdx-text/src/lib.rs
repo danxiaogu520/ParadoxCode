@@ -187,18 +187,6 @@ impl LineIndex {
 pub struct LogicalPath(String);
 
 impl LogicalPath {
-    /// Creates a logical path after normalizing separators and removing a leading slash.
-    ///
-    /// This compatibility constructor keeps the original Phase 0 API. Callers that accept
-    /// untrusted paths should use [`Self::parse`] so path traversal is rejected explicitly.
-    #[must_use]
-    pub fn new(path: &str) -> Self {
-        Self::parse(path).unwrap_or_else(|_| {
-            let normalized = path.replace('\\', "/");
-            Self(normalized.trim_start_matches('/').to_owned())
-        })
-    }
-
     /// Parses and validates an EU4 logical path.
     pub fn parse(path: &str) -> Result<Self, LogicalPathError> {
         let normalized = path.replace('\\', "/");
@@ -314,7 +302,9 @@ mod tests {
     #[test]
     fn logical_path_normalizes_separators() {
         assert_eq!(
-            LogicalPath::new("\\common\\events\\x.txt").as_str(),
+            LogicalPath::parse("\\common\\events\\x.txt")
+                .expect("normalized path")
+                .as_str(),
             "common/events/x.txt"
         );
     }

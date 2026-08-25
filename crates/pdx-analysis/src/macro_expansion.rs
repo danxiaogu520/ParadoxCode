@@ -43,6 +43,15 @@ struct RenderedToken {
     quoted_source: Option<QuotedScalarSource>,
 }
 
+struct ExpansionInput<'bindings, 'session, 'cancel> {
+    bindings: &'bindings BTreeMap<String, BoundValue>,
+    fallback_range: TextRange,
+    cancellation: &'bindings CancellationToken,
+    quoted_scripts: &'session mut QuotedScriptSession<'cancel>,
+    quoted_script_depth: usize,
+    runtime_guarded: bool,
+}
+
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ExpandedContainer {
     pub(crate) properties: Vec<ScriptProperty>,
@@ -112,46 +121,40 @@ impl MacroExpansionSession {
         quoted_script_depth: usize,
     ) -> Result<Result<ExpandedContainer, ExpansionFailure>, Cancelled> {
         let bindings = bind_arguments(invocation);
-        self.expand_items(
-            &template.items,
-            &bindings,
-            invocation.key_range,
+        let mut input = ExpansionInput {
+            bindings: &bindings,
+            fallback_range: invocation.key_range,
             cancellation,
             quoted_scripts,
             quoted_script_depth,
-            false,
-        )
+            runtime_guarded: false,
+        };
+        self.expand_items(&template.items, &mut input)
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn expand_items(
         &mut self,
         items: &[MacroTemplateItem],
-        bindings: &BTreeMap<String, BoundValue>,
-        fallback_range: TextRange,
-        cancellation: &CancellationToken,
-        quoted_scripts: &mut QuotedScriptSession<'_>,
-        quoted_script_depth: usize,
-        runtime_guarded: bool,
+        input: &mut ExpansionInput<'_, '_, '_>,
     ) -> Result<Result<ExpandedContainer, ExpansionFailure>, Cancelled> {
         let mut expanded = ExpandedContainer::default();
         for item in items {
-            cancellation.checkpoint()?;
+            input.cancellation.checkpoint()?;
             if let Err(error) = self.charge_node() {
                 return Ok(Err(error));
             }
             match item {
                 MacroTemplateItem::Property(property) => {
-                    let property_guarded = runtime_guarded && !is_limit_property(property);
-                    let property = match self.expand_property(
-                        property,
-                        bindings,
-                        fallback_range,
-                        cancellation,
-                        quoted_scripts,
-                        quoted_script_depth,
-                        property_guarded,
-                    )? {
+                    let property_guarded = input.runtime_guarded && !is_limit_property(property);
+                    let mut property_input = ExpansionInput {
+                        bindings: input.bindings,
+                        fallback_range: input.fallback_range,
+                        cancellation: input.cancellation,
+                        quoted_scripts: &mut *input.quoted_scripts,
+                        quoted_script_depth: input.quoted_script_depth,
+                        runtime_guarded: property_guarded,
+                    };
+                    let property = match self.expand_property(property, &mut property_input)? {
                         Ok(property) => property,
                         Err(ExpansionFailure::OmitOptionalProperty) => {
                             if !is_runtime_branch_property(property) {
@@ -166,16 +169,20 @@ impl MacroExpansionSession {
                     }
                 }
                 MacroTemplateItem::BareValue(token) => {
-                    if runtime_guarded && missing_single_parameter(token, bindings) {
+                    if input.runtime_guarded && missing_single_parameter(token, input.bindings) {
                         expanded.omitted_optional = true;
                         continue;
                     }
-                    let rendered = match self.render_token(token, bindings, fallback_range) {
-                        Ok(value) => value,
-                        Err(error) => return Ok(Err(error)),
-                    };
+                    let rendered =
+                        match self.render_token(token, input.bindings, input.fallback_range) {
+                            Ok(value) => value,
+                            Err(error) => return Ok(Err(error)),
+                        };
                     if let Some(origin) = rendered.quoted_source.as_ref() {
-                        match quoted_scripts.parse(origin.source(), quoted_script_depth)? {
+                        match input
+                            .quoted_scripts
+                            .parse(origin.source(), input.quoted_script_depth)?
+                        {
                             QuotedScriptParse::Parsed(script) => {
                                 let (properties, bare_values) =
                                     quoted_script_container(&script, origin);
@@ -199,17 +206,11 @@ impl MacroExpansionSession {
                     }
                 }
                 MacroTemplateItem::Conditional(conditional) => {
-                    let supplied = bindings.contains_key(&conditional.name.to_ascii_lowercase());
+                    let supplied = input
+                        .bindings
+                        .contains_key(&conditional.name.to_ascii_lowercase());
                     if supplied != conditional.negated {
-                        let nested = match self.expand_items(
-                            &conditional.items,
-                            bindings,
-                            fallback_range,
-                            cancellation,
-                            quoted_scripts,
-                            quoted_script_depth,
-                            runtime_guarded,
-                        )? {
+                        let nested = match self.expand_items(&conditional.items, input)? {
                             Ok(nested) => nested,
                             Err(error) => return Ok(Err(error)),
                         };
@@ -223,32 +224,28 @@ impl MacroExpansionSession {
         Ok(Ok(expanded))
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn expand_property(
         &mut self,
         property: &MacroTemplateProperty,
-        bindings: &BTreeMap<String, BoundValue>,
-        fallback_range: TextRange,
-        cancellation: &CancellationToken,
-        quoted_scripts: &mut QuotedScriptSession<'_>,
-        quoted_script_depth: usize,
-        runtime_guarded: bool,
+        input: &mut ExpansionInput<'_, '_, '_>,
     ) -> Result<Result<Option<ScriptProperty>, ExpansionFailure>, Cancelled> {
-        let forwarding = is_forwarding_property(property, bindings);
-        if missing_single_parameter(&property.key, bindings) && (runtime_guarded || forwarding) {
+        let forwarding = is_forwarding_property(property, input.bindings);
+        if missing_single_parameter(&property.key, input.bindings)
+            && (input.runtime_guarded || forwarding)
+        {
             // A key substitution with no binding cannot produce a meaningful property. The
             // signature validator has already rejected missing required parameters; this path
             // is for optional values that live in a runtime branch of the macro body.
             return Ok(Err(ExpansionFailure::OmitOptionalProperty));
         }
-        let mut key = match self.render_token(&property.key, bindings, fallback_range) {
+        let mut key = match self.render_token(&property.key, input.bindings, input.fallback_range) {
             Ok(key) => key,
             Err(error) => return Ok(Err(error)),
         };
         key.value = key.value.trim().to_owned();
         if let MacroTemplateValue::Scalar(token) = &property.value
-            && missing_single_parameter(token, bindings)
-            && (runtime_guarded || forwarding)
+            && missing_single_parameter(token, input.bindings)
+            && (input.runtime_guarded || forwarding)
         {
             // EU4 macros commonly place optional substitutions in branch-local scalar values.
             // Omitting that property preserves the surrounding definition and lets sibling
@@ -258,7 +255,7 @@ impl MacroExpansionSession {
         let (scalar, quoted, quoted_source, block_range, block, bare_values) = match &property.value
         {
             MacroTemplateValue::Scalar(token) => {
-                let scalar = match self.render_token(token, bindings, fallback_range) {
+                let scalar = match self.render_token(token, input.bindings, input.fallback_range) {
                     Ok(scalar) => scalar,
                     Err(error) => return Ok(Err(error)),
                 };
@@ -273,15 +270,15 @@ impl MacroExpansionSession {
                 )
             }
             MacroTemplateValue::Block { items, .. } => {
-                let nested = match self.expand_items(
-                    items,
-                    bindings,
-                    fallback_range,
-                    cancellation,
-                    quoted_scripts,
-                    quoted_script_depth,
-                    runtime_guarded || is_runtime_branch_key(&key.value),
-                )? {
+                let mut nested_input = ExpansionInput {
+                    bindings: input.bindings,
+                    fallback_range: input.fallback_range,
+                    cancellation: input.cancellation,
+                    quoted_scripts: &mut *input.quoted_scripts,
+                    quoted_script_depth: input.quoted_script_depth,
+                    runtime_guarded: input.runtime_guarded || is_runtime_branch_key(&key.value),
+                };
+                let nested = match self.expand_items(items, &mut nested_input)? {
                     Ok(nested) => nested,
                     Err(error) => return Ok(Err(error)),
                 };
@@ -292,7 +289,7 @@ impl MacroExpansionSession {
                     None,
                     false,
                     None,
-                    Some(fallback_range),
+                    Some(input.fallback_range),
                     nested.properties,
                     nested.bare_values,
                 )
@@ -301,7 +298,7 @@ impl MacroExpansionSession {
         Ok(Ok(Some(ScriptProperty {
             key: key.value,
             key_range: key.range,
-            range: fallback_range,
+            range: input.fallback_range,
             operator: property.operator.clone(),
             scalar,
             quoted,

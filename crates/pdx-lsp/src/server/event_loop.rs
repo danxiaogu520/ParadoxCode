@@ -325,18 +325,18 @@ impl LspServer {
                             };
                             scope.spawn(move || {
                                 let log_ref: &(dyn Fn(&str) + Sync) = &log;
-                                let result = run_index_cache_load(
-                                    &path,
+                                let result = run_index_cache_load(IndexCacheLoadRequest {
+                                    path: &path,
                                     rules,
                                     profile,
                                     current_rule_hash,
-                                    auto_vanilla.as_ref(),
-                                    Some(log_ref),
-                                    progress
+                                    auto_vanilla: auto_vanilla.as_ref(),
+                                    log: Some(log_ref),
+                                    progress: progress
                                         .as_deref()
                                         .map(|callback| callback as &(dyn Fn(usize, usize) + Sync)),
-                                    &worker_cancellation,
-                                );
+                                    cancellation: &worker_cancellation,
+                                });
                                 let _ =
                                     sender.send(TransportEvent::VanillaSetup(IndexSetupResult {
                                         result,

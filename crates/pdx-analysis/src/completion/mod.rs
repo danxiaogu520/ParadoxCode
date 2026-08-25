@@ -81,16 +81,16 @@ pub fn complete_with_cancellation(
         cancellation.checkpoint()?;
         if value_context {
             if let Some(property) = context.property.as_ref() {
-                let inferred = add_inferred_macro_value_items(
+                let inferred = add_inferred_macro_value_items(InferredMacroCompletionInput {
                     snapshot,
                     context,
                     property,
-                    &mut member_cache,
-                    &mut items,
+                    member_cache: &mut member_cache,
+                    items: &mut items,
                     replacement_range,
-                    &prefix,
+                    prefix: &prefix,
                     cancellation,
-                )?;
+                })?;
                 if !inferred {
                     add_semantic_value_items(
                         snapshot,

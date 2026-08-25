@@ -1,5 +1,3 @@
-#![allow(unused_imports)]
-
 use super::support::*;
 
 #[test]
@@ -38,7 +36,7 @@ fn unknown_tooltip_and_named_event_target_scopes_stay_conservative() {
     let results = diagnostics(&host.snapshot(), &id);
     assert!(
         results.iter().all(|item| {
-            item.code != DiagnosticCode::WrongScope
+            item.code != DiagnosticCode::RuleWrongScope
                 && !(item.code == DiagnosticCode::InvalidValue
                     && item.message.contains("set_capital"))
         }),
@@ -355,7 +353,7 @@ fn scripted_macro_expansion_uses_the_callers_nested_scope() {
     let wrong_scope = results
         .iter()
         .filter(|diagnostic| {
-            diagnostic.code == DiagnosticCode::WrongScope
+            diagnostic.code == DiagnosticCode::RuleWrongScope
                 && diagnostic.message.contains("fixture_country_only")
         })
         .collect::<Vec<_>>();

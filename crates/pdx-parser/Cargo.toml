@@ -15,8 +15,5 @@ publish = false
 pdx-text = { path = "../pdx-text" }
 unicode-width = "0.2"
 
-[lints.rust]
-unsafe_code = "allow"
-
-[lints.clippy]
-all = "warn"
+[lints]
+workspace = true

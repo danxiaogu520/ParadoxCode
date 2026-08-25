@@ -39,6 +39,9 @@ source tree.
 The shared project configuration is also understood by the Zed extension. The first server start
 may build or load the Vanilla index; progress is visible in the status bar and ParadoxCode output.
 
+The bundled server requires a modern LSP client that sends `workspaceFolders` during initialize.
+Clients that send only the deprecated `rootUri` field are not supported.
+
 ## Mission Preview
 
 Open a mission file under `common/missions` or `missions`, then choose **Open Mission Tree Preview

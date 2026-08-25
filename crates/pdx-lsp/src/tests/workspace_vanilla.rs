@@ -25,7 +25,7 @@ fn workspace_root_is_scanned_as_current_mod_without_project_config() {
     fs::write(&mission, "country_event = { id = test.1 }\n").expect("mission source");
     let mission_uri = canonical_uri(&mission);
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":mission_uri,"languageId":"eu4","version":1,"text":"country_event = { id = test.1 }\n"}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
@@ -62,7 +62,7 @@ fn watched_file_registration_and_notification_update_the_disk_index() {
                 "id":1,
                 "method":"initialize",
                 "params":{
-                    "rootUri":root_uri,
+                    "workspaceFolders":[{"uri":root_uri,"name":"test"}],
                     "capabilities":{
                         "workspace":{
                             "didChangeWatchedFiles":{
@@ -253,7 +253,7 @@ path = "dependencies/high"
     let reference_uri = canonical_uri(&reference_path);
     let root_uri = canonical_uri(&canonical_root);
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{},"initializationOptions":{"projectConfig":".pdx/project.toml"}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{},"initializationOptions":{"projectConfig":".pdx/project.toml"}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"eu4","version":1,"text":"event = dependency.1\nevent = vanilla.1\n"}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":reference_uri},"position":{"line":0,"character":10},"newName":"renamed.1"}}),
@@ -345,7 +345,7 @@ fn missing_vanilla_cache_degrades_with_an_lsp_warning() {
     let root = std::env::temp_dir().join(format!("pdx-lsp-missing-vanilla-cache-{nonce}"));
     fs::create_dir_all(root.join("events")).expect("workspace fixture");
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&root),"capabilities":{},"initializationOptions":{"vanillaIndexCache":".pdx/missing.pdxindex"}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":path_to_uri(&root),"name":"test"}],"capabilities":{},"initializationOptions":{"vanillaIndexCache":".pdx/missing.pdxindex"}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -403,7 +403,7 @@ fn initialize_defers_an_existing_vanilla_cache() {
     cache.save(&cache_path).expect("save Vanilla cache");
 
     let params = serde_json::from_value(json!({
-        "rootUri": path_to_uri(&workspace),
+        "workspaceFolders":[{"uri":path_to_uri(&workspace),"name":"test"}],
         "capabilities": {},
         "initializationOptions": {"vanillaIndexCache": cache_path}
     }))
@@ -454,7 +454,7 @@ fn stale_vanilla_cache_is_regenerated_with_an_explicit_notification() {
     );
 
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&container.join("workspace")),"capabilities":{},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":path_to_uri(&container.join("workspace")),"name":"test"}],"capabilities":{},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -523,7 +523,7 @@ fn stale_cache_regeneration_reports_work_done_progress() {
     }
 
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&container.join("workspace")),"capabilities":{"window":{"workDoneProgress":true}},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":path_to_uri(&container.join("workspace")),"name":"test"}],"capabilities":{"window":{"workDoneProgress":true}},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -587,7 +587,7 @@ fn valid_cache_load_reports_work_done_progress() {
     let cache_path = valid_cache_fixture(&container);
 
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&container.join("workspace")),"capabilities":{"window":{"workDoneProgress":true}},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":path_to_uri(&container.join("workspace")),"name":"test"}],"capabilities":{"window":{"workDoneProgress":true}},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -701,7 +701,7 @@ fn stale_vanilla_cache_reports_regeneration_failure_explicitly() {
     fs::remove_dir_all(container.join("vanilla")).expect("remove Vanilla directory");
 
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&container.join("workspace")),"capabilities":{},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":path_to_uri(&container.join("workspace")),"name":"test"}],"capabilities":{},"initializationOptions":{"vanillaIndexCache":cache_path}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -774,14 +774,16 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
         ..DiscoveryOptions::default()
     };
     let (cache, message) = run_index_cache_load_with_options(
-        &explicit,
-        rules.clone(),
-        pdx_game::eu4::profile(),
-        rules.rule_hash().to_hex(),
-        Some(&automatic),
-        None,
-        None,
-        &cancellation,
+        IndexCacheLoadRequest {
+            path: &explicit,
+            rules: rules.clone(),
+            profile: pdx_game::eu4::profile(),
+            current_rule_hash: rules.rule_hash().to_hex(),
+            auto_vanilla: Some(&automatic),
+            log: None,
+            progress: None,
+            cancellation: &cancellation,
+        },
         &discovery_options,
     )
     .expect("unavailable cache must rebuild");
@@ -795,14 +797,16 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
 
     // A second start finds a matching cache and loads it directly.
     let (_, second) = run_index_cache_load_with_options(
-        &explicit,
-        rules.clone(),
-        pdx_game::eu4::profile(),
-        rules.rule_hash().to_hex(),
-        Some(&automatic),
-        None,
-        None,
-        &cancellation,
+        IndexCacheLoadRequest {
+            path: &explicit,
+            rules: rules.clone(),
+            profile: pdx_game::eu4::profile(),
+            current_rule_hash: rules.rule_hash().to_hex(),
+            auto_vanilla: Some(&automatic),
+            log: None,
+            progress: None,
+            cancellation: &cancellation,
+        },
         &discovery_options,
     )
     .expect("rebuilt cache loads");
@@ -832,7 +836,7 @@ fn unavailable_configured_cache_is_rebuilt_from_configured_source() {
     };
 
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&root.join("workspace")),"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":path_to_uri(&root.join("workspace")),"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -1012,7 +1016,7 @@ fn initialize_game_directory_guides_a_previous_failed_discovery() {
             "id":1,
             "method":"initialize",
             "params":{
-                "rootUri":path_to_uri(&workspace),
+                "workspaceFolders":[{"uri":path_to_uri(&workspace),"name":"test"}],
                 "capabilities":{},
                 "initializationOptions":{"gameDirectory":source}
             }
@@ -1277,7 +1281,7 @@ fn existing_dependency_index_cache_is_installed_in_the_background() {
     fs::write(&reference, "event = dep.1\n").expect("workspace reference");
     let reference_uri = canonical_uri(&reference);
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":canonical_uri(&workspace),"capabilities":{},"initializationOptions":{"modDirectory":".","dependencies":[{"id":"dep-a","path":dependency,"index":cache_path}]}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":canonical_uri(&workspace),"name":"test"}],"capabilities":{},"initializationOptions":{"modDirectory":".","dependencies":[{"id":"dep-a","path":dependency,"index":cache_path}]}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"eu4","version":1,"text":"event = dep.1\n"}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{"textDocument":{"uri":reference_uri},"position":{"line":0,"character":8}}}),
@@ -1353,7 +1357,7 @@ fn missing_dependency_index_cache_is_built_in_the_background() {
     fs::write(&reference, "event = dep.2\n").expect("workspace reference");
     let reference_uri = canonical_uri(&reference);
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":canonical_uri(&workspace),"capabilities":{},"initializationOptions":{"modDirectory":".","dependencies":[{"id":"dep-b","path":dependency,"index":cache_path}]}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":canonical_uri(&workspace),"name":"test"}],"capabilities":{},"initializationOptions":{"modDirectory":".","dependencies":[{"id":"dep-b","path":dependency,"index":cache_path}]}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"eu4","version":1,"text":"event = dep.2\n"}}}),
         json!({"jsonrpc":"2.0","method":"shutdown","params":{}}),

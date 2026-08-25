@@ -501,7 +501,10 @@ pub fn check_zed_extension(root: &Path) -> Vec<CheckResult> {
                                 format!("query failed: {}", String::from_utf8_lossy(&out.stderr)),
                             ));
                         }
-                        Err(_) => {} // tree-sitter not available, skip
+                        Err(error) => results.push(CheckResult::fail(
+                            format!("{lang_dir_name}: {query_name}"),
+                            format!("tree-sitter query could not run: {error}"),
+                        )),
                     }
                 }
             }

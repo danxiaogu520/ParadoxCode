@@ -38,11 +38,11 @@ fn file_matcher_path_prefix_is_directory_bounded() {
         case_sensitive: false,
     };
 
-    assert!(matcher.matches(&LogicalPath::new("localisation/main.yml")));
-    assert!(matcher.matches(&LogicalPath::new("localisation/events/main.yml")));
-    assert!(matcher.matches(&LogicalPath::new("LOCALISATION/events/MAIN.YML")));
-    assert!(!matcher.matches(&LogicalPath::new("localisation_extra/main.yml")));
-    assert!(!matcher.matches(&LogicalPath::new("common/main.yml")));
+    assert!(matcher.matches(&LogicalPath::parse("localisation/main.yml").expect("path")));
+    assert!(matcher.matches(&LogicalPath::parse("localisation/events/main.yml").expect("path")));
+    assert!(matcher.matches(&LogicalPath::parse("LOCALISATION/events/MAIN.YML").expect("path")));
+    assert!(!matcher.matches(&LogicalPath::parse("localisation_extra/main.yml").expect("path")));
+    assert!(!matcher.matches(&LogicalPath::parse("common/main.yml").expect("path")));
 }
 
 #[test]

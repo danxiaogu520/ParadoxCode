@@ -1,5 +1,3 @@
-#![allow(unused_imports)]
-
 use super::support::*;
 
 #[test]
@@ -47,16 +45,16 @@ fn quoted_transition_beats_any_scalar_leaf_fallback() {
     };
     let scope = crate::ScopeContext::new(snapshot.game_profile_handle());
 
-    let selected = crate::semantic_selected_transition(
-        &snapshot,
-        &[&fallback, quoted],
-        None,
-        "trigger",
-        &[],
-        &property,
-        &scope,
-        false,
-    )
+    let selected = crate::semantic_selected_transition(crate::SemanticTransitionInput {
+        snapshot: &snapshot,
+        matching: &[&fallback, quoted],
+        selected_alternative: None,
+        context: "trigger",
+        parent_path: &[],
+        property: &property,
+        scope: &scope,
+        transparent_wrapper: false,
+    })
     .expect("specific quoted transition");
 
     assert_eq!(selected.id, quoted.id);
@@ -220,7 +218,7 @@ fn area_scope_transition_keeps_province_trigger_valid() {
     );
     assert!(
         !results.iter().any(|item| {
-            item.code == DiagnosticCode::WrongScope
+            item.code == DiagnosticCode::RuleWrongScope
                 && item
                     .message
                     .contains("`country_or_non_sovereign_subject_holds`")
@@ -496,16 +494,16 @@ fn workspace_type_child_key_selects_only_one_transition() {
         }],
         bare_values: Vec::new(),
     };
-    let selected = crate::semantic_selected_transition(
-        &snapshot,
-        &[&country_transition, &other_transition],
-        None,
-        "fixture",
-        &[],
-        &property,
-        &scope,
-        false,
-    )
+    let selected = crate::semantic_selected_transition(crate::SemanticTransitionInput {
+        snapshot: &snapshot,
+        matching: &[&country_transition, &other_transition],
+        selected_alternative: None,
+        context: "fixture",
+        parent_path: &[],
+        property: &property,
+        scope: &scope,
+        transparent_wrapper: false,
+    })
     .expect("workspace-backed child key selects a transition");
     assert_eq!(
         selected.child_context.as_deref(),
@@ -514,16 +512,16 @@ fn workspace_type_child_key_selects_only_one_transition() {
 
     property.block[0].key = "MISSING".to_owned();
     assert!(
-        crate::semantic_selected_transition(
-            &snapshot,
-            &[&country_transition, &other_transition],
-            None,
-            "fixture",
-            &[],
-            &property,
-            &scope,
-            false,
-        )
+        crate::semantic_selected_transition(crate::SemanticTransitionInput {
+            snapshot: &snapshot,
+            matching: &[&country_transition, &other_transition],
+            selected_alternative: None,
+            context: "fixture",
+            parent_path: &[],
+            property: &property,
+            scope: &scope,
+            transparent_wrapper: false,
+        })
         .is_none(),
         "an unresolved child key must not fall back to rule order"
     );

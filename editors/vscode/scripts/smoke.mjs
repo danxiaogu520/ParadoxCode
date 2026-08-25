@@ -78,7 +78,7 @@ function run(serverArgs) {
       child.stdin.write(encode({ jsonrpc: '2.0', id, method, params }));
     };
     request(1, 'initialize', {
-      rootUri: 'file:///tmp/paradoxcode-smoke',
+      workspaceFolders: [{ uri: 'file:///tmp/paradoxcode-smoke', name: 'smoke' }],
       capabilities: {},
     });
     child.stdin.write(encode({ jsonrpc: '2.0', method: 'initialized', params: {} }));
@@ -202,7 +202,7 @@ if (!preview) {
   if (!a1) {
     fail('node a1 missing');
   } else {
-    for (const field of ['x', 'y', 'start', 'end', 'sourceRange', 'isRoot', 'hasError', 'hasWarning', 'icon', 'titleKey']) {
+    for (const field of ['x', 'y', 'sourceRange', 'isRoot', 'hasError', 'hasWarning', 'icon', 'titleKey']) {
       if (!(field in a1)) {
         fail(`node a1 missing field ${field}`);
       }

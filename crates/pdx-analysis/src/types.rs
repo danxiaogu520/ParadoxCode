@@ -123,16 +123,6 @@ pub enum DiagnosticCode {
 }
 
 impl DiagnosticCode {
-    /// Compatibility alias for the pre-refactor name. New producers should use
-    /// [`DiagnosticCode::RuleWrongScope`].
-    #[allow(non_upper_case_globals)]
-    pub const WrongScope: Self = Self::RuleWrongScope;
-
-    /// Compatibility alias for the pre-refactor name. New producers should use
-    /// [`DiagnosticCode::AnalysisIncomplete`].
-    #[allow(non_upper_case_globals)]
-    pub const MacroExpansionLimit: Self = Self::AnalysisIncomplete;
-
     /// Returns the stable wire-facing code.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
@@ -151,26 +141,6 @@ impl DiagnosticCode {
             Self::InvalidScopeCommand => "InvalidScopeCommand",
             Self::MacroExpansionCycle => "MacroExpansionCycle",
             Self::AnalysisIncomplete => "AnalysisIncomplete",
-        }
-    }
-
-    /// Returns the legacy wire-facing code used by clients before the PascalCase migration.
-    #[must_use]
-    pub const fn legacy_str(self) -> &'static str {
-        match self {
-            Self::Syntax => "pdx-parser",
-            Self::UnknownKey => "pdx-unknown-key",
-            Self::UnknownSymbol => "pdx-unknown-symbol",
-            Self::AmbiguousSymbol => "pdx-ambiguous-symbol",
-            Self::UnknownScope => "pdx-unknown-scope",
-            Self::InvalidValue | Self::UnknownBareValue => "pdx-invalid-value",
-            Self::Cardinality => "pdx-cardinality",
-            Self::RuleWrongScope => "pdx-wrong-scope",
-            Self::InvalidTarget => "pdx-invalid-target",
-            Self::TargetWrongScope => "pdx-target-wrong-scope",
-            Self::InvalidScopeCommand => "pdx-invalid-scope-command",
-            Self::MacroExpansionCycle => "pdx-macro-expansion-cycle",
-            Self::AnalysisIncomplete => "pdx-macro-expansion-limit",
         }
     }
 
@@ -469,7 +439,6 @@ pub struct SemanticToken {
 /// Stable semantic token types. The ordering of [`Self::ALL`] is the protocol legend contract:
 /// protocol adapters must preserve it and must not invent additional types.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[allow(clippy::upper_case_acronyms)]
 pub enum SemanticTokenType {
     /// A line comment.
     Comment,

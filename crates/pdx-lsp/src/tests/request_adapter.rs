@@ -15,7 +15,7 @@ use super::*;
 fn classify_paths_uses_profile_whitelist_and_diagnostic_parser_categories() {
     let (root, root_uri) = temp_workspace_dir();
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"pdx/classifyPaths","params":{"paths":["events/test.txt","localisation/test_l_english.yml","ThirdPartyLicenses.txt","interface/test.gui"]}}),
         json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
@@ -42,7 +42,7 @@ fn classify_paths_uses_profile_whitelist_and_diagnostic_parser_categories() {
 fn text_diagnostics_analyzes_caller_supplied_files_without_opening_overlays() {
     let (root, root_uri) = temp_workspace_dir();
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"pdx/textDiagnostics","params":{"files":[
             {"path":"events/invalid.txt","text":"country_event = { id = text.1 scope = nowhere }\n"},
@@ -78,7 +78,7 @@ fn text_diagnostics_analyzes_caller_supplied_files_without_opening_overlays() {
 fn mission_preview_returns_renderer_ready_tree_data() {
     let (root, root_uri) = temp_workspace_dir();
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":format!("{root_uri}/localisation/titles_l_english.yml"),"languageId":"Localisation","version":1,"text":"l_english:\n a1_title:0 \"Alpha One\"\n a2_title:0 \"Alpha Two\"\n"}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"pdx/missionPreview","params":{"path":"missions/test.txt","uri":format!("{root_uri}/missions/test.txt"),"version":7,"text":"main_tree = {\n\tslot = 1\n\ta1 = { position = 1 icon = mission_alpha }\n\ta2 = { position = 2 required_missions = { a1 } }\n}\n\nbranch_tree = {\n\tslot = 2\n\tb1 = { position = 1 required_missions = { external_id } }\n}\n"}}),
@@ -128,9 +128,6 @@ fn mission_preview_returns_renderer_ready_tree_data() {
         .iter()
         .find(|node| node["id"] == "a2")
         .expect("a2 node");
-    let start = a2["start"].as_u64().expect("a2 start");
-    let end = a2["end"].as_u64().expect("a2 end");
-    assert!(start < end, "mission block carries a real byte span");
     assert!(a2["sourceRange"]["start"]["line"].is_u64());
     assert!(a2["sourceRange"]["start"]["character"].is_u64());
     assert!(a2["sourceRange"]["end"]["line"].is_u64());
@@ -189,7 +186,7 @@ fn workspace_diagnostics_batches_indexed_disk_files_without_opening_overlays() {
     .expect("first source");
     fs::write(events.join("b.txt"), "country_event = { id = batch.2 }\n").expect("second source");
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"pdx/workspaceDiagnostics","params":{"offset":0,"limit":1}}),
         json!({"jsonrpc":"2.0","id":3,"method":"pdx/workspaceDiagnostics","params":{"offset":1,"limit":1}}),
@@ -235,7 +232,7 @@ fn workspace_files_exposes_active_source_roots_without_contents() {
     )
     .expect("source file");
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","id":2,"method":"pdx/workspaceFiles"}),
         json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
@@ -290,7 +287,7 @@ fn noncanonical_document_uri_preserves_rule_path_context() {
     let root_uri = path_to_uri(&aliased_root);
     let uri = path_to_uri(&aliased_file);
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":"my_decree = { cost = 50 }\n"}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":16}}}),
@@ -328,7 +325,7 @@ fn memory_transport_hover_returns_semantic_value_and_null_for_unknown_text() {
     let cost = text.find("cost").expect("cost") + 1;
     let unknown = text.find("unknown").expect("unknown") + 1;
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":cost}}}),
@@ -379,7 +376,7 @@ fn memory_transport_completes_macro_argument_values_from_body_constraints() {
     let text = "country_event = { immediate = { bool_macro = { VALUE =  } } }\n";
     let position = text.find("=  }").expect("empty value") + 2;
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":position}}}),
@@ -415,7 +412,7 @@ fn memory_transport_delegates_phase5_requests_to_analysis() {
     let uri = canonical_uri(&file_path);
     let text = "country_event = { id = test.1 }\nevent = test.1\nscope = nowhere\n";
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":19}}}),
@@ -535,7 +532,7 @@ fn semantic_tokens_are_advertised_and_encoded_in_relative_order() {
     let uri = format!("{root_uri}/events/test.txt");
     let text = "@cost = 100\ncountry_event = { favorable = yes }\n";
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri.clone(),"languageId":"eu4","version":1,"text":text}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":uri.clone()}}}),
@@ -625,7 +622,7 @@ fn memory_transport_preserves_hir_disambiguated_mixed_context_completion() {
         "}\n",
     );
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":4,"character":6}}}),
@@ -721,7 +718,7 @@ fn memory_transport_negotiates_completion_snippet_support() {
     let text = "country_event = { immediate = { ap";
     let run = |capabilities: Value| {
         let input = frames([
-            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri.clone(),"capabilities":capabilities}}),
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri.clone(),"name":"test"}],"capabilities":capabilities}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri.clone(),"languageId":"eu4","version":1,"text":text}}}),
             json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri.clone()},"position":{"line":0,"character":33}}}),
@@ -800,7 +797,7 @@ fn memory_transport_resolves_completion_items_by_data() {
         "}\n",
     );
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":4,"character":6}}}),
@@ -831,7 +828,7 @@ fn memory_transport_resolves_completion_items_by_data() {
 
     let mut resolve_input = Vec::new();
     resolve_input.extend(frame(json!({
-        "jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}
+        "jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}
     })));
     resolve_input.extend(frame(
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -870,7 +867,7 @@ fn memory_transport_exposes_parameters_as_document_local_symbols() {
     let uri = canonical_uri(&file_path);
     let text = "apply = { value = $Amount$ again = $amount$ [[optional] enabled = yes ] }\n";
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":uri}}}),
@@ -912,7 +909,7 @@ fn memory_transport_formats_safe_text_and_refuses_recovered_syntax() {
     let valid_uri = "file:///tmp/format-valid.txt";
     let unsafe_uri = "file:///tmp/format-unsafe.txt";
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":"file:///tmp","capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":"file:///tmp","name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":valid_uri,"languageId":"eu4","version":1,"text":"root={name=\"汉😀\" other=yes}"}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/formatting","params":{"textDocument":{"uri":valid_uri},"options":{"tabSize":2,"insertSpaces":true}}}),
@@ -965,7 +962,7 @@ fn memory_transport_rename_covers_current_mod_disk_references() {
     let references_uri = canonical_uri(&references_path);
     let root_uri = canonical_uri(&fs::canonicalize(&root).expect("canonical root"));
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":target_uri,"languageId":"eu4","version":1,"text":"country_event = { id = cross.1 }\n"}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":target_uri},"position":{"line":0,"character":25},"newName":"renamed.1"}}),
@@ -1013,7 +1010,7 @@ fn initialize_reports_stages_via_log_message_and_work_done_progress() {
     let (root, root_uri) = temp_workspace_dir();
     let run = |capabilities: Value| {
         let input = frames([
-            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri.clone(),"capabilities":capabilities}}),
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri.clone(),"name":"test"}],"capabilities":capabilities}}),
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
             json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
             json!({"jsonrpc":"2.0","method":"exit"}),

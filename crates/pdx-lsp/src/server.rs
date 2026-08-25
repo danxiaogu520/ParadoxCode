@@ -38,7 +38,7 @@ use crate::text::{
 };
 use crate::transport::{read_message, write_message};
 use crate::uri::uri_to_path;
-use crate::vanilla::{run_auto_vanilla_setup, run_index_cache_load};
+use crate::vanilla::{IndexCacheLoadRequest, run_auto_vanilla_setup, run_index_cache_load};
 use crate::workspace::DependencyIndexCache;
 use crate::{
     DIAGNOSTIC_DEBOUNCE, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, JSON_RPC_VERSION,

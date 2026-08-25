@@ -536,11 +536,10 @@ async function waitForDiagnostic(client, uri, timeoutMs, label) {
 }
 
 function initializeParameters(root, initializationOptions) {
-  const rootUri = pathToFileURL(root).href;
+  const workspaceUri = pathToFileURL(root).href;
   return {
     processId: null,
-    rootUri,
-    workspaceFolders: [{ uri: rootUri, name: 'pdx-perf-workspace' }],
+    workspaceFolders: [{ uri: workspaceUri, name: 'pdx-perf-workspace' }],
     capabilities: {},
     initializationOptions,
   };

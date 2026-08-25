@@ -547,11 +547,6 @@ async function startClient(context: vscode.ExtensionContext, loadedFiles?: Loade
             log.appendLine(`[pdx-ls] ${params.message}`);
             statusBar.tooltip = `ParadoxCode: ${params.message}`;
             updateVanillaContext(params.message);
-            // Keep older user-selected pdx-ls binaries usable while they do not yet emit the
-            // explicit readiness notification.
-            if (/pdx-ls ready/i.test(params.message)) {
-                handleServerReady(currentClient, loadedFiles);
-            }
         });
         currentClient.onNotification('pdx/ready', () => {
             if (client !== currentClient) {

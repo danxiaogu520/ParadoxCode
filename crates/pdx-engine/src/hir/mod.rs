@@ -20,8 +20,8 @@ pub use semantics::{
 
 #[cfg(test)]
 pub(crate) use scope::{
-    child_key_may_match, child_scope_state, property_children, repeated_scope_register_depth,
-    resolve_scope_expression, statically_selected_transition,
+    StaticTransitionInput, child_key_may_match, child_scope_state, property_children,
+    repeated_scope_register_depth, resolve_scope_expression, statically_selected_transition,
 };
 
 fn range_within(inner: pdx_text::TextRange, outer: pdx_text::TextRange) -> bool {

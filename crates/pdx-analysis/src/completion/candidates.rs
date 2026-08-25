@@ -164,7 +164,6 @@ pub(crate) fn semantic_rules_for_completion<'rule, 'path>(
     rules
 }
 
-#[allow(clippy::too_many_arguments)] // Candidate construction keeps the query context and output state explicit.
 pub(crate) fn add_semantic_key_items(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
@@ -778,17 +777,30 @@ pub(crate) fn add_semantic_value_items(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+pub(crate) struct InferredMacroCompletionInput<'a> {
+    pub(crate) snapshot: &'a AnalysisSnapshot,
+    pub(crate) context: &'a SemanticCompletionContext,
+    pub(crate) property: &'a ScriptProperty,
+    pub(crate) member_cache: &'a mut CompletionMemberCache,
+    pub(crate) items: &'a mut Vec<CompletionItem>,
+    pub(crate) replacement_range: TextRange,
+    pub(crate) prefix: &'a str,
+    pub(crate) cancellation: &'a CancellationToken,
+}
+
 pub(crate) fn add_inferred_macro_value_items(
-    snapshot: &AnalysisSnapshot,
-    context: &SemanticCompletionContext,
-    property: &ScriptProperty,
-    member_cache: &mut CompletionMemberCache,
-    items: &mut Vec<CompletionItem>,
-    replacement_range: TextRange,
-    prefix: &str,
-    cancellation: &CancellationToken,
+    input: InferredMacroCompletionInput<'_>,
 ) -> Result<bool, Cancelled> {
+    let InferredMacroCompletionInput {
+        snapshot,
+        context,
+        property,
+        member_cache,
+        items,
+        replacement_range,
+        prefix,
+        cancellation,
+    } = input;
     let sites = infer_macro_value_constraints(snapshot, context, property, cancellation)?;
     if sites.is_empty() {
         return Ok(false);
@@ -835,7 +847,6 @@ pub(crate) fn add_inferred_macro_value_items(
     Ok(true)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn add_inferred_matcher_items(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
@@ -1104,13 +1115,15 @@ pub(crate) fn add_value_completion(
 ) {
     add_typed_value_completion(
         items,
-        label,
-        detail,
-        documentation,
-        replacement_range,
-        prefix,
-        deprecated,
-        CompletionKind::Value,
+        TypedValueCompletion {
+            label,
+            detail,
+            documentation,
+            replacement_range,
+            prefix,
+            deprecated,
+            kind: CompletionKind::Value,
+        },
     );
 }
 
@@ -1125,13 +1138,15 @@ fn add_enum_member_completion(
 ) {
     add_typed_value_completion(
         items,
-        label,
-        detail,
-        documentation,
-        replacement_range,
-        prefix,
-        deprecated,
-        CompletionKind::EnumMember,
+        TypedValueCompletion {
+            label,
+            detail,
+            documentation,
+            replacement_range,
+            prefix,
+            deprecated,
+            kind: CompletionKind::EnumMember,
+        },
     );
 }
 
@@ -1146,41 +1161,46 @@ fn add_scope_completion(
 ) {
     add_typed_value_completion(
         items,
-        label,
-        detail,
-        documentation,
-        replacement_range,
-        prefix,
-        deprecated,
-        CompletionKind::Scope,
+        TypedValueCompletion {
+            label,
+            detail,
+            documentation,
+            replacement_range,
+            prefix,
+            deprecated,
+            kind: CompletionKind::Scope,
+        },
     );
 }
 
-#[allow(clippy::too_many_arguments)]
-fn add_typed_value_completion(
-    items: &mut Vec<CompletionItem>,
-    label: &str,
-    detail: &str,
+struct TypedValueCompletion<'a> {
+    label: &'a str,
+    detail: &'a str,
     documentation: Option<String>,
     replacement_range: TextRange,
-    prefix: &str,
+    prefix: &'a str,
     deprecated: bool,
     kind: CompletionKind,
+}
+
+fn add_typed_value_completion(
+    items: &mut Vec<CompletionItem>,
+    completion: TypedValueCompletion<'_>,
 ) {
     push_completion(
         items,
         CompletionItem {
-            label: label.to_owned(),
-            kind,
-            detail: detail.to_owned(),
-            documentation,
-            replacement_range,
-            insert_text: label.to_owned(),
-            sort_score: completion_sort_score(4, deprecated),
-            deprecated,
+            label: completion.label.to_owned(),
+            kind: completion.kind,
+            detail: completion.detail.to_owned(),
+            documentation: completion.documentation,
+            replacement_range: completion.replacement_range,
+            insert_text: completion.label.to_owned(),
+            sort_score: completion_sort_score(4, completion.deprecated),
+            deprecated: completion.deprecated,
             resolve_data: None,
         },
-        prefix,
+        completion.prefix,
     );
 }
 
