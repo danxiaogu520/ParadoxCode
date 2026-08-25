@@ -849,9 +849,13 @@ fn scripted_macro_bare_parameter_infers_quoted_effect_completion_context() {
 
     let items = complete(&host.snapshot(), &id, position).items;
 
+    let add_prestige = items
+        .iter()
+        .find(|item| item.label == "add_prestige")
+        .expect("quoted macro argument did not inherit effect completion");
     assert!(
-        items.iter().any(|item| item.label == "add_prestige"),
-        "quoted macro argument did not inherit effect completion: {items:?}"
+        add_prestige.sort_score < 10_000_000,
+        "macro-inferred candidates must retain the highest schema tier: {items:?}"
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
@@ -1363,6 +1367,8 @@ fn scope_value_completion_offers_intrinsics_links_and_chains() {
         parent_path: Vec::new(),
         structural_containers: Vec::new(),
         alternative_containers: Vec::new(),
+        existing_keys: Vec::new(),
+        macro_inferred: false,
         scope: crate::ScopeContext {
             profile: snapshot.game_profile_handle(),
             root: "province".to_owned(),
@@ -2028,6 +2034,69 @@ fn if_limit_effect_context_completes_trigger_keys() {
             .items
             .iter()
             .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn event_option_members_rank_before_effect_commands() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/event-option-order.txt");
+
+    let partial = "country_event = { option = { a } }\n";
+    host.open_document(id.clone(), 1, partial.to_owned(), None)
+        .expect("open partial option");
+    let partial_position =
+        u32::try_from(partial.find("a }").expect("partial prefix") + 1).expect("position");
+    let partial_items = complete(&host.snapshot(), &id, partial_position).items;
+    let option_member = partial_items
+        .iter()
+        .position(|item| item.label == "ai_chance")
+        .expect("event.option member");
+    let effect_command = partial_items
+        .iter()
+        .position(|item| item.label == "add_prestige")
+        .expect("effect command");
+    assert!(
+        option_member < effect_command,
+        "explicit event.option members must precede effect commands for a shared prefix: {:?}",
+        partial_items
+            .iter()
+            .take(effect_command.saturating_add(1))
+            .map(|item| (&item.label, &item.detail))
+            .collect::<Vec<_>>()
+    );
+
+    let empty = "country_event = { option = {  } }\n";
+    let empty_id = DocumentId::new("file:///tmp/events/event-option-empty.txt");
+    host.open_document(empty_id.clone(), 1, empty.to_owned(), None)
+        .expect("open empty option");
+    let empty_position =
+        u32::try_from(empty.find("  }").expect("empty option") + 1).expect("position");
+    let empty_items = complete(&host.snapshot(), &empty_id, empty_position).items;
+    let first_effect = empty_items
+        .iter()
+        .position(|item| item.detail == "effect")
+        .expect("effect candidates");
+    for label in ["ai_chance", "name", "required_personality"] {
+        let position = empty_items
+            .iter()
+            .position(|item| item.label == label && item.detail == "event")
+            .unwrap_or_else(|| panic!("missing explicit event.option member `{label}`"));
+        assert!(
+            position < first_effect,
+            "explicit event.option member `{label}` must precede effect candidates: {empty_items:?}"
+        );
+    }
+    assert!(
+        empty_items[..first_effect]
+            .iter()
+            .any(|item| item.label == "ai_chance" && item.detail == "event"),
+        "the explicit option member tier must be materialized before effect candidates: {:?}",
+        empty_items
+            .iter()
+            .take(first_effect.saturating_add(1))
+            .map(|item| (&item.label, &item.detail))
             .collect::<Vec<_>>()
     );
 }

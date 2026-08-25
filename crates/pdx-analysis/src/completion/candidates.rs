@@ -9,12 +9,18 @@ use pdx_text::TextRange;
 
 use super::context::SemanticCompletionContext;
 use super::macro_constraints::infer_macro_value_constraints;
-use super::support::{completion_sort_score, push_completion};
+#[cfg(test)]
+use super::support::finalize_completion_items;
+use super::support::{
+    CompletionRankContext, CompletionSchemaTier, CompletionSpecificity, RankedCompletionItem,
+    push_completion,
+};
 
 pub(crate) struct SemanticCompletionRule<'rule, 'path> {
     pub(crate) rule: &'rule pdx_rules::SemanticRule,
     pub(crate) parent_path: &'path [String],
     pub(crate) scope: &'path ScopeContext,
+    pub(crate) schema_tier: CompletionSchemaTier,
 }
 
 #[derive(Default)]
@@ -101,6 +107,54 @@ fn key_completion_kind(
     }
 }
 
+fn key_specificity(
+    snapshot: &AnalysisSnapshot,
+    rule: &pdx_rules::SemanticRule,
+) -> CompletionSpecificity {
+    match &rule.key {
+        KeyMatcher::Exact(_) => CompletionSpecificity::Exact,
+        KeyMatcher::Enum(_) => CompletionSpecificity::Enum,
+        KeyMatcher::Type(type_name) if scripted_macro_type(snapshot, type_name) => {
+            CompletionSpecificity::ScriptedMacro
+        }
+        KeyMatcher::Type(_) => CompletionSpecificity::Type,
+        KeyMatcher::Dynamic(_) => CompletionSpecificity::Dynamic,
+        KeyMatcher::Date | KeyMatcher::AnyScalar => CompletionSpecificity::Fallback,
+    }
+}
+
+fn rule_required_missing(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    candidate: &SemanticCompletionRule<'_, '_>,
+) -> bool {
+    // `min_occurs` is populated with the parser's default cardinality for nearly every rule;
+    // the explicit `required` flag is the schema's signal that a member is expected in the
+    // current container.  Treating every `min_occurs = 1` row as required would bury ordinary
+    // commands such as `always` behind hundreds of mandatory-looking aliases.
+    if !candidate.rule.required {
+        return false;
+    }
+    !context
+        .existing_keys
+        .iter()
+        .any(|key| semantic_rule_key_matches(snapshot, candidate.rule, candidate.parent_path, key))
+}
+
+fn rule_rank_context(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    candidate: &SemanticCompletionRule<'_, '_>,
+    specificity: CompletionSpecificity,
+) -> CompletionRankContext {
+    CompletionRankContext::new(
+        candidate.schema_tier,
+        specificity,
+        rule_required_missing(snapshot, context, candidate),
+        candidate.rule.deprecated,
+    )
+}
+
 pub(crate) fn semantic_rules_for_completion<'rule, 'path>(
     snapshot: &'rule AnalysisSnapshot,
     context: &'path SemanticCompletionContext,
@@ -116,6 +170,11 @@ pub(crate) fn semantic_rules_for_completion<'rule, 'path>(
         rule,
         parent_path: &context.parent_path,
         scope: &context.scope,
+        schema_tier: if context.macro_inferred {
+            CompletionSchemaTier::MacroInferred
+        } else {
+            CompletionSchemaTier::CurrentContext
+        },
     })
     .collect::<Vec<_>>();
     for (structural_context, structural_path) in &context.structural_containers {
@@ -131,6 +190,7 @@ pub(crate) fn semantic_rules_for_completion<'rule, 'path>(
                 rule,
                 parent_path: structural_path,
                 scope: &context.scope,
+                schema_tier: CompletionSchemaTier::ExplicitParentMember,
             }),
         );
     }
@@ -147,10 +207,20 @@ pub(crate) fn semantic_rules_for_completion<'rule, 'path>(
                 rule,
                 parent_path: &alternative.parent_path,
                 scope: &alternative.scope,
+                schema_tier: if context.macro_inferred {
+                    CompletionSchemaTier::MacroInferred
+                } else {
+                    CompletionSchemaTier::Alternative
+                },
             }),
         );
     }
-    rules.sort_by(|left, right| left.rule.id.cmp(&right.rule.id));
+    rules.sort_by(|left, right| {
+        left.rule
+            .id
+            .cmp(&right.rule.id)
+            .then_with(|| left.schema_tier.cmp(&right.schema_tier))
+    });
     rules.dedup_by(|left, right| {
         left.rule.id == right.rule.id
             && left.parent_path.len() == right.parent_path.len()
@@ -164,11 +234,34 @@ pub(crate) fn semantic_rules_for_completion<'rule, 'path>(
     rules
 }
 
+#[cfg(test)]
 pub(crate) fn add_semantic_key_items(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
     member_cache: &mut CompletionMemberCache,
     items: &mut Vec<CompletionItem>,
+    replacement_range: TextRange,
+    prefix: &str,
+    insert_assignment: bool,
+) {
+    let mut ranked = Vec::new();
+    add_semantic_key_items_ranked(
+        snapshot,
+        context,
+        member_cache,
+        &mut ranked,
+        replacement_range,
+        prefix,
+        insert_assignment,
+    );
+    items.extend(finalize_completion_items(ranked));
+}
+
+pub(crate) fn add_semantic_key_items_ranked(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    member_cache: &mut CompletionMemberCache,
+    items: &mut Vec<RankedCompletionItem>,
     replacement_range: TextRange,
     prefix: &str,
     insert_assignment: bool,
@@ -191,6 +284,7 @@ pub(crate) fn add_semantic_key_items(
                 replacement_range,
                 prefix,
                 documentation,
+                candidate.schema_tier,
             );
             continue;
         }
@@ -204,14 +298,12 @@ pub(crate) fn add_semantic_key_items(
                     documentation,
                     replacement_range,
                     insert_text: key_insert_text(rule, label, insert_assignment),
-                    sort_score: completion_sort_score(
-                        if rule.required { 2 } else { 5 },
-                        rule.deprecated,
-                    ),
+                    sort_score: 0,
                     deprecated: rule.deprecated,
                     resolve_data: Some(format!("rule:{}", rule.id)),
                 },
                 prefix,
+                rule_rank_context(snapshot, context, &candidate, CompletionSpecificity::Exact),
             ),
             KeyMatcher::Type(type_name) => {
                 for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
@@ -231,11 +323,17 @@ pub(crate) fn add_semantic_key_items(
                             documentation: documentation.clone(),
                             replacement_range,
                             insert_text,
-                            sort_score: completion_sort_score(8, rule.deprecated),
+                            sort_score: 0,
                             deprecated: rule.deprecated,
                             resolve_data: Some(format!("rule:{}", rule.id)),
                         },
                         prefix,
+                        rule_rank_context(
+                            snapshot,
+                            context,
+                            &candidate,
+                            key_specificity(snapshot, rule),
+                        ),
                     );
                 }
             }
@@ -252,11 +350,17 @@ pub(crate) fn add_semantic_key_items(
                                     documentation: documentation.clone(),
                                     replacement_range,
                                     insert_text: key_insert_text(rule, &label, insert_assignment),
-                                    sort_score: completion_sort_score(8, rule.deprecated),
+                                    sort_score: 0,
                                     deprecated: rule.deprecated,
                                     resolve_data: Some(format!("rule:{}", rule.id)),
                                 },
                                 prefix,
+                                rule_rank_context(
+                                    snapshot,
+                                    context,
+                                    &candidate,
+                                    CompletionSpecificity::Enum,
+                                ),
                             );
                         }
                     }
@@ -272,11 +376,17 @@ pub(crate) fn add_semantic_key_items(
                                     documentation: documentation.clone(),
                                     replacement_range,
                                     insert_text: key_insert_text(rule, label, insert_assignment),
-                                    sort_score: completion_sort_score(8, rule.deprecated),
+                                    sort_score: 0,
                                     deprecated: rule.deprecated,
                                     resolve_data: Some(format!("rule:{}", rule.id)),
                                 },
                                 prefix,
+                                rule_rank_context(
+                                    snapshot,
+                                    context,
+                                    &candidate,
+                                    CompletionSpecificity::Enum,
+                                ),
                             );
                         }
                     }
@@ -293,11 +403,17 @@ pub(crate) fn add_semantic_key_items(
                             documentation: documentation.clone(),
                             replacement_range,
                             insert_text: key_insert_text(rule, label, insert_assignment),
-                            sort_score: completion_sort_score(8, rule.deprecated),
+                            sort_score: 0,
                             deprecated: rule.deprecated,
                             resolve_data: Some(format!("rule:{}", rule.id)),
                         },
                         prefix,
+                        rule_rank_context(
+                            snapshot,
+                            context,
+                            &candidate,
+                            CompletionSpecificity::Dynamic,
+                        ),
                     );
                 }
             }
@@ -311,11 +427,17 @@ pub(crate) fn add_semantic_key_items(
                         documentation: documentation.clone(),
                         replacement_range,
                         insert_text: key_insert_text(rule, "1444.11.11", insert_assignment),
-                        sort_score: completion_sort_score(8, rule.deprecated),
+                        sort_score: 0,
                         deprecated: rule.deprecated,
                         resolve_data: Some(format!("rule:{}", rule.id)),
                     },
                     prefix,
+                    rule_rank_context(
+                        snapshot,
+                        context,
+                        &candidate,
+                        CompletionSpecificity::Fallback,
+                    ),
                 );
             }
             // AnyScalar keys accept arbitrary spellings and carry no member information.
@@ -329,14 +451,16 @@ pub(crate) fn add_semantic_key_items(
 /// Used both for keys inside a leaf-value container and for bare values of a `value_clause`
 /// rule whose children are leaf-value rules. Members are completed as keys (the inserted text
 /// is the bare spelling, without an assignment).
+#[expect(clippy::too_many_arguments)]
 fn add_leaf_value_member_items(
     snapshot: &AnalysisSnapshot,
     rule: &pdx_rules::SemanticRule,
     member_cache: &mut CompletionMemberCache,
-    items: &mut Vec<CompletionItem>,
+    items: &mut Vec<RankedCompletionItem>,
     replacement_range: TextRange,
     prefix: &str,
     documentation: Option<String>,
+    schema_tier: CompletionSchemaTier,
 ) {
     match &rule.value {
         ValueMatcher::Type(type_name) => {
@@ -350,11 +474,17 @@ fn add_leaf_value_member_items(
                         documentation: documentation.clone(),
                         replacement_range,
                         insert_text: label.clone(),
-                        sort_score: completion_sort_score(8, rule.deprecated),
+                        sort_score: 0,
                         deprecated: rule.deprecated,
                         resolve_data: Some(format!("rule:{}", rule.id)),
                     },
                     prefix,
+                    CompletionRankContext::new(
+                        schema_tier,
+                        CompletionSpecificity::Type,
+                        false,
+                        rule.deprecated,
+                    ),
                 );
             }
         }
@@ -369,11 +499,17 @@ fn add_leaf_value_member_items(
                         documentation: documentation.clone(),
                         replacement_range,
                         insert_text: label.clone(),
-                        sort_score: completion_sort_score(8, rule.deprecated),
+                        sort_score: 0,
                         deprecated: rule.deprecated,
                         resolve_data: Some(format!("rule:{}", rule.id)),
                     },
                     prefix,
+                    CompletionRankContext::new(
+                        schema_tier,
+                        CompletionSpecificity::Enum,
+                        false,
+                        rule.deprecated,
+                    ),
                 );
             }
         }
@@ -388,17 +524,23 @@ fn add_leaf_value_member_items(
                         documentation: documentation.clone(),
                         replacement_range,
                         insert_text: label.clone(),
-                        sort_score: completion_sort_score(8, rule.deprecated),
+                        sort_score: 0,
                         deprecated: rule.deprecated,
                         resolve_data: Some(format!("rule:{}", rule.id)),
                     },
                     prefix,
+                    CompletionRankContext::new(
+                        schema_tier,
+                        CompletionSpecificity::Dynamic,
+                        false,
+                        rule.deprecated,
+                    ),
                 );
             }
         }
         ValueMatcher::Localisation => {
             for label in member_cache.workspace_member_names(snapshot, "localisation", prefix) {
-                add_localisation_value_completion(
+                add_localisation_value_completion_ranked(
                     items,
                     label,
                     "localisation",
@@ -406,11 +548,12 @@ fn add_leaf_value_member_items(
                     replacement_range,
                     prefix,
                     rule.deprecated,
+                    schema_tier,
                 );
             }
         }
         ValueMatcher::Exact(label) => {
-            add_value_completion(
+            add_value_completion_ranked(
                 items,
                 label,
                 &semantic_value_matcher_label(&rule.value),
@@ -418,11 +561,13 @@ fn add_leaf_value_member_items(
                 replacement_range,
                 prefix,
                 rule.deprecated,
+                schema_tier,
+                CompletionSpecificity::Exact,
             );
         }
         ValueMatcher::Bool => {
             for label in ["yes", "no"] {
-                add_value_completion(
+                add_value_completion_ranked(
                     items,
                     label,
                     "bool",
@@ -430,11 +575,13 @@ fn add_leaf_value_member_items(
                     replacement_range,
                     prefix,
                     rule.deprecated,
+                    schema_tier,
+                    CompletionSpecificity::Value,
                 );
             }
         }
         ValueMatcher::Int { min, max } => {
-            add_numeric_completion(
+            add_numeric_completion_ranked(
                 items,
                 min.map(|value| value.to_string()).as_deref(),
                 "int",
@@ -442,8 +589,9 @@ fn add_leaf_value_member_items(
                 replacement_range,
                 prefix,
                 rule.deprecated,
+                schema_tier,
             );
-            add_numeric_completion(
+            add_numeric_completion_ranked(
                 items,
                 max.map(|value| value.to_string()).as_deref(),
                 "int",
@@ -451,10 +599,11 @@ fn add_leaf_value_member_items(
                 replacement_range,
                 prefix,
                 rule.deprecated,
+                schema_tier,
             );
         }
         ValueMatcher::Float { min, max } => {
-            add_value_completion(
+            add_value_completion_ranked(
                 items,
                 min.as_deref().or(max.as_deref()).unwrap_or("0"),
                 "float",
@@ -462,10 +611,12 @@ fn add_leaf_value_member_items(
                 replacement_range,
                 prefix,
                 rule.deprecated,
+                schema_tier,
+                CompletionSpecificity::Value,
             );
         }
         ValueMatcher::Date => {
-            add_value_completion(
+            add_value_completion_ranked(
                 items,
                 "1444.11.11",
                 "date",
@@ -473,6 +624,8 @@ fn add_leaf_value_member_items(
                 replacement_range,
                 prefix,
                 rule.deprecated,
+                schema_tier,
+                CompletionSpecificity::Value,
             );
         }
         // AnyScalar, DynamicSet, Filepath, Opaque, and Scope carry no member information.
@@ -489,7 +642,7 @@ pub(crate) fn add_semantic_value_items(
     context: &SemanticCompletionContext,
     property: &ScriptProperty,
     member_cache: &mut CompletionMemberCache,
-    items: &mut Vec<CompletionItem>,
+    items: &mut Vec<RankedCompletionItem>,
     replacement_range: TextRange,
     prefix: &str,
 ) {
@@ -519,6 +672,7 @@ pub(crate) fn add_semantic_value_items(
                 replacement_range,
                 prefix,
                 documentation,
+                candidate.schema_tier,
             );
             continue;
         }
@@ -542,13 +696,14 @@ pub(crate) fn add_semantic_value_items(
                         replacement_range,
                         prefix,
                         documentation.clone(),
+                        candidate.schema_tier,
                     );
                 }
             }
             continue;
         }
         match &rule.value {
-            ValueMatcher::Exact(label) => add_value_completion(
+            ValueMatcher::Exact(label) => add_value_completion_ranked(
                 items,
                 label,
                 &semantic_value_matcher_label(&rule.value),
@@ -556,9 +711,11 @@ pub(crate) fn add_semantic_value_items(
                 replacement_range,
                 prefix,
                 rule.deprecated,
+                candidate.schema_tier,
+                CompletionSpecificity::Exact,
             ),
             ValueMatcher::Bool => {
-                add_value_completion(
+                add_value_completion_ranked(
                     items,
                     "yes",
                     "bool",
@@ -566,8 +723,10 @@ pub(crate) fn add_semantic_value_items(
                     replacement_range,
                     prefix,
                     rule.deprecated,
+                    candidate.schema_tier,
+                    CompletionSpecificity::Value,
                 );
-                add_value_completion(
+                add_value_completion_ranked(
                     items,
                     "no",
                     "bool",
@@ -575,10 +734,12 @@ pub(crate) fn add_semantic_value_items(
                     replacement_range,
                     prefix,
                     rule.deprecated,
+                    candidate.schema_tier,
+                    CompletionSpecificity::Value,
                 );
             }
             ValueMatcher::Int { min, max } => {
-                add_numeric_completion(
+                add_numeric_completion_ranked(
                     items,
                     min.map(|value| value.to_string()).as_deref(),
                     "int",
@@ -586,8 +747,9 @@ pub(crate) fn add_semantic_value_items(
                     replacement_range,
                     prefix,
                     rule.deprecated,
+                    candidate.schema_tier,
                 );
-                add_numeric_completion(
+                add_numeric_completion_ranked(
                     items,
                     max.map(|value| value.to_string()).as_deref(),
                     "int",
@@ -595,10 +757,11 @@ pub(crate) fn add_semantic_value_items(
                     replacement_range,
                     prefix,
                     rule.deprecated,
+                    candidate.schema_tier,
                 );
             }
             ValueMatcher::Date => {
-                add_value_completion(
+                add_value_completion_ranked(
                     items,
                     "1444.11.11",
                     "date",
@@ -606,10 +769,12 @@ pub(crate) fn add_semantic_value_items(
                     replacement_range,
                     prefix,
                     rule.deprecated,
+                    candidate.schema_tier,
+                    CompletionSpecificity::Value,
                 );
             }
             ValueMatcher::Float { min, max } => {
-                add_value_completion(
+                add_value_completion_ranked(
                     items,
                     "0",
                     "float",
@@ -617,9 +782,11 @@ pub(crate) fn add_semantic_value_items(
                     replacement_range,
                     prefix,
                     rule.deprecated,
+                    candidate.schema_tier,
+                    CompletionSpecificity::Value,
                 );
                 if min.is_some() || max.is_some() {
-                    add_value_completion(
+                    add_value_completion_ranked(
                         items,
                         min.as_deref().unwrap_or("1"),
                         "float",
@@ -627,8 +794,10 @@ pub(crate) fn add_semantic_value_items(
                         replacement_range,
                         prefix,
                         rule.deprecated,
+                        candidate.schema_tier,
+                        CompletionSpecificity::Value,
                     );
-                    add_value_completion(
+                    add_value_completion_ranked(
                         items,
                         max.as_deref().unwrap_or("1"),
                         "float",
@@ -636,12 +805,14 @@ pub(crate) fn add_semantic_value_items(
                         replacement_range,
                         prefix,
                         rule.deprecated,
+                        candidate.schema_tier,
+                        CompletionSpecificity::Value,
                     );
                 }
             }
             ValueMatcher::Type(type_name) => {
                 for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
-                    add_value_completion(
+                    add_value_completion_ranked(
                         items,
                         label,
                         type_name,
@@ -649,12 +820,14 @@ pub(crate) fn add_semantic_value_items(
                         replacement_range,
                         prefix,
                         rule.deprecated,
+                        candidate.schema_tier,
+                        CompletionSpecificity::Type,
                     );
                 }
             }
             ValueMatcher::Enum(enum_name) => {
                 for label in member_cache.enum_member_names(snapshot, enum_name, prefix) {
-                    add_enum_member_completion(
+                    add_enum_member_completion_ranked(
                         items,
                         label,
                         enum_name,
@@ -662,6 +835,7 @@ pub(crate) fn add_semantic_value_items(
                         replacement_range,
                         prefix,
                         rule.deprecated,
+                        candidate.schema_tier,
                     );
                 }
             }
@@ -669,7 +843,7 @@ pub(crate) fn add_semantic_value_items(
                 for (label, detail) in
                     scope_expression_candidates(snapshot, context, expected.as_deref())
                 {
-                    add_scope_completion(
+                    add_scope_completion_ranked(
                         items,
                         &label,
                         detail,
@@ -677,12 +851,13 @@ pub(crate) fn add_semantic_value_items(
                         replacement_range,
                         prefix,
                         rule.deprecated,
+                        candidate.schema_tier,
                     );
                 }
             }
             ValueMatcher::Localisation => {
                 for label in member_cache.workspace_member_names(snapshot, "localisation", prefix) {
-                    add_localisation_value_completion(
+                    add_localisation_value_completion_ranked(
                         items,
                         label,
                         "localisation",
@@ -690,6 +865,7 @@ pub(crate) fn add_semantic_value_items(
                         replacement_range,
                         prefix,
                         rule.deprecated,
+                        candidate.schema_tier,
                     );
                 }
             }
@@ -699,7 +875,7 @@ pub(crate) fn add_semantic_value_items(
                 // and same-named static enum members at runtime.
                 if kind.eq_ignore_ascii_case("scope_field") {
                     for (label, detail) in scope_expression_candidates(snapshot, context, None) {
-                        add_scope_completion(
+                        add_scope_completion_ranked(
                             items,
                             &label,
                             detail,
@@ -707,12 +883,13 @@ pub(crate) fn add_semantic_value_items(
                             replacement_range,
                             prefix,
                             rule.deprecated,
+                            candidate.schema_tier,
                         );
                     }
                     for label in
                         member_cache.workspace_member_names(snapshot, "variable_name", prefix)
                     {
-                        add_value_completion(
+                        add_value_completion_ranked(
                             items,
                             label,
                             "variable_name",
@@ -720,12 +897,14 @@ pub(crate) fn add_semantic_value_items(
                             replacement_range,
                             prefix,
                             rule.deprecated,
+                            candidate.schema_tier,
+                            CompletionSpecificity::Type,
                         );
                     }
                     continue;
                 }
                 for label in member_cache.workspace_member_names(snapshot, kind, prefix) {
-                    add_value_completion(
+                    add_value_completion_ranked(
                         items,
                         label,
                         kind,
@@ -733,10 +912,12 @@ pub(crate) fn add_semantic_value_items(
                         replacement_range,
                         prefix,
                         rule.deprecated,
+                        candidate.schema_tier,
+                        CompletionSpecificity::Dynamic,
                     );
                 }
                 for (label, detail) in scope_expression_candidates(snapshot, context, None) {
-                    add_scope_completion(
+                    add_scope_completion_ranked(
                         items,
                         &label,
                         detail,
@@ -744,10 +925,11 @@ pub(crate) fn add_semantic_value_items(
                         replacement_range,
                         prefix,
                         rule.deprecated,
+                        candidate.schema_tier,
                     );
                 }
                 for label in member_cache.enum_member_names(snapshot, kind, prefix) {
-                    add_enum_member_completion(
+                    add_enum_member_completion_ranked(
                         items,
                         label,
                         kind,
@@ -755,10 +937,11 @@ pub(crate) fn add_semantic_value_items(
                         replacement_range,
                         prefix,
                         rule.deprecated,
+                        candidate.schema_tier,
                     );
                 }
                 if matches!(kind.as_str(), "variable" | "value") {
-                    add_value_completion(
+                    add_value_completion_ranked(
                         items,
                         "$0",
                         kind,
@@ -766,6 +949,8 @@ pub(crate) fn add_semantic_value_items(
                         replacement_range,
                         prefix,
                         rule.deprecated,
+                        candidate.schema_tier,
+                        CompletionSpecificity::Fallback,
                     );
                 }
             }
@@ -782,7 +967,7 @@ pub(crate) struct InferredMacroCompletionInput<'a> {
     pub(crate) context: &'a SemanticCompletionContext,
     pub(crate) property: &'a ScriptProperty,
     pub(crate) member_cache: &'a mut CompletionMemberCache,
-    pub(crate) items: &'a mut Vec<CompletionItem>,
+    pub(crate) items: &'a mut Vec<RankedCompletionItem>,
     pub(crate) replacement_range: TextRange,
     pub(crate) prefix: &'a str,
     pub(crate) cancellation: &'a CancellationToken,
@@ -805,7 +990,7 @@ pub(crate) fn add_inferred_macro_value_items(
     if sites.is_empty() {
         return Ok(false);
     }
-    let mut intersection: Option<BTreeMap<(String, CompletionKind), CompletionItem>> = None;
+    let mut intersection: Option<BTreeMap<(String, CompletionKind), RankedCompletionItem>> = None;
     for site in sites {
         cancellation.checkpoint()?;
         let site_context = SemanticCompletionContext {
@@ -813,6 +998,8 @@ pub(crate) fn add_inferred_macro_value_items(
             parent_path: context.parent_path.clone(),
             structural_containers: Vec::new(),
             alternative_containers: Vec::new(),
+            existing_keys: Vec::new(),
+            macro_inferred: false,
             scope: site.scope,
             container_property: None,
             property: None,
@@ -831,10 +1018,24 @@ pub(crate) fn add_inferred_macro_value_items(
                 prefix,
             );
         }
-        let site_items = site_items
-            .into_iter()
-            .map(|item| ((item.label.to_ascii_lowercase(), item.kind), item))
-            .collect::<BTreeMap<_, _>>();
+        let site_items = site_items.into_iter().fold(
+            BTreeMap::<(String, CompletionKind), RankedCompletionItem>::new(),
+            |mut known, item| {
+                let key = (item.item.label.to_ascii_lowercase(), item.item.kind);
+                match known.entry(key) {
+                    std::collections::btree_map::Entry::Vacant(entry) => {
+                        entry.insert(item);
+                    }
+                    std::collections::btree_map::Entry::Occupied(mut entry)
+                        if item.rank < entry.get().rank =>
+                    {
+                        entry.insert(item);
+                    }
+                    std::collections::btree_map::Entry::Occupied(_) => {}
+                }
+                known
+            },
+        );
         if let Some(known) = &mut intersection {
             known.retain(|key, _| site_items.contains_key(key));
         } else {
@@ -852,12 +1053,12 @@ fn add_inferred_matcher_items(
     context: &SemanticCompletionContext,
     matcher: &ValueMatcher,
     member_cache: &mut CompletionMemberCache,
-    items: &mut Vec<CompletionItem>,
+    items: &mut Vec<RankedCompletionItem>,
     replacement_range: TextRange,
     prefix: &str,
 ) {
     match matcher {
-        ValueMatcher::Exact(label) => add_value_completion(
+        ValueMatcher::Exact(label) => add_value_completion_ranked(
             items,
             label,
             &semantic_value_matcher_label(matcher),
@@ -865,14 +1066,26 @@ fn add_inferred_matcher_items(
             replacement_range,
             prefix,
             false,
+            CompletionSchemaTier::MacroInferred,
+            CompletionSpecificity::Exact,
         ),
         ValueMatcher::Bool => {
             for label in ["yes", "no"] {
-                add_value_completion(items, label, "bool", None, replacement_range, prefix, false);
+                add_value_completion_ranked(
+                    items,
+                    label,
+                    "bool",
+                    None,
+                    replacement_range,
+                    prefix,
+                    false,
+                    CompletionSchemaTier::MacroInferred,
+                    CompletionSpecificity::Value,
+                );
             }
         }
         ValueMatcher::Int { min, max } => {
-            add_numeric_completion(
+            add_numeric_completion_ranked(
                 items,
                 min.map(|value| value.to_string()).as_deref(),
                 "int",
@@ -880,8 +1093,9 @@ fn add_inferred_matcher_items(
                 replacement_range,
                 prefix,
                 false,
+                CompletionSchemaTier::MacroInferred,
             );
-            add_numeric_completion(
+            add_numeric_completion_ranked(
                 items,
                 max.map(|value| value.to_string()).as_deref(),
                 "int",
@@ -889,13 +1103,24 @@ fn add_inferred_matcher_items(
                 replacement_range,
                 prefix,
                 false,
+                CompletionSchemaTier::MacroInferred,
             );
         }
         ValueMatcher::Float { min, max } => {
-            add_value_completion(items, "0", "float", None, replacement_range, prefix, false);
+            add_value_completion_ranked(
+                items,
+                "0",
+                "float",
+                None,
+                replacement_range,
+                prefix,
+                false,
+                CompletionSchemaTier::MacroInferred,
+                CompletionSpecificity::Value,
+            );
             if min.is_some() || max.is_some() {
                 for label in [min.as_deref().unwrap_or("1"), max.as_deref().unwrap_or("1")] {
-                    add_value_completion(
+                    add_value_completion_ranked(
                         items,
                         label,
                         "float",
@@ -903,11 +1128,13 @@ fn add_inferred_matcher_items(
                         replacement_range,
                         prefix,
                         false,
+                        CompletionSchemaTier::MacroInferred,
+                        CompletionSpecificity::Value,
                     );
                 }
             }
         }
-        ValueMatcher::Date => add_value_completion(
+        ValueMatcher::Date => add_value_completion_ranked(
             items,
             "1444.11.11",
             "date",
@@ -915,10 +1142,12 @@ fn add_inferred_matcher_items(
             replacement_range,
             prefix,
             false,
+            CompletionSchemaTier::MacroInferred,
+            CompletionSpecificity::Value,
         ),
         ValueMatcher::Type(type_name) => {
             for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
-                add_value_completion(
+                add_value_completion_ranked(
                     items,
                     label,
                     type_name,
@@ -926,12 +1155,14 @@ fn add_inferred_matcher_items(
                     replacement_range,
                     prefix,
                     false,
+                    CompletionSchemaTier::MacroInferred,
+                    CompletionSpecificity::Type,
                 );
             }
         }
         ValueMatcher::Enum(enum_name) => {
             for label in member_cache.enum_member_names(snapshot, enum_name, prefix) {
-                add_enum_member_completion(
+                add_enum_member_completion_ranked(
                     items,
                     label,
                     enum_name,
@@ -939,6 +1170,7 @@ fn add_inferred_matcher_items(
                     replacement_range,
                     prefix,
                     false,
+                    CompletionSchemaTier::MacroInferred,
                 );
             }
         }
@@ -946,7 +1178,7 @@ fn add_inferred_matcher_items(
             for (label, detail) in
                 scope_expression_candidates(snapshot, context, expected.as_deref())
             {
-                add_scope_completion(
+                add_scope_completion_ranked(
                     items,
                     &label,
                     detail,
@@ -954,12 +1186,13 @@ fn add_inferred_matcher_items(
                     replacement_range,
                     prefix,
                     false,
+                    CompletionSchemaTier::MacroInferred,
                 );
             }
         }
         ValueMatcher::Localisation => {
             for label in member_cache.workspace_member_names(snapshot, "localisation", prefix) {
-                add_localisation_value_completion(
+                add_localisation_value_completion_ranked(
                     items,
                     label,
                     "localisation",
@@ -967,15 +1200,36 @@ fn add_inferred_matcher_items(
                     replacement_range,
                     prefix,
                     false,
+                    CompletionSchemaTier::MacroInferred,
                 );
             }
         }
         ValueMatcher::Dynamic(kind) => {
             for label in member_cache.workspace_member_names(snapshot, kind, prefix) {
-                add_value_completion(items, label, kind, None, replacement_range, prefix, false);
+                add_value_completion_ranked(
+                    items,
+                    label,
+                    kind,
+                    None,
+                    replacement_range,
+                    prefix,
+                    false,
+                    CompletionSchemaTier::MacroInferred,
+                    CompletionSpecificity::Dynamic,
+                );
             }
             if matches!(kind.as_str(), "variable" | "value") {
-                add_value_completion(items, "$0", kind, None, replacement_range, prefix, false);
+                add_value_completion_ranked(
+                    items,
+                    "$0",
+                    kind,
+                    None,
+                    replacement_range,
+                    prefix,
+                    false,
+                    CompletionSchemaTier::MacroInferred,
+                    CompletionSpecificity::Fallback,
+                );
             }
         }
         ValueMatcher::DynamicSet(_)
@@ -1104,14 +1358,17 @@ pub(crate) fn scope_link_rules(snapshot: &AnalysisSnapshot) -> Vec<(String, Vec<
     links
 }
 
-pub(crate) fn add_value_completion(
-    items: &mut Vec<CompletionItem>,
+#[expect(clippy::too_many_arguments)]
+fn add_value_completion_ranked(
+    items: &mut Vec<RankedCompletionItem>,
     label: &str,
     detail: &str,
     documentation: Option<String>,
     replacement_range: TextRange,
     prefix: &str,
     deprecated: bool,
+    schema_tier: CompletionSchemaTier,
+    specificity: CompletionSpecificity,
 ) {
     add_typed_value_completion(
         items,
@@ -1123,18 +1380,21 @@ pub(crate) fn add_value_completion(
             prefix,
             deprecated,
             kind: CompletionKind::Value,
+            rank: CompletionRankContext::new(schema_tier, specificity, false, deprecated),
         },
     );
 }
 
-fn add_enum_member_completion(
-    items: &mut Vec<CompletionItem>,
+#[expect(clippy::too_many_arguments)]
+fn add_enum_member_completion_ranked(
+    items: &mut Vec<RankedCompletionItem>,
     label: &str,
     detail: &str,
     documentation: Option<String>,
     replacement_range: TextRange,
     prefix: &str,
     deprecated: bool,
+    schema_tier: CompletionSchemaTier,
 ) {
     add_typed_value_completion(
         items,
@@ -1146,18 +1406,26 @@ fn add_enum_member_completion(
             prefix,
             deprecated,
             kind: CompletionKind::EnumMember,
+            rank: CompletionRankContext::new(
+                schema_tier,
+                CompletionSpecificity::Enum,
+                false,
+                deprecated,
+            ),
         },
     );
 }
 
-fn add_scope_completion(
-    items: &mut Vec<CompletionItem>,
+#[expect(clippy::too_many_arguments)]
+fn add_scope_completion_ranked(
+    items: &mut Vec<RankedCompletionItem>,
     label: &str,
     detail: &str,
     documentation: Option<String>,
     replacement_range: TextRange,
     prefix: &str,
     deprecated: bool,
+    schema_tier: CompletionSchemaTier,
 ) {
     add_typed_value_completion(
         items,
@@ -1169,6 +1437,13 @@ fn add_scope_completion(
             prefix,
             deprecated,
             kind: CompletionKind::Scope,
+            rank: CompletionRankContext::new(
+                schema_tier,
+                CompletionSpecificity::Scope,
+                false,
+                deprecated,
+            )
+            .with_scope_distance(label.matches('.').count().min(99) as u8),
         },
     );
 }
@@ -1181,10 +1456,11 @@ struct TypedValueCompletion<'a> {
     prefix: &'a str,
     deprecated: bool,
     kind: CompletionKind,
+    rank: CompletionRankContext,
 }
 
 fn add_typed_value_completion(
-    items: &mut Vec<CompletionItem>,
+    items: &mut Vec<RankedCompletionItem>,
     completion: TypedValueCompletion<'_>,
 ) {
     push_completion(
@@ -1196,24 +1472,27 @@ fn add_typed_value_completion(
             documentation: completion.documentation,
             replacement_range: completion.replacement_range,
             insert_text: completion.label.to_owned(),
-            sort_score: completion_sort_score(4, completion.deprecated),
+            sort_score: 0,
             deprecated: completion.deprecated,
             resolve_data: None,
         },
         completion.prefix,
+        completion.rank,
     );
 }
 
 /// Value completion for localisation keys, which keeps the `Localisation` kind independent of
 /// the detail text.
-pub(crate) fn add_localisation_value_completion(
-    items: &mut Vec<CompletionItem>,
+#[expect(clippy::too_many_arguments)]
+fn add_localisation_value_completion_ranked(
+    items: &mut Vec<RankedCompletionItem>,
     label: &str,
     detail: &str,
     documentation: Option<String>,
     replacement_range: TextRange,
     prefix: &str,
     deprecated: bool,
+    schema_tier: CompletionSchemaTier,
 ) {
     push_completion(
         items,
@@ -1224,25 +1503,33 @@ pub(crate) fn add_localisation_value_completion(
             documentation,
             replacement_range,
             insert_text: label.to_owned(),
-            sort_score: completion_sort_score(4, deprecated),
+            sort_score: 0,
             deprecated,
             resolve_data: None,
         },
         prefix,
+        CompletionRankContext::new(
+            schema_tier,
+            CompletionSpecificity::Localisation,
+            false,
+            deprecated,
+        ),
     );
 }
 
-pub(crate) fn add_numeric_completion(
-    items: &mut Vec<CompletionItem>,
+#[expect(clippy::too_many_arguments)]
+fn add_numeric_completion_ranked(
+    items: &mut Vec<RankedCompletionItem>,
     label: Option<&str>,
     detail: &str,
     documentation: Option<String>,
     replacement_range: TextRange,
     prefix: &str,
     deprecated: bool,
+    schema_tier: CompletionSchemaTier,
 ) {
     if let Some(label) = label {
-        add_value_completion(
+        add_value_completion_ranked(
             items,
             label,
             detail,
@@ -1250,6 +1537,8 @@ pub(crate) fn add_numeric_completion(
             replacement_range,
             prefix,
             deprecated,
+            schema_tier,
+            CompletionSpecificity::Value,
         );
     }
 }

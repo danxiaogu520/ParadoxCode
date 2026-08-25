@@ -22,6 +22,12 @@ pub(crate) struct SemanticCompletionContext {
     pub(crate) parent_path: Vec<String>,
     pub(crate) structural_containers: Vec<(String, Vec<String>)>,
     pub(crate) alternative_containers: Vec<SemanticCompletionContainer>,
+    /// Keys already present in the active container.  Completion uses this to distinguish a
+    /// missing required member from one that is already satisfied.
+    pub(crate) existing_keys: Vec<String>,
+    /// Whether this context was inferred from a scripted-macro body rather than directly from
+    /// the caller's syntax. Macro-inferred rules get the highest schema tier.
+    pub(crate) macro_inferred: bool,
     pub(crate) scope: ScopeContext,
     pub(crate) container_property: Option<ScriptProperty>,
     pub(crate) property: Option<ScriptProperty>,
@@ -85,6 +91,7 @@ pub(crate) fn semantic_completion_context_with_cancellation(
                 parent_path: Vec::new(),
                 structural_containers: Vec::new(),
                 alternative_containers: Vec::new(),
+                macro_inferred: false,
                 container_property: None,
                 skip_type_instance,
                 properties: root.block,
@@ -106,6 +113,7 @@ struct SemanticCompletionContainerInput<'a> {
     parent_path: Vec<String>,
     structural_containers: Vec<(String, Vec<String>)>,
     alternative_containers: Vec<SemanticCompletionContainer>,
+    macro_inferred: bool,
     container_property: Option<ScriptProperty>,
     skip_type_instance: bool,
     properties: Vec<ScriptProperty>,
@@ -126,6 +134,7 @@ fn semantic_completion_container(
         parent_path,
         structural_containers,
         alternative_containers,
+        macro_inferred,
         container_property,
         skip_type_instance,
         properties,
@@ -158,6 +167,7 @@ fn semantic_completion_container(
                     parent_path: parent_path.clone(),
                     structural_containers,
                     alternative_containers,
+                    macro_inferred,
                     container_property: Some(property.clone()),
                     skip_type_instance: false,
                     properties: property.block.clone(),
@@ -225,6 +235,7 @@ fn semantic_completion_container(
                     parent_path: fact.parent_path.clone(),
                     structural_containers,
                     alternative_containers: Vec::new(),
+                    macro_inferred,
                     container_property: Some(property.clone()),
                     skip_type_instance: false,
                     properties: property.block.clone(),
@@ -244,6 +255,12 @@ fn semantic_completion_container(
                 parent_path: parent_path.clone(),
                 structural_containers: structural_containers.clone(),
                 alternative_containers: alternative_containers.clone(),
+                existing_keys: property
+                    .block
+                    .iter()
+                    .map(|child| child.key.clone())
+                    .collect(),
+                macro_inferred,
                 scope: scope.clone(),
                 container_property: container_property.clone(),
                 property: Some(property.clone()),
@@ -281,6 +298,7 @@ fn semantic_completion_container(
                         parent_path: primary.parent_path.clone(),
                         structural_containers: Vec::new(),
                         alternative_containers: alternatives,
+                        macro_inferred: true,
                         container_property: Some(property.clone()),
                         skip_type_instance: false,
                         properties: quoted_properties,
@@ -376,6 +394,7 @@ fn semantic_completion_container(
                     parent_path: primary.parent_path,
                     structural_containers,
                     alternative_containers,
+                    macro_inferred,
                     container_property: Some(property.clone()),
                     skip_type_instance: false,
                     properties: quoted_properties,
@@ -395,6 +414,7 @@ fn semantic_completion_container(
                 parent_path: primary.parent_path,
                 structural_containers,
                 alternative_containers,
+                macro_inferred,
                 container_property: Some(property.clone()),
                 skip_type_instance: false,
                 properties: property.block.clone(),
@@ -406,6 +426,10 @@ fn semantic_completion_container(
             quoted_scripts,
         );
     }
+    let existing_keys = properties
+        .iter()
+        .map(|property| property.key.clone())
+        .collect();
     let property = properties.into_iter().find(|property| {
         contains(property.range, position)
             // A value position directly after an unfinished `key = ` sits on the half-open
@@ -417,6 +441,8 @@ fn semantic_completion_container(
         parent_path,
         structural_containers,
         alternative_containers,
+        existing_keys,
+        macro_inferred,
         scope,
         container_property,
         property,
