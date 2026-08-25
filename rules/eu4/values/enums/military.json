@@ -1,0 +1,78 @@
+{
+  "land_unit_types": [
+    "artillery",
+    "cavalry",
+    "infantry"
+  ],
+  "naval_unit_types": [
+    "galley",
+    "heavy_ship",
+    "light_ship",
+    "transport"
+  ],
+  "unit_types": [
+    "artillery",
+    "cavalry",
+    "galley",
+    "heavy_ship",
+    "infantry",
+    "light_ship",
+    "transport"
+  ],
+  "military_leader_types": [
+    "admiral",
+    "conquistador",
+    "explorer",
+    "general"
+  ],
+  "special_units": [
+    "banner",
+    "caravel",
+    "carolean",
+    "cawa",
+    "cossacks",
+    "galleass",
+    "galleon",
+    "geobukseon",
+    "hussars",
+    "janissaries",
+    "mamluks",
+    "man_of_war",
+    "marines",
+    "musketeer",
+    "qizilbash",
+    "rajput",
+    "revolutionary_guard",
+    "samurai",
+    "streltsy",
+    "tercio",
+    "voc_indiamen"
+  ],
+  "special_unit_types": [
+    "banner_cavalry",
+    "banner_infantry",
+    "caravel_light",
+    "carolean_infantry",
+    "cawa_infantry",
+    "cossack_cavalry",
+    "cossack_infantry",
+    "galleass_galley",
+    "galleon_heavy",
+    "geobukseon_galley",
+    "hussars_cavalry",
+    "janissary_infantry",
+    "mamluks_cavalry",
+    "mamluks_infantry",
+    "man_of_war_heavy",
+    "man_of_war_light",
+    "marine_infantry",
+    "musketeer_infantry",
+    "qizilbash_cavalry",
+    "qizilbash_infantry",
+    "rajput_infantry",
+    "samurai_infantry",
+    "streltsy_infantry",
+    "tercio_infantry",
+    "voc_indiamen_light"
+  ]
+}

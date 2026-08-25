@@ -1,0 +1,1623 @@
+[
+  {
+    "id": "common/custom_gui:21:rule:root:custom_button:name",
+    "context": "root:custom_button",
+    "parent_path": [],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Must match a scripted guiButtonType in a .gui file"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 411
+  },
+  {
+    "id": "common/custom_gui:23:rule:root:custom_button:potential",
+    "context": "root:custom_button",
+    "parent_path": [],
+    "key": {
+      "exact": "potential"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "If true, the button will be shown in the interface"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 412
+  },
+  {
+    "id": "common/custom_gui:25:rule:root:custom_button:trigger",
+    "context": "root:custom_button",
+    "parent_path": [],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "If true, the button will be clickable"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 413
+  },
+  {
+    "id": "common/custom_gui:27:rule:root:custom_button:effect",
+    "context": "root:custom_button",
+    "parent_path": [],
+    "key": {
+      "exact": "effect"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "The code that runs when the button is clicked"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 414
+  },
+  {
+    "id": "common/custom_gui:28:rule:root:custom_button:tooltip",
+    "context": "root:custom_button",
+    "parent_path": [],
+    "key": {
+      "exact": "tooltip"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 2,
+    "required": false,
+    "documentation": [
+      "Tooltip to display while hovering this button. Not required, but highly recommended."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 415
+  },
+  {
+    "id": "common/custom_gui:29:rule:root:custom_button:number",
+    "context": "root:custom_button",
+    "parent_path": [
+      "frame"
+    ],
+    "key": {
+      "exact": "number"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Which frame of the frame file to use"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 416
+  },
+  {
+    "id": "common/custom_gui:31:rule:root:custom_button:trigger",
+    "context": "root:custom_button",
+    "parent_path": [
+      "frame"
+    ],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "When to use the specified frame"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 417
+  },
+  {
+    "id": "common/custom_gui:32:rule:root:custom_button:frame",
+    "context": "root:custom_button",
+    "parent_path": [],
+    "key": {
+      "exact": "frame"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Which frame file to use"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 418
+  },
+  {
+    "id": "common/custom_gui:34:rule:root:custom_text_box:name",
+    "context": "root:custom_text_box",
+    "parent_path": [],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Must match a scripted instantTextBoxType in a .gui file"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 419
+  },
+  {
+    "id": "common/custom_gui:36:rule:root:custom_text_box:potential",
+    "context": "root:custom_text_box",
+    "parent_path": [],
+    "key": {
+      "exact": "potential"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "If true, the text box will be shown"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 420
+  },
+  {
+    "id": "common/custom_gui:37:rule:root:custom_text_box:tooltip",
+    "context": "root:custom_text_box",
+    "parent_path": [],
+    "key": {
+      "exact": "tooltip"
+    },
+    "operator": "=",
+    "value": "localisation",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Tooltip to display while hovering this text. Optional."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 421
+  },
+  {
+    "id": "common/custom_gui:39:rule:root:custom_icon:name",
+    "context": "root:custom_icon",
+    "parent_path": [],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Must match a scripted iconType in a .gui file"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 422
+  },
+  {
+    "id": "common/custom_gui:41:rule:root:custom_icon:potential",
+    "context": "root:custom_icon",
+    "parent_path": [],
+    "key": {
+      "exact": "potential"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "If true, the icon will be shown in the interface"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 423
+  },
+  {
+    "id": "common/custom_gui:42:rule:root:custom_icon:tooltip",
+    "context": "root:custom_icon",
+    "parent_path": [],
+    "key": {
+      "exact": "tooltip"
+    },
+    "operator": "=",
+    "value": "localisation",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Tooltip to display while hovering this icon. Optional."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 424
+  },
+  {
+    "id": "common/custom_gui:43:rule:root:custom_icon:number",
+    "context": "root:custom_icon",
+    "parent_path": [
+      "frame"
+    ],
+    "key": {
+      "exact": "number"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Which frame of the frame file to use"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 425
+  },
+  {
+    "id": "common/custom_gui:45:rule:root:custom_icon:trigger",
+    "context": "root:custom_icon",
+    "parent_path": [
+      "frame"
+    ],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "When to use the specified frame"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 426
+  },
+  {
+    "id": "common/custom_gui:46:rule:root:custom_icon:frame",
+    "context": "root:custom_icon",
+    "parent_path": [],
+    "key": {
+      "exact": "frame"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Which frame file to use"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 427
+  },
+  {
+    "id": "common/custom_gui:47:rule:root:custom_icon:frame_variable",
+    "context": "root:custom_icon",
+    "parent_path": [],
+    "key": {
+      "exact": "frame_variable"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Use the value of a variable to determine the icon frame"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 428
+  },
+  {
+    "id": "common/custom_gui:60:rule:root:custom_window:name",
+    "context": "root:custom_window",
+    "parent_path": [],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Must match a scripted windowType in a .gui file"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 436
+  },
+  {
+    "id": "common/custom_gui:62:rule:root:custom_window:potential",
+    "context": "root:custom_window",
+    "parent_path": [],
+    "key": {
+      "exact": "potential"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Determines when the window is visible, and will affect every other gui object inside it, not running their potentials if the window isn't visible."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 437
+  },
+  {
+    "id": "gfx/sprite_packs:62:rule:root:sprite_pack:available_for_custom_nation",
+    "context": "root:sprite_pack",
+    "parent_path": [],
+    "key": {
+      "exact": "available_for_custom_nation"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5047
+  },
+  {
+    "id": "gfx/sprite_packs:64:rule:root:sprite_pack:country_trigger",
+    "context": "root:sprite_pack",
+    "parent_path": [],
+    "key": {
+      "exact": "country_trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "country"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5048
+  },
+  {
+    "id": "gfx/sprite_packs:65:leaf-value:root:sprite_pack:enum[graphical_cultures]",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "graphical_cultures"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "enum": "graphical_cultures"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5049
+  },
+  {
+    "id": "gfx/sprite_packs:66:rule:root:sprite_pack:graphical_cultures",
+    "context": "root:sprite_pack",
+    "parent_path": [],
+    "key": {
+      "exact": "graphical_cultures"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5050
+  },
+  {
+    "id": "gfx/sprite_packs:67:leaf-value:root:sprite_pack:<continent>",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "continents"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "continent"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5051
+  },
+  {
+    "id": "gfx/sprite_packs:68:rule:root:sprite_pack:continents",
+    "context": "root:sprite_pack",
+    "parent_path": [],
+    "key": {
+      "exact": "continents"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5052
+  },
+  {
+    "id": "gfx/sprite_packs:69:rule:root:sprite_pack:0",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_infantry"
+    ],
+    "key": {
+      "exact": "0"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5053
+  },
+  {
+    "id": "gfx/sprite_packs:70:rule:root:sprite_pack:0",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_infantry"
+    ],
+    "key": {
+      "exact": "0"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "builtin_dlc"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5054
+  },
+  {
+    "id": "gfx/sprite_packs:71:rule:root:sprite_pack:1",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_infantry"
+    ],
+    "key": {
+      "exact": "1"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5055
+  },
+  {
+    "id": "gfx/sprite_packs:72:rule:root:sprite_pack:1",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_infantry"
+    ],
+    "key": {
+      "exact": "1"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "builtin_dlc"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5056
+  },
+  {
+    "id": "gfx/sprite_packs:73:rule:root:sprite_pack:2",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_infantry"
+    ],
+    "key": {
+      "exact": "2"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5057
+  },
+  {
+    "id": "gfx/sprite_packs:74:rule:root:sprite_pack:2",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_infantry"
+    ],
+    "key": {
+      "exact": "2"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "builtin_dlc"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5058
+  },
+  {
+    "id": "gfx/sprite_packs:75:rule:root:sprite_pack:3",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_infantry"
+    ],
+    "key": {
+      "exact": "3"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5059
+  },
+  {
+    "id": "gfx/sprite_packs:76:rule:root:sprite_pack:3",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_infantry"
+    ],
+    "key": {
+      "exact": "3"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "builtin_dlc"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5060
+  },
+  {
+    "id": "gfx/sprite_packs:77:rule:root:sprite_pack:sprite_infantry",
+    "context": "root:sprite_pack",
+    "parent_path": [],
+    "key": {
+      "exact": "sprite_infantry"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5061
+  },
+  {
+    "id": "gfx/sprite_packs:78:rule:root:sprite_pack:0",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_cavalry"
+    ],
+    "key": {
+      "exact": "0"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5062
+  },
+  {
+    "id": "gfx/sprite_packs:79:rule:root:sprite_pack:0",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_cavalry"
+    ],
+    "key": {
+      "exact": "0"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "builtin_dlc"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5063
+  },
+  {
+    "id": "gfx/sprite_packs:80:rule:root:sprite_pack:1",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_cavalry"
+    ],
+    "key": {
+      "exact": "1"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5064
+  },
+  {
+    "id": "gfx/sprite_packs:81:rule:root:sprite_pack:1",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_cavalry"
+    ],
+    "key": {
+      "exact": "1"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "builtin_dlc"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5065
+  },
+  {
+    "id": "gfx/sprite_packs:82:rule:root:sprite_pack:2",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_cavalry"
+    ],
+    "key": {
+      "exact": "2"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5066
+  },
+  {
+    "id": "gfx/sprite_packs:83:rule:root:sprite_pack:2",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_cavalry"
+    ],
+    "key": {
+      "exact": "2"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "builtin_dlc"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5067
+  },
+  {
+    "id": "gfx/sprite_packs:84:rule:root:sprite_pack:3",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_cavalry"
+    ],
+    "key": {
+      "exact": "3"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5068
+  },
+  {
+    "id": "gfx/sprite_packs:85:rule:root:sprite_pack:3",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_cavalry"
+    ],
+    "key": {
+      "exact": "3"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "builtin_dlc"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5069
+  },
+  {
+    "id": "gfx/sprite_packs:86:rule:root:sprite_pack:sprite_cavalry",
+    "context": "root:sprite_pack",
+    "parent_path": [],
+    "key": {
+      "exact": "sprite_cavalry"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5070
+  },
+  {
+    "id": "gfx/sprite_packs:87:rule:root:sprite_pack:0",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_artillery"
+    ],
+    "key": {
+      "exact": "0"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5071
+  },
+  {
+    "id": "gfx/sprite_packs:88:rule:root:sprite_pack:0",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_artillery"
+    ],
+    "key": {
+      "exact": "0"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "builtin_dlc"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5072
+  },
+  {
+    "id": "gfx/sprite_packs:89:rule:root:sprite_pack:1",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_artillery"
+    ],
+    "key": {
+      "exact": "1"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5073
+  },
+  {
+    "id": "gfx/sprite_packs:90:rule:root:sprite_pack:1",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_artillery"
+    ],
+    "key": {
+      "exact": "1"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "builtin_dlc"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5074
+  },
+  {
+    "id": "gfx/sprite_packs:91:rule:root:sprite_pack:2",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_artillery"
+    ],
+    "key": {
+      "exact": "2"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5075
+  },
+  {
+    "id": "gfx/sprite_packs:92:rule:root:sprite_pack:2",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_artillery"
+    ],
+    "key": {
+      "exact": "2"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "builtin_dlc"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5076
+  },
+  {
+    "id": "gfx/sprite_packs:93:rule:root:sprite_pack:3",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_artillery"
+    ],
+    "key": {
+      "exact": "3"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5077
+  },
+  {
+    "id": "gfx/sprite_packs:94:rule:root:sprite_pack:3",
+    "context": "root:sprite_pack",
+    "parent_path": [
+      "sprite_artillery"
+    ],
+    "key": {
+      "exact": "3"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "builtin_dlc"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5078
+  },
+  {
+    "id": "gfx/sprite_packs:95:rule:root:sprite_pack:sprite_artillery",
+    "context": "root:sprite_pack",
+    "parent_path": [],
+    "key": {
+      "exact": "sprite_artillery"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5079
+  },
+  {
+    "id": "gfx/sprite_packsorder:313:rule:root:packorder:<packentity>",
+    "context": "root:packorder",
+    "parent_path": [],
+    "key": {
+      "type": "packentity"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5080
+  },
+  {
+    "id": "gfx/sprite_packsorder:314:rule:root:packorder:enum[spritepacks]",
+    "context": "root:packorder",
+    "parent_path": [],
+    "key": {
+      "enum": "spritepacks"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5081
+  },
+  {
+    "id": "gfx/sprite_packsorder:315:rule:root:packorder:any",
+    "context": "root:packorder",
+    "parent_path": [],
+    "key": {
+      "any_scalar": null
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5081
+  },
+  {
+    "id": "interface/sprites:3:rule:type:sprite:severity",
+    "context": "type:sprite",
+    "parent_path": [],
+    "key": {
+      "exact": "severity"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "warning"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5359
+  },
+  {
+    "id": "interface/sprites:6:rule:root:sprite:name",
+    "context": "root:sprite",
+    "parent_path": [],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5360
+  },
+  {
+    "id": "interface/sprites:7:rule:root:sprite:scalar",
+    "context": "root:sprite",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5361
+  },
+  {
+    "id": "interface/sprites:8:rule:root:sprite:scalar:node",
+    "context": "root:sprite",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5361
+  },
+  {
+    "id": "common/units_display:1:rule:units_display:any",
+    "context": "root:units_display",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "units_display_entry",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Unit display definitions are keyed by unit type."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "common/units_display/*.txt",
+    "line": 1
+  }
+]

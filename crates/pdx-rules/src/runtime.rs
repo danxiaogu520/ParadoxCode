@@ -109,7 +109,7 @@ pub struct RuleSet {
 impl RuleSet {
     /// Creates an empty rule set for bootstrapping the crate graph.
     #[must_use]
-    pub const fn empty() -> Self {
+    pub fn empty() -> Self {
         Self {
             schema_version: CURRENT_SCHEMA_VERSION,
             rule_hash: RuleHash::empty(),
@@ -126,6 +126,7 @@ impl RuleSet {
                     type_descriptors: BTreeMap::new(),
                     localisation_bindings: Vec::new(),
                 },
+                profile: crate::GameProfile::default(),
             },
             exact_semantic_rules: BTreeMap::new(),
             semantic_rules_by_context: BTreeMap::new(),
@@ -223,6 +224,12 @@ impl RuleSet {
     #[must_use]
     pub const fn model(&self) -> &RulesModel {
         &self.model
+    }
+
+    /// Returns the data-only profile carried by this rules artifact.
+    #[must_use]
+    pub const fn profile(&self) -> &crate::GameProfile {
+        &self.model.profile
     }
 
     /// Returns exact-key semantic rule candidates without scanning unrelated matchers.

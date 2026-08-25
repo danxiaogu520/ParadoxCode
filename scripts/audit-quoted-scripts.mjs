@@ -8,7 +8,7 @@ const SKIPPED_DIRECTORIES = new Set(["crashes", "dumps", "logs", "patchnotes"]);
 
 function usage() {
   return [
-    "usage: node scripts/audit-quoted-scripts.mjs --source <directory> [--rules <semantic-rules.json>] [--json]",
+    "usage: node scripts/audit-quoted-scripts.mjs --source <directory> [--rules <rules/eu4>] [--json]",
     "",
     "Inventories multiline quoted property values without copying their payloads.",
     "The report contains only paths, keys, structural paths, line numbers, sizes, and aggregate counts.",
@@ -216,11 +216,39 @@ function scriptedMacroParameters(root) {
   return macros;
 }
 
+function jsonFilesUnder(root) {
+  const files = [];
+  const pending = [root];
+  while (pending.length > 0) {
+    const directory = pending.pop();
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) pending.push(absolute);
+      else if (entry.isFile() && path.extname(entry.name).toLowerCase() === ".json") files.push(absolute);
+    }
+  }
+  return files.sort();
+}
+
 function quotedRules(rulesPath) {
   if (!rulesPath) return [];
-  const rules = JSON.parse(fs.readFileSync(rulesPath, "utf8"));
-  const enumPath = path.join(path.dirname(rulesPath), "enum-values.json");
-  const enums = fs.existsSync(enumPath) ? JSON.parse(fs.readFileSync(enumPath, "utf8")) : {};
+  const rules = [];
+  const enums = {};
+  if (fs.statSync(rulesPath).isDirectory()) {
+    for (const file of jsonFilesUnder(rulesPath)) {
+      const relative = path.relative(rulesPath, file).replaceAll(path.sep, "/");
+      const value = JSON.parse(fs.readFileSync(file, "utf8"));
+      if (relative.startsWith("semantic/") && Array.isArray(value)) rules.push(...value);
+      if (relative.startsWith("values/") && value && typeof value === "object" && !Array.isArray(value)) {
+        for (const [name, members] of Object.entries(value)) enums[name] = members;
+      }
+    }
+  } else {
+    const value = JSON.parse(fs.readFileSync(rulesPath, "utf8"));
+    if (Array.isArray(value)) rules.push(...value);
+    const enumPath = path.join(path.dirname(rulesPath), "enum-values.json");
+    if (fs.existsSync(enumPath)) Object.assign(enums, JSON.parse(fs.readFileSync(enumPath, "utf8")));
+  }
   const result = [];
   for (const rule of rules) {
     if (rule.shape !== "quoted_script") continue;
@@ -337,7 +365,11 @@ try {
   const options = parseArgs(process.argv.slice(2));
   if (!fs.statSync(options.source).isDirectory()) throw new Error("--source must be a directory");
   const records = filesUnder(options.source).flatMap((file) => inventoryFile(options.source, file));
-  const result = report(records, options.rules, scriptedMacroParameters(options.source));
+  const result = report(
+    records,
+    options.rules ?? path.resolve("rules/eu4"),
+    scriptedMacroParameters(options.source),
+  );
   process.stdout.write(options.json ? `${JSON.stringify(result, null, 2)}\n` : markdown(result));
 } catch (error) {
   process.stderr.write(`quoted-script audit failed: ${error.message}\n\n${usage()}\n`);

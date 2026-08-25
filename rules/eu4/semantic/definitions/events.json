@@ -1,0 +1,1436 @@
+[
+  {
+    "id": "events/events:10:rule:type:event:is_triggered_only",
+    "context": "type:event",
+    "parent_path": [],
+    "key": {
+      "exact": "is_triggered_only"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 4994
+  },
+  {
+    "id": "events/events:14:rule:root:event:id",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "id"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 4995
+  },
+  {
+    "id": "events/events:15:rule:root:event:title",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "title"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 4996
+  },
+  {
+    "id": "events/events:16:rule:root:event:desc",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "desc"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 4997
+  },
+  {
+    "id": "events/events:17:rule:root:event:picture",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "picture"
+    },
+    "operator": "=",
+    "value": {
+      "type": "sprite"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 4998
+  },
+  {
+    "id": "events/events:18:rule:root:event:picture",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "picture"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "dlc_event_pictures"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 4999
+  },
+  {
+    "id": "events/events:19:rule:root:event:picture",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "picture"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "none"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5000
+  },
+  {
+    "id": "events/events:21:rule:root:event:title",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "title"
+    },
+    "operator": "=",
+    "value": "localisation",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5001
+  },
+  {
+    "id": "events/events:22:rule:root:event:desc",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "desc"
+    },
+    "operator": "=",
+    "value": "localisation",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5002
+  },
+  {
+    "id": "events/events:23:rule:root:event:goto",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "goto"
+    },
+    "operator": "=",
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5003
+  },
+  {
+    "id": "events/events:24:rule:root:event:goto",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "goto"
+    },
+    "operator": "=",
+    "value": {
+      "dynamic": "event_target"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5004
+  },
+  {
+    "id": "events/events:25:rule:root:event:goto",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "goto"
+    },
+    "operator": "=",
+    "value": {
+      "dynamic": "global_event_target"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5005
+  },
+  {
+    "id": "events/events:26:rule:root:event:goto",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "goto"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "root"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5006
+  },
+  {
+    "id": "events/events:27:rule:root:event:goto",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "goto"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "from"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5007
+  },
+  {
+    "id": "events/events:28:rule:root:event:goto",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "goto"
+    },
+    "operator": "=",
+    "value": {
+      "type": "estate"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5008
+  },
+  {
+    "id": "events/events:30:rule:root:event:trigger",
+    "context": "root:event",
+    "parent_path": [
+      "desc"
+    ],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5009
+  },
+  {
+    "id": "events/events:31:rule:root:event:desc",
+    "context": "root:event",
+    "parent_path": [
+      "desc"
+    ],
+    "key": {
+      "exact": "desc"
+    },
+    "operator": "=",
+    "value": "localisation",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5010
+  },
+  {
+    "id": "events/events:32:rule:root:event:desc",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "desc"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5011
+  },
+  {
+    "id": "events/events:33:rule:root:event:picture",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "picture"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5012
+  },
+  {
+    "id": "events/events:35:rule:root:event:trigger",
+    "context": "root:event",
+    "parent_path": [
+      "picture"
+    ],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5013
+  },
+  {
+    "id": "events/events:36:rule:root:event:picture",
+    "context": "root:event",
+    "parent_path": [
+      "picture"
+    ],
+    "key": {
+      "exact": "picture"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5014
+  },
+  {
+    "id": "events/events:37:rule:root:event:picture",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "picture"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5015
+  },
+  {
+    "id": "events/events:39:rule:root:event:hidden",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "hidden"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 2,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5016
+  },
+  {
+    "id": "events/events:40:rule:root:event:major",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "major"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "If yes, every country will be notified which options are selected."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5017
+  },
+  {
+    "id": "events/events:42:rule:root:event:major_trigger",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "major_trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Only displays the event to country validating the trigger"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5018
+  },
+  {
+    "id": "events/events:43:rule:root:event:is_triggered_only",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "is_triggered_only"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5019
+  },
+  {
+    "id": "events/events:44:rule:root:event:is_triggered_only",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "is_triggered_only"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 2,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5020
+  },
+  {
+    "id": "events/events:46:rule:root:event:days",
+    "context": "root:event",
+    "parent_path": [
+      "mean_time_to_happen"
+    ],
+    "key": {
+      "exact": "days"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "1"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5021
+  },
+  {
+    "id": "events/events:47:rule:root:event:mean_time_to_happen",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "mean_time_to_happen"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 3,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 0,
+    "source_file": "semantic-rules.json",
+    "line": 5022
+  },
+  {
+    "id": "events/events:49:rule:root:event:fire_only_once",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "fire_only_once"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5023
+  },
+  {
+    "id": "events/events:50:rule:root:event:enum[days_months_years]",
+    "context": "root:event",
+    "parent_path": [
+      "mean_time_to_happen"
+    ],
+    "key": {
+      "enum": "days_months_years"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5024
+  },
+  {
+    "id": "events/events:52:rule:root:event:mean_time_to_happen",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "mean_time_to_happen"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier_rule",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5025
+  },
+  {
+    "id": "events/events:54:rule:root:event:enum[days_months_years]",
+    "context": "root:event",
+    "parent_path": [
+      "mean_time_to_happen"
+    ],
+    "key": {
+      "enum": "days_months_years"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "1"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5026
+  },
+  {
+    "id": "events/events:56:rule:root:event:mean_time_to_happen",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "mean_time_to_happen"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier_rule",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5027
+  },
+  {
+    "id": "events/events:58:rule:root:event:is_mtth_scaled_to_size",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "is_mtth_scaled_to_size"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5028
+  },
+  {
+    "id": "events/events:60:rule:root:event:trigger",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5029
+  },
+  {
+    "id": "events/events:62:rule:root:event:immediate",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "immediate"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5030
+  },
+  {
+    "id": "events/events:63:rule:root:event:name",
+    "context": "root:event",
+    "parent_path": [
+      "option"
+    ],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5031
+  },
+  {
+    "id": "events/events:65:rule:root:event:name",
+    "context": "root:event",
+    "parent_path": [
+      "option"
+    ],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "localisation",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 2,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5032
+  },
+  {
+    "id": "events/events:66:rule:root:event:goto",
+    "context": "root:event",
+    "parent_path": [
+      "option"
+    ],
+    "key": {
+      "exact": "goto"
+    },
+    "operator": "=",
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5033
+  },
+  {
+    "id": "events/events:67:rule:root:event:goto",
+    "context": "root:event",
+    "parent_path": [
+      "option"
+    ],
+    "key": {
+      "exact": "goto"
+    },
+    "operator": "=",
+    "value": {
+      "dynamic": "event_target"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5034
+  },
+  {
+    "id": "events/events:68:rule:root:event:goto",
+    "context": "root:event",
+    "parent_path": [
+      "option"
+    ],
+    "key": {
+      "exact": "goto"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "root"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5035
+  },
+  {
+    "id": "events/events:69:rule:root:event:goto",
+    "context": "root:event",
+    "parent_path": [
+      "option"
+    ],
+    "key": {
+      "exact": "goto"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "from"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5036
+  },
+  {
+    "id": "events/events:6:rule:type:event:mean_time_to_happen",
+    "context": "type:event",
+    "parent_path": [],
+    "key": {
+      "exact": "mean_time_to_happen"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5037
+  },
+  {
+    "id": "events/events:70:rule:root:event:goto",
+    "context": "root:event",
+    "parent_path": [
+      "option"
+    ],
+    "key": {
+      "exact": "goto"
+    },
+    "operator": "=",
+    "value": {
+      "type": "estate"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5038
+  },
+  {
+    "id": "events/events:73:rule:root:event:trigger",
+    "context": "root:event",
+    "parent_path": [
+      "option"
+    ],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5039
+  },
+  {
+    "id": "events/events:75:rule:root:event:factor",
+    "context": "root:event",
+    "parent_path": [
+      "option",
+      "ai_chance"
+    ],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": "0",
+        "max": "10000"
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5040
+  },
+  {
+    "id": "events/events:77:rule:root:event:ai_chance",
+    "context": "root:event",
+    "parent_path": [
+      "option"
+    ],
+    "key": {
+      "exact": "ai_chance"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier_rule",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5041
+  },
+  {
+    "id": "events/events:78:rule:root:event:required_personality",
+    "context": "root:event",
+    "parent_path": [
+      "option"
+    ],
+    "key": {
+      "exact": "required_personality"
+    },
+    "operator": "=",
+    "value": {
+      "type": "ruler_personality"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5042
+  },
+  {
+    "id": "events/events:79:rule:root:event:highlight",
+    "context": "root:event",
+    "parent_path": [
+      "option"
+    ],
+    "key": {
+      "exact": "highlight"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5043
+  },
+  {
+    "id": "events/events:80:rule:root:event:option",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "option"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5044
+  },
+  {
+    "id": "events/events:82:rule:root:event:after",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "after"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5045
+  },
+  {
+    "id": "events/events:8:rule:type:event:hidden",
+    "context": "type:event",
+    "parent_path": [],
+    "key": {
+      "exact": "hidden"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5046
+  },
+  {
+    "id": "eu4:event:goto_scope",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "goto"
+    },
+    "operator": "=",
+    "value": {
+      "scope": null
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Scope-based event camera target."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5003
+  },
+  {
+    "id": "eu4:event_option:goto_scope",
+    "context": "root:event",
+    "parent_path": [
+      "option"
+    ],
+    "key": {
+      "exact": "goto"
+    },
+    "operator": "=",
+    "value": {
+      "scope": null
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Scope-based event option camera target."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5033
+  }
+]

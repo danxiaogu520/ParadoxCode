@@ -1,0 +1,2509 @@
+[
+  {
+    "id": "abilities:0:alias:ability:auto_explore_adjacent_to_colony",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "auto_explore_adjacent_to_colony"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:0:alias:ability:auto_explore_adjacent_to_colony",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1
+  },
+  {
+    "id": "abilities:10:alias:ability:cb_on_overseas",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "cb_on_overseas"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:10:alias:ability:cb_on_overseas",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2
+  },
+  {
+    "id": "abilities:11:alias:ability:sea_repair",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "sea_repair"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:11:alias:ability:sea_repair",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3
+  },
+  {
+    "id": "abilities:12:alias:ability:cb_on_religious_enemies",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "cb_on_religious_enemies"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:12:alias:ability:cb_on_religious_enemies",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 4
+  },
+  {
+    "id": "abilities:13:alias:ability:can_fabricate_for_vassals",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "can_fabricate_for_vassals"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:13:alias:ability:can_fabricate_for_vassals",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5
+  },
+  {
+    "id": "abilities:14:alias:ability:idea_claim_colonies",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "idea_claim_colonies"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:14:alias:ability:idea_claim_colonies",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 6
+  },
+  {
+    "id": "abilities:15:alias:ability:may_perform_slave_raid_on_same_religion",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "may_perform_slave_raid_on_same_religion"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:15:alias:ability:may_perform_slave_raid_on_same_religion",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 7
+  },
+  {
+    "id": "abilities:16:alias:ability:may_not_reduce_inflation",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "may_not_reduce_inflation"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:16:alias:ability:may_not_reduce_inflation",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 8
+  },
+  {
+    "id": "abilities:1:alias:ability:may_recruit_female_generals",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "may_recruit_female_generals"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:1:alias:ability:may_recruit_female_generals",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 9
+  },
+  {
+    "id": "abilities:2:alias:ability:may_perform_slave_raid_on_same_religion",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "may_perform_slave_raid_on_same_religion"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:2:alias:ability:may_perform_slave_raid_on_same_religion",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 10
+  },
+  {
+    "id": "abilities:3:alias:ability:reduced_stab_impacts",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "reduced_stab_impacts"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:3:alias:ability:reduced_stab_impacts",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 11
+  },
+  {
+    "id": "abilities:4:alias:ability:may_convert_territories",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "may_convert_territories"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:4:alias:ability:may_convert_territories",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 12
+  },
+  {
+    "id": "abilities:5:alias:ability:cb_on_primitives",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "cb_on_primitives"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:5:alias:ability:cb_on_primitives",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 13
+  },
+  {
+    "id": "abilities:6:alias:ability:may_explore",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "may_explore"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:6:alias:ability:may_explore",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 14
+  },
+  {
+    "id": "abilities:7:alias:ability:may_establish_frontier",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "may_establish_frontier"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:7:alias:ability:may_establish_frontier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 15
+  },
+  {
+    "id": "abilities:8:alias:ability:may_perform_slave_raid",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "may_perform_slave_raid"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:8:alias:ability:may_perform_slave_raid",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 16
+  },
+  {
+    "id": "abilities:9:alias:ability:no_religion_penalty",
+    "context": "ability",
+    "parent_path": [],
+    "key": {
+      "exact": "no_religion_penalty"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "abilities:9:alias:ability:no_religion_penalty",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 17
+  },
+  {
+    "id": "common/flagship_modification:17:alias:flagship_modifier:flagship_durability",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "flagship_durability"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:17:alias:flagship_modifier:flagship_durability",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 649
+  },
+  {
+    "id": "common/flagship_modification:18:alias:flagship_modifier:naval_maintenance_flagship_modifier",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "naval_maintenance_flagship_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:18:alias:flagship_modifier:naval_maintenance_flagship_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 650
+  },
+  {
+    "id": "common/flagship_modification:19:alias:flagship_modifier:number_of_cannons_flagship_modifier",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "number_of_cannons_flagship_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:19:alias:flagship_modifier:number_of_cannons_flagship_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 651
+  },
+  {
+    "id": "common/flagship_modification:20:alias:flagship_modifier:flagship_morale",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "flagship_morale"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:20:alias:flagship_modifier:flagship_morale",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 652
+  },
+  {
+    "id": "common/flagship_modification:21:alias:flagship_modifier:blockade_impact_on_siege_in_fleet_modifier",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "blockade_impact_on_siege_in_fleet_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:21:alias:flagship_modifier:blockade_impact_on_siege_in_fleet_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 653
+  },
+  {
+    "id": "common/flagship_modification:22:alias:flagship_modifier:movement_speed_in_fleet_modifier",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "movement_speed_in_fleet_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:22:alias:flagship_modifier:movement_speed_in_fleet_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 654
+  },
+  {
+    "id": "common/flagship_modification:23:alias:flagship_modifier:exploration_mission_range_in_fleet_modifier",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "exploration_mission_range_in_fleet_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:23:alias:flagship_modifier:exploration_mission_range_in_fleet_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 655
+  },
+  {
+    "id": "common/flagship_modification:24:alias:flagship_modifier:trade_power_in_fleet_modifier",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "trade_power_in_fleet_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:24:alias:flagship_modifier:trade_power_in_fleet_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 656
+  },
+  {
+    "id": "common/flagship_modification:25:alias:flagship_modifier:flagship_naval_engagement_modifier",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "flagship_naval_engagement_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:25:alias:flagship_modifier:flagship_naval_engagement_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 657
+  },
+  {
+    "id": "common/flagship_modification:26:alias:flagship_modifier:barrage_cost_in_fleet_modifier",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "barrage_cost_in_fleet_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:26:alias:flagship_modifier:barrage_cost_in_fleet_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 658
+  },
+  {
+    "id": "common/flagship_modification:27:alias:flagship_modifier:cannons_for_hunting_pirates_in_fleet",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "cannons_for_hunting_pirates_in_fleet"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:27:alias:flagship_modifier:cannons_for_hunting_pirates_in_fleet",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 659
+  },
+  {
+    "id": "common/flagship_modification:28:alias:flagship_modifier:movement_speed_onto_off_boat_modifier",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "movement_speed_onto_off_boat_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:28:alias:flagship_modifier:movement_speed_onto_off_boat_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 660
+  },
+  {
+    "id": "common/flagship_modification:29:alias:flagship_modifier:landing_penalty",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "landing_penalty"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:29:alias:flagship_modifier:landing_penalty",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 661
+  },
+  {
+    "id": "common/flagship_modification:30:alias:flagship_modifier:admiral_skill_gain_modifier",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "admiral_skill_gain_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:30:alias:flagship_modifier:admiral_skill_gain_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 662
+  },
+  {
+    "id": "common/flagship_modification:31:alias:flagship_modifier:privateering_efficiency_in_fleet_modifier",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "privateering_efficiency_in_fleet_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:31:alias:flagship_modifier:privateering_efficiency_in_fleet_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 663
+  },
+  {
+    "id": "common/flagship_modification:32:alias:flagship_modifier:prestige_from_battles_in_fleet_modifier",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "prestige_from_battles_in_fleet_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:32:alias:flagship_modifier:prestige_from_battles_in_fleet_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 664
+  },
+  {
+    "id": "common/flagship_modification:33:alias:flagship_modifier:morale_in_fleet_modifier",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "morale_in_fleet_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:33:alias:flagship_modifier:morale_in_fleet_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 665
+  },
+  {
+    "id": "common/flagship_modification:34:alias:flagship_modifier:naval_attrition_in_fleet_modifier",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "naval_attrition_in_fleet_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:34:alias:flagship_modifier:naval_attrition_in_fleet_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 666
+  },
+  {
+    "id": "common/flagship_modification:35:alias:flagship_modifier:naval_tradition_in_fleet_modifier",
+    "context": "flagship_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "naval_tradition_in_fleet_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/flagship_modification:35:alias:flagship_modifier:naval_tradition_in_fleet_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 667
+  },
+  {
+    "id": "common/imperial_incident:12:rule:root:imperial_incident:factor",
+    "context": "imperial_incident_option",
+    "parent_path": [],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": "-10000",
+        "max": "10000"
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1187
+  },
+  {
+    "id": "common/personalities:46:alias:personality_modifier:knowledge_sharing",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "knowledge_sharing"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:46:alias:personality_modifier:knowledge_sharing",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2629
+  },
+  {
+    "id": "common/personalities:47:alias:personality_modifier:wants_condottieri",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_condottieri"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:47:alias:personality_modifier:wants_condottieri",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2630
+  },
+  {
+    "id": "common/personalities:48:alias:personality_modifier:fair_fights",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "fair_fights"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:48:alias:personality_modifier:fair_fights",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2631
+  },
+  {
+    "id": "common/personalities:49:alias:personality_modifier:wants_heathen_land",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_heathen_land"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:49:alias:personality_modifier:wants_heathen_land",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2632
+  },
+  {
+    "id": "common/personalities:50:alias:personality_modifier:wants_heretic_land",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_heretic_land"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:50:alias:personality_modifier:wants_heretic_land",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2633
+  },
+  {
+    "id": "common/personalities:51:alias:personality_modifier:wants_excommunicate",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_excommunicate"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:51:alias:personality_modifier:wants_excommunicate",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2634
+  },
+  {
+    "id": "common/personalities:52:alias:personality_modifier:wants_gold",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_gold"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:52:alias:personality_modifier:wants_gold",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2635
+  },
+  {
+    "id": "common/personalities:53:alias:personality_modifier:wants_explorers",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_explorers"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:53:alias:personality_modifier:wants_explorers",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2636
+  },
+  {
+    "id": "common/personalities:54:alias:personality_modifier:random_insults",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "random_insults"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:54:alias:personality_modifier:random_insults",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2637
+  },
+  {
+    "id": "common/personalities:55:alias:personality_modifier:wants_disclose_attack",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_disclose_attack"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:55:alias:personality_modifier:wants_disclose_attack",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2638
+  },
+  {
+    "id": "common/personalities:56:alias:personality_modifier:wants_debase",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_debase"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:56:alias:personality_modifier:wants_debase",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2639
+  },
+  {
+    "id": "common/personalities:57:alias:personality_modifier:wants_sell_provinces",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_sell_provinces"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:57:alias:personality_modifier:wants_sell_provinces",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2640
+  },
+  {
+    "id": "common/personalities:58:alias:personality_modifier:wants_colonies",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_colonies"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:58:alias:personality_modifier:wants_colonies",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2641
+  },
+  {
+    "id": "common/personalities:59:alias:personality_modifier:wants_avoid_debase",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_avoid_debase"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:59:alias:personality_modifier:wants_avoid_debase",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2642
+  },
+  {
+    "id": "common/personalities:60:alias:personality_modifier:wants_land",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_land"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:60:alias:personality_modifier:wants_land",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2643
+  },
+  {
+    "id": "common/personalities:61:alias:personality_modifier:wants_avoid_loans",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_avoid_loans"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:61:alias:personality_modifier:wants_avoid_loans",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2644
+  },
+  {
+    "id": "common/personalities:62:alias:personality_modifier:wants_loans",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_loans"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:62:alias:personality_modifier:wants_loans",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2645
+  },
+  {
+    "id": "common/personalities:63:alias:personality_modifier:random_troop_moves",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "random_troop_moves"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:63:alias:personality_modifier:random_troop_moves",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "\"Often indistinguishable from a bug\""
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2646
+  },
+  {
+    "id": "common/personalities:64:alias:personality_modifier:razing",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "razing"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:64:alias:personality_modifier:razing",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2647
+  },
+  {
+    "id": "common/personalities:65:alias:personality_modifier:wants_betray_allies",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_betray_allies"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:65:alias:personality_modifier:wants_betray_allies",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2648
+  },
+  {
+    "id": "common/personalities:66:alias:personality_modifier:lower_autonomy",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "lower_autonomy"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:66:alias:personality_modifier:lower_autonomy",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2649
+  },
+  {
+    "id": "common/personalities:67:alias:personality_modifier:underestimate_ae",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "underestimate_ae"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:67:alias:personality_modifier:underestimate_ae",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2650
+  },
+  {
+    "id": "common/personalities:68:alias:personality_modifier:wants_avoid_ugly_borders",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_avoid_ugly_borders"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:68:alias:personality_modifier:wants_avoid_ugly_borders",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2651
+  },
+  {
+    "id": "common/personalities:69:alias:personality_modifier:wants_threaten_war",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_threaten_war"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:69:alias:personality_modifier:wants_threaten_war",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2652
+  },
+  {
+    "id": "common/personalities:70:alias:personality_modifier:wants_ecumenical_council",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_ecumenical_council"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:70:alias:personality_modifier:wants_ecumenical_council",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2653
+  },
+  {
+    "id": "common/personalities:71:alias:personality_modifier:wants_to_appoint_cardinals_in_his_own_land",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "wants_to_appoint_cardinals_in_his_own_land"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:71:alias:personality_modifier:wants_to_appoint_cardinals_in_his_own_land",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2654
+  },
+  {
+    "id": "common/personalities:72:alias:personality_modifier:easy_war_chance_multiplier",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "easy_war_chance_multiplier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:72:alias:personality_modifier:easy_war_chance_multiplier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2655
+  },
+  {
+    "id": "common/personalities:73:alias:personality_modifier:other_ai_help_us_multiplier",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "other_ai_help_us_multiplier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:73:alias:personality_modifier:other_ai_help_us_multiplier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2656
+  },
+  {
+    "id": "common/personalities:74:alias:personality_modifier:different_religion_war_multiplier",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "different_religion_war_multiplier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:74:alias:personality_modifier:different_religion_war_multiplier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2657
+  },
+  {
+    "id": "common/personalities:75:alias:personality_modifier:war_chance_multiplier",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "war_chance_multiplier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:75:alias:personality_modifier:war_chance_multiplier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2658
+  },
+  {
+    "id": "common/personalities:76:alias:personality_modifier:building_budget_multiplier",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "building_budget_multiplier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:76:alias:personality_modifier:building_budget_multiplier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2659
+  },
+  {
+    "id": "common/personalities:77:alias:personality_modifier:other_ai_war_chance_multiplier",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "other_ai_war_chance_multiplier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:77:alias:personality_modifier:other_ai_war_chance_multiplier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2660
+  },
+  {
+    "id": "common/personalities:78:alias:personality_modifier:enemy_strength_multiplier",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "enemy_strength_multiplier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:78:alias:personality_modifier:enemy_strength_multiplier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2661
+  },
+  {
+    "id": "common/personalities:79:alias:personality_modifier:heretic_ally_acceptance",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "heretic_ally_acceptance"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:79:alias:personality_modifier:heretic_ally_acceptance",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2662
+  },
+  {
+    "id": "common/personalities:80:alias:personality_modifier:heathen_ally_acceptance",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "heathen_ally_acceptance"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:80:alias:personality_modifier:heathen_ally_acceptance",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2663
+  },
+  {
+    "id": "common/personalities:81:alias:personality_modifier:gift_chance",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "gift_chance"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:81:alias:personality_modifier:gift_chance",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2664
+  },
+  {
+    "id": "common/personalities:82:alias:personality_modifier:other_ai_peace_term_bonus",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "other_ai_peace_term_bonus"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:82:alias:personality_modifier:other_ai_peace_term_bonus",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2665
+  },
+  {
+    "id": "common/personalities:83:alias:personality_modifier:alliance_acceptance",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "alliance_acceptance"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:83:alias:personality_modifier:alliance_acceptance",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2666
+  },
+  {
+    "id": "common/personalities:84:alias:personality_modifier:royal_marriage_acceptance",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "royal_marriage_acceptance"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:84:alias:personality_modifier:royal_marriage_acceptance",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2667
+  },
+  {
+    "id": "common/personalities:85:alias:personality_modifier:peace_desire",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "peace_desire"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:85:alias:personality_modifier:peace_desire",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2668
+  },
+  {
+    "id": "common/personalities:86:alias:personality_modifier:trade_league_acceptance",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "trade_league_acceptance"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:86:alias:personality_modifier:trade_league_acceptance",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2669
+  },
+  {
+    "id": "common/personalities:87:alias:personality_modifier:send_warning_desire",
+    "context": "personality_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "send_warning_desire"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "common/personalities:87:alias:personality_modifier:send_warning_desire",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 2670
+  },
+  {
+    "id": "modifier_rule:0:rule:modifier_rule:factor",
+    "context": "modifier_rule",
+    "parent_path": [
+      "modifier"
+    ],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "modifier_rule:2:alias:modifier_rule:modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5633
+  },
+  {
+    "id": "modifier_rule:2:alias:modifier_rule:modifier",
+    "context": "modifier_rule",
+    "parent_path": [],
+    "key": {
+      "exact": "modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": "modifier_rule:2:alias:modifier_rule:modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5634
+  },
+  {
+    "id": "eu4:imperial_incident_option:modifier",
+    "context": "imperial_incident_option",
+    "parent_path": [],
+    "key": {
+      "exact": "modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "imperial_incident_option_modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Conditional weighting block for an imperial incident option."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1188
+  },
+  {
+    "id": "eu4:imperial_incident_option_modifier:factor",
+    "context": "imperial_incident_option_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Weight multiplier inside an imperial incident option modifier."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1188
+  },
+  {
+    "id": "common/alerts:4:leaf:alerts_sound:level",
+    "context": "alerts_sound",
+    "parent_path": [],
+    "key": {
+      "enum": "alert_level"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/alerts.txt",
+    "line": 4
+  },
+  {
+    "id": "common/alerts:5:leaf:alerts_icon:level",
+    "context": "alerts_icon",
+    "parent_path": [],
+    "key": {
+      "enum": "alert_level"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/alerts.txt",
+    "line": 5
+  },
+  {
+    "id": "common/alerts:6:rule:alerts_definitions:any",
+    "context": "alerts_definitions",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "alert_definition",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "common/alerts.txt",
+    "line": 6
+  },
+  {
+    "id": "common/alerts:7:rule:alert_definition:category",
+    "context": "alert_definition",
+    "parent_path": [],
+    "key": {
+      "exact": "category"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "alert_level"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Alert severity: HIGH, MEDIUM, LOW, or DISABLED."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/alerts.txt",
+    "line": 7
+  },
+  {
+    "id": "common/units_display:2:rule:units_display_entry:factor",
+    "context": "units_display_entry",
+    "parent_path": [],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": true,
+    "deprecated": false,
+    "documentation": [
+      "Base display factor for a unit type or modifier."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/units_display/*.txt",
+    "line": 2
+  },
+  {
+    "id": "common/units_display:3:rule:units_display_entry:modifier",
+    "context": "units_display_entry",
+    "parent_path": [],
+    "key": {
+      "exact": "modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "units_display_modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "common/units_display/*.txt",
+    "line": 3
+  },
+  {
+    "id": "common/units_display:4:rule:units_display_modifier:factor",
+    "context": "units_display_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": true,
+    "deprecated": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/units_display/*.txt",
+    "line": 4
+  },
+  {
+    "id": "common/units_display:5:rule:units_display_modifier:or",
+    "context": "units_display_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "OR"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/units_display/*.txt",
+    "line": 5
+  },
+  {
+    "id": "common/units_display:6:rule:units_display_modifier:trigger",
+    "context": "units_display_modifier",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Unit display modifiers may use arbitrary trigger clauses."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "common/units_display/*.txt",
+    "line": 6
+  }
+]

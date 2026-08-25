@@ -1,0 +1,54 @@
+{
+  "country_history": {
+    "name": "country_history",
+    "path": "game/history/countries",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "province_history": {
+    "name": "province_history",
+    "path": "game/history/provinces",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "diplomacy_history": {
+    "name": "diplomacy_history",
+    "path": "game/history/diplomacy",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "war_history": {
+    "name": "war_history",
+    "path": "game/history/wars",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": "name",
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  }
+}

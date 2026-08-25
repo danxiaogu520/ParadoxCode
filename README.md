@@ -166,6 +166,14 @@ Official `pdx-ls` binaries embed the first-party JSON source and generate a vali
 artifact in the user cache on first use or when the source `rule_hash` changes. The generated
 artifact is not committed to the repository.
 
+The EU4 source is intentionally split by responsibility. `catalog/` contains file categories,
+symbol descriptors, and normalized records; `semantic/` contains executable rule alternatives
+grouped by context and game-directory schema; `types/`, `values/`, and `localisation/` contain
+the supporting semantic tables; and `profile/` contains the data-only EU4 filesystem, scope,
+symbol, dynamic-value, and semantic-inheritance profile. `rules/eu4/manifest.json` lists every
+fragment explicitly. The compiler merges those fragments into one logical `RulesModel`, and the
+same canonical `rule_hash` covers both semantic data and profile data.
+
 ## Development setup
 
 Launch `pdx-ls` from a configured path or from `PATH`. Workspace source roots are configured
@@ -255,12 +263,13 @@ change the automation threshold. Use `--help` for all options.
 | `editors/vscode/` | VS Code extension: server bootstrap, walkthrough, mission-tree preview |
 | `editors/zed/` | Thin Zed extension, language metadata, and queries |
 | `grammars/` | Editor-only Tree-sitter grammars and corpus tests |
-| `rules/eu4/` | Authoritative first-party EU4 rule source (JSON) and generated manifest |
+| `rules/eu4/` | Authoritative first-party EU4 rule tree (catalog, semantic, supporting tables, profile) |
 | `fuzz/` | Parser, edit, formatter, and HIR fuzz targets |
 | `scripts/` | Reproducible quality checks and diagnostic workflows |
 
-The current first-party EU4 rules target game version **1.37.5** (8,577 semantic rules, 117 file
-categories, 2,674 symbol descriptors).
+The current first-party EU4 rules target game version **1.37.5** (8,525 semantic rules, 121 file
+categories, 2,667 symbol descriptors). The generated release manifest in `rules/manifest.json`
+records the schema version, source format, canonical `rule_hash`, and artifact checksum.
 
 ## Releases
 

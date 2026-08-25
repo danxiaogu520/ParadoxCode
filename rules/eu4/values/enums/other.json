@@ -219,22 +219,6 @@
     "all",
     "any"
   ],
-  "attitudes": [
-    "attitude_allied",
-    "attitude_defensive",
-    "attitude_disloyal",
-    "attitude_domineering",
-    "attitude_friendly",
-    "attitude_hostile",
-    "attitude_loyal",
-    "attitude_neutral",
-    "attitude_outraged",
-    "attitude_overlord",
-    "attitude_protective",
-    "attitude_rebellious",
-    "attitude_rivalry",
-    "attitude_threatened"
-  ],
   "bribe_effect_options": [
     "\n\t\t\t\tadd_government_power = {\n\t\t\t\t\tmechanic_type = cossacks_mechanic\n\t\t\t\t\tpower_type = cossacks_adm_power\n\t\t\t\t\tvalue = -0.25\n\t\t\t\t}\n\t\t\t\tadd_government_power = {\n\t\t\t\t\tmechanic_type = cossacks_mechanic\n\t\t\t\t\tpower_type = cossacks_dip_power\n\t\t\t\t\tvalue = -0.25\n\t\t\t\t}\n\t\t\t\tadd_government_power = {\n\t\t\t\t\tmechanic_type = cossacks_mechanic\n\t\t\t\t\tpower_type = cossacks_mil_power\n\t\t\t\t\tvalue = -0.25\n\t\t\t\t}",
     "\n\t\t\t\tadd_government_power = {\n\t\t\t\t\tmechanic_type = cossacks_mechanic\n\t\t\t\t\tpower_type = cossacks_adm_power\n\t\t\t\t\tvalue = -0.5\n\t\t\t\t}\n\t\t\t\tadd_government_power = {\n\t\t\t\t\tmechanic_type = cossacks_mechanic\n\t\t\t\t\tpower_type = cossacks_dip_power\n\t\t\t\t\tvalue = -0.5\n\t\t\t\t}\n\t\t\t\tadd_government_power = {\n\t\t\t\t\tmechanic_type = cossacks_mechanic\n\t\t\t\t\tpower_type = cossacks_mil_power\n\t\t\t\t\tvalue = -0.5\n\t\t\t\t}",
@@ -678,18 +662,6 @@
   "defined_text_commands": [
     "name",
     "path"
-  ],
-  "diplomatic_actions_new": [
-    "access",
-    "alliance",
-    "covert",
-    "dynasty",
-    "economy",
-    "emperor",
-    "great_powers",
-    "influence",
-    "papacy",
-    "relation"
   ],
   "dlc_event_pictures": [
     "10_Jain_Estate_eventPicture",
@@ -1618,107 +1590,6 @@
     "winning_war_increases_legitimacy",
     "winning_wars_gives_rt"
   ],
-  "government_icons": [
-    "ambrosian_republic",
-    "arabic_scripture",
-    "asian_scripture",
-    "assembly_hall",
-    "ballot_box",
-    "british_queen",
-    "castle",
-    "celestial_empire",
-    "chieftain",
-    "chinese_palace",
-    "church",
-    "clergyman",
-    "compass",
-    "constitution",
-    "crown",
-    "crown_highlighted",
-    "daimyo",
-    "dutch_flag",
-    "dutch_republic",
-    "elective_monarchy",
-    "english_monarchy",
-    "feudal_theocracy",
-    "fist_in_air",
-    "free_city",
-    "general_eastern_administrative",
-    "generic_people",
-    "horde_riding",
-    "horde_riding_highlighted",
-    "indian_crown",
-    "indian_palace",
-    "indian_sultanate",
-    "judge",
-    "king",
-    "king_2",
-    "king_2_highlighted",
-    "king_highlighted",
-    "landscape",
-    "mamluk_government",
-    "man_and_children",
-    "man_on_podium",
-    "mandala_system",
-    "map",
-    "map_2",
-    "merchant",
-    "merchant_ship",
-    "misl_confederacy",
-    "monks",
-    "muslim",
-    "muslim_highlighted",
-    "nayankara_system",
-    "noble_indian",
-    "noble_muslim",
-    "nobleman",
-    "ottoman_government",
-    "papacy",
-    "paper_money_map",
-    "paper_with_seal",
-    "paper_with_seal_3",
-    "parliament",
-    "parliament_hall",
-    "parliament_highlighted",
-    "peacock_throne",
-    "peasant_republic",
-    "peasants",
-    "people_walking",
-    "politician",
-    "pope",
-    "pope_highlighted",
-    "prussian_monarchy",
-    "prussian_monarchy_2",
-    "queen",
-    "rajput_kingdom",
-    "religious_leader",
-    "religious_leader_highlighted",
-    "retain_tribal_hierarchy",
-    "revolutionary_republic",
-    "rioting_burning",
-    "rioting_burning_2",
-    "russian_principality",
-    "samurai",
-    "shaman",
-    "shogunate",
-    "siddhi_recruitment",
-    "soldiers",
-    "soldiers_2",
-    "soldiers_3",
-    "soldiers_3_highlighted",
-    "soldiers_4",
-    "soldiers_5",
-    "soldiers_6",
-    "states_general",
-    "strength_of_the_khalsa",
-    "trading_city",
-    "tribal_centralize_power",
-    "tribal_civil_society",
-    "tribal_council",
-    "tribal_lip_service",
-    "tribal_martial_society",
-    "tribal_religious_society"
-  ],
   "graphical_cultures": [
     "aboriginalgfx",
     "africangfx",
@@ -1807,11 +1678,6 @@
     "venetian_merchant_republic",
     "war_against_the_world_government"
   ],
-  "holy_order_cost_types": [
-    "adm_power",
-    "dip_power",
-    "mil_power"
-  ],
   "interest_modifier_fixed_interest": [
     "fixed_interest",
     "interest_modifier"
@@ -1819,11 +1685,6 @@
   "key_name": [
     "key",
     "name"
-  ],
-  "land_unit_types": [
-    "artillery",
-    "cavalry",
-    "infantry"
   ],
   "legacy_reforms_with_no_new_equivalent": [
     "administrative_monarchy",
@@ -1851,12 +1712,6 @@
   ],
   "message_options": [
     "MULTISUBJECTINTERACT"
-  ],
-  "military_leader_types": [
-    "admiral",
-    "conquistador",
-    "explorer",
-    "general"
   ],
   "modifier_value": [
     "administrative_efficiency",
@@ -1910,59 +1765,10 @@
     "trade_efficiency",
     "trade_steering"
   ],
-  "monsoons": [
-    "mild_monsoon",
-    "normal_monsoon",
-    "severe_monsoon"
-  ],
   "native_policies": [
     "native_policy_coexist",
     "native_policy_hostile",
     "native_policy_trade"
-  ],
-  "naval_unit_types": [
-    "galley",
-    "heavy_ship",
-    "light_ship",
-    "transport"
-  ],
-  "other_diplo_history": [
-    "guarantee",
-    "royal_marriage",
-    "union"
-  ],
-  "peace_options": [
-    "po_annul_treaties",
-    "po_become_tributary_state",
-    "po_become_vassal",
-    "po_change_government",
-    "po_change_hre_religion",
-    "po_change_religion",
-    "po_concede_defeat",
-    "po_demand_provinces",
-    "po_dismantle_revolution",
-    "po_enforce_rebel_demands",
-    "po_force_migration",
-    "po_force_out_colonizers",
-    "po_form_personal_union",
-    "po_gold",
-    "po_guaranteed_join_empire",
-    "po_humiliate",
-    "po_humiliate_rival",
-    "po_independence",
-    "po_join_empire",
-    "po_release_annexed",
-    "po_release_vassals",
-    "po_return_cores",
-    "po_revoke_cores",
-    "po_revoke_elector",
-    "po_spread_revolution",
-    "po_steer_trade",
-    "po_subjugate_tributary_state",
-    "po_subjugate_vassal",
-    "po_take_mandate",
-    "po_trade_power",
-    "po_transfer_vassals"
   ],
   "power_categories": [
     "ADM",
@@ -2009,25 +1815,6 @@
     "nation_rebel_tag",
     "none",
     "religion"
-  ],
-  "religion_new_variables": [
-    "new_variable:From:adm_advisor_religion",
-    "new_variable:From:consort_religion",
-    "new_variable:From:dip_advisor_religion",
-    "new_variable:From:heir_religion",
-    "new_variable:From:mil_advisor_religion",
-    "new_variable:From:ruler_religion",
-    "new_variable:adm_advisor_religion",
-    "new_variable:consort_religion",
-    "new_variable:dip_advisor_religion",
-    "new_variable:heir_religion",
-    "new_variable:mil_advisor_religion",
-    "new_variable:ruler_religion",
-    "noreligion"
-  ],
-  "religious_leagues": [
-    "catholic",
-    "protestant"
   ],
   "scaling_with_estate_influence_options": [
     "\t\n\t\t\tdefine_advisor = {\n\t\t\t\ttype = colonial_governor\n\t\t\t\tskill = 3\n\t\t\t\tcost_multiplier = 0.1\n\t\t\t}\n\t\t\t",
@@ -2132,56 +1919,6 @@
     "create_general = { tradition = 45 }",
     "create_general = { tradition = 60 }",
     "create_general = { tradition = 75 }"
-  ],
-  "special_unit_types": [
-    "banner_cavalry",
-    "banner_infantry",
-    "caravel_light",
-    "carolean_infantry",
-    "cawa_infantry",
-    "cossack_cavalry",
-    "cossack_infantry",
-    "galleass_galley",
-    "galleon_heavy",
-    "geobukseon_galley",
-    "hussars_cavalry",
-    "janissary_infantry",
-    "mamluks_cavalry",
-    "mamluks_infantry",
-    "man_of_war_heavy",
-    "man_of_war_light",
-    "marine_infantry",
-    "musketeer_infantry",
-    "qizilbash_cavalry",
-    "qizilbash_infantry",
-    "rajput_infantry",
-    "samurai_infantry",
-    "streltsy_infantry",
-    "tercio_infantry",
-    "voc_indiamen_light"
-  ],
-  "special_units": [
-    "banner",
-    "caravel",
-    "carolean",
-    "cawa",
-    "cossacks",
-    "galleass",
-    "galleon",
-    "geobukseon",
-    "hussars",
-    "janissaries",
-    "mamluks",
-    "man_of_war",
-    "marines",
-    "musketeer",
-    "qizilbash",
-    "rajput",
-    "revolutionary_guard",
-    "samurai",
-    "streltsy",
-    "tercio",
-    "voc_indiamen"
   ],
   "spritepacks": [
     "dlc001_amg_sprite_pack",
@@ -2483,25 +2220,6 @@
     "dlc137_URB_sprite_pack",
     "dlc137_WES_sprite_pack"
   ],
-  "terrain_sound_types": [
-    "desert",
-    "forest",
-    "jungle",
-    "mountains",
-    "plains",
-    "sea"
-  ],
-  "terrain_types": [
-    "artic",
-    "desert",
-    "forest",
-    "hills",
-    "jungle",
-    "marsh",
-    "mountains",
-    "plains",
-    "pti"
-  ],
   "timed_modifier_liberty": [
     "liberty_desire",
     "reduced_liberty_desire"
@@ -2517,30 +2235,8 @@
     "harbor",
     "local_venture"
   ],
-  "unit_types": [
-    "artillery",
-    "cavalry",
-    "galley",
-    "heavy_ship",
-    "infantry",
-    "light_ship",
-    "transport"
-  ],
   "variable_name": [
     "num_converted_religion"
-  ],
-  "wargoal_types": [
-    "blockade_ports",
-    "defend_capital",
-    "defend_country",
-    "naval_superiority",
-    "superiority",
-    "take_border",
-    "take_capital",
-    "take_colony",
-    "take_core",
-    "take_province",
-    "take_region"
   ],
   "warloss_cause": [
     "attrition",
@@ -2550,10 +2246,6 @@
   "which_varname": [
     "variable_name",
     "which"
-  ],
-  "who_or_subject": [
-    "subject",
-    "who"
   ],
   "vanilla_exported_modifier_keys": [
     "blood_gain_modifier",
@@ -2584,10 +2276,5 @@
     "russian_modernization_gain_modifier",
     "soyurghals_amount_check_influence",
     "temples_influence"
-  ],
-  "winter_types": [
-    "mild_winter",
-    "normal_winter",
-    "severe_winter"
   ]
 }

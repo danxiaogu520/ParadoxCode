@@ -1,0 +1,23 @@
+{
+  "dynamic_scope_prefixes": [
+    "event_target",
+    "global_event_target"
+  ],
+  "dynamic_value_prefixes": [
+    "variable",
+    "modifier"
+  ],
+  "open_world_value_kinds": [
+    "country_flag",
+    "global_flag",
+    "province_flag",
+    "ruler_flag",
+    "heir_flag",
+    "consort_flag",
+    "saved_name",
+    "named_unrest",
+    "event_target",
+    "global_event_target",
+    "dynasty_name"
+  ]
+}

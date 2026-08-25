@@ -1,0 +1,134 @@
+{
+  "government": {
+    "name": "government",
+    "path": "game/common/governments",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "government_reform": {
+    "name": "government_reform",
+    "path": "game/common/government_reforms",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "religion": {
+    "name": "religion",
+    "path": "game/common/religions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "religious_schools",
+        "flag_emblem_index_range"
+      ],
+      true
+    ]
+  },
+  "religion_group": {
+    "name": "religion_group",
+    "path": "game/common/religions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "building": {
+    "name": "building",
+    "path": "game/common/buildings",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "technology": {
+    "name": "technology",
+    "path": "game/common/technologies",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "technology"
+      ],
+      false
+    ]
+  },
+  "static_modifier": {
+    "name": "static_modifier",
+    "path": "game/common/static_modifiers",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "triggered_modifier": {
+    "name": "triggered_modifier",
+    "path": "game/common/triggered_modifiers",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "timed_modifier": {
+    "name": "timed_modifier",
+    "path": "game/common/timed_modifiers",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  }
+}

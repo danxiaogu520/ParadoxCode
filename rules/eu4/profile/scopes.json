@@ -1,0 +1,69 @@
+{
+  "scope_names": [
+    "any",
+    "root",
+    "from",
+    "prev",
+    "previous",
+    "prev_prev",
+    "this",
+    "owner",
+    "controller",
+    "capital",
+    "capital_scope",
+    "location",
+    "province",
+    "country",
+    "trade_node",
+    "unit",
+    "monarch",
+    "heir",
+    "consort",
+    "mercenary_company",
+    "rebel_faction",
+    "religion",
+    "culture",
+    "advisor",
+    "leader",
+    "trade_company",
+    "global",
+    "none",
+    "overlord",
+    "emperor",
+    "event_target",
+    "global_event_target"
+  ],
+  "scope_completions": [
+    "ROOT",
+    "THIS",
+    "FROM",
+    "PREV",
+    "country",
+    "province",
+    "trade_node"
+  ],
+  "root_scopes": [
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "country_event",
+        "case_sensitive": false
+      },
+      "scope": "country"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "province_event",
+        "case_sensitive": false
+      },
+      "scope": "province"
+    }
+  ],
+  "scope_compatibilities": [
+    {
+      "actual": "trade_node",
+      "expected": "province"
+    }
+  ]
+}

@@ -394,7 +394,7 @@ fn build_cache(
 ) -> Result<String, CliError> {
     let started = Instant::now();
     let rules = pdx_game::eu4::first_party_rules()?;
-    let profile = pdx_game::eu4::profile();
+    let profile = rules.profile().clone();
     // An existing validated cache is refreshed in place: only files whose content fingerprint
     // changed are reindexed. Any load or refresh failure (missing file, stale rules, corrupt
     // data) falls back to a full scan and rebuild.

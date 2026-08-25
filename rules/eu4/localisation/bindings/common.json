@@ -1,0 +1,109 @@
+{
+  "government": [
+    {
+      "field": "name",
+      "template": "$_name",
+      "required": true,
+      "subtype": "normal",
+      "condition": {
+        "field": "basic_reform"
+      }
+    }
+  ],
+  "government_reform": [
+    {
+      "field": "name",
+      "template": "$",
+      "required": true
+    },
+    {
+      "field": "description",
+      "template": "$_desc"
+    }
+  ],
+  "religion": [
+    {
+      "field": "name",
+      "template": "$",
+      "required": true
+    },
+    {
+      "field": "desc",
+      "template": "$_religion_desc",
+      "optional": true
+    },
+    {
+      "field": "harmonized",
+      "template": "harmonized_$",
+      "optional": true,
+      "subtype": "harmonized",
+      "condition": {
+        "field": "harmonized_modifier"
+      }
+    },
+    {
+      "field": "harmonized_desc",
+      "template": "desc_harmonized_$",
+      "optional": true,
+      "subtype": "harmonized",
+      "condition": {
+        "field": "harmonized_modifier"
+      }
+    }
+  ],
+  "religion_group": [
+    {
+      "field": "name",
+      "template": "$",
+      "required": true
+    },
+    {
+      "field": "harmonized",
+      "template": "harmonized_$",
+      "optional": true,
+      "subtype": "harmonized",
+      "condition": {
+        "field": "harmonized_modifier"
+      }
+    },
+    {
+      "field": "harmonized_desc",
+      "template": "desc_harmonized_$",
+      "optional": true,
+      "subtype": "harmonized",
+      "condition": {
+        "field": "harmonized_modifier"
+      }
+    }
+  ],
+  "building": [
+    {
+      "field": "name",
+      "template": "building_$",
+      "required": true
+    }
+  ],
+  "static_modifier": [
+    {
+      "field": "name",
+      "template": "$",
+      "optional": true
+    }
+  ],
+  "triggered_modifier": [
+    {
+      "field": "name",
+      "template": "$"
+    },
+    {
+      "field": "description",
+      "template": "desc_$"
+    }
+  ],
+  "timed_modifier": [
+    {
+      "field": "name",
+      "template": "$"
+    }
+  ]
+}

@@ -1,0 +1,364 @@
+[
+  {
+    "id": "decisions/decisions:11:rule:root:decision:provinces_to_highlight",
+    "context": "root:decision",
+    "parent_path": [],
+    "key": {
+      "exact": "provinces_to_highlight"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "province"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3513
+  },
+  {
+    "id": "decisions/decisions:13:rule:root:decision:allow",
+    "context": "root:decision",
+    "parent_path": [],
+    "key": {
+      "exact": "allow"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "country"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3514
+  },
+  {
+    "id": "decisions/decisions:15:rule:root:decision:effect",
+    "context": "root:decision",
+    "parent_path": [],
+    "key": {
+      "exact": "effect"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "country"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3515
+  },
+  {
+    "id": "decisions/decisions:16:rule:root:decision:factor",
+    "context": "root:decision",
+    "parent_path": [
+      "ai_will_do"
+    ],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 400
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3516
+  },
+  {
+    "id": "decisions/decisions:18:rule:root:decision:ai_will_do",
+    "context": "root:decision",
+    "parent_path": [],
+    "key": {
+      "exact": "ai_will_do"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier_rule",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3517
+  },
+  {
+    "id": "decisions/decisions:19:rule:root:decision:ai_importance",
+    "context": "root:decision",
+    "parent_path": [],
+    "key": {
+      "exact": "ai_importance"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3518
+  },
+  {
+    "id": "decisions/decisions:20:rule:root:decision:do_not_integrate",
+    "context": "root:decision",
+    "parent_path": [],
+    "key": {
+      "exact": "do_not_integrate"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "The AI will not try to integrate this country if the decision is available, meant to prevent them from using diplomatic power integrating countries that will get annexed or changed."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 3519
+  },
+  {
+    "id": "decisions/decisions:21:rule:root:decision:do_not_core",
+    "context": "root:decision",
+    "parent_path": [],
+    "key": {
+      "exact": "do_not_core"
+    },
+    "operator": "=",
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "The AI will not try to core this province if the decision is available, meant to prevent them from using monarch power coring provinces that will get cored or given away to another country."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 3520
+  },
+  {
+    "id": "decisions/decisions:22:leaf-value:root:decision:int[0..255]",
+    "context": "root:decision",
+    "parent_path": [
+      "color"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": 0,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 3521
+  },
+  {
+    "id": "decisions/decisions:23:rule:root:decision:color",
+    "context": "root:decision",
+    "parent_path": [],
+    "key": {
+      "exact": "color"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Changes the color used in the decision tab"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3522
+  },
+  {
+    "id": "decisions/decisions:7:rule:root:decision:major",
+    "context": "root:decision",
+    "parent_path": [],
+    "key": {
+      "exact": "major"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3523
+  },
+  {
+    "id": "decisions/decisions:9:rule:root:decision:potential",
+    "context": "root:decision",
+    "parent_path": [],
+    "key": {
+      "exact": "potential"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "country"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 3524
+  }
+]

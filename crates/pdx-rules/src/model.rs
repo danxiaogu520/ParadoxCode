@@ -383,6 +383,13 @@ pub struct RulesModel {
     pub records: Vec<RuleRecord>,
     /// Executable semantic matcher model used by semantic analysis.
     pub semantic: SemanticModel,
+    /// Data-only game profile consumed by the generic engine and selected by the composition root.
+    ///
+    /// The profile is part of the logical rules model so changes to path, symbol, scope, or
+    /// dynamic-value interpretation invalidate the same canonical rule identity as semantic
+    /// rule changes.
+    #[serde(default)]
+    pub profile: crate::GameProfile,
 }
 
 impl RulesModel {

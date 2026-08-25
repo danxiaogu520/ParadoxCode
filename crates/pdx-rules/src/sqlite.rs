@@ -1,4 +1,5 @@
 use crate::CURRENT_SCHEMA_VERSION;
+use crate::GameProfile;
 use crate::matcher::{FileMatcher, KeyMatcher, ValueMatcher};
 use crate::model::{
     FileCategory, FileResolutionPolicy, LocalisationBinding, LocalisationBindingCondition,
@@ -207,8 +208,19 @@ pub(crate) fn load(path: &Path) -> Result<RuleSet, RulesError> {
         .ok_or_else(|| RulesError::MissingMetadata("rule_hash".to_owned()))?;
     let game_id = metadata(&connection, "game_id")?
         .ok_or_else(|| RulesError::MissingMetadata("game_id".to_owned()))?;
+    let profile_json = metadata(&connection, "profile_json")?
+        .ok_or_else(|| RulesError::MissingMetadata("profile_json".to_owned()))?;
+    let profile: GameProfile = serde_json::from_str(&profile_json)
+        .map_err(|error| RulesError::Source(format!("invalid persisted game profile: {error}")))?;
+    if !profile.game_id.is_empty() && profile.game_id != game_id {
+        return Err(RulesError::GameMismatch {
+            expected: game_id,
+            actual: profile.game_id,
+        });
+    }
     let mut model = read_model(&connection)?;
     model.game_id = game_id;
+    model.profile = profile;
     let mut rules = RuleSet::from_model(model);
     rules.schema_version = version;
     let computed = rules.rule_hash.to_hex();
@@ -223,8 +235,14 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
     let transaction = connection.transaction()?;
     transaction.execute_batch("DELETE FROM metadata; DELETE FROM file_categories; DELETE FROM symbol_descriptors; DELETE FROM enum_values; DELETE FROM type_root_keys; DELETE FROM type_root_scopes; DELETE FROM type_descriptors; DELETE FROM localisation_bindings; DELETE FROM semantic_rules; DELETE FROM rule_fields; DELETE FROM rule_records;")?;
     transaction.execute(
-        "INSERT INTO metadata(key, value) VALUES ('schema_version', ?1), ('rule_hash', ?2), ('game_id', ?3)",
-        params![rules.schema_version.to_string(), rules.rule_hash.to_hex(), rules.game_id()],
+        "INSERT INTO metadata(key, value) VALUES ('schema_version', ?1), ('rule_hash', ?2), ('game_id', ?3), ('profile_json', ?4)",
+        params![
+            rules.schema_version.to_string(),
+            rules.rule_hash.to_hex(),
+            rules.game_id(),
+            serde_json::to_string(rules.profile())
+                .map_err(|error| RulesError::Source(format!("serialize game profile: {error}")))?,
+        ],
     )?;
     for category in &rules.model.file_categories {
         transaction.execute("INSERT INTO file_categories(id, parser, resolution, path_prefix, path_exact, extensions, path_suffix, path_exclude_prefixes, case_sensitive) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)", params![category.id, category.parser.as_str(), category.resolution.as_str(), category.matcher.path_prefix, category.matcher.path_exact, category.matcher.extensions.join("\u{1f}"), category.matcher.path_suffix, category.matcher.path_exclude_prefixes.join("\u{1e}"), i64::from(category.matcher.case_sensitive)])?;
@@ -536,6 +554,7 @@ fn read_model(connection: &Connection) -> Result<RulesModel, RulesError> {
         symbol_descriptors: descriptors,
         records,
         semantic,
+        profile: GameProfile::default(),
     })
 }
 

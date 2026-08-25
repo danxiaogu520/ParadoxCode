@@ -1,0 +1,3978 @@
+{
+  "records": [
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:0",
+      "source_order": 18,
+      "fields": {
+        "child_count": "2",
+        "key": "type[faction]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:1",
+      "source_order": 24,
+      "fields": {
+        "child_count": "2",
+        "key": "type[fervor]",
+        "line": "19",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:10",
+      "source_order": 66,
+      "fields": {
+        "child_count": "2",
+        "key": "type[professionalism_modifier]",
+        "line": "94",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:11",
+      "source_order": 70,
+      "fields": {
+        "child_count": "2",
+        "key": "type[edict]",
+        "line": "101",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:12",
+      "source_order": 74,
+      "fields": {
+        "child_count": "3",
+        "key": "type[power_projection_modifier]",
+        "line": "108",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:13",
+      "source_order": 80,
+      "fields": {
+        "child_count": "1",
+        "key": "type[client_state]",
+        "line": "120",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:14",
+      "source_order": 82,
+      "fields": {
+        "child_count": "2",
+        "directives": "type_key_filter = bookmark",
+        "key": "type[bookmark]",
+        "line": "124",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:15",
+      "source_order": 85,
+      "fields": {
+        "child_count": "3",
+        "key": "type[dynasty_colors]",
+        "line": "128",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:16",
+      "source_order": 89,
+      "fields": {
+        "child_count": "3",
+        "key": "type[region_colors]",
+        "line": "133",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:17",
+      "source_order": 93,
+      "fields": {
+        "child_count": "3",
+        "key": "type[province_names]",
+        "line": "139",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:18",
+      "source_order": 97,
+      "fields": {
+        "child_count": "2",
+        "key": "type[achievement]",
+        "line": "144",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:2",
+      "source_order": 29,
+      "fields": {
+        "child_count": "2",
+        "key": "type[cult]",
+        "line": "28",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:3",
+      "source_order": 34,
+      "fields": {
+        "child_count": "1",
+        "key": "type[revolt_trigger]",
+        "line": "37",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:4",
+      "source_order": 36,
+      "fields": {
+        "child_count": "2",
+        "key": "type[insult]",
+        "line": "40",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:5",
+      "source_order": 40,
+      "fields": {
+        "child_count": "2",
+        "key": "type[natives]",
+        "line": "47",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:6",
+      "source_order": 44,
+      "fields": {
+        "child_count": "2",
+        "key": "type[decree]",
+        "line": "54",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:7",
+      "source_order": 50,
+      "fields": {
+        "child_count": "2",
+        "key": "type[isolationism]",
+        "line": "65",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:8",
+      "source_order": 56,
+      "fields": {
+        "child_count": "2",
+        "key": "type[naval_doctrine]",
+        "line": "76",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:9",
+      "source_order": 61,
+      "fields": {
+        "child_count": "2",
+        "key": "type[policy]",
+        "line": "85",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/00_small_types_consolidated:root:0",
+      "source_order": 17,
+      "fields": {
+        "child_count": "19",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/advisortypes:common/advisortypes:root:0:0",
+      "source_order": 269,
+      "fields": {
+        "child_count": "2",
+        "key": "type[advisor_type]",
+        "line": "4",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/advisortypes:root:0",
+      "source_order": 268,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/ages:common/ages:root:0:0",
+      "source_order": 292,
+      "fields": {
+        "child_count": "2",
+        "key": "type[game_age]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/ages:common/ages:root:0:1",
+      "source_order": 298,
+      "fields": {
+        "child_count": "3",
+        "key": "type[game_age_ability]",
+        "line": "15",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/ages:root:0",
+      "source_order": 291,
+      "fields": {
+        "child_count": "2",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/ai_army:common/ai_army:root:0:0",
+      "source_order": 338,
+      "fields": {
+        "child_count": "2",
+        "key": "type[ai_army]",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/ai_army:root:0",
+      "source_order": 337,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "1",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/ai_personalities:common/ai_personalities:root:0:0",
+      "source_order": 354,
+      "fields": {
+        "child_count": "3",
+        "key": "type[ai_personality]",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/ai_personalities:root:0",
+      "source_order": 353,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/ancestor_personalities:common/ancestor_personalities:root:0:0",
+      "source_order": 368,
+      "fields": {
+        "child_count": "3",
+        "key": "type[ancestor_personalities]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/ancestor_personalities:root:0",
+      "source_order": 367,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/buildings:common/buildings:root:0:0",
+      "source_order": 467,
+      "fields": {
+        "child_count": "3",
+        "key": "type[building]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/buildings:root:0",
+      "source_order": 466,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:0:0",
+      "source_order": 515,
+      "fields": {
+        "child_count": "3",
+        "key": "type[casus_belli]",
+        "line": "4",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:0:1",
+      "source_order": 522,
+      "fields": {
+        "child_count": "3",
+        "key": "type[wargoal_type]",
+        "line": "16",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:0:2",
+      "source_order": 530,
+      "fields": {
+        "child_count": "1",
+        "key": "type[peace_options]",
+        "line": "29",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:4:0",
+      "source_order": 608,
+      "fields": {
+        "key": "type",
+        "line": "170",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[wargoal_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/casus_belli_and_war_goals:root:0",
+      "source_order": 514,
+      "fields": {
+        "child_count": "3",
+        "key": "types",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/center_of_revolution:common/center_of_revolution:root:0:0",
+      "source_order": 672,
+      "fields": {
+        "child_count": "1",
+        "key": "type[center_of_revolution_conversion]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/center_of_revolution:root:0",
+      "source_order": 671,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/colonial_region:common/colonial_region:root:0:0",
+      "source_order": 683,
+      "fields": {
+        "child_count": "2",
+        "key": "type[colonial_region]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/colonial_region:root:0",
+      "source_order": 682,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/countries_consolidated:common/countries_consolidated:root:0:0",
+      "source_order": 708,
+      "fields": {
+        "child_count": "3",
+        "key": "type[country_color_file]",
+        "line": "7",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/countries_consolidated:common/countries_consolidated:root:0:1",
+      "source_order": 712,
+      "fields": {
+        "child_count": "3",
+        "key": "type[country_file]",
+        "line": "12",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/countries_consolidated:common/countries_consolidated:root:0:2",
+      "source_order": 716,
+      "fields": {
+        "child_count": "4",
+        "key": "type[custom_country_colors]",
+        "line": "17",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/countries_consolidated:root:0",
+      "source_order": 707,
+      "fields": {
+        "child_count": "3",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/cultures:common/cultures:root:0:0",
+      "source_order": 779,
+      "fields": {
+        "child_count": "2",
+        "key": "type[culture_group]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/cultures:common/cultures:root:0:1",
+      "source_order": 783,
+      "fields": {
+        "child_count": "3",
+        "directives": "type_key_filter <> { male_names female_names dynasty_names province country }",
+        "key": "type[culture]",
+        "line": "10",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/cultures:root:0",
+      "source_order": 778,
+      "fields": {
+        "child_count": "2",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/custom_gui:common/custom_gui:root:0:0",
+      "source_order": 825,
+      "fields": {
+        "child_count": "3",
+        "directives": "type_key_filter = custom_button",
+        "key": "type[custom_button]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/custom_gui:common/custom_gui:root:0:1",
+      "source_order": 829,
+      "fields": {
+        "child_count": "3",
+        "directives": "type_key_filter = custom_text_box",
+        "key": "type[custom_text_box]",
+        "line": "9",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/custom_gui:common/custom_gui:root:0:2",
+      "source_order": 833,
+      "fields": {
+        "child_count": "3",
+        "directives": "type_key_filter = custom_icon",
+        "key": "type[custom_icon]",
+        "line": "15",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/custom_gui:common/custom_gui:root:0:3",
+      "source_order": 837,
+      "fields": {
+        "child_count": "3",
+        "directives": "type_key_filter = custom_shield",
+        "key": "type[custom_shield]",
+        "line": "21",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/custom_gui:common/custom_gui:root:0:4",
+      "source_order": 841,
+      "fields": {
+        "child_count": "3",
+        "directives": "type_key_filter = custom_window",
+        "key": "type[custom_window]",
+        "line": "27",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/custom_gui:root:0",
+      "source_order": 824,
+      "fields": {
+        "child_count": "5",
+        "key": "types",
+        "line": "1",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/defender_of_faith:common/defender_of_faith:root:0:0",
+      "source_order": 889,
+      "fields": {
+        "child_count": "2",
+        "key": "type[defender_faith]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/defender_of_faith:root:0",
+      "source_order": 888,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/diplomatic_actions:common/diplomatic_actions:root:0:0",
+      "source_order": 906,
+      "fields": {
+        "child_count": "1",
+        "key": "type[diplomatic_action]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/diplomatic_actions:root:0",
+      "source_order": 905,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/diplomatic_actions_new:common/diplomatic_actions_new:root:0:0",
+      "source_order": 920,
+      "fields": {
+        "child_count": "3",
+        "directives": "type_key_filter <> static_actions",
+        "key": "type[new_diplomatic_action]",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/diplomatic_actions_new:root:0",
+      "source_order": 919,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/disasters:common/disasters:root:0:0",
+      "source_order": 996,
+      "fields": {
+        "child_count": "2",
+        "key": "type[disaster]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/disasters:root:0",
+      "source_order": 995,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/estates:common/estates:root:0:0",
+      "source_order": 1031,
+      "fields": {
+        "child_count": "3",
+        "key": "type[estate]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/estates:common/estates:root:0:1",
+      "source_order": 1036,
+      "fields": {
+        "child_count": "2",
+        "key": "type[estate_privilege]",
+        "line": "11",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/estates:common/estates:root:0:2",
+      "source_order": 1041,
+      "fields": {
+        "child_count": "2",
+        "key": "type[estate_agenda]",
+        "line": "20",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/estates:common/estates:root:0:3",
+      "source_order": 1046,
+      "fields": {
+        "child_count": "4",
+        "key": "type[estate_modifier]",
+        "line": "29",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/estates:common/estates:root:0:4",
+      "source_order": 1052,
+      "fields": {
+        "child_count": "3",
+        "directives": "type_key_filter = interaction",
+        "key": "type[estate_interaction]",
+        "line": "39",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/estates:common/estates:root:0:5",
+      "source_order": 1057,
+      "fields": {
+        "child_count": "3",
+        "directives": "type_key_filter = bonus",
+        "key": "type[estate_crown_land_bonus]",
+        "line": "48",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/estates:root:0",
+      "source_order": 1030,
+      "fields": {
+        "child_count": "6",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/federation_advancements:common/federation_advancements:root:0:0",
+      "source_order": 1224,
+      "fields": {
+        "child_count": "2",
+        "key": "type[federation_advancements]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/federation_advancements:root:0",
+      "source_order": 1223,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/flagship_modification:common/flagship_modification:root:0:0",
+      "source_order": 1240,
+      "fields": {
+        "child_count": "1",
+        "key": "type[flagship_modification]",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/flagship_modification:common/flagship_modification:root:0:1",
+      "source_order": 1242,
+      "fields": {
+        "child_count": "1",
+        "key": "type[holy_order]",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/flagship_modification:root:0",
+      "source_order": 1239,
+      "fields": {
+        "child_count": "2",
+        "key": "types",
+        "line": "1",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/golden_bull:common/golden_bull:root:0:0",
+      "source_order": 1276,
+      "fields": {
+        "child_count": "2",
+        "key": "type[golden_bull]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/golden_bull:root:0",
+      "source_order": 1275,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:root:0:0",
+      "source_order": 1298,
+      "fields": {
+        "child_count": "4",
+        "key": "type[government]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:root:0:1",
+      "source_order": 1306,
+      "fields": {
+        "child_count": "6",
+        "key": "type[government_reform]",
+        "line": "21",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:root:0:2",
+      "source_order": 1318,
+      "fields": {
+        "child_count": "3",
+        "key": "type[states_general_faction]",
+        "line": "43",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:root:0:3",
+      "source_order": 1325,
+      "fields": {
+        "child_count": "4",
+        "key": "type[government_ranks]",
+        "line": "52",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:root:0:4",
+      "source_order": 1330,
+      "fields": {
+        "child_count": "2",
+        "key": "type[government_name]",
+        "line": "58",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:root:0:5",
+      "source_order": 1334,
+      "fields": {
+        "child_count": "2",
+        "key": "type[government_mechanic]",
+        "line": "64",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:root:0:6",
+      "source_order": 1338,
+      "fields": {
+        "child_count": "5",
+        "key": "type[government_mechanic_power]",
+        "line": "71",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:root:0:7",
+      "source_order": 1353,
+      "fields": {
+        "child_count": "3",
+        "key": "type[government_mechanic_interaction]",
+        "line": "96",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/governments_and_reforms:root:0",
+      "source_order": 1297,
+      "fields": {
+        "child_count": "8",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/greatprojects:common/greatprojects:common/greatprojects:common/greatprojects:root:0:0:2:0",
+      "source_order": 1924,
+      "fields": {
+        "key": "type",
+        "line": "13",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "monument"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/greatprojects:common/greatprojects:common/greatprojects:common/greatprojects:root:0:0:3:0",
+      "source_order": 1926,
+      "fields": {
+        "key": "type",
+        "line": "16",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "canal"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/greatprojects:common/greatprojects:common/greatprojects:root:1:7:0",
+      "source_order": 1937,
+      "fields": {
+        "key": "type",
+        "line": "39",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "monument"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/greatprojects:common/greatprojects:common/greatprojects:root:1:8:0",
+      "source_order": 1939,
+      "fields": {
+        "key": "type",
+        "line": "42",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "canal"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/greatprojects:common/greatprojects:root:0:0",
+      "source_order": 1918,
+      "fields": {
+        "child_count": "4",
+        "key": "type[great_project]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/greatprojects:root:0",
+      "source_order": 1917,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/hegemon:common/hegemon:root:0:0",
+      "source_order": 2055,
+      "fields": {
+        "child_count": "2",
+        "key": "type[hegemon]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/hegemon:root:0",
+      "source_order": 2054,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/holy_order:common/holy_order:root:0:0",
+      "source_order": 2073,
+      "fields": {
+        "child_count": "2",
+        "key": "type[holy_order]",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/holy_order:root:0",
+      "source_order": 2072,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "1",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:0:0",
+      "source_order": 2102,
+      "fields": {
+        "child_count": "4",
+        "key": "type[idea_group]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:0:1",
+      "source_order": 2113,
+      "fields": {
+        "child_count": "3",
+        "directives": "type_key_filter <> { start trigger bonus ai_will_do }",
+        "key": "type[idea]",
+        "line": "25",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:0:4",
+      "source_order": 2129,
+      "fields": {
+        "child_count": "3",
+        "directives": "type_key_filter <> { start trigger bonus ai_will_do }",
+        "key": "type[customideas]",
+        "line": "54",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/ideas_and_native_advancements:root:0",
+      "source_order": 2101,
+      "fields": {
+        "child_count": "5",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/imperial_incident:common/imperial_incident:root:0:0",
+      "source_order": 2212,
+      "fields": {
+        "child_count": "2",
+        "key": "type[imperial_incident]",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/imperial_incident:root:0",
+      "source_order": 2211,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "1",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/imperial_reforms:common/imperial_reforms:root:0:0",
+      "source_order": 2228,
+      "fields": {
+        "child_count": "10",
+        "key": "type[imperial_reform]",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/imperial_reforms:root:0",
+      "source_order": 2227,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "1",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/incidents:common/incidents:root:0:0",
+      "source_order": 2305,
+      "fields": {
+        "child_count": "2",
+        "key": "type[incident]",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/incidents:root:0",
+      "source_order": 2304,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "1",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/institutions:common/institutions:root:0:0",
+      "source_order": 2323,
+      "fields": {
+        "child_count": "2",
+        "key": "type[institution]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/institutions:root:0",
+      "source_order": 2322,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/luck:common/luck:root:0:0",
+      "source_order": 2391,
+      "fields": {
+        "child_count": "2",
+        "key": "type[luck]",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/luck:root:0",
+      "source_order": 2390,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "1",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/mercenary_company:common/mercenary_company:root:0:0",
+      "source_order": 2397,
+      "fields": {
+        "child_count": "2",
+        "key": "type[mercenary_company]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/mercenary_company:root:0",
+      "source_order": 2396,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/modifiers_consolidated:common/modifiers_consolidated:root:0:0",
+      "source_order": 2532,
+      "fields": {
+        "child_count": "3",
+        "key": "type[event_modifier]",
+        "line": "4",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/modifiers_consolidated:common/modifiers_consolidated:root:0:1",
+      "source_order": 2540,
+      "fields": {
+        "child_count": "2",
+        "key": "type[static_modifier]",
+        "line": "19",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/modifiers_consolidated:common/modifiers_consolidated:root:0:2",
+      "source_order": 2544,
+      "fields": {
+        "child_count": "2",
+        "key": "type[triggered_modifier]",
+        "line": "27",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/modifiers_consolidated:common/modifiers_consolidated:root:0:3",
+      "source_order": 2549,
+      "fields": {
+        "child_count": "2",
+        "key": "type[province_triggered_modifier]",
+        "line": "35",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/modifiers_consolidated:common/modifiers_consolidated:root:0:4",
+      "source_order": 2554,
+      "fields": {
+        "child_count": "2",
+        "key": "type[timed_modifier]",
+        "line": "44",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/modifiers_consolidated:root:0",
+      "source_order": 2531,
+      "fields": {
+        "child_count": "5",
+        "key": "types",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/on_actions:common/on_actions:root:0:0",
+      "source_order": 2600,
+      "fields": {
+        "child_count": "255",
+        "key": "type[on_action]",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/on_actions:root:0",
+      "source_order": 2599,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "1",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/opinion_modifiers:common/opinion_modifiers:root:0:0",
+      "source_order": 4444,
+      "fields": {
+        "child_count": "4",
+        "key": "type[opinion_modifier]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/opinion_modifiers:root:0",
+      "source_order": 4443,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/parliaments:common/parliaments:root:0:0",
+      "source_order": 4465,
+      "fields": {
+        "child_count": "2",
+        "key": "type[parliament_bribe]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/parliaments:common/parliaments:root:0:1",
+      "source_order": 4469,
+      "fields": {
+        "child_count": "2",
+        "key": "type[parliament_issue]",
+        "line": "10",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/parliaments:root:0",
+      "source_order": 4464,
+      "fields": {
+        "child_count": "2",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/peace_treaties:common/peace_treaties:root:0:0",
+      "source_order": 4510,
+      "fields": {
+        "child_count": "2",
+        "key": "type[peace_treaty]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/peace_treaties:root:0",
+      "source_order": 4509,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/personalities:common/personalities:root:0:0",
+      "source_order": 4551,
+      "fields": {
+        "child_count": "2",
+        "key": "type[leader_personality]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/personalities:common/personalities:root:0:1",
+      "source_order": 4557,
+      "fields": {
+        "child_count": "2",
+        "key": "type[ruler_personality]",
+        "line": "14",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/personalities:root:0",
+      "source_order": 4550,
+      "fields": {
+        "child_count": "2",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/rebel_types:common/rebel_types:root:0:0",
+      "source_order": 4639,
+      "fields": {
+        "child_count": "2",
+        "key": "type[rebel_type]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/rebel_types:common/rebel_types:root:0:1",
+      "source_order": 4646,
+      "fields": {
+        "child_count": "3",
+        "key": "type[rebel_demand_loc]",
+        "line": "16",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/rebel_types:root:0",
+      "source_order": 4638,
+      "fields": {
+        "child_count": "2",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:44:0:4:0:0",
+      "source_order": 5048,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "768",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "ADM"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:44:0:4:0:1",
+      "source_order": 5049,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "770",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "DIP"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:44:0:4:0:2",
+      "source_order": 5050,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "772",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "MIL"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:0:0",
+      "source_order": 4727,
+      "fields": {
+        "child_count": "3",
+        "key": "type[religion_group]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:0:1",
+      "source_order": 4736,
+      "fields": {
+        "child_count": "4",
+        "directives": "type_key_filter <> { religious_schools flag_emblem_index_range }",
+        "key": "type[religion]",
+        "line": "20",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:0:10",
+      "source_order": 4799,
+      "fields": {
+        "child_count": "3",
+        "directives": "type_key_filter <> { trigger can_buy_idea ai_will_do }",
+        "key": "type[religious_reform]",
+        "line": "116",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:0:11",
+      "source_order": 4805,
+      "fields": {
+        "child_count": "4",
+        "key": "type[aspects_and_blessings]",
+        "line": "126",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:0:2",
+      "source_order": 4747,
+      "fields": {
+        "child_count": "3",
+        "key": "type[orthodox_icon]",
+        "line": "40",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:0:3",
+      "source_order": 4755,
+      "fields": {
+        "child_count": "3",
+        "key": "type[religious_school]",
+        "line": "51",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:0:4",
+      "source_order": 4762,
+      "fields": {
+        "child_count": "3",
+        "key": "type[papal_policy]",
+        "line": "62",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:0:5",
+      "source_order": 4769,
+      "fields": {
+        "child_count": "3",
+        "key": "type[guru]",
+        "line": "71",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:0:6",
+      "source_order": 4776,
+      "fields": {
+        "child_count": "3",
+        "key": "type[guru_teaching]",
+        "line": "80",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:0:7",
+      "source_order": 4784,
+      "fields": {
+        "child_count": "2",
+        "key": "type[personal_deity]",
+        "line": "89",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:0:8",
+      "source_order": 4789,
+      "fields": {
+        "child_count": "3",
+        "key": "type[religion_propagation]",
+        "line": "98",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:0:9",
+      "source_order": 4795,
+      "fields": {
+        "child_count": "2",
+        "key": "type[religious_reform_group]",
+        "line": "108",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/religions_and_related:root:0",
+      "source_order": 4726,
+      "fields": {
+        "child_count": "12",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/scripted_functions:common/scripted_functions:root:0:0",
+      "source_order": 5126,
+      "fields": {
+        "child_count": "1",
+        "key": "type[scripted_function]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/scripted_functions:root:0",
+      "source_order": 5125,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:0:0",
+      "source_order": 5138,
+      "fields": {
+        "child_count": "1",
+        "directives": "type_key_filter <> { has_completed_idea_group_of_category has_completed_idea_group_of_category num_of_completed_idea_groups_by_category has_any_active_incomplete_idea_group_of_category has_unlocked_government_reform }",
+        "key": "type[scripted_trigger]",
+        "line": "4",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:0:1",
+      "source_order": 5140,
+      "fields": {
+        "child_count": "1",
+        "directives": "type_key_filter <> { add_latest_building unlock_merc_company unlock_estate for_variable_amount show_points_needed_for_livionian_government_of_category count_won_battles_and_reward_at_end faction_in_power_effect add_inflation_scaled_to_trade unlock_estate allow_baseline_invite_scholar transfer_treasury upgrade_building add_years_of_trade_income for create_units_of_type create_units_of_type_in_province}",
+        "key": "type[scripted_effect]",
+        "line": "9",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:6:0",
+      "source_order": 5167,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "72",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[power_categories]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:72:0",
+      "source_order": 5845,
+      "fields": {
+        "key": "type",
+        "line": "2219",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[power_categories]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:74:0",
+      "source_order": 5852,
+      "fields": {
+        "key": "type",
+        "line": "2235",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<decision>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:77:1",
+      "source_order": 5861,
+      "fields": {
+        "key": "type",
+        "line": "2257",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[building_development_type]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/scripted_triggers_and_effects:root:0",
+      "source_order": 5137,
+      "fields": {
+        "child_count": "2",
+        "key": "types",
+        "line": "1",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/subject_types:common/subject_types:root:0:0",
+      "source_order": 5884,
+      "fields": {
+        "child_count": "2",
+        "key": "type[subject_type]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/subject_types:common/subject_types:root:0:1",
+      "source_order": 5891,
+      "fields": {
+        "child_count": "1",
+        "key": "type[subject_upgrades]",
+        "line": "16",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/subject_types:root:0",
+      "source_order": 5883,
+      "fields": {
+        "child_count": "2",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/technologies:common/technologies:root:0:0",
+      "source_order": 6089,
+      "fields": {
+        "child_count": "1",
+        "directives": "type_key_filter = technology",
+        "key": "type[technology]",
+        "line": "4",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/technologies:common/technologies:root:0:1",
+      "source_order": 6091,
+      "fields": {
+        "child_count": "1",
+        "directives": "type_key_filter = ahead_of_time",
+        "key": "type[tech_ahead_of_time]",
+        "line": "8",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/technologies:root:0",
+      "source_order": 6088,
+      "fields": {
+        "child_count": "2",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/technology_groups:common/technology_groups:root:0:0",
+      "source_order": 6145,
+      "fields": {
+        "child_count": "4",
+        "key": "type[technology_group]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/technology_groups:root:0",
+      "source_order": 6144,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:root:0:0",
+      "source_order": 6164,
+      "fields": {
+        "child_count": "3",
+        "key": "type[trade_good]",
+        "line": "4",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:root:0:1",
+      "source_order": 6171,
+      "fields": {
+        "child_count": "2",
+        "key": "type[trade_company]",
+        "line": "18",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:root:0:2",
+      "source_order": 6175,
+      "fields": {
+        "child_count": "2",
+        "key": "type[trade_company_investment]",
+        "line": "26",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:root:0:3",
+      "source_order": 6180,
+      "fields": {
+        "child_count": "2",
+        "key": "type[trade_node_name]",
+        "line": "36",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:root:0:4",
+      "source_order": 6184,
+      "fields": {
+        "child_count": "2",
+        "key": "type[trade_node]",
+        "line": "44",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:root:0:5",
+      "source_order": 6187,
+      "fields": {
+        "child_count": "2",
+        "key": "type[trading_policy]",
+        "line": "48",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:root:0:6",
+      "source_order": 6192,
+      "fields": {
+        "child_count": "3",
+        "key": "type[prices]",
+        "line": "58",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:root:0:7",
+      "source_order": 6196,
+      "fields": {
+        "child_count": "2",
+        "key": "type[trade_center]",
+        "line": "63",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:root:8:3",
+      "source_order": 6299,
+      "fields": {
+        "key": "type",
+        "line": "303",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[trade_center_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/trade_consolidated:root:0",
+      "source_order": 6163,
+      "fields": {
+        "child_count": "8",
+        "key": "types",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/unit_types:common/unit_types:common/unit_types:common/unit_types:root:0:0:5:0",
+      "source_order": 6320,
+      "fields": {
+        "key": "type",
+        "line": "18",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[land_unit_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/unit_types:common/unit_types:common/unit_types:common/unit_types:root:0:0:6:0",
+      "source_order": 6322,
+      "fields": {
+        "key": "type",
+        "line": "21",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[naval_unit_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/unit_types:common/unit_types:root:0:0",
+      "source_order": 6311,
+      "fields": {
+        "child_count": "7",
+        "key": "type[unit_type]",
+        "line": "4",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/unit_types:common/unit_types:root:1:0",
+      "source_order": 6324,
+      "fields": {
+        "key": "type",
+        "line": "27",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[unit_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "common/unit_types:root:0",
+      "source_order": 6310,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "customizable_localisation/custom_locs:customizable_localisation/custom_locs:root:1:0",
+      "source_order": 6351,
+      "fields": {
+        "child_count": "2",
+        "key": "type[defined_text]",
+        "line": "12",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "customizable_localisation/custom_locs:root:1",
+      "source_order": 6350,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "11",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "decisions/decisions:decisions/decisions:root:0:0",
+      "source_order": 6362,
+      "fields": {
+        "child_count": "3",
+        "key": "type[decision]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "decisions/decisions:root:0",
+      "source_order": 6361,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:157:0",
+      "source_order": 7279,
+      "fields": {
+        "key": "type",
+        "line": "793",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<advisor_type>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:179:0",
+      "source_order": 7382,
+      "fields": {
+        "key": "type",
+        "line": "1083",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[military_leader_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:179:1",
+      "source_order": 7383,
+      "fields": {
+        "key": "type",
+        "line": "1084",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "random"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:179:2",
+      "source_order": 7384,
+      "fields": {
+        "key": "type",
+        "line": "1085",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "localisation_synced"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:270:0",
+      "source_order": 7543,
+      "fields": {
+        "key": "type",
+        "line": "1573",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<casus_belli>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:271:0",
+      "source_order": 7548,
+      "fields": {
+        "key": "type",
+        "line": "1583",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<casus_belli>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:272:0",
+      "source_order": 7553,
+      "fields": {
+        "key": "type",
+        "line": "1593",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<casus_belli>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:273:0",
+      "source_order": 7557,
+      "fields": {
+        "key": "type",
+        "line": "1601",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<casus_belli>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:321:1",
+      "source_order": 7657,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "1880",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[military_leader_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:429:0",
+      "source_order": 7908,
+      "fields": {
+        "directives": "cardinality = 1..1",
+        "documentation": "The Great Project to add.",
+        "key": "type",
+        "line": "2631",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<great_project>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:456:0",
+      "source_order": 7945,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "2775",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<rebel_type>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:456:1",
+      "source_order": 7946,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "2777",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "religious_rebels"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:45:1",
+      "source_order": 7130,
+      "fields": {
+        "key": "type",
+        "line": "275",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "advisor"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:45:2",
+      "source_order": 7131,
+      "fields": {
+        "key": "type",
+        "line": "276",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "simple"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:45:3",
+      "source_order": 7132,
+      "fields": {
+        "key": "type",
+        "line": "277",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "leader"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:516:4",
+      "source_order": 8044,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "3100",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[unit_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:516:5",
+      "source_order": 8045,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "3102",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<unit_type>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:517:0",
+      "source_order": 8048,
+      "fields": {
+        "key": "type",
+        "line": "3110",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[unit_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:517:1",
+      "source_order": 8049,
+      "fields": {
+        "key": "type",
+        "line": "3111",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<unit_type>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:567:1",
+      "source_order": 8145,
+      "fields": {
+        "key": "type",
+        "line": "3385",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[naval_unit_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:568:1",
+      "source_order": 8148,
+      "fields": {
+        "key": "type",
+        "line": "3391",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[naval_unit_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:594:0",
+      "source_order": 8181,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "3503",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<rebel_type>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:595:0",
+      "source_order": 8184,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "3511",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<rebel_type>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:605:0",
+      "source_order": 8205,
+      "fields": {
+        "key": "type",
+        "line": "3566",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<great_project>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:625:1",
+      "source_order": 8231,
+      "fields": {
+        "key": "type",
+        "line": "3651",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[building_development_type]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:626:2",
+      "source_order": 8236,
+      "fields": {
+        "key": "type",
+        "line": "3660",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[building_development_type]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:627:1",
+      "source_order": 8241,
+      "fields": {
+        "key": "type",
+        "line": "3669",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[building_development_type]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:640:0",
+      "source_order": 8256,
+      "fields": {
+        "key": "type",
+        "line": "3723",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<power_projection_modifier>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:687:0",
+      "source_order": 8336,
+      "fields": {
+        "key": "type",
+        "line": "3983",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<great_project>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:709:0",
+      "source_order": 8368,
+      "fields": {
+        "key": "type",
+        "line": "4081",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<advisor_type>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:727:0",
+      "source_order": 8410,
+      "fields": {
+        "key": "type",
+        "line": "4199",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<power_projection_modifier>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "effects:effects:root:752:0",
+      "source_order": 8457,
+      "fields": {
+        "documentation": "Using a unit type that does not exist will create a unit that when selected will cause a Crash to Desktop",
+        "key": "type",
+        "line": "4347",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[unit_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "events/events:events/events:root:0:0",
+      "source_order": 9112,
+      "fields": {
+        "child_count": "8",
+        "directives": "graph_related_types = { }",
+        "key": "type[event]",
+        "line": "4",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "events/events:root:0",
+      "source_order": 9111,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "gfx/sprite_packs:gfx/sprite_packs:root:0:0",
+      "source_order": 9312,
+      "fields": {
+        "child_count": "2",
+        "key": "type[sprite_pack]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "gfx/sprite_packs:gfx/sprite_packs:root:0:1",
+      "source_order": 9316,
+      "fields": {
+        "child_count": "2",
+        "key": "type[entity]",
+        "line": "10",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "gfx/sprite_packs:root:0",
+      "source_order": 9311,
+      "fields": {
+        "child_count": "2",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "gfx/sprite_packsorder:gfx/sprite_packsorder:root:0:0",
+      "source_order": 9409,
+      "fields": {
+        "child_count": "3",
+        "key": "type[packorder]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "gfx/sprite_packsorder:gfx/sprite_packsorder:root:0:1",
+      "source_order": 9413,
+      "fields": {
+        "child_count": "1",
+        "key": "type[packentity]",
+        "line": "8",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "gfx/sprite_packsorder:root:0",
+      "source_order": 9408,
+      "fields": {
+        "child_count": "2",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:root:6:0:20:0:12:1",
+      "source_order": 9956,
+      "fields": {
+        "key": "type",
+        "line": "449",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[military_leader_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:root:6:0:20:2:13:1",
+      "source_order": 9992,
+      "fields": {
+        "key": "type",
+        "line": "511",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[military_leader_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:root:6:0:20:3:11:1",
+      "source_order": 10015,
+      "fields": {
+        "key": "type",
+        "line": "550",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[military_leader_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:root:4:0:18:0:0",
+      "source_order": 9830,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "183",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<rebel_type>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:root:4:0:18:0:1",
+      "source_order": 9831,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "185",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "religious_rebels"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:root:6:0:20:4:1",
+      "source_order": 10025,
+      "fields": {
+        "key": "type",
+        "line": "566",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[military_leader_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "history/history_consolidated:history/history_consolidated:history/history_consolidated:root:5:2:0",
+      "source_order": 9891,
+      "fields": {
+        "key": "type",
+        "line": "321",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<wargoal_type>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "history/history_consolidated:history/history_consolidated:root:0:0",
+      "source_order": 9725,
+      "fields": {
+        "child_count": "2",
+        "key": "type[advisor_id]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "history/history_consolidated:history/history_consolidated:root:0:1",
+      "source_order": 9728,
+      "fields": {
+        "child_count": "6",
+        "key": "type[diplomacy_history]",
+        "line": "7",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "history/history_consolidated:history/history_consolidated:root:0:2",
+      "source_order": 9737,
+      "fields": {
+        "child_count": "5",
+        "directives": "push_scope = province",
+        "key": "type[province_history]",
+        "line": "27",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "history/history_consolidated:history/history_consolidated:root:0:3",
+      "source_order": 9745,
+      "fields": {
+        "child_count": "4",
+        "key": "type[war_history]",
+        "line": "40",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "history/history_consolidated:history/history_consolidated:root:0:4",
+      "source_order": 9750,
+      "fields": {
+        "child_count": "5",
+        "key": "type[country_history]",
+        "line": "48",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "history/history_consolidated:history/history_consolidated:root:1:5",
+      "source_order": 9764,
+      "fields": {
+        "key": "type",
+        "line": "70",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<advisor_type>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "history/history_consolidated:root:0",
+      "source_order": 9724,
+      "fields": {
+        "child_count": "5",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "interface/sprites:interface/sprites:root:0:0",
+      "source_order": 10054,
+      "fields": {
+        "child_count": "4",
+        "directives": "type_key_filter = spriteType",
+        "key": "type[sprite]",
+        "line": "6",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "interface/sprites:root:0",
+      "source_order": 10053,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "4",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:root:0:2:3:0",
+      "source_order": 10202,
+      "fields": {
+        "directives": "required",
+        "key": "type",
+        "line": "20",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "$"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:root:0:0",
+      "source_order": 10188,
+      "fields": {
+        "child_count": "3",
+        "key": "type[ambient_object_basis]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:root:0:1",
+      "source_order": 10192,
+      "fields": {
+        "child_count": "4",
+        "key": "type[ambient_object]",
+        "line": "8",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:root:0:2",
+      "source_order": 10197,
+      "fields": {
+        "child_count": "4",
+        "key": "type[terrain]",
+        "line": "14",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:root:0:3",
+      "source_order": 10203,
+      "fields": {
+        "child_count": "3",
+        "key": "type[graphical_terrain]",
+        "line": "23",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:root:0:4",
+      "source_order": 10207,
+      "fields": {
+        "child_count": "3",
+        "key": "type[tree_terrain]",
+        "line": "28",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:root:0:5",
+      "source_order": 10211,
+      "fields": {
+        "child_count": "4",
+        "key": "type[trade_winds]",
+        "line": "33",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:root:1:0",
+      "source_order": 10217,
+      "fields": {
+        "key": "type",
+        "line": "43",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scalar"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:root:2:0",
+      "source_order": 10231,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "documentation": "Types are used by the game to apply certain bonuses/maluses on movement/combat etc.",
+        "key": "type",
+        "line": "72",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[terrain_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:root:3:0",
+      "source_order": 10246,
+      "fields": {
+        "key": "type",
+        "line": "113",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<terrain>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/ambient_objects_and_terrain:root:0",
+      "source_order": 10187,
+      "fields": {
+        "child_count": "6",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:map/areas_regions_etc:map/areas_regions_etc:root:0:5:2:0",
+      "source_order": 10304,
+      "fields": {
+        "directives": "required",
+        "key": "type",
+        "line": "51",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "$"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:map/areas_regions_etc:map/areas_regions_etc:root:0:6:2:0",
+      "source_order": 10311,
+      "fields": {
+        "directives": "optional",
+        "key": "type",
+        "line": "65",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "$"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:root:0:0",
+      "source_order": 10274,
+      "fields": {
+        "child_count": "3",
+        "key": "type[province_id]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:root:0:1",
+      "source_order": 10280,
+      "fields": {
+        "child_count": "4",
+        "key": "type[area]",
+        "line": "13",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:root:0:2",
+      "source_order": 10287,
+      "fields": {
+        "child_count": "2",
+        "key": "type[continent]",
+        "line": "27",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:root:0:3",
+      "source_order": 10290,
+      "fields": {
+        "child_count": "3",
+        "key": "type[climate]",
+        "line": "31",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:root:0:4",
+      "source_order": 10296,
+      "fields": {
+        "child_count": "3",
+        "key": "type[mapclimate]",
+        "line": "41",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:root:0:5",
+      "source_order": 10300,
+      "fields": {
+        "child_count": "3",
+        "key": "type[region]",
+        "line": "46",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:root:0:6",
+      "source_order": 10307,
+      "fields": {
+        "child_count": "3",
+        "key": "type[superregion]",
+        "line": "59",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:root:0:7",
+      "source_order": 10314,
+      "fields": {
+        "child_count": "4",
+        "key": "type[province_group]",
+        "line": "72",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/areas_regions_etc:root:0",
+      "source_order": 10273,
+      "fields": {
+        "child_count": "8",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/default_map:map/default_map:root:0:0",
+      "source_order": 10349,
+      "fields": {
+        "child_count": "4",
+        "key": "type[default_map]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "map/default_map:root:0",
+      "source_order": 10348,
+      "fields": {
+        "child_count": "1",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "missions/missions:missions/missions:root:0:0",
+      "source_order": 10436,
+      "fields": {
+        "child_count": "1",
+        "key": "type[mission_series]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "missions/missions:missions/missions:root:0:1",
+      "source_order": 10438,
+      "fields": {
+        "child_count": "3",
+        "directives": "type_key_filter <> { potential potential_on_load }\ngraph_related_types = { }",
+        "key": "type[mission]",
+        "line": "8",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "missions/missions:root:0",
+      "source_order": 10435,
+      "fields": {
+        "child_count": "2",
+        "key": "types",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:10:2",
+      "source_order": 11363,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "documentation": "Apply effect to random provinces in the continent, use combined with amount",
+        "key": "type",
+        "line": "114",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[random_repeating]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:14:0",
+      "source_order": 11374,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "151",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[any_all]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:15:0",
+      "source_order": 11377,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "160",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[any_all]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:15:2",
+      "source_order": 11379,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "documentation": "Apply effect to random provinces in the province group, use combined with amount",
+        "key": "type",
+        "line": "165",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[random_repeating]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:161:0",
+      "source_order": 11811,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "1614",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[any_all]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:162:0",
+      "source_order": 11814,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "1623",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[any_all]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:169:0",
+      "source_order": 11834,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "1674",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[any_all]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:16:0",
+      "source_order": 11382,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "176",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[any_all]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:17:0",
+      "source_order": 11385,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "184",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[any_all]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:18:0",
+      "source_order": 11388,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "193",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[any_all]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:19:0",
+      "source_order": 11391,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "202",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[any_all]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:20:0",
+      "source_order": 11394,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "211",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[any_all]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:6:2",
+      "source_order": 11341,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "documentation": "Apply effect to random provinces in the area, use combined with amount",
+        "key": "type",
+        "line": "49",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[random_repeating]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:71:2",
+      "source_order": 11588,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "documentation": "Apply effect to random provinces in the area, use combined with amount",
+        "key": "type",
+        "line": "803",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[random_repeating]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:8:2",
+      "source_order": 11351,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "documentation": "Apply effect to random provinces in the region, use combined with amount",
+        "key": "type",
+        "line": "78",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[random_repeating]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "scope_links:scope_links:root:9:2",
+      "source_order": 11357,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "documentation": "Apply effect to random provinces in the superregion, use combined with amount",
+        "key": "type",
+        "line": "96",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[random_repeating]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:1064:1",
+      "source_order": 13324,
+      "fields": {
+        "key": "type",
+        "line": "4715",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[military_leader_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:1114:0",
+      "source_order": 13382,
+      "fields": {
+        "key": "type",
+        "line": "4898",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[great_project]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:1114:1",
+      "source_order": 13383,
+      "fields": {
+        "key": "type",
+        "line": "4899",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<great_project>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:1114:2",
+      "source_order": 13384,
+      "fields": {
+        "key": "type",
+        "line": "4900",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "any"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:1124:1",
+      "source_order": 13401,
+      "fields": {
+        "key": "type",
+        "line": "4953",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<subject_type>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:1125:1",
+      "source_order": 13404,
+      "fields": {
+        "key": "type",
+        "line": "4959",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<subject_type>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:1169:2",
+      "source_order": 13456,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "5149",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[unit_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:1169:3",
+      "source_order": 13457,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "documentation": "This, as of 1.34.3.0, doesn't work, use 'soldiers' instead",
+        "key": "type",
+        "line": "5152",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "men"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:1169:4",
+      "source_order": 13458,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "documentation": "Land Units",
+        "key": "type",
+        "line": "5155",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "soldiers"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:1169:5",
+      "source_order": 13459,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "5157",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "ships"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:1169:6",
+      "source_order": 13460,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "5159",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "all"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:1270:0",
+      "source_order": 13593,
+      "fields": {
+        "key": "type",
+        "line": "5613",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<subject_type>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:1272:1",
+      "source_order": 13599,
+      "fields": {
+        "key": "type",
+        "line": "5624",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[unit_types]"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:196:16",
+      "source_order": 12239,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "870",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<advisor_type>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:254:0",
+      "source_order": 12336,
+      "fields": {
+        "key": "type",
+        "line": "1156",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<casus_belli>"
+      }
+    },
+    {
+      "table": "types",
+      "logical_id": "triggers:triggers:root:780:3",
+      "source_order": 12941,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "type",
+        "line": "3418",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[unit_types]"
+      }
+    }
+  ]
+}

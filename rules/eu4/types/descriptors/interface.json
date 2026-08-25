@@ -1,0 +1,122 @@
+{
+  "sprite": {
+    "name": "sprite",
+    "path": "game/interface",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "spriteTypes"
+      ]
+    ],
+    "name_field": "name",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "spriteType"
+      ],
+      false
+    ]
+  },
+  "sprite_pack": {
+    "name": "sprite_pack",
+    "path": "game/gfx/sprite_packs",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "custom_button": {
+    "name": "custom_button",
+    "path": "game/common/custom_gui",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": "name",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "custom_button"
+      ],
+      false
+    ]
+  },
+  "custom_icon": {
+    "name": "custom_icon",
+    "path": "game/common/custom_gui",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": "name",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "custom_icon"
+      ],
+      false
+    ]
+  },
+  "custom_text_box": {
+    "name": "custom_text_box",
+    "path": "game/common/custom_gui",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": "name",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "custom_text_box"
+      ],
+      false
+    ]
+  },
+  "custom_window": {
+    "name": "custom_window",
+    "path": "game/common/custom_gui",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": "name",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "custom_window"
+      ],
+      false
+    ]
+  },
+  "units_display": {
+    "name": "units_display",
+    "path": "game/common/units_display",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": true,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  }
+}

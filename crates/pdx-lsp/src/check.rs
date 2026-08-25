@@ -114,15 +114,7 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     // CWT prohibition in rules.
     let rule_source = root.join("rules/eu4");
     if rule_source.is_dir() {
-        let mut cwt_found = false;
-        if let Ok(entries) = fs::read_dir(&rule_source) {
-            for entry in entries.flatten() {
-                if entry.path().extension().and_then(|ext| ext.to_str()) == Some("cwt") {
-                    cwt_found = true;
-                    break;
-                }
-            }
-        }
+        let cwt_found = contains_extension_recursive(&rule_source, "cwt");
         results.push(check(
             !cwt_found,
             "no CWT in rules/eu4",
@@ -386,6 +378,22 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     }
 
     results
+}
+
+fn contains_extension_recursive(root: &Path, extension: &str) -> bool {
+    let Ok(entries) = fs::read_dir(root) else {
+        return false;
+    };
+    entries.flatten().any(|entry| {
+        let path = entry.path();
+        if path.is_dir() {
+            contains_extension_recursive(&path, extension)
+        } else {
+            path.extension()
+                .and_then(|value| value.to_str())
+                .is_some_and(|value| value.eq_ignore_ascii_case(extension))
+        }
+    })
 }
 
 /// Validates the Zed extension manifest, grammar config, and query files.
@@ -1001,6 +1009,17 @@ pub fn check_release_artifact(root: &Path) -> Vec<CheckResult> {
                         "rules game_id",
                         format!("game/profile mismatch: {} vs eu4", rules.game_id()),
                     ));
+                    match pdx_game::eu4::first_party_rules() {
+                        Ok(embedded) => results.push(check(
+                            embedded == rules,
+                            "embedded rules match source",
+                            "embedded first-party JSON bundle differs from the compiled source",
+                        )),
+                        Err(error) => results.push(CheckResult::fail(
+                            "embedded rules validation",
+                            error.to_string(),
+                        )),
+                    }
                     results.push(CheckResult::pass("rules foreign keys enabled"));
                 }
                 Err(error) => {

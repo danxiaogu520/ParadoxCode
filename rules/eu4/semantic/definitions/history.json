@@ -1,0 +1,7480 @@
+[
+  {
+    "id": "history/history_consolidated:100:rule:root:province_history:latent_trade_goods",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "latent_trade_goods"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5082
+  },
+  {
+    "id": "history/history_consolidated:102:rule:root:province_history:type",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field",
+      "revolt"
+    ],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "type": "rebel_type"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5083
+  },
+  {
+    "id": "history/history_consolidated:103:rule:root:province_history:type",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field",
+      "revolt"
+    ],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "religious_rebels"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5084
+  },
+  {
+    "id": "history/history_consolidated:104:rule:root:province_history:size",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field",
+      "revolt"
+    ],
+    "key": {
+      "exact": "size"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5085
+  },
+  {
+    "id": "history/history_consolidated:105:rule:root:province_history:leader",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field",
+      "revolt"
+    ],
+    "key": {
+      "exact": "leader"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5086
+  },
+  {
+    "id": "history/history_consolidated:106:rule:root:province_history:name",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field",
+      "revolt"
+    ],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5087
+  },
+  {
+    "id": "history/history_consolidated:107:rule:root:province_history:revolt",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "revolt"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 2,
+    "source_file": "semantic-rules.json",
+    "line": 5088
+  },
+  {
+    "id": "history/history_consolidated:108:rule:root:province_history:seat_in_parliament",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "seat_in_parliament"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 2,
+    "source_file": "semantic-rules.json",
+    "line": 5089
+  },
+  {
+    "id": "history/history_consolidated:109:rule:root:province_history:base_tax",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "base_tax"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5090
+  },
+  {
+    "id": "history/history_consolidated:110:rule:root:province_history:base_manpower",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "base_manpower"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5091
+  },
+  {
+    "id": "history/history_consolidated:111:rule:root:province_history:base_production",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "base_production"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5092
+  },
+  {
+    "id": "history/history_consolidated:112:rule:root:province_history:estate",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "estate"
+    },
+    "operator": "=",
+    "value": {
+      "type": "estate"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5093
+  },
+  {
+    "id": "history/history_consolidated:113:rule:root:province_history:controller",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "controller"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5094
+  },
+  {
+    "id": "history/history_consolidated:114:rule:root:province_history:discovered_by",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "discovered_by"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5095
+  },
+  {
+    "id": "history/history_consolidated:115:rule:root:province_history:discovered_by",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "discovered_by"
+    },
+    "operator": "=",
+    "value": {
+      "type": "technology_group"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5096
+  },
+  {
+    "id": "history/history_consolidated:116:rule:root:province_history:owner",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "owner"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5097
+  },
+  {
+    "id": "history/history_consolidated:117:rule:root:province_history:owner",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "owner"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "---"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5098
+  },
+  {
+    "id": "history/history_consolidated:118:rule:root:province_history:controller",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "controller"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5099
+  },
+  {
+    "id": "history/history_consolidated:119:rule:root:province_history:controller",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "controller"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "---"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5100
+  },
+  {
+    "id": "history/history_consolidated:120:rule:root:province_history:add_core",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "add_core"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5101
+  },
+  {
+    "id": "history/history_consolidated:121:rule:root:province_history:remove_core",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "remove_core"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5102
+  },
+  {
+    "id": "history/history_consolidated:122:rule:root:province_history:is_city",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "is_city"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5103
+  },
+  {
+    "id": "history/history_consolidated:123:rule:root:province_history:culture",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "culture"
+    },
+    "operator": "=",
+    "value": {
+      "type": "culture"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5104
+  },
+  {
+    "id": "history/history_consolidated:124:rule:root:province_history:religion",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "religion"
+    },
+    "operator": "=",
+    "value": {
+      "type": "religion"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5105
+  },
+  {
+    "id": "history/history_consolidated:125:rule:root:province_history:reformation_center",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "reformation_center"
+    },
+    "operator": "=",
+    "value": {
+      "type": "religion"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5106
+  },
+  {
+    "id": "history/history_consolidated:126:rule:root:province_history:trade_goods",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "trade_goods"
+    },
+    "operator": "=",
+    "value": {
+      "type": "trade_good"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5107
+  },
+  {
+    "id": "history/history_consolidated:127:rule:root:province_history:capital",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "capital"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5108
+  },
+  {
+    "id": "history/history_consolidated:128:rule:root:province_history:trade_goods",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "trade_goods"
+    },
+    "operator": "=",
+    "value": {
+      "type": "trade_good"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5109
+  },
+  {
+    "id": "history/history_consolidated:129:rule:root:province_history:unrest",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "unrest"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5110
+  },
+  {
+    "id": "history/history_consolidated:130:rule:root:province_history:<building>",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "type": "building"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5111
+  },
+  {
+    "id": "history/history_consolidated:131:rule:root:province_history:hre",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "hre"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5112
+  },
+  {
+    "id": "history/history_consolidated:132:rule:root:province_history:revolt_risk",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "revolt_risk"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5113
+  },
+  {
+    "id": "history/history_consolidated:133:rule:root:province_history:native_size",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "native_size"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5114
+  },
+  {
+    "id": "history/history_consolidated:134:rule:root:province_history:native_ferocity",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "native_ferocity"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": "0",
+        "max": "10"
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5115
+  },
+  {
+    "id": "history/history_consolidated:135:rule:root:province_history:native_hostileness",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "native_hostileness"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": "0",
+        "max": "10"
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5116
+  },
+  {
+    "id": "history/history_consolidated:136:rule:root:province_history:tribal_owner",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "tribal_owner"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5117
+  },
+  {
+    "id": "history/history_consolidated:137:rule:root:province_history:extra_cost",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "extra_cost"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5118
+  },
+  {
+    "id": "history/history_consolidated:138:rule:root:province_history:center_of_trade",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "center_of_trade"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 1,
+        "max": 3
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5119
+  },
+  {
+    "id": "history/history_consolidated:139:rule:root:province_history:citysize",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "citysize"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5120
+  },
+  {
+    "id": "history/history_consolidated:141:rule:root:province_history:date_field",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": "date",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5121
+  },
+  {
+    "id": "history/history_consolidated:143:rule:root:province_history:discovered_by",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "discovered_by"
+    },
+    "operator": "=",
+    "value": {
+      "type": "technology_group"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5122
+  },
+  {
+    "id": "history/history_consolidated:144:rule:root:province_history:discovered_by",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "discovered_by"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5123
+  },
+  {
+    "id": "history/history_consolidated:145:rule:root:province_history:discovered_by",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "discovered_by"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5124
+  },
+  {
+    "id": "history/history_consolidated:146:rule:root:province_history:discovered_by",
+    "context": "root:province_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "discovered_by"
+    },
+    "operator": "=",
+    "value": {
+      "type": "technology_group"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5125
+  },
+  {
+    "id": "history/history_consolidated:147:rule:root:province_history:date_field",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": "date",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 2,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5126
+  },
+  {
+    "id": "history/history_consolidated:149:rule:root:province_history:owner",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "owner"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5127
+  },
+  {
+    "id": "history/history_consolidated:150:rule:root:province_history:controller",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "controller"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5128
+  },
+  {
+    "id": "history/history_consolidated:151:rule:root:province_history:is_city",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "is_city"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5129
+  },
+  {
+    "id": "history/history_consolidated:152:rule:root:province_history:add_core",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "add_core"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5130
+  },
+  {
+    "id": "history/history_consolidated:153:rule:root:province_history:<building>",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "type": "building"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5131
+  },
+  {
+    "id": "history/history_consolidated:154:rule:root:province_history:native_size",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "native_size"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 3,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 0,
+    "source_file": "semantic-rules.json",
+    "line": 5132
+  },
+  {
+    "id": "history/history_consolidated:155:rule:root:province_history:native_ferocity",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "native_ferocity"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 3,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 0,
+    "source_file": "semantic-rules.json",
+    "line": 5133
+  },
+  {
+    "id": "history/history_consolidated:156:rule:root:province_history:native_hostileness",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "native_hostileness"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 3,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 0,
+    "source_file": "semantic-rules.json",
+    "line": 5134
+  },
+  {
+    "id": "history/history_consolidated:158:rule:root:province_history:native_size",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "native_size"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5135
+  },
+  {
+    "id": "history/history_consolidated:159:rule:root:province_history:native_ferocity",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "native_ferocity"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": "0",
+        "max": "10"
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5136
+  },
+  {
+    "id": "history/history_consolidated:15:rule:type:province_history:trade_goods",
+    "context": "type:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "trade_goods"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5137
+  },
+  {
+    "id": "history/history_consolidated:160:rule:root:province_history:native_hostileness",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "native_hostileness"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": "0",
+        "max": "10"
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5138
+  },
+  {
+    "id": "history/history_consolidated:163:rule:root:war_history:name",
+    "context": "root:war_history",
+    "parent_path": [],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5139
+  },
+  {
+    "id": "history/history_consolidated:164:rule:root:war_history:succession",
+    "context": "root:war_history",
+    "parent_path": [],
+    "key": {
+      "exact": "succession"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5140
+  },
+  {
+    "id": "history/history_consolidated:165:rule:root:war_history:type",
+    "context": "root:war_history",
+    "parent_path": [
+      "war_goal"
+    ],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "type": "wargoal_type"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5141
+  },
+  {
+    "id": "history/history_consolidated:166:rule:root:war_history:casus_belli",
+    "context": "root:war_history",
+    "parent_path": [
+      "war_goal"
+    ],
+    "key": {
+      "exact": "casus_belli"
+    },
+    "operator": "=",
+    "value": {
+      "type": "casus_belli"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5142
+  },
+  {
+    "id": "history/history_consolidated:167:rule:root:war_history:province",
+    "context": "root:war_history",
+    "parent_path": [
+      "war_goal"
+    ],
+    "key": {
+      "exact": "province"
+    },
+    "operator": "=",
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5143
+  },
+  {
+    "id": "history/history_consolidated:168:rule:root:war_history:tag",
+    "context": "root:war_history",
+    "parent_path": [
+      "war_goal"
+    ],
+    "key": {
+      "exact": "tag"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5144
+  },
+  {
+    "id": "history/history_consolidated:169:rule:root:war_history:war_goal",
+    "context": "root:war_history",
+    "parent_path": [],
+    "key": {
+      "exact": "war_goal"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5145
+  },
+  {
+    "id": "history/history_consolidated:170:rule:root:war_history:add_attacker",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "add_attacker"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5146
+  },
+  {
+    "id": "history/history_consolidated:171:rule:root:war_history:rem_attacker",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "rem_attacker"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5147
+  },
+  {
+    "id": "history/history_consolidated:172:rule:root:war_history:add_defender",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "add_defender"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5148
+  },
+  {
+    "id": "history/history_consolidated:173:rule:root:war_history:rem_defender",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "rem_defender"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5149
+  },
+  {
+    "id": "history/history_consolidated:174:rule:root:war_history:name",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field",
+      "battle"
+    ],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5150
+  },
+  {
+    "id": "history/history_consolidated:175:rule:root:war_history:location",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field",
+      "battle"
+    ],
+    "key": {
+      "exact": "location"
+    },
+    "operator": "=",
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5151
+  },
+  {
+    "id": "history/history_consolidated:176:rule:root:war_history:commander",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field",
+      "battle",
+      "attacker"
+    ],
+    "key": {
+      "exact": "commander"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5152
+  },
+  {
+    "id": "history/history_consolidated:177:rule:root:war_history:enum[unit_types]",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field",
+      "battle",
+      "attacker"
+    ],
+    "key": {
+      "enum": "unit_types"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 4,
+    "source_file": "semantic-rules.json",
+    "line": 5153
+  },
+  {
+    "id": "history/history_consolidated:178:rule:root:war_history:losses",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field",
+      "battle",
+      "attacker"
+    ],
+    "key": {
+      "exact": "losses"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "In percent (0-100)"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5154
+  },
+  {
+    "id": "history/history_consolidated:179:rule:root:war_history:country",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field",
+      "battle",
+      "attacker"
+    ],
+    "key": {
+      "exact": "country"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5155
+  },
+  {
+    "id": "history/history_consolidated:17:rule:type:province_history:owner",
+    "context": "type:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "owner"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5156
+  },
+  {
+    "id": "history/history_consolidated:180:rule:root:war_history:attacker",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field",
+      "battle"
+    ],
+    "key": {
+      "exact": "attacker"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5157
+  },
+  {
+    "id": "history/history_consolidated:181:rule:root:war_history:commander",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field",
+      "battle",
+      "defender"
+    ],
+    "key": {
+      "exact": "commander"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5158
+  },
+  {
+    "id": "history/history_consolidated:182:rule:root:war_history:enum[unit_types]",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field",
+      "battle",
+      "defender"
+    ],
+    "key": {
+      "enum": "unit_types"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 4,
+    "source_file": "semantic-rules.json",
+    "line": 5159
+  },
+  {
+    "id": "history/history_consolidated:183:rule:root:war_history:losses",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field",
+      "battle",
+      "defender"
+    ],
+    "key": {
+      "exact": "losses"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "In percent (0-100)"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5160
+  },
+  {
+    "id": "history/history_consolidated:184:rule:root:war_history:country",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field",
+      "battle",
+      "defender"
+    ],
+    "key": {
+      "exact": "country"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5161
+  },
+  {
+    "id": "history/history_consolidated:185:rule:root:war_history:defender",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field",
+      "battle"
+    ],
+    "key": {
+      "exact": "defender"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5162
+  },
+  {
+    "id": "history/history_consolidated:186:rule:root:war_history:result",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field",
+      "battle"
+    ],
+    "key": {
+      "exact": "result"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5163
+  },
+  {
+    "id": "history/history_consolidated:187:rule:root:war_history:battle",
+    "context": "root:war_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "battle"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5164
+  },
+  {
+    "id": "history/history_consolidated:188:rule:root:war_history:date_field",
+    "context": "root:war_history",
+    "parent_path": [],
+    "key": "date",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5165
+  },
+  {
+    "id": "history/history_consolidated:190:rule:root:country_history:government",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "government"
+    },
+    "operator": "=",
+    "value": {
+      "type": "government"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5166
+  },
+  {
+    "id": "history/history_consolidated:191:rule:root:country_history:add_government_reform",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "add_government_reform"
+    },
+    "operator": "=",
+    "value": {
+      "type": "government_reform"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5167
+  },
+  {
+    "id": "history/history_consolidated:192:rule:root:country_history:government_rank",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "government_rank"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5168
+  },
+  {
+    "id": "history/history_consolidated:193:rule:root:country_history:mercantilism",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "mercantilism"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5169
+  },
+  {
+    "id": "history/history_consolidated:194:rule:root:country_history:technology_group",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "technology_group"
+    },
+    "operator": "=",
+    "value": {
+      "type": "technology_group"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5170
+  },
+  {
+    "id": "history/history_consolidated:195:rule:root:country_history:unit_type",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "unit_type"
+    },
+    "operator": "=",
+    "value": {
+      "type": "technology_group"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5171
+  },
+  {
+    "id": "history/history_consolidated:196:rule:root:country_history:religion",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "religion"
+    },
+    "operator": "=",
+    "value": {
+      "type": "religion"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5172
+  },
+  {
+    "id": "history/history_consolidated:197:rule:root:country_history:secondary_religion",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "secondary_religion"
+    },
+    "operator": "=",
+    "value": {
+      "type": "religion"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5173
+  },
+  {
+    "id": "history/history_consolidated:198:rule:root:country_history:primary_culture",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "primary_culture"
+    },
+    "operator": "=",
+    "value": {
+      "type": "culture"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5174
+  },
+  {
+    "id": "history/history_consolidated:199:rule:root:country_history:capital",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "capital"
+    },
+    "operator": "=",
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5175
+  },
+  {
+    "id": "history/history_consolidated:200:rule:root:country_history:fixed_capital",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "fixed_capital"
+    },
+    "operator": "=",
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Cannot move capital away from this province & no power cost to move to it"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5176
+  },
+  {
+    "id": "history/history_consolidated:201:rule:root:country_history:national_focus",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "national_focus"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "power_categories"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5177
+  },
+  {
+    "id": "history/history_consolidated:202:rule:root:country_history:religious_school",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "religious_school"
+    },
+    "operator": "=",
+    "value": {
+      "type": "religious_school"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5178
+  },
+  {
+    "id": "history/history_consolidated:203:rule:root:country_history:historical_rival",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "historical_rival"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5179
+  },
+  {
+    "id": "history/history_consolidated:204:rule:root:country_history:historical_friend",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "historical_friend"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5180
+  },
+  {
+    "id": "history/history_consolidated:205:rule:root:country_history:elector",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "elector"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5181
+  },
+  {
+    "id": "history/history_consolidated:206:rule:root:country_history:historical_council",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "historical_council"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "council_positions"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5182
+  },
+  {
+    "id": "history/history_consolidated:207:rule:root:country_history:name",
+    "context": "root:country_history",
+    "parent_path": [
+      "federation"
+    ],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5183
+  },
+  {
+    "id": "history/history_consolidated:208:leaf-value:root:country_history:enum[country_tags]",
+    "context": "root:country_history",
+    "parent_path": [
+      "federation",
+      "members"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5184
+  },
+  {
+    "id": "history/history_consolidated:209:rule:root:country_history:members",
+    "context": "root:country_history",
+    "parent_path": [
+      "federation"
+    ],
+    "key": {
+      "exact": "members"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5185
+  },
+  {
+    "id": "history/history_consolidated:210:rule:root:country_history:federation",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "federation"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5186
+  },
+  {
+    "id": "history/history_consolidated:212:rule:root:country_history:religious_school",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "religious_school"
+    },
+    "operator": "=",
+    "value": {
+      "type": "religious_school"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5187
+  },
+  {
+    "id": "history/history_consolidated:214:rule:root:country_history:name",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch"
+    ],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": 2,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5188
+  },
+  {
+    "id": "history/history_consolidated:215:rule:root:country_history:dynasty",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch"
+    ],
+    "key": {
+      "exact": "dynasty"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5189
+  },
+  {
+    "id": "history/history_consolidated:216:rule:root:country_history:birth_date",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch"
+    ],
+    "key": {
+      "exact": "birth_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5190
+  },
+  {
+    "id": "history/history_consolidated:217:rule:root:country_history:death_date",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch"
+    ],
+    "key": {
+      "exact": "death_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5191
+  },
+  {
+    "id": "history/history_consolidated:218:rule:root:country_history:adm",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch"
+    ],
+    "key": {
+      "exact": "adm"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5192
+  },
+  {
+    "id": "history/history_consolidated:219:rule:root:country_history:dip",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch"
+    ],
+    "key": {
+      "exact": "dip"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5193
+  },
+  {
+    "id": "history/history_consolidated:220:rule:root:country_history:mil",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch"
+    ],
+    "key": {
+      "exact": "mil"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5194
+  },
+  {
+    "id": "history/history_consolidated:221:rule:root:country_history:regent",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch"
+    ],
+    "key": {
+      "exact": "regent"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5195
+  },
+  {
+    "id": "history/history_consolidated:222:rule:root:country_history:claim",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch"
+    ],
+    "key": {
+      "exact": "claim"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5196
+  },
+  {
+    "id": "history/history_consolidated:223:rule:root:country_history:female",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch"
+    ],
+    "key": {
+      "exact": "female"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5197
+  },
+  {
+    "id": "history/history_consolidated:224:rule:root:country_history:culture",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch"
+    ],
+    "key": {
+      "exact": "culture"
+    },
+    "operator": "=",
+    "value": {
+      "type": "culture"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5198
+  },
+  {
+    "id": "history/history_consolidated:225:rule:root:country_history:religion",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch"
+    ],
+    "key": {
+      "exact": "religion"
+    },
+    "operator": "=",
+    "value": {
+      "type": "religion"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5199
+  },
+  {
+    "id": "history/history_consolidated:226:rule:root:country_history:name",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch",
+      "leader"
+    ],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5200
+  },
+  {
+    "id": "history/history_consolidated:227:rule:root:country_history:type",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch",
+      "leader"
+    ],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "military_leader_types"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5201
+  },
+  {
+    "id": "history/history_consolidated:228:rule:root:country_history:fire",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch",
+      "leader"
+    ],
+    "key": {
+      "exact": "fire"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5202
+  },
+  {
+    "id": "history/history_consolidated:229:rule:root:country_history:shock",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch",
+      "leader"
+    ],
+    "key": {
+      "exact": "shock"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5203
+  },
+  {
+    "id": "history/history_consolidated:230:rule:root:country_history:manuever",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch",
+      "leader"
+    ],
+    "key": {
+      "exact": "manuever"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5204
+  },
+  {
+    "id": "history/history_consolidated:231:rule:root:country_history:siege",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch",
+      "leader"
+    ],
+    "key": {
+      "exact": "siege"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5205
+  },
+  {
+    "id": "history/history_consolidated:232:rule:root:country_history:birth_date",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch",
+      "leader"
+    ],
+    "key": {
+      "exact": "birth_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5206
+  },
+  {
+    "id": "history/history_consolidated:233:rule:root:country_history:death_date",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch",
+      "leader"
+    ],
+    "key": {
+      "exact": "death_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5207
+  },
+  {
+    "id": "history/history_consolidated:234:rule:root:country_history:personality",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch",
+      "leader"
+    ],
+    "key": {
+      "exact": "personality"
+    },
+    "operator": "=",
+    "value": {
+      "type": "leader_personality"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5208
+  },
+  {
+    "id": "history/history_consolidated:235:rule:root:country_history:female",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch",
+      "leader"
+    ],
+    "key": {
+      "exact": "female"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5209
+  },
+  {
+    "id": "history/history_consolidated:236:rule:root:country_history:leader",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch"
+    ],
+    "key": {
+      "exact": "leader"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5210
+  },
+  {
+    "id": "history/history_consolidated:237:rule:root:country_history:monarch",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "monarch"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5211
+  },
+  {
+    "id": "history/history_consolidated:238:rule:root:country_history:name",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch_consort"
+    ],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5212
+  },
+  {
+    "id": "history/history_consolidated:239:rule:root:country_history:monarch_name",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch_consort"
+    ],
+    "key": {
+      "exact": "monarch_name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5213
+  },
+  {
+    "id": "history/history_consolidated:240:rule:root:country_history:regent",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch_consort"
+    ],
+    "key": {
+      "exact": "regent"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5214
+  },
+  {
+    "id": "history/history_consolidated:241:rule:root:country_history:female",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch_consort"
+    ],
+    "key": {
+      "exact": "female"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5215
+  },
+  {
+    "id": "history/history_consolidated:242:rule:root:country_history:adm",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch_consort"
+    ],
+    "key": {
+      "exact": "adm"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5216
+  },
+  {
+    "id": "history/history_consolidated:243:rule:root:country_history:dip",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch_consort"
+    ],
+    "key": {
+      "exact": "dip"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5217
+  },
+  {
+    "id": "history/history_consolidated:244:rule:root:country_history:mil",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch_consort"
+    ],
+    "key": {
+      "exact": "mil"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5218
+  },
+  {
+    "id": "history/history_consolidated:245:rule:root:country_history:dynasty",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch_consort"
+    ],
+    "key": {
+      "exact": "dynasty"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5219
+  },
+  {
+    "id": "history/history_consolidated:246:rule:root:country_history:culture",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch_consort"
+    ],
+    "key": {
+      "exact": "culture"
+    },
+    "operator": "=",
+    "value": {
+      "type": "culture"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5220
+  },
+  {
+    "id": "history/history_consolidated:247:rule:root:country_history:religion",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "monarch_consort"
+    ],
+    "key": {
+      "exact": "religion"
+    },
+    "operator": "=",
+    "value": {
+      "type": "religion"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5221
+  },
+  {
+    "id": "history/history_consolidated:248:rule:root:country_history:monarch_consort",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "monarch_consort"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5222
+  },
+  {
+    "id": "history/history_consolidated:249:rule:root:country_history:name",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir"
+    ],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5223
+  },
+  {
+    "id": "history/history_consolidated:250:rule:root:country_history:monarch_name",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir"
+    ],
+    "key": {
+      "exact": "monarch_name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5224
+  },
+  {
+    "id": "history/history_consolidated:251:rule:root:country_history:dynasty",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir"
+    ],
+    "key": {
+      "exact": "dynasty"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5225
+  },
+  {
+    "id": "history/history_consolidated:252:rule:root:country_history:birth_date",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir"
+    ],
+    "key": {
+      "exact": "birth_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5226
+  },
+  {
+    "id": "history/history_consolidated:253:rule:root:country_history:death_date",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir"
+    ],
+    "key": {
+      "exact": "death_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5227
+  },
+  {
+    "id": "history/history_consolidated:254:rule:root:country_history:adm",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir"
+    ],
+    "key": {
+      "exact": "adm"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5228
+  },
+  {
+    "id": "history/history_consolidated:255:rule:root:country_history:dip",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir"
+    ],
+    "key": {
+      "exact": "dip"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5229
+  },
+  {
+    "id": "history/history_consolidated:256:rule:root:country_history:mil",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir"
+    ],
+    "key": {
+      "exact": "mil"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5230
+  },
+  {
+    "id": "history/history_consolidated:257:rule:root:country_history:claim",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir"
+    ],
+    "key": {
+      "exact": "claim"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5231
+  },
+  {
+    "id": "history/history_consolidated:258:rule:root:country_history:female",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir"
+    ],
+    "key": {
+      "exact": "female"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5232
+  },
+  {
+    "id": "history/history_consolidated:259:rule:root:country_history:culture",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir"
+    ],
+    "key": {
+      "exact": "culture"
+    },
+    "operator": "=",
+    "value": {
+      "type": "culture"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5233
+  },
+  {
+    "id": "history/history_consolidated:260:rule:root:country_history:religion",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir"
+    ],
+    "key": {
+      "exact": "religion"
+    },
+    "operator": "=",
+    "value": {
+      "type": "religion"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5234
+  },
+  {
+    "id": "history/history_consolidated:261:rule:root:country_history:block_disinherit",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir"
+    ],
+    "key": {
+      "exact": "block_disinherit"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5235
+  },
+  {
+    "id": "history/history_consolidated:262:rule:root:country_history:name",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir",
+      "leader"
+    ],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5236
+  },
+  {
+    "id": "history/history_consolidated:263:rule:root:country_history:type",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir",
+      "leader"
+    ],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "military_leader_types"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5237
+  },
+  {
+    "id": "history/history_consolidated:264:rule:root:country_history:fire",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir",
+      "leader"
+    ],
+    "key": {
+      "exact": "fire"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5238
+  },
+  {
+    "id": "history/history_consolidated:265:rule:root:country_history:shock",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir",
+      "leader"
+    ],
+    "key": {
+      "exact": "shock"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5239
+  },
+  {
+    "id": "history/history_consolidated:266:rule:root:country_history:manuever",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir",
+      "leader"
+    ],
+    "key": {
+      "exact": "manuever"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5240
+  },
+  {
+    "id": "history/history_consolidated:267:rule:root:country_history:siege",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir",
+      "leader"
+    ],
+    "key": {
+      "exact": "siege"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5241
+  },
+  {
+    "id": "history/history_consolidated:268:rule:root:country_history:birth_date",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir",
+      "leader"
+    ],
+    "key": {
+      "exact": "birth_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5242
+  },
+  {
+    "id": "history/history_consolidated:269:rule:root:country_history:death_date",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir",
+      "leader"
+    ],
+    "key": {
+      "exact": "death_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5243
+  },
+  {
+    "id": "history/history_consolidated:270:rule:root:country_history:personality",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir",
+      "leader"
+    ],
+    "key": {
+      "exact": "personality"
+    },
+    "operator": "=",
+    "value": {
+      "type": "leader_personality"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5244
+  },
+  {
+    "id": "history/history_consolidated:271:rule:root:country_history:female",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir",
+      "leader"
+    ],
+    "key": {
+      "exact": "female"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5245
+  },
+  {
+    "id": "history/history_consolidated:272:rule:root:country_history:leader",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "heir"
+    ],
+    "key": {
+      "exact": "leader"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5246
+  },
+  {
+    "id": "history/history_consolidated:273:rule:root:country_history:heir",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "heir"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5247
+  },
+  {
+    "id": "history/history_consolidated:274:rule:root:country_history:country_of_origin",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen"
+    ],
+    "key": {
+      "exact": "country_of_origin"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Country of Origin for the consort, defaults to the current country."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5248
+  },
+  {
+    "id": "history/history_consolidated:275:rule:root:country_history:name",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen"
+    ],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5249
+  },
+  {
+    "id": "history/history_consolidated:276:rule:root:country_history:dynasty",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen"
+    ],
+    "key": {
+      "exact": "dynasty"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5250
+  },
+  {
+    "id": "history/history_consolidated:277:rule:root:country_history:birth_date",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen"
+    ],
+    "key": {
+      "exact": "birth_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5251
+  },
+  {
+    "id": "history/history_consolidated:278:rule:root:country_history:death_date",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen"
+    ],
+    "key": {
+      "exact": "death_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5252
+  },
+  {
+    "id": "history/history_consolidated:279:rule:root:country_history:female",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen"
+    ],
+    "key": {
+      "exact": "female"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5253
+  },
+  {
+    "id": "history/history_consolidated:280:rule:root:country_history:adm",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen"
+    ],
+    "key": {
+      "exact": "adm"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5254
+  },
+  {
+    "id": "history/history_consolidated:281:rule:root:country_history:dip",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen"
+    ],
+    "key": {
+      "exact": "dip"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5255
+  },
+  {
+    "id": "history/history_consolidated:282:rule:root:country_history:mil",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen"
+    ],
+    "key": {
+      "exact": "mil"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5256
+  },
+  {
+    "id": "history/history_consolidated:283:rule:root:country_history:culture",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen"
+    ],
+    "key": {
+      "exact": "culture"
+    },
+    "operator": "=",
+    "value": {
+      "type": "culture"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5257
+  },
+  {
+    "id": "history/history_consolidated:284:rule:root:country_history:religion",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen"
+    ],
+    "key": {
+      "exact": "religion"
+    },
+    "operator": "=",
+    "value": {
+      "type": "religion"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5258
+  },
+  {
+    "id": "history/history_consolidated:285:rule:root:country_history:name",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen",
+      "leader"
+    ],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5259
+  },
+  {
+    "id": "history/history_consolidated:286:rule:root:country_history:type",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen",
+      "leader"
+    ],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "military_leader_types"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5260
+  },
+  {
+    "id": "history/history_consolidated:287:rule:root:country_history:fire",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen",
+      "leader"
+    ],
+    "key": {
+      "exact": "fire"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5261
+  },
+  {
+    "id": "history/history_consolidated:288:rule:root:country_history:shock",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen",
+      "leader"
+    ],
+    "key": {
+      "exact": "shock"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5262
+  },
+  {
+    "id": "history/history_consolidated:289:rule:root:country_history:manuever",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen",
+      "leader"
+    ],
+    "key": {
+      "exact": "manuever"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5263
+  },
+  {
+    "id": "history/history_consolidated:28:rule:type:country_history:government",
+    "context": "type:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "government"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5264
+  },
+  {
+    "id": "history/history_consolidated:290:rule:root:country_history:siege",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen",
+      "leader"
+    ],
+    "key": {
+      "exact": "siege"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5265
+  },
+  {
+    "id": "history/history_consolidated:291:rule:root:country_history:death_date",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen",
+      "leader"
+    ],
+    "key": {
+      "exact": "death_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5266
+  },
+  {
+    "id": "history/history_consolidated:292:rule:root:country_history:personality",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen",
+      "leader"
+    ],
+    "key": {
+      "exact": "personality"
+    },
+    "operator": "=",
+    "value": {
+      "type": "leader_personality"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5267
+  },
+  {
+    "id": "history/history_consolidated:293:rule:root:country_history:female",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen",
+      "leader"
+    ],
+    "key": {
+      "exact": "female"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5268
+  },
+  {
+    "id": "history/history_consolidated:294:rule:root:country_history:leader",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "queen"
+    ],
+    "key": {
+      "exact": "leader"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5269
+  },
+  {
+    "id": "history/history_consolidated:295:rule:root:country_history:queen",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "queen"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Defines a consort"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5270
+  },
+  {
+    "id": "history/history_consolidated:296:rule:root:country_history:name",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "leader"
+    ],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5271
+  },
+  {
+    "id": "history/history_consolidated:297:rule:root:country_history:type",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "leader"
+    ],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "military_leader_types"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5272
+  },
+  {
+    "id": "history/history_consolidated:298:rule:root:country_history:fire",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "leader"
+    ],
+    "key": {
+      "exact": "fire"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5273
+  },
+  {
+    "id": "history/history_consolidated:299:rule:root:country_history:shock",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "leader"
+    ],
+    "key": {
+      "exact": "shock"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5274
+  },
+  {
+    "id": "history/history_consolidated:300:rule:root:country_history:manuever",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "leader"
+    ],
+    "key": {
+      "exact": "manuever"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5275
+  },
+  {
+    "id": "history/history_consolidated:301:rule:root:country_history:siege",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "leader"
+    ],
+    "key": {
+      "exact": "siege"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5276
+  },
+  {
+    "id": "history/history_consolidated:302:rule:root:country_history:birth_date",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "leader"
+    ],
+    "key": {
+      "exact": "birth_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5277
+  },
+  {
+    "id": "history/history_consolidated:303:rule:root:country_history:death_date",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "leader"
+    ],
+    "key": {
+      "exact": "death_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5278
+  },
+  {
+    "id": "history/history_consolidated:304:rule:root:country_history:personality",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "leader"
+    ],
+    "key": {
+      "exact": "personality"
+    },
+    "operator": "=",
+    "value": {
+      "type": "leader_personality"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5279
+  },
+  {
+    "id": "history/history_consolidated:305:rule:root:country_history:female",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field",
+      "leader"
+    ],
+    "key": {
+      "exact": "female"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5280
+  },
+  {
+    "id": "history/history_consolidated:306:rule:root:country_history:leader",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "leader"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5281
+  },
+  {
+    "id": "history/history_consolidated:308:rule:root:country_history:clear_scripted_personalities",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "clear_scripted_personalities"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Pretty sure this one only works when a leader is spawned"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5282
+  },
+  {
+    "id": "history/history_consolidated:309:rule:root:country_history:religion",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "religion"
+    },
+    "operator": "=",
+    "value": {
+      "type": "religion"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5283
+  },
+  {
+    "id": "history/history_consolidated:30:rule:type:country_history:religion",
+    "context": "type:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "religion"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "sunni"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5284
+  },
+  {
+    "id": "history/history_consolidated:310:rule:root:country_history:government",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "government"
+    },
+    "operator": "=",
+    "value": {
+      "type": "government"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5285
+  },
+  {
+    "id": "history/history_consolidated:311:rule:root:country_history:culture",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "culture"
+    },
+    "operator": "=",
+    "value": {
+      "type": "culture"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5286
+  },
+  {
+    "id": "history/history_consolidated:312:rule:root:country_history:primary_culture",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "primary_culture"
+    },
+    "operator": "=",
+    "value": {
+      "type": "culture"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5287
+  },
+  {
+    "id": "history/history_consolidated:313:rule:root:country_history:decision",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "decision"
+    },
+    "operator": "=",
+    "value": {
+      "type": "decision"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5288
+  },
+  {
+    "id": "history/history_consolidated:314:rule:root:country_history:capital",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "capital"
+    },
+    "operator": "=",
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5289
+  },
+  {
+    "id": "history/history_consolidated:315:rule:root:country_history:religious_school",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "religious_school"
+    },
+    "operator": "=",
+    "value": {
+      "type": "religious_school"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5290
+  },
+  {
+    "id": "history/history_consolidated:316:rule:root:country_history:historical_rival",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "historical_rival"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5291
+  },
+  {
+    "id": "history/history_consolidated:317:rule:root:country_history:historical_friend",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "historical_friend"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5292
+  },
+  {
+    "id": "history/history_consolidated:318:rule:root:country_history:government_rank",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "government_rank"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5293
+  },
+  {
+    "id": "history/history_consolidated:319:rule:root:country_history:elector",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "elector"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5294
+  },
+  {
+    "id": "history/history_consolidated:320:rule:root:country_history:technology_group",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "technology_group"
+    },
+    "operator": "=",
+    "value": {
+      "type": "technology_group"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5295
+  },
+  {
+    "id": "history/history_consolidated:321:rule:root:country_history:mercantilism",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "mercantilism"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5296
+  },
+  {
+    "id": "history/history_consolidated:322:rule:root:country_history:changed_tag_from",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "changed_tag_from"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5297
+  },
+  {
+    "id": "history/history_consolidated:323:rule:root:country_history:revolution_target",
+    "context": "root:country_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "revolution_target"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5298
+  },
+  {
+    "id": "history/history_consolidated:324:rule:root:country_history:date_field",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": "date",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5299
+  },
+  {
+    "id": "history/history_consolidated:326:rule:root:country_history:technology_group",
+    "context": "root:country_history",
+    "parent_path": [],
+    "key": {
+      "exact": "technology_group"
+    },
+    "operator": "=",
+    "value": {
+      "type": "technology_group"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5300
+  },
+  {
+    "id": "history/history_consolidated:46:rule:root:diplomacy_history:first",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "<subject_type>"
+    ],
+    "key": {
+      "exact": "first"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5312
+  },
+  {
+    "id": "history/history_consolidated:47:rule:root:diplomacy_history:second",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "<subject_type>"
+    ],
+    "key": {
+      "exact": "second"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5313
+  },
+  {
+    "id": "history/history_consolidated:48:rule:root:diplomacy_history:start_date",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "<subject_type>"
+    ],
+    "key": {
+      "exact": "start_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5314
+  },
+  {
+    "id": "history/history_consolidated:49:rule:root:diplomacy_history:end_date",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "<subject_type>"
+    ],
+    "key": {
+      "exact": "end_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5315
+  },
+  {
+    "id": "history/history_consolidated:50:rule:root:diplomacy_history:<subject_type>",
+    "context": "root:diplomacy_history",
+    "parent_path": [],
+    "key": {
+      "type": "subject_type"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5316
+  },
+  {
+    "id": "history/history_consolidated:51:rule:root:diplomacy_history:first",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "alliance"
+    ],
+    "key": {
+      "exact": "first"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5317
+  },
+  {
+    "id": "history/history_consolidated:52:rule:root:diplomacy_history:second",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "alliance"
+    ],
+    "key": {
+      "exact": "second"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5318
+  },
+  {
+    "id": "history/history_consolidated:53:rule:root:diplomacy_history:start_date",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "alliance"
+    ],
+    "key": {
+      "exact": "start_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5319
+  },
+  {
+    "id": "history/history_consolidated:54:rule:root:diplomacy_history:end_date",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "alliance"
+    ],
+    "key": {
+      "exact": "end_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5320
+  },
+  {
+    "id": "history/history_consolidated:55:rule:root:diplomacy_history:trade_league",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "alliance"
+    ],
+    "key": {
+      "exact": "trade_league"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "1"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5321
+  },
+  {
+    "id": "history/history_consolidated:56:rule:root:diplomacy_history:alliance",
+    "context": "root:diplomacy_history",
+    "parent_path": [],
+    "key": {
+      "exact": "alliance"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5322
+  },
+  {
+    "id": "history/history_consolidated:57:rule:root:diplomacy_history:first",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "enum[other_diplo_history]"
+    ],
+    "key": {
+      "exact": "first"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5323
+  },
+  {
+    "id": "history/history_consolidated:58:rule:root:diplomacy_history:second",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "enum[other_diplo_history]"
+    ],
+    "key": {
+      "exact": "second"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5324
+  },
+  {
+    "id": "history/history_consolidated:59:rule:root:diplomacy_history:start_date",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "enum[other_diplo_history]"
+    ],
+    "key": {
+      "exact": "start_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5325
+  },
+  {
+    "id": "history/history_consolidated:60:rule:root:diplomacy_history:end_date",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "enum[other_diplo_history]"
+    ],
+    "key": {
+      "exact": "end_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5326
+  },
+  {
+    "id": "history/history_consolidated:61:rule:root:diplomacy_history:enum[other_diplo_history]",
+    "context": "root:diplomacy_history",
+    "parent_path": [],
+    "key": {
+      "enum": "other_diplo_history"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5327
+  },
+  {
+    "id": "history/history_consolidated:62:rule:root:diplomacy_history:subject_type",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "dependency"
+    ],
+    "key": {
+      "exact": "subject_type"
+    },
+    "operator": "=",
+    "value": {
+      "type": "subject_type"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5328
+  },
+  {
+    "id": "history/history_consolidated:63:rule:root:diplomacy_history:first",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "dependency"
+    ],
+    "key": {
+      "exact": "first"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5329
+  },
+  {
+    "id": "history/history_consolidated:64:rule:root:diplomacy_history:second",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "dependency"
+    ],
+    "key": {
+      "exact": "second"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5330
+  },
+  {
+    "id": "history/history_consolidated:65:rule:root:diplomacy_history:start_date",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "dependency"
+    ],
+    "key": {
+      "exact": "start_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5331
+  },
+  {
+    "id": "history/history_consolidated:66:rule:root:diplomacy_history:end_date",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "dependency"
+    ],
+    "key": {
+      "exact": "end_date"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5332
+  },
+  {
+    "id": "history/history_consolidated:67:rule:root:diplomacy_history:dependency",
+    "context": "root:diplomacy_history",
+    "parent_path": [],
+    "key": {
+      "exact": "dependency"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5333
+  },
+  {
+    "id": "history/history_consolidated:69:rule:root:diplomacy_history:celestial_emperor",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "celestial_emperor"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5334
+  },
+  {
+    "id": "history/history_consolidated:6:rule:type:diplomacy_history:scalar",
+    "context": "type:diplomacy_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": "any_scalar",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5335
+  },
+  {
+    "id": "history/history_consolidated:70:rule:root:diplomacy_history:celestial_emperor",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "celestial_emperor"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "---"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5336
+  },
+  {
+    "id": "history/history_consolidated:71:rule:root:diplomacy_history:date_field",
+    "context": "root:diplomacy_history",
+    "parent_path": [],
+    "key": "date",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5337
+  },
+  {
+    "id": "history/history_consolidated:73:rule:root:diplomacy_history:emperor",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "emperor"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5338
+  },
+  {
+    "id": "history/history_consolidated:74:rule:root:diplomacy_history:celestial_emperor",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "celestial_emperor"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5338
+  },
+  {
+    "id": "history/history_consolidated:74:rule:root:diplomacy_history:emperor",
+    "context": "root:diplomacy_history",
+    "parent_path": [
+      "date_field"
+    ],
+    "key": {
+      "exact": "emperor"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "---"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5339
+  },
+  {
+    "id": "history/history_consolidated:75:rule:root:diplomacy_history:date_field",
+    "context": "root:diplomacy_history",
+    "parent_path": [],
+    "key": "date",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5340
+  },
+  {
+    "id": "history/history_consolidated:7:rule:type:diplomacy_history:date_field",
+    "context": "type:diplomacy_history",
+    "parent_path": [],
+    "key": "date",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 0,
+    "source_file": "semantic-rules.json",
+    "line": 5341
+  },
+  {
+    "id": "history/history_consolidated:83:rule:root:province_history:culture",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "culture"
+    },
+    "operator": "=",
+    "value": {
+      "type": "culture"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5342
+  },
+  {
+    "id": "history/history_consolidated:84:rule:root:province_history:religion",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "religion"
+    },
+    "operator": "=",
+    "value": {
+      "type": "religion"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5343
+  },
+  {
+    "id": "history/history_consolidated:85:rule:root:province_history:hre",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "hre"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5344
+  },
+  {
+    "id": "history/history_consolidated:86:rule:root:province_history:base_tax",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "base_tax"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5345
+  },
+  {
+    "id": "history/history_consolidated:87:rule:root:province_history:base_production",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "base_production"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5346
+  },
+  {
+    "id": "history/history_consolidated:88:rule:root:province_history:base_manpower",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "base_manpower"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5347
+  },
+  {
+    "id": "history/history_consolidated:89:rule:root:province_history:trade_goods",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "trade_goods"
+    },
+    "operator": "=",
+    "value": {
+      "type": "trade_good"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5348
+  },
+  {
+    "id": "history/history_consolidated:90:rule:root:province_history:trade_goods",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "trade_goods"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "unknown"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5349
+  },
+  {
+    "id": "history/history_consolidated:91:rule:root:province_history:capital",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "capital"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5350
+  },
+  {
+    "id": "history/history_consolidated:92:rule:root:province_history:extra_cost",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "extra_cost"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5351
+  },
+  {
+    "id": "history/history_consolidated:93:rule:root:province_history:center_of_trade",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "center_of_trade"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 1,
+        "max": 3
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5352
+  },
+  {
+    "id": "history/history_consolidated:94:rule:root:province_history:estate",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "estate"
+    },
+    "operator": "=",
+    "value": {
+      "type": "estate"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5353
+  },
+  {
+    "id": "history/history_consolidated:95:rule:root:province_history:revolt_risk",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "revolt_risk"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5354
+  },
+  {
+    "id": "history/history_consolidated:96:rule:root:province_history:unrest",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "unrest"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5355
+  },
+  {
+    "id": "history/history_consolidated:97:rule:root:province_history:seat_in_parliament",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "seat_in_parliament"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5356
+  },
+  {
+    "id": "history/history_consolidated:98:rule:root:province_history:tribal_owner",
+    "context": "root:province_history",
+    "parent_path": [],
+    "key": {
+      "exact": "tribal_owner"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5357
+  },
+  {
+    "id": "history/history_consolidated:99:leaf-value:root:province_history:<trade_good.latent>",
+    "context": "root:province_history",
+    "parent_path": [
+      "latent_trade_goods"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "trade_good.latent"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5358
+  }
+]

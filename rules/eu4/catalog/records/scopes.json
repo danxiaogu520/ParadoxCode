@@ -1,0 +1,47 @@
+{
+  "records": [
+    {
+      "table": "scopes",
+      "logical_id": "effects:effects:root:45:4",
+      "source_order": 7133,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "documentation": "Only with type = advisor",
+        "key": "scope",
+        "line": "280",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scope[country]"
+      }
+    },
+    {
+      "table": "scopes",
+      "logical_id": "effects:effects:root:45:5",
+      "source_order": 7134,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "documentation": "Only with type = advisor",
+        "key": "scope",
+        "line": "283",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scope[province]"
+      }
+    },
+    {
+      "table": "scopes",
+      "logical_id": "scopes:root:0",
+      "source_order": 11952,
+      "fields": {
+        "child_count": "14",
+        "key": "scopes",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    }
+  ]
+}

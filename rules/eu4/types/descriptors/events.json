@@ -1,0 +1,72 @@
+{
+  "event": {
+    "name": "event",
+    "path": "game/events",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": "id",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "decision": {
+    "name": "decision",
+    "path": "game/decisions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "country_decisions"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "mission": {
+    "name": "mission",
+    "path": "game/missions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "potential",
+        "potential_on_load",
+        "slot",
+        "generic",
+        "ai",
+        "has_country_shield"
+      ],
+      true
+    ]
+  },
+  "mission_series": {
+    "name": "mission_series",
+    "path": "game/missions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  }
+}

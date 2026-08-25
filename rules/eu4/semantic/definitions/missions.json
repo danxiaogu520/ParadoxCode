@@ -1,0 +1,635 @@
+[
+  {
+    "id": "missions/missions:10:rule:root:mission_series:generic",
+    "context": "root:mission_series",
+    "parent_path": [],
+    "key": {
+      "exact": "generic"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "if a mission without generic = yes wants this slot then it overrides this."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5614
+  },
+  {
+    "id": "missions/missions:11:rule:root:mission_series:ai",
+    "context": "root:mission_series",
+    "parent_path": [],
+    "key": {
+      "exact": "ai"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Can exist under the series itself or within individual missions."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5615
+  },
+  {
+    "id": "missions/missions:12:rule:root:mission_series:has_country_shield",
+    "context": "root:mission_series",
+    "parent_path": [],
+    "key": {
+      "exact": "has_country_shield"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5616
+  },
+  {
+    "id": "missions/missions:14:rule:root:mission_series:potential_on_load",
+    "context": "root:mission_series",
+    "parent_path": [],
+    "key": {
+      "exact": "potential_on_load"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5617
+  },
+  {
+    "id": "missions/missions:16:rule:root:mission_series:potential",
+    "context": "root:mission_series",
+    "parent_path": [],
+    "key": {
+      "exact": "potential"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "These are triggers for the entire series"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "country"
+      ],
+      [
+        "root",
+        "country"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5618
+  },
+  {
+    "id": "missions/missions:17:rule:root:mission_series:icon",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>"
+    ],
+    "key": {
+      "exact": "icon"
+    },
+    "operator": "=",
+    "value": {
+      "type": "sprite"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5619
+  },
+  {
+    "id": "missions/missions:18:leaf-value:root:mission_series:<mission>",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>",
+      "required_missions"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "mission"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5620
+  },
+  {
+    "id": "missions/missions:19:rule:root:mission_series:required_missions",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>"
+    ],
+    "key": {
+      "exact": "required_missions"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5621
+  },
+  {
+    "id": "missions/missions:21:rule:root:mission_series:mil_ideas",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>",
+      "trigger",
+      "has_completed_idea_group_of_category"
+    ],
+    "key": {
+      "exact": "mil_ideas"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5622
+  },
+  {
+    "id": "missions/missions:22:rule:root:mission_series:has_completed_idea_group_of_category",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>",
+      "trigger"
+    ],
+    "key": {
+      "exact": "has_completed_idea_group_of_category"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5623
+  },
+  {
+    "id": "missions/missions:23:rule:root:mission_series:trigger",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>"
+    ],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "What you need to complete the mission, displayed for mission tooltip"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "country"
+      ],
+      [
+        "root",
+        "country"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5624
+  },
+  {
+    "id": "missions/missions:23:quoted-script:root:mission_series:trigger",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>"
+    ],
+    "key": {
+      "exact": "trigger"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "quoted_script",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Quoted Script form of a mission completion trigger."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "country"
+      ],
+      [
+        "root",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5624
+  },
+  {
+    "id": "missions/missions:25:rule:root:mission_series:effect",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>"
+    ],
+    "key": {
+      "exact": "effect"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "This is what you get after you finished your mission."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "country"
+      ],
+      [
+        "root",
+        "country"
+      ]
+    ],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5625
+  },
+  {
+    "id": "missions/missions:25:quoted-script:root:mission_series:effect",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>"
+    ],
+    "key": {
+      "exact": "effect"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "quoted_script",
+    "child_context": "effect",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Quoted Script form of a mission completion effect."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "country"
+      ],
+      [
+        "root",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5625
+  },
+  {
+    "id": "missions/missions:27:rule:root:mission_series:provinces_to_highlight",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>"
+    ],
+    "key": {
+      "exact": "provinces_to_highlight"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "province"
+      ],
+      [
+        "root",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5626
+  },
+  {
+    "id": "missions/missions:28:rule:root:mission_series:completed_by",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>"
+    ],
+    "key": {
+      "exact": "completed_by"
+    },
+    "operator": "=",
+    "value": "date",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5627
+  },
+  {
+    "id": "missions/missions:29:rule:root:mission_series:position",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>"
+    ],
+    "key": {
+      "exact": "position"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5628
+  },
+  {
+    "id": "missions/missions:30:rule:root:mission_series:factor",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>",
+      "ai_weight"
+    ],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5629
+  },
+  {
+    "id": "missions/missions:32:rule:root:mission_series:ai_weight",
+    "context": "root:mission_series",
+    "parent_path": [
+      "<mission>"
+    ],
+    "key": {
+      "exact": "ai_weight"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier_rule",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [
+      [
+        "this",
+        "country"
+      ],
+      [
+        "root",
+        "country"
+      ]
+    ],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5630
+  },
+  {
+    "id": "missions/missions:33:rule:root:mission_series:<mission>",
+    "context": "root:mission_series",
+    "parent_path": [],
+    "key": {
+      "type": "mission"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5631
+  },
+  {
+    "id": "missions/missions:9:rule:root:mission_series:slot",
+    "context": "root:mission_series",
+    "parent_path": [],
+    "key": {
+      "exact": "slot"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5632
+  }
+]
