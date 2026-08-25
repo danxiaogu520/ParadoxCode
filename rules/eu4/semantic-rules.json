@@ -32064,56 +32064,6 @@
     "line": 1155
   },
   {
-    "id": "common/ideas_and_native_advancements:66:rule:root:native_advancement_group:category",
-    "context": "root:native_advancement_group",
-    "parent_path": [],
-    "key": {
-      "exact": "category"
-    },
-    "operator": "=",
-    "value": {
-      "enum": "power_categories"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 1156
-  },
-  {
-    "id": "common/ideas_and_native_advancements:69:rule:root:native_advancement_group:<native_advancement>",
-    "context": "root:native_advancement_group",
-    "parent_path": [],
-    "key": {
-      "type": "native_advancement"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "node",
-    "child_context": "modifier",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 5,
-    "strict_min": true,
-    "max_occurs": 5,
-    "source_file": "semantic-rules.json",
-    "line": 1157
-  },
-  {
     "id": "common/ideas_and_native_advancements:6:rule:type:idea_group:category",
     "context": "type:idea_group",
     "parent_path": [],
@@ -32136,63 +32086,6 @@
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 1158
-  },
-  {
-    "id": "common/ideas_and_native_advancements:70:rule:root:native_advancement_group:factor",
-    "context": "root:native_advancement_group",
-    "parent_path": [
-      "ai_will_do"
-    ],
-    "key": {
-      "exact": "factor"
-    },
-    "operator": "=",
-    "value": {
-      "int": {
-        "min": 0,
-        "max": 1
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 1159
-  },
-  {
-    "id": "common/ideas_and_native_advancements:71:rule:root:native_advancement_group:ai_will_do",
-    "context": "root:native_advancement_group",
-    "parent_path": [],
-    "key": {
-      "exact": "ai_will_do"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [
-      "ai_will do does not actually determine weighting, but AI will not pick an idea with ai_will_do = 0"
-    ],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 1160
   },
   {
     "id": "common/ideas_and_native_advancements:73:rule:root:customideas:important",
@@ -95767,607 +95660,6 @@
     "line": 3524
   },
   {
-    "id": "dlc_metadata/dlc_metadata:11:rule:root:dlc_info:name",
-    "context": "root:dlc_info",
-    "parent_path": [],
-    "key": {
-      "exact": "name"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3525
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:12:rule:root:dlc_info:id",
-    "context": "root:dlc_info",
-    "parent_path": [],
-    "key": {
-      "exact": "id"
-    },
-    "operator": "=",
-    "value": {
-      "int": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3526
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:13:rule:root:dlc_info:category",
-    "context": "root:dlc_info",
-    "parent_path": [],
-    "key": {
-      "exact": "category"
-    },
-    "operator": "=",
-    "value": {
-      "type": "dlc_categories"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3527
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:14:rule:root:dlc_info:subscription_promo",
-    "context": "root:dlc_info",
-    "parent_path": [],
-    "key": {
-      "exact": "subscription_promo"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3528
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:15:leaf-value:root:dlc_info:<dlc_info>",
-    "context": "root:dlc_info",
-    "parent_path": [
-      "recommendations"
-    ],
-    "key": "any_scalar",
-    "operator": null,
-    "value": {
-      "type": "dlc_info"
-    },
-    "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 5,
-    "source_file": "semantic-rules.json",
-    "line": 3529
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:16:rule:root:dlc_info:recommendations",
-    "context": "root:dlc_info",
-    "parent_path": [],
-    "key": {
-      "exact": "recommendations"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3530
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:17:rule:root:dlc_info:egs_url",
-    "context": "root:dlc_info",
-    "parent_path": [],
-    "key": {
-      "exact": "egs_url"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3531
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:18:rule:root:dlc_info:ms_id",
-    "context": "root:dlc_info",
-    "parent_path": [],
-    "key": {
-      "exact": "ms_id"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3532
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:19:rule:root:dlc_info:gog_url",
-    "context": "root:dlc_info",
-    "parent_path": [],
-    "key": {
-      "exact": "gog_url"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3533
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:20:leaf-value:root:dlc_info:enum[country_tags]",
-    "context": "root:dlc_info",
-    "parent_path": [
-      "interesting_countries"
-    ],
-    "key": "any_scalar",
-    "operator": null,
-    "value": {
-      "enum": "country_tags"
-    },
-    "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 4,
-    "source_file": "semantic-rules.json",
-    "line": 3534
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:21:rule:root:dlc_info:interesting_countries",
-    "context": "root:dlc_info",
-    "parent_path": [],
-    "key": {
-      "exact": "interesting_countries"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3535
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:22:rule:root:dlc_info:hide_if_dlc_owned",
-    "context": "root:dlc_info",
-    "parent_path": [],
-    "key": {
-      "exact": "hide_if_dlc_owned"
-    },
-    "operator": "=",
-    "value": {
-      "type": "dlc_info"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3536
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:23:rule:root:dlc_info:change_landingpage",
-    "context": "root:dlc_info",
-    "parent_path": [],
-    "key": {
-      "exact": "change_landingpage"
-    },
-    "operator": "=",
-    "value": {
-      "type": "dlc_info"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3537
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:24:rule:root:dlc_info:hide_if_unowned",
-    "context": "root:dlc_info",
-    "parent_path": [],
-    "key": {
-      "exact": "hide_if_unowned"
-    },
-    "operator": "=",
-    "value": {
-      "exact": "yes"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3538
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:25:rule:root:dlc_info:show_example_image",
-    "context": "root:dlc_info",
-    "parent_path": [],
-    "key": {
-      "exact": "show_example_image"
-    },
-    "operator": "=",
-    "value": {
-      "exact": "yes"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3539
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:26:rule:root:dlc_info:show_example_image_tooltips",
-    "context": "root:dlc_info",
-    "parent_path": [],
-    "key": {
-      "exact": "show_example_image_tooltips"
-    },
-    "operator": "=",
-    "value": {
-      "exact": "yes"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3540
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:27:rule:root:dlc_info:icon",
-    "context": "root:dlc_info",
-    "parent_path": [],
-    "key": {
-      "exact": "icon"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3541
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:29:rule:root:dlc_recommendation:tooltip_desc",
-    "context": "root:dlc_recommendation",
-    "parent_path": [
-      "enum[DLCNUM]",
-      "reason"
-    ],
-    "key": {
-      "exact": "tooltip_desc"
-    },
-    "operator": "=",
-    "value": "localisation",
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3542
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:30:rule:root:dlc_recommendation:tooltip_reason",
-    "context": "root:dlc_recommendation",
-    "parent_path": [
-      "enum[DLCNUM]",
-      "reason"
-    ],
-    "key": {
-      "exact": "tooltip_reason"
-    },
-    "operator": "=",
-    "value": "localisation",
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3543
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:31:rule:root:dlc_recommendation:weight",
-    "context": "root:dlc_recommendation",
-    "parent_path": [
-      "enum[DLCNUM]",
-      "reason"
-    ],
-    "key": {
-      "exact": "weight"
-    },
-    "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3544
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:33:rule:root:dlc_recommendation:trigger",
-    "context": "root:dlc_recommendation",
-    "parent_path": [
-      "enum[DLCNUM]",
-      "reason"
-    ],
-    "key": {
-      "exact": "trigger"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "node",
-    "child_context": "trigger",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [
-      [
-        "this",
-        "country"
-      ],
-      [
-        "root",
-        "country"
-      ]
-    ],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 3545
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:34:rule:root:dlc_recommendation:reason",
-    "context": "root:dlc_recommendation",
-    "parent_path": [
-      "enum[DLCNUM]"
-    ],
-    "key": {
-      "exact": "reason"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
-    "source_file": "semantic-rules.json",
-    "line": 3546
-  },
-  {
-    "id": "dlc_metadata/dlc_metadata:35:rule:root:dlc_recommendation:enum[DLCNUM]",
-    "context": "root:dlc_recommendation",
-    "parent_path": [],
-    "key": {
-      "enum": "DLCNUM"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
-    "source_file": "semantic-rules.json",
-    "line": 3547
-  },
-  {
     "id": "effects:0:alias:effect:<scripted_effect>",
     "context": "effect",
     "parent_path": [],
@@ -154633,1027 +153925,6 @@
     "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5575
-  },
-  {
-    "id": "map/tiles:10:rule:root:rnw_tiles:from",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "strait"
-    ],
-    "key": {
-      "exact": "from"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5576
-  },
-  {
-    "id": "map/tiles:11:leaf-value:root:rnw_tiles:int[0..255]",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "strait",
-      "to"
-    ],
-    "key": "any_scalar",
-    "operator": null,
-    "value": {
-      "int": {
-        "min": 0,
-        "max": null
-      }
-    },
-    "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 3,
-    "strict_min": true,
-    "max_occurs": 3,
-    "source_file": "semantic-rules.json",
-    "line": 5577
-  },
-  {
-    "id": "map/tiles:12:rule:root:rnw_tiles:to",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "strait"
-    ],
-    "key": {
-      "exact": "to"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5578
-  },
-  {
-    "id": "map/tiles:13:leaf-value:root:rnw_tiles:int[0..255]",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "strait",
-      "through"
-    ],
-    "key": "any_scalar",
-    "operator": null,
-    "value": {
-      "int": {
-        "min": 0,
-        "max": null
-      }
-    },
-    "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 3,
-    "strict_min": true,
-    "max_occurs": 3,
-    "source_file": "semantic-rules.json",
-    "line": 5579
-  },
-  {
-    "id": "map/tiles:14:rule:root:rnw_tiles:through",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "strait"
-    ],
-    "key": {
-      "exact": "through"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5580
-  },
-  {
-    "id": "map/tiles:15:rule:root:rnw_tiles:strait",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "strait"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
-    "source_file": "semantic-rules.json",
-    "line": 5581
-  },
-  {
-    "id": "map/tiles:16:rule:root:rnw_tiles:Regions",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "Regions"
-    },
-    "operator": "=",
-    "value": {
-      "int": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5582
-  },
-  {
-    "id": "map/tiles:17:leaf-value:root:rnw_tiles:int[0..255]",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "region"
-    ],
-    "key": "any_scalar",
-    "operator": null,
-    "value": {
-      "int": {
-        "min": 0,
-        "max": null
-      }
-    },
-    "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 3,
-    "strict_min": true,
-    "max_occurs": 3,
-    "source_file": "semantic-rules.json",
-    "line": 5583
-  },
-  {
-    "id": "map/tiles:18:rule:root:rnw_tiles:region",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "region"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
-    "source_file": "semantic-rules.json",
-    "line": 5584
-  },
-  {
-    "id": "map/tiles:19:leaf-value:root:rnw_tiles:int[0..255]",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "<event_modifier>"
-    ],
-    "key": "any_scalar",
-    "operator": null,
-    "value": {
-      "int": {
-        "min": 0,
-        "max": null
-      }
-    },
-    "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 3,
-    "strict_min": true,
-    "max_occurs": 3,
-    "source_file": "semantic-rules.json",
-    "line": 5585
-  },
-  {
-    "id": "map/tiles:20:rule:root:rnw_tiles:<event_modifier>",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "type": "event_modifier"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
-    "source_file": "semantic-rules.json",
-    "line": 5586
-  },
-  {
-    "id": "map/tiles:21:leaf-value:root:rnw_tiles:int[0..255]",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "level_1_center_of_trade"
-    ],
-    "key": "any_scalar",
-    "operator": null,
-    "value": {
-      "int": {
-        "min": 0,
-        "max": null
-      }
-    },
-    "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 3,
-    "strict_min": true,
-    "max_occurs": 3,
-    "source_file": "semantic-rules.json",
-    "line": 5587
-  },
-  {
-    "id": "map/tiles:22:rule:root:rnw_tiles:level_1_center_of_trade",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "level_1_center_of_trade"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
-    "source_file": "semantic-rules.json",
-    "line": 5588
-  },
-  {
-    "id": "map/tiles:23:rule:root:rnw_tiles:num_sea_provinces",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "num_sea_provinces"
-    },
-    "operator": "=",
-    "value": {
-      "int": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5589
-  },
-  {
-    "id": "map/tiles:24:rule:root:rnw_tiles:num_land_provinces",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "num_land_provinces"
-    },
-    "operator": "=",
-    "value": {
-      "int": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5590
-  },
-  {
-    "id": "map/tiles:25:leaf-value:root:rnw_tiles:int[1..100]",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "size"
-    ],
-    "key": "any_scalar",
-    "operator": null,
-    "value": {
-      "int": {
-        "min": 1,
-        "max": 100
-      }
-    },
-    "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 2,
-    "strict_min": true,
-    "max_occurs": 2,
-    "source_file": "semantic-rules.json",
-    "line": 5591
-  },
-  {
-    "id": "map/tiles:26:rule:root:rnw_tiles:size",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "size"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5592
-  },
-  {
-    "id": "map/tiles:27:rule:root:rnw_tiles:continent",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "continent"
-    },
-    "operator": "=",
-    "value": {
-      "exact": "yes"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5593
-  },
-  {
-    "id": "map/tiles:28:rule:root:rnw_tiles:fantasy",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "fantasy"
-    },
-    "operator": "=",
-    "value": {
-      "exact": "yes"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5594
-  },
-  {
-    "id": "map/tiles:29:rule:root:rnw_tiles:do_not_rotate",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "do_not_rotate"
-    },
-    "operator": "=",
-    "value": {
-      "exact": "yes"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5595
-  },
-  {
-    "id": "map/tiles:30:rule:root:rnw_tiles:do_not_rotate_or_mirror",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "do_not_rotate_or_mirror"
-    },
-    "operator": "=",
-    "value": {
-      "exact": "yes"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5596
-  },
-  {
-    "id": "map/tiles:31:rule:root:rnw_tiles:restrict_to_north_edge",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "restrict_to_north_edge"
-    },
-    "operator": "=",
-    "value": {
-      "exact": "yes"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5597
-  },
-  {
-    "id": "map/tiles:32:rule:root:rnw_tiles:restrict_to_south_edge",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "restrict_to_south_edge"
-    },
-    "operator": "=",
-    "value": {
-      "exact": "yes"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5598
-  },
-  {
-    "id": "map/tiles:33:rule:root:rnw_tiles:restrict_to_equator",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "restrict_to_equator"
-    },
-    "operator": "=",
-    "value": {
-      "exact": "yes"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5599
-  },
-  {
-    "id": "map/tiles:35:rule:root:rnw_tiles:weight",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "weight"
-    },
-    "operator": "=",
-    "value": {
-      "int": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5600
-  },
-  {
-    "id": "map/tiles:36:rule:root:rnw_tiles:add_moisture",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "add_moisture"
-    },
-    "operator": "=",
-    "value": {
-      "int": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5601
-  },
-  {
-    "id": "map/tiles:37:leaf-value:root:rnw_tiles:int[0..255]",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "wasteland_province"
-    ],
-    "key": "any_scalar",
-    "operator": null,
-    "value": {
-      "int": {
-        "min": 0,
-        "max": null
-      }
-    },
-    "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 3,
-    "strict_min": true,
-    "max_occurs": 3,
-    "source_file": "semantic-rules.json",
-    "line": 5602
-  },
-  {
-    "id": "map/tiles:38:rule:root:rnw_tiles:wasteland_province",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "wasteland_province"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
-    "source_file": "semantic-rules.json",
-    "line": 5603
-  },
-  {
-    "id": "map/tiles:39:leaf-value:root:rnw_tiles:int[0..255]",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "empty"
-    ],
-    "key": "any_scalar",
-    "operator": null,
-    "value": {
-      "int": {
-        "min": 0,
-        "max": null
-      }
-    },
-    "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 3,
-    "strict_min": true,
-    "max_occurs": 3,
-    "source_file": "semantic-rules.json",
-    "line": 5604
-  },
-  {
-    "id": "map/tiles:40:rule:root:rnw_tiles:empty",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "empty"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5605
-  },
-  {
-    "id": "map/tiles:41:leaf-value:root:rnw_tiles:int[0..255]",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "province_names",
-      "scalar"
-    ],
-    "key": "any_scalar",
-    "operator": null,
-    "value": {
-      "int": {
-        "min": 0,
-        "max": null
-      }
-    },
-    "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 3,
-    "strict_min": true,
-    "max_occurs": 3,
-    "source_file": "semantic-rules.json",
-    "line": 5606
-  },
-  {
-    "id": "map/tiles:42:rule:root:rnw_tiles:scalar",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "province_names"
-    ],
-    "key": "any_scalar",
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": null,
-    "source_file": "semantic-rules.json",
-    "line": 5607
-  },
-  {
-    "id": "map/tiles:43:rule:root:rnw_tiles:province_names",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "province_names"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "node",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
-    "source_file": "semantic-rules.json",
-    "line": 5608
-  },
-  {
-    "id": "map/tiles:5:leaf-value:root:rnw_tiles:int[0..255]",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "sea_province"
-    ],
-    "key": "any_scalar",
-    "operator": null,
-    "value": {
-      "int": {
-        "min": 0,
-        "max": null
-      }
-    },
-    "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 3,
-    "strict_min": true,
-    "max_occurs": 3,
-    "source_file": "semantic-rules.json",
-    "line": 5609
-  },
-  {
-    "id": "map/tiles:6:rule:root:rnw_tiles:sea_province",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "sea_province"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
-    "source_file": "semantic-rules.json",
-    "line": 5610
-  },
-  {
-    "id": "map/tiles:7:leaf-value:root:rnw_tiles:int[0..255]",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "lake_province"
-    ],
-    "key": "any_scalar",
-    "operator": null,
-    "value": {
-      "int": {
-        "min": 0,
-        "max": null
-      }
-    },
-    "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 3,
-    "strict_min": true,
-    "max_occurs": 3,
-    "source_file": "semantic-rules.json",
-    "line": 5611
-  },
-  {
-    "id": "map/tiles:8:rule:root:rnw_tiles:lake_province",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "lake_province"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "value_clause",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": null,
-    "source_file": "semantic-rules.json",
-    "line": 5612
-  },
-  {
-    "id": "map/tiles:9:leaf-value:root:rnw_tiles:int[0..255]",
-    "context": "root:rnw_tiles",
-    "parent_path": [
-      "strait",
-      "from"
-    ],
-    "key": "any_scalar",
-    "operator": null,
-    "value": {
-      "int": {
-        "min": 0,
-        "max": null
-      }
-    },
-    "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 3,
-    "strict_min": true,
-    "max_occurs": 3,
-    "source_file": "semantic-rules.json",
-    "line": 5613
   },
   {
     "id": "missions/missions:10:rule:root:mission_series:generic",
@@ -242506,38 +240777,6 @@
     "line": 5033
   },
   {
-    "id": "eu4:rnw_tiles:unique",
-    "context": "root:rnw_tiles",
-    "parent_path": [],
-    "key": {
-      "exact": "unique"
-    },
-    "operator": "=",
-    "value": {
-      "int": {
-        "min": -1,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
-    "documentation": [
-      "Number of unique placements allowed for a random-new-world tile."
-    ],
-    "allowed_scopes": [],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 7001
-  },
-  {
     "id": "eu4:trading_policy:unique",
     "context": "root:trading_policy",
     "parent_path": [],
@@ -242689,5 +240928,365 @@
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 12
+  },
+  {
+    "id": "common/alerts:1:rule:root:alerts:sound",
+    "context": "root:alerts",
+    "parent_path": [],
+    "key": {
+      "exact": "sound"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "alerts_sound",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Alert sound assignments by severity level."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/alerts.txt",
+    "line": 1
+  },
+  {
+    "id": "common/alerts:2:rule:root:alerts:icon",
+    "context": "root:alerts",
+    "parent_path": [],
+    "key": {
+      "exact": "icon"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "alerts_icon",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Alert icon assignments by severity level."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/alerts.txt",
+    "line": 2
+  },
+  {
+    "id": "common/alerts:3:rule:root:alerts:alerts",
+    "context": "root:alerts",
+    "parent_path": [],
+    "key": {
+      "exact": "alerts"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "alerts_definitions",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Named alert definitions and their default severity."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/alerts.txt",
+    "line": 3
+  },
+  {
+    "id": "common/alerts:4:leaf:alerts_sound:level",
+    "context": "alerts_sound",
+    "parent_path": [],
+    "key": {
+      "enum": "alert_level"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/alerts.txt",
+    "line": 4
+  },
+  {
+    "id": "common/alerts:5:leaf:alerts_icon:level",
+    "context": "alerts_icon",
+    "parent_path": [],
+    "key": {
+      "enum": "alert_level"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/alerts.txt",
+    "line": 5
+  },
+  {
+    "id": "common/alerts:6:rule:alerts_definitions:any",
+    "context": "alerts_definitions",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "alert_definition",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "common/alerts.txt",
+    "line": 6
+  },
+  {
+    "id": "common/alerts:7:rule:alert_definition:category",
+    "context": "alert_definition",
+    "parent_path": [],
+    "key": {
+      "exact": "category"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "alert_level"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Alert severity: HIGH, MEDIUM, LOW, or DISABLED."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/alerts.txt",
+    "line": 7
+  },
+  {
+    "id": "common/units_display:1:rule:units_display:any",
+    "context": "root:units_display",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "units_display_entry",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Unit display definitions are keyed by unit type."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "common/units_display/*.txt",
+    "line": 1
+  },
+  {
+    "id": "common/units_display:2:rule:units_display_entry:factor",
+    "context": "units_display_entry",
+    "parent_path": [],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": true,
+    "deprecated": false,
+    "documentation": [
+      "Base display factor for a unit type or modifier."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/units_display/*.txt",
+    "line": 2
+  },
+  {
+    "id": "common/units_display:3:rule:units_display_entry:modifier",
+    "context": "units_display_entry",
+    "parent_path": [],
+    "key": {
+      "exact": "modifier"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "units_display_modifier",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "common/units_display/*.txt",
+    "line": 3
+  },
+  {
+    "id": "common/units_display:4:rule:units_display_modifier:factor",
+    "context": "units_display_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "factor"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": true,
+    "deprecated": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/units_display/*.txt",
+    "line": 4
+  },
+  {
+    "id": "common/units_display:5:rule:units_display_modifier:or",
+    "context": "units_display_modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "OR"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "common/units_display/*.txt",
+    "line": 5
+  },
+  {
+    "id": "common/units_display:6:rule:units_display_modifier:trigger",
+    "context": "units_display_modifier",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Unit display modifiers may use arbitrary trigger clauses."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "common/units_display/*.txt",
+    "line": 6
+  },
+  {
+    "id": "common/historial_lucky:1:rule:root:luck:country",
+    "context": "root:luck",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Country-priority blocks in historial_lucky.txt contain trigger clauses."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "common/historial_lucky.txt",
+    "line": 1
   }
 ]

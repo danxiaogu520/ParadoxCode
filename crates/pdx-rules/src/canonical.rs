@@ -53,7 +53,7 @@ impl fmt::Debug for RuleHash {
 }
 pub(crate) fn canonical_hash(model: &RulesModel) -> RuleHash {
     let mut bytes = Vec::new();
-    bytes.extend_from_slice(b"paradoxcode/rules/v6\0");
+    bytes.extend_from_slice(b"paradoxcode/rules/v7\0");
     put_str(&mut bytes, &model.game_id);
     let mut categories = model.file_categories.clone();
     categories.sort_by(|left, right| left.id.cmp(&right.id));
@@ -63,11 +63,16 @@ pub(crate) fn canonical_hash(model: &RulesModel) -> RuleHash {
         put_str(&mut bytes, &category.parser.as_str());
         put_str(&mut bytes, category.resolution.as_str());
         put_opt_str(&mut bytes, category.matcher.path_prefix.as_deref());
+        put_opt_str(&mut bytes, category.matcher.path_exact.as_deref());
         put_len(&mut bytes, category.matcher.extensions.len());
         for extension in category.matcher.extensions {
             put_str(&mut bytes, &extension);
         }
         put_opt_str(&mut bytes, category.matcher.path_suffix.as_deref());
+        put_len(&mut bytes, category.matcher.path_exclude_prefixes.len());
+        for prefix in category.matcher.path_exclude_prefixes {
+            put_str(&mut bytes, &prefix);
+        }
         bytes.push(u8::from(category.matcher.case_sensitive));
     }
     let mut descriptors = model.symbol_descriptors.clone();

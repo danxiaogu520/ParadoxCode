@@ -10,6 +10,19 @@
   "name_field": null,
   "name_from_file": false,
   "starts_with": null,
+ "type_key_filter": null
+ },
+ "alerts": {
+  "name": "alerts",
+  "path": "game/common",
+  "path_file": "alerts.txt",
+  "path_extension": null,
+  "path_strict": false,
+  "type_per_file": true,
+  "skip_root_paths": [],
+  "name_field": null,
+  "name_from_file": false,
+  "starts_with": null,
   "type_key_filter": null
  },
  "advisor_id": {
@@ -357,10 +370,10 @@
  },
  "custom_country_colors": {
   "name": "custom_country_colors",
-  "path": "game/common/countries",
+  "path": "game/common/custom_country_colors",
   "path_file": "00_custom_country_colors.txt",
   "path_extension": null,
-  "path_strict": false,
+  "path_strict": true,
   "type_per_file": true,
   "skip_root_paths": [],
   "name_field": null,
@@ -574,53 +587,6 @@
   "starts_with": null,
   "type_key_filter": null
  },
- "dlc_categories": {
-  "name": "dlc_categories",
-  "path": "game/dlc_metadata/dlc_info",
-  "path_file": null,
-  "path_extension": null,
-  "path_strict": false,
-  "type_per_file": false,
-  "skip_root_paths": [
-   [
-    "categories"
-   ]
-  ],
-  "name_field": null,
-  "name_from_file": false,
-  "starts_with": null,
-  "type_key_filter": null
- },
- "dlc_info": {
-  "name": "dlc_info",
-  "path": "game/dlc_metadata/dlc_info",
-  "path_file": null,
-  "path_extension": null,
-  "path_strict": false,
-  "type_per_file": false,
-  "skip_root_paths": [
-   [
-    "dlcs"
-   ]
-  ],
-  "name_field": null,
-  "name_from_file": false,
-  "starts_with": null,
-  "type_key_filter": null
- },
- "dlc_recommendation": {
-  "name": "dlc_recommendation",
-  "path": "game/dlc_metadata/dlc_recommendations",
-  "path_file": null,
-  "path_extension": null,
-  "path_strict": false,
-  "type_per_file": true,
-  "skip_root_paths": [],
-  "name_field": null,
-  "name_from_file": true,
-  "starts_with": null,
-  "type_key_filter": null
- },
  "dynasty_colors": {
   "name": "dynasty_colors",
   "path": "game/common/dynasty_colors",
@@ -643,19 +609,6 @@
   "type_per_file": false,
   "skip_root_paths": [],
   "name_field": null,
-  "name_from_file": false,
-  "starts_with": null,
-  "type_key_filter": null
- },
- "entity": {
-  "name": "entity",
-  "path": "game/gfx/entities",
-  "path_file": null,
-  "path_extension": null,
-  "path_strict": false,
-  "type_per_file": false,
-  "skip_root_paths": [],
-  "name_field": "name",
   "name_from_file": false,
   "starts_with": null,
   "type_key_filter": null
@@ -1281,41 +1234,6 @@
   "starts_with": null,
   "type_key_filter": null
  },
- "native_advancement": {
-  "name": "native_advancement",
-  "path": "game/common/native_advancements",
-  "path_file": null,
-  "path_extension": null,
-  "path_strict": false,
-  "type_per_file": false,
-  "skip_root_paths": [
-   [
-    "any"
-   ]
-  ],
-  "name_field": null,
-  "name_from_file": false,
-  "starts_with": null,
-  "type_key_filter": [
-   [
-    "ai_will_do"
-   ],
-   true
-  ]
- },
- "native_advancement_group": {
-  "name": "native_advancement_group",
-  "path": "game/common/native_advancements",
-  "path_file": null,
-  "path_extension": null,
-  "path_strict": false,
-  "type_per_file": false,
-  "skip_root_paths": [],
-  "name_field": null,
-  "name_from_file": false,
-  "starts_with": null,
-  "type_key_filter": null
- },
  "natives": {
   "name": "natives",
   "path": "game/common/natives",
@@ -1801,19 +1719,6 @@
   "starts_with": null,
   "type_key_filter": null
  },
- "rnw_tiles": {
-  "name": "rnw_tiles",
-  "path": "game/map/random/tiles",
-  "path_file": null,
-  "path_extension": null,
-  "path_strict": false,
-  "type_per_file": true,
-  "skip_root_paths": [],
-  "name_field": null,
-  "name_from_file": true,
-  "starts_with": null,
-  "type_key_filter": null
- },
  "ruler_personality": {
   "name": "ruler_personality",
   "path": "game/common/ruler_personalities",
@@ -2202,6 +2107,19 @@
   "path_extension": null,
   "path_strict": false,
   "type_per_file": false,
+  "skip_root_paths": [],
+  "name_field": null,
+  "name_from_file": false,
+  "starts_with": null,
+  "type_key_filter": null
+ },
+ "units_display": {
+  "name": "units_display",
+  "path": "game/common/units_display",
+  "path_file": null,
+  "path_extension": null,
+  "path_strict": true,
+  "type_per_file": true,
   "skip_root_paths": [],
   "name_field": null,
   "name_from_file": false,

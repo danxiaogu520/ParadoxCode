@@ -15,7 +15,8 @@ fn schema(connection: &Connection) -> Result<(), RulesError> {
         CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS file_categories (
             id TEXT PRIMARY KEY NOT NULL, parser TEXT NOT NULL, resolution TEXT NOT NULL,
-            path_prefix TEXT, extensions TEXT NOT NULL, path_suffix TEXT, case_sensitive INTEGER NOT NULL
+            path_prefix TEXT, path_exact TEXT, extensions TEXT NOT NULL, path_suffix TEXT,
+            path_exclude_prefixes TEXT NOT NULL DEFAULT '', case_sensitive INTEGER NOT NULL
         );
         CREATE TABLE IF NOT EXISTS symbol_descriptors (
             kind_id TEXT PRIMARY KEY NOT NULL, resolution TEXT NOT NULL, case_sensitive INTEGER NOT NULL
@@ -106,7 +107,28 @@ fn schema(connection: &Connection) -> Result<(), RulesError> {
             PRIMARY KEY(type_name, field, subtype)
         );"
     )?;
+    ensure_file_category_columns(connection)?;
     ensure_semantic_columns(connection)?;
+    Ok(())
+}
+
+fn ensure_file_category_columns(connection: &Connection) -> Result<(), RulesError> {
+    for (name, definition) in [
+        ("path_exact", "TEXT"),
+        ("path_exclude_prefixes", "TEXT NOT NULL DEFAULT ''"),
+    ] {
+        let present: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('file_categories') WHERE name = ?1",
+            params![name],
+            |row| row.get(0),
+        )?;
+        if present == 0 {
+            connection.execute(
+                &format!("ALTER TABLE file_categories ADD COLUMN {name} {definition}"),
+                [],
+            )?;
+        }
+    }
     Ok(())
 }
 
@@ -205,7 +227,7 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
         params![rules.schema_version.to_string(), rules.rule_hash.to_hex(), rules.game_id()],
     )?;
     for category in &rules.model.file_categories {
-        transaction.execute("INSERT INTO file_categories(id, parser, resolution, path_prefix, extensions, path_suffix, case_sensitive) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", params![category.id, category.parser.as_str(), category.resolution.as_str(), category.matcher.path_prefix, category.matcher.extensions.join("\u{1f}"), category.matcher.path_suffix, i64::from(category.matcher.case_sensitive)])?;
+        transaction.execute("INSERT INTO file_categories(id, parser, resolution, path_prefix, path_exact, extensions, path_suffix, path_exclude_prefixes, case_sensitive) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)", params![category.id, category.parser.as_str(), category.resolution.as_str(), category.matcher.path_prefix, category.matcher.path_exact, category.matcher.extensions.join("\u{1f}"), category.matcher.path_suffix, category.matcher.path_exclude_prefixes.join("\u{1e}"), i64::from(category.matcher.case_sensitive)])?;
     }
     for descriptor in &rules.model.symbol_descriptors {
         transaction.execute("INSERT INTO symbol_descriptors(kind_id, resolution, case_sensitive) VALUES (?1, ?2, ?3)", params![descriptor.kind_id, descriptor.resolution.as_str(), i64::from(descriptor.case_sensitive)])?;
@@ -401,9 +423,9 @@ fn metadata(connection: &Connection, key: &str) -> Result<Option<String>, RulesE
 
 fn read_model(connection: &Connection) -> Result<RulesModel, RulesError> {
     let mut categories = Vec::new();
-    let mut statement = connection.prepare("SELECT id, parser, resolution, path_prefix, extensions, path_suffix, case_sensitive FROM file_categories ORDER BY id")?;
+    let mut statement = connection.prepare("SELECT id, parser, resolution, path_prefix, path_exact, extensions, path_suffix, path_exclude_prefixes, case_sensitive FROM file_categories ORDER BY id")?;
     let rows = statement.query_map([], |row| -> rusqlite::Result<FileCategory> {
-        let extensions: String = row.get(4)?;
+        let extensions: String = row.get(5)?;
         let parser = ParserKind::parse(&row.get::<_, String>(1)?)
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
         let resolution = FileResolutionPolicy::parse(&row.get::<_, String>(2)?)
@@ -414,13 +436,22 @@ fn read_model(connection: &Connection) -> Result<RulesModel, RulesError> {
             resolution,
             matcher: FileMatcher {
                 path_prefix: row.get(3)?,
+                path_exact: row.get(4)?,
                 extensions: if extensions.is_empty() {
                     Vec::new()
                 } else {
                     extensions.split('\u{1f}').map(str::to_owned).collect()
                 },
-                path_suffix: row.get(5)?,
-                case_sensitive: row.get::<_, i64>(6)? != 0,
+                path_suffix: row.get(6)?,
+                path_exclude_prefixes: {
+                    let encoded: String = row.get(7)?;
+                    if encoded.is_empty() {
+                        Vec::new()
+                    } else {
+                        encoded.split('\u{1e}').map(str::to_owned).collect()
+                    }
+                },
+                case_sensitive: row.get::<_, i64>(8)? != 0,
             },
         })
     })?;

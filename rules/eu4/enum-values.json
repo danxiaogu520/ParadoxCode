@@ -1,4 +1,10 @@
 {
+  "alert_level": [
+    "HIGH",
+    "MEDIUM",
+    "LOW",
+    "DISABLED"
+  ],
   "DLCNUM": [
     "dlc001",
     "dlc002",

@@ -131,11 +131,6 @@
     {"field": "name", "template": "$", "required": true},
     {"field": "desc", "template": "$_desc", "required": true}
   ],
-  "native_advancement_group": [{"field": "name", "template": "$", "required": true}],
-  "native_advancement": [
-    {"field": "name", "template": "$", "required": true},
-    {"field": "desc", "template": "$_desc", "required": true}
-  ],
   "customideas": [
     {"field": "name", "template": "$", "required": true},
     {"field": "desc", "template": "$_desc", "required": true}

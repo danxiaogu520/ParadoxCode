@@ -960,8 +960,10 @@ pub fn bootstrap_model() -> RulesModel {
                 resolution: FileResolutionPolicy::ReplaceByRelativePath,
                 matcher: FileMatcher {
                     path_prefix: Some("localisation".to_owned()),
+                    path_exact: None,
                     extensions: vec!["yml".to_owned(), "yaml".to_owned()],
                     path_suffix: None,
+                    path_exclude_prefixes: Vec::new(),
                     case_sensitive: false,
                 },
             },
@@ -971,6 +973,7 @@ pub fn bootstrap_model() -> RulesModel {
                 resolution: FileResolutionPolicy::ReplaceByRelativePath,
                 matcher: FileMatcher {
                     path_prefix: None,
+                    path_exact: None,
                     extensions: vec![
                         "txt".to_owned(),
                         "gui".to_owned(),
@@ -979,6 +982,7 @@ pub fn bootstrap_model() -> RulesModel {
                         "sfx".to_owned(),
                     ],
                     path_suffix: None,
+                    path_exclude_prefixes: Vec::new(),
                     case_sensitive: false,
                 },
             },
@@ -988,6 +992,7 @@ pub fn bootstrap_model() -> RulesModel {
                 resolution: FileResolutionPolicy::ReplaceByRelativePath,
                 matcher: FileMatcher {
                     path_prefix: None,
+                    path_exact: None,
                     extensions: vec![
                         "png".to_owned(),
                         "dds".to_owned(),
@@ -999,6 +1004,7 @@ pub fn bootstrap_model() -> RulesModel {
                         "fnt".to_owned(),
                     ],
                     path_suffix: None,
+                    path_exclude_prefixes: Vec::new(),
                     case_sensitive: false,
                 },
             },
@@ -1008,8 +1014,10 @@ pub fn bootstrap_model() -> RulesModel {
                 resolution: FileResolutionPolicy::ReplaceByRelativePath,
                 matcher: FileMatcher {
                     path_prefix: None,
+                    path_exact: None,
                     extensions: vec!["json".to_owned(), "lua".to_owned()],
                     path_suffix: None,
+                    path_exclude_prefixes: Vec::new(),
                     case_sensitive: false,
                 },
             },
@@ -1056,6 +1064,7 @@ mod tests {
         first_party_rules, first_party_rules_cached, first_party_rules_ephemeral, profile,
     };
     use pdx_rules::SourceEncoding;
+    use pdx_text::LogicalPath;
 
     #[test]
     fn profile_identity_and_bootstrap_catalog_are_stable() {
@@ -1193,9 +1202,59 @@ mod tests {
         assert!(!rules.model().semantic.rules.is_empty());
         assert_eq!(
             rules.model().semantic.localisation_bindings.len(),
-            190,
+            187,
             "embedded source must carry the complete first-party type localisation map"
         );
+    }
+
+    #[test]
+    fn first_party_file_categories_are_closed_over_common_and_generated_map_paths() {
+        let rules = first_party_rules().expect("embedded EU4 source");
+        let classify = |path: &str| {
+            rules
+                .classify(&LogicalPath::parse(path).expect("logical path"))
+                .map(|category| category.id.as_str())
+        };
+
+        assert_eq!(
+            classify("common/achievements.txt"),
+            Some("eu4-path-common-achievements")
+        );
+        assert_eq!(
+            classify("common/technology.txt"),
+            Some("eu4-path-common-technology")
+        );
+        assert_eq!(
+            classify("common/alerts.txt"),
+            Some("eu4-path-common-alerts")
+        );
+        assert_eq!(
+            classify("common/graphicalculturetype.txt"),
+            Some("eu4-path-common-graphicalculturetype")
+        );
+        assert_eq!(
+            classify("common/historial_lucky.txt"),
+            Some("eu4-path-common-historial_lucky")
+        );
+        assert_eq!(
+            classify("common/ai_attitudes/00_ai_attitudes.txt"),
+            Some("eu4-path-common-ai_attitudes")
+        );
+        assert_eq!(
+            classify("common/defines/difficulty_easy.lua"),
+            Some("eu4-path-common-defines-lua")
+        );
+        assert_eq!(
+            classify("common/defines/00_mod_defines.txt"),
+            Some("eu4-path-common-defines")
+        );
+        assert_eq!(classify("common/unknown.txt"), None);
+        assert_eq!(classify("common/native_advancements/00_native.txt"), None);
+        assert_eq!(classify("common/defines.lua"), None);
+        assert_eq!(classify("map/unknown.txt"), Some("eu4-path-map"));
+        assert_eq!(classify("map/random/tiles/tile0.txt"), None);
+        assert_eq!(classify("dlc_metadata/dlc_info/00_dlc_info.txt"), None);
+        assert_eq!(classify("gfx/entities/african_units.asset"), None);
     }
 
     #[test]

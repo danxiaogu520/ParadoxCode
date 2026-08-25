@@ -47,11 +47,133 @@
       }
     },
     {
-      "id": "eu4-path-common",
+      "id": "eu4-path-common-achievements",
       "parser": "script",
       "resolution": "merge",
       "matcher": {
-        "path_prefix": "common",
+        "path_prefix": null,
+        "path_exact": "common/achievements.txt",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-alerts",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": null,
+        "path_exact": "common/alerts.txt",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-graphicalculturetype",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": null,
+        "path_exact": "common/graphicalculturetype.txt",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-historial_lucky",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": null,
+        "path_exact": "common/historial_lucky.txt",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-technology",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": null,
+        "path_exact": "common/technology.txt",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-ai_attitudes",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/ai_attitudes",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-custom_country_colors",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/custom_country_colors",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-defines",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/defines",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-defines-lua",
+      "parser": "syntax-only",
+      "resolution": "replace-by-relative-path",
+      "matcher": {
+        "path_prefix": "common/defines",
+        "extensions": [
+          "lua"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-units_display",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/units_display",
         "extensions": [
           "txt"
         ],
@@ -736,19 +858,6 @@
       }
     },
     {
-      "id": "eu4-path-common-native_advancements",
-      "parser": "script",
-      "resolution": "merge",
-      "matcher": {
-        "path_prefix": "common/native_advancements",
-        "extensions": [
-          "txt"
-        ],
-        "path_suffix": null,
-        "case_sensitive": false
-      }
-    },
-    {
       "id": "eu4-path-common-natives",
       "parser": "script",
       "resolution": "merge",
@@ -1295,50 +1404,11 @@
       }
     },
     {
-      "id": "eu4-path-dlc_metadata-dlc_info",
-      "parser": "script",
-      "resolution": "merge",
-      "matcher": {
-        "path_prefix": "dlc_metadata/dlc_info",
-        "extensions": [
-          "txt"
-        ],
-        "path_suffix": null,
-        "case_sensitive": false
-      }
-    },
-    {
-      "id": "eu4-path-dlc_metadata-dlc_recommendations",
-      "parser": "script",
-      "resolution": "merge",
-      "matcher": {
-        "path_prefix": "dlc_metadata/dlc_recommendations",
-        "extensions": [
-          "txt"
-        ],
-        "path_suffix": null,
-        "case_sensitive": false
-      }
-    },
-    {
       "id": "eu4-path-events",
       "parser": "script",
       "resolution": "merge",
       "matcher": {
         "path_prefix": "events",
-        "extensions": [
-          "txt"
-        ],
-        "path_suffix": null,
-        "case_sensitive": false
-      }
-    },
-    {
-      "id": "eu4-path-gfx-entities",
-      "parser": "script",
-      "resolution": "merge",
-      "matcher": {
-        "path_prefix": "gfx/entities",
         "extensions": [
           "txt"
         ],
@@ -1460,19 +1530,9 @@
           "txt"
         ],
         "path_suffix": null,
-        "case_sensitive": false
-      }
-    },
-    {
-      "id": "eu4-path-map-random-tiles",
-      "parser": "script",
-      "resolution": "merge",
-      "matcher": {
-        "path_prefix": "map/random/tiles",
-        "extensions": [
-          "txt"
+        "path_exclude_prefixes": [
+          "map/random/tiles"
         ],
-        "path_suffix": null,
         "case_sensitive": false
       }
     },
@@ -1517,6 +1577,12 @@
           "sfx"
         ],
         "path_suffix": null,
+        "path_exclude_prefixes": [
+          "common",
+          "map/random/tiles",
+          "dlc_metadata",
+          "gfx/entities"
+        ],
         "case_sensitive": false
       }
     },
@@ -1531,6 +1597,9 @@
           "lua"
         ],
         "path_suffix": null,
+        "path_exclude_prefixes": [
+          "common"
+        ],
         "case_sensitive": false
       }
     }
@@ -2017,22 +2086,7 @@
       "case_sensitive": false
     },
     {
-      "kind_id": "dlc_categories",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
       "kind_id": "dlc_event_pictures",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
-      "kind_id": "dlc_info",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
-      "kind_id": "dlc_recommendation",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },
@@ -5532,11 +5586,6 @@
       "case_sensitive": false
     },
     {
-      "kind_id": "entity",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
       "kind_id": "estate",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
@@ -7987,16 +8036,6 @@
       "case_sensitive": false
     },
     {
-      "kind_id": "native_advancement",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
-      "kind_id": "native_advancement_group",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
       "kind_id": "native_policies",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
@@ -9633,11 +9672,6 @@
     },
     {
       "kind_id": "revolt_trigger",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
-      "kind_id": "rnw_tiles",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },
@@ -81626,32 +81660,6 @@
     },
     {
       "table": "rule_nodes",
-      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:0:2:0",
-      "source_order": 2120,
-      "fields": {
-        "key": "path",
-        "line": "36",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "game/common/native_advancements"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:0:3:0",
-      "source_order": 2124,
-      "fields": {
-        "key": "path",
-        "line": "44",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "game/common/native_advancements"
-      }
-    },
-    {
-      "table": "rule_nodes",
       "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:0:3:1",
       "source_order": 2125,
       "fields": {
@@ -82005,20 +82013,6 @@
         "shape": "scalar",
         "source_file": "catalog.json",
         "value": "enum[power_categories]"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:2:1",
-      "source_order": 2169,
-      "fields": {
-        "child_count": "2",
-        "directives": "cardinality = 5..5",
-        "key": "<native_advancement>",
-        "line": "142",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
       }
     },
     {
@@ -82393,19 +82387,6 @@
         "child_count": "5",
         "key": "idea_group",
         "line": "67",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "common/ideas_and_native_advancements:root:2",
-      "source_order": 2167,
-      "fields": {
-        "child_count": "3",
-        "key": "native_advancement_group",
-        "line": "138",
         "operator": "=",
         "shape": "block",
         "source_file": "catalog.json"
@@ -132991,408 +132972,6 @@
     },
     {
       "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:2:0:0:3:0",
-      "source_order": 7033,
-      "fields": {
-        "key": "alias_name[trigger]",
-        "line": "64",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "alias_match_left[trigger]"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:2:0:0:0",
-      "source_order": 7029,
-      "fields": {
-        "key": "tooltip_desc",
-        "line": "59",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "localisation"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:2:0:0:1",
-      "source_order": 7030,
-      "fields": {
-        "key": "tooltip_reason",
-        "line": "60",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "localisation"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:2:0:0:2",
-      "source_order": 7031,
-      "fields": {
-        "key": "weight",
-        "line": "61",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "float"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:0:0:0",
-      "source_order": 6999,
-      "fields": {
-        "key": "path",
-        "line": "4",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "game/dlc_metadata/dlc_info"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:0:0:1",
-      "source_order": 7000,
-      "fields": {
-        "key": "skip_root_key",
-        "line": "5",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "categories"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:0:1:0",
-      "source_order": 7002,
-      "fields": {
-        "key": "path",
-        "line": "8",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "game/dlc_metadata/dlc_info"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:0:1:1",
-      "source_order": 7003,
-      "fields": {
-        "key": "skip_root_key",
-        "line": "9",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "dlcs"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:0:2:0",
-      "source_order": 7005,
-      "fields": {
-        "key": "path",
-        "line": "12",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "game/dlc_metadata/dlc_recommendations"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:0:2:1",
-      "source_order": 7006,
-      "fields": {
-        "key": "name_from_file",
-        "line": "13",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "yes"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:0:2:2",
-      "source_order": 7007,
-      "fields": {
-        "key": "type_per_file",
-        "line": "14",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "yes"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:4:0",
-      "source_order": 7014,
-      "fields": {
-        "directives": "cardinality = 0..5",
-        "key": "<dlc_info>",
-        "line": "27",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:2:0:0",
-      "source_order": 7028,
-      "fields": {
-        "child_count": "4",
-        "directives": "cardinality = 0..inf",
-        "key": "reason",
-        "line": "58",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:0",
-      "source_order": 7009,
-      "fields": {
-        "key": "name",
-        "line": "19",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "localisation_synced"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:1",
-      "source_order": 7010,
-      "fields": {
-        "key": "id",
-        "line": "20",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "int"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:10",
-      "source_order": 7021,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "change_landingpage",
-        "line": "43",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "<dlc_info>"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:11",
-      "source_order": 7022,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "hide_if_unowned",
-        "line": "45",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "yes"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:12",
-      "source_order": 7023,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "show_example_image",
-        "line": "47",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "yes"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:13",
-      "source_order": 7024,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "show_example_image_tooltips",
-        "line": "49",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "yes"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:14",
-      "source_order": 7025,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "icon",
-        "line": "51",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "scalar"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:2",
-      "source_order": 7011,
-      "fields": {
-        "key": "category",
-        "line": "21",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "<dlc_categories>"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:3",
-      "source_order": 7012,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "subscription_promo",
-        "line": "23",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "scalar"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:4",
-      "source_order": 7013,
-      "fields": {
-        "child_count": "1",
-        "directives": "cardinality = 0..1",
-        "key": "recommendations",
-        "line": "25",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:5",
-      "source_order": 7015,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "egs_url",
-        "line": "30",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "scalar"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:6",
-      "source_order": 7016,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "ms_id",
-        "line": "32",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "scalar"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:7",
-      "source_order": 7017,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "gog_url",
-        "line": "34",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "scalar"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:8",
-      "source_order": 7018,
-      "fields": {
-        "child_count": "1",
-        "directives": "cardinality = 0..1",
-        "key": "interesting_countries",
-        "line": "36",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:9",
-      "source_order": 7020,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "hide_if_dlc_owned",
-        "line": "41",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "<dlc_info>"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:root:1",
-      "source_order": 7008,
-      "fields": {
-        "child_count": "15",
-        "key": "dlc_info",
-        "line": "18",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "dlc_metadata/dlc_metadata:root:2",
-      "source_order": 7026,
-      "fields": {
-        "child_count": "1",
-        "key": "dlc_recommendation",
-        "line": "54",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
       "logical_id": "effects:effects:effects:root:322:36:0",
       "source_order": 7701,
       "fields": {
@@ -149463,39 +149042,6 @@
     },
     {
       "table": "rule_nodes",
-      "logical_id": "folders:root:113",
-      "source_order": 9308,
-      "fields": {
-        "key": "dlc_metadata",
-        "line": "114",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "folders:root:114",
-      "source_order": 9309,
-      "fields": {
-        "key": "dlc_metadata/dlc_info",
-        "line": "115",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "folders:root:115",
-      "source_order": 9310,
-      "fields": {
-        "key": "dlc_metadata/dlc_recommendations",
-        "line": "116",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
       "logical_id": "folders:root:12",
       "source_order": 9207,
       "fields": {
@@ -162869,574 +162415,6 @@
         "child_count": "27",
         "key": "default_map",
         "line": "11",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:map/tiles:root:1:22:0:0",
-      "source_order": 10434,
-      "fields": {
-        "directives": "cardinality = 3..3",
-        "key": "int[0..255]",
-        "line": "110",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:map/tiles:root:1:2:0:0",
-      "source_order": 10402,
-      "fields": {
-        "directives": "cardinality = 3..3",
-        "key": "int[0..255]",
-        "line": "25",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:map/tiles:root:1:2:1:0",
-      "source_order": 10404,
-      "fields": {
-        "directives": "cardinality = 3..3",
-        "key": "int[0..255]",
-        "line": "29",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:map/tiles:root:1:2:2:0",
-      "source_order": 10406,
-      "fields": {
-        "directives": "cardinality = 3..3",
-        "key": "int[0..255]",
-        "line": "33",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:root:0:0:0",
-      "source_order": 10392,
-      "fields": {
-        "key": "name_from_file",
-        "line": "4",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "yes"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:root:0:0:1",
-      "source_order": 10393,
-      "fields": {
-        "key": "type_per_file",
-        "line": "5",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "yes"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:root:0:0:2",
-      "source_order": 10394,
-      "fields": {
-        "key": "path",
-        "line": "6",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "game/map/random/tiles"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:root:1:0:0",
-      "source_order": 10397,
-      "fields": {
-        "directives": "cardinality = 3..3",
-        "key": "int[0..255]",
-        "line": "14",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:root:1:1:0",
-      "source_order": 10399,
-      "fields": {
-        "directives": "cardinality = 3..3",
-        "key": "int[0..255]",
-        "line": "19",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:root:1:20:0",
-      "source_order": 10429,
-      "fields": {
-        "directives": "cardinality = 3..3",
-        "key": "int[0..255]",
-        "line": "98",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:root:1:21:0",
-      "source_order": 10431,
-      "fields": {
-        "directives": "cardinality = 3..3",
-        "key": "int[0..255]",
-        "line": "102",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:root:1:22:0",
-      "source_order": 10433,
-      "fields": {
-        "child_count": "1",
-        "directives": "cardinality = 1..inf",
-        "key": "scalar",
-        "line": "108",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:root:1:2:0",
-      "source_order": 10401,
-      "fields": {
-        "child_count": "1",
-        "key": "from",
-        "line": "23",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:root:1:2:1",
-      "source_order": 10403,
-      "fields": {
-        "child_count": "1",
-        "key": "to",
-        "line": "27",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:root:1:2:2",
-      "source_order": 10405,
-      "fields": {
-        "child_count": "1",
-        "key": "through",
-        "line": "31",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:root:1:4:0",
-      "source_order": 10409,
-      "fields": {
-        "directives": "cardinality = 3..3",
-        "key": "int[0..255]",
-        "line": "43",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:root:1:5:0",
-      "source_order": 10411,
-      "fields": {
-        "directives": "cardinality = 3..3",
-        "key": "int[0..255]",
-        "line": "49",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:root:1:6:0",
-      "source_order": 10413,
-      "fields": {
-        "directives": "cardinality = 3..3",
-        "key": "int[0..255]",
-        "line": "55",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:map/tiles:root:1:9:0",
-      "source_order": 10417,
-      "fields": {
-        "directives": "cardinality = 2..2",
-        "key": "int[1..100]",
-        "line": "65",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:0",
-      "source_order": 10396,
-      "fields": {
-        "child_count": "1",
-        "directives": "cardinality = 0..inf",
-        "key": "sea_province",
-        "line": "12",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:1",
-      "source_order": 10398,
-      "fields": {
-        "child_count": "1",
-        "directives": "cardinality = 0..inf",
-        "key": "lake_province",
-        "line": "17",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:10",
-      "source_order": 10418,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "continent",
-        "line": "68",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "yes"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:11",
-      "source_order": 10419,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "fantasy",
-        "line": "70",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "yes"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:12",
-      "source_order": 10420,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "do_not_rotate",
-        "line": "73",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "yes"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:13",
-      "source_order": 10421,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "do_not_rotate_or_mirror",
-        "line": "76",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "yes"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:14",
-      "source_order": 10422,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "restrict_to_north_edge",
-        "line": "79",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "yes"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:15",
-      "source_order": 10423,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "restrict_to_south_edge",
-        "line": "82",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "yes"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:16",
-      "source_order": 10424,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "restrict_to_equator",
-        "line": "85",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "yes"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:17",
-      "source_order": 10425,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "unique",
-        "line": "88",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "int"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:18",
-      "source_order": 10426,
-      "fields": {
-        "key": "weight",
-        "line": "90",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "int"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:19",
-      "source_order": 10427,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "add_moisture",
-        "line": "93",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "int"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:2",
-      "source_order": 10400,
-      "fields": {
-        "child_count": "3",
-        "directives": "cardinality = 0..inf",
-        "key": "strait",
-        "line": "22",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:20",
-      "source_order": 10428,
-      "fields": {
-        "child_count": "1",
-        "directives": "cardinality = 0..inf",
-        "key": "wasteland_province",
-        "line": "96",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:21",
-      "source_order": 10430,
-      "fields": {
-        "child_count": "1",
-        "key": "empty",
-        "line": "100",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:22",
-      "source_order": 10432,
-      "fields": {
-        "child_count": "1",
-        "directives": "cardinality = 0..inf",
-        "key": "province_names",
-        "line": "106",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:3",
-      "source_order": 10407,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "Regions",
-        "line": "38",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "int"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:4",
-      "source_order": 10408,
-      "fields": {
-        "child_count": "1",
-        "directives": "cardinality = 0..inf",
-        "key": "region",
-        "line": "41",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:5",
-      "source_order": 10410,
-      "fields": {
-        "child_count": "1",
-        "directives": "cardinality = 0..inf",
-        "key": "<event_modifier>",
-        "line": "47",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:6",
-      "source_order": 10412,
-      "fields": {
-        "child_count": "1",
-        "directives": "cardinality = 0..inf",
-        "key": "level_1_center_of_trade",
-        "line": "53",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:7",
-      "source_order": 10414,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "num_sea_provinces",
-        "line": "59",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "int"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:8",
-      "source_order": 10415,
-      "fields": {
-        "directives": "cardinality = 0..1",
-        "key": "num_land_provinces",
-        "line": "61",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "int"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:map/tiles:root:1:9",
-      "source_order": 10416,
-      "fields": {
-        "child_count": "1",
-        "key": "size",
-        "line": "63",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "rule_nodes",
-      "logical_id": "map/tiles:root:1",
-      "source_order": 10395,
-      "fields": {
-        "child_count": "23",
-        "key": "rnw_tiles",
-        "line": "10",
         "operator": "=",
         "shape": "block",
         "source_file": "catalog.json"
@@ -182031,32 +181009,6 @@
     },
     {
       "table": "enums",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:1:8:0",
-      "source_order": 7019,
-      "fields": {
-        "directives": "cardinality = 1..4",
-        "key": "enum[country_tags]",
-        "line": "38",
-        "shape": "empty",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "enums",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:2:0",
-      "source_order": 7027,
-      "fields": {
-        "child_count": "1",
-        "directives": "cardinality = 0..inf",
-        "key": "enum[DLCNUM]",
-        "line": "56",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "enums",
       "logical_id": "effects:effects:root:1:0",
       "source_order": 7036,
       "fields": {
@@ -194051,20 +193003,6 @@
     },
     {
       "table": "triggers",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:2:0:0:3",
-      "source_order": 7032,
-      "fields": {
-        "child_count": "1",
-        "directives": "replace_scope = { this = country root = country }",
-        "key": "trigger",
-        "line": "63",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "triggers",
       "logical_id": "effects:effects:root:646:1",
       "source_order": 8270,
       "fields": {
@@ -195537,33 +194475,6 @@
     },
     {
       "table": "types",
-      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:0:2",
-      "source_order": 2119,
-      "fields": {
-        "child_count": "2",
-        "key": "type[native_advancement_group]",
-        "line": "35",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "types",
-      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:0:3",
-      "source_order": 2123,
-      "fields": {
-        "child_count": "3",
-        "directives": "type_key_filter <> { ai_will_do }",
-        "key": "type[native_advancement]",
-        "line": "43",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "types",
       "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:0:4",
       "source_order": 2129,
       "fields": {
@@ -196706,58 +195617,6 @@
     },
     {
       "table": "types",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:0:0",
-      "source_order": 6998,
-      "fields": {
-        "child_count": "2",
-        "key": "type[dlc_categories]",
-        "line": "3",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "types",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:0:1",
-      "source_order": 7001,
-      "fields": {
-        "child_count": "2",
-        "key": "type[dlc_info]",
-        "line": "7",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "types",
-      "logical_id": "dlc_metadata/dlc_metadata:dlc_metadata/dlc_metadata:root:0:2",
-      "source_order": 7004,
-      "fields": {
-        "child_count": "3",
-        "key": "type[dlc_recommendation]",
-        "line": "11",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "types",
-      "logical_id": "dlc_metadata/dlc_metadata:root:0",
-      "source_order": 6997,
-      "fields": {
-        "child_count": "3",
-        "key": "types",
-        "line": "2",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "types",
       "logical_id": "effects:effects:root:157:0",
       "source_order": 7279,
       "fields": {
@@ -197807,32 +196666,6 @@
       "table": "types",
       "logical_id": "map/default_map:root:0",
       "source_order": 10348,
-      "fields": {
-        "child_count": "1",
-        "key": "types",
-        "line": "2",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "types",
-      "logical_id": "map/tiles:map/tiles:root:0:0",
-      "source_order": 10391,
-      "fields": {
-        "child_count": "3",
-        "key": "type[rnw_tiles]",
-        "line": "3",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "types",
-      "logical_id": "map/tiles:root:0",
-      "source_order": 10390,
       "fields": {
         "child_count": "1",
         "key": "types",
