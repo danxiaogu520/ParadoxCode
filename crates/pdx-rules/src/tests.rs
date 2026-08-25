@@ -72,6 +72,42 @@ fn profile_scan_extensions_are_case_insensitive_and_directory_bounded() {
 }
 
 #[test]
+fn profile_scan_root_depth_can_limit_directories_without_affecting_other_roots() {
+    let mut profile = GameProfile::empty("test");
+    profile.scan_roots = vec![
+        "common".to_owned(),
+        "common/countries".to_owned(),
+        "events".to_owned(),
+    ];
+    profile.scan_root_max_depths.insert("common".to_owned(), 0);
+    profile
+        .scan_root_max_depths
+        .insert("common/countries".to_owned(), 0);
+    profile
+        .scan_root_files
+        .insert("common".to_owned(), vec!["technology.txt".to_owned()]);
+
+    assert!(profile.allows_scan_file("common/technology.txt"));
+    assert!(!profile.allows_scan_file("common/other.txt"));
+    assert!(!profile.allows_scan_file("common/other/file.txt"));
+    assert!(profile.allows_scan_file("common/countries/file.txt"));
+    assert!(!profile.allows_scan_file("common/countries/nested/file.txt"));
+    assert!(profile.allows_scan_file("events/nested/file.txt"));
+
+    profile.scan_roots.push("map".to_owned());
+    profile.scan_root_max_depths.insert("map".to_owned(), 1);
+    profile.scan_root_files.insert(
+        "map".to_owned(),
+        vec!["area.txt".to_owned(), "lakes/00_lakes.txt".to_owned()],
+    );
+    assert!(profile.allows_scan_file("map/area.txt"));
+    assert!(profile.allows_scan_file("map/lakes/00_lakes.txt"));
+    assert!(!profile.allows_scan_file("map/unknown.txt"));
+    assert!(!profile.allows_scan_file("map/lakes/unknown.txt"));
+    assert!(!profile.allows_scan_file("map/random/area.txt"));
+}
+
+#[test]
 fn canonical_hash_is_independent_of_record_insertion_order() {
     let mut first = RulesModel {
         game_id: "test-game".to_owned(),

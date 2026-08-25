@@ -49,7 +49,7 @@ fn workspace_root_is_scanned_as_current_mod_without_project_config() {
 #[test]
 fn watched_file_registration_and_notification_update_the_disk_index() {
     let (root, root_uri) = temp_workspace_dir();
-    let events = root.join("common/events");
+    let events = root.join("events");
     fs::create_dir_all(&events).expect("events directory");
     let definition = events.join("watched.txt");
     fs::write(&definition, "country_event = { id = old.1 }\n").expect("initial definition");
@@ -156,7 +156,7 @@ fn project_config_loads_ordered_dependencies_and_keeps_them_read_only() {
     let vanilla = root.join("vanilla");
     fs::create_dir_all(&config_dir).expect("config directory");
     for directory in [&current, &low, &high, &vanilla] {
-        fs::create_dir_all(directory.join("common/events")).expect("fixture directory");
+        fs::create_dir_all(directory.join("events")).expect("fixture directory");
     }
     let canonical_root = fs::canonicalize(&root).expect("canonical root");
     let current = fs::canonicalize(&current).expect("canonical current");
@@ -180,7 +180,7 @@ fn project_config_loads_ordered_dependencies_and_keeps_them_read_only() {
         Some(&canonical_root),
         Some(json!({
             "modDirectory": "mod",
-            "dependencies": [{"id": "nested", "path": "mod/common"}]
+            "dependencies": [{"id": "nested", "path": "mod/events"}]
         })),
         &pdx_engine::WorkspaceScanToken::new(),
     )
@@ -188,7 +188,7 @@ fn project_config_loads_ordered_dependencies_and_keeps_them_read_only() {
     assert_eq!(overlap.code, INVALID_PARAMS);
     assert!(overlap.message.contains("must not overlap"));
     fs::write(
-        vanilla.join("common/events/definitions.txt"),
+        vanilla.join("events/definitions.txt"),
         "country_event = { id = vanilla.1 }\n",
     )
     .expect("Vanilla definition");
@@ -228,7 +228,7 @@ path = "dependencies/high"
     )
     .expect("project config");
     fs::write(
-        low.join("common/events/definitions.txt"),
+        low.join("events/definitions.txt"),
         concat!(
             "country_event = { id = shared.1 }\n",
             "country_event = { id = dependency-shared.1 }\n",
@@ -237,16 +237,16 @@ path = "dependencies/high"
     )
     .expect("low dependency");
     fs::write(
-        high.join("common/events/definitions.txt"),
+        high.join("events/definitions.txt"),
         "country_event = { id = shared.1 }\ncountry_event = { id = dependency-shared.1 }\n",
     )
     .expect("high dependency");
     fs::write(
-        current.join("common/events/definitions.txt"),
+        current.join("events/definitions.txt"),
         "country_event = { id = shared.1 }\n",
     )
     .expect("current mod");
-    let reference_path = current.join("common/events/reference.txt");
+    let reference_path = current.join("events/reference.txt");
     fs::write(&reference_path, "event = dependency.1\nevent = vanilla.1\n")
         .expect("current reference");
 
@@ -343,7 +343,7 @@ fn missing_vanilla_cache_degrades_with_an_lsp_warning() {
         .expect("clock")
         .as_nanos();
     let root = std::env::temp_dir().join(format!("pdx-lsp-missing-vanilla-cache-{nonce}"));
-    fs::create_dir_all(root.join("common/events")).expect("workspace fixture");
+    fs::create_dir_all(root.join("events")).expect("workspace fixture");
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":path_to_uri(&root),"capabilities":{},"initializationOptions":{"vanillaIndexCache":".pdx/missing.pdxindex"}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -741,9 +741,9 @@ fn fixture_vanilla_source(root: &std::path::Path) -> std::path::PathBuf {
     fs::create_dir_all(executable.parent().expect("executable parent"))
         .expect("executable parent directory");
     fs::write(executable, b"fixture executable").expect("executable marker");
-    fs::create_dir_all(source.join("common/events")).expect("indexed directory");
+    fs::create_dir_all(source.join("events")).expect("indexed directory");
     fs::write(
-        source.join("common/events/definitions.txt"),
+        source.join("events/definitions.txt"),
         "country_event = { id = vanilla.1 }\n",
     )
     .expect("fixture source");
@@ -889,9 +889,9 @@ fn automatic_vanilla_setup_builds_cache_and_records_single_attempt() {
     fs::create_dir_all(executable.parent().expect("executable parent"))
         .expect("executable parent directory");
     fs::write(executable, b"fixture executable").expect("executable marker");
-    fs::create_dir_all(source.join("common/events")).expect("indexed directory");
+    fs::create_dir_all(source.join("events")).expect("indexed directory");
     fs::write(
-        source.join("common/events/definitions.txt"),
+        source.join("events/definitions.txt"),
         "country_event = { id = vanilla.1 }\n",
     )
     .expect("fixture source");
@@ -1134,9 +1134,9 @@ fn unsuccessful_automatic_discovery_is_recorded_and_not_repeated() {
 #[test]
 fn project_config_is_auto_discovered_from_the_workspace_root() {
     let (root, _) = temp_workspace_dir();
-    fs::create_dir_all(root.join("mod/common/events")).expect("current directory");
-    fs::create_dir_all(root.join("deps/low/common/events")).expect("low dependency");
-    fs::create_dir_all(root.join("deps/high/common/events")).expect("high dependency");
+    fs::create_dir_all(root.join("mod/events")).expect("current directory");
+    fs::create_dir_all(root.join("deps/low/events")).expect("low dependency");
+    fs::create_dir_all(root.join("deps/high/events")).expect("high dependency");
     fs::create_dir_all(root.join(".pdx")).expect("config directory");
     fs::write(
         root.join(".pdx/project.toml"),
@@ -1200,9 +1200,9 @@ fn invalid_auto_discovered_project_config_fails_loudly() {
 #[test]
 fn indexed_dependencies_are_excluded_from_live_scanning() {
     let (root, _) = temp_workspace_dir();
-    fs::create_dir_all(root.join("mod/common/events")).expect("current directory");
-    fs::create_dir_all(root.join("deps/live/common/events")).expect("live dependency");
-    fs::create_dir_all(root.join("deps/cached/common/events")).expect("cached dependency");
+    fs::create_dir_all(root.join("mod/events")).expect("current directory");
+    fs::create_dir_all(root.join("deps/live/events")).expect("live dependency");
+    fs::create_dir_all(root.join("deps/cached/events")).expect("cached dependency");
     let canonical_root = fs::canonicalize(&root).expect("canonical root");
     let resolved = super::resolve_source_roots(
         Some(&canonical_root),
@@ -1247,10 +1247,10 @@ fn existing_dependency_index_cache_is_installed_in_the_background() {
     let container = std::env::temp_dir().join(format!("pdx-lsp-dep-cache-load-{nonce}"));
     let workspace = container.join("workspace");
     let dependency = container.join("dependency");
-    fs::create_dir_all(workspace.join("common/events")).expect("workspace fixture");
-    fs::create_dir_all(dependency.join("common/events")).expect("dependency fixture");
+    fs::create_dir_all(workspace.join("events")).expect("workspace fixture");
+    fs::create_dir_all(dependency.join("events")).expect("dependency fixture");
     fs::write(
-        dependency.join("common/events/dep_events.txt"),
+        dependency.join("events/dep_events.txt"),
         "country_event = { id = dep.1 }\n",
     )
     .expect("dependency definition");
@@ -1273,7 +1273,7 @@ fn existing_dependency_index_cache_is_installed_in_the_background() {
     cache.save(&cache_path).expect("save dependency cache");
     fs::remove_dir_all(&dependency).expect("make dependency source unavailable after caching");
 
-    let reference = workspace.join("common/events/reference.txt");
+    let reference = workspace.join("events/reference.txt");
     fs::write(&reference, "event = dep.1\n").expect("workspace reference");
     let reference_uri = canonical_uri(&reference);
     let input = frames([
@@ -1341,15 +1341,15 @@ fn missing_dependency_index_cache_is_built_in_the_background() {
     let container = std::env::temp_dir().join(format!("pdx-lsp-dep-cache-build-{nonce}"));
     let workspace = container.join("workspace");
     let dependency = container.join("dependency");
-    fs::create_dir_all(workspace.join("common/events")).expect("workspace fixture");
-    fs::create_dir_all(dependency.join("common/events")).expect("dependency fixture");
+    fs::create_dir_all(workspace.join("events")).expect("workspace fixture");
+    fs::create_dir_all(dependency.join("events")).expect("dependency fixture");
     fs::write(
-        dependency.join("common/events/dep_events.txt"),
+        dependency.join("events/dep_events.txt"),
         "country_event = { id = dep.2 }\n",
     )
     .expect("dependency definition");
     let cache_path = container.join("missing/dependency.pdxindex");
-    let reference = workspace.join("common/events/reference.txt");
+    let reference = workspace.join("events/reference.txt");
     fs::write(&reference, "event = dep.2\n").expect("workspace reference");
     let reference_uri = canonical_uri(&reference);
     let input = frames([

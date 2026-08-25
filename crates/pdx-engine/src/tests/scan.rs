@@ -436,15 +436,20 @@ fn opaque_binary_assets_are_indexed_without_reading_them_as_utf8() {
 }
 
 #[test]
-fn eu4_scan_uses_the_cwtools_script_folder_whitelist() {
+fn eu4_scan_uses_the_explicit_script_folder_whitelist() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
     let root = std::env::temp_dir().join(format!("pdx-engine-whitelist-{nonce}"));
     fs::create_dir_all(root.join("events")).expect("events directory");
-    fs::create_dir_all(root.join("common/custom_unknown")).expect("common directory");
+    fs::create_dir_all(root.join("events/nested")).expect("nested events directory");
+    fs::create_dir_all(root.join("common/countries")).expect("common directory");
+    fs::create_dir_all(root.join("common/countries/nested")).expect("nested common directory");
     fs::create_dir_all(root.join("gfx")).expect("gfx directory");
+    fs::create_dir_all(root.join("gfx/sprite_packs")).expect("nested gfx directory");
+    fs::create_dir_all(root.join("map/lakes")).expect("map lakes directory");
+    fs::create_dir_all(root.join("map/random/tiles")).expect("map generated directory");
     fs::create_dir_all(root.join("ignored")).expect("ignored directory");
     fs::write(
         root.join("events/allowed.txt"),
@@ -452,15 +457,60 @@ fn eu4_scan_uses_the_cwtools_script_folder_whitelist() {
     )
     .expect("event fixture");
     fs::write(
-        root.join("common/custom_unknown/allowed.txt"),
+        root.join("events/nested/ignored.txt"),
+        "country_event = { id = whitelist.events_nested }\n",
+    )
+    .expect("nested event fixture");
+    fs::write(
+        root.join("common/technology.txt"),
+        "country_event = { id = whitelist.technology }\n",
+    )
+    .expect("bare common fixture");
+    fs::write(
+        root.join("common/unknown.txt"),
+        "country_event = { id = whitelist.unknown_bare }\n",
+    )
+    .expect("unknown bare common fixture");
+    fs::write(
+        root.join("common/countries/allowed.txt"),
         "country_event = { id = whitelist.common }\n",
     )
     .expect("common fixture");
+    fs::write(
+        root.join("common/countries/nested/ignored.txt"),
+        "country_event = { id = whitelist.common_nested }\n",
+    )
+    .expect("nested common fixture");
     fs::write(
         root.join("gfx/icon.gfx"),
         "spriteType = { name = whitelist.gfx }\n",
     )
     .expect("gfx fixture");
+    fs::write(
+        root.join("gfx/sprite_packs/allowed.txt"),
+        "country_event = { id = whitelist.gfx_nested }\n",
+    )
+    .expect("nested gfx fixture");
+    fs::write(
+        root.join("map/area.txt"),
+        "country_event = { id = whitelist.map_area }\n",
+    )
+    .expect("map fixture");
+    fs::write(
+        root.join("map/lakes/00_lakes.txt"),
+        "country_event = { id = whitelist.map_lakes }\n",
+    )
+    .expect("nested map fixture");
+    fs::write(
+        root.join("map/random/tiles/tile0.txt"),
+        "country_event = { id = whitelist.map_generated }\n",
+    )
+    .expect("generated map fixture");
+    fs::write(
+        root.join("map/unknown.txt"),
+        "country_event = { id = whitelist.map_unknown }\n",
+    )
+    .expect("unknown map fixture");
     fs::write(root.join("gfx/icon.png"), [0_u8, 159, 146, 150]).expect("asset fixture");
     fs::write(
         root.join("ignored/not_scanned.txt"),
@@ -482,8 +532,8 @@ fn eu4_scan_uses_the_cwtools_script_folder_whitelist() {
         ),
     ]));
     let report = host.refresh_source_roots().expect("whitelist scan");
-    assert_eq!(report.discovered_files, 4);
-    assert_eq!(report.indexed_files, 3);
+    assert_eq!(report.discovered_files, 10);
+    assert_eq!(report.indexed_files, 7);
     let snapshot = host.snapshot();
     assert!(
         snapshot
@@ -496,6 +546,60 @@ fn eu4_scan_uses_the_cwtools_script_folder_whitelist() {
             .index()
             .active_definition("event", "whitelist.common")
             .is_some()
+    );
+    assert!(
+        snapshot
+            .index()
+            .active_definition("event", "whitelist.technology")
+            .is_some()
+    );
+    assert!(
+        snapshot
+            .index()
+            .active_definition("event", "whitelist.gfx_nested")
+            .is_some()
+    );
+    assert!(
+        snapshot
+            .index()
+            .active_definition("event", "whitelist.map_area")
+            .is_some()
+    );
+    assert!(
+        snapshot
+            .index()
+            .active_definition("event", "whitelist.map_lakes")
+            .is_some()
+    );
+    assert!(
+        snapshot
+            .index()
+            .active_definition("event", "whitelist.unknown_bare")
+            .is_none()
+    );
+    assert!(
+        snapshot
+            .index()
+            .active_definition("event", "whitelist.common_nested")
+            .is_none()
+    );
+    assert!(
+        snapshot
+            .index()
+            .active_definition("event", "whitelist.events_nested")
+            .is_none()
+    );
+    assert!(
+        snapshot
+            .index()
+            .active_definition("event", "whitelist.map_generated")
+            .is_none()
+    );
+    assert!(
+        snapshot
+            .index()
+            .active_definition("event", "whitelist.map_unknown")
+            .is_none()
     );
     assert!(
         snapshot

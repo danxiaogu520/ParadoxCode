@@ -498,7 +498,7 @@ fn navigation_targets_the_name_in_an_indexed_definition() {
         .expect("clock")
         .as_nanos();
     let root = std::env::temp_dir().join(format!("pdx-analysis-navigation-{nonce}"));
-    let definitions = root.join("common/events");
+    let definitions = root.join("events");
     fs::create_dir_all(&definitions).expect("event directory");
     let definition_path = definitions.join("definitions.txt");
     let definition_text = "country_event = { id = indexed.1 }\n";

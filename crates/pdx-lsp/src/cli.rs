@@ -750,8 +750,7 @@ fn dev_prepare_manifest(args: &[String]) -> Result<String, CliError> {
     }
     let revision = String::from_utf8_lossy(&rev.stdout).trim().to_owned();
 
-    {
-        let (grammar_id, grammar_dir_name) = ("eu4", "eu4");
+    for (grammar_id, grammar_dir_name) in [("eu4", "eu4"), ("localisation", "localisation")] {
         let table = format!("[grammars.{grammar_id}]");
         if let Some(start) = text.find(&table) {
             let next = text[start + table.len()..]
@@ -830,9 +829,9 @@ mod tests {
             .as_nanos();
         let root = std::env::temp_dir().join(format!("pdx-cli-vanilla-cache-{nonce}"));
         let source = root.join("vanilla");
-        fs::create_dir_all(source.join("common/events")).expect("fixture directory");
+        fs::create_dir_all(source.join("events")).expect("fixture directory");
         fs::write(
-            source.join("common/events/definitions.txt"),
+            source.join("events/definitions.txt"),
             "country_event = { id = vanilla.1 }\n",
         )
         .expect("fixture source");
@@ -868,9 +867,9 @@ mod tests {
             .as_nanos();
         let root = std::env::temp_dir().join(format!("pdx-cli-dependency-cache-{nonce}"));
         let source = root.join("dependency");
-        fs::create_dir_all(source.join("common/events")).expect("fixture directory");
+        fs::create_dir_all(source.join("events")).expect("fixture directory");
         fs::write(
-            source.join("common/events/definitions.txt"),
+            source.join("events/definitions.txt"),
             "country_event = { id = dep.1 }\n",
         )
         .expect("fixture source");
@@ -915,9 +914,9 @@ mod tests {
         fs::create_dir_all(executable.parent().expect("executable parent"))
             .expect("executable parent directory");
         fs::write(executable, b"fixture executable").expect("executable marker");
-        fs::create_dir_all(source.join("common/events")).expect("indexed directory");
+        fs::create_dir_all(source.join("events")).expect("indexed directory");
         fs::write(
-            source.join("common/events/definitions.txt"),
+            source.join("events/definitions.txt"),
             "country_event = { id = vanilla.1 }\n",
         )
         .expect("fixture source");

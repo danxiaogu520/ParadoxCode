@@ -7,7 +7,7 @@ fn targeted_disk_changes_replace_one_shard_without_overwriting_an_overlay() {
         .expect("clock")
         .as_nanos();
     let root = std::env::temp_dir().join(format!("pdx-engine-targeted-disk-{nonce}"));
-    let events = root.join("common/events");
+    let events = root.join("events");
     fs::create_dir_all(&events).expect("fixture directory");
     let changed_path = events.join("changed.txt");
     let untouched_path = events.join("untouched.txt");
@@ -125,6 +125,59 @@ fn targeted_disk_changes_replace_one_shard_without_overwriting_an_overlay() {
             .text(),
         "country_event = { id = overlay.1 }\n"
     );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn targeted_disk_changes_reindex_a_localisation_shard() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-targeted-localisation-{nonce}"));
+    let localisation = root.join("localisation/nested");
+    fs::create_dir_all(&localisation).expect("localisation fixture directory");
+    let changed_path = localisation.join("test_l_english.yml");
+    fs::write(&changed_path, "l_english:\nold_name:0 \"Old\"\n").expect("localisation fixture");
+
+    let mut host = eu4_host();
+    host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        ),
+    ]));
+    host.refresh_source_roots()
+        .expect("initial localisation scan");
+    assert!(
+        host.snapshot()
+            .index()
+            .active_definition("localisation", "old_name")
+            .is_some()
+    );
+
+    fs::write(&changed_path, "l_english:\nnew_name:0 \"New\"\n").expect("localisation edit");
+    reset_pipeline_counts();
+    host.apply_disk_file_changes(&[DiskFileChange::new(
+        changed_path,
+        DiskFileChangeKind::Changed,
+    )])
+    .expect("targeted localisation change");
+    assert_eq!(pipeline_counts(), (1, 1));
+    assert!(
+        host.snapshot()
+            .index()
+            .active_definition("localisation", "old_name")
+            .is_none()
+    );
+    assert!(
+        host.snapshot()
+            .index()
+            .active_definition("localisation", "new_name")
+            .is_some()
+    );
+
     fs::remove_dir_all(root).expect("cleanup");
 }
 
@@ -539,22 +592,22 @@ fn roots_overlay_and_shards_preserve_shadowed_semantic_definitions() {
     let dependency = root.join("dependency");
     let current = root.join("current");
     for directory in [
-        vanilla.join("common/events"),
-        dependency.join("common/events"),
+        vanilla.join("events"),
+        dependency.join("events"),
         dependency.join("common/scripted_effects"),
-        current.join("common/events"),
+        current.join("events"),
         current.join("common/scripted_triggers"),
         current.join("localisation/nested/deeper"),
     ] {
         fs::create_dir_all(directory).expect("fixture directory");
     }
     fs::write(
-        vanilla.join("common/events/foo.txt"),
+        vanilla.join("events/foo.txt"),
         "country_event = { id = foo.1 }\n",
     )
     .expect("vanilla event");
     fs::write(
-        dependency.join("common/events/foo.txt"),
+        dependency.join("events/foo.txt"),
         "country_event = { id = foo.1 }\n",
     )
     .expect("dependency event");
@@ -563,7 +616,7 @@ fn roots_overlay_and_shards_preserve_shadowed_semantic_definitions() {
         "heal_army = { add_manpower = 1 }\n",
     )
     .expect("effect");
-    let current_event = current.join("common/events/foo.txt");
+    let current_event = current.join("events/foo.txt");
     fs::write(&current_event, "country_event = { id = foo.1 }\n").expect("current event");
     fs::write(
         current.join("common/scripted_triggers/triggers.txt"),
@@ -645,7 +698,7 @@ fn roots_overlay_and_shards_preserve_shadowed_semantic_definitions() {
             .is_empty()
     );
 
-    let logical = LogicalPath::new("common/events/foo.txt");
+    let logical = LogicalPath::new("events/foo.txt");
     assert_eq!(
         snapshot
             .resolve(&logical)

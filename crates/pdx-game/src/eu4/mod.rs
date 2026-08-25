@@ -5,6 +5,7 @@
 
 pub mod mission;
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -49,16 +50,20 @@ pub const INSTALL_DESCRIPTOR: GameInstallDescriptor = GameInstallDescriptor {
     installation_directory_names: &["Europa Universalis IV"],
 };
 
-/// CWTools-compatible EU4 source directory whitelist.
+/// EU4 source directory whitelist.
 ///
-/// The `common` entry intentionally covers the more specific `common/*` entries as well. The
-/// complete list is retained as profile data to match CWTools' `scriptFolders` contract; the
-/// engine collapses nested entries before walking the filesystem.
+/// Every script root is bounded to direct files only; supported nested script directories are
+/// listed as separate roots. `map` is the one fixed-name exception: its known vanilla paths are
+/// enumerated below so generated map assets cannot enter the script index. `localisation` remains
+/// recursive because it is owned by the separate Localisation language.
 pub const SCRIPT_FOLDERS: &[&str] = &[
+    "common",
     "common/advisortypes",
     "common/ages",
+    "common/ai_army",
     "common/ai_attitudes",
     "common/ai_personalities",
+    "common/ancestor_personalities",
     "common/bookmarks",
     "common/buildings",
     "common/cb_types",
@@ -71,31 +76,44 @@ pub const SCRIPT_FOLDERS: &[&str] = &[
     "common/country_tags",
     "common/cultures",
     "common/custom_country_colors",
+    "common/custom_gui",
     "common/custom_ideas",
     "common/decrees",
+    "common/defender_of_faith",
     "common/defines",
     "common/diplomatic_actions",
     "common/disasters",
     "common/dynasty_colors",
+    "common/estate_agendas",
+    "common/estate_crown_land",
+    "common/estate_privileges",
     "common/estates",
+    "common/estates_preload",
     "common/event_modifiers",
     "common/factions",
+    "common/federation_advancements",
     "common/fervor",
     "common/fetishist_cults",
+    "common/flagship_modifications",
+    "common/golden_bulls",
+    "common/government_mechanics",
     "common/governments",
     "common/government_names",
     "common/government_ranks",
     "common/government_reforms",
     "common/great_projects",
+    "common/hegemons",
+    "common/holy_orders",
     "common/ideas",
+    "common/imperial_incidents",
     "common/imperial_reforms",
     "common/incidents",
     "common/institutions",
     "common/insults",
     "common/isolationism",
     "common/leader_personalities",
+    "common/mercenary_companies",
     "common/natives",
-    "common/native_advancement",
     "common/naval_doctrines",
     "common/new_diplomatic_actions",
     "common/on_actions",
@@ -116,12 +134,14 @@ pub const SCRIPT_FOLDERS: &[&str] = &[
     "common/religious_conversions",
     "common/religious_reforms",
     "common/revolt_triggers",
+    "common/revolution",
     "common/ruler_personalities",
     "common/scripted_effects",
     "common/scripted_functions",
     "common/scripted_triggers",
     "common/state_edicts",
     "common/static_modifiers",
+    "common/subject_type_upgrades",
     "common/subject_types",
     "common/technologies",
     "common/timed_modifiers",
@@ -134,7 +154,6 @@ pub const SCRIPT_FOLDERS: &[&str] = &[
     "common/units",
     "common/units_display",
     "common/wargoal_types",
-    "common",
     "customizable_localization",
     "decisions",
     "events",
@@ -148,10 +167,52 @@ pub const SCRIPT_FOLDERS: &[&str] = &[
     "music",
     "missions",
     "sound",
+    "sound/amb",
+    "sound/battle",
+    "sound/battle/naval",
     "tutorial",
     "gfx",
+    "gfx/combat_result",
+    "gfx/sprite_packs",
+    "gfx/sprite_packs_order",
     "interface",
+    "interface/assets",
+    "interface/government_mechanics",
+    "interface/state_view",
     "localisation",
+];
+
+/// EU4 script files directly under the common directory.
+pub const COMMON_ROOT_FILES: &[&str] = &[
+    "achievements.txt",
+    "alerts.txt",
+    "graphicalculturetype.txt",
+    "historial_lucky.txt",
+    "technology.txt",
+];
+
+/// EU4 map script paths supported by the vanilla game and the reference mod.
+///
+/// Map data contains many generated assets (for example `map/random/tiles/*.txt`) that are not
+/// script sources. Keep the language/index deliberately name-based so those assets are never
+/// pulled in by a recursive glob.
+pub const MAP_ROOT_FILES: &[&str] = &[
+    "ambient_object.txt",
+    "area.txt",
+    "climate.txt",
+    "continent.txt",
+    "lakes/00_lakes.txt",
+    "positions.txt",
+    "provincegroup.txt",
+    "random/RNWScenarios.txt",
+    "random/RandomLakeNames.txt",
+    "random/RandomLandNames.txt",
+    "random/RandomSeaNames.txt",
+    "region.txt",
+    "seasons.txt",
+    "superregion.txt",
+    "terrain.txt",
+    "trade_winds.txt",
 ];
 
 /// Loads and validates the first-party EU4 rules from the embedded JSON source bundle.
@@ -460,14 +521,41 @@ pub fn profile() -> GameProfile {
         container_value_definition("exile_heir_as", "name", "exiled_heir"),
         container_value_definition("exile_consort_as", "name", "exiled_consort"),
     ];
+    let scan_roots = SCRIPT_FOLDERS
+        .iter()
+        .map(|folder| (*folder).to_owned())
+        .collect::<Vec<_>>();
+    let scan_root_max_depths = scan_roots
+        .iter()
+        .filter(|root| root.as_str() != "localisation")
+        .map(|root| {
+            let max_depth = if root == "map" { 1 } else { 0 };
+            (root.clone(), max_depth)
+        })
+        .collect::<BTreeMap<_, _>>();
+    let scan_root_files = BTreeMap::from([
+        (
+            "common".to_owned(),
+            COMMON_ROOT_FILES
+                .iter()
+                .map(|file| (*file).to_owned())
+                .collect(),
+        ),
+        (
+            "map".to_owned(),
+            MAP_ROOT_FILES
+                .iter()
+                .map(|file| (*file).to_owned())
+                .collect(),
+        ),
+    ]);
     GameProfile {
         game_id: GAME_ID.to_owned(),
         source_encoding: SourceEncoding::Windows1252,
-        scan_roots: SCRIPT_FOLDERS
-            .iter()
-            .map(|folder| (*folder).to_owned())
-            .collect(),
-        scan_extensions: ["txt", "gfx", "yml"]
+        scan_roots,
+        scan_root_max_depths,
+        scan_root_files,
+        scan_extensions: ["txt", "gfx", "yml", "yaml"]
             .into_iter()
             .map(str::to_owned)
             .collect(),
@@ -964,8 +1052,8 @@ mod tests {
     use std::fs;
 
     use super::{
-        Eu4Profile, GAME_ID, SCRIPT_FOLDERS, bootstrap_rules, first_party_rules,
-        first_party_rules_cached, first_party_rules_ephemeral, profile,
+        COMMON_ROOT_FILES, Eu4Profile, GAME_ID, MAP_ROOT_FILES, SCRIPT_FOLDERS, bootstrap_rules,
+        first_party_rules, first_party_rules_cached, first_party_rules_ephemeral, profile,
     };
     use pdx_rules::SourceEncoding;
 
@@ -992,7 +1080,67 @@ mod tests {
         assert_eq!(profile.source_encoding, SourceEncoding::Windows1252);
         assert_eq!(profile.scan_roots().len(), SCRIPT_FOLDERS.len());
         assert!(profile.scan_roots().iter().any(|root| root == "common"));
-        assert_eq!(profile.scan_extensions(), ["txt", "gfx", "yml"]);
+        assert_eq!(profile.scan_root_max_depth("common"), Some(0));
+        assert!(profile.scan_root_files("common").is_some_and(|files| {
+            files
+                .iter()
+                .map(String::as_str)
+                .eq(COMMON_ROOT_FILES.iter().copied())
+        }));
+        assert!(
+            profile
+                .scan_roots()
+                .iter()
+                .any(|root| root == "common/ai_army")
+        );
+        assert_eq!(profile.scan_root_max_depth("common/ai_army"), Some(0));
+        assert_eq!(profile.scan_root_max_depth("events"), Some(0));
+        assert_eq!(
+            profile.scan_root_max_depth("interface/government_mechanics"),
+            Some(0)
+        );
+        assert_eq!(profile.scan_root_max_depth("map"), Some(1));
+        assert!(profile.scan_root_files("map").is_some_and(|files| {
+            files
+                .iter()
+                .map(String::as_str)
+                .eq(MAP_ROOT_FILES.iter().copied())
+        }));
+        for root in profile.scan_roots() {
+            if root == "localisation" || root == "map" {
+                continue;
+            }
+            assert_eq!(
+                profile.scan_root_max_depth(root),
+                Some(0),
+                "script root must not recurse: {root}"
+            );
+        }
+        assert_eq!(profile.scan_root_max_depth("localisation"), None);
+        assert!(
+            profile
+                .scan_roots()
+                .iter()
+                .any(|root| root == "common/estate_crown_land")
+        );
+        assert!(
+            !profile
+                .scan_roots()
+                .iter()
+                .any(|root| root == "common/native_advancement")
+        );
+        assert!(profile.allows_scan_file("common/technology.txt"));
+        assert!(!profile.allows_scan_file("common/example.txt"));
+        assert!(!profile.allows_scan_file("common/unlisted/example.txt"));
+        assert!(profile.allows_scan_file("common/ai_army/example.txt"));
+        assert!(!profile.allows_scan_file("common/ai_army/nested/example.txt"));
+        assert!(profile.allows_scan_file("map/area.txt"));
+        assert!(profile.allows_scan_file("map/lakes/00_lakes.txt"));
+        assert!(profile.allows_scan_file("map/random/RandomLandNames.txt"));
+        assert!(!profile.allows_scan_file("map/unknown.txt"));
+        assert!(!profile.allows_scan_file("map/random/tiles/tile0.txt"));
+        assert!(!profile.allows_scan_file("map/lakes/unknown.txt"));
+        assert_eq!(profile.scan_extensions(), ["txt", "gfx", "yml", "yaml"]);
         assert!(
             profile
                 .scan_roots()

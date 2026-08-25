@@ -1,0 +1,84 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Localisation",
+  "scopeName": "source.localisation",
+  "fileTypes": ["yml", "yaml"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#header" },
+    { "include": "#key" },
+    { "include": "#version" },
+    { "include": "#separator" },
+    { "include": "#string" },
+    { "include": "#parameter" },
+    { "include": "#tag" },
+    { "include": "#scope" },
+    { "include": "#bare" }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        { "name": "comment.line.number-sign.localisation", "match": "#.*$" }
+      ]
+    },
+    "header": {
+      "patterns": [
+        {
+          "name": "entity.name.type.localisation",
+          "match": "^\\s*\\uFEFF?l_[A-Za-z0-9_]+(?=\\s*:)"
+        }
+      ]
+    },
+    "key": {
+      "patterns": [
+        {
+          "name": "variable.other.property.localisation",
+          "match": "^\\s*[A-Za-z_][A-Za-z0-9_.-]*(?=\\s*(?::\\s*\\d+)?\\s+\\\")"
+        }
+      ]
+    },
+    "version": {
+      "patterns": [
+        {
+          "name": "constant.numeric.localisation",
+          "match": "(?<=:)\\s*\\d+"
+        }
+      ]
+    },
+    "separator": {
+      "patterns": [
+        { "name": "punctuation.separator.key-value.localisation", "match": ":" }
+      ]
+    },
+    "string": {
+      "name": "string.quoted.double.localisation",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        { "name": "variable.parameter.localisation", "match": "\\$[A-Za-z_][A-Za-z0-9_.-]*\\$" },
+        { "name": "markup.other.attribute.localisation", "match": "§[A-Za-z0-9]" },
+        { "name": "constant.character.escape.localisation", "match": "\\\\." }
+      ]
+    },
+    "parameter": {
+      "patterns": [
+        { "name": "variable.parameter.localisation", "match": "\\$[A-Za-z_][A-Za-z0-9_.-]*\\$" }
+      ]
+    },
+    "tag": {
+      "patterns": [
+        { "name": "markup.other.attribute.localisation", "match": "§[A-Za-z0-9]" }
+      ]
+    },
+    "scope": {
+      "patterns": [
+        { "name": "variable.language.scope.localisation", "match": "\\[[^\\]\\r\\n]+\\]" }
+      ]
+    },
+    "bare": {
+      "patterns": [
+        { "name": "string.unquoted.localisation", "match": "\\b[A-Za-z_][A-Za-z0-9_.-]*\\b" }
+      ]
+    }
+  }
+}

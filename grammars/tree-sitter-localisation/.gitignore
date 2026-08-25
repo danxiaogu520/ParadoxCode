@@ -1,0 +1,5 @@
+# Native build artifacts produced while compiling the generated parser
+# (tree-sitter test / pdx check grammar-fuzz on Windows).
+parser.exp
+parser.lib
+parser.obj

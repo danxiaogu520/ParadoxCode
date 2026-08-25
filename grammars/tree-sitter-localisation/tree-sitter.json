@@ -1,0 +1,24 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "localisation",
+      "camelcase": "Localisation",
+      "title": "Localisation",
+      "scope": "source.localisation",
+      "file-types": ["yml", "yaml"],
+      "injection-regex": "^localisation$",
+      "class-name": "TreeSitterLocalisation"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Tree-sitter grammar for Paradox localisation files"
+  },
+  "bindings": {
+    "c": true,
+    "node": true,
+    "rust": true
+  }
+}

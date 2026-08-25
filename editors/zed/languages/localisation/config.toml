@@ -1,0 +1,6 @@
+name = "Localisation"
+grammar = "localisation"
+line_comments = ["# "]
+tab_size = 2
+hard_tabs = false
+first_line_pattern = "^\\uFEFF?l_[A-Za-z0-9_]+:"

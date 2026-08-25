@@ -61,7 +61,7 @@ fn rename_rejects_dependency_and_vanilla_definitions() {
 
     let nonce = std::process::id();
     let root = std::env::temp_dir().join(format!("pdx-analysis-rename-{nonce}"));
-    let dependency = root.join("dependency/common/events");
+    let dependency = root.join("dependency/events");
     fs::create_dir_all(&dependency).expect("dependency directory");
     let path = dependency.join("events.txt");
     fs::write(&path, "country_event = { id = read_only.1 }\n").expect("dependency event");

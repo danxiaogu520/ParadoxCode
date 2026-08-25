@@ -372,9 +372,9 @@ mod tests {
         let mut configs = Vec::new();
         for (index, name) in [(1_u32, "first"), (2, "second")] {
             let root = container.path().join(name);
-            fs::create_dir_all(root.join("common/events")).expect("dependency directory");
+            fs::create_dir_all(root.join("events")).expect("dependency directory");
             fs::write(
-                root.join("common/events/events.txt"),
+                root.join("events/events.txt"),
                 format!("country_event = {{ id = {name}.1 }}\n"),
             )
             .expect("dependency source");

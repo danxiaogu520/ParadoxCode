@@ -67,6 +67,7 @@ jobs:
           cache: npm
           cache-dependency-path: |
             grammars/tree-sitter-eu4/package-lock.json
+            grammars/tree-sitter-localisation/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: bash scripts/check-quality-gates.sh grammars
