@@ -1,0 +1,1316 @@
+{
+  "records": [
+    {
+      "table": "localisation",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:0:1",
+      "source_order": 20,
+      "fields": {
+        "child_count": "3",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:10:1",
+      "source_order": 68,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "96",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:11:1",
+      "source_order": 72,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "103",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:1:1",
+      "source_order": 26,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "21",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:2:1",
+      "source_order": 31,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "30",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:4:1",
+      "source_order": 38,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "42",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:5:1",
+      "source_order": 42,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "49",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:6:1",
+      "source_order": 46,
+      "fields": {
+        "child_count": "3",
+        "key": "localisation",
+        "line": "56",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:7:1",
+      "source_order": 52,
+      "fields": {
+        "child_count": "3",
+        "key": "localisation",
+        "line": "67",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:8:1",
+      "source_order": 58,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "78",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:common/00_small_types_consolidated:root:0:9:1",
+      "source_order": 63,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "87",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/advisortypes:common/advisortypes:common/advisortypes:root:0:0:1",
+      "source_order": 271,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "7",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/ages:common/ages:common/ages:root:0:0:1",
+      "source_order": 294,
+      "fields": {
+        "child_count": "3",
+        "key": "localisation",
+        "line": "6",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/ages:common/ages:common/ages:root:0:1:2",
+      "source_order": 302,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "20",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/ages:common/ages:common/ages:root:1:5:0",
+      "source_order": 322,
+      "fields": {
+        "child_count": "2",
+        "directives": "cardinality = 4..inf\nreplace_scope = { root = country this = country }",
+        "key": "localisation",
+        "line": "60",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/ai_personalities:common/ai_personalities:common/ai_personalities:root:0:0:1",
+      "source_order": 356,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "7",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/ancestor_personalities:common/ancestor_personalities:common/ancestor_personalities:root:0:0:1",
+      "source_order": 370,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/buildings:common/buildings:common/buildings:root:0:0:1",
+      "source_order": 469,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "6",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:0:0:1",
+      "source_order": 517,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "6",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:0:1:1",
+      "source_order": 524,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "19",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/colonial_region:common/colonial_region:common/colonial_region:root:0:0:1",
+      "source_order": 685,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/cultures:common/cultures:common/cultures:root:0:0:1",
+      "source_order": 781,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/cultures:common/cultures:common/cultures:root:0:1:2",
+      "source_order": 786,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "13",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/defender_of_faith:common/defender_of_faith:common/defender_of_faith:root:0:0:1",
+      "source_order": 891,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/diplomatic_actions_new:common/diplomatic_actions_new:common/diplomatic_actions_new:root:0:0:2",
+      "source_order": 924,
+      "fields": {
+        "child_count": "4",
+        "key": "localisation",
+        "line": "12",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/disasters:common/disasters:common/disasters:root:0:0:1",
+      "source_order": 998,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/estates:common/estates:common/estates:root:0:0:2",
+      "source_order": 1034,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "6",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/estates:common/estates:common/estates:root:0:1:1",
+      "source_order": 1038,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "13",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/estates:common/estates:common/estates:root:0:2:1",
+      "source_order": 1043,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "22",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/estates:common/estates:common/estates:root:0:3:3",
+      "source_order": 1050,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "33",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/estates:common/estates:common/estates:root:0:4:2",
+      "source_order": 1055,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "42",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/estates:common/estates:common/estates:root:0:5:2",
+      "source_order": 1060,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "51",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/federation_advancements:common/federation_advancements:common/federation_advancements:root:0:0:1",
+      "source_order": 1226,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/golden_bull:common/golden_bull:common/golden_bull:root:0:0:1",
+      "source_order": 1278,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:4:0:2:0",
+      "source_order": 1855,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 1..inf",
+        "key": "localisation",
+        "line": "950",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:0:0:3",
+      "source_order": 1303,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "14",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:0:1:5",
+      "source_order": 1315,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "37",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:0:2:2",
+      "source_order": 1323,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "47",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:0:5:1",
+      "source_order": 1336,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "66",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:0:6:4",
+      "source_order": 1346,
+      "fields": {
+        "child_count": "4",
+        "key": "localisation",
+        "line": "81",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:0:7:2",
+      "source_order": 1357,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "100",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/greatprojects:common/greatprojects:common/greatprojects:root:0:0:1",
+      "source_order": 1920,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/hegemon:common/hegemon:common/hegemon:root:0:0:1",
+      "source_order": 2057,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/holy_order:common/holy_order:common/holy_order:root:0:0:1",
+      "source_order": 2075,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "4",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:0:0:1",
+      "source_order": 2104,
+      "fields": {
+        "child_count": "3",
+        "key": "localisation",
+        "line": "6",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:0:1:2",
+      "source_order": 2116,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "28",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:0:2:1",
+      "source_order": 2121,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "37",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:0:3:2",
+      "source_order": 2126,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "46",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:0:4:2",
+      "source_order": 2132,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "57",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/imperial_incident:common/imperial_incident:common/imperial_incident:root:0:0:1",
+      "source_order": 2214,
+      "fields": {
+        "child_count": "3",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/imperial_reforms:common/imperial_reforms:common/imperial_reforms:root:0:0:9",
+      "source_order": 2246,
+      "fields": {
+        "child_count": "8",
+        "key": "localisation",
+        "line": "30",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/incidents:common/incidents:common/incidents:root:0:0:1",
+      "source_order": 2307,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "4",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/institutions:common/institutions:common/institutions:root:0:0:1",
+      "source_order": 2325,
+      "fields": {
+        "child_count": "3",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/mercenary_company:common/mercenary_company:common/mercenary_company:root:0:0:1",
+      "source_order": 2399,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/modifiers_consolidated:common/modifiers_consolidated:common/modifiers_consolidated:root:0:0:2",
+      "source_order": 2536,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "12",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/modifiers_consolidated:common/modifiers_consolidated:common/modifiers_consolidated:root:0:1:1",
+      "source_order": 2542,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "22",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/modifiers_consolidated:common/modifiers_consolidated:common/modifiers_consolidated:root:0:2:1",
+      "source_order": 2546,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "30",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/modifiers_consolidated:common/modifiers_consolidated:common/modifiers_consolidated:root:0:3:1",
+      "source_order": 2551,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "38",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/modifiers_consolidated:common/modifiers_consolidated:common/modifiers_consolidated:root:0:4:1",
+      "source_order": 2556,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "47",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/opinion_modifiers:common/opinion_modifiers:common/opinion_modifiers:root:0:0:1",
+      "source_order": 4446,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "6",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/parliaments:common/parliaments:common/parliaments:root:0:0:1",
+      "source_order": 4467,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/parliaments:common/parliaments:common/parliaments:root:0:1:1",
+      "source_order": 4471,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "12",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/peace_treaties:common/peace_treaties:common/peace_treaties:root:0:0:1",
+      "source_order": 4512,
+      "fields": {
+        "child_count": "4",
+        "key": "localisation",
+        "line": "6",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/personalities:common/personalities:common/personalities:root:0:0:1",
+      "source_order": 4553,
+      "fields": {
+        "child_count": "3",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/personalities:common/personalities:common/personalities:root:0:1:1",
+      "source_order": 4559,
+      "fields": {
+        "child_count": "3",
+        "key": "localisation",
+        "line": "16",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/rebel_types:common/rebel_types:common/rebel_types:root:0:0:1",
+      "source_order": 4641,
+      "fields": {
+        "child_count": "4",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/rebel_types:common/rebel_types:common/rebel_types:root:0:1:2",
+      "source_order": 4649,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "19",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:43:0",
+      "source_order": 5032,
+      "fields": {
+        "directives": "cardinality = 1..inf",
+        "key": "localisation",
+        "line": "738",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:root:0:0:1",
+      "source_order": 4729,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:root:0:10:2",
+      "source_order": 4802,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "119",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:root:0:11:3",
+      "source_order": 4811,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "135",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:root:0:1:2",
+      "source_order": 4739,
+      "fields": {
+        "child_count": "3",
+        "key": "localisation",
+        "line": "23",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:root:0:2:2",
+      "source_order": 4752,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "44",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:root:0:3:2",
+      "source_order": 4759,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "55",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:root:0:4:2",
+      "source_order": 4767,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "66",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:root:0:5:2",
+      "source_order": 4774,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "75",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:root:0:6:2",
+      "source_order": 4782,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "84",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:root:0:7:1",
+      "source_order": 4786,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "91",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:root:0:8:2",
+      "source_order": 4793,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "103",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:root:0:9:1",
+      "source_order": 4797,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "110",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/subject_types:common/subject_types:common/subject_types:root:0:0:1",
+      "source_order": 5886,
+      "fields": {
+        "child_count": "4",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/technology_groups:common/technology_groups:common/technology_groups:root:0:0:3",
+      "source_order": 6149,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "7",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:common/trade_consolidated:root:0:0:1",
+      "source_order": 6166,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "7",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:common/trade_consolidated:root:0:1:1",
+      "source_order": 6173,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "21",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:common/trade_consolidated:root:0:2:1",
+      "source_order": 6177,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "29",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:common/trade_consolidated:root:0:3:1",
+      "source_order": 6182,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "39",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:common/trade_consolidated:root:0:5:1",
+      "source_order": 6189,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "51",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:common/trade_consolidated:root:0:7:1",
+      "source_order": 6198,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "66",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "common/unit_types:common/unit_types:common/unit_types:root:0:0:4",
+      "source_order": 6316,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "10",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "decisions/decisions:decisions/decisions:decisions/decisions:root:0:0:2",
+      "source_order": 6365,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "6",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "events/events:events/events:events/events:root:0:0:2",
+      "source_order": 9115,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "9",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "folders:root:112",
+      "source_order": 9307,
+      "fields": {
+        "key": "localisation",
+        "line": "113",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "gfx/sprite_packs:gfx/sprite_packs:gfx/sprite_packs:root:0:0:1",
+      "source_order": 9314,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "5",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:root:0:2:3",
+      "source_order": 10201,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "18",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:map/areas_regions_etc:root:0:0:2",
+      "source_order": 10277,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "6",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:map/areas_regions_etc:root:0:1:3",
+      "source_order": 10285,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "22",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:map/areas_regions_etc:root:0:3:2",
+      "source_order": 10293,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "34",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:map/areas_regions_etc:root:0:5:2",
+      "source_order": 10303,
+      "fields": {
+        "child_count": "3",
+        "key": "localisation",
+        "line": "49",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:map/areas_regions_etc:root:0:6:2",
+      "source_order": 10310,
+      "fields": {
+        "child_count": "3",
+        "key": "localisation",
+        "line": "62",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "map/areas_regions_etc:map/areas_regions_etc:map/areas_regions_etc:root:0:7:3",
+      "source_order": 10319,
+      "fields": {
+        "child_count": "1",
+        "key": "localisation",
+        "line": "81",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "localisation",
+      "logical_id": "missions/missions:missions/missions:missions/missions:root:0:1:2",
+      "source_order": 10441,
+      "fields": {
+        "child_count": "2",
+        "key": "localisation",
+        "line": "11",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    }
+  ]
+}

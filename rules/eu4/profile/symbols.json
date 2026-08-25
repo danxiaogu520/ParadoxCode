@@ -1,0 +1,1179 @@
+{
+  "definitions": [
+    {
+      "path": {
+        "mode": "contains",
+        "pattern": "scripted_effect",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "scripted_effect",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "contains",
+        "pattern": "scripted_trigger",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "scripted_trigger",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "contains",
+        "pattern": "events/",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "event",
+      "name_field": "id",
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "suffix",
+        "pattern": "_event",
+        "case_sensitive": false
+      },
+      "kind": "event",
+      "name_field": "id",
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "exact",
+        "pattern": "country_event",
+        "case_sensitive": false
+      },
+      "kind": "event",
+      "name_field": "id",
+      "requires_value": true
+    },
+    {
+      "path": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "exact",
+        "pattern": "province_event",
+        "case_sensitive": false
+      },
+      "kind": "event",
+      "name_field": "id",
+      "requires_value": true
+    },
+    {
+      "path": {
+        "mode": "prefix",
+        "pattern": "common/country_tags/",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "country_tag",
+      "name_field": null,
+      "requires_value": true
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/cultures",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "culture",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/religions",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "religion",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/tradenodes",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "trade_node",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/colonial_regions",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "colonial_region",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/estates",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "estate",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/ideas",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "idea_group",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/governments",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "government",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/government_reforms",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "government_reform",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/subject_types",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "subject_type",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/technologies",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "technology",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/buildings",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "building",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/units",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "unit_type",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/mercenary_companies",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "mercenary_company",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/trade_companies",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "trade_company",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/advisortypes",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "advisor_type",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/leader_personalities",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "leader_personality",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/ruler_personalities",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "ruler_personality",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/event_modifiers",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "event_modifier",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/static_modifiers",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "static_modifier",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/timed_modifiers",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "timed_modifier",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/triggered_modifiers",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "triggered_modifier",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/subject_type_upgrades",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "subject_type_upgrade",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/peace_treaties",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "peace_treaty",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/casus_belli",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "casus_belli",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/cb_types",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "casus_belli",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/wargoal_types",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "wargoal_type",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/institutions",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "institution",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/great_projects",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "great_project",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/estate_privileges",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "estate_privilege",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/estate_agendas",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "estate_agenda",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/diplomatic_actions",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "diplomatic_action",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/new_diplomatic_actions",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "diplomatic_action",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/disasters",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "disaster",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/rebel_types",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "rebel_type",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/insults",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "insult",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/opinion_modifiers",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "opinion_modifier",
+      "name_field": null,
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "directory",
+        "pattern": "common/tradegoods",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "any",
+        "pattern": "",
+        "case_sensitive": false
+      },
+      "kind": "tradegood",
+      "name_field": null,
+      "requires_value": false
+    }
+  ],
+  "references": [
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "event",
+        "case_sensitive": false
+      },
+      "kind": "event",
+      "excluded_keys": [],
+      "excluded_paths": []
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "events",
+        "case_sensitive": false
+      },
+      "kind": "event",
+      "excluded_keys": [],
+      "excluded_paths": []
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "event_id",
+        "case_sensitive": false
+      },
+      "kind": "event",
+      "excluded_keys": [],
+      "excluded_paths": []
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "trigger_event",
+        "case_sensitive": false
+      },
+      "kind": "event",
+      "excluded_keys": [],
+      "excluded_paths": []
+    },
+    {
+      "key": {
+        "mode": "suffix",
+        "pattern": "_event",
+        "case_sensitive": false
+      },
+      "kind": "event",
+      "excluded_keys": [],
+      "excluded_paths": []
+    },
+    {
+      "key": {
+        "mode": "contains",
+        "pattern": "scripted_effect",
+        "case_sensitive": false
+      },
+      "kind": "scripted_effect",
+      "excluded_keys": [],
+      "excluded_paths": []
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "call_effect",
+        "case_sensitive": false
+      },
+      "kind": "scripted_effect",
+      "excluded_keys": [],
+      "excluded_paths": []
+    },
+    {
+      "key": {
+        "mode": "suffix",
+        "pattern": "_effect",
+        "case_sensitive": false
+      },
+      "kind": "scripted_effect",
+      "excluded_keys": [
+        "default_effect",
+        "specific_effect"
+      ],
+      "excluded_paths": []
+    },
+    {
+      "key": {
+        "mode": "contains",
+        "pattern": "scripted_trigger",
+        "case_sensitive": false
+      },
+      "kind": "scripted_trigger",
+      "excluded_keys": [],
+      "excluded_paths": []
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "call_trigger",
+        "case_sensitive": false
+      },
+      "kind": "scripted_trigger",
+      "excluded_keys": [],
+      "excluded_paths": []
+    },
+    {
+      "key": {
+        "mode": "suffix",
+        "pattern": "_trigger",
+        "case_sensitive": false
+      },
+      "kind": "scripted_trigger",
+      "excluded_keys": [],
+      "excluded_paths": []
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "localisation",
+        "case_sensitive": false
+      },
+      "kind": "localisation",
+      "excluded_keys": [],
+      "excluded_paths": []
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "localization",
+        "case_sensitive": false
+      },
+      "kind": "localisation",
+      "excluded_keys": [],
+      "excluded_paths": []
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "loc_key",
+        "case_sensitive": false
+      },
+      "kind": "localisation",
+      "excluded_keys": [],
+      "excluded_paths": []
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "name",
+        "case_sensitive": false
+      },
+      "kind": "localisation",
+      "excluded_keys": [],
+      "excluded_paths": [
+        {
+          "mode": "contains",
+          "pattern": "history/countries/",
+          "case_sensitive": false
+        },
+        {
+          "mode": "contains",
+          "pattern": "history/provinces/",
+          "case_sensitive": false
+        },
+        {
+          "mode": "contains",
+          "pattern": "interface/",
+          "case_sensitive": false
+        }
+      ]
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "desc",
+        "case_sensitive": false
+      },
+      "kind": "localisation",
+      "excluded_keys": [],
+      "excluded_paths": [
+        {
+          "mode": "contains",
+          "pattern": "history/countries/",
+          "case_sensitive": false
+        },
+        {
+          "mode": "contains",
+          "pattern": "history/provinces/",
+          "case_sensitive": false
+        },
+        {
+          "mode": "contains",
+          "pattern": "interface/",
+          "case_sensitive": false
+        }
+      ]
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "title",
+        "case_sensitive": false
+      },
+      "kind": "localisation",
+      "excluded_keys": [],
+      "excluded_paths": [
+        {
+          "mode": "contains",
+          "pattern": "history/countries/",
+          "case_sensitive": false
+        },
+        {
+          "mode": "contains",
+          "pattern": "history/provinces/",
+          "case_sensitive": false
+        },
+        {
+          "mode": "contains",
+          "pattern": "interface/",
+          "case_sensitive": false
+        }
+      ]
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "tooltip",
+        "case_sensitive": false
+      },
+      "kind": "localisation",
+      "excluded_keys": [],
+      "excluded_paths": [
+        {
+          "mode": "contains",
+          "pattern": "history/countries/",
+          "case_sensitive": false
+        },
+        {
+          "mode": "contains",
+          "pattern": "history/provinces/",
+          "case_sensitive": false
+        },
+        {
+          "mode": "contains",
+          "pattern": "interface/",
+          "case_sensitive": false
+        }
+      ]
+    }
+  ],
+  "value_definitions": [
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "set_country_flag",
+        "case_sensitive": false
+      },
+      "parent_key": null,
+      "kind": "country_flag"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "set_global_flag",
+        "case_sensitive": false
+      },
+      "parent_key": null,
+      "kind": "global_flag"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "set_province_flag",
+        "case_sensitive": false
+      },
+      "parent_key": null,
+      "kind": "province_flag"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "set_ruler_flag",
+        "case_sensitive": false
+      },
+      "parent_key": null,
+      "kind": "ruler_flag"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "set_heir_flag",
+        "case_sensitive": false
+      },
+      "parent_key": null,
+      "kind": "heir_flag"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "set_consort_flag",
+        "case_sensitive": false
+      },
+      "parent_key": null,
+      "kind": "consort_flag"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "save_event_target_as",
+        "case_sensitive": false
+      },
+      "parent_key": null,
+      "kind": "event_target"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "save_global_event_target_as",
+        "case_sensitive": false
+      },
+      "parent_key": null,
+      "kind": "global_event_target"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "exile_ruler_as",
+        "case_sensitive": false
+      },
+      "parent_key": null,
+      "kind": "exiled_ruler"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "exile_heir_as",
+        "case_sensitive": false
+      },
+      "parent_key": null,
+      "kind": "exiled_heir"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "exile_consort_as",
+        "case_sensitive": false
+      },
+      "parent_key": null,
+      "kind": "exiled_consort"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "exiled_as",
+        "case_sensitive": false
+      },
+      "parent_key": {
+        "mode": "exact",
+        "pattern": "define_exiled_ruler",
+        "case_sensitive": false
+      },
+      "kind": "exiled_ruler"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "exiled_as",
+        "case_sensitive": false
+      },
+      "parent_key": {
+        "mode": "exact",
+        "pattern": "define_exiled_heir",
+        "case_sensitive": false
+      },
+      "kind": "exiled_heir"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "exiled_as",
+        "case_sensitive": false
+      },
+      "parent_key": {
+        "mode": "exact",
+        "pattern": "define_exiled_consort",
+        "case_sensitive": false
+      },
+      "kind": "exiled_consort"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "set_saved_name",
+        "case_sensitive": false
+      },
+      "parent_key": null,
+      "kind": "saved_name"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "which",
+        "case_sensitive": false
+      },
+      "parent_key": {
+        "mode": "exact",
+        "pattern": "set_variable",
+        "case_sensitive": false
+      },
+      "kind": "variable"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "which",
+        "case_sensitive": false
+      },
+      "parent_key": {
+        "mode": "exact",
+        "pattern": "change_variable",
+        "case_sensitive": false
+      },
+      "kind": "variable"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "which",
+        "case_sensitive": false
+      },
+      "parent_key": {
+        "mode": "exact",
+        "pattern": "new_variable",
+        "case_sensitive": false
+      },
+      "kind": "variable"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "which",
+        "case_sensitive": false
+      },
+      "parent_key": {
+        "mode": "exact",
+        "pattern": "new_variables",
+        "case_sensitive": false
+      },
+      "kind": "variable"
+    }
+  ],
+  "container_value_definitions": [
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "exile_ruler_as",
+        "case_sensitive": false
+      },
+      "name_field": "name",
+      "kind": "exiled_ruler"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "exile_heir_as",
+        "case_sensitive": false
+      },
+      "name_field": "name",
+      "kind": "exiled_heir"
+    },
+    {
+      "key": {
+        "mode": "exact",
+        "pattern": "exile_consort_as",
+        "case_sensitive": false
+      },
+      "name_field": "name",
+      "kind": "exiled_consort"
+    }
+  ],
+  "container_definitions": [],
+  "conditional_definitions": [
+    {
+      "path": {
+        "mode": "contains",
+        "pattern": "common/government_reforms/",
+        "case_sensitive": false
+      },
+      "kind": "hardcoded_legacy_government",
+      "required_field": "legacy_government",
+      "required_value": "yes",
+      "absent_field": "legacy_equivalent"
+    }
+  ],
+  "token_definitions": [
+    {
+      "path": {
+        "mode": "prefix",
+        "pattern": "common/scripted_effects/",
+        "case_sensitive": false
+      },
+      "delimiter": "$",
+      "inner_kind": "scripted_effect_param",
+      "wrapped_kind": "scripted_effect_param_dollar"
+    },
+    {
+      "path": {
+        "mode": "prefix",
+        "pattern": "common/scripted_triggers/",
+        "case_sensitive": false
+      },
+      "delimiter": "$",
+      "inner_kind": "scripted_effect_param",
+      "wrapped_kind": "scripted_effect_param_dollar"
+    }
+  ]
+}

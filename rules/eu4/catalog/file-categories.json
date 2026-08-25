@@ -1,0 +1,1607 @@
+{
+  "file_categories": [
+    {
+      "id": "eu4-opaque-credits",
+      "parser": "syntax-only",
+      "resolution": "replace-by-relative-path",
+      "matcher": {
+        "path_prefix": null,
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": "interface/credits.txt",
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "asset",
+      "parser": "asset",
+      "resolution": "replace-by-relative-path",
+      "matcher": {
+        "path_prefix": null,
+        "extensions": [
+          "png",
+          "dds",
+          "tga",
+          "jpg",
+          "jpeg",
+          "ogg",
+          "wav",
+          "fnt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "csv",
+      "parser": "syntax-only",
+      "resolution": "replace-by-relative-path",
+      "matcher": {
+        "path_prefix": null,
+        "extensions": [
+          "csv"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-achievements",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": null,
+        "path_exact": "common/achievements.txt",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-alerts",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": null,
+        "path_exact": "common/alerts.txt",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-graphicalculturetype",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": null,
+        "path_exact": "common/graphicalculturetype.txt",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-historial_lucky",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": null,
+        "path_exact": "common/historial_lucky.txt",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-technology",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": null,
+        "path_exact": "common/technology.txt",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-ai_attitudes",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/ai_attitudes",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-custom_country_colors",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/custom_country_colors",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-defines",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/defines",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-defines-lua",
+      "parser": "syntax-only",
+      "resolution": "replace-by-relative-path",
+      "matcher": {
+        "path_prefix": "common/defines",
+        "extensions": [
+          "lua"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-units_display",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/units_display",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-advisortypes",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/advisortypes",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-ages",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/ages",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-ai_army",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/ai_army",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-ai_personalities",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/ai_personalities",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-ancestor_personalities",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/ancestor_personalities",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-bookmarks",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/bookmarks",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-buildings",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/buildings",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-cb_types",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/cb_types",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-centers_of_trade",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/centers_of_trade",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-church_aspects",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/church_aspects",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-client_states",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/client_states",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-colonial_regions",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/colonial_regions",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-countries",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/countries",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-country_colors",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/country_colors",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-country_tags",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/country_tags",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-cultures",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/cultures",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-custom_gui",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/custom_gui",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-custom_ideas",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/custom_ideas",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-decrees",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/decrees",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-defender_of_faith",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/defender_of_faith",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-diplomatic_actions",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/diplomatic_actions",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-disasters",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/disasters",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-dynasty_colors",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/dynasty_colors",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-estate_agendas",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/estate_agendas",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-estate_crown_land",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/estate_crown_land",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-estate_privileges",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/estate_privileges",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-estates",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/estates",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-estates_preload",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/estates_preload",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-event_modifiers",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/event_modifiers",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-factions",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/factions",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-federation_advancements",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/federation_advancements",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-fervor",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/fervor",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-fetishist_cults",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/fetishist_cults",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-flagship_modifications",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/flagship_modifications",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-golden_bulls",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/golden_bulls",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-government_mechanics",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/government_mechanics",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-government_names",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/government_names",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-government_ranks",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/government_ranks",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-government_reforms",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/government_reforms",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-governments",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/governments",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-great_projects",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/great_projects",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-hegemons",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/hegemons",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-holy_orders",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/holy_orders",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-ideas",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/ideas",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-imperial_incidents",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/imperial_incidents",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-imperial_reforms",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/imperial_reforms",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-incidents",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/incidents",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-institutions",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/institutions",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-insults",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/insults",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-isolationism",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/isolationism",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-leader_personalities",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/leader_personalities",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-mercenary_companies",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/mercenary_companies",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-natives",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/natives",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-naval_doctrines",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/naval_doctrines",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-new_diplomatic_actions",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/new_diplomatic_actions",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-on_actions",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/on_actions",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-opinion_modifiers",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/opinion_modifiers",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-parliament_bribes",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/parliament_bribes",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-parliament_issues",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/parliament_issues",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-peace_treaties",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/peace_treaties",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-personal_deities",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/personal_deities",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-policies",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/policies",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-powerprojection",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/powerprojection",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-prices",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/prices",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-professionalism",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/professionalism",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-province_names",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/province_names",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-province_triggered_modifiers",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/province_triggered_modifiers",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-rebel_types",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/rebel_types",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-region_colors",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/region_colors",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-religions",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/religions",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-religious_conversions",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/religious_conversions",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-religious_reforms",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/religious_reforms",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-revolt_triggers",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/revolt_triggers",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-revolution",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/revolution",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-ruler_personalities",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/ruler_personalities",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-scripted_effects",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/scripted_effects",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-scripted_functions",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/scripted_functions",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-scripted_triggers",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/scripted_triggers",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-state_edicts",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/state_edicts",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-static_modifiers",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/static_modifiers",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-subject_type_upgrades",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/subject_type_upgrades",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-subject_types",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/subject_types",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-technologies",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/technologies",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-timed_modifiers",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/timed_modifiers",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-trade_companies",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/trade_companies",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-tradecompany_investments",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/tradecompany_investments",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-tradegoods",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/tradegoods",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-tradenodes",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/tradenodes",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-trading_policies",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/trading_policies",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-triggered_modifiers",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/triggered_modifiers",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-units",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/units",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-wargoal_types",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/wargoal_types",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-customizable_localization",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "customizable_localization",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-decisions",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "decisions",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-events",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "events",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-gfx-sprite_packs",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "gfx/sprite_packs",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-gfx-sprite_packs_order",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "gfx/sprite_packs_order",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-history-advisors",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "history/advisors",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-history-countries",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "history/countries",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-history-diplomacy",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "history/diplomacy",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-history-provinces",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "history/provinces",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-history-wars",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "history/wars",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-interface",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "interface",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-map",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "map",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "path_exclude_prefixes": [
+          "map/random/tiles"
+        ],
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-missions",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "missions",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "localisation",
+      "parser": "localisation",
+      "resolution": "replace-by-relative-path",
+      "matcher": {
+        "path_prefix": "localisation",
+        "extensions": [
+          "yml",
+          "yaml"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "script",
+      "parser": "script",
+      "resolution": "replace-by-relative-path",
+      "matcher": {
+        "path_prefix": null,
+        "extensions": [
+          "txt",
+          "gui",
+          "gfx",
+          "asset",
+          "sfx"
+        ],
+        "path_suffix": null,
+        "path_exclude_prefixes": [
+          "common",
+          "map/random/tiles",
+          "dlc_metadata",
+          "gfx/entities"
+        ],
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "syntax-only",
+      "parser": "syntax-only",
+      "resolution": "replace-by-relative-path",
+      "matcher": {
+        "path_prefix": null,
+        "extensions": [
+          "json",
+          "lua"
+        ],
+        "path_suffix": null,
+        "path_exclude_prefixes": [
+          "common"
+        ],
+        "case_sensitive": false
+      }
+    }
+  ]
+}

@@ -17,8 +17,10 @@ fn main() -> Result<(), pdx_lsp::LspError> {
             args[0]
         )));
     }
-    let profile = pdx_lsp::profile();
-    let profile_message = format!("game profile selected: {}", profile.game_id);
+    let profile_message = format!(
+        "game profile selected: {}",
+        pdx_lsp::INSTALL_DESCRIPTOR.game_id
+    );
     eprintln!("pdx-ls: {profile_message}");
     startup_messages.push(profile_message);
     match pdx_game::UserPaths::platform() {
@@ -59,6 +61,7 @@ fn main() -> Result<(), pdx_lsp::LspError> {
                     return Err(error.into());
                 }
             };
+            let profile = rules.profile().clone();
             let transport_message =
                 "stdio JSON-RPC transport starting; waiting for initialize".to_owned();
             eprintln!("pdx-ls: {transport_message}");
@@ -110,6 +113,7 @@ fn main() -> Result<(), pdx_lsp::LspError> {
                     return Err(error.into());
                 }
             };
+            let profile = rules.profile().clone();
             let transport_message =
                 "stdio JSON-RPC transport starting; waiting for initialize".to_owned();
             eprintln!("pdx-ls: {transport_message}");

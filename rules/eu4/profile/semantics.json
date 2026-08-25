@@ -1,0 +1,106 @@
+{
+  "transparent_scope_wrappers": [
+    "AND",
+    "OR",
+    "NOT"
+  ],
+  "semantic_context_inheritance": {
+    "imperial_incident_option": [
+      "trigger"
+    ],
+    "imperial_incident_option_modifier": [
+      "trigger"
+    ],
+    "root:fervor": [
+      "modifier"
+    ],
+    "root:power_projection": [
+      "modifier"
+    ],
+    "type:advisor_type": [
+      "modifier"
+    ],
+    "type:ancestor_personalities": [
+      "modifier"
+    ],
+    "type:country_history": [
+      "effect"
+    ],
+    "type:cult": [
+      "modifier"
+    ],
+    "type:customideas": [
+      "modifier"
+    ],
+    "type:event_modifier": [
+      "modifier"
+    ],
+    "type:government_ranks": [
+      "modifier"
+    ],
+    "type:leader_personality": [
+      "modifier"
+    ],
+    "type:on_action": [
+      "effect"
+    ],
+    "type:personal_deity": [
+      "modifier"
+    ],
+    "type:policy": [
+      "modifier"
+    ],
+    "type:professionalism_modifier": [
+      "modifier"
+    ],
+    "type:province_history": [
+      "effect"
+    ],
+    "type:province_triggered_modifier": [
+      "modifier"
+    ],
+    "type:ruler_personality": [
+      "modifier",
+      "personality_modifier"
+    ],
+    "type:static_modifier": [
+      "modifier"
+    ],
+    "type:terrain": [
+      "modifier"
+    ],
+    "type:trading_policy": [
+      "modifier"
+    ],
+    "type:triggered_modifier": [
+      "modifier"
+    ]
+  },
+  "quoted_script_definition_keys": [
+    {
+      "mode": "exact",
+      "pattern": "effect",
+      "case_sensitive": false
+    },
+    {
+      "mode": "suffix",
+      "pattern": "_effect",
+      "case_sensitive": false
+    }
+  ],
+  "control_flow_keys": [
+    "AND",
+    "OR",
+    "NOT",
+    "if",
+    "else",
+    "limit",
+    "trigger",
+    "effect",
+    "hidden_effect",
+    "random_list",
+    "modifier",
+    "option",
+    "immediate"
+  ]
+}

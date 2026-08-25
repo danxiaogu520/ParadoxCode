@@ -1,0 +1,957 @@
+{
+  "records": [
+    {
+      "table": "triggers",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:common/00_small_types_consolidated:root:15:1:1",
+      "source_order": 248,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { this = province root = province from = country }",
+        "key": "trigger",
+        "line": "493",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:common/00_small_types_consolidated:root:2:4:1",
+      "source_order": 120,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { this = country root = country }",
+        "key": "trigger",
+        "line": "193",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:12:4",
+      "source_order": 211,
+      "fields": {
+        "child_count": "1",
+        "key": "trigger",
+        "line": "395",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:3:3",
+      "source_order": 128,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "trigger",
+        "line": "210",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:6:0",
+      "source_order": 148,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { root = country this = country from = country }",
+        "key": "trigger",
+        "line": "253",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:8:3",
+      "source_order": 163,
+      "fields": {
+        "child_count": "1",
+        "documentation": "If false you will not be able to take the decree",
+        "key": "trigger",
+        "line": "287",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/advisortypes:common/advisortypes:common/advisortypes:root:1:2:0",
+      "source_order": 278,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = province }",
+        "key": "trigger",
+        "line": "26",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/colonial_region:common/colonial_region:common/colonial_region:root:1:9:0",
+      "source_order": 704,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { root = country this = country }",
+        "key": "trigger",
+        "line": "57",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/custom_gui:common/custom_gui:common/custom_gui:root:1:5:1",
+      "source_order": 856,
+      "fields": {
+        "child_count": "1",
+        "documentation": "When to use the specified frame",
+        "key": "trigger",
+        "line": "59",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/custom_gui:common/custom_gui:common/custom_gui:root:3:3:1",
+      "source_order": 870,
+      "fields": {
+        "child_count": "1",
+        "documentation": "When to use the specified frame",
+        "key": "trigger",
+        "line": "93",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/custom_gui:common/custom_gui:root:1:2",
+      "source_order": 849,
+      "fields": {
+        "child_count": "1",
+        "documentation": "If true, the button will be clickable",
+        "key": "trigger",
+        "line": "42",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/custom_gui:common/custom_gui:root:4:2",
+      "source_order": 877,
+      "fields": {
+        "child_count": "1",
+        "documentation": "If true, the shield is clickable",
+        "key": "trigger",
+        "line": "110",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/estates:common/estates:common/estates:root:1:13:1",
+      "source_order": 1085,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { this = country root = country }",
+        "key": "trigger",
+        "line": "114",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/estates:common/estates:common/estates:root:1:14:1",
+      "source_order": 1090,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { this = country root = country }",
+        "key": "trigger",
+        "line": "124",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/estates:common/estates:common/estates:root:1:15:1",
+      "source_order": 1095,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { this = country root = country }",
+        "key": "trigger",
+        "line": "134",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/estates:common/estates:common/estates:root:1:16:1",
+      "source_order": 1099,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { this = country root = country }",
+        "key": "trigger",
+        "line": "143",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/estates:common/estates:common/estates:root:2:18:0",
+      "source_order": 1141,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "trigger",
+        "line": "256",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/estates:common/estates:common/estates:root:2:19:0",
+      "source_order": 1147,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "documentation": "Conditions under which this modifier will be active, if empty it will be always",
+        "key": "trigger",
+        "line": "272",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/estates:common/estates:common/estates:root:2:20:0",
+      "source_order": 1153,
+      "fields": {
+        "child_count": "1",
+        "key": "trigger",
+        "line": "285",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/estates:common/estates:root:1:7",
+      "source_order": 1072,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { this = country root = country }",
+        "documentation": "If true, country will get estate",
+        "key": "trigger",
+        "line": "85",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/estates:common/estates:root:4:4",
+      "source_order": 1210,
+      "fields": {
+        "child_count": "1",
+        "directives": "push_scope = country",
+        "key": "trigger",
+        "line": "420",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/flagship_modification:common/flagship_modification:root:1:0",
+      "source_order": 1245,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country }",
+        "key": "trigger",
+        "line": "13",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/golden_bull:common/golden_bull:root:1:2",
+      "source_order": 1286,
+      "fields": {
+        "child_count": "1",
+        "key": "trigger",
+        "line": "24",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:1:3:0:11:0",
+      "source_order": 1379,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "trigger",
+        "line": "158",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:1:3:0:12:0",
+      "source_order": 1386,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "trigger",
+        "line": "174",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:1:3:0:13:0",
+      "source_order": 1394,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "trigger",
+        "line": "194",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:1:4:0:4",
+      "source_order": 1412,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { root = country this = country }",
+        "key": "trigger",
+        "line": "237",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:2:4:50",
+      "source_order": 1575,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { root = country this = country }\ncardinality = 0..1",
+        "key": "trigger",
+        "line": "522",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:root:6:2",
+      "source_order": 1915,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { root = country this = country }",
+        "key": "trigger",
+        "line": "1090",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/greatprojects:common/greatprojects:common/greatprojects:common/greatprojects:root:1:15:7:1",
+      "source_order": 1977,
+      "fields": {
+        "child_count": "1",
+        "key": "trigger",
+        "line": "135",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/greatprojects:common/greatprojects:common/greatprojects:common/greatprojects:root:1:16:7:1",
+      "source_order": 2001,
+      "fields": {
+        "child_count": "1",
+        "key": "trigger",
+        "line": "190",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/greatprojects:common/greatprojects:common/greatprojects:common/greatprojects:root:1:17:7:1",
+      "source_order": 2025,
+      "fields": {
+        "child_count": "1",
+        "key": "trigger",
+        "line": "245",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/greatprojects:common/greatprojects:common/greatprojects:common/greatprojects:root:1:18:7:1",
+      "source_order": 2049,
+      "fields": {
+        "child_count": "1",
+        "key": "trigger",
+        "line": "300",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/holy_order:common/holy_order:root:1:1",
+      "source_order": 2080,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { this = country root = country }",
+        "key": "trigger",
+        "line": "17",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:1:2",
+      "source_order": 2149,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country }",
+        "key": "trigger",
+        "line": "97",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/imperial_reforms:common/imperial_reforms:common/imperial_reforms:root:1:1:3",
+      "source_order": 2290,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "documentation": "Whether the reform can be enacted",
+        "key": "trigger",
+        "line": "118",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/incidents:common/incidents:root:1:3",
+      "source_order": 2315,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scopes = { this = country root = country }",
+        "key": "trigger",
+        "line": "26",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/mercenary_company:common/mercenary_company:root:1:6",
+      "source_order": 2408,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { root = country this = country }",
+        "documentation": "Default: Always = yes",
+        "key": "trigger",
+        "line": "29",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/modifiers_consolidated:common/modifiers_consolidated:root:3:1",
+      "source_order": 2572,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { this = country root = country }",
+        "key": "trigger",
+        "line": "89",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/modifiers_consolidated:common/modifiers_consolidated:root:4:2",
+      "source_order": 2581,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { this = province root = province }",
+        "key": "trigger",
+        "line": "110",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/parliaments:common/parliaments:root:1:2",
+      "source_order": 4476,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { root = country this = country from = province }",
+        "key": "trigger",
+        "line": "27",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:44:0:1",
+      "source_order": 5037,
+      "fields": {
+        "child_count": "1",
+        "key": "trigger",
+        "line": "749",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:2:4",
+      "source_order": 5073,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { root = country this = country }",
+        "documentation": "Requirements for picking the deity",
+        "key": "trigger",
+        "line": "837",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:4:0",
+      "source_order": 5091,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { root = country this = country }",
+        "key": "trigger",
+        "line": "890",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:5:3",
+      "source_order": 5116,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country }",
+        "key": "trigger",
+        "line": "949",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:78:0",
+      "source_order": 5865,
+      "fields": {
+        "key": "trigger",
+        "line": "2266",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scalar"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:80:0",
+      "source_order": 5871,
+      "fields": {
+        "key": "trigger",
+        "line": "2281",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scalar"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:81:0",
+      "source_order": 5874,
+      "fields": {
+        "key": "trigger",
+        "line": "2289",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scalar"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/subject_types:common/subject_types:common/subject_types:root:1:133:2",
+      "source_order": 6060,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { root = country this = country from = country }",
+        "documentation": "Root = subject, from = overlord.",
+        "key": "trigger",
+        "line": "423",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/subject_types:common/subject_types:common/subject_types:root:1:135:2",
+      "source_order": 6068,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { root = country this = country from = country }",
+        "documentation": "Root = subject, from = overlord.",
+        "key": "trigger",
+        "line": "443",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/technology_groups:common/technology_groups:common/technology_groups:root:1:5:0",
+      "source_order": 6160,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { root = country this = country }\ncardinality = 0..1",
+        "key": "trigger",
+        "line": "33",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:common/trade_consolidated:root:1:5:2",
+      "source_order": 6215,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { this = province root = province }",
+        "key": "trigger",
+        "line": "108",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:common/trade_consolidated:root:2:2:0",
+      "source_order": 6223,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { root = country this = country }",
+        "key": "trigger",
+        "line": "131",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "common/unit_types:common/unit_types:root:1:3",
+      "source_order": 6343,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country }",
+        "key": "trigger",
+        "line": "57",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "customizable_localisation/custom_locs:customizable_localisation/custom_locs:customizable_localisation/custom_locs:root:2:2:1",
+      "source_order": 6359,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "trigger",
+        "line": "30",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "effects:effects:root:646:1",
+      "source_order": 8270,
+      "fields": {
+        "child_count": "1",
+        "directives": "push_scope = province\ncardinality = 0..1",
+        "documentation": "Which provinces to include in the calculation, defaults to 'always = yes' if not defined.",
+        "key": "trigger",
+        "line": "3764",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "effects:effects:root:671:1",
+      "source_order": 8305,
+      "fields": {
+        "child_count": "1",
+        "directives": "push_scope = province",
+        "key": "trigger",
+        "line": "3885",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "effects:effects:root:672:1",
+      "source_order": 8310,
+      "fields": {
+        "child_count": "1",
+        "directives": "push_scope = province",
+        "key": "trigger",
+        "line": "3897",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "effects:effects:root:728:3",
+      "source_order": 8416,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\npush_scope = { root = province this = province }",
+        "documentation": "Only consider subjects that pass this trigger",
+        "key": "trigger",
+        "line": "4219",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "effects:effects:root:729:3",
+      "source_order": 8422,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\npush_scope = { root = province this = province }",
+        "documentation": "Only consider subjects that pass this trigger",
+        "key": "trigger",
+        "line": "4239",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "effects:effects:root:730:3",
+      "source_order": 8428,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\npush_scope = { root = province this = province }",
+        "documentation": "Only consider provinces that pass this trigger",
+        "key": "trigger",
+        "line": "4259",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "effects:effects:root:731:3",
+      "source_order": 8434,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\npush_scope = { root = province this = province }",
+        "documentation": "Only consider provinces that pass this trigger",
+        "key": "trigger",
+        "line": "4279",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "events/events:events/events:events/events:events/events:root:1:2:10:0",
+      "source_order": 9148,
+      "fields": {
+        "child_count": "1",
+        "key": "trigger",
+        "line": "73",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "events/events:events/events:events/events:events/events:root:1:2:8:0",
+      "source_order": 9143,
+      "fields": {
+        "child_count": "1",
+        "key": "trigger",
+        "line": "66",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "events/events:events/events:events/events:root:1:15:2",
+      "source_order": 9185,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "trigger",
+        "line": "164",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "events/events:events/events:root:1:13",
+      "source_order": 9171,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "trigger",
+        "line": "132",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "missions/missions:missions/missions:missions/missions:root:1:6:2",
+      "source_order": 10457,
+      "fields": {
+        "child_count": "2",
+        "directives": "replace_scope = { this = country root = country }",
+        "documentation": "What you need to complete the mission, displayed for mission tooltip",
+        "key": "trigger",
+        "line": "58",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "triggers",
+      "logical_id": "scope_links:scope_links:scope_links:root:29:0:0",
+      "source_order": 11432,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "documentation": "Must return true for this to be considered, if false this chance block is not considered",
+        "key": "trigger",
+        "line": "298",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    }
+  ]
+}

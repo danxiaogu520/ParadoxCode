@@ -1,0 +1,2429 @@
+[
+  {
+    "id": "common/00_small_types_consolidated:247:rule:root:province_names:<province_id>",
+    "context": "root:province_names",
+    "parent_path": [],
+    "key": {
+      "type": "province_id"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 105
+  },
+  {
+    "id": "common/00_small_types_consolidated:248:leaf-value:root:province_names:scalar",
+    "context": "root:province_names",
+    "parent_path": [
+      "<province_id>"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": "any_scalar",
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 2,
+    "source_file": "semantic-rules.json",
+    "line": 106
+  },
+  {
+    "id": "common/00_small_types_consolidated:249:rule:root:province_names:<province_id>",
+    "context": "root:province_names",
+    "parent_path": [],
+    "key": {
+      "type": "province_id"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 107
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:29:rule:root:ambient_object_basis:type",
+    "context": "root:ambient_object_basis",
+    "parent_path": [],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5486
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:30:rule:root:ambient_object_basis:use_animation",
+    "context": "root:ambient_object_basis",
+    "parent_path": [],
+    "key": {
+      "exact": "use_animation"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5487
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:31:rule:root:ambient_object_basis:scale",
+    "context": "root:ambient_object_basis",
+    "parent_path": [],
+    "key": {
+      "exact": "scale"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5488
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:32:rule:root:ambient_object_basis:time_duration",
+    "context": "root:ambient_object_basis",
+    "parent_path": [],
+    "key": {
+      "exact": "time_duration"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5489
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:33:rule:root:ambient_object_basis:always_visible",
+    "context": "root:ambient_object_basis",
+    "parent_path": [],
+    "key": {
+      "exact": "always_visible"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5490
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:34:rule:root:ambient_object_basis:visible_in_all_map_modes",
+    "context": "root:ambient_object_basis",
+    "parent_path": [],
+    "key": {
+      "exact": "visible_in_all_map_modes"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5491
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:35:rule:root:ambient_object_basis:name",
+    "context": "root:ambient_object_basis",
+    "parent_path": [
+      "object"
+    ],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5492
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:36:rule:root:ambient_object_basis:hidden_on_start",
+    "context": "root:ambient_object_basis",
+    "parent_path": [
+      "object"
+    ],
+    "key": {
+      "exact": "hidden_on_start"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5493
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:37:leaf-value:root:ambient_object_basis:float",
+    "context": "root:ambient_object_basis",
+    "parent_path": [
+      "object",
+      "position"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 5494
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:38:rule:root:ambient_object_basis:position",
+    "context": "root:ambient_object_basis",
+    "parent_path": [
+      "object"
+    ],
+    "key": {
+      "exact": "position"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5495
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:39:leaf-value:root:ambient_object_basis:float",
+    "context": "root:ambient_object_basis",
+    "parent_path": [
+      "object",
+      "rotation"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 5496
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:40:rule:root:ambient_object_basis:rotation",
+    "context": "root:ambient_object_basis",
+    "parent_path": [
+      "object"
+    ],
+    "key": {
+      "exact": "rotation"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5497
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:41:rule:root:ambient_object_basis:object",
+    "context": "root:ambient_object_basis",
+    "parent_path": [],
+    "key": {
+      "exact": "object"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5498
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:43:rule:root:terrain:type",
+    "context": "root:terrain",
+    "parent_path": [],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "terrain_types"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Types are used by the game to apply certain bonuses/maluses on movement/combat etc."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5499
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:44:rule:root:terrain:sound_type",
+    "context": "root:terrain",
+    "parent_path": [],
+    "key": {
+      "exact": "sound_type"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "terrain_sound_types"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5500
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:45:rule:root:terrain:is_water",
+    "context": "root:terrain",
+    "parent_path": [],
+    "key": {
+      "exact": "is_water"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5501
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:46:rule:root:terrain:inland_sea",
+    "context": "root:terrain",
+    "parent_path": [],
+    "key": {
+      "exact": "inland_sea"
+    },
+    "operator": "=",
+    "value": {
+      "exact": "yes"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5502
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:47:leaf-value:root:terrain:int[0..255]",
+    "context": "root:terrain",
+    "parent_path": [
+      "color"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": 0,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 5503
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:48:rule:root:terrain:color",
+    "context": "root:terrain",
+    "parent_path": [],
+    "key": {
+      "exact": "color"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5504
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:50:rule:root:terrain:cs_only_local_development_cost",
+    "context": "root:terrain",
+    "parent_path": [],
+    "key": {
+      "exact": "cs_only_local_development_cost"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5505
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:51:rule:root:terrain:defence",
+    "context": "root:terrain",
+    "parent_path": [],
+    "key": {
+      "exact": "defence"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Addition to defence roll in combat in this terrain"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5506
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:52:rule:root:terrain:combat_width",
+    "context": "root:terrain",
+    "parent_path": [],
+    "key": {
+      "exact": "combat_width"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Multiplier to increase or decrease combat width in this terrain"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5507
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:53:rule:root:terrain:movement_cost",
+    "context": "root:terrain",
+    "parent_path": [],
+    "key": {
+      "exact": "movement_cost"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Multiplier to movement time into/out of province with terrain"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5508
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:54:rule:root:terrain:nation_designer_cost_multiplier",
+    "context": "root:terrain",
+    "parent_path": [],
+    "key": {
+      "exact": "nation_designer_cost_multiplier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Extra cost multiplier when picked in the Nation Designer"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5509
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:55:leaf-value:root:terrain:<province_id>",
+    "context": "root:terrain",
+    "parent_path": [
+      "terrain_override"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5510
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:56:rule:root:terrain:terrain_override",
+    "context": "root:terrain",
+    "parent_path": [],
+    "key": {
+      "exact": "terrain_override"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5511
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:58:rule:root:graphical_terrain:type",
+    "context": "root:graphical_terrain",
+    "parent_path": [],
+    "key": {
+      "exact": "type"
+    },
+    "operator": "=",
+    "value": {
+      "type": "terrain"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5512
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:59:leaf-value:root:graphical_terrain:int",
+    "context": "root:graphical_terrain",
+    "parent_path": [
+      "color"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5513
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:60:rule:root:graphical_terrain:color",
+    "context": "root:graphical_terrain",
+    "parent_path": [],
+    "key": {
+      "exact": "color"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5514
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:62:rule:root:tree_terrain:terrain",
+    "context": "root:tree_terrain",
+    "parent_path": [],
+    "key": {
+      "exact": "terrain"
+    },
+    "operator": "=",
+    "value": {
+      "type": "terrain"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5515
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:63:leaf-value:root:tree_terrain:int",
+    "context": "root:tree_terrain",
+    "parent_path": [
+      "color"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5516
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:64:rule:root:tree_terrain:color",
+    "context": "root:tree_terrain",
+    "parent_path": [],
+    "key": {
+      "exact": "color"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5517
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:66:rule:root:trade_winds:<province_id>",
+    "context": "root:trade_winds",
+    "parent_path": [],
+    "key": {
+      "type": "province_id"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "province id = rotation in degrees, 0 is pointing right, then ccw"
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5518
+  },
+  {
+    "id": "map/areas_regions_etc:42:leaf-value:type:province_group:scalar",
+    "context": "type:province_group",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": null,
+    "value": "any_scalar",
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5519
+  },
+  {
+    "id": "map/areas_regions_etc:48:leaf-value:root:province_id:float",
+    "context": "root:province_id",
+    "parent_path": [
+      "position"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 14,
+    "strict_min": true,
+    "max_occurs": 14,
+    "source_file": "semantic-rules.json",
+    "line": 5520
+  },
+  {
+    "id": "map/areas_regions_etc:49:rule:root:province_id:position",
+    "context": "root:province_id",
+    "parent_path": [],
+    "key": {
+      "exact": "position"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5521
+  },
+  {
+    "id": "map/areas_regions_etc:50:leaf-value:root:province_id:float",
+    "context": "root:province_id",
+    "parent_path": [
+      "rotation"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 7,
+    "strict_min": true,
+    "max_occurs": 7,
+    "source_file": "semantic-rules.json",
+    "line": 5522
+  },
+  {
+    "id": "map/areas_regions_etc:51:rule:root:province_id:rotation",
+    "context": "root:province_id",
+    "parent_path": [],
+    "key": {
+      "exact": "rotation"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5523
+  },
+  {
+    "id": "map/areas_regions_etc:52:leaf-value:root:province_id:float",
+    "context": "root:province_id",
+    "parent_path": [
+      "height"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 7,
+    "strict_min": true,
+    "max_occurs": 7,
+    "source_file": "semantic-rules.json",
+    "line": 5524
+  },
+  {
+    "id": "map/areas_regions_etc:53:rule:root:province_id:height",
+    "context": "root:province_id",
+    "parent_path": [],
+    "key": {
+      "exact": "height"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5525
+  },
+  {
+    "id": "map/areas_regions_etc:55:leaf-value:root:area:<province_id>",
+    "context": "root:area",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5526
+  },
+  {
+    "id": "map/areas_regions_etc:56:leaf-value:root:area:int[0..255]",
+    "context": "root:area",
+    "parent_path": [
+      "color"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": 0,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 3,
+    "strict_min": true,
+    "max_occurs": 3,
+    "source_file": "semantic-rules.json",
+    "line": 5527
+  },
+  {
+    "id": "map/areas_regions_etc:57:rule:root:area:color",
+    "context": "root:area",
+    "parent_path": [],
+    "key": {
+      "exact": "color"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5528
+  },
+  {
+    "id": "map/areas_regions_etc:59:leaf-value:root:continent:<province_id>",
+    "context": "root:continent",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5529
+  },
+  {
+    "id": "map/areas_regions_etc:61:rule:root:mapclimate:equator_y_on_province_image",
+    "context": "root:mapclimate",
+    "parent_path": [],
+    "key": {
+      "exact": "equator_y_on_province_image"
+    },
+    "operator": "=",
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5530
+  },
+  {
+    "id": "map/areas_regions_etc:62:leaf-value:root:mapclimate:<province_id>",
+    "context": "root:mapclimate",
+    "parent_path": [
+      "<climate>"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5531
+  },
+  {
+    "id": "map/areas_regions_etc:63:rule:root:mapclimate:<climate>",
+    "context": "root:mapclimate",
+    "parent_path": [],
+    "key": {
+      "type": "climate"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 10,
+    "strict_min": true,
+    "max_occurs": 10,
+    "source_file": "semantic-rules.json",
+    "line": 5532
+  },
+  {
+    "id": "map/areas_regions_etc:65:leaf-value:root:region:<area.used>",
+    "context": "root:region",
+    "parent_path": [
+      "areas"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "area.used"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5533
+  },
+  {
+    "id": "map/areas_regions_etc:66:rule:root:region:areas",
+    "context": "root:region",
+    "parent_path": [],
+    "key": {
+      "exact": "areas"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5534
+  },
+  {
+    "id": "map/areas_regions_etc:67:leaf-value:root:region:scalar",
+    "context": "root:region",
+    "parent_path": [
+      "monsoon"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": "any_scalar",
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 2,
+    "strict_min": true,
+    "max_occurs": 2,
+    "source_file": "semantic-rules.json",
+    "line": 5535
+  },
+  {
+    "id": "map/areas_regions_etc:68:rule:root:region:monsoon",
+    "context": "root:region",
+    "parent_path": [],
+    "key": {
+      "exact": "monsoon"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5536
+  },
+  {
+    "id": "map/areas_regions_etc:70:leaf-value:root:superregion:restrict_charter",
+    "context": "root:superregion",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "exact": "restrict_charter"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5537
+  },
+  {
+    "id": "map/areas_regions_etc:71:leaf-value:root:superregion:<region>",
+    "context": "root:superregion",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "region"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5538
+  },
+  {
+    "id": "map/areas_regions_etc:73:leaf-value:root:province_group:<province_id>",
+    "context": "root:province_group",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5539
+  },
+  {
+    "id": "map/areas_regions_etc:8:leaf-value:type:area:scalar",
+    "context": "type:area",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": null,
+    "value": "any_scalar",
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5540
+  },
+  {
+    "id": "map/default_map:10:rule:root:default_map:sea_starts",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "sea_starts"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5541
+  },
+  {
+    "id": "map/default_map:11:leaf-value:root:default_map:<province_id>",
+    "context": "root:default_map",
+    "parent_path": [
+      "only_used_for_random"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5542
+  },
+  {
+    "id": "map/default_map:12:rule:root:default_map:only_used_for_random",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "only_used_for_random"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5543
+  },
+  {
+    "id": "map/default_map:13:leaf-value:root:default_map:<province_id>",
+    "context": "root:default_map",
+    "parent_path": [
+      "lakes"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5544
+  },
+  {
+    "id": "map/default_map:14:rule:root:default_map:lakes",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "lakes"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5545
+  },
+  {
+    "id": "map/default_map:15:leaf-value:root:default_map:<province_id>",
+    "context": "root:default_map",
+    "parent_path": [
+      "force_coastal"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5546
+  },
+  {
+    "id": "map/default_map:16:rule:root:default_map:force_coastal",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "force_coastal"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5547
+  },
+  {
+    "id": "map/default_map:17:rule:root:default_map:definitions",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "definitions"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5548
+  },
+  {
+    "id": "map/default_map:18:rule:root:default_map:provinces",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "provinces"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5549
+  },
+  {
+    "id": "map/default_map:19:rule:root:default_map:positions",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "positions"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5550
+  },
+  {
+    "id": "map/default_map:20:rule:root:default_map:terrain",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "terrain"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5551
+  },
+  {
+    "id": "map/default_map:21:rule:root:default_map:rivers",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "rivers"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5552
+  },
+  {
+    "id": "map/default_map:22:rule:root:default_map:terrain_definition",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "terrain_definition"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5553
+  },
+  {
+    "id": "map/default_map:23:rule:root:default_map:heightmap",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "heightmap"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5554
+  },
+  {
+    "id": "map/default_map:24:rule:root:default_map:tree_definition",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "tree_definition"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5555
+  },
+  {
+    "id": "map/default_map:25:rule:root:default_map:continent",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "continent"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5556
+  },
+  {
+    "id": "map/default_map:26:rule:root:default_map:adjacencies",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "adjacencies"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5557
+  },
+  {
+    "id": "map/default_map:27:rule:root:default_map:climate",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "climate"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5558
+  },
+  {
+    "id": "map/default_map:28:rule:root:default_map:region",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "region"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5559
+  },
+  {
+    "id": "map/default_map:29:rule:root:default_map:superregion",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "superregion"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5560
+  },
+  {
+    "id": "map/default_map:30:rule:root:default_map:area",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "area"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5561
+  },
+  {
+    "id": "map/default_map:31:rule:root:default_map:provincegroup",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "provincegroup"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5562
+  },
+  {
+    "id": "map/default_map:32:rule:root:default_map:ambient_object",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "ambient_object"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5563
+  },
+  {
+    "id": "map/default_map:33:rule:root:default_map:seasons",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "seasons"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5564
+  },
+  {
+    "id": "map/default_map:34:rule:root:default_map:trade_winds",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "trade_winds"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5565
+  },
+  {
+    "id": "map/default_map:35:rule:root:default_map:name",
+    "context": "root:default_map",
+    "parent_path": [
+      "canal_definition"
+    ],
+    "key": {
+      "exact": "name"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5566
+  },
+  {
+    "id": "map/default_map:36:rule:root:default_map:x",
+    "context": "root:default_map",
+    "parent_path": [
+      "canal_definition"
+    ],
+    "key": {
+      "exact": "x"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5567
+  },
+  {
+    "id": "map/default_map:37:rule:root:default_map:y",
+    "context": "root:default_map",
+    "parent_path": [
+      "canal_definition"
+    ],
+    "key": {
+      "exact": "y"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5568
+  },
+  {
+    "id": "map/default_map:38:rule:root:default_map:canal_definition",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "canal_definition"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5569
+  },
+  {
+    "id": "map/default_map:39:leaf-value:root:default_map:int[0..255]",
+    "context": "root:default_map",
+    "parent_path": [
+      "tree"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "int": {
+        "min": 0,
+        "max": null
+      }
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 4,
+    "source_file": "semantic-rules.json",
+    "line": 5570
+  },
+  {
+    "id": "map/default_map:40:rule:root:default_map:tree",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "tree"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "value_clause",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5571
+  },
+  {
+    "id": "map/default_map:6:rule:root:default_map:width",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "width"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5572
+  },
+  {
+    "id": "map/default_map:7:rule:root:default_map:height",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "height"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5573
+  },
+  {
+    "id": "map/default_map:8:rule:root:default_map:max_provinces",
+    "context": "root:default_map",
+    "parent_path": [],
+    "key": {
+      "exact": "max_provinces"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": 2300,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "There is an unknown minimum number required due to a paradox bug. If a custom map is crashing try a higher number."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5574
+  },
+  {
+    "id": "map/default_map:9:leaf-value:root:default_map:<province_id>",
+    "context": "root:default_map",
+    "parent_path": [
+      "sea_starts"
+    ],
+    "key": "any_scalar",
+    "operator": null,
+    "value": {
+      "type": "province_id"
+    },
+    "shape": "leaf_value",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 5575
+  },
+  {
+    "id": "map/ambient_objects_and_terrain:47:rule:root:terrain:any_scalar",
+    "context": "root:terrain",
+    "parent_path": [],
+    "key": "any_scalar",
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 47
+  }
+]

@@ -1,0 +1,621 @@
+{
+  "records": [
+    {
+      "table": "effects",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:10:2",
+      "source_order": 185,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "effect",
+        "line": "336",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:11:5",
+      "source_order": 199,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "effect",
+        "line": "370",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:3:1",
+      "source_order": 124,
+      "fields": {
+        "child_count": "1",
+        "key": "effect",
+        "line": "202",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:4:4",
+      "source_order": 141,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { root = country this = country }\ncardinality = 0..1",
+        "key": "effect",
+        "line": "235",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:8:5",
+      "source_order": 167,
+      "fields": {
+        "child_count": "1",
+        "documentation": "Effects to run when the decree is enacted",
+        "key": "effect",
+        "line": "295",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/ages:common/ages:common/ages:common/ages:root:1:6:0:1",
+      "source_order": 330,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { root = country this = country }",
+        "key": "effect",
+        "line": "81",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/custom_gui:common/custom_gui:root:1:3",
+      "source_order": 851,
+      "fields": {
+        "child_count": "1",
+        "documentation": "The code that runs when the button is clicked",
+        "key": "effect",
+        "line": "46",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/custom_gui:common/custom_gui:root:4:3",
+      "source_order": 879,
+      "fields": {
+        "child_count": "1",
+        "documentation": "The code that runs when clicked",
+        "key": "effect",
+        "line": "114",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/diplomatic_actions:common/diplomatic_actions:root:1:2",
+      "source_order": 917,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country from = country }",
+        "key": "effect",
+        "line": "36",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/estates:common/estates:root:4:5",
+      "source_order": 1212,
+      "fields": {
+        "child_count": "1",
+        "directives": "push_scope = country",
+        "key": "effect",
+        "line": "424",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/federation_advancements:common/federation_advancements:root:1:3",
+      "source_order": 1234,
+      "fields": {
+        "child_count": "2",
+        "directives": "cardinality = 0..1\n## replace_scope = { root = country this = country }",
+        "key": "effect",
+        "line": "27",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:2:3:2:0:1",
+      "source_order": 1515,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "documentation": "Run when the culture fully assimilated",
+        "key": "effect",
+        "line": "376",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:1:4:0:5",
+      "source_order": 1414,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { root = country this = country }",
+        "key": "effect",
+        "line": "241",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:2:4:51",
+      "source_order": 1577,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { root = country this = country }\ncardinality = 0..1",
+        "key": "effect",
+        "line": "528",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/hegemon:common/hegemon:root:1:4",
+      "source_order": 2068,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "documentation": "When Hegemony is proclaimed",
+        "key": "effect",
+        "line": "36",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:1:1:2",
+      "source_order": 2145,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "effect",
+        "line": "86",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:1:3:2",
+      "source_order": 2154,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "effect",
+        "line": "108",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:1:4:2",
+      "source_order": 2163,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "effect",
+        "line": "127",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/institutions:common/institutions:root:1:9",
+      "source_order": 2343,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { this = country root = country }\ncardinality = 0..1",
+        "documentation": "Effect that runs when the country embraces it",
+        "key": "effect",
+        "line": "53",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/parliaments:common/parliaments:root:1:3",
+      "source_order": 4478,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { root = country this = country from = province }",
+        "key": "effect",
+        "line": "32",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/parliaments:common/parliaments:root:2:2",
+      "source_order": 4490,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { root = country this = country }",
+        "key": "effect",
+        "line": "62",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/peace_treaties:common/peace_treaties:root:1:14",
+      "source_order": 4542,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { root = country this = country from = country }",
+        "documentation": "Defaults to empty effect (which makes error log entry but is safe)",
+        "key": "effect",
+        "line": "100",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:41:10:3",
+      "source_order": 4970,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country }",
+        "key": "effect",
+        "line": "565",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:41:11:3",
+      "source_order": 4981,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country }",
+        "key": "effect",
+        "line": "596",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:41:12:3",
+      "source_order": 4992,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country }",
+        "key": "effect",
+        "line": "627",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:41:13:3",
+      "source_order": 5003,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country }",
+        "key": "effect",
+        "line": "658",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:41:14:3",
+      "source_order": 5014,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country }",
+        "key": "effect",
+        "line": "689",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:41:15:3",
+      "source_order": 5025,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country }",
+        "key": "effect",
+        "line": "720",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:41:7:3",
+      "source_order": 4937,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country }",
+        "key": "effect",
+        "line": "472",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:41:8:3",
+      "source_order": 4948,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country }",
+        "key": "effect",
+        "line": "503",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:41:9:3",
+      "source_order": 4959,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country }",
+        "key": "effect",
+        "line": "534",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:46:3",
+      "source_order": 5060,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 1..1\nreplace_scope = { root = country this = country }",
+        "key": "effect",
+        "line": "800",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:2:5",
+      "source_order": 5075,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "effect",
+        "line": "842",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:5:4",
+      "source_order": 5118,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country }",
+        "key": "effect",
+        "line": "955",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/scripted_functions:common/scripted_functions:root:1:1",
+      "source_order": 5135,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "effect",
+        "line": "24",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:10:1",
+      "source_order": 5183,
+      "fields": {
+        "directives": "cardinality 0..1",
+        "key": "effect",
+        "line": "116",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scalar"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:12:2",
+      "source_order": 5191,
+      "fields": {
+        "directives": "cardinality 0..1",
+        "key": "effect",
+        "line": "138",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scalar"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:13:1",
+      "source_order": 5194,
+      "fields": {
+        "directives": "cardinality 0..1",
+        "key": "effect",
+        "line": "147",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scalar"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:20:1",
+      "source_order": 5229,
+      "fields": {
+        "key": "effect",
+        "line": "225",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scalar"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:71:1",
+      "source_order": 5843,
+      "fields": {
+        "key": "effect",
+        "line": "2213",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scalar"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:72:1",
+      "source_order": 5846,
+      "fields": {
+        "key": "effect",
+        "line": "2220",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scalar"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "common/subject_types:common/subject_types:root:2:2",
+      "source_order": 6080,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { root = country this = country }",
+        "key": "effect",
+        "line": "474",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "decisions/decisions:decisions/decisions:root:1:4",
+      "source_order": 6376,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { root = country this = country }",
+        "key": "effect",
+        "line": "36",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "effects",
+      "logical_id": "missions/missions:missions/missions:missions/missions:root:1:6:3",
+      "source_order": 10461,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { this = country root = country }",
+        "documentation": "This is what you get after you finished your mission.",
+        "key": "effect",
+        "line": "67",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    }
+  ]
+}

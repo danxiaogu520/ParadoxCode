@@ -320,6 +320,22 @@ fn canonical_hash_includes_scripted_macro_metadata() {
 }
 
 #[test]
+fn canonical_hash_includes_game_profile_data() {
+    let mut first = RulesModel {
+        game_id: "test-game".to_owned(),
+        ..RulesModel::default()
+    };
+    first.profile.scan_roots.push("common".to_owned());
+    let mut second = first.clone();
+    second.profile.scan_extensions.push("txt".to_owned());
+
+    assert_ne!(
+        RuleSet::from_model(first).rule_hash(),
+        RuleSet::from_model(second).rule_hash()
+    );
+}
+
+#[test]
 fn type_descriptor_macro_metadata_is_strict_and_old_source_defaults_it() {
     let old_source = r#"{
         "name": "legacy",
@@ -381,6 +397,7 @@ fn sqlite_round_trip_validates_logical_hash() {
         game_id: "test-game".to_owned(),
         ..RulesModel::default()
     };
+    model.profile.scan_roots.push("common".to_owned());
     model.semantic.type_descriptors.insert(
         "scripted_trigger".to_owned(),
         TypeDescriptor {

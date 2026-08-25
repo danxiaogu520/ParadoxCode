@@ -1,0 +1,680 @@
+{
+  "records": [
+    {
+      "table": "modifiers",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:13:2",
+      "source_order": 223,
+      "fields": {
+        "child_count": "1",
+        "key": "modifier",
+        "line": "424",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:2:3",
+      "source_order": 116,
+      "fields": {
+        "child_count": "1",
+        "key": "modifier",
+        "line": "184",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:8:4",
+      "source_order": 165,
+      "fields": {
+        "child_count": "1",
+        "documentation": "Modifiers active during the duration of the decree",
+        "key": "modifier",
+        "line": "291",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/00_small_types_consolidated:common/00_small_types_consolidated:root:9:1",
+      "source_order": 176,
+      "fields": {
+        "child_count": "1",
+        "key": "modifier",
+        "line": "314",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/advisortypes:common/advisortypes:common/advisortypes:root:1:2:1",
+      "source_order": 280,
+      "fields": {
+        "child_count": "1",
+        "key": "modifier",
+        "line": "29",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/ages:common/ages:common/ages:common/ages:root:1:6:0:2",
+      "source_order": 332,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "modifier",
+        "line": "85",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/ai_army:common/ai_army:common/ai_army:root:2:1:1",
+      "source_order": 350,
+      "fields": {
+        "child_count": "2",
+        "directives": "cardinality = 0..inf",
+        "key": "modifier",
+        "line": "29",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/buildings:common/buildings:root:1:1",
+      "source_order": 477,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "modifier",
+        "line": "26",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/defender_of_faith:common/defender_of_faith:root:1:3",
+      "source_order": 898,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "modifier",
+        "line": "22",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/disasters:common/disasters:root:1:7",
+      "source_order": 1015,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { root = country this = country }",
+        "documentation": "Modifier enabled for the country during the disaster.",
+        "key": "modifier",
+        "line": "61",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/estates:common/estates:common/estates:root:2:18:1",
+      "source_order": 1143,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..inf",
+        "key": "modifier",
+        "line": "260",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/estates:common/estates:common/estates:root:2:19:1",
+      "source_order": 1149,
+      "fields": {
+        "child_count": "1",
+        "key": "modifier",
+        "line": "275",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/estates:common/estates:common/estates:root:2:20:1",
+      "source_order": 1155,
+      "fields": {
+        "child_count": "1",
+        "key": "modifier",
+        "line": "288",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/estates:common/estates:root:3:12",
+      "source_order": 1203,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "documentation": "Country modifier granted while the agenda is active",
+        "key": "modifier",
+        "line": "407",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/estates:common/estates:root:5:3",
+      "source_order": 1221,
+      "fields": {
+        "child_count": "1",
+        "directives": "push_scope = country",
+        "key": "modifier",
+        "line": "440",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/federation_advancements:common/federation_advancements:root:1:2",
+      "source_order": 1232,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { root = country this = country }",
+        "key": "modifier",
+        "line": "21",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/flagship_modification:common/flagship_modification:root:1:1",
+      "source_order": 1247,
+      "fields": {
+        "child_count": "1",
+        "key": "modifier",
+        "line": "16",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/golden_bull:common/golden_bull:root:1:0",
+      "source_order": 1282,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "modifier",
+        "line": "17",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:0:6:4:2:0",
+      "source_order": 1350,
+      "fields": {
+        "directives": "required",
+        "key": "modifier",
+        "line": "88",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "monthly_$"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:0:6:4:3:0",
+      "source_order": 1352,
+      "fields": {
+        "directives": "required",
+        "key": "modifier",
+        "line": "92",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "monthly_$"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:1:3:0:11:1",
+      "source_order": 1381,
+      "fields": {
+        "child_count": "1",
+        "key": "modifier",
+        "line": "161",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:1:3:0:12:1",
+      "source_order": 1388,
+      "fields": {
+        "child_count": "1",
+        "key": "modifier",
+        "line": "177",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:1:3:0:13:1",
+      "source_order": 1396,
+      "fields": {
+        "child_count": "1",
+        "key": "modifier",
+        "line": "197",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:2:4:47",
+      "source_order": 1568,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { root = country this = country }",
+        "key": "modifiers",
+        "line": "505",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/greatprojects:common/greatprojects:common/greatprojects:common/greatprojects:root:1:15:7:2",
+      "source_order": 1979,
+      "fields": {
+        "child_count": "1",
+        "key": "modifier",
+        "line": "138",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/greatprojects:common/greatprojects:common/greatprojects:common/greatprojects:root:1:16:7:2",
+      "source_order": 2003,
+      "fields": {
+        "child_count": "1",
+        "key": "modifier",
+        "line": "193",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/greatprojects:common/greatprojects:common/greatprojects:common/greatprojects:root:1:17:7:2",
+      "source_order": 2027,
+      "fields": {
+        "child_count": "1",
+        "key": "modifier",
+        "line": "248",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/greatprojects:common/greatprojects:common/greatprojects:common/greatprojects:root:1:18:7:2",
+      "source_order": 2051,
+      "fields": {
+        "child_count": "1",
+        "key": "modifier",
+        "line": "303",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/holy_order:common/holy_order:root:1:7",
+      "source_order": 2090,
+      "fields": {
+        "child_count": "1",
+        "directives": "replace_scope = { this = province root = province }",
+        "key": "modifier",
+        "line": "37",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/ideas_and_native_advancements:common/ideas_and_native_advancements:common/ideas_and_native_advancements:root:3:25:1",
+      "source_order": 2208,
+      "fields": {
+        "child_count": "2",
+        "directives": "cardinality = 0..inf",
+        "key": "modifier",
+        "line": "223",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/institutions:common/institutions:common/institutions:root:1:10:0",
+      "source_order": 2346,
+      "fields": {
+        "child_count": "6",
+        "directives": "cardinality = 1..inf",
+        "key": "modifier",
+        "line": "61",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/mercenary_company:common/mercenary_company:root:1:8",
+      "source_order": 2411,
+      "fields": {
+        "child_count": "2",
+        "directives": "cardinality = 0..1",
+        "key": "modifier",
+        "line": "35",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/parliaments:common/parliaments:root:2:4",
+      "source_order": 4494,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1",
+        "key": "modifier",
+        "line": "73",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:44:0:2:1",
+      "source_order": 5041,
+      "fields": {
+        "child_count": "2",
+        "directives": "cardinality = 0..inf",
+        "key": "modifier",
+        "line": "755",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:common/religions_and_related:root:1:9:44:0:3",
+      "source_order": 5044,
+      "fields": {
+        "child_count": "1",
+        "key": "modifier",
+        "line": "761",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/religions_and_related:common/religions_and_related:root:5:1",
+      "source_order": 5112,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { root = country this = country }",
+        "key": "modifier",
+        "line": "937",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/subject_types:common/subject_types:common/subject_types:root:1:133:0",
+      "source_order": 6058,
+      "fields": {
+        "directives": "cardinality = 1..1",
+        "key": "modifier",
+        "line": "418",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<static_modifier>"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/subject_types:common/subject_types:common/subject_types:root:1:133:1",
+      "source_order": 6059,
+      "fields": {
+        "key": "modifier",
+        "line": "419",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<event_modifier>"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/subject_types:common/subject_types:common/subject_types:root:1:135:0",
+      "source_order": 6066,
+      "fields": {
+        "directives": "cardinality = 1..1",
+        "key": "modifier",
+        "line": "438",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<static_modifier>"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/subject_types:common/subject_types:common/subject_types:root:1:135:1",
+      "source_order": 6067,
+      "fields": {
+        "key": "modifier",
+        "line": "439",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<event_modifier>"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:root:1:2",
+      "source_order": 6205,
+      "fields": {
+        "child_count": "1",
+        "directives": "cardinality = 0..1\nreplace_scope = { this = country root = country }",
+        "key": "modifier",
+        "line": "87",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "effects:effects:root:230:2",
+      "source_order": 7477,
+      "fields": {
+        "key": "modifier",
+        "line": "1367",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<opinion_modifier>"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "effects:effects:root:231:2",
+      "source_order": 7484,
+      "fields": {
+        "key": "modifier",
+        "line": "1383",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<opinion_modifier>"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "effects:effects:root:232:2",
+      "source_order": 7491,
+      "fields": {
+        "key": "modifier",
+        "line": "1399",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<opinion_modifier>"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "effects:effects:root:233:2",
+      "source_order": 7495,
+      "fields": {
+        "key": "modifier",
+        "line": "1407",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<opinion_modifier>"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "modifiers:root:0",
+      "source_order": 10473,
+      "fields": {
+        "child_count": "446",
+        "key": "modifiers",
+        "line": "4",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "triggers:triggers:root:291:1",
+      "source_order": 12379,
+      "fields": {
+        "key": "modifier",
+        "line": "1315",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "localisation"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "triggers:triggers:root:292:1",
+      "source_order": 12383,
+      "fields": {
+        "key": "modifier",
+        "line": "1325",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "localisation"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "triggers:triggers:root:341:2",
+      "source_order": 12451,
+      "fields": {
+        "key": "modifier",
+        "line": "1556",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<opinion_modifier>"
+      }
+    },
+    {
+      "table": "modifiers",
+      "logical_id": "triggers:triggers:root:887:2",
+      "source_order": 13068,
+      "fields": {
+        "key": "modifier",
+        "line": "3871",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "<opinion_modifier>"
+      }
+    }
+  ]
+}

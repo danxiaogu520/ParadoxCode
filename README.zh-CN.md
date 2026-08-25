@@ -121,6 +121,12 @@ cargo run -p pdx-rules --bin pdx-bake -- build \
 
 官方 `pdx-ls` 二进制内嵌第一方 JSON 规则源，并在首次使用或源 `rule_hash` 变化时，在用户缓存中生成经过校验的 SQLite 规则工件。生成工件不会提交到仓库。
 
+EU4 规则源按职责拆分：`catalog/` 保存文件类别、符号描述符与规范化记录，`semantic/` 按
+effect、trigger、modifier、on_action 以及 event、decision、mission、history 等目录语义组织规则，
+`types/`、`values/`、`localisation/` 保存支撑表，`profile/` 保存 EU4 的扫描路径、符号、作用域、
+动态值和语义继承配置。`rules/eu4/manifest.json` 显式列出全部片段；编译器把它们合并成一个
+逻辑模型，profile 与语义规则共同参与同一个规范 `rule_hash`。
+
 `pdx-ls` 要求现代 LSP 客户端在 initialize 请求中提供至少一个 `workspaceFolders` 条目。仅发送已弃用
 `rootUri` 的旧客户端不受支持，并会收到 `INVALID_PARAMS`；请升级编辑器或语言客户端。
 
@@ -199,11 +205,12 @@ bash scripts/diagnose-current-mod.sh \
 | `editors/vscode/` | VS Code 扩展：服务器引导、引导流程、任务树预览 |
 | `editors/zed/` | 轻量 Zed 扩展、语言元数据与查询 |
 | `grammars/` | 仅编辑用的 Tree-sitter 语法与语料测试 |
-| `rules/eu4/` | 权威第一方 EU4 规则源（JSON）与生成的清单 |
+| `rules/eu4/` | 权威第一方 EU4 规则树（catalog、semantic、支撑表与 profile） |
 | `fuzz/` | 解析、编辑、格式化与 HIR 模糊测试目标 |
 | `scripts/` | 可复现的质量检查与诊断工作流 |
 
-当前第一方 EU4 规则面向游戏版本 **1.37.5**（8,577 条语义规则、117 个文件类别、2,674 个符号描述符）。
+当前第一方 EU4 规则面向游戏版本 **1.37.5**（8,525 条语义规则、121 个文件类别、2,667 个符号描述符）。
+`rules/manifest.json` 记录 schema/source 版本、规范 `rule_hash` 与工件校验和。
 
 ## 发布
 

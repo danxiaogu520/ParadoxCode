@@ -1,7 +1,10 @@
 //! Compiler for ParadoxCode's strict, first-party rule source format.
 //!
 //! This crate deliberately has no external rule-language parser or compatibility layer. Its only
-//! accepted input is the versioned source tree owned and reviewed in this repository.
+//! accepted input is the versioned, manifest-driven JSON source tree owned and reviewed in this
+//! repository. The manifest explicitly groups fragments by catalog, semantic context, supporting
+//! tables, localisation bindings, and game profile; compilation produces one normalized logical
+//! model and one canonical hash.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -9,22 +12,25 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::{
-    FileCategory, RuleRecord, RuleSet, RulesError, RulesModel, SemanticModel, SymbolDescriptor,
+    FileCategory, GameProfile, RuleRecord, RuleSet, RulesError, RulesModel, SemanticModel,
+    SymbolDescriptor,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 
 /// Current version of the developer-maintained source layout.
-pub const SOURCE_FORMAT_VERSION: u32 = 8;
+pub const SOURCE_FORMAT_VERSION: u32 = 9;
 
 const SOURCE_MANIFEST: &str = "manifest.json";
-const CATALOG: &str = "catalog.json";
-const SEMANTIC_RULES: &str = "semantic-rules.json";
-const ENUM_VALUES: &str = "enum-values.json";
-const TYPE_ROOT_KEYS: &str = "type-root-keys.json";
-const TYPE_ROOT_SCOPES: &str = "type-root-scopes.json";
-const TYPE_DESCRIPTORS: &str = "type-descriptors.json";
-const LOCALISATION_BINDINGS: &str = "localisation-bindings.json";
+
+/// One named source file embedded into an official runtime binary.
+#[derive(Clone, Copy, Debug)]
+pub struct SourceFile<'a> {
+    /// Normalized path relative to the source root, using `/` separators.
+    pub path: &'a str,
+    /// UTF-8 JSON bytes for the source file.
+    pub bytes: &'a [u8],
+}
 
 /// A complete first-party source bundle, either embedded in a runtime binary or supplied by a
 /// developer-side source loader.
@@ -32,20 +38,8 @@ const LOCALISATION_BINDINGS: &str = "localisation-bindings.json";
 pub struct SourceBundle<'a> {
     /// Source manifest JSON.
     pub manifest: &'a [u8],
-    /// Normalized catalog JSON.
-    pub catalog: &'a [u8],
-    /// Semantic rule alternatives JSON.
-    pub semantic_rules: &'a [u8],
-    /// Static enum values JSON.
-    pub enum_values: &'a [u8],
-    /// Type root key selectors JSON.
-    pub type_root_keys: &'a [u8],
-    /// Type root scope selectors JSON.
-    pub type_root_scopes: &'a [u8],
-    /// Type descriptor JSON.
-    pub type_descriptors: &'a [u8],
-    /// Type-instance localisation binding JSON.
-    pub localisation_bindings: &'a [u8],
+    /// All files named by the manifest.
+    pub files: &'a [SourceFile<'a>],
 }
 
 /// Identity and compatibility metadata maintained with the rule source.
@@ -58,15 +52,44 @@ pub struct SourceManifest {
     pub game_id: String,
     /// Human-readable game release supported by this rule revision.
     pub target_game_version: String,
+    /// Explicit source files grouped by their normalized logical data family.
+    pub files: SourceFiles,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+/// Explicit source file lists for the first-party rule tree.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SourceFiles {
+    /// Catalog fragments containing file categories, symbol descriptors, and records.
+    pub catalog: Vec<String>,
+    /// Executable semantic rule fragments.
+    pub semantic: Vec<String>,
+    /// Type descriptor and root selector fragments.
+    pub types: Vec<String>,
+    /// Static enum value fragments.
+    pub values: Vec<String>,
+    /// Type-to-localisation binding fragments.
+    pub localisation: Vec<String>,
+    /// Data-only game profile fragments.
+    pub profile: Vec<String>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct CatalogSource {
+    #[serde(default)]
     file_categories: Vec<FileCategory>,
+    #[serde(default)]
     symbol_descriptors: Vec<SymbolDescriptor>,
+    #[serde(default)]
     records: Vec<RuleRecord>,
 }
+
+type ParsedTypeFragments = (
+    BTreeMap<String, crate::TypeDescriptor>,
+    BTreeMap<String, Vec<String>>,
+    BTreeMap<String, BTreeMap<String, String>>,
+);
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -172,19 +195,10 @@ impl From<RulesError> for CompileError {
 
 /// Loads and validates one complete first-party source tree.
 pub fn load_source(source: &Path) -> Result<(SourceManifest, RulesModel), CompileError> {
-    validate_source_layout(source)?;
     let manifest: SourceManifest = read_json(&source.join(SOURCE_MANIFEST))?;
-    let catalog: CatalogSource = read_json(&source.join(CATALOG))?;
-    let localisation_bindings = read_localisation_bindings(&source.join(LOCALISATION_BINDINGS))?;
-    let semantic = SemanticModel {
-        rules: read_json(&source.join(SEMANTIC_RULES))?,
-        enum_values: read_json(&source.join(ENUM_VALUES))?,
-        type_root_keys: read_json(&source.join(TYPE_ROOT_KEYS))?,
-        type_root_scopes: read_json(&source.join(TYPE_ROOT_SCOPES))?,
-        type_descriptors: read_json(&source.join(TYPE_DESCRIPTORS))?,
-        localisation_bindings,
-    };
-    validate_source_model(manifest, catalog, semantic)
+    validate_source_layout(source, &manifest)?;
+    let files = read_declared_files(source, &manifest.files)?;
+    parse_source_files(manifest, files)
 }
 
 /// Loads and validates an embedded first-party source bundle without materializing its JSON files.
@@ -193,42 +207,177 @@ pub fn load_source_bundle(
 ) -> Result<(SourceManifest, RulesModel), CompileError> {
     let manifest: SourceManifest =
         read_json_bytes(PathBuf::from("<embedded>/manifest.json"), source.manifest)?;
-    let catalog: CatalogSource =
-        read_json_bytes(PathBuf::from("<embedded>/catalog.json"), source.catalog)?;
-    let localisation_bindings = read_localisation_bindings_bytes(
-        PathBuf::from("<embedded>/localisation-bindings.json"),
-        source.localisation_bindings,
-    )?;
+    let mut files = BTreeMap::new();
+    for file in source.files {
+        let path = normalize_source_path(file.path)?;
+        if files.insert(path.clone(), file.bytes.to_vec()).is_some() {
+            return Err(CompileError::Validation(format!(
+                "duplicate embedded rule source file: {path}"
+            )));
+        }
+    }
+    validate_declared_file_set(&manifest.files, files.keys().map(String::as_str))?;
+    parse_source_files(manifest, files)
+}
+
+fn parse_source_files(
+    manifest: SourceManifest,
+    files: BTreeMap<String, Vec<u8>>,
+) -> Result<(SourceManifest, RulesModel), CompileError> {
+    let catalog = parse_catalog_fragments(&manifest.files.catalog, &files)?;
+    let semantic_rules = parse_semantic_fragments(&manifest.files.semantic, &files)?;
+    let (type_descriptors, type_root_keys, type_root_scopes) =
+        parse_type_fragments(&manifest.files.types, &files)?;
+    let enum_values = parse_value_fragments(&manifest.files.values, &files)?;
+    let localisation_bindings = parse_localisation_fragments(&manifest.files.localisation, &files)?;
+    let profile = parse_profile_fragments(&manifest.files.profile, &files)?;
     let semantic = SemanticModel {
-        rules: read_json_bytes(
-            PathBuf::from("<embedded>/semantic-rules.json"),
-            source.semantic_rules,
-        )?,
-        enum_values: read_json_bytes(
-            PathBuf::from("<embedded>/enum-values.json"),
-            source.enum_values,
-        )?,
-        type_root_keys: read_json_bytes(
-            PathBuf::from("<embedded>/type-root-keys.json"),
-            source.type_root_keys,
-        )?,
-        type_root_scopes: read_json_bytes(
-            PathBuf::from("<embedded>/type-root-scopes.json"),
-            source.type_root_scopes,
-        )?,
-        type_descriptors: read_json_bytes(
-            PathBuf::from("<embedded>/type-descriptors.json"),
-            source.type_descriptors,
-        )?,
+        rules: semantic_rules,
+        enum_values,
+        type_root_keys,
+        type_root_scopes,
+        type_descriptors,
         localisation_bindings,
     };
-    validate_source_model(manifest, catalog, semantic)
+    validate_source_model(manifest, catalog, semantic, profile)
+}
+
+fn parse_catalog_fragments(
+    paths: &[String],
+    files: &BTreeMap<String, Vec<u8>>,
+) -> Result<CatalogSource, CompileError> {
+    let mut catalog = CatalogSource::default();
+    for path in paths {
+        let fragment: CatalogSource = read_declared_json(path, files)?;
+        catalog.file_categories.extend(fragment.file_categories);
+        catalog
+            .symbol_descriptors
+            .extend(fragment.symbol_descriptors);
+        catalog.records.extend(fragment.records);
+    }
+    Ok(catalog)
+}
+
+fn parse_semantic_fragments(
+    paths: &[String],
+    files: &BTreeMap<String, Vec<u8>>,
+) -> Result<Vec<crate::SemanticRule>, CompileError> {
+    let mut rules = Vec::new();
+    for path in paths {
+        let fragment: Vec<crate::SemanticRule> = read_declared_json(path, files)?;
+        rules.extend(fragment);
+    }
+    Ok(rules)
+}
+
+fn parse_type_fragments(
+    paths: &[String],
+    files: &BTreeMap<String, Vec<u8>>,
+) -> Result<ParsedTypeFragments, CompileError> {
+    let mut descriptors = BTreeMap::new();
+    let mut root_keys = BTreeMap::new();
+    let mut root_scopes = BTreeMap::<String, BTreeMap<String, String>>::new();
+    for path in paths {
+        if path.ends_with("root-keys.json") {
+            merge_unique_map(
+                &mut root_keys,
+                read_declared_json(path, files)?,
+                "type root keys",
+            )?;
+        } else if path.ends_with("root-scopes.json") {
+            merge_unique_map(
+                &mut root_scopes,
+                read_declared_json(path, files)?,
+                "type root scopes",
+            )?;
+        } else {
+            let fragment: BTreeMap<String, crate::TypeDescriptor> =
+                read_declared_json(path, files)?;
+            merge_unique_map(&mut descriptors, fragment, "type descriptor")?;
+        }
+    }
+    Ok((descriptors, root_keys, root_scopes))
+}
+
+fn parse_value_fragments(
+    paths: &[String],
+    files: &BTreeMap<String, Vec<u8>>,
+) -> Result<BTreeMap<String, Vec<String>>, CompileError> {
+    let mut values = BTreeMap::new();
+    for path in paths {
+        let fragment: BTreeMap<String, Vec<String>> = read_declared_json(path, files)?;
+        merge_unique_map(&mut values, fragment, "enum value set")?;
+    }
+    Ok(values)
+}
+
+fn parse_localisation_fragments(
+    paths: &[String],
+    files: &BTreeMap<String, Vec<u8>>,
+) -> Result<Vec<crate::LocalisationBinding>, CompileError> {
+    let mut source = BTreeMap::<String, Vec<LocalisationBindingSource>>::new();
+    for path in paths {
+        let fragment: BTreeMap<String, Vec<LocalisationBindingSource>> =
+            read_declared_json(path, files)?;
+        for (type_name, bindings) in fragment {
+            source.entry(type_name).or_default().extend(bindings);
+        }
+    }
+    Ok(decode_localisation_bindings(source))
+}
+
+fn parse_profile_fragments(
+    paths: &[String],
+    files: &BTreeMap<String, Vec<u8>>,
+) -> Result<GameProfile, CompileError> {
+    let mut profile = serde_json::Map::new();
+    for path in paths {
+        let fragment: serde_json::Value = read_declared_json(path, files)?;
+        let serde_json::Value::Object(fragment) = fragment else {
+            return Err(CompileError::Validation(format!(
+                "profile fragment must be an object: {path}"
+            )));
+        };
+        for (key, value) in fragment {
+            if profile.insert(key.clone(), value).is_some() {
+                return Err(CompileError::Validation(format!(
+                    "duplicate profile field across fragments: {key}"
+                )));
+            }
+        }
+    }
+    serde_json::from_value(serde_json::Value::Object(profile)).map_err(|source| {
+        CompileError::Json {
+            path: PathBuf::from("<profile fragments>"),
+            source,
+        }
+    })
+}
+
+fn merge_unique_map<K, V>(
+    target: &mut BTreeMap<K, V>,
+    fragment: BTreeMap<K, V>,
+    family: &str,
+) -> Result<(), CompileError>
+where
+    K: Ord + fmt::Display,
+{
+    for (key, value) in fragment {
+        let key_display = key.to_string();
+        if target.insert(key, value).is_some() {
+            return Err(CompileError::Validation(format!(
+                "duplicate {family} identity: {key_display}"
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn validate_source_model(
     manifest: SourceManifest,
     catalog: CatalogSource,
     semantic: SemanticModel,
+    profile: GameProfile,
 ) -> Result<(SourceManifest, RulesModel), CompileError> {
     if manifest.source_format_version != SOURCE_FORMAT_VERSION {
         return Err(CompileError::Validation(format!(
@@ -246,30 +395,27 @@ fn validate_source_model(
             "target_game_version must not be empty".to_owned(),
         ));
     }
+    if profile.game_id.trim().is_empty() {
+        return Err(CompileError::Validation(
+            "profile game_id must not be empty".to_owned(),
+        ));
+    }
+    if profile.game_id != manifest.game_id {
+        return Err(CompileError::Validation(format!(
+            "profile game_id {} disagrees with source manifest game_id {}",
+            profile.game_id, manifest.game_id
+        )));
+    }
     let model = RulesModel {
         game_id: manifest.game_id.clone(),
         file_categories: catalog.file_categories,
         symbol_descriptors: catalog.symbol_descriptors,
         records: catalog.records,
         semantic,
+        profile,
     };
     validate_model(&model)?;
     Ok((manifest, model))
-}
-
-fn read_localisation_bindings(
-    path: &Path,
-) -> Result<Vec<crate::LocalisationBinding>, CompileError> {
-    let source: BTreeMap<String, Vec<LocalisationBindingSource>> = read_json(path)?;
-    Ok(decode_localisation_bindings(source))
-}
-
-fn read_localisation_bindings_bytes(
-    path: PathBuf,
-    bytes: &[u8],
-) -> Result<Vec<crate::LocalisationBinding>, CompileError> {
-    let source: BTreeMap<String, Vec<LocalisationBindingSource>> = read_json_bytes(path, bytes)?;
-    Ok(decode_localisation_bindings(source))
 }
 
 fn decode_localisation_bindings(
@@ -361,6 +507,12 @@ pub fn compile(
 }
 
 fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
+    if !model.profile.game_id.trim().is_empty() && model.profile.game_id != model.game_id {
+        return Err(CompileError::Validation(format!(
+            "profile game_id {} disagrees with rules game_id {}",
+            model.profile.game_id, model.game_id
+        )));
+    }
     unique_nonempty(
         model.file_categories.iter().map(|item| item.id.as_str()),
         "file category",
@@ -565,50 +717,169 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
     Ok(())
 }
 
-fn validate_source_layout(source: &Path) -> Result<(), CompileError> {
-    let expected = BTreeSet::from([
-        SOURCE_MANIFEST,
-        CATALOG,
-        SEMANTIC_RULES,
-        ENUM_VALUES,
-        TYPE_ROOT_KEYS,
-        TYPE_ROOT_SCOPES,
-        TYPE_DESCRIPTORS,
-        LOCALISATION_BINDINGS,
-    ]);
-    let entries = fs::read_dir(source).map_err(|error| CompileError::Io {
-        path: source.to_owned(),
-        source: error,
-    })?;
-    for entry in entries {
-        let entry = entry.map_err(|error| CompileError::Io {
-            path: source.to_owned(),
-            source: error,
-        })?;
-        let path = entry.path();
-        let file_type = entry.file_type().map_err(|error| CompileError::Io {
-            path: path.clone(),
-            source: error,
-        })?;
-        if !file_type.is_file() {
-            return Err(CompileError::Validation(format!(
-                "rule source entry must be a regular file: {}",
-                path.display()
-            )));
-        }
-        let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
-            return Err(CompileError::Validation(format!(
-                "rule source filename is not UTF-8: {}",
-                path.display()
-            )));
-        };
-        if !expected.contains(name.as_str()) {
-            return Err(CompileError::Validation(format!(
-                "unknown rule source file: {name}"
-            )));
-        }
+fn validate_source_layout(source: &Path, manifest: &SourceManifest) -> Result<(), CompileError> {
+    let mut actual = BTreeSet::from([SOURCE_MANIFEST.to_owned()]);
+    collect_source_files(source, source, &mut actual)?;
+    let mut expected = BTreeSet::from([SOURCE_MANIFEST.to_owned()]);
+    expected.extend(validate_declared_paths(&manifest.files)?);
+    if let Some(unexpected) = actual.difference(&expected).next() {
+        return Err(CompileError::Validation(format!(
+            "unknown rule source file: {unexpected}"
+        )));
+    }
+    if let Some(missing) = expected.difference(&actual).next() {
+        return Err(CompileError::Validation(format!(
+            "declared rule source file is missing: {missing}"
+        )));
     }
     Ok(())
+}
+
+fn collect_source_files(
+    root: &Path,
+    directory: &Path,
+    output: &mut BTreeSet<String>,
+) -> Result<(), CompileError> {
+    let entries = fs::read_dir(directory).map_err(|source| CompileError::Io {
+        path: directory.to_owned(),
+        source,
+    })?;
+    for entry in entries {
+        let entry = entry.map_err(|source| CompileError::Io {
+            path: directory.to_owned(),
+            source,
+        })?;
+        let path = entry.path();
+        let file_type = entry.file_type().map_err(|source| CompileError::Io {
+            path: path.clone(),
+            source,
+        })?;
+        if file_type.is_dir() {
+            collect_source_files(root, &path, output)?;
+            continue;
+        }
+        if !file_type.is_file() {
+            return Err(CompileError::Validation(format!(
+                "rule source entry must be a regular file or directory: {}",
+                path.display()
+            )));
+        }
+        let relative = path
+            .strip_prefix(root)
+            .map_err(|_| CompileError::Validation("rule source path escaped root".to_owned()))?
+            .to_str()
+            .ok_or_else(|| {
+                CompileError::Validation(format!(
+                    "rule source filename is not UTF-8: {}",
+                    path.display()
+                ))
+            })?
+            .replace('\\', "/");
+        output.insert(relative);
+    }
+    Ok(())
+}
+
+fn validate_declared_paths(files: &SourceFiles) -> Result<BTreeSet<String>, CompileError> {
+    let mut paths = BTreeSet::new();
+    for (family, entries) in [
+        ("catalog", &files.catalog),
+        ("semantic", &files.semantic),
+        ("types", &files.types),
+        ("values", &files.values),
+        ("localisation", &files.localisation),
+        ("profile", &files.profile),
+    ] {
+        for entry in entries {
+            let path = normalize_source_path(entry)?;
+            let expected_prefix = format!("{family}/");
+            if !path.starts_with(&expected_prefix) {
+                return Err(CompileError::Validation(format!(
+                    "{family} source file is outside its source directory: {path}"
+                )));
+            }
+            if !paths.insert(path.clone()) {
+                return Err(CompileError::Validation(format!(
+                    "duplicate declared rule source file: {path}"
+                )));
+            }
+        }
+    }
+    if paths.is_empty() {
+        return Err(CompileError::Validation(
+            "rule source manifest declares no input files".to_owned(),
+        ));
+    }
+    Ok(paths)
+}
+
+fn validate_declared_file_set<'a>(
+    files: &SourceFiles,
+    actual: impl Iterator<Item = &'a str>,
+) -> Result<(), CompileError> {
+    let expected = validate_declared_paths(files)?;
+    let actual = actual
+        .map(normalize_source_path)
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    if let Some(unexpected) = actual.difference(&expected).next() {
+        return Err(CompileError::Validation(format!(
+            "embedded rule source contains an undeclared file: {unexpected}"
+        )));
+    }
+    if let Some(missing) = expected.difference(&actual).next() {
+        return Err(CompileError::Validation(format!(
+            "embedded rule source is missing a declared file: {missing}"
+        )));
+    }
+    Ok(())
+}
+
+fn normalize_source_path(path: &str) -> Result<String, CompileError> {
+    if path.is_empty() || path.contains('\\') || path.starts_with('/') || path.contains('\0') {
+        return Err(CompileError::Validation(format!(
+            "invalid rule source path: {path}"
+        )));
+    }
+    let components = path.split('/').collect::<Vec<_>>();
+    if components
+        .iter()
+        .any(|component| component.is_empty() || *component == "." || *component == "..")
+        || !path.ends_with(".json")
+    {
+        return Err(CompileError::Validation(format!(
+            "invalid rule source path: {path}"
+        )));
+    }
+    if components.first() == Some(&"manifest.json") {
+        return Err(CompileError::Validation(
+            "manifest.json must not be listed as a rule input".to_owned(),
+        ));
+    }
+    Ok(path.to_owned())
+}
+
+fn read_declared_files(
+    source: &Path,
+    manifest: &SourceFiles,
+) -> Result<BTreeMap<String, Vec<u8>>, CompileError> {
+    let paths = validate_declared_paths(manifest)?;
+    let mut files = BTreeMap::new();
+    for path in paths {
+        let full = source.join(&path);
+        let bytes = fs::read(&full).map_err(|source| CompileError::Io { path: full, source })?;
+        files.insert(path, bytes);
+    }
+    Ok(files)
+}
+
+fn read_declared_json<T: DeserializeOwned>(
+    path: &str,
+    files: &BTreeMap<String, Vec<u8>>,
+) -> Result<T, CompileError> {
+    let bytes = files.get(path).ok_or_else(|| {
+        CompileError::Validation(format!("declared rule source file is missing: {path}"))
+    })?;
+    read_json_bytes(PathBuf::from(path), bytes)
 }
 
 fn unique_nonempty<'a>(
@@ -786,7 +1057,16 @@ mod tests {
         let expected: ArtifactManifest =
             read_json(&root.join("rules/manifest.json")).expect("committed manifest");
         let (_, source_model) = load_source(&root.join("rules/eu4")).expect("source model");
+        assert_eq!(source_model.file_categories.len(), 121);
+        assert_eq!(source_model.symbol_descriptors.len(), 2667);
+        assert_eq!(source_model.records.len(), 13_719);
+        assert_eq!(source_model.semantic.rules.len(), 8_525);
+        assert_eq!(source_model.semantic.enum_values.len(), 72);
+        assert_eq!(source_model.semantic.type_root_keys.len(), 5);
+        assert_eq!(source_model.semantic.type_root_scopes.len(), 1);
+        assert_eq!(source_model.semantic.type_descriptors.len(), 148);
         assert_eq!(source_model.semantic.localisation_bindings.len(), 187);
+        assert_eq!(source_model.profile.scan_roots.len(), 123);
         let quoted_script_rules = source_model
             .semantic
             .rules

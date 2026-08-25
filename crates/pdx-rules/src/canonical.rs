@@ -53,8 +53,13 @@ impl fmt::Debug for RuleHash {
 }
 pub(crate) fn canonical_hash(model: &RulesModel) -> RuleHash {
     let mut bytes = Vec::new();
-    bytes.extend_from_slice(b"paradoxcode/rules/v7\0");
+    bytes.extend_from_slice(b"paradoxcode/rules/v8\0");
     put_str(&mut bytes, &model.game_id);
+    // The profile is part of the logical rule identity. A cache built with different path,
+    // scope, symbol, or dynamic-value interpretation must never be reused under the same hash.
+    let profile = serde_json::to_vec(&model.profile).expect("game profile is serializable");
+    put_len(&mut bytes, profile.len());
+    bytes.extend_from_slice(&profile);
     let mut categories = model.file_categories.clone();
     categories.sort_by(|left, right| left.id.cmp(&right.id));
     put_len(&mut bytes, categories.len());

@@ -1,0 +1,1634 @@
+{
+  "achievement": {
+    "name": "achievement",
+    "path": "game/common",
+    "path_file": "achievements.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "alerts": {
+    "name": "alerts",
+    "path": "game/common",
+    "path_file": "alerts.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "advisor_id": {
+    "name": "advisor_id",
+    "path": "game/history/advisors",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": "advisor_id",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "advisor_type": {
+    "name": "advisor_type",
+    "path": "game/common/advisortypes",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "ai_army": {
+    "name": "ai_army",
+    "path": "game/common/ai_army",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "province"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "ai_personality": {
+    "name": "ai_personality",
+    "path": "game/common/ai_personalities",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "ambient_object": {
+    "name": "ambient_object",
+    "path": "game/map",
+    "path_file": "ambient_object.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "type"
+      ]
+    ],
+    "name_field": "name",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "ambient_object_basis": {
+    "name": "ambient_object_basis",
+    "path": "game/map",
+    "path_file": "ambient_object.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": "type",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "ancestor_personalities": {
+    "name": "ancestor_personalities",
+    "path": "game/common/ancestor_personalities",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "aspects_and_blessings": {
+    "name": "aspects_and_blessings",
+    "path": "game/common/church_aspects",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "bookmark": {
+    "name": "bookmark",
+    "path": "game/common/bookmarks",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": "name",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "bookmark"
+      ],
+      false
+    ]
+  },
+  "casus_belli": {
+    "name": "casus_belli",
+    "path": "game/common/cb_types",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "center_of_revolution_conversion": {
+    "name": "center_of_revolution_conversion",
+    "path": "game/common/revolution",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "client_state": {
+    "name": "client_state",
+    "path": "game/common/client_states",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "colonial_region": {
+    "name": "colonial_region",
+    "path": "game/common/colonial_regions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "country_color_file": {
+    "name": "country_color_file",
+    "path": "game/common/country_colors",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "country_file": {
+    "name": "country_file",
+    "path": "game/common/countries",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "cult": {
+    "name": "cult",
+    "path": "game/common/fetishist_cults",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "culture": {
+    "name": "culture",
+    "path": "game/common/cultures",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "male_names",
+        "female_names",
+        "dynasty_names",
+        "province",
+        "country"
+      ],
+      true
+    ]
+  },
+  "culture_group": {
+    "name": "culture_group",
+    "path": "game/common/cultures",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "custom_country_colors": {
+    "name": "custom_country_colors",
+    "path": "game/common/custom_country_colors",
+    "path_file": "00_custom_country_colors.txt",
+    "path_extension": null,
+    "path_strict": true,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "custom_shield": {
+    "name": "custom_shield",
+    "path": "game/common/custom_gui",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": "name",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "custom_shield"
+      ],
+      false
+    ]
+  },
+  "customideas": {
+    "name": "customideas",
+    "path": "game/common/custom_ideas",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "start",
+        "trigger",
+        "bonus",
+        "ai_will_do",
+        "category"
+      ],
+      true
+    ]
+  },
+  "decree": {
+    "name": "decree",
+    "path": "game/common/decrees",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "defender_faith": {
+    "name": "defender_faith",
+    "path": "game/common/defender_of_faith",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "defined_text": {
+    "name": "defined_text",
+    "path": "game/customizable_localization",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": "name",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "diplomatic_action": {
+    "name": "diplomatic_action",
+    "path": "game/common/diplomatic_actions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "disaster": {
+    "name": "disaster",
+    "path": "game/common/disasters",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "dynasty_colors": {
+    "name": "dynasty_colors",
+    "path": "game/common/dynasty_colors",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "edict": {
+    "name": "edict",
+    "path": "game/common/state_edicts",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "estate": {
+    "name": "estate",
+    "path": "game/common/estates",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": true,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "estate_agenda": {
+    "name": "estate_agenda",
+    "path": "game/common/estate_agendas",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "estate_crown_land_bonus": {
+    "name": "estate_crown_land_bonus",
+    "path": "game/common/estate_crown_land",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": "key",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "bonus"
+      ],
+      false
+    ]
+  },
+  "estate_interaction": {
+    "name": "estate_interaction",
+    "path": "game/common/estate_crown_land",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": "key",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "interaction"
+      ],
+      false
+    ]
+  },
+  "estate_modifier": {
+    "name": "estate_modifier",
+    "path": "game/common/estates_preload",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any"
+      ]
+    ],
+    "name_field": "key",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "estate_privilege": {
+    "name": "estate_privilege",
+    "path": "game/common/estate_privileges",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "event_modifier": {
+    "name": "event_modifier",
+    "path": "game/common/event_modifiers",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "faction": {
+    "name": "faction",
+    "path": "game/common/factions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "federation_advancements": {
+    "name": "federation_advancements",
+    "path": "game/common/federation_advancements",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "fervor": {
+    "name": "fervor",
+    "path": "game/common/fervor",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "flagship_modification": {
+    "name": "flagship_modification",
+    "path": "game/common/flagship_modifications",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "game_age": {
+    "name": "game_age",
+    "path": "game/common/ages",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "game_age_ability": {
+    "name": "game_age_ability",
+    "path": "game/common/ages",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any",
+        "abilities"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "golden_bull": {
+    "name": "golden_bull",
+    "path": "game/common/golden_bulls",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "government_mechanic": {
+    "name": "government_mechanic",
+    "path": "game/common/government_mechanics",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "government_mechanic_interaction": {
+    "name": "government_mechanic_interaction",
+    "path": "game/common/government_mechanics",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any",
+        "interactions"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "government_mechanic_power": {
+    "name": "government_mechanic_power",
+    "path": "game/common/government_mechanics",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any",
+        "powers"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "government_name": {
+    "name": "government_name",
+    "path": "game/common/government_names",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "government_ranks": {
+    "name": "government_ranks",
+    "path": "game/common/government_ranks",
+    "path_file": "00_government_ranks.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "graphical_terrain": {
+    "name": "graphical_terrain",
+    "path": "game/map",
+    "path_file": "terrain.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "terrain"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "great_project": {
+    "name": "great_project",
+    "path": "game/common/great_projects",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "guru": {
+    "name": "guru",
+    "path": "game/common/religions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any",
+        "any",
+        "gurus"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "guru_teaching": {
+    "name": "guru_teaching",
+    "path": "game/common/religions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any",
+        "any",
+        "gurus",
+        "any",
+        "teachings"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "hegemon": {
+    "name": "hegemon",
+    "path": "game/common/hegemons",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "holy_order": {
+    "name": "holy_order",
+    "path": "game/common/holy_orders",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "idea": {
+    "name": "idea",
+    "path": "game/common/ideas",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "start",
+        "trigger",
+        "bonus",
+        "ai_will_do",
+        "free",
+        "category"
+      ],
+      true
+    ]
+  },
+  "idea_group": {
+    "name": "idea_group",
+    "path": "game/common/ideas",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "imperial_incident": {
+    "name": "imperial_incident",
+    "path": "game/common/imperial_incidents",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "imperial_reform": {
+    "name": "imperial_reform",
+    "path": "game/common/imperial_reforms",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "incident": {
+    "name": "incident",
+    "path": "game/common/incidents",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "institution": {
+    "name": "institution",
+    "path": "game/common/institutions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "insult": {
+    "name": "insult",
+    "path": "game/common/insults",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "isolationism": {
+    "name": "isolationism",
+    "path": "game/common/isolationism",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "leader_personality": {
+    "name": "leader_personality",
+    "path": "game/common/leader_personalities",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "luck": {
+    "name": "luck",
+    "path": "game/common",
+    "path_file": "historial_lucky.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "mercenary_company": {
+    "name": "mercenary_company",
+    "path": "game/common/mercenary_companies",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "natives": {
+    "name": "natives",
+    "path": "game/common/natives",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "naval_doctrine": {
+    "name": "naval_doctrine",
+    "path": "game/common/naval_doctrines",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "new_diplomatic_action": {
+    "name": "new_diplomatic_action",
+    "path": "game/common/new_diplomatic_actions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "static_actions"
+      ],
+      true
+    ]
+  },
+  "on_action": {
+    "name": "on_action",
+    "path": "game/common/on_actions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": "on_harmonized_",
+    "type_key_filter": null
+  },
+  "opinion_modifier": {
+    "name": "opinion_modifier",
+    "path": "game/common/opinion_modifiers",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "orthodox_icon": {
+    "name": "orthodox_icon",
+    "path": "game/common/religions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any",
+        "any",
+        "orthodox_icons"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "packentity": {
+    "name": "packentity",
+    "path": "game/gfx/sprite_packs",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "packorder": {
+    "name": "packorder",
+    "path": "game/gfx/sprite_packs_order",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "papal_policy": {
+    "name": "papal_policy",
+    "path": "game/common/religions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any",
+        "any",
+        "papacy"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "parliament_bribe": {
+    "name": "parliament_bribe",
+    "path": "game/common/parliament_bribes",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "parliament_issue": {
+    "name": "parliament_issue",
+    "path": "game/common/parliament_issues",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "peace_options": {
+    "name": "peace_options",
+    "path": "game/common/peace_treaties",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "peace_treaty": {
+    "name": "peace_treaty",
+    "path": "game/common/peace_treaties",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "personal_deity": {
+    "name": "personal_deity",
+    "path": "game/common/personal_deities",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "policy": {
+    "name": "policy",
+    "path": "game/common/policies",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "power_projection": {
+    "name": "power_projection",
+    "path": "game/common/powerprojection",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "prices": {
+    "name": "prices",
+    "path": "game/common/prices",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "professionalism_modifier": {
+    "name": "professionalism_modifier",
+    "path": "game/common/professionalism",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "province_triggered_modifier": {
+    "name": "province_triggered_modifier",
+    "path": "game/common/province_triggered_modifiers",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "rebel_demand_loc": {
+    "name": "rebel_demand_loc",
+    "path": "game/common/rebel_types",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": "demands_description",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "rebel_type": {
+    "name": "rebel_type",
+    "path": "game/common/rebel_types",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "region_colors": {
+    "name": "region_colors",
+    "path": "game/common/region_colors",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "religion_propagation": {
+    "name": "religion_propagation",
+    "path": "game/common/religious_conversions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "religious_reform": {
+    "name": "religious_reform",
+    "path": "game/common/religious_reforms",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "trigger",
+        "can_buy_idea",
+        "ai_will_do"
+      ],
+      true
+    ]
+  },
+  "religious_reform_group": {
+    "name": "religious_reform_group",
+    "path": "game/common/religious_reforms",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "religious_school": {
+    "name": "religious_school",
+    "path": "game/common/religions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any",
+        "religious_schools"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "revolt_trigger": {
+    "name": "revolt_trigger",
+    "path": "game/common/revolt_triggers",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "ruler_personality": {
+    "name": "ruler_personality",
+    "path": "game/common/ruler_personalities",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "scripted_effect": {
+    "name": "scripted_effect",
+    "path": "game/common/scripted_effects",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null,
+    "scripted_macro": {
+      "body_context": "effect",
+      "macro_enabled": true,
+      "usage": {
+        "replacement": true,
+        "condition": true,
+        "dynamic_key": true,
+        "opaque_text": true
+      }
+    }
+  },
+  "scripted_function": {
+    "name": "scripted_function",
+    "path": "game/common/scripted_functions",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "scripted_trigger": {
+    "name": "scripted_trigger",
+    "path": "game/common/scripted_triggers",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null,
+    "scripted_macro": {
+      "body_context": "trigger",
+      "macro_enabled": true,
+      "usage": {
+        "replacement": true,
+        "condition": true,
+        "dynamic_key": true,
+        "opaque_text": true
+      }
+    }
+  },
+  "states_general_faction": {
+    "name": "states_general_faction",
+    "path": "game/common/government_reforms",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any",
+        "states_general_mechanic"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "subject_type": {
+    "name": "subject_type",
+    "path": "game/common/subject_types",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "subject_upgrades": {
+    "name": "subject_upgrades",
+    "path": "game/common/subject_type_upgrades",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "tech_ahead_of_time": {
+    "name": "tech_ahead_of_time",
+    "path": "game/common/technologies",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": [
+      [
+        "ahead_of_time"
+      ],
+      false
+    ]
+  },
+  "technology_group": {
+    "name": "technology_group",
+    "path": "game/common",
+    "path_file": "technology.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "groups"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "trade_center": {
+    "name": "trade_center",
+    "path": "game/common/centers_of_trade",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "trade_company": {
+    "name": "trade_company",
+    "path": "game/common/trade_companies",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "trade_company_investment": {
+    "name": "trade_company_investment",
+    "path": "game/common/tradecompany_investments",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "trade_good": {
+    "name": "trade_good",
+    "path": "game/common/tradegoods",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "trade_node": {
+    "name": "trade_node",
+    "path": "game/common/tradenodes",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": "location",
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "trade_node_name": {
+    "name": "trade_node_name",
+    "path": "game/common/tradenodes",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "trading_policy": {
+    "name": "trading_policy",
+    "path": "game/common/trading_policies",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "tree_terrain": {
+    "name": "tree_terrain",
+    "path": "game/map",
+    "path_file": "terrain.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "tree"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "unit_type": {
+    "name": "unit_type",
+    "path": "game/common/units",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": true,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "wargoal_type": {
+    "name": "wargoal_type",
+    "path": "game/common/wargoal_types",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  }
+}

@@ -1,15 +1,20 @@
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+
 /// Text encoding policy selected by a game profile for source files.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum SourceEncoding {
     /// Strict UTF-8 source, which is the generic engine default.
     #[default]
     Utf8,
     /// Legacy Windows-1252 source decoded to UTF-8 before parsing.
+    #[serde(rename = "windows-1252")]
     Windows1252,
 }
 /// Matching mode for small, data-only game-profile selectors.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum ProfileMatchMode {
     /// Accepts every candidate.
     Any,
@@ -26,7 +31,8 @@ pub enum ProfileMatchMode {
 }
 
 /// A deterministic text selector used by built-in game-profile data.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProfileTextMatcher {
     /// Match operation.
     pub mode: ProfileMatchMode,
@@ -99,7 +105,8 @@ impl ProfileTextMatcher {
 }
 
 /// One top-level symbol-definition interpretation supplied by a game profile.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProfileDefinitionRule {
     /// Logical-path selector.
     pub path: ProfileTextMatcher,
@@ -114,7 +121,8 @@ pub struct ProfileDefinitionRule {
 }
 
 /// One scalar-reference interpretation supplied by a game profile.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProfileReferenceRule {
     /// Property-key selector.
     pub key: ProfileTextMatcher,
@@ -128,7 +136,8 @@ pub struct ProfileReferenceRule {
 }
 
 /// One scalar value that declares a workspace symbol.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProfileValueDefinitionRule {
     /// Property-key selector.
     pub key: ProfileTextMatcher,
@@ -139,7 +148,8 @@ pub struct ProfileValueDefinitionRule {
 }
 
 /// One block-valued property whose nested name field declares a workspace symbol.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProfileContainerValueDefinitionRule {
     /// Property-key selector.
     pub key: ProfileTextMatcher,
@@ -150,7 +160,8 @@ pub struct ProfileContainerValueDefinitionRule {
 }
 
 /// One suffix appended to member names when validating a dynamic value kind.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProfileMemberNameSuffixRule {
     /// Value kinds whose members also accept the suffixed spelling.
     pub kinds: Vec<String>,
@@ -159,7 +170,8 @@ pub struct ProfileMemberNameSuffixRule {
 }
 
 /// One block whose direct child keys declare workspace symbols.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProfileContainerDefinitionRule {
     /// Logical-path selector.
     pub path: ProfileTextMatcher,
@@ -170,7 +182,8 @@ pub struct ProfileContainerDefinitionRule {
 }
 
 /// One definition emitted when nested scalar conditions are satisfied.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProfileConditionalDefinitionRule {
     /// Logical-path selector.
     pub path: ProfileTextMatcher,
@@ -185,7 +198,8 @@ pub struct ProfileConditionalDefinitionRule {
 }
 
 /// One delimited identifier embedded in parser tokens.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProfileTokenDefinitionRule {
     /// Logical-path selector.
     pub path: ProfileTextMatcher,
@@ -198,7 +212,8 @@ pub struct ProfileTokenDefinitionRule {
 }
 
 /// One root property that selects an initial semantic scope.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProfileRootScopeRule {
     /// Root property-key selector.
     pub key: ProfileTextMatcher,
@@ -207,7 +222,8 @@ pub struct ProfileRootScopeRule {
 }
 
 /// One asymmetric scope compatibility accepted by a game profile.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProfileScopeCompatibility {
     /// Actual current scope.
     pub actual: String,
@@ -216,7 +232,8 @@ pub struct ProfileScopeCompatibility {
 }
 
 /// Data-only game-specific interpretation selected by the composition root.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct GameProfile {
     /// Stable identity shared with the selected rules artifact.
     pub game_id: String,

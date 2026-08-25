@@ -1,0 +1,33 @@
+{
+  "event": [
+    {
+      "field": "title",
+      "template": null,
+      "explicit_field": "title"
+    }
+  ],
+  "decision": [
+    {
+      "field": "name",
+      "template": "$_title",
+      "required": true
+    },
+    {
+      "field": "desc",
+      "template": "$_desc",
+      "required": true
+    }
+  ],
+  "mission": [
+    {
+      "field": "name",
+      "template": "$_title",
+      "required": true
+    },
+    {
+      "field": "desc",
+      "template": "$_desc",
+      "required": true
+    }
+  ]
+}

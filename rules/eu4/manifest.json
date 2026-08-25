@@ -1,5 +1,66 @@
 {
-  "source_format_version": 8,
+  "source_format_version": 9,
   "game_id": "eu4",
-  "target_game_version": "1.37.5"
+  "target_game_version": "1.37.5",
+  "files": {
+    "catalog": [
+      "catalog/file-categories.json",
+      "catalog/records/aliases.json",
+      "catalog/records/effects.json",
+      "catalog/records/enums.json",
+      "catalog/records/localisation.json",
+      "catalog/records/modifiers.json",
+      "catalog/records/rule_nodes.json",
+      "catalog/records/scopes.json",
+      "catalog/records/subtypes.json",
+      "catalog/records/triggers.json",
+      "catalog/records/types.json",
+      "catalog/symbol-descriptors.json"
+    ],
+    "semantic": [
+      "semantic/contexts/effect.json",
+      "semantic/contexts/modifier.json",
+      "semantic/contexts/on-action.json",
+      "semantic/contexts/special.json",
+      "semantic/contexts/trigger.json",
+      "semantic/definitions/common.json",
+      "semantic/definitions/decisions.json",
+      "semantic/definitions/events.json",
+      "semantic/definitions/history.json",
+      "semantic/definitions/interface.json",
+      "semantic/definitions/map.json",
+      "semantic/definitions/missions.json"
+    ],
+    "types": [
+      "types/descriptors/common.json",
+      "types/descriptors/events.json",
+      "types/descriptors/history.json",
+      "types/descriptors/interface.json",
+      "types/descriptors/map.json",
+      "types/descriptors/other.json",
+      "types/root-keys.json",
+      "types/root-scopes.json"
+    ],
+    "values": [
+      "values/enums/diplomacy.json",
+      "values/enums/map.json",
+      "values/enums/military.json",
+      "values/enums/other.json",
+      "values/enums/religion.json"
+    ],
+    "localisation": [
+      "localisation/bindings/common.json",
+      "localisation/bindings/events.json",
+      "localisation/bindings/other.json"
+    ],
+    "profile": [
+      "profile/dynamic.json",
+      "profile/filesystem.json",
+      "profile/install.json",
+      "profile/lexicon.json",
+      "profile/scopes.json",
+      "profile/semantics.json",
+      "profile/symbols.json"
+    ]
+  }
 }

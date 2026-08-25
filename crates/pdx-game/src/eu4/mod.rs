@@ -1,38 +1,221 @@
 //! EU4 profile data layered on the game-independent rules runtime.
 //!
-//! Everything here is EU4-specific: installation discovery facts, script folder
-//! whitelist, first-party rules bootstrap, and the structured mission model.
+//! Everything here is EU4-specific: installation discovery facts, the embedded first-party rule
+//! bootstrap, and the structured mission model. Semantic/profile data itself lives under
+//! `rules/eu4` and is carried by the compiled `RuleSet`.
 
 pub mod mission;
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::{GameInstallDescriptor, PlatformExecutablePaths};
-use pdx_rules::rulec::{SourceBundle, load_source_bundle};
+use pdx_rules::rulec::{SourceBundle, SourceFile, load_source_bundle};
 use pdx_rules::{
-    FileCategory, FileMatcher, FileResolutionPolicy, GameProfile, ParserKind,
-    ProfileConditionalDefinitionRule, ProfileContainerValueDefinitionRule, ProfileDefinitionRule,
-    ProfileMatchMode, ProfileMemberNameSuffixRule, ProfileReferenceRule, ProfileRootScopeRule,
-    ProfileScopeCompatibility, ProfileTextMatcher, ProfileTokenDefinitionRule,
-    ProfileValueDefinitionRule, RuleSet, RulesModel, SourceEncoding, SymbolDescriptor,
-    SymbolResolutionPolicy,
+    FileCategory, FileMatcher, FileResolutionPolicy, GameProfile, ParserKind, RuleSet, RulesModel,
+    SymbolDescriptor, SymbolResolutionPolicy,
 };
+
+const FIRST_PARTY_FILES: &[SourceFile<'static>] = &[
+    SourceFile {
+        path: "catalog/file-categories.json",
+        bytes: include_bytes!("../../../../rules/eu4/catalog/file-categories.json"),
+    },
+    SourceFile {
+        path: "catalog/records/aliases.json",
+        bytes: include_bytes!("../../../../rules/eu4/catalog/records/aliases.json"),
+    },
+    SourceFile {
+        path: "catalog/records/effects.json",
+        bytes: include_bytes!("../../../../rules/eu4/catalog/records/effects.json"),
+    },
+    SourceFile {
+        path: "catalog/records/enums.json",
+        bytes: include_bytes!("../../../../rules/eu4/catalog/records/enums.json"),
+    },
+    SourceFile {
+        path: "catalog/records/localisation.json",
+        bytes: include_bytes!("../../../../rules/eu4/catalog/records/localisation.json"),
+    },
+    SourceFile {
+        path: "catalog/records/modifiers.json",
+        bytes: include_bytes!("../../../../rules/eu4/catalog/records/modifiers.json"),
+    },
+    SourceFile {
+        path: "catalog/records/rule_nodes.json",
+        bytes: include_bytes!("../../../../rules/eu4/catalog/records/rule_nodes.json"),
+    },
+    SourceFile {
+        path: "catalog/records/scopes.json",
+        bytes: include_bytes!("../../../../rules/eu4/catalog/records/scopes.json"),
+    },
+    SourceFile {
+        path: "catalog/records/subtypes.json",
+        bytes: include_bytes!("../../../../rules/eu4/catalog/records/subtypes.json"),
+    },
+    SourceFile {
+        path: "catalog/records/triggers.json",
+        bytes: include_bytes!("../../../../rules/eu4/catalog/records/triggers.json"),
+    },
+    SourceFile {
+        path: "catalog/records/types.json",
+        bytes: include_bytes!("../../../../rules/eu4/catalog/records/types.json"),
+    },
+    SourceFile {
+        path: "catalog/symbol-descriptors.json",
+        bytes: include_bytes!("../../../../rules/eu4/catalog/symbol-descriptors.json"),
+    },
+    SourceFile {
+        path: "semantic/contexts/effect.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/contexts/effect.json"),
+    },
+    SourceFile {
+        path: "semantic/contexts/modifier.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/contexts/modifier.json"),
+    },
+    SourceFile {
+        path: "semantic/contexts/on-action.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/contexts/on-action.json"),
+    },
+    SourceFile {
+        path: "semantic/contexts/special.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/contexts/special.json"),
+    },
+    SourceFile {
+        path: "semantic/contexts/trigger.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/contexts/trigger.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/common.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/common.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/decisions.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/decisions.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/events.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/events.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/history.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/history.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/interface.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/interface.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/map.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/map.json"),
+    },
+    SourceFile {
+        path: "semantic/definitions/missions.json",
+        bytes: include_bytes!("../../../../rules/eu4/semantic/definitions/missions.json"),
+    },
+    SourceFile {
+        path: "types/descriptors/common.json",
+        bytes: include_bytes!("../../../../rules/eu4/types/descriptors/common.json"),
+    },
+    SourceFile {
+        path: "types/descriptors/events.json",
+        bytes: include_bytes!("../../../../rules/eu4/types/descriptors/events.json"),
+    },
+    SourceFile {
+        path: "types/descriptors/history.json",
+        bytes: include_bytes!("../../../../rules/eu4/types/descriptors/history.json"),
+    },
+    SourceFile {
+        path: "types/descriptors/interface.json",
+        bytes: include_bytes!("../../../../rules/eu4/types/descriptors/interface.json"),
+    },
+    SourceFile {
+        path: "types/descriptors/map.json",
+        bytes: include_bytes!("../../../../rules/eu4/types/descriptors/map.json"),
+    },
+    SourceFile {
+        path: "types/descriptors/other.json",
+        bytes: include_bytes!("../../../../rules/eu4/types/descriptors/other.json"),
+    },
+    SourceFile {
+        path: "types/root-keys.json",
+        bytes: include_bytes!("../../../../rules/eu4/types/root-keys.json"),
+    },
+    SourceFile {
+        path: "types/root-scopes.json",
+        bytes: include_bytes!("../../../../rules/eu4/types/root-scopes.json"),
+    },
+    SourceFile {
+        path: "values/enums/diplomacy.json",
+        bytes: include_bytes!("../../../../rules/eu4/values/enums/diplomacy.json"),
+    },
+    SourceFile {
+        path: "values/enums/map.json",
+        bytes: include_bytes!("../../../../rules/eu4/values/enums/map.json"),
+    },
+    SourceFile {
+        path: "values/enums/military.json",
+        bytes: include_bytes!("../../../../rules/eu4/values/enums/military.json"),
+    },
+    SourceFile {
+        path: "values/enums/other.json",
+        bytes: include_bytes!("../../../../rules/eu4/values/enums/other.json"),
+    },
+    SourceFile {
+        path: "values/enums/religion.json",
+        bytes: include_bytes!("../../../../rules/eu4/values/enums/religion.json"),
+    },
+    SourceFile {
+        path: "localisation/bindings/common.json",
+        bytes: include_bytes!("../../../../rules/eu4/localisation/bindings/common.json"),
+    },
+    SourceFile {
+        path: "localisation/bindings/events.json",
+        bytes: include_bytes!("../../../../rules/eu4/localisation/bindings/events.json"),
+    },
+    SourceFile {
+        path: "localisation/bindings/other.json",
+        bytes: include_bytes!("../../../../rules/eu4/localisation/bindings/other.json"),
+    },
+    SourceFile {
+        path: "profile/dynamic.json",
+        bytes: include_bytes!("../../../../rules/eu4/profile/dynamic.json"),
+    },
+    SourceFile {
+        path: "profile/filesystem.json",
+        bytes: include_bytes!("../../../../rules/eu4/profile/filesystem.json"),
+    },
+    SourceFile {
+        path: "profile/install.json",
+        bytes: include_bytes!("../../../../rules/eu4/profile/install.json"),
+    },
+    SourceFile {
+        path: "profile/lexicon.json",
+        bytes: include_bytes!("../../../../rules/eu4/profile/lexicon.json"),
+    },
+    SourceFile {
+        path: "profile/scopes.json",
+        bytes: include_bytes!("../../../../rules/eu4/profile/scopes.json"),
+    },
+    SourceFile {
+        path: "profile/semantics.json",
+        bytes: include_bytes!("../../../../rules/eu4/profile/semantics.json"),
+    },
+    SourceFile {
+        path: "profile/symbols.json",
+        bytes: include_bytes!("../../../../rules/eu4/profile/symbols.json"),
+    },
+];
 
 const FIRST_PARTY_SOURCE: SourceBundle<'static> = SourceBundle {
     manifest: include_bytes!("../../../../rules/eu4/manifest.json"),
-    catalog: include_bytes!("../../../../rules/eu4/catalog.json"),
-    semantic_rules: include_bytes!("../../../../rules/eu4/semantic-rules.json"),
-    enum_values: include_bytes!("../../../../rules/eu4/enum-values.json"),
-    type_root_keys: include_bytes!("../../../../rules/eu4/type-root-keys.json"),
-    type_root_scopes: include_bytes!("../../../../rules/eu4/type-root-scopes.json"),
-    type_descriptors: include_bytes!("../../../../rules/eu4/type-descriptors.json"),
-    localisation_bindings: include_bytes!("../../../../rules/eu4/localisation-bindings.json"),
+    files: FIRST_PARTY_FILES,
 };
 
 static RULE_CACHE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+static FIRST_PARTY_PROFILE: OnceLock<GameProfile> = OnceLock::new();
 
 /// Stable identity stored by EU4 rule artifacts and selected by the server.
 pub const GAME_ID: &str = "eu4";
@@ -49,171 +232,6 @@ pub const INSTALL_DESCRIPTOR: GameInstallDescriptor = GameInstallDescriptor {
     validation_directories: &["common", "events", "missions", "decisions", "localisation"],
     installation_directory_names: &["Europa Universalis IV"],
 };
-
-/// EU4 source directory whitelist.
-///
-/// Every script root is bounded to direct files only; supported nested script directories are
-/// listed as separate roots. `map` is the one fixed-name exception: its known vanilla paths are
-/// enumerated below so generated map assets cannot enter the script index. `localisation` remains
-/// recursive because it is owned by the separate Localisation language.
-pub const SCRIPT_FOLDERS: &[&str] = &[
-    "common",
-    "common/advisortypes",
-    "common/ages",
-    "common/ai_army",
-    "common/ai_attitudes",
-    "common/ai_personalities",
-    "common/ancestor_personalities",
-    "common/bookmarks",
-    "common/buildings",
-    "common/cb_types",
-    "common/centers_of_trade",
-    "common/church_aspects",
-    "common/client_states",
-    "common/colonial_regions",
-    "common/countries",
-    "common/country_colors",
-    "common/country_tags",
-    "common/cultures",
-    "common/custom_country_colors",
-    "common/custom_gui",
-    "common/custom_ideas",
-    "common/decrees",
-    "common/defender_of_faith",
-    "common/defines",
-    "common/diplomatic_actions",
-    "common/disasters",
-    "common/dynasty_colors",
-    "common/estate_agendas",
-    "common/estate_crown_land",
-    "common/estate_privileges",
-    "common/estates",
-    "common/estates_preload",
-    "common/event_modifiers",
-    "common/factions",
-    "common/federation_advancements",
-    "common/fervor",
-    "common/fetishist_cults",
-    "common/flagship_modifications",
-    "common/golden_bulls",
-    "common/government_mechanics",
-    "common/governments",
-    "common/government_names",
-    "common/government_ranks",
-    "common/government_reforms",
-    "common/great_projects",
-    "common/hegemons",
-    "common/holy_orders",
-    "common/ideas",
-    "common/imperial_incidents",
-    "common/imperial_reforms",
-    "common/incidents",
-    "common/institutions",
-    "common/insults",
-    "common/isolationism",
-    "common/leader_personalities",
-    "common/mercenary_companies",
-    "common/natives",
-    "common/naval_doctrines",
-    "common/new_diplomatic_actions",
-    "common/on_actions",
-    "common/opinion_modifiers",
-    "common/parliament_bribes",
-    "common/parliament_issues",
-    "common/peace_treaties",
-    "common/personal_deities",
-    "common/policies",
-    "common/powerprojection",
-    "common/prices",
-    "common/professionalism",
-    "common/province_names",
-    "common/province_triggered_modifiers",
-    "common/rebel_types",
-    "common/region_colors",
-    "common/religions",
-    "common/religious_conversions",
-    "common/religious_reforms",
-    "common/revolt_triggers",
-    "common/revolution",
-    "common/ruler_personalities",
-    "common/scripted_effects",
-    "common/scripted_functions",
-    "common/scripted_triggers",
-    "common/state_edicts",
-    "common/static_modifiers",
-    "common/subject_type_upgrades",
-    "common/subject_types",
-    "common/technologies",
-    "common/timed_modifiers",
-    "common/tradecompany_investments",
-    "common/tradegoods",
-    "common/tradenodes",
-    "common/trade_companies",
-    "common/trading_policies",
-    "common/triggered_modifiers",
-    "common/units",
-    "common/units_display",
-    "common/wargoal_types",
-    "customizable_localization",
-    "decisions",
-    "events",
-    "hints",
-    "history/advisors",
-    "history/countries",
-    "history/diplomacy",
-    "history/provinces",
-    "history/wars",
-    "map",
-    "music",
-    "missions",
-    "sound",
-    "sound/amb",
-    "sound/battle",
-    "sound/battle/naval",
-    "tutorial",
-    "gfx",
-    "gfx/combat_result",
-    "gfx/sprite_packs",
-    "gfx/sprite_packs_order",
-    "interface",
-    "interface/assets",
-    "interface/government_mechanics",
-    "interface/state_view",
-    "localisation",
-];
-
-/// EU4 script files directly under the common directory.
-pub const COMMON_ROOT_FILES: &[&str] = &[
-    "achievements.txt",
-    "alerts.txt",
-    "graphicalculturetype.txt",
-    "historial_lucky.txt",
-    "technology.txt",
-];
-
-/// EU4 map script paths supported by the vanilla game and the reference mod.
-///
-/// Map data contains many generated assets (for example `map/random/tiles/*.txt`) that are not
-/// script sources. Keep the language/index deliberately name-based so those assets are never
-/// pulled in by a recursive glob.
-pub const MAP_ROOT_FILES: &[&str] = &[
-    "ambient_object.txt",
-    "area.txt",
-    "climate.txt",
-    "continent.txt",
-    "lakes/00_lakes.txt",
-    "positions.txt",
-    "provincegroup.txt",
-    "random/RNWScenarios.txt",
-    "random/RandomLakeNames.txt",
-    "random/RandomLandNames.txt",
-    "random/RandomSeaNames.txt",
-    "region.txt",
-    "seasons.txt",
-    "superregion.txt",
-    "terrain.txt",
-    "trade_winds.txt",
-];
 
 /// Loads and validates the first-party EU4 rules from the embedded JSON source bundle.
 ///
@@ -333,623 +351,21 @@ impl Eu4Profile {
 /// Returns EU4's built-in semantic profile data.
 #[must_use]
 pub fn profile() -> GameProfile {
-    let matcher = |mode, pattern| ProfileTextMatcher::insensitive(mode, pattern);
-    let definition =
-        |path_mode, path, key_mode, key, kind: &str, name_field: Option<&str>, requires_value| {
-            ProfileDefinitionRule {
-                path: matcher(path_mode, path),
-                key: matcher(key_mode, key),
-                kind: kind.to_owned(),
-                name_field: name_field.map(str::to_owned),
-                requires_value,
-            }
-        };
-    let reference = |mode, key, kind: &str| ProfileReferenceRule {
-        key: matcher(mode, key),
-        kind: kind.to_owned(),
-        excluded_keys: Vec::new(),
-        excluded_paths: Vec::new(),
-    };
-    // `name`/`desc`/`title`/`tooltip` are localisation keys in event-style content, but
-    // literal text in history files (dynast names, rebel names) and resource identifiers
-    // in interface files (mesh/sprite names).
-    let text_paths = ["history/countries/", "history/provinces/", "interface/"]
-        .into_iter()
-        .map(|pattern| matcher(ProfileMatchMode::Contains, pattern))
-        .collect::<Vec<_>>();
-    let localisation_reference = |mode, key| ProfileReferenceRule {
-        key: matcher(mode, key),
-        kind: "localisation".to_owned(),
-        excluded_keys: Vec::new(),
-        excluded_paths: text_paths.clone(),
-    };
-    let mut definitions = vec![
-        definition(
-            ProfileMatchMode::Contains,
-            "scripted_effect",
-            ProfileMatchMode::Any,
-            "",
-            "scripted_effect",
-            None,
-            false,
-        ),
-        definition(
-            ProfileMatchMode::Contains,
-            "scripted_trigger",
-            ProfileMatchMode::Any,
-            "",
-            "scripted_trigger",
-            None,
-            false,
-        ),
-        definition(
-            ProfileMatchMode::Contains,
-            "events/",
-            ProfileMatchMode::Any,
-            "",
-            "event",
-            Some("id"),
-            false,
-        ),
-        definition(
-            ProfileMatchMode::Any,
-            "",
-            ProfileMatchMode::Suffix,
-            "_event",
-            "event",
-            Some("id"),
-            false,
-        ),
-        definition(
-            ProfileMatchMode::Any,
-            "",
-            ProfileMatchMode::Exact,
-            "country_event",
-            "event",
-            Some("id"),
-            true,
-        ),
-        definition(
-            ProfileMatchMode::Any,
-            "",
-            ProfileMatchMode::Exact,
-            "province_event",
-            "event",
-            Some("id"),
-            true,
-        ),
-        definition(
-            ProfileMatchMode::Prefix,
-            "common/country_tags/",
-            ProfileMatchMode::Any,
-            "",
-            "country_tag",
-            None,
-            true,
-        ),
-    ];
-    for (directory, kind) in [
-        ("common/cultures", "culture"),
-        ("common/religions", "religion"),
-        ("common/tradenodes", "trade_node"),
-        ("common/colonial_regions", "colonial_region"),
-        ("common/estates", "estate"),
-        ("common/ideas", "idea_group"),
-        ("common/governments", "government"),
-        ("common/government_reforms", "government_reform"),
-        ("common/subject_types", "subject_type"),
-        ("common/technologies", "technology"),
-        ("common/buildings", "building"),
-        ("common/units", "unit_type"),
-        ("common/mercenary_companies", "mercenary_company"),
-        ("common/trade_companies", "trade_company"),
-        ("common/advisortypes", "advisor_type"),
-        ("common/leader_personalities", "leader_personality"),
-        ("common/ruler_personalities", "ruler_personality"),
-        ("common/event_modifiers", "event_modifier"),
-        ("common/static_modifiers", "static_modifier"),
-        ("common/timed_modifiers", "timed_modifier"),
-        ("common/triggered_modifiers", "triggered_modifier"),
-        ("common/subject_type_upgrades", "subject_type_upgrade"),
-        ("common/peace_treaties", "peace_treaty"),
-        ("common/casus_belli", "casus_belli"),
-        ("common/cb_types", "casus_belli"),
-        ("common/wargoal_types", "wargoal_type"),
-        ("common/institutions", "institution"),
-        ("common/great_projects", "great_project"),
-        ("common/estate_privileges", "estate_privilege"),
-        ("common/estate_agendas", "estate_agenda"),
-        ("common/diplomatic_actions", "diplomatic_action"),
-        ("common/new_diplomatic_actions", "diplomatic_action"),
-        ("common/disasters", "disaster"),
-        ("common/rebel_types", "rebel_type"),
-        ("common/insults", "insult"),
-        ("common/opinion_modifiers", "opinion_modifier"),
-        ("common/tradegoods", "tradegood"),
-    ] {
-        definitions.push(definition(
-            ProfileMatchMode::Directory,
-            directory,
-            ProfileMatchMode::Any,
-            "",
-            kind,
-            None,
-            false,
-        ));
-    }
-    let value_definition =
-        |key: &str, parent_key: Option<&str>, kind: &str| ProfileValueDefinitionRule {
-            key: ProfileTextMatcher::insensitive(ProfileMatchMode::Exact, key.to_owned()),
-            parent_key: parent_key.map(|key| {
-                ProfileTextMatcher::insensitive(ProfileMatchMode::Exact, key.to_owned())
-            }),
-            kind: kind.to_owned(),
-        };
-    let mut value_definitions = vec![
-        value_definition("set_country_flag", None, "country_flag"),
-        value_definition("set_global_flag", None, "global_flag"),
-        value_definition("set_province_flag", None, "province_flag"),
-        value_definition("set_ruler_flag", None, "ruler_flag"),
-        value_definition("set_heir_flag", None, "heir_flag"),
-        value_definition("set_consort_flag", None, "consort_flag"),
-        value_definition("save_event_target_as", None, "event_target"),
-        value_definition("save_global_event_target_as", None, "global_event_target"),
-        value_definition("exile_ruler_as", None, "exiled_ruler"),
-        value_definition("exile_heir_as", None, "exiled_heir"),
-        value_definition("exile_consort_as", None, "exiled_consort"),
-        value_definition("exiled_as", Some("define_exiled_ruler"), "exiled_ruler"),
-        value_definition("exiled_as", Some("define_exiled_heir"), "exiled_heir"),
-        value_definition("exiled_as", Some("define_exiled_consort"), "exiled_consort"),
-        value_definition("set_saved_name", None, "saved_name"),
-    ];
-    for parent in [
-        "set_variable",
-        "change_variable",
-        "new_variable",
-        "new_variables",
-    ] {
-        value_definitions.push(value_definition("which", Some(parent), "variable"));
-    }
-    let container_value_definition =
-        |key: &str, name_field: &str, kind: &str| ProfileContainerValueDefinitionRule {
-            key: ProfileTextMatcher::insensitive(ProfileMatchMode::Exact, key.to_owned()),
-            name_field: name_field.to_owned(),
-            kind: kind.to_owned(),
-        };
-    let container_value_definitions = vec![
-        container_value_definition("exile_ruler_as", "name", "exiled_ruler"),
-        container_value_definition("exile_heir_as", "name", "exiled_heir"),
-        container_value_definition("exile_consort_as", "name", "exiled_consort"),
-    ];
-    let scan_roots = SCRIPT_FOLDERS
-        .iter()
-        .map(|folder| (*folder).to_owned())
-        .collect::<Vec<_>>();
-    let scan_root_max_depths = scan_roots
-        .iter()
-        .filter(|root| root.as_str() != "localisation")
-        .map(|root| {
-            let max_depth = if root == "map" { 1 } else { 0 };
-            (root.clone(), max_depth)
+    FIRST_PARTY_PROFILE
+        .get_or_init(|| {
+            first_party_rules()
+                .expect("embedded EU4 profile source")
+                .profile()
+                .clone()
         })
-        .collect::<BTreeMap<_, _>>();
-    let scan_root_files = BTreeMap::from([
-        (
-            "common".to_owned(),
-            COMMON_ROOT_FILES
-                .iter()
-                .map(|file| (*file).to_owned())
-                .collect(),
-        ),
-        (
-            "map".to_owned(),
-            MAP_ROOT_FILES
-                .iter()
-                .map(|file| (*file).to_owned())
-                .collect(),
-        ),
-    ]);
-    GameProfile {
-        game_id: GAME_ID.to_owned(),
-        source_encoding: SourceEncoding::Windows1252,
-        scan_roots,
-        scan_root_max_depths,
-        scan_root_files,
-        scan_extensions: ["txt", "gfx", "yml", "yaml"]
-            .into_iter()
-            .map(str::to_owned)
-            .collect(),
-        definitions,
-        references: vec![
-            reference(ProfileMatchMode::Exact, "event", "event"),
-            reference(ProfileMatchMode::Exact, "events", "event"),
-            reference(ProfileMatchMode::Exact, "event_id", "event"),
-            reference(ProfileMatchMode::Exact, "trigger_event", "event"),
-            reference(ProfileMatchMode::Suffix, "_event", "event"),
-            reference(
-                ProfileMatchMode::Contains,
-                "scripted_effect",
-                "scripted_effect",
-            ),
-            reference(ProfileMatchMode::Exact, "call_effect", "scripted_effect"),
-            // Sound files use `default_effect`/`specific_effect` to name sound groups,
-            // not scripted effects.
-            ProfileReferenceRule {
-                key: matcher(ProfileMatchMode::Suffix, "_effect"),
-                kind: "scripted_effect".to_owned(),
-                excluded_keys: ["default_effect", "specific_effect"]
-                    .into_iter()
-                    .map(str::to_owned)
-                    .collect(),
-                excluded_paths: Vec::new(),
-            },
-            reference(
-                ProfileMatchMode::Contains,
-                "scripted_trigger",
-                "scripted_trigger",
-            ),
-            reference(ProfileMatchMode::Exact, "call_trigger", "scripted_trigger"),
-            reference(ProfileMatchMode::Suffix, "_trigger", "scripted_trigger"),
-            reference(ProfileMatchMode::Exact, "localisation", "localisation"),
-            reference(ProfileMatchMode::Exact, "localization", "localisation"),
-            reference(ProfileMatchMode::Exact, "loc_key", "localisation"),
-            localisation_reference(ProfileMatchMode::Exact, "name"),
-            localisation_reference(ProfileMatchMode::Exact, "desc"),
-            localisation_reference(ProfileMatchMode::Exact, "title"),
-            localisation_reference(ProfileMatchMode::Exact, "tooltip"),
-        ],
-        value_definitions,
-        container_value_definitions,
-        container_definitions: Vec::new(),
-        conditional_definitions: vec![ProfileConditionalDefinitionRule {
-            path: matcher(ProfileMatchMode::Contains, "common/government_reforms/"),
-            kind: "hardcoded_legacy_government".to_owned(),
-            required_field: "legacy_government".to_owned(),
-            required_value: "yes".to_owned(),
-            absent_field: "legacy_equivalent".to_owned(),
-        }],
-        token_definitions: vec![
-            ProfileTokenDefinitionRule {
-                path: matcher(ProfileMatchMode::Prefix, "common/scripted_effects/"),
-                delimiter: '$',
-                inner_kind: "scripted_effect_param".to_owned(),
-                wrapped_kind: "scripted_effect_param_dollar".to_owned(),
-            },
-            ProfileTokenDefinitionRule {
-                path: matcher(ProfileMatchMode::Prefix, "common/scripted_triggers/"),
-                delimiter: '$',
-                inner_kind: "scripted_effect_param".to_owned(),
-                wrapped_kind: "scripted_effect_param_dollar".to_owned(),
-            },
-        ],
-        scope_names: [
-            "any",
-            "root",
-            "from",
-            "prev",
-            "previous",
-            "prev_prev",
-            "this",
-            "owner",
-            "controller",
-            "capital",
-            "capital_scope",
-            "location",
-            "province",
-            "country",
-            "trade_node",
-            "unit",
-            "monarch",
-            "heir",
-            "consort",
-            "mercenary_company",
-            "rebel_faction",
-            "religion",
-            "culture",
-            "advisor",
-            "leader",
-            "trade_company",
-            "global",
-            "none",
-            "overlord",
-            "emperor",
-            "event_target",
-            "global_event_target",
-        ]
-        .into_iter()
-        .map(str::to_owned)
-        .collect(),
-        scope_completions: [
-            "ROOT",
-            "THIS",
-            "FROM",
-            "PREV",
-            "country",
-            "province",
-            "trade_node",
-        ]
-        .into_iter()
-        .map(str::to_owned)
-        .collect(),
-        root_scopes: vec![
-            ProfileRootScopeRule {
-                key: matcher(ProfileMatchMode::Exact, "country_event"),
-                scope: "country".to_owned(),
-            },
-            ProfileRootScopeRule {
-                key: matcher(ProfileMatchMode::Exact, "province_event"),
-                scope: "province".to_owned(),
-            },
-        ],
-        scope_compatibilities: vec![ProfileScopeCompatibility {
-            actual: "trade_node".to_owned(),
-            expected: "province".to_owned(),
-        }],
-        transparent_scope_wrappers: ["AND", "OR", "NOT"]
-            .into_iter()
-            .map(str::to_owned)
-            .collect(),
-        control_flow_keys: [
-            "AND",
-            "OR",
-            "NOT",
-            "if",
-            "else",
-            "limit",
-            "trigger",
-            "effect",
-            "hidden_effect",
-            "random_list",
-            "modifier",
-            "option",
-            "immediate",
-        ]
-        .into_iter()
-        .map(str::to_owned)
-        .collect(),
-        semantic_context_inheritance: [
-            ("type:advisor_type", vec!["modifier"]),
-            ("type:ancestor_personalities", vec!["modifier"]),
-            ("type:customideas", vec!["modifier"]),
-            ("type:country_history", vec!["effect"]),
-            ("type:cult", vec!["modifier"]),
-            ("type:event_modifier", vec!["modifier"]),
-            ("type:government_ranks", vec!["modifier"]),
-            ("type:leader_personality", vec!["modifier"]),
-            ("type:on_action", vec!["effect"]),
-            ("type:personal_deity", vec!["modifier"]),
-            ("type:policy", vec!["modifier"]),
-            ("type:professionalism_modifier", vec!["modifier"]),
-            ("type:province_history", vec!["effect"]),
-            ("type:province_triggered_modifier", vec!["modifier"]),
-            (
-                "type:ruler_personality",
-                vec!["modifier", "personality_modifier"],
-            ),
-            ("type:static_modifier", vec!["modifier"]),
-            ("type:terrain", vec!["modifier"]),
-            ("type:trading_policy", vec!["modifier"]),
-            ("type:triggered_modifier", vec!["modifier"]),
-            ("imperial_incident_option", vec!["trigger"]),
-            ("imperial_incident_option_modifier", vec!["trigger"]),
-            ("root:fervor", vec!["modifier"]),
-            ("root:power_projection", vec!["modifier"]),
-        ]
-        .into_iter()
-        .map(|(context, inherited)| {
-            (
-                context.to_owned(),
-                inherited.into_iter().map(str::to_owned).collect(),
-            )
-        })
-        .collect(),
-        quoted_script_definition_keys: [
-            matcher(ProfileMatchMode::Exact, "effect"),
-            matcher(ProfileMatchMode::Suffix, "_effect"),
-        ]
-        .into_iter()
-        .collect(),
-        dynamic_scope_prefixes: vec!["event_target".to_owned(), "global_event_target".to_owned()],
-        dynamic_value_prefixes: ["variable", "modifier"]
-            .into_iter()
-            .map(str::to_owned)
-            .collect(),
-        open_world_value_kinds: [
-            "country_flag",
-            "global_flag",
-            "province_flag",
-            "ruler_flag",
-            "heir_flag",
-            "consort_flag",
-            "saved_name",
-            "named_unrest",
-            "event_target",
-            "global_event_target",
-            "dynasty_name",
-        ]
-        .into_iter()
-        .map(str::to_owned)
-        .collect(),
-        member_kind_aliases: [
-            ("country_tags", "country_tag"),
-            ("country_tag", "country_tag"),
-            ("trade_nodes", "trade_node"),
-            ("tradenodes", "trade_node"),
-            ("trade_node", "trade_node"),
-            ("colonial_regions", "colonial_region"),
-            ("colonial_region", "colonial_region"),
-            ("government_reforms", "government_reform"),
-            ("government_reform", "government_reform"),
-            ("subject_types", "subject_type"),
-            ("subject_type", "subject_type"),
-            ("mercenary_companies", "mercenary_company"),
-            ("mercenary_company", "mercenary_company"),
-            ("trade_companies", "trade_company"),
-            ("trade_company", "trade_company"),
-            ("event_modifiers", "event_modifier"),
-            ("ruler_personality", "ancestor_personalities"),
-            ("event_modifier", "event_modifier"),
-            ("static_modifiers", "static_modifier"),
-            ("static_modifier", "static_modifier"),
-            ("timed_modifiers", "timed_modifier"),
-            ("timed_modifier", "timed_modifier"),
-            ("triggered_modifiers", "triggered_modifier"),
-            ("triggered_modifier", "triggered_modifier"),
-            ("peace_treaties", "peace_treaty"),
-            ("peace_treaty", "peace_treaty"),
-            ("wargoal_types", "wargoal_type"),
-            ("wargoal_type", "wargoal_type"),
-            ("advisortypes", "advisor_type"),
-            ("advisor_type", "advisor_type"),
-            ("leader_personalities", "leader_personality"),
-            ("leader_personality", "leader_personality"),
-            ("ruler_personalities", "ruler_personality"),
-            ("ruler_personality", "ruler_personality"),
-            ("idea_groups", "idea_group"),
-            ("idea_group", "idea_group"),
-            ("buildings", "building"),
-            ("building", "building"),
-            ("technologies", "technology"),
-            ("technology", "technology"),
-            ("religions", "religion"),
-            ("religion", "religion"),
-            ("cultures", "culture"),
-            ("culture", "culture"),
-            ("scripted_effect_params", "scripted_effect_param"),
-            (
-                "scripted_effect_params_dollar",
-                "scripted_effect_param_dollar",
-            ),
-            ("hardcoded_legacygovernments", "hardcoded_legacy_government"),
-            (
-                "hardcoded_legacy_only_governments",
-                "hardcoded_legacy_government",
-            ),
-            ("modifiers", "static_modifier"),
-            ("modifier", "static_modifier"),
-            ("ruler_personality", "ancestor_personalities"),
-        ]
-        .into_iter()
-        .map(|(alias, kind)| (alias.to_owned(), kind.to_owned()))
-        .collect(),
-        member_name_suffixes: vec![ProfileMemberNameSuffixRule {
-            kinds: [
-                "ruler_personality",
-                "leader_personality",
-                "ancestor_personalities",
-            ]
-            .into_iter()
-            .map(str::to_owned)
-            .collect(),
-            suffix: "_personality".to_owned(),
-        }],
-        fallback_keys: [
-            "id",
-            "name",
-            "desc",
-            "title",
-            "picture",
-            "type",
-            "trigger",
-            "immediate",
-            "option",
-            "options",
-            "ai_chance",
-            "effect",
-            "hidden",
-            "is_triggered_only",
-            "country_event",
-            "province_event",
-            "event",
-            "always",
-            "limit",
-            "else",
-            "if",
-            "custom_tooltip",
-            "tooltip",
-            "text",
-            "scope",
-            "from",
-            "root",
-            "prev",
-            "owner",
-            "controller",
-            "capital",
-            "location",
-            "value",
-            "factor",
-            "modifier",
-            "add",
-            "remove",
-            "set",
-            "yes",
-            "no",
-            "true",
-            "false",
-            "random",
-            "weight",
-            "mean_time_to_happen",
-            "days",
-            "months",
-            "years",
-            "chance",
-            "is_valid",
-            "allow",
-            "target",
-            "file",
-            "path",
-            "color",
-            "culture",
-            "religion",
-            "province",
-            "country",
-            "tag",
-            "flag",
-            "has_country_flag",
-            "set_country_flag",
-            "clr_country_flag",
-            "has_global_flag",
-            "set_global_flag",
-            "clr_global_flag",
-            "add_manpower",
-            "add_prestige",
-            "add_stability",
-            "add_treasury",
-            "change_variable",
-            "check_variable",
-            "set_variable",
-            "save_event_target_as",
-            "fire_event",
-            "call_scripted_effect",
-            "call_scripted_trigger",
-            "scripted_effect",
-            "scripted_trigger",
-            "localisation",
-            "localization",
-            "loc_key",
-        ]
-        .into_iter()
-        .map(str::to_owned)
-        .collect(),
-        enum_extra_members: [
-            (
-                "scripted_effect_params".to_owned(),
-                vec!["scaled_skill".to_owned()],
-            ),
-            (
-                "country_tags".to_owned(),
-                ["F", "T"]
-                    .into_iter()
-                    .flat_map(|prefix| (0..100).map(move |number| format!("{prefix}{number:02}")))
-                    .collect(),
-            ),
-        ]
-        .into_iter()
-        .collect(),
-    }
+        .clone()
 }
 
-/// Returns a useful minimal catalog for an EU4 workspace.
+/// Returns a useful minimal catalog for isolated bootstrap callers.
+///
+/// Official runtime composition uses [`first_party_rules`], whose profile is part of the rule
+/// hash. This intentionally small fallback keeps crate-graph and synthetic tests independent of
+/// the full catalog.
 #[must_use]
 pub fn bootstrap_model() -> RulesModel {
     RulesModel {
@@ -1047,6 +463,7 @@ pub fn bootstrap_model() -> RulesModel {
         ],
         records: Vec::new(),
         semantic: pdx_rules::SemanticModel::default(),
+        profile: GameProfile::default(),
     }
 }
 
@@ -1059,12 +476,13 @@ pub fn bootstrap_rules() -> RuleSet {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::path::Path;
 
     use super::{
-        COMMON_ROOT_FILES, Eu4Profile, GAME_ID, MAP_ROOT_FILES, SCRIPT_FOLDERS, bootstrap_rules,
-        first_party_rules, first_party_rules_cached, first_party_rules_ephemeral, profile,
+        Eu4Profile, GAME_ID, bootstrap_rules, first_party_rules, first_party_rules_cached,
+        first_party_rules_ephemeral, profile,
     };
-    use pdx_rules::SourceEncoding;
+    use pdx_rules::{RuleSet, SourceEncoding};
     use pdx_text::LogicalPath;
 
     #[test]
@@ -1088,15 +506,13 @@ mod tests {
         let profile = profile();
         assert_eq!(profile.game_id, GAME_ID);
         assert_eq!(profile.source_encoding, SourceEncoding::Windows1252);
-        assert_eq!(profile.scan_roots().len(), SCRIPT_FOLDERS.len());
+        assert_eq!(profile.scan_roots().len(), 123);
         assert!(profile.scan_roots().iter().any(|root| root == "common"));
         assert_eq!(profile.scan_root_max_depth("common"), Some(0));
-        assert!(profile.scan_root_files("common").is_some_and(|files| {
-            files
-                .iter()
-                .map(String::as_str)
-                .eq(COMMON_ROOT_FILES.iter().copied())
-        }));
+        assert_eq!(
+            profile.scan_root_files("common").map(|files| files.len()),
+            Some(5)
+        );
         assert!(
             profile
                 .scan_roots()
@@ -1110,12 +526,10 @@ mod tests {
             Some(0)
         );
         assert_eq!(profile.scan_root_max_depth("map"), Some(1));
-        assert!(profile.scan_root_files("map").is_some_and(|files| {
-            files
-                .iter()
-                .map(String::as_str)
-                .eq(MAP_ROOT_FILES.iter().copied())
-        }));
+        assert_eq!(
+            profile.scan_root_files("map").map(|files| files.len()),
+            Some(16)
+        );
         for root in profile.scan_roots() {
             if root == "localisation" || root == "map" {
                 continue;
@@ -1199,7 +613,13 @@ mod tests {
     #[test]
     fn embedded_first_party_source_matches_the_eu4_profile() {
         let rules = first_party_rules().expect("embedded EU4 source");
+        let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let (_, source_model) = pdx_rules::rulec::load_source(&repository_root.join("rules/eu4"))
+            .expect("filesystem EU4 source");
+        let source_rules = RuleSet::from_model(source_model);
         assert_eq!(rules.game_id(), GAME_ID);
+        assert_eq!(rules, source_rules);
+        assert_eq!(rules.profile(), &profile());
         assert!(!rules.model().semantic.rules.is_empty());
         assert_eq!(
             rules.model().semantic.localisation_bindings.len(),

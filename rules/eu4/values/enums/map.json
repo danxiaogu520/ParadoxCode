@@ -1,0 +1,31 @@
+{
+  "terrain_types": [
+    "artic",
+    "desert",
+    "forest",
+    "hills",
+    "jungle",
+    "marsh",
+    "mountains",
+    "plains",
+    "pti"
+  ],
+  "terrain_sound_types": [
+    "desert",
+    "forest",
+    "jungle",
+    "mountains",
+    "plains",
+    "sea"
+  ],
+  "winter_types": [
+    "mild_winter",
+    "normal_winter",
+    "severe_winter"
+  ],
+  "monsoons": [
+    "mild_monsoon",
+    "normal_monsoon",
+    "severe_monsoon"
+  ]
+}

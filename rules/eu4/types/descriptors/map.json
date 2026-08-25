@@ -1,0 +1,162 @@
+{
+  "area": {
+    "name": "area",
+    "path": "game/map",
+    "path_file": "area.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "climate": {
+    "name": "climate",
+    "path": "game/map",
+    "path_file": "climate.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "continent": {
+    "name": "continent",
+    "path": "game/map",
+    "path_file": "continent.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "region": {
+    "name": "region",
+    "path": "game/map",
+    "path_file": "region.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "superregion": {
+    "name": "superregion",
+    "path": "game/map",
+    "path_file": "superregion.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "province_group": {
+    "name": "province_group",
+    "path": "game/map",
+    "path_file": "provincegroup.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "province_id": {
+    "name": "province_id",
+    "path": "game/map",
+    "path_file": "positions.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "province_names": {
+    "name": "province_names",
+    "path": "game/common/province_names",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "terrain": {
+    "name": "terrain",
+    "path": "game/map",
+    "path_file": "terrain.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "categories"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "trade_winds": {
+    "name": "trade_winds",
+    "path": "game/map",
+    "path_file": "trade_winds.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "default_map": {
+    "name": "default_map",
+    "path": "game/map",
+    "path_file": "default.map",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": true,
+    "starts_with": null,
+    "type_key_filter": null
+  },
+  "mapclimate": {
+    "name": "mapclimate",
+    "path": "game/map",
+    "path_file": "climate.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": true,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  }
+}

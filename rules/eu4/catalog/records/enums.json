@@ -1,0 +1,1406 @@
+{
+  "records": [
+    {
+      "table": "enums",
+      "logical_id": "common/ai_army:common/ai_army:root:1:0",
+      "source_order": 342,
+      "fields": {
+        "child_count": "2",
+        "key": "enum[ai_army_eval]",
+        "line": "9",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/ai_army:common/ai_army:root:2:1",
+      "source_order": 348,
+      "fields": {
+        "child_count": "2",
+        "directives": "cardinality = 1..inf\nreplace_scope = { this = province root = province }",
+        "documentation": "Modifies the province score by adding or multiplying it with the factor. The factor is modified further by optional modifier blocks, which modify multiplicatively.",
+        "key": "enum[ai_army_eval]",
+        "line": "26",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/ancestor_personalities:common/ancestor_personalities:root:1:0",
+      "source_order": 377,
+      "fields": {
+        "child_count": "32",
+        "key": "enum[ancestor_key]",
+        "line": "22",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:4:2:11:1",
+      "source_order": 627,
+      "fields": {
+        "directives": "cardinality = 1..inf",
+        "key": "enum[peace_options]",
+        "line": "225",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:4:2:13:0",
+      "source_order": 631,
+      "fields": {
+        "directives": "cardinality = 1..inf",
+        "key": "enum[peace_options]",
+        "line": "235",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:4:2:14:1",
+      "source_order": 634,
+      "fields": {
+        "directives": "cardinality = 1..inf",
+        "key": "enum[peace_options]",
+        "line": "243",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:4:2:16:0",
+      "source_order": 638,
+      "fields": {
+        "directives": "cardinality = 1..inf",
+        "key": "enum[peace_options]",
+        "line": "251",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:4:3:11:0",
+      "source_order": 659,
+      "fields": {
+        "directives": "cardinality = 1..inf",
+        "key": "enum[peace_options]",
+        "line": "309",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:4:3:12:1",
+      "source_order": 662,
+      "fields": {
+        "directives": "cardinality = 1..inf",
+        "key": "enum[peace_options]",
+        "line": "318",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:4:3:14:0",
+      "source_order": 666,
+      "fields": {
+        "directives": "cardinality = 1..inf",
+        "key": "enum[peace_options]",
+        "line": "328",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:4:3:9:1",
+      "source_order": 655,
+      "fields": {
+        "directives": "cardinality = 1..inf",
+        "key": "enum[peace_options]",
+        "line": "299",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:3:17:1",
+      "source_order": 606,
+      "fields": {
+        "directives": "cardinality = 0..inf",
+        "key": "enum[peace_options]",
+        "line": "163",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:1:0",
+      "source_order": 533,
+      "fields": {
+        "child_count": "31",
+        "key": "enum[peace_options]",
+        "line": "36",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/casus_belli_and_war_goals:common/casus_belli_and_war_goals:root:1:1",
+      "source_order": 565,
+      "fields": {
+        "child_count": "11",
+        "key": "enum[wargoal_types]",
+        "line": "70",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/countries_consolidated:common/countries_consolidated:root:1:0",
+      "source_order": 722,
+      "fields": {
+        "child_count": "3",
+        "key": "complex_enum[country_tags]",
+        "line": "27",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/countries_consolidated:common/countries_consolidated:root:2:0",
+      "source_order": 728,
+      "fields": {
+        "child_count": "3",
+        "directives": "cardinality = 0..inf",
+        "key": "enum[country_tags]",
+        "line": "41",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/cultures:common/cultures:root:1:0",
+      "source_order": 789,
+      "fields": {
+        "child_count": "2",
+        "key": "complex_enum[dynasty_name]",
+        "line": "20",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/diplomatic_actions_new:common/diplomatic_actions_new:common/diplomatic_actions_new:common/diplomatic_actions_new:common/diplomatic_actions_new:root:1:10:0:2:0",
+      "source_order": 952,
+      "fields": {
+        "key": "enum[which_varname]",
+        "line": "84",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "ai_value"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/golden_bull:common/golden_bull:common/golden_bull:root:1:1:0",
+      "source_order": 1285,
+      "fields": {
+        "key": "enum[golden_bull_mechanics]",
+        "line": "22",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/golden_bull:common/golden_bull:root:2:0",
+      "source_order": 1294,
+      "fields": {
+        "child_count": "2",
+        "key": "enum[golden_bull_mechanics]",
+        "line": "38",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:4:0:3:1",
+      "source_order": 1860,
+      "fields": {
+        "directives": "cardinality = 0..inf",
+        "key": "enum[hardcoded_legacygovernments]",
+        "line": "961",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:common/governments_and_reforms:root:4:1:0:2",
+      "source_order": 1867,
+      "fields": {
+        "directives": "cardinality = 0..inf",
+        "key": "enum[hardcoded_legacygovernments]",
+        "line": "975",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:root:3:0",
+      "source_order": 1679,
+      "fields": {
+        "child_count": "99",
+        "key": "enum[government_icons]",
+        "line": "765",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/governments_and_reforms:common/governments_and_reforms:root:3:1",
+      "source_order": 1779,
+      "fields": {
+        "child_count": "69",
+        "key": "enum[hardcoded_legacygovernments]",
+        "line": "866",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/holy_order:common/holy_order:root:2:0",
+      "source_order": 2097,
+      "fields": {
+        "child_count": "3",
+        "key": "enum[holy_order_cost_types]",
+        "line": "52",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/modifiers_consolidated:common/modifiers_consolidated:root:5:0",
+      "source_order": 2590,
+      "fields": {
+        "child_count": "2",
+        "key": "enum[timed_modifier_liberty]",
+        "line": "133",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/modifiers_consolidated:common/modifiers_consolidated:root:6:0",
+      "source_order": 2594,
+      "fields": {
+        "child_count": "2",
+        "key": "enum[timed_modifier_liberty]",
+        "line": "140",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/rebel_types:common/rebel_types:root:1:0",
+      "source_order": 4652,
+      "fields": {
+        "child_count": "3",
+        "key": "enum[rebel_areas]",
+        "line": "51",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/rebel_types:common/rebel_types:root:1:1",
+      "source_order": 4656,
+      "fields": {
+        "child_count": "6",
+        "key": "enum[rebel_governments]",
+        "line": "56",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/rebel_types:common/rebel_types:root:1:2",
+      "source_order": 4663,
+      "fields": {
+        "child_count": "6",
+        "key": "enum[rebel_defection]",
+        "line": "64",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/rebel_types:common/rebel_types:root:1:3",
+      "source_order": 4670,
+      "fields": {
+        "child_count": "6",
+        "key": "enum[rebel_independence]",
+        "line": "72",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/rebel_types:common/rebel_types:root:1:4",
+      "source_order": 4677,
+      "fields": {
+        "child_count": "2",
+        "key": "enum[rebel_gfx_type]",
+        "line": "80",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:25:0",
+      "source_order": 5260,
+      "fields": {
+        "child_count": "380",
+        "key": "enum[bribe_effect_options]",
+        "line": "287",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:61:0",
+      "source_order": 5701,
+      "fields": {
+        "child_count": "109",
+        "key": "enum[scaling_with_estate_influence_options]",
+        "line": "1858",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:8:0",
+      "source_order": 5177,
+      "fields": {
+        "directives": "cardinality 1..3",
+        "key": "enum[power_categories]",
+        "line": "96",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "yes"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:root:4:0",
+      "source_order": 6250,
+      "fields": {
+        "child_count": "5",
+        "key": "enum[trade_company_investment_types]",
+        "line": "187",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "common/trade_consolidated:common/trade_consolidated:root:9:0",
+      "source_order": 6307,
+      "fields": {
+        "child_count": "2",
+        "key": "enum[trade_center_types]",
+        "line": "322",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "customizable_localisation/custom_locs:customizable_localisation/custom_locs:root:0:0",
+      "source_order": 6346,
+      "fields": {
+        "child_count": "2",
+        "key": "complex_enum[defined_text_commands]",
+        "line": "3",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "dlc_event_pics:dlc_event_pics:root:0:0",
+      "source_order": 6387,
+      "fields": {
+        "child_count": "609",
+        "key": "enum[dlc_event_pictures]",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "effects:effects:root:1:0",
+      "source_order": 7036,
+      "fields": {
+        "directives": "cardinality = 1..inf",
+        "key": "enum[scripted_effect_params]",
+        "line": "10",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scalar"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "effects:effects:root:1:1",
+      "source_order": 7037,
+      "fields": {
+        "directives": "cardinality = 1..inf",
+        "key": "enum[scripted_effect_params]",
+        "line": "12",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scope_field"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "effects:effects:root:248:1",
+      "source_order": 7512,
+      "fields": {
+        "directives": "cardinality = 1..1",
+        "key": "enum[who_or_subject]",
+        "line": "1471",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scope[country]"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "effects:effects:root:248:2",
+      "source_order": 7513,
+      "fields": {
+        "key": "enum[who_or_subject]",
+        "line": "1472",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[country_tags]"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "effects:effects:root:3:0",
+      "source_order": 7041,
+      "fields": {
+        "key": "enum[which_varname]",
+        "line": "23",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "value_set[variable]"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "effects:effects:root:525:2",
+      "source_order": 8081,
+      "fields": {
+        "key": "enum[key_name]",
+        "line": "3186",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "localisation"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "effects:effects:root:558:0",
+      "source_order": 8130,
+      "fields": {
+        "key": "enum[interest_modifier_fixed_interest]",
+        "line": "3344",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "float"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:0",
+      "source_order": 8490,
+      "fields": {
+        "child_count": "7",
+        "key": "enum[unit_types]",
+        "line": "6",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:1",
+      "source_order": 8498,
+      "fields": {
+        "child_count": "3",
+        "key": "enum[land_unit_types]",
+        "line": "15",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:10",
+      "source_order": 8697,
+      "fields": {
+        "child_count": "2",
+        "key": "enum[which_varname]",
+        "line": "223",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:11",
+      "source_order": 8700,
+      "fields": {
+        "child_count": "1",
+        "key": "enum[variable_name]",
+        "line": "227",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:12",
+      "source_order": 8702,
+      "fields": {
+        "child_count": "14",
+        "key": "enum[attitudes]",
+        "line": "230",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:13",
+      "source_order": 8717,
+      "fields": {
+        "child_count": "3",
+        "key": "enum[days_months_years]",
+        "line": "246",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:14",
+      "source_order": 8721,
+      "fields": {
+        "child_count": "6",
+        "key": "enum[ai_personalities]",
+        "line": "251",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:15",
+      "source_order": 8728,
+      "fields": {
+        "child_count": "3",
+        "key": "enum[winter_types]",
+        "line": "259",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:16",
+      "source_order": 8732,
+      "fields": {
+        "child_count": "2",
+        "key": "enum[religious_leagues]",
+        "line": "264",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:17",
+      "source_order": 8735,
+      "fields": {
+        "child_count": "132",
+        "key": "enum[government_attributes]",
+        "line": "268",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:18",
+      "source_order": 8868,
+      "fields": {
+        "child_count": "3",
+        "key": "enum[monsoons]",
+        "line": "402",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:19",
+      "source_order": 8872,
+      "fields": {
+        "child_count": "7",
+        "key": "enum[local_autonomy_modifier]",
+        "line": "407",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:2",
+      "source_order": 8502,
+      "fields": {
+        "child_count": "4",
+        "key": "enum[naval_unit_types]",
+        "line": "20",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:20",
+      "source_order": 8880,
+      "fields": {
+        "child_count": "4",
+        "key": "complex_enum[graphical_cultures]",
+        "line": "416",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:21",
+      "source_order": 8886,
+      "fields": {
+        "child_count": "50",
+        "key": "enum[modifier_value]",
+        "line": "424",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:22",
+      "source_order": 8937,
+      "fields": {
+        "child_count": "3",
+        "key": "enum[native_policies]",
+        "line": "476",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:23",
+      "source_order": 8941,
+      "fields": {
+        "child_count": "8",
+        "key": "enum[legacy_reforms_with_no_new_equivalent]",
+        "line": "481",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:24",
+      "source_order": 8950,
+      "fields": {
+        "child_count": "2",
+        "key": "enum[interest_modifier_fixed_interest]",
+        "line": "491",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:25",
+      "source_order": 8953,
+      "fields": {
+        "child_count": "2",
+        "key": "enum[any_all]",
+        "line": "495",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:26",
+      "source_order": 8956,
+      "fields": {
+        "child_count": "3",
+        "key": "enum[council_positions]",
+        "line": "499",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:27",
+      "source_order": 8960,
+      "fields": {
+        "child_count": "2",
+        "key": "enum[great_project]",
+        "line": "504",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:28",
+      "source_order": 8963,
+      "fields": {
+        "child_count": "1",
+        "key": "enum[estate_all]",
+        "line": "508",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:29",
+      "source_order": 8965,
+      "fields": {
+        "child_count": "1",
+        "key": "enum[estate_any]",
+        "line": "511",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:3",
+      "source_order": 8507,
+      "fields": {
+        "child_count": "3",
+        "key": "enum[warloss_cause]",
+        "line": "26",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:30",
+      "source_order": 8967,
+      "fields": {
+        "child_count": "2",
+        "key": "enum[reb_nativesponsor]",
+        "line": "514",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:31",
+      "source_order": 8970,
+      "fields": {
+        "child_count": "3",
+        "key": "enum[building_development_type]",
+        "line": "518",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:32",
+      "source_order": 8974,
+      "fields": {
+        "child_count": "2",
+        "key": "enum[who_or_subject]",
+        "line": "524",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:33",
+      "source_order": 8977,
+      "fields": {
+        "child_count": "21",
+        "key": "enum[special_units]",
+        "line": "529",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:34",
+      "source_order": 8999,
+      "fields": {
+        "child_count": "25",
+        "key": "enum[special_unit_types]",
+        "line": "554",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:35",
+      "source_order": 9025,
+      "fields": {
+        "child_count": "2",
+        "key": "enum[random_repeating]",
+        "line": "585",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:36",
+      "source_order": 9028,
+      "fields": {
+        "child_count": "1",
+        "key": "enum[message_options]",
+        "line": "589",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:37",
+      "source_order": 9030,
+      "fields": {
+        "child_count": "3",
+        "key": "enum[message_data_options]",
+        "line": "592",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:38",
+      "source_order": 9034,
+      "fields": {
+        "child_count": "65",
+        "key": "enum[estate_action_enum]",
+        "line": "597",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:39",
+      "source_order": 9100,
+      "fields": {
+        "child_count": "10",
+        "key": "enum[diplomatic_actions_new]",
+        "line": "667",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:4",
+      "source_order": 8511,
+      "fields": {
+        "child_count": "3",
+        "key": "enum[power_categories]",
+        "line": "31",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:5",
+      "source_order": 8515,
+      "fields": {
+        "child_count": "4",
+        "key": "enum[military_leader_types]",
+        "line": "36",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:6",
+      "source_order": 8520,
+      "fields": {
+        "child_count": "11",
+        "key": "enum[construction_types]",
+        "line": "42",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:7",
+      "source_order": 8532,
+      "fields": {
+        "child_count": "28",
+        "key": "enum[DLCs]",
+        "line": "55",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:8",
+      "source_order": 8561,
+      "fields": {
+        "child_count": "132",
+        "key": "enum[DLCNUM]",
+        "line": "85",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "enums:enums:root:0:9",
+      "source_order": 8694,
+      "fields": {
+        "child_count": "2",
+        "key": "enum[key_name]",
+        "line": "219",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "events/events:events/events:events/events:events/events:root:1:10:0:0",
+      "source_order": 9164,
+      "fields": {
+        "key": "enum[days_months_years]",
+        "line": "116",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "int"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "events/events:events/events:events/events:events/events:root:1:11:0:0",
+      "source_order": 9168,
+      "fields": {
+        "key": "enum[days_months_years]",
+        "line": "123",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "1"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "gfx/sprite_packs:gfx/sprite_packs:gfx/sprite_packs:root:2:2:0",
+      "source_order": 9378,
+      "fields": {
+        "key": "enum[graphical_cultures]",
+        "line": "83",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "gfx/sprite_packs:gfx/sprite_packs:root:1:0",
+      "source_order": 9320,
+      "fields": {
+        "child_count": "52",
+        "key": "enum[builtin_dlc]",
+        "line": "17",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "gfx/sprite_packsorder:gfx/sprite_packsorder:root:1:0",
+      "source_order": 9416,
+      "fields": {
+        "child_count": "304",
+        "key": "enum[spritepacks]",
+        "line": "14",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "gfx/sprite_packsorder:gfx/sprite_packsorder:root:2:1",
+      "source_order": 9723,
+      "fields": {
+        "directives": "cardinality = 0..inf",
+        "key": "enum[spritepacks]",
+        "line": "327",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "int"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:root:5:3:4:2:1",
+      "source_order": 9905,
+      "fields": {
+        "directives": "cardinality = 1..4",
+        "key": "enum[unit_types]",
+        "line": "350",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "int"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:root:5:3:4:3:1",
+      "source_order": 9910,
+      "fields": {
+        "directives": "cardinality = 1..4",
+        "key": "enum[unit_types]",
+        "line": "358",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "int"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:history/history_consolidated:root:6:0:17:1:0",
+      "source_order": 9936,
+      "fields": {
+        "directives": "cardinality = 1..inf",
+        "key": "enum[country_tags]",
+        "line": "407",
+        "shape": "empty",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "history/history_consolidated:history/history_consolidated:history/history_consolidated:root:2:0:2",
+      "source_order": 9783,
+      "fields": {
+        "child_count": "4",
+        "directives": "cardinality = 0..inf",
+        "key": "enum[other_diplo_history]",
+        "line": "103",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "history/history_consolidated:history/history_consolidated:root:3:0",
+      "source_order": 9803,
+      "fields": {
+        "child_count": "3",
+        "key": "enum[other_diplo_history]",
+        "line": "138",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "localisation:localisation:root:0:71",
+      "source_order": 10180,
+      "fields": {
+        "key": "enum[defined_text_commands]",
+        "line": "73",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "any"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:root:6:0",
+      "source_order": 10256,
+      "fields": {
+        "child_count": "9",
+        "key": "enum[terrain_types]",
+        "line": "135",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "map/ambient_objects_and_terrain:map/ambient_objects_and_terrain:root:6:1",
+      "source_order": 10266,
+      "fields": {
+        "child_count": "6",
+        "key": "enum[terrain_sound_types]",
+        "line": "146",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "triggers:triggers:root:1:0",
+      "source_order": 11999,
+      "fields": {
+        "directives": "cardinality = 1..inf",
+        "key": "enum[scripted_effect_params]",
+        "line": "8",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scalar"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "triggers:triggers:root:1:1",
+      "source_order": 12000,
+      "fields": {
+        "directives": "cardinality = 1..inf",
+        "key": "enum[scripted_effect_params]",
+        "line": "10",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scope_field"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "triggers:triggers:root:327:0",
+      "source_order": 12423,
+      "fields": {
+        "directives": "cardinality = 0..1",
+        "key": "enum[military_leader_types]",
+        "line": "1477",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "yes"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "triggers:triggers:root:383:2",
+      "source_order": 12503,
+      "fields": {
+        "key": "enum[key_name]",
+        "line": "1743",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "localisation"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "triggers:triggers:triggers:root:1002:2:0",
+      "source_order": 13200,
+      "fields": {
+        "key": "enum[which_varname]",
+        "line": "4358",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "value_set[variable]"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "variable_enums:variable_enums:root:0:0",
+      "source_order": 13682,
+      "fields": {
+        "child_count": "99",
+        "key": "enum[export_to_variable_data]",
+        "line": "2",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "variable_enums:variable_enums:root:0:1",
+      "source_order": 13782,
+      "fields": {
+        "child_count": "13",
+        "key": "enum[culture_new_variables]",
+        "line": "103",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    },
+    {
+      "table": "enums",
+      "logical_id": "variable_enums:variable_enums:root:0:2",
+      "source_order": 13796,
+      "fields": {
+        "child_count": "13",
+        "key": "enum[religion_new_variables]",
+        "line": "118",
+        "operator": "=",
+        "shape": "block",
+        "source_file": "catalog.json"
+      }
+    }
+  ]
+}
