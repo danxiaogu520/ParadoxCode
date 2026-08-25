@@ -7,6 +7,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-08-26
+
+Maintenance release focused on EU4 rule coverage, semantic completion quality, and editor
+integration reliability.
+
+### Added
+
+- The first-party EU4 rule source is organized into catalog, semantic, supporting-table, and
+  profile data with a single canonical `rule_hash` covering the complete logical model.
+- Common EU4 path whitelists and event modifier keys are covered by the profile and rule data.
+
+### Changed
+
+- Completion candidates are ranked by contextual and macro-expansion relevance, with scripted macro
+  highlighting and completion aligned across the supported editors.
+- VS Code retriggers completion after assignments and block edits, while the CI matrix keeps
+  Windows release builds parallel with Windows test and lint checks.
+
+### Fixed
+
+- Completion and semantic analysis no longer lose context after assignments or nested blocks, and
+  the legacy LSP compatibility path has been removed in favor of the current initialization contract.
+
 ## [0.1.3] - 2026-08-22
 
 Maintenance release focused on formatting canonicalization, completion quality, and hover
@@ -102,7 +125,8 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.0...v0.1.1
