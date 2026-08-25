@@ -83,7 +83,7 @@ pdx-rules + pdx-game -> pdx-engine / pdx-analysis
 
 ## 从源码构建
 
-前置条件：**Rust 1.97 或更新版本**，以及 **Node.js 24 LTS**（用于 Tree-sitter 语料检查）。
+前置条件：**Rust 1.98 或更新版本**，以及 **Node.js 24 LTS**（用于 Tree-sitter 语料检查）。
 
 ```bash
 git clone https://github.com/danxiaogu520/ParadoxCode.git

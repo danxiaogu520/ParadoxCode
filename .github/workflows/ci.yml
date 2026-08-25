@@ -29,15 +29,15 @@ jobs:
       - run: bash scripts/check-quality-gates.sh core
 
   msrv:
-    name: Minimum supported Rust 1.97
+    name: Minimum supported Rust 1.98
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.97.0
+      - uses: dtolnay/rust-toolchain@1.98.0
       - uses: Swatinem/rust-cache@v2
         with:
-          key: msrv-1.97
+          key: msrv-1.98
       - run: cargo check --locked --workspace --all-targets --all-features
 
   windows:

@@ -25,7 +25,7 @@ EU4 profile), never in the generic engine, LSP layer, or editor extensions.
 
 ## Prerequisites
 
-- Rust **1.97 or newer** (see `.github/workflows/ci.yml` for the enforced MSRV).
+- Rust **1.98 or newer** (see `.github/workflows/ci.yml` for the enforced MSRV).
 - Node.js **24 LTS** for Tree-sitter corpus checks and the VS Code extension.
 - Git. Install the repository hooks once after cloning:
 

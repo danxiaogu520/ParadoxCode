@@ -119,7 +119,7 @@ pdx-rules + pdx-game -> pdx-engine / pdx-analysis
 
 ## Building from source
 
-Prerequisites: **Rust 1.97 or newer** and **Node.js 24 LTS** (for Tree-sitter corpus checks).
+Prerequisites: **Rust 1.98 or newer** and **Node.js 24 LTS** (for Tree-sitter corpus checks).
 
 ```bash
 git clone https://github.com/danxiaogu520/ParadoxCode.git
