@@ -5,37 +5,62 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub struct FileMatcher {
     /// Optional path prefix, without a leading slash.
+    #[serde(default)]
     pub path_prefix: Option<String>,
+    /// Optional exact logical path, without a leading slash.
+    #[serde(default)]
+    pub path_exact: Option<String>,
     /// Accepted file extensions without the leading dot.
     pub extensions: Vec<String>,
     /// Optional suffix match on the logical path.
+    #[serde(default)]
     pub path_suffix: Option<String>,
+    /// Directory-bounded prefixes that must not match this category.
+    #[serde(default)]
+    pub path_exclude_prefixes: Vec<String>,
     /// Whether path and extension matching preserves case.
     pub case_sensitive: bool,
 }
 
 impl FileMatcher {
+    /// Returns a stable specificity key used to select the most precise category.
+    #[must_use]
+    pub(crate) fn specificity(&self) -> (u8, usize) {
+        if let Some(path) = &self.path_exact {
+            return (2, path.len());
+        }
+        (
+            u8::from(self.path_prefix.is_some() || self.path_suffix.is_some()),
+            self.path_prefix.as_ref().map_or(0, String::len)
+                + self.path_suffix.as_ref().map_or(0, String::len),
+        )
+    }
+
     /// Matches a validated logical path.
     #[must_use]
     pub fn matches(&self, path: &LogicalPath) -> bool {
         let candidate = path.as_str();
-        if let Some(prefix) = &self.path_prefix {
-            let is_directory_prefix = if self.case_sensitive {
-                candidate == prefix
-                    || candidate
-                        .strip_prefix(prefix)
-                        .is_some_and(|remainder| remainder.starts_with('/'))
+        if let Some(exact) = &self.path_exact {
+            let matches_exact = if self.case_sensitive {
+                candidate == exact
             } else {
-                candidate.len() == prefix.len() && candidate.eq_ignore_ascii_case(prefix)
-                    || candidate.len() > prefix.len()
-                        && candidate
-                            .get(..prefix.len())
-                            .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
-                        && candidate.as_bytes().get(prefix.len()) == Some(&b'/')
+                candidate.eq_ignore_ascii_case(exact)
             };
-            if !is_directory_prefix {
+            if !matches_exact {
                 return false;
             }
+        }
+        if self
+            .path_exclude_prefixes
+            .iter()
+            .any(|prefix| directory_prefix_matches(candidate, prefix, self.case_sensitive))
+        {
+            return false;
+        }
+        if let Some(prefix) = &self.path_prefix
+            && !directory_prefix_matches(candidate, prefix, self.case_sensitive)
+        {
+            return false;
         }
         if let Some(suffix) = &self.path_suffix {
             let matches_suffix = if self.case_sensitive {
@@ -63,6 +88,22 @@ impl FileMatcher {
                 item.eq_ignore_ascii_case(extension)
             }
         })
+    }
+}
+
+fn directory_prefix_matches(candidate: &str, prefix: &str, case_sensitive: bool) -> bool {
+    if case_sensitive {
+        candidate == prefix
+            || candidate
+                .strip_prefix(prefix)
+                .is_some_and(|remainder| remainder.starts_with('/'))
+    } else {
+        candidate.len() == prefix.len() && candidate.eq_ignore_ascii_case(prefix)
+            || candidate.len() > prefix.len()
+                && candidate
+                    .get(..prefix.len())
+                    .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+                && candidate.as_bytes().get(prefix.len()) == Some(&b'/')
     }
 }
 /// A key matcher compiled from a first-party field declaration.

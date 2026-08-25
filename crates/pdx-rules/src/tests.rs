@@ -1,7 +1,8 @@
 use super::{
-    CURRENT_SCHEMA_VERSION, FileMatcher, GameProfile, KeyMatcher, ProfileMatchMode,
-    ProfileTextMatcher, RuleRecord, RuleSet, RuleShape, RulesModel, ScriptedMacroDescriptor,
-    ScriptedMacroUsage, SemanticRule, TypeDescriptor, ValueMatcher,
+    CURRENT_SCHEMA_VERSION, FileCategory, FileMatcher, FileResolutionPolicy, GameProfile,
+    KeyMatcher, ParserKind, ProfileMatchMode, ProfileTextMatcher, RuleRecord, RuleSet, RuleShape,
+    RulesModel, ScriptedMacroDescriptor, ScriptedMacroUsage, SemanticRule, TypeDescriptor,
+    ValueMatcher,
 };
 use pdx_text::LogicalPath;
 use std::collections::BTreeMap;
@@ -33,8 +34,10 @@ fn profile_text_matchers_are_case_insensitive_and_bounded() {
 fn file_matcher_path_prefix_is_directory_bounded() {
     let matcher = FileMatcher {
         path_prefix: Some("localisation".to_owned()),
+        path_exact: None,
         extensions: vec!["yml".to_owned()],
         path_suffix: None,
+        path_exclude_prefixes: Vec::new(),
         case_sensitive: false,
     };
 
@@ -43,6 +46,62 @@ fn file_matcher_path_prefix_is_directory_bounded() {
     assert!(matcher.matches(&LogicalPath::parse("LOCALISATION/events/MAIN.YML").expect("path")));
     assert!(!matcher.matches(&LogicalPath::parse("localisation_extra/main.yml").expect("path")));
     assert!(!matcher.matches(&LogicalPath::parse("common/main.yml").expect("path")));
+}
+
+#[test]
+fn file_matcher_supports_exact_paths_and_excluded_directories() {
+    let exact = FileMatcher {
+        path_prefix: None,
+        path_exact: Some("common/technology.txt".to_owned()),
+        extensions: vec!["txt".to_owned()],
+        path_suffix: None,
+        path_exclude_prefixes: Vec::new(),
+        case_sensitive: false,
+    };
+    assert!(exact.matches(&LogicalPath::parse("COMMON/TECHNOLOGY.TXT").expect("path")));
+    assert!(!exact.matches(&LogicalPath::parse("common/technology_extra.txt").expect("path")));
+
+    let script = FileMatcher {
+        path_prefix: None,
+        path_exact: None,
+        extensions: vec!["txt".to_owned()],
+        path_suffix: None,
+        path_exclude_prefixes: vec!["common".to_owned()],
+        case_sensitive: false,
+    };
+    assert!(!script.matches(&LogicalPath::parse("common/unknown.txt").expect("path")));
+    assert!(script.matches(&LogicalPath::parse("common_extra/unknown.txt").expect("path")));
+    assert!(script.matches(&LogicalPath::parse("events/unknown.txt").expect("path")));
+}
+
+#[test]
+fn classify_prefers_an_exact_path_over_a_broad_prefix() {
+    let category = |id: &str, path_prefix: Option<&str>, path_exact: Option<&str>| FileCategory {
+        id: id.to_owned(),
+        parser: ParserKind::Script,
+        resolution: FileResolutionPolicy::Merge,
+        matcher: FileMatcher {
+            path_prefix: path_prefix.map(str::to_owned),
+            path_exact: path_exact.map(str::to_owned),
+            extensions: vec!["txt".to_owned()],
+            path_suffix: None,
+            path_exclude_prefixes: Vec::new(),
+            case_sensitive: false,
+        },
+    };
+    let rules = RulesModel {
+        file_categories: vec![
+            category("script", None, None),
+            category("common-root", Some("common"), None),
+            category("common-technology", None, Some("common/technology.txt")),
+        ],
+        ..RulesModel::default()
+    };
+    let path = LogicalPath::parse("common/technology.txt").expect("path");
+    assert_eq!(
+        rules.classify(&path).map(|item| item.id.as_str()),
+        Some("common-technology")
+    );
 }
 
 #[test]
@@ -105,6 +164,26 @@ fn profile_scan_root_depth_can_limit_directories_without_affecting_other_roots()
     assert!(!profile.allows_scan_file("map/unknown.txt"));
     assert!(!profile.allows_scan_file("map/lakes/unknown.txt"));
     assert!(!profile.allows_scan_file("map/random/area.txt"));
+}
+
+#[test]
+fn profile_shape_matching_ignores_extensions_but_keeps_common_whitelist() {
+    let mut profile = GameProfile::empty("test");
+    profile.scan_roots = vec!["common".to_owned(), "interface".to_owned()];
+    profile.scan_root_max_depths.insert("common".to_owned(), 0);
+    profile
+        .scan_root_max_depths
+        .insert("interface".to_owned(), 0);
+    profile
+        .scan_root_files
+        .insert("common".to_owned(), vec!["technology.txt".to_owned()]);
+
+    assert!(profile.allows_profile_path("common/technology.txt"));
+    assert!(!profile.allows_profile_path("common/unknown.txt"));
+    assert!(!profile.allows_profile_path("common/nested/file.txt"));
+    assert!(profile.allows_profile_path("interface/window.gui"));
+    assert!(profile.rejects_unlisted_root_file("common/unknown.txt"));
+    assert!(!profile.rejects_unlisted_root_file("common/nested/file.txt"));
 }
 
 #[test]

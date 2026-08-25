@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 
 /// Current version of the developer-maintained source layout.
-pub const SOURCE_FORMAT_VERSION: u32 = 7;
+pub const SOURCE_FORMAT_VERSION: u32 = 8;
 
 const SOURCE_MANIFEST: &str = "manifest.json";
 const CATALOG: &str = "catalog.json";
@@ -786,7 +786,7 @@ mod tests {
         let expected: ArtifactManifest =
             read_json(&root.join("rules/manifest.json")).expect("committed manifest");
         let (_, source_model) = load_source(&root.join("rules/eu4")).expect("source model");
-        assert_eq!(source_model.semantic.localisation_bindings.len(), 190);
+        assert_eq!(source_model.semantic.localisation_bindings.len(), 187);
         let quoted_script_rules = source_model
             .semantic
             .rules

@@ -2272,6 +2272,65 @@ fn vanilla_leader_names_and_custom_idea_metadata_are_not_false_symbols() {
 }
 
 #[test]
+fn common_alerts_and_units_display_use_path_specific_semantics() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+
+    let alerts = DocumentId::new("file:///tmp/common/alerts.txt");
+    host.open_document(
+        alerts.clone(),
+        1,
+        "sound = { HIGH = new_alert MEDIUM = new_alert LOW = new_alert }\nicon = { HIGH = GFX_alerticon_banner }\nalerts = { alert_bankrupt = { category = HIGH } }\n"
+            .to_owned(),
+        Some(std::path::PathBuf::from("/tmp/common/alerts.txt")),
+    )
+    .expect("open alerts");
+    let alert_diagnostics = diagnostics(&host.snapshot(), &alerts);
+    assert!(
+        alert_diagnostics.iter().all(|diagnostic| {
+            diagnostic.code != DiagnosticCode::UnknownKey
+                && diagnostic.code != DiagnosticCode::UnknownBareValue
+        }),
+        "valid alert declarations must use the alerts rule contexts: {alert_diagnostics:?}"
+    );
+
+    let units = DocumentId::new("file:///tmp/common/units_display/test.txt");
+    host.open_document(
+        units.clone(),
+        1,
+        "cavalry = { factor = 1 modifier = { factor = 3 OR = { always = yes } } modifier = { factor = 2 has_country_flag = MUG_more_chance_for_elephants_flag } }\n".to_owned(),
+        Some(std::path::PathBuf::from(
+            "/tmp/common/units_display/test.txt",
+        )),
+    )
+    .expect("open units display");
+    let unit_diagnostics = diagnostics(&host.snapshot(), &units);
+    assert!(
+        unit_diagnostics.iter().all(|diagnostic| {
+            diagnostic.code != DiagnosticCode::UnknownKey
+                && diagnostic.code != DiagnosticCode::UnknownBareValue
+        }),
+        "unit display factors and trigger clauses must use the path-specific rules: {unit_diagnostics:?}"
+    );
+
+    let lucky = DocumentId::new("file:///tmp/common/historial_lucky.txt");
+    host.open_document(
+        lucky.clone(),
+        1,
+        "CAS = { NOT = { exists = SPA } is_year = 1700 }\n".to_owned(),
+        Some(std::path::PathBuf::from("/tmp/common/historial_lucky.txt")),
+    )
+    .expect("open historial lucky");
+    let lucky_diagnostics = diagnostics(&host.snapshot(), &lucky);
+    assert!(
+        lucky_diagnostics.iter().all(|diagnostic| {
+            diagnostic.code != DiagnosticCode::UnknownKey
+                && diagnostic.code != DiagnosticCode::UnknownBareValue
+        }),
+        "lucky-country trigger blocks must use the trigger context: {lucky_diagnostics:?}"
+    );
+}
+
+#[test]
 fn type_per_file_rules_validate_the_document_root_once() {
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(

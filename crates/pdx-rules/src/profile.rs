@@ -460,16 +460,29 @@ impl GameProfile {
         })
     }
 
-    /// Returns whether a logical file path belongs to the directory and extension whitelists.
+    /// Returns whether a logical file path has an allowed root, relative path, and directory
+    /// depth. This deliberately ignores the extension whitelist so parser selection can still
+    /// recognize formats such as `.gui` that are not part of the source-index scan set.
     #[must_use]
-    pub fn allows_scan_file(&self, logical_path: &str) -> bool {
-        let allowed_by_root = self.scan_roots.iter().any(|root| {
+    pub fn allows_profile_path(&self, logical_path: &str) -> bool {
+        self.scan_roots
+            .iter()
+            .any(|root| self.allows_profile_path_in_root(root, logical_path))
+    }
+
+    /// Returns whether a path is a direct file below a root with an explicit filename whitelist
+    /// and is not one of those filenames. This is used by parser selection to prevent a generic
+    /// extension fallback from reopening an otherwise closed root while preserving the generic
+    /// parser behavior for documents supplied through a prefixed editor URI.
+    #[must_use]
+    pub fn rejects_unlisted_root_file(&self, logical_path: &str) -> bool {
+        self.scan_roots.iter().any(|root| {
+            let Some(allowed_files) = self.scan_root_files(root) else {
+                return false;
+            };
             let remainder = if root.is_empty() {
                 logical_path
             } else {
-                if logical_path == root {
-                    return false;
-                }
                 let Some(remainder) = logical_path
                     .strip_prefix(root)
                     .and_then(|remainder| remainder.strip_prefix('/'))
@@ -478,24 +491,52 @@ impl GameProfile {
                 };
                 remainder
             };
-            let components = remainder
-                .split('/')
-                .filter(|component| !component.is_empty());
-            let components = components.collect::<Vec<_>>();
-            if components.is_empty() {
-                return false;
-            }
-            let directory_depth = components.len().saturating_sub(1);
-            if self.scan_root_files(root).is_some_and(|allowed_files| {
-                !allowed_files
+            !remainder.is_empty()
+                && !remainder.contains('/')
+                && !allowed_files
                     .iter()
                     .any(|allowed| allowed.eq_ignore_ascii_case(remainder))
-            }) {
+        })
+    }
+
+    fn allows_profile_path_in_root(&self, root: &str, logical_path: &str) -> bool {
+        let remainder = if root.is_empty() {
+            logical_path
+        } else {
+            if logical_path == root {
                 return false;
             }
-            self.scan_root_max_depth(root)
-                .is_none_or(|max_depth| directory_depth <= max_depth)
-        });
+            let Some(remainder) = logical_path
+                .strip_prefix(root)
+                .and_then(|remainder| remainder.strip_prefix('/'))
+            else {
+                return false;
+            };
+            remainder
+        };
+        let components = remainder
+            .split('/')
+            .filter(|component| !component.is_empty())
+            .collect::<Vec<_>>();
+        if components.is_empty() {
+            return false;
+        }
+        let directory_depth = components.len().saturating_sub(1);
+        if self.scan_root_files(root).is_some_and(|allowed_files| {
+            !allowed_files
+                .iter()
+                .any(|allowed| allowed.eq_ignore_ascii_case(remainder))
+        }) {
+            return false;
+        }
+        self.scan_root_max_depth(root)
+            .is_none_or(|max_depth| directory_depth <= max_depth)
+    }
+
+    /// Returns whether a logical file path belongs to the directory and extension whitelists.
+    #[must_use]
+    pub fn allows_scan_file(&self, logical_path: &str) -> bool {
+        let allowed_by_root = self.allows_profile_path(logical_path);
         if !allowed_by_root || self.scan_extensions.is_empty() {
             return allowed_by_root;
         }

@@ -386,23 +386,12 @@ pub struct RulesModel {
 }
 
 impl RulesModel {
-    /// Returns the first matching category in stable catalog order.
+    /// Returns the most specific matching category in stable catalog order.
     #[must_use]
     pub fn classify(&self, path: &LogicalPath) -> Option<&FileCategory> {
         self.file_categories
             .iter()
             .filter(|category| category.matcher.matches(path))
-            .max_by_key(|category| {
-                category
-                    .matcher
-                    .path_prefix
-                    .as_ref()
-                    .map_or(0, |prefix| prefix.len())
-                    + category
-                        .matcher
-                        .path_suffix
-                        .as_ref()
-                        .map_or(0, |suffix| suffix.len())
-            })
+            .max_by_key(|category| category.matcher.specificity())
     }
 }

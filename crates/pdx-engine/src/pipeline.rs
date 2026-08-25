@@ -60,6 +60,7 @@ pub(crate) fn parse_source(
 
 fn parser_for_document(
     rules: &RuleSet,
+    profile: &GameProfile,
     roots: &[SourceRoot],
     id: &DocumentId,
     path: Option<&Path>,
@@ -79,6 +80,12 @@ fn parser_for_document(
                 .next_back()
                 .and_then(|name| LogicalPath::parse(name).ok())
         });
+    if logical
+        .as_ref()
+        .is_some_and(|path| profile.rejects_unlisted_root_file(path.as_str()))
+    {
+        return None;
+    }
     if let Some(category) = logical.as_ref().and_then(|path| rules.classify(path)) {
         return Some((category.parser.clone(), logical));
     }
@@ -107,16 +114,22 @@ pub(crate) fn prepare_document_snapshot(
     roots: &[SourceRoot],
     mut document: DocumentSnapshot,
 ) -> DocumentSnapshot {
-    let (parsed, hir) = parser_for_document(rules, roots, &document.id, document.path.as_deref())
-        .map_or((None, None), |(parser, logical_path)| {
-            parse_source(
-                &parser,
-                &document.text,
-                logical_path.as_ref(),
-                rules,
-                profile,
-            )
-        });
+    let (parsed, hir) = parser_for_document(
+        rules,
+        profile,
+        roots,
+        &document.id,
+        document.path.as_deref(),
+    )
+    .map_or((None, None), |(parser, logical_path)| {
+        parse_source(
+            &parser,
+            &document.text,
+            logical_path.as_ref(),
+            rules,
+            profile,
+        )
+    });
     document.parsed = parsed;
     document.hir = hir;
     document
@@ -798,4 +811,83 @@ fn find_property(node: &CstNode, wanted: &str, parsed: &ParsedFile) -> Option<St
     node.children()
         .iter()
         .find_map(|child| find_property(child, wanted, parsed))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{SourceRootId, SourceRootKind};
+    use pdx_rules::{FileCategory, FileMatcher, FileResolutionPolicy, RulesModel};
+
+    fn strict_common_profile() -> GameProfile {
+        let mut profile = GameProfile::empty("test");
+        profile.scan_roots = vec!["common".to_owned()];
+        profile.scan_root_max_depths.insert("common".to_owned(), 0);
+        profile
+            .scan_root_files
+            .insert("common".to_owned(), vec!["technology.txt".to_owned()]);
+        profile
+    }
+
+    fn generic_script_rules() -> RuleSet {
+        RuleSet::from_model(RulesModel {
+            game_id: "test".to_owned(),
+            file_categories: vec![FileCategory {
+                id: "script".to_owned(),
+                parser: ParserKind::Script,
+                resolution: FileResolutionPolicy::ReplaceByRelativePath,
+                matcher: FileMatcher {
+                    path_prefix: None,
+                    path_exact: None,
+                    extensions: vec!["txt".to_owned()],
+                    path_suffix: None,
+                    path_exclude_prefixes: Vec::new(),
+                    case_sensitive: false,
+                },
+            }],
+            ..RulesModel::default()
+        })
+    }
+
+    #[test]
+    fn strict_profile_prevents_generic_script_fallback_under_common() {
+        let root = SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::CurrentMod,
+            PathBuf::from("C:/fixture"),
+        );
+        let profile = strict_common_profile();
+        let rules = generic_script_rules();
+        let unknown = unparsed_document(
+            DocumentId::new("file:///fixture/common/unknown.txt"),
+            None,
+            "unknown = yes".to_owned(),
+            DocumentSource::Disk,
+            Some(root.path.join("common/unknown.txt")),
+        );
+        let prepared = prepare_document_snapshot(&rules, &profile, &[root], unknown);
+        assert!(prepared.parsed.is_none());
+        assert!(prepared.hir.is_none());
+    }
+
+    #[test]
+    fn strict_profile_keeps_an_exact_common_file_parseable() {
+        let root = SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::CurrentMod,
+            PathBuf::from("C:/fixture"),
+        );
+        let profile = strict_common_profile();
+        let rules = generic_script_rules();
+        let known = unparsed_document(
+            DocumentId::new("file:///fixture/common/technology.txt"),
+            None,
+            "technology_group = { adm_tech = 1 }".to_owned(),
+            DocumentSource::Disk,
+            Some(root.path.join("common/technology.txt")),
+        );
+        let prepared = prepare_document_snapshot(&rules, &profile, &[root], known);
+        assert!(prepared.parsed.is_some());
+        assert!(prepared.hir.is_some());
+    }
 }
