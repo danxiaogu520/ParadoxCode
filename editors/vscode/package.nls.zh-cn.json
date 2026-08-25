@@ -7,7 +7,7 @@
   "walkthrough.trustWorkspace.title": "信任 Mod 工作区",
   "walkthrough.trustWorkspace.description": "ParadoxCode 只会在受信任的工作区运行语言服务器。选择[信任此工作区](command:workbench.trust.manage)，然后回到这里。",
   "walkthrough.openMod.title": "打开 Mod 文件夹",
-  "walkthrough.openMod.description": "用[打开文件夹](command:workbench.action.files.openFolder)打开包含 Mod 的 common、events、decisions、history 或 missions 目录的文件夹。不需要先创建项目配置文件。",
+  "walkthrough.openMod.description": "用[打开文件夹](command:workbench.action.files.openFolder)打开包含 Mod 的 common、events、decisions、history、missions 或 localisation 目录的文件夹。不需要先创建项目配置文件。",
   "walkthrough.prepareServer.title": "等待 ParadoxCode 准备 pdx-ls",
   "walkthrough.prepareServer.description": "扩展会自动下载并校验匹配版本的 pdx-ls。等待状态栏出现 PDX ●。如果一直是 ○，可重试[安装或更新 pdx-ls](command:paradoxcode.installServer)，或查看[输出](command:paradoxcode.openOutput)。",
   "walkthrough.vanillaData.title": "启用 Vanilla 符号",

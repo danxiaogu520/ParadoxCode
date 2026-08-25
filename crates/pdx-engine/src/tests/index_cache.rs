@@ -382,12 +382,12 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
     let root = std::env::temp_dir().join(format!("pdx-engine-vanilla-cache-{nonce}"));
     let vanilla = root.join("vanilla");
     let current = root.join("current");
-    fs::create_dir_all(vanilla.join("common/events")).expect("Vanilla fixture directory");
+    fs::create_dir_all(vanilla.join("events")).expect("Vanilla fixture directory");
     fs::create_dir_all(vanilla.join("localisation/nested/deeper"))
         .expect("Vanilla localisation fixture directory");
-    fs::create_dir_all(current.join("common/events")).expect("current fixture directory");
+    fs::create_dir_all(current.join("events")).expect("current fixture directory");
     fs::write(
-        vanilla.join("common/events/definitions.txt"),
+        vanilla.join("events/definitions.txt"),
         "country_event = { id = shared.1 }\ncountry_event = { id = vanilla.1 }\n",
     )
     .expect("Vanilla definitions");
@@ -397,7 +397,7 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
     )
     .expect("Vanilla localisation");
     fs::write(
-        current.join("common/events/definitions.txt"),
+        current.join("events/definitions.txt"),
         "country_event = { id = shared.1 }\n",
     )
     .expect("current definition");

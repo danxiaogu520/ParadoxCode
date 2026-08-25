@@ -50,7 +50,7 @@ Install **ParadoxCode - EU4 Language Tools** from the
 
 1. Open (or create) a workspace and **trust** it.
 2. Open a file from an EU4 Mod — e.g. `common/`, `events/`, `decisions/`, `missions/`,
-   `history/`, `interface/`.
+   `history/`, `interface/`, or any file below `localisation/` (including nested files).
 3. On first use the extension downloads the matching `pdx-ls` release for your platform,
    verifies its SHA-256 checksum, caches it, and starts it automatically. No language-server
    configuration is required.
@@ -66,6 +66,10 @@ The Zed extension is developed in this repository (`editors/zed`) and awaits rev
 [`zed-industries/extensions`](https://github.com/zed-industries/extensions) registry. Until it is
 listed there, install it as a dev extension pointing at a checkout of this repository
 (`editors/zed`). Recommended language settings are in `editors/zed/recommended-settings.json`.
+They associate every file under `localisation/` (recursively) with the separate `Localisation`
+language while keeping the profile's configured EU4 script directories on the `Europa Universalis IV`
+language. Script directories are matched only at their configured directory level; `map` uses
+fixed vanilla/reference-mod file names, and `localisation/` is the only recursive source tree.
 
 ### pdx-ls standalone
 

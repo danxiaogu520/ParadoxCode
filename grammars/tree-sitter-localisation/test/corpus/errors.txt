@@ -1,0 +1,22 @@
+==================
+Incomplete localisation string
+==================
+l_english:
+broken:0 "unterminated
+next:0 "still parsed"
+---
+
+(source_file
+  (language_header
+    (language_identifier))
+  (newline)
+  (entry
+    (localisation_key)
+    (version)
+    (localisation_string
+      (MISSING """)))
+  (newline)
+  (entry
+    (localisation_key)
+    (version)
+    (localisation_string)))

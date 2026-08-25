@@ -60,11 +60,11 @@ fn symbol_hover_explains_active_and_shadowed_source_roots() {
     let root = std::env::temp_dir().join(format!("pdx-analysis-hover-sources-{nonce}"));
     let vanilla = root.join("vanilla");
     let current = root.join("current");
-    fs::create_dir_all(vanilla.join("common/events")).expect("Vanilla directory");
-    fs::create_dir_all(current.join("common/events")).expect("current directory");
+    fs::create_dir_all(vanilla.join("events")).expect("Vanilla directory");
+    fs::create_dir_all(current.join("events")).expect("current directory");
     for source_root in [&vanilla, &current] {
         fs::write(
-            source_root.join("common/events/definitions.txt"),
+            source_root.join("events/definitions.txt"),
             "country_event = { id = shared.1 }\n",
         )
         .expect("event definition");

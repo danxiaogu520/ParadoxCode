@@ -8,13 +8,16 @@ trap 'rm -r -- "$tree_sitter_home"' EXIT
 mkdir -p "$tree_sitter_config"
 
 for grammar in \
-    "$root/grammars/tree-sitter-eu4"; do
+    "$root/grammars/tree-sitter-eu4" \
+    "$root/grammars/tree-sitter-localisation"; do
     (
         cd "$grammar"
         if [[ -x "$grammar/node_modules/.bin/tree-sitter" ]]; then
             tree_sitter="$grammar/node_modules/.bin/tree-sitter"
         elif [[ -x "$root/grammars/tree-sitter-eu4/node_modules/.bin/tree-sitter" ]]; then
             tree_sitter="$root/grammars/tree-sitter-eu4/node_modules/.bin/tree-sitter"
+        elif [[ -x "$root/grammars/tree-sitter-localisation/node_modules/.bin/tree-sitter" ]]; then
+            tree_sitter="$root/grammars/tree-sitter-localisation/node_modules/.bin/tree-sitter"
         else
             npm ci --no-audit --no-fund
             tree_sitter="$grammar/node_modules/.bin/tree-sitter"

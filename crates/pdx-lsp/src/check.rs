@@ -81,6 +81,7 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
     results.push(requires_file("editors/vscode/package.json"));
     results.push(requires_file("editors/vscode/package-lock.json"));
     results.push(requires_dir("grammars/tree-sitter-eu4"));
+    results.push(requires_dir("grammars/tree-sitter-localisation"));
     results.push(requires_dir("fuzz"));
     results.push(requires_file(".githooks/pre-commit"));
 
@@ -297,6 +298,20 @@ pub fn check_project_policy(root: &Path) -> Vec<CheckResult> {
             "Zed description must identify the extension as unofficial",
         ));
     }
+    if let Ok(languages) = read_toml_value::<Vec<String>>(
+        root.join("editors/zed/extension.toml"),
+        &["language_servers", "pdx-ls", "languages"],
+    ) {
+        results.push(check(
+            languages
+                == [
+                    "Europa Universalis IV".to_owned(),
+                    "Localisation".to_owned(),
+                ],
+            "Zed language-server bindings",
+            "pdx-ls must serve both Europa Universalis IV and Localisation",
+        ));
+    }
 
     // Server distribution contract.
     if root.join("editors/zed/server-distribution.json").is_file() {
@@ -389,16 +404,40 @@ pub fn check_zed_extension(root: &Path) -> Vec<CheckResult> {
     }
 
     let grammar_root = root.join("grammars");
-    let languages = [(
-        "eu4",
-        "tree-sitter-eu4",
-        "test/corpus/eu4.txt",
-        &["highlights.scm", "brackets.scm", "indents.scm"][..],
-    )];
+    let languages = [
+        (
+            "eu4",
+            "tree-sitter-eu4",
+            "Europa Universalis IV",
+            "test/corpus/eu4.txt",
+            &["highlights.scm", "brackets.scm", "indents.scm"][..],
+        ),
+        (
+            "localisation",
+            "tree-sitter-localisation",
+            "Localisation",
+            "test/corpus/localisation.txt",
+            &["highlights.scm", "outline.scm"][..],
+        ),
+    ];
 
-    for (lang_dir_name, grammar_dir_name, sample_relative, query_names) in languages {
+    for (lang_dir_name, grammar_dir_name, language_name, sample_relative, query_names) in languages
+    {
         let lang_dir = ext_dir.join("languages").join(lang_dir_name);
         let grammar_path = grammar_root.join(grammar_dir_name);
+
+        if let Ok(name) = read_toml_value::<String>(lang_dir.join("config.toml"), &["name"]) {
+            results.push(if name == language_name {
+                CheckResult::pass(format!("{lang_dir_name}: language name"))
+            } else {
+                CheckResult::fail(
+                    format!("{lang_dir_name}: language name"),
+                    format!(
+                        "{lang_dir_name}: expected language name {language_name}, found {name}"
+                    ),
+                )
+            });
+        }
 
         results.push(check(
             grammar_path.join("grammar.js").is_file(),
@@ -480,11 +519,218 @@ pub fn check_zed_extension(root: &Path) -> Vec<CheckResult> {
             .and_then(|v| v.as_object())
             .map(|obj| obj.keys().cloned().collect())
             .unwrap_or_default();
-        let expected: BTreeSet<String> = ["Europa Universalis IV".to_owned()].into_iter().collect();
+        let expected: BTreeSet<String> = [
+            "Europa Universalis IV".to_owned(),
+            "Localisation".to_owned(),
+        ]
+        .into_iter()
+        .collect();
         results.push(check(
             file_types == expected,
             "recommended settings",
             "recommended settings are incomplete",
+        ));
+        let expected_eu4_patterns: BTreeSet<String> = [
+            "common/achievements.txt",
+            "common/alerts.txt",
+            "common/graphicalculturetype.txt",
+            "common/historial_lucky.txt",
+            "common/technology.txt",
+            "common/advisortypes/*.txt",
+            "common/ages/*.txt",
+            "common/ai_army/*.txt",
+            "common/ai_attitudes/*.txt",
+            "common/ai_personalities/*.txt",
+            "common/ancestor_personalities/*.txt",
+            "common/bookmarks/*.txt",
+            "common/buildings/*.txt",
+            "common/cb_types/*.txt",
+            "common/centers_of_trade/*.txt",
+            "common/church_aspects/*.txt",
+            "common/client_states/*.txt",
+            "common/colonial_regions/*.txt",
+            "common/countries/*.txt",
+            "common/country_colors/*.txt",
+            "common/country_tags/*.txt",
+            "common/cultures/*.txt",
+            "common/custom_country_colors/*.txt",
+            "common/custom_gui/*.txt",
+            "common/custom_ideas/*.txt",
+            "common/decrees/*.txt",
+            "common/defender_of_faith/*.txt",
+            "common/defines/*.txt",
+            "common/diplomatic_actions/*.txt",
+            "common/disasters/*.txt",
+            "common/dynasty_colors/*.txt",
+            "common/estate_agendas/*.txt",
+            "common/estate_crown_land/*.txt",
+            "common/estate_privileges/*.txt",
+            "common/estates/*.txt",
+            "common/estates_preload/*.txt",
+            "common/event_modifiers/*.txt",
+            "common/factions/*.txt",
+            "common/federation_advancements/*.txt",
+            "common/fervor/*.txt",
+            "common/fetishist_cults/*.txt",
+            "common/flagship_modifications/*.txt",
+            "common/golden_bulls/*.txt",
+            "common/government_mechanics/*.txt",
+            "common/government_names/*.txt",
+            "common/government_ranks/*.txt",
+            "common/government_reforms/*.txt",
+            "common/governments/*.txt",
+            "common/great_projects/*.txt",
+            "common/hegemons/*.txt",
+            "common/holy_orders/*.txt",
+            "common/ideas/*.txt",
+            "common/imperial_incidents/*.txt",
+            "common/imperial_reforms/*.txt",
+            "common/incidents/*.txt",
+            "common/institutions/*.txt",
+            "common/insults/*.txt",
+            "common/isolationism/*.txt",
+            "common/leader_personalities/*.txt",
+            "common/mercenary_companies/*.txt",
+            "common/natives/*.txt",
+            "common/naval_doctrines/*.txt",
+            "common/new_diplomatic_actions/*.txt",
+            "common/on_actions/*.txt",
+            "common/opinion_modifiers/*.txt",
+            "common/parliament_bribes/*.txt",
+            "common/parliament_issues/*.txt",
+            "common/peace_treaties/*.txt",
+            "common/personal_deities/*.txt",
+            "common/policies/*.txt",
+            "common/powerprojection/*.txt",
+            "common/prices/*.txt",
+            "common/professionalism/*.txt",
+            "common/province_names/*.txt",
+            "common/province_triggered_modifiers/*.txt",
+            "common/rebel_types/*.txt",
+            "common/region_colors/*.txt",
+            "common/religions/*.txt",
+            "common/religious_conversions/*.txt",
+            "common/religious_reforms/*.txt",
+            "common/revolt_triggers/*.txt",
+            "common/revolution/*.txt",
+            "common/ruler_personalities/*.txt",
+            "common/scripted_effects/*.txt",
+            "common/scripted_functions/*.txt",
+            "common/scripted_triggers/*.txt",
+            "common/state_edicts/*.txt",
+            "common/static_modifiers/*.txt",
+            "common/subject_type_upgrades/*.txt",
+            "common/subject_types/*.txt",
+            "common/technologies/*.txt",
+            "common/timed_modifiers/*.txt",
+            "common/trade_companies/*.txt",
+            "common/tradecompany_investments/*.txt",
+            "common/tradegoods/*.txt",
+            "common/tradenodes/*.txt",
+            "common/trading_policies/*.txt",
+            "common/triggered_modifiers/*.txt",
+            "common/units/*.txt",
+            "common/units_display/*.txt",
+            "common/wargoal_types/*.txt",
+            "customizable_localization/*.txt",
+            "decisions/*.txt",
+            "events/*.txt",
+            "hints/*.txt",
+            "history/advisors/*.txt",
+            "history/countries/*.txt",
+            "history/diplomacy/*.txt",
+            "history/provinces/*.txt",
+            "history/wars/*.txt",
+            "map/ambient_object.txt",
+            "map/area.txt",
+            "map/climate.txt",
+            "map/continent.txt",
+            "map/lakes/00_lakes.txt",
+            "map/positions.txt",
+            "map/provincegroup.txt",
+            "map/random/RNWScenarios.txt",
+            "map/random/RandomLakeNames.txt",
+            "map/random/RandomLandNames.txt",
+            "map/random/RandomSeaNames.txt",
+            "map/region.txt",
+            "map/seasons.txt",
+            "map/superregion.txt",
+            "map/terrain.txt",
+            "map/trade_winds.txt",
+            "music/*.txt",
+            "missions/*.txt",
+            "sound/*.txt",
+            "sound/amb/*.txt",
+            "sound/battle/*.txt",
+            "sound/battle/naval/*.txt",
+            "tutorial/*.txt",
+            "gfx/*.txt",
+            "gfx/combat_result/*.txt",
+            "gfx/sprite_packs/*.txt",
+            "gfx/sprite_packs_order/*.txt",
+            "interface/*.txt",
+            "interface/*.gui",
+            "interface/*.gfx",
+            "interface/assets/*.gfx",
+            "interface/government_mechanics/*.txt",
+            "interface/government_mechanics/*.gui",
+            "interface/government_mechanics/*.gfx",
+            "interface/state_view/*.txt",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+        let eu4_patterns: BTreeSet<String> = settings
+            .get("file_types")
+            .and_then(|v| v.get("Europa Universalis IV"))
+            .and_then(serde_json::Value::as_array)
+            .map(|patterns| {
+                patterns
+                    .iter()
+                    .filter_map(serde_json::Value::as_str)
+                    .map(str::to_owned)
+                    .collect()
+            })
+            .unwrap_or_default();
+        results.push(check(
+            expected_eu4_patterns.is_subset(&eu4_patterns),
+            "EU4 profile file associations",
+            "recommended settings do not cover every configured EU4 source directory",
+        ));
+        let unexpected_common_patterns = eu4_patterns.iter().any(|pattern| {
+            pattern.starts_with("common/") && !expected_eu4_patterns.contains(pattern)
+        });
+        results.push(check(
+            !unexpected_common_patterns,
+            "fixed common file associations",
+            "recommended settings contain an unconfigured common file pattern",
+        ));
+        results.push(check(
+            !eu4_patterns.contains("common/*.txt") && !eu4_patterns.contains("common/**/*.txt"),
+            "bounded common file associations",
+            "recommended settings must use the fixed common file whitelist",
+        ));
+        let recursive_script_patterns = eu4_patterns.iter().any(|pattern| pattern.contains("/**"));
+        results.push(check(
+            !recursive_script_patterns,
+            "bounded EU4 script associations",
+            "recommended settings must not recursively associate EU4 script directories",
+        ));
+        let localisation_patterns = settings
+            .get("file_types")
+            .and_then(|v| v.get("Localisation"))
+            .and_then(serde_json::Value::as_array)
+            .map(|patterns| {
+                patterns
+                    .iter()
+                    .filter_map(serde_json::Value::as_str)
+                    .any(|pattern| pattern == "localisation/**/*")
+            })
+            .unwrap_or(false);
+        results.push(check(
+            localisation_patterns,
+            "localisation recursive file association",
+            "Localisation must claim localisation/**/* recursively",
         ));
     }
 
@@ -783,12 +1029,19 @@ pub fn check_release_artifact(root: &Path) -> Vec<CheckResult> {
 
 /// Single-character deletion fuzz test for grammar corpora.
 pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
+    ["tree-sitter-eu4", "tree-sitter-localisation"]
+        .into_iter()
+        .flat_map(|grammar_name| check_one_grammar_fuzz(root, grammar_name))
+        .collect()
+}
+
+fn check_one_grammar_fuzz(root: &Path, grammar_name: &str) -> Vec<CheckResult> {
     let mut results = Vec::new();
-    let grammar_root = root.join("grammars/tree-sitter-eu4");
+    let grammar_root = root.join("grammars").join(grammar_name);
     if !grammar_root.is_dir() {
         results.push(CheckResult::fail(
-            "grammar fuzz",
-            "grammars/tree-sitter-eu4 missing",
+            format!("{grammar_name} grammar fuzz"),
+            format!("grammars/{grammar_name} missing"),
         ));
         return results;
     }
@@ -797,7 +1050,7 @@ pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
         Some(cli) => cli,
         None => {
             results.push(CheckResult::fail(
-                "grammar fuzz",
+                format!("{grammar_name} grammar fuzz"),
                 "tree-sitter CLI not found",
             ));
             return results;
@@ -807,7 +1060,7 @@ pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
     let corpus_dir = grammar_root.join("test/corpus");
     if !corpus_dir.is_dir() {
         results.push(CheckResult::fail(
-            "grammar fuzz",
+            format!("{grammar_name} grammar fuzz"),
             "corpus directory missing",
         ));
         return results;
@@ -819,7 +1072,7 @@ pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
 
     let Ok(entries) = fs::read_dir(&corpus_dir) else {
         results.push(CheckResult::fail(
-            "grammar fuzz",
+            format!("{grammar_name} grammar fuzz"),
             "cannot read corpus directory",
         ));
         return results;
@@ -869,7 +1122,7 @@ pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
             std::env::temp_dir().join(format!("pdx-grammar-fuzz-{}-{}", std::process::id(), nonce));
         if fs::create_dir_all(&temp_dir).is_err() {
             results.push(CheckResult::fail(
-                "grammar fuzz",
+                format!("{grammar_name} grammar fuzz"),
                 "cannot create temp directory",
             ));
             return results;
@@ -906,7 +1159,7 @@ pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
             Ok(out) => {
                 if out.status.code().is_some_and(|code| code > 1) {
                     results.push(CheckResult::fail(
-                        "grammar fuzz",
+                        format!("{grammar_name} grammar fuzz"),
                         format!(
                             "parser process failed with exit {}:\n{}",
                             out.status.code().unwrap_or(-1),
@@ -923,7 +1176,7 @@ pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
                 .to_lowercase();
                 if crash_markers.iter().any(|marker| combined.contains(marker)) {
                     results.push(CheckResult::fail(
-                        "grammar fuzz",
+                        format!("{grammar_name} grammar fuzz"),
                         "parser crash marker found in output",
                     ));
                     return results;
@@ -931,7 +1184,7 @@ pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
             }
             Err(error) => {
                 results.push(CheckResult::fail(
-                    "grammar fuzz",
+                    format!("{grammar_name} grammar fuzz"),
                     format!("cannot run tree-sitter: {error}"),
                 ));
                 return results;
@@ -940,7 +1193,7 @@ pub fn check_grammar_fuzz(root: &Path) -> Vec<CheckResult> {
     }
 
     results.push(CheckResult::pass(format!(
-        "grammar fuzz: {total} single-char deletions"
+        "{grammar_name} grammar fuzz: {total} single-char deletions"
     )));
     results
 }
@@ -1058,8 +1311,10 @@ fn read_toml_value<T: for<'de> serde::Deserialize<'de>>(
 fn find_tree_sitter(grammar_root: &Path) -> Option<String> {
     // Check local node_modules first.
     for candidate in [
-        grammar_root.join("tree-sitter-eu4/node_modules/.bin/tree-sitter"),
         grammar_root.join("tree-sitter-eu4/node_modules/.bin/tree-sitter.cmd"),
+        grammar_root.join("tree-sitter-eu4/node_modules/.bin/tree-sitter"),
+        grammar_root.join("tree-sitter-localisation/node_modules/.bin/tree-sitter.cmd"),
+        grammar_root.join("tree-sitter-localisation/node_modules/.bin/tree-sitter"),
     ] {
         if candidate.is_file() {
             return Some(candidate.to_string_lossy().into_owned());

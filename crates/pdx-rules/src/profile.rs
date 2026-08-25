@@ -227,6 +227,17 @@ pub struct GameProfile {
     /// An empty whitelist means that the profile does not authorize disk discovery. This keeps
     /// the generic engine conservative until a game profile supplies its resource roots.
     pub scan_roots: Vec<String>,
+    /// Optional maximum number of directory levels below each scan root.
+    ///
+    /// A missing entry keeps the root recursive. A value of `0` authorizes only files directly
+    /// inside that root, while larger values authorize that many nested directory levels.
+    pub scan_root_max_depths: BTreeMap<String, usize>,
+    /// Optional exact relative-file-path whitelist for a scan root.
+    ///
+    /// Entries are relative to the root and use `/` separators. When a root has an entry here,
+    /// only those exact paths are accepted. This supports fixed nested paths such as EU4's
+    /// `map/lakes/00_lakes.txt` without falling back to an unbounded recursive glob.
+    pub scan_root_files: BTreeMap<String, Vec<String>>,
     /// Optional file-extension whitelist used after directory discovery.
     ///
     /// Entries omit the leading dot and are compared case-insensitively. An empty list keeps
@@ -292,6 +303,8 @@ impl GameProfile {
             game_id: game_id.into(),
             source_encoding: SourceEncoding::Utf8,
             scan_roots: Vec::new(),
+            scan_root_max_depths: BTreeMap::new(),
+            scan_root_files: BTreeMap::new(),
             scan_extensions: Vec::new(),
             definitions: Vec::new(),
             references: Vec::new(),
@@ -417,6 +430,18 @@ impl GameProfile {
         &self.scan_roots
     }
 
+    /// Returns the optional maximum directory depth for one scan root.
+    #[must_use]
+    pub fn scan_root_max_depth(&self, root: &str) -> Option<usize> {
+        self.scan_root_max_depths.get(root).copied()
+    }
+
+    /// Returns the optional exact relative-file-path whitelist for one scan root.
+    #[must_use]
+    pub fn scan_root_files(&self, root: &str) -> Option<&[String]> {
+        self.scan_root_files.get(root).map(Vec::as_slice)
+    }
+
     /// Returns the optional file-extension whitelist used during source discovery.
     #[must_use]
     pub fn scan_extensions(&self) -> &[String] {
@@ -438,8 +463,41 @@ impl GameProfile {
     /// Returns whether a logical file path belongs to the directory and extension whitelists.
     #[must_use]
     pub fn allows_scan_file(&self, logical_path: &str) -> bool {
-        if !self.allows_scan_path(logical_path) || self.scan_extensions.is_empty() {
-            return self.allows_scan_path(logical_path);
+        let allowed_by_root = self.scan_roots.iter().any(|root| {
+            let remainder = if root.is_empty() {
+                logical_path
+            } else {
+                if logical_path == root {
+                    return false;
+                }
+                let Some(remainder) = logical_path
+                    .strip_prefix(root)
+                    .and_then(|remainder| remainder.strip_prefix('/'))
+                else {
+                    return false;
+                };
+                remainder
+            };
+            let components = remainder
+                .split('/')
+                .filter(|component| !component.is_empty());
+            let components = components.collect::<Vec<_>>();
+            if components.is_empty() {
+                return false;
+            }
+            let directory_depth = components.len().saturating_sub(1);
+            if self.scan_root_files(root).is_some_and(|allowed_files| {
+                !allowed_files
+                    .iter()
+                    .any(|allowed| allowed.eq_ignore_ascii_case(remainder))
+            }) {
+                return false;
+            }
+            self.scan_root_max_depth(root)
+                .is_none_or(|max_depth| directory_depth <= max_depth)
+        });
+        if !allowed_by_root || self.scan_extensions.is_empty() {
+            return allowed_by_root;
         }
         let Some(extension) = logical_path
             .rsplit('/')

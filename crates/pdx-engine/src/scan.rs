@@ -67,7 +67,25 @@ pub(crate) fn collect_whitelisted_files(
                 || scan_root
                     .as_str()
                     .strip_prefix(parent.as_str())
-                    .is_some_and(|remainder| remainder.starts_with('/'))
+                    .is_some_and(|remainder| {
+                        let Some(remainder) = remainder.strip_prefix('/') else {
+                            return false;
+                        };
+                        let distance = remainder
+                            .split('/')
+                            .filter(|component| !component.is_empty())
+                            .count();
+                        match (
+                            profile.scan_root_max_depth(parent.as_str()),
+                            profile.scan_root_max_depth(scan_root.as_str()),
+                        ) {
+                            (None, _) => true,
+                            (Some(parent_max_depth), Some(child_max_depth)) => {
+                                parent_max_depth >= distance.saturating_add(child_max_depth)
+                            }
+                            (Some(_), None) => false,
+                        }
+                    })
         }) {
             continue;
         }
@@ -135,7 +153,14 @@ pub(crate) fn collect_whitelisted_files(
         if !metadata.is_dir() {
             continue;
         }
-        collect_disk_files(root, &current, depth, &mut scan)?;
+        collect_disk_files(
+            root,
+            &current,
+            depth,
+            depth,
+            profile.scan_root_max_depth(scan_root.as_str()),
+            &mut scan,
+        )?;
     }
     Ok(())
 }
@@ -153,6 +178,8 @@ fn collect_disk_files(
     root: &std::path::Path,
     current: &std::path::Path,
     depth: usize,
+    root_depth: usize,
+    root_max_relative_depth: Option<usize>,
     scan: &mut DiskScanContext<'_>,
 ) -> Result<(), WorkspaceError> {
     scan.cancellation.checkpoint()?;
@@ -213,6 +240,10 @@ fn collect_disk_files(
             continue;
         }
         if file_type.is_dir() {
+            let relative_depth = depth.saturating_sub(root_depth);
+            if root_max_relative_depth.is_some_and(|max_depth| relative_depth >= max_depth) {
+                continue;
+            }
             if ignored_workspace_directory(&entry.file_name()) {
                 continue;
             }
@@ -229,7 +260,14 @@ fn collect_disk_files(
                 );
                 continue;
             }
-            collect_disk_files(root, &path, depth + 1, scan)?;
+            collect_disk_files(
+                root,
+                &path,
+                depth + 1,
+                root_depth,
+                root_max_relative_depth,
+                scan,
+            )?;
             continue;
         }
         if !file_type.is_file() {

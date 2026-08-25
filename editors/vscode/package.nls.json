@@ -7,7 +7,7 @@
   "walkthrough.trustWorkspace.title": "Trust the Mod workspace",
   "walkthrough.trustWorkspace.description": "ParadoxCode runs the language server only in a trusted workspace. Choose [Trust this workspace](command:workbench.trust.manage), then return here.",
   "walkthrough.openMod.title": "Open your Mod folder",
-  "walkthrough.openMod.description": "Open the folder that contains your Mod's common, events, decisions, history, or missions directories with [Open Folder](command:workbench.action.files.openFolder). You do not need to create a project file first.",
+  "walkthrough.openMod.description": "Open the folder that contains your Mod's common, events, decisions, history, missions, or localisation directories with [Open Folder](command:workbench.action.files.openFolder). You do not need to create a project file first.",
   "walkthrough.prepareServer.title": "Let ParadoxCode prepare pdx-ls",
   "walkthrough.prepareServer.description": "The extension downloads and checksum-verifies the matching pdx-ls release automatically. Wait for the PDX ● status item. If it stays ○, retry [Install or Update pdx-ls](command:paradoxcode.installServer) or inspect [Output](command:paradoxcode.openOutput).",
   "walkthrough.vanillaData.title": "Enable Vanilla symbols",

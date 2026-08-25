@@ -80,7 +80,7 @@ fn mission_preview_returns_renderer_ready_tree_data() {
     let input = frames([
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"rootUri":root_uri,"capabilities":{}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":format!("{root_uri}/localisation/titles_l_english.yml"),"languageId":"eu4","version":1,"text":"l_english:\n a1_title:0 \"Alpha One\"\n a2_title:0 \"Alpha Two\"\n"}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":format!("{root_uri}/localisation/titles_l_english.yml"),"languageId":"Localisation","version":1,"text":"l_english:\n a1_title:0 \"Alpha One\"\n a2_title:0 \"Alpha Two\"\n"}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"pdx/missionPreview","params":{"path":"missions/test.txt","uri":format!("{root_uri}/missions/test.txt"),"version":7,"text":"main_tree = {\n\tslot = 1\n\ta1 = { position = 1 icon = mission_alpha }\n\ta2 = { position = 2 required_missions = { a1 } }\n}\n\nbranch_tree = {\n\tslot = 2\n\tb1 = { position = 1 required_missions = { external_id } }\n}\n"}}),
         json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -956,8 +956,8 @@ fn memory_transport_formats_safe_text_and_refuses_recovered_syntax() {
 fn memory_transport_rename_covers_current_mod_disk_references() {
     let nonce = std::process::id();
     let root = std::env::temp_dir().join(format!("pdx-lsp-rename-{nonce}"));
-    let target_path = root.join("common/events/target.txt");
-    let references_path = root.join("common/events/references.txt");
+    let target_path = root.join("events/target.txt");
+    let references_path = root.join("events/references.txt");
     fs::create_dir_all(target_path.parent().expect("target parent")).expect("directories");
     fs::write(&target_path, "country_event = { id = cross.1 }\n").expect("target");
     fs::write(&references_path, "event = cross.1\n").expect("reference");
