@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 use crate::resolution::*;
@@ -282,6 +283,35 @@ fn merge_completion_item(best: &mut CompletionItem, other: &CompletionItem) {
     }
 }
 
+/// Compares labels using case-insensitive lexical order, preferring the lowercase spelling when
+/// two labels differ only by ASCII case (`a < A < b < B`).
+pub(crate) fn completion_label_cmp(left: &str, right: &str) -> Ordering {
+    left.to_ascii_lowercase()
+        .cmp(&right.to_ascii_lowercase())
+        .then_with(|| {
+            left.as_bytes()
+                .iter()
+                .zip(right.as_bytes())
+                .find_map(|(&left_byte, &right_byte)| {
+                    if left_byte == right_byte {
+                        return None;
+                    }
+                    if left_byte.is_ascii_lowercase()
+                        && left_byte.to_ascii_uppercase() == right_byte
+                    {
+                        Some(Ordering::Less)
+                    } else if left_byte.is_ascii_uppercase()
+                        && left_byte.to_ascii_lowercase() == right_byte
+                    {
+                        Some(Ordering::Greater)
+                    } else {
+                        Some(left_byte.cmp(&right_byte))
+                    }
+                })
+                .unwrap_or_else(|| left.len().cmp(&right.len()))
+        })
+}
+
 /// Selects the best evidence for duplicate labels, sorts deterministically, and materializes the
 /// editor-neutral DTOs.  Deduplication happens before sorting because the same label can be
 /// emitted by multiple semantic rules with different ranks.
@@ -313,13 +343,7 @@ pub(crate) fn finalize_completion_items(
     candidates.sort_by(|left, right| {
         left.rank
             .cmp(&right.rank)
-            .then_with(|| {
-                left.item
-                    .label
-                    .to_ascii_lowercase()
-                    .cmp(&right.item.label.to_ascii_lowercase())
-            })
-            .then_with(|| left.item.label.cmp(&right.item.label))
+            .then_with(|| completion_label_cmp(&left.item.label, &right.item.label))
             .then_with(|| left.item.kind.cmp(&right.item.kind))
             .then_with(|| left.item.detail.cmp(&right.item.detail))
             .then_with(|| left.item.insert_text.cmp(&right.item.insert_text))
@@ -331,4 +355,16 @@ pub(crate) fn finalize_completion_items(
             candidate.item
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::completion_label_cmp;
+
+    #[test]
+    fn completion_labels_prefer_lowercase_when_case_insensitive_names_tie() {
+        let mut labels = vec!["B", "a", "A", "b"];
+        labels.sort_by(|left, right| completion_label_cmp(left, right));
+        assert_eq!(labels, ["a", "A", "b", "B"]);
+    }
 }
