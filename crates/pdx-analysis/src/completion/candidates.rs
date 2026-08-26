@@ -257,146 +257,6 @@ pub(crate) fn add_semantic_key_items(
     items.extend(finalize_completion_items(ranked));
 }
 
-/// Adds the profile's file-level entry keys when no rule-backed container covers the cursor.
-///
-/// This is the only completion source at the document root of a still-empty file (for example
-/// EU4 decision files before the `country_decisions` wrapper exists). Single-instance entries
-/// already declared at the document root are skipped; repeatable block entries stay available
-/// so the next instance (such as another `country_event`) can be scaffolded.
-pub(crate) fn add_file_root_entry_items(
-    snapshot: &AnalysisSnapshot,
-    input: &crate::support::ParsedInput,
-    items: &mut Vec<RankedCompletionItem>,
-    replacement_range: TextRange,
-    prefix: &str,
-    cancellation: &crate::CancellationToken,
-) -> Result<(), crate::Cancelled> {
-    let Some(path) = input.path.as_ref() else {
-        return Ok(());
-    };
-    let entries = &snapshot.game_profile().file_root_entries;
-    if entries.is_empty() {
-        return Ok(());
-    }
-    let ParsedContent::Text(parsed) = &input.parsed;
-    let declared = crate::support::script_properties(input, parsed.root());
-    for entry in entries {
-        cancellation.checkpoint()?;
-        if !entry.path.matches(path.as_str())
-            || (!entry.repeatable
-                && declared
-                    .iter()
-                    .any(|property| property.key.eq_ignore_ascii_case(&entry.key)))
-            || !completion_matches(&entry.key, prefix)
-        {
-            continue;
-        }
-        let insert_text = match entry.shape {
-            pdx_rules::ProfileRootEntryShape::Node => format!("{} = {{\n\t$0\n}}", entry.key),
-            pdx_rules::ProfileRootEntryShape::Leaf => format!("{} = ", entry.key),
-        };
-        push_completion(
-            items,
-            CompletionItem {
-                label: entry.key.clone(),
-                kind: CompletionKind::Key,
-                detail: entry
-                    .detail
-                    .clone()
-                    .unwrap_or_else(|| "file entry".to_owned()),
-                documentation: None,
-                replacement_range,
-                insert_text,
-                sort_score: 0,
-                deprecated: false,
-                resolve_data: None,
-            },
-            prefix,
-            CompletionRankContext::new(
-                CompletionSchemaTier::CurrentContext,
-                CompletionSpecificity::Exact,
-                false,
-                false,
-            ),
-        );
-    }
-    Ok(())
-}
-
-/// Adds value candidates for a file-level leaf entry once `key = ` is already typed.
-///
-/// Location-aware: only the entry whose key prefixes the current line is consulted, so
-/// `normal_or_historical_nations = ` offers its `yes`/`no` domain without touching other
-/// roots.
-pub(crate) fn add_file_root_entry_value_items(
-    snapshot: &AnalysisSnapshot,
-    input: &crate::support::ParsedInput,
-    items: &mut Vec<RankedCompletionItem>,
-    replacement_range: TextRange,
-    position: u32,
-    prefix: &str,
-    cancellation: &crate::CancellationToken,
-) -> Result<(), crate::Cancelled> {
-    let Some(path) = input.path.as_ref() else {
-        return Ok(());
-    };
-    let Some(key) = line_property_key(&input.source, position) else {
-        return Ok(());
-    };
-    for entry in &snapshot.game_profile().file_root_entries {
-        cancellation.checkpoint()?;
-        if !entry.path.matches(path.as_str())
-            || !entry.key.eq_ignore_ascii_case(&key)
-            || entry.values.is_empty()
-        {
-            continue;
-        }
-        for value in &entry.values {
-            if !completion_matches(value, prefix) {
-                continue;
-            }
-            push_completion(
-                items,
-                CompletionItem {
-                    label: value.clone(),
-                    kind: CompletionKind::EnumMember,
-                    detail: entry
-                        .detail
-                        .clone()
-                        .unwrap_or_else(|| "file entry".to_owned()),
-                    documentation: None,
-                    replacement_range,
-                    insert_text: value.clone(),
-                    sort_score: 0,
-                    deprecated: false,
-                    resolve_data: None,
-                },
-                prefix,
-                CompletionRankContext::new(
-                    CompletionSchemaTier::CurrentContext,
-                    CompletionSpecificity::Enum,
-                    false,
-                    false,
-                ),
-            );
-        }
-    }
-    Ok(())
-}
-
-/// Returns the key of an unfinished `key = …` property on the cursor's line.
-fn line_property_key(source: &str, position: u32) -> Option<String> {
-    let position = usize::try_from(position).ok()?.min(source.len());
-    let line_start = source[..position].rfind('\n').map_or(0, |index| index + 1);
-    let line = &source[line_start..position];
-    let equals = line.rfind('=')?;
-    let key = line[..equals].trim_end();
-    let key = key
-        .rsplit(|character: char| !character.is_alphanumeric() && character != '_')
-        .next()?;
-    (!key.is_empty()).then(|| key.to_owned())
-}
-
 pub(crate) fn add_semantic_key_items_ranked(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
@@ -409,6 +269,18 @@ pub(crate) fn add_semantic_key_items_ranked(
     for candidate in semantic_rules_for_completion(snapshot, context) {
         let rule = candidate.rule;
         if !semantic_scope_allows(rule, candidate.scope) {
+            continue;
+        }
+        // The file-root entry scaffold is the only container that suppresses single-instance
+        // keys already declared at the document root; ordinary containers keep offering
+        // declared keys so users can repeat or edit them.
+        if context.root_entry_container
+            && rule.max_occurs == Some(1)
+            && context
+                .existing_keys
+                .iter()
+                .any(|key| semantic_rule_key_matches(snapshot, rule, candidate.parent_path, key))
+        {
             continue;
         }
         let documentation = (!rule.documentation.is_empty()).then(|| rule.documentation.join("\n"));
@@ -1146,6 +1018,7 @@ pub(crate) fn add_inferred_macro_value_items(
             quoted_depth: context.quoted_depth,
             embedded_value_context: context.embedded_value_context,
             wrapper_container: false,
+            root_entry_container: false,
         };
         let mut site_items = Vec::new();
         for matcher in &site.matchers {

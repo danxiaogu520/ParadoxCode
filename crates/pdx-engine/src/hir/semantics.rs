@@ -244,7 +244,9 @@ pub(super) fn semantic_type_root_key_allowed(
     roots.iter().any(|root| root.eq_ignore_ascii_case(key))
 }
 
-fn semantic_type_path_matches(
+/// Returns whether a descriptor's path/file/extension selectors match a logical path.
+#[must_use]
+pub fn semantic_type_path_matches(
     descriptor: &TypeDescriptor,
     logical_path: Option<&LogicalPath>,
 ) -> bool {

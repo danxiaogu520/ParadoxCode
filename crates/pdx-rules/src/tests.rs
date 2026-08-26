@@ -320,6 +320,34 @@ fn canonical_hash_includes_scripted_macro_metadata() {
 }
 
 #[test]
+fn canonical_hash_includes_root_entries_metadata() {
+    let mut first = RulesModel {
+        game_id: "test-game".to_owned(),
+        ..RulesModel::default()
+    };
+    first.semantic.type_descriptors.insert(
+        "entry_type".to_owned(),
+        TypeDescriptor {
+            name: "entry_type".to_owned(),
+            root_entries: Some("file_entries".to_owned()),
+            ..TypeDescriptor::default()
+        },
+    );
+    let mut second = first.clone();
+    second
+        .semantic
+        .type_descriptors
+        .get_mut("entry_type")
+        .expect("entry descriptor")
+        .root_entries = None;
+
+    assert_ne!(
+        RuleSet::from_model(first).rule_hash(),
+        RuleSet::from_model(second).rule_hash()
+    );
+}
+
+#[test]
 fn canonical_hash_includes_game_profile_data() {
     let mut first = RulesModel {
         game_id: "test-game".to_owned(),

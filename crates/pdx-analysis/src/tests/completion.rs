@@ -1784,6 +1784,7 @@ fn scope_value_completion_offers_intrinsics_links_and_chains() {
         quoted_depth: 0,
         embedded_value_context: None,
         wrapper_container: false,
+        root_entry_container: false,
     };
     let labels = crate::scope_expression_candidates(&snapshot, &context, Some("province"))
         .into_iter()
@@ -2595,6 +2596,64 @@ fn if_block_key_completion_still_offers_limit_clause() {
             .iter()
             .map(|item| item.label.as_str())
             .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn file_root_scaffolds_use_rule_backed_entry_containers() {
+    use std::path::PathBuf;
+
+    // An empty decisions file resolves to the rule-backed `root:decision_entries` container
+    // rather than a profile side table.
+    let mut decision_host =
+        eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let decision_id = DocumentId::new("file:///tmp/decisions/entry-context.txt");
+    decision_host
+        .open_document(
+            decision_id.clone(),
+            1,
+            "\n".to_owned(),
+            Some(PathBuf::from("decisions/entry-context.txt")),
+        )
+        .expect("open decision document");
+    let snapshot = decision_host.snapshot();
+    let input = input_for_document(&snapshot, &decision_id).expect("decision input");
+    let context =
+        semantic_completion_context(&snapshot, &input, 0).expect("decision entry context");
+    assert_eq!(context.context, "root:decision_entries");
+    assert!(context.parent_path.is_empty());
+
+    // An empty events file resolves to `root:event_entries` with all four entries scaffolded
+    // by ordinary semantic rules (blocks get skeletons, leaves the bare assignment).
+    let mut event_host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let event_id = DocumentId::new("file:///tmp/events/entry-context.txt");
+    event_host
+        .open_document(
+            event_id.clone(),
+            1,
+            "\n".to_owned(),
+            Some(PathBuf::from("events/entry-context.txt")),
+        )
+        .expect("open event document");
+    let snapshot = event_host.snapshot();
+    let input = input_for_document(&snapshot, &event_id).expect("event input");
+    let context = semantic_completion_context(&snapshot, &input, 0).expect("event entry context");
+    assert_eq!(context.context, "root:event_entries");
+    assert!(context.parent_path.is_empty());
+    let result = complete(&snapshot, &event_id, 0);
+    let by_label = |label: &str| result.items.iter().find(|item| item.label == label);
+    assert_eq!(
+        by_label("country_event")
+            .expect("country_event")
+            .insert_text,
+        "country_event = {\n\t$0\n}",
+        "block entries must keep the rule-backed skeleton"
+    );
+    assert_eq!(
+        by_label("normal_or_historical_nations")
+            .expect("normal_or_historical_nations")
+            .insert_text,
+        "normal_or_historical_nations = "
     );
 }
 
