@@ -526,6 +526,9 @@ fn is_completion_constraint(matcher: &ValueMatcher) -> bool {
     !matches!(
         matcher,
         ValueMatcher::AnyScalar
+            | ValueMatcher::Int { .. }
+            | ValueMatcher::Float { .. }
+            | ValueMatcher::Date
             | ValueMatcher::DynamicSet(_)
             | ValueMatcher::Filepath
             | ValueMatcher::Opaque(_)

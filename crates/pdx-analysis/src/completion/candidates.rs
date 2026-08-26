@@ -429,31 +429,9 @@ pub(crate) fn add_semantic_key_items_ranked(
                     );
                 }
             }
-            KeyMatcher::Date => {
-                push_completion(
-                    items,
-                    CompletionItem {
-                        label: "1444.11.11".to_owned(),
-                        kind: CompletionKind::Key,
-                        detail: "date".to_owned(),
-                        documentation: documentation.clone(),
-                        replacement_range,
-                        insert_text: key_insert_text(rule, "1444.11.11", insert_assignment),
-                        sort_score: 0,
-                        deprecated: rule.deprecated,
-                        resolve_data: Some(format!("rule:{}", rule.id)),
-                    },
-                    prefix,
-                    rule_rank_context(
-                        snapshot,
-                        context,
-                        &candidate,
-                        CompletionSpecificity::Fallback,
-                    ),
-                );
-            }
-            // AnyScalar keys accept arbitrary spellings and carry no member information.
-            KeyMatcher::AnyScalar => {}
+            // Open-ended keys accept arbitrary spellings and carry no member information. Date
+            // keys are validated as a shape, but a fixed sample date is not a useful candidate.
+            KeyMatcher::AnyScalar | KeyMatcher::Date => {}
         }
     }
 }
@@ -592,56 +570,13 @@ fn add_leaf_value_member_items(
                 );
             }
         }
-        ValueMatcher::Int { min, max } => {
-            add_numeric_completion_ranked(
-                items,
-                min.map(|value| value.to_string()).as_deref(),
-                "int",
-                documentation.clone(),
-                replacement_range,
-                prefix,
-                rule.deprecated,
-                schema_tier,
-            );
-            add_numeric_completion_ranked(
-                items,
-                max.map(|value| value.to_string()).as_deref(),
-                "int",
-                documentation.clone(),
-                replacement_range,
-                prefix,
-                rule.deprecated,
-                schema_tier,
-            );
-        }
-        ValueMatcher::Float { min, max } => {
-            add_value_completion_ranked(
-                items,
-                min.as_deref().or(max.as_deref()).unwrap_or("0"),
-                "float",
-                documentation.clone(),
-                replacement_range,
-                prefix,
-                rule.deprecated,
-                schema_tier,
-                CompletionSpecificity::Value,
-            );
-        }
-        ValueMatcher::Date => {
-            add_value_completion_ranked(
-                items,
-                "1444.11.11",
-                "date",
-                documentation,
-                replacement_range,
-                prefix,
-                rule.deprecated,
-                schema_tier,
-                CompletionSpecificity::Value,
-            );
-        }
-        // AnyScalar, DynamicSet, Filepath, Opaque, and Scope carry no member information.
-        ValueMatcher::AnyScalar
+        // Numeric and date matchers describe open-ended syntax/ranges, not finite candidate sets.
+        // AnyScalar, DynamicSet, Filepath, Opaque, and Scope likewise carry no member
+        // information.
+        ValueMatcher::Int { .. }
+        | ValueMatcher::Float { .. }
+        | ValueMatcher::Date
+        | ValueMatcher::AnyScalar
         | ValueMatcher::DynamicSet(_)
         | ValueMatcher::Filepath
         | ValueMatcher::Opaque(_)
@@ -750,78 +685,9 @@ pub(crate) fn add_semantic_value_items(
                     CompletionSpecificity::Value,
                 );
             }
-            ValueMatcher::Int { min, max } => {
-                add_numeric_completion_ranked(
-                    items,
-                    min.map(|value| value.to_string()).as_deref(),
-                    "int",
-                    documentation.clone(),
-                    replacement_range,
-                    prefix,
-                    rule.deprecated,
-                    candidate.schema_tier,
-                );
-                add_numeric_completion_ranked(
-                    items,
-                    max.map(|value| value.to_string()).as_deref(),
-                    "int",
-                    documentation.clone(),
-                    replacement_range,
-                    prefix,
-                    rule.deprecated,
-                    candidate.schema_tier,
-                );
-            }
-            ValueMatcher::Date => {
-                add_value_completion_ranked(
-                    items,
-                    "1444.11.11",
-                    "date",
-                    documentation.clone(),
-                    replacement_range,
-                    prefix,
-                    rule.deprecated,
-                    candidate.schema_tier,
-                    CompletionSpecificity::Value,
-                );
-            }
-            ValueMatcher::Float { min, max } => {
-                add_value_completion_ranked(
-                    items,
-                    "0",
-                    "float",
-                    documentation.clone(),
-                    replacement_range,
-                    prefix,
-                    rule.deprecated,
-                    candidate.schema_tier,
-                    CompletionSpecificity::Value,
-                );
-                if min.is_some() || max.is_some() {
-                    add_value_completion_ranked(
-                        items,
-                        min.as_deref().unwrap_or("1"),
-                        "float",
-                        documentation.clone(),
-                        replacement_range,
-                        prefix,
-                        rule.deprecated,
-                        candidate.schema_tier,
-                        CompletionSpecificity::Value,
-                    );
-                    add_value_completion_ranked(
-                        items,
-                        max.as_deref().unwrap_or("1"),
-                        "float",
-                        documentation.clone(),
-                        replacement_range,
-                        prefix,
-                        rule.deprecated,
-                        candidate.schema_tier,
-                        CompletionSpecificity::Value,
-                    );
-                }
-            }
+            // Numeric and date matchers describe open-ended syntax/ranges, not finite candidate
+            // sets. Their constraints remain available to diagnostics and hover.
+            ValueMatcher::Int { .. } | ValueMatcher::Float { .. } | ValueMatcher::Date => {}
             ValueMatcher::Type(type_name) => {
                 for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
                     add_value_completion_ranked(
@@ -950,19 +816,6 @@ pub(crate) fn add_semantic_value_items(
                         prefix,
                         rule.deprecated,
                         candidate.schema_tier,
-                    );
-                }
-                if matches!(kind.as_str(), "variable" | "value") {
-                    add_value_completion_ranked(
-                        items,
-                        "$0",
-                        kind,
-                        documentation.clone(),
-                        replacement_range,
-                        prefix,
-                        rule.deprecated,
-                        candidate.schema_tier,
-                        CompletionSpecificity::Fallback,
                     );
                 }
             }
@@ -1098,67 +951,9 @@ fn add_inferred_matcher_items(
                 );
             }
         }
-        ValueMatcher::Int { min, max } => {
-            add_numeric_completion_ranked(
-                items,
-                min.map(|value| value.to_string()).as_deref(),
-                "int",
-                None,
-                replacement_range,
-                prefix,
-                false,
-                CompletionSchemaTier::MacroInferred,
-            );
-            add_numeric_completion_ranked(
-                items,
-                max.map(|value| value.to_string()).as_deref(),
-                "int",
-                None,
-                replacement_range,
-                prefix,
-                false,
-                CompletionSchemaTier::MacroInferred,
-            );
-        }
-        ValueMatcher::Float { min, max } => {
-            add_value_completion_ranked(
-                items,
-                "0",
-                "float",
-                None,
-                replacement_range,
-                prefix,
-                false,
-                CompletionSchemaTier::MacroInferred,
-                CompletionSpecificity::Value,
-            );
-            if min.is_some() || max.is_some() {
-                for label in [min.as_deref().unwrap_or("1"), max.as_deref().unwrap_or("1")] {
-                    add_value_completion_ranked(
-                        items,
-                        label,
-                        "float",
-                        None,
-                        replacement_range,
-                        prefix,
-                        false,
-                        CompletionSchemaTier::MacroInferred,
-                        CompletionSpecificity::Value,
-                    );
-                }
-            }
-        }
-        ValueMatcher::Date => add_value_completion_ranked(
-            items,
-            "1444.11.11",
-            "date",
-            None,
-            replacement_range,
-            prefix,
-            false,
-            CompletionSchemaTier::MacroInferred,
-            CompletionSpecificity::Value,
-        ),
+        // Numeric and date matchers are open-ended; do not turn their constraints into arbitrary
+        // completion values.
+        ValueMatcher::Int { .. } | ValueMatcher::Float { .. } | ValueMatcher::Date => {}
         ValueMatcher::Type(type_name) => {
             for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
                 add_value_completion_ranked(
@@ -1230,19 +1025,6 @@ fn add_inferred_matcher_items(
                     false,
                     CompletionSchemaTier::MacroInferred,
                     CompletionSpecificity::Dynamic,
-                );
-            }
-            if matches!(kind.as_str(), "variable" | "value") {
-                add_value_completion_ranked(
-                    items,
-                    "$0",
-                    kind,
-                    None,
-                    replacement_range,
-                    prefix,
-                    false,
-                    CompletionSchemaTier::MacroInferred,
-                    CompletionSpecificity::Fallback,
                 );
             }
         }
@@ -1529,32 +1311,6 @@ fn add_localisation_value_completion_ranked(
             deprecated,
         ),
     );
-}
-
-#[expect(clippy::too_many_arguments)]
-fn add_numeric_completion_ranked(
-    items: &mut Vec<RankedCompletionItem>,
-    label: Option<&str>,
-    detail: &str,
-    documentation: Option<String>,
-    replacement_range: TextRange,
-    prefix: &str,
-    deprecated: bool,
-    schema_tier: CompletionSchemaTier,
-) {
-    if let Some(label) = label {
-        add_value_completion_ranked(
-            items,
-            label,
-            detail,
-            documentation,
-            replacement_range,
-            prefix,
-            deprecated,
-            schema_tier,
-            CompletionSpecificity::Value,
-        );
-    }
 }
 
 /// Short detail for a rule-backed key: the semantic context the rule belongs to. `effect` and
