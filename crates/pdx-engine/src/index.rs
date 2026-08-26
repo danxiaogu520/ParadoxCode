@@ -6,7 +6,426 @@ use pdx_rules::{RuleSet, SymbolResolutionPolicy};
 use pdx_text::{PositionRange, TextRange};
 
 use crate::hir::MacroTemplate;
-use crate::model::{SourceFileId, WorkspaceError, WorkspaceScanToken};
+use crate::model::{LocalisationPreview, SourceFileId, WorkspaceError, WorkspaceScanToken};
+
+/// Compact, file-grouped UTF-16 positions for indexed ranges.
+///
+/// A flat `BTreeMap<(SourceFileId, TextRange), PositionRange>` needs one tree node for every
+/// definition and reference.  EU4's Vanilla index contains millions of those entries, so the
+/// node allocator overhead is larger than the position payload itself.  Grouping by file keeps
+/// the same deterministic lookup semantics while storing only one vector allocation per file.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct PositionMap {
+    by_file: BTreeMap<SourceFileId, Vec<(TextRange, PositionRange)>>,
+    len: usize,
+}
+
+impl PositionMap {
+    /// Creates an empty position map.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Returns the number of indexed ranges.
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Returns whether no indexed ranges are retained.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Looks up one file/range pair.
+    #[must_use]
+    pub fn get<K>(&self, key: K) -> Option<&PositionRange>
+    where
+        K: std::borrow::Borrow<(SourceFileId, TextRange)>,
+    {
+        let key = key.borrow();
+        let entries = self.by_file.get(&key.0)?;
+        let index = entries
+            .binary_search_by_key(&key.1, |(range, _)| *range)
+            .ok()?;
+        entries.get(index).map(|(_, position)| position)
+    }
+
+    /// Iterates in stable `(file_id, range)` order.
+    pub fn iter(&self) -> PositionMapIter<'_> {
+        PositionMapIter {
+            outer: self.by_file.iter(),
+            current_file: None,
+            current: None,
+        }
+    }
+
+    /// Replaces all entries belonging to one file.
+    pub fn replace_file(
+        &mut self,
+        file_id: SourceFileId,
+        entries: impl IntoIterator<Item = (TextRange, PositionRange)>,
+    ) {
+        self.remove_file(file_id);
+        let entries = sort_position_entries(entries.into_iter().collect::<Vec<_>>());
+        if entries.is_empty() {
+            return;
+        }
+        self.len = self.len.saturating_add(entries.len());
+        self.by_file.insert(file_id, entries);
+    }
+
+    /// Merges entries, replacing an existing value with the later value for a duplicate range.
+    pub fn extend(
+        &mut self,
+        entries: impl IntoIterator<Item = ((SourceFileId, TextRange), PositionRange)>,
+    ) {
+        let mut grouped = BTreeMap::<SourceFileId, Vec<(TextRange, PositionRange)>>::new();
+        for ((file_id, range), position) in entries {
+            grouped.entry(file_id).or_default().push((range, position));
+        }
+        self.merge_grouped(grouped);
+    }
+
+    /// Merges another map without flattening its already grouped vectors.
+    pub fn merge(&mut self, other: Self) {
+        self.merge_grouped(other.by_file);
+    }
+
+    fn merge_grouped(&mut self, grouped: BTreeMap<SourceFileId, Vec<(TextRange, PositionRange)>>) {
+        for (file_id, additions) in grouped {
+            let mut merged = self.by_file.remove(&file_id).unwrap_or_default();
+            merged.extend(additions);
+            let merged = sort_position_entries(merged);
+            self.by_file.insert(file_id, merged);
+        }
+        self.recount_len();
+    }
+
+    /// Replaces the complete map from a deterministic iterator.
+    pub fn from_entries(
+        entries: impl IntoIterator<Item = ((SourceFileId, TextRange), PositionRange)>,
+    ) -> Self {
+        let mut grouped = BTreeMap::<SourceFileId, Vec<(TextRange, PositionRange)>>::new();
+        for ((file_id, range), position) in entries {
+            grouped.entry(file_id).or_default().push((range, position));
+        }
+        Self::from_grouped(grouped)
+    }
+
+    /// Builds a map from already file-grouped entries without another intermediate grouping.
+    pub(crate) fn from_grouped(
+        grouped: BTreeMap<SourceFileId, Vec<(TextRange, PositionRange)>>,
+    ) -> Self {
+        let mut map = Self {
+            by_file: BTreeMap::new(),
+            len: 0,
+        };
+        for (file_id, entries) in grouped {
+            let entries = sort_position_entries(entries);
+            map.len = map.len.saturating_add(entries.len());
+            if !entries.is_empty() {
+                map.by_file.insert(file_id, entries);
+            }
+        }
+        map
+    }
+
+    /// Removes all entries belonging to one file.
+    pub fn remove_file(&mut self, file_id: SourceFileId) {
+        if let Some(entries) = self.by_file.remove(&file_id) {
+            self.len = self.len.saturating_sub(entries.len());
+        }
+    }
+
+    /// Retains files satisfying `keep`.
+    pub fn retain_files(&mut self, mut keep: impl FnMut(SourceFileId) -> bool) {
+        let removed = self
+            .by_file
+            .keys()
+            .copied()
+            .filter(|file_id| !keep(*file_id))
+            .collect::<Vec<_>>();
+        for file_id in removed {
+            self.remove_file(file_id);
+        }
+    }
+
+    fn recount_len(&mut self) {
+        self.len = self.by_file.values().map(Vec::len).sum();
+    }
+}
+
+impl From<BTreeMap<(SourceFileId, TextRange), PositionRange>> for PositionMap {
+    fn from(entries: BTreeMap<(SourceFileId, TextRange), PositionRange>) -> Self {
+        Self::from_entries(entries)
+    }
+}
+
+impl<'map> IntoIterator for &'map PositionMap {
+    type Item = ((SourceFileId, TextRange), &'map PositionRange);
+    type IntoIter = PositionMapIter<'map>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+/// Iterator returned by [`PositionMap::iter`].
+pub struct PositionMapIter<'map> {
+    outer: std::collections::btree_map::Iter<'map, SourceFileId, Vec<(TextRange, PositionRange)>>,
+    current_file: Option<SourceFileId>,
+    current: Option<std::slice::Iter<'map, (TextRange, PositionRange)>>,
+}
+
+impl<'map> Iterator for PositionMapIter<'map> {
+    type Item = ((SourceFileId, TextRange), &'map PositionRange);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let (Some(file_id), Some(entries)) = (self.current_file, self.current.as_mut())
+                && let Some((range, position)) = entries.next()
+            {
+                return Some(((file_id, *range), position));
+            }
+            let (file_id, entries) = self.outer.next()?;
+            self.current_file = Some(*file_id);
+            self.current = Some(entries.iter());
+        }
+    }
+}
+
+/// Compact, file-grouped localisation previews for cache-backed hover results.
+///
+/// A flat `BTreeMap<(SourceFileId, TextRange), LocalisationPreview>` stores one tree entry for
+/// every localisation line. Grouping ranges by file keeps lookup deterministic while avoiding
+/// the per-entry tree-node overhead for the hundreds of thousands of Vanilla previews.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct LocalisationPreviewMap {
+    by_file: BTreeMap<SourceFileId, Vec<(TextRange, LocalisationPreview)>>,
+    len: usize,
+}
+
+impl LocalisationPreviewMap {
+    /// Creates an empty preview map.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Returns the number of retained previews.
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Returns whether no previews are retained.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Looks up one file/range pair.
+    #[must_use]
+    pub fn get<K>(&self, key: K) -> Option<&LocalisationPreview>
+    where
+        K: std::borrow::Borrow<(SourceFileId, TextRange)>,
+    {
+        let key = key.borrow();
+        let entries = self.by_file.get(&key.0)?;
+        let index = entries
+            .binary_search_by_key(&key.1, |(range, _)| *range)
+            .ok()?;
+        entries.get(index).map(|(_, preview)| preview)
+    }
+
+    /// Iterates in stable `(file_id, range)` order.
+    pub fn iter(&self) -> LocalisationPreviewMapIter<'_> {
+        LocalisationPreviewMapIter {
+            outer: self.by_file.iter(),
+            current_file: None,
+            current: None,
+        }
+    }
+
+    /// Replaces all previews belonging to one file.
+    pub fn replace_file(
+        &mut self,
+        file_id: SourceFileId,
+        entries: impl IntoIterator<Item = (TextRange, LocalisationPreview)>,
+    ) {
+        self.remove_file(file_id);
+        let entries = sort_preview_entries(entries.into_iter().collect::<Vec<_>>());
+        if entries.is_empty() {
+            return;
+        }
+        self.len = self.len.saturating_add(entries.len());
+        self.by_file.insert(file_id, entries);
+    }
+
+    /// Merges entries, replacing an existing value with the later value for a duplicate range.
+    pub fn extend(
+        &mut self,
+        entries: impl IntoIterator<Item = ((SourceFileId, TextRange), LocalisationPreview)>,
+    ) {
+        let mut grouped = BTreeMap::<SourceFileId, Vec<(TextRange, LocalisationPreview)>>::new();
+        for ((file_id, range), preview) in entries {
+            grouped.entry(file_id).or_default().push((range, preview));
+        }
+        self.merge_grouped(grouped);
+    }
+
+    /// Merges another map without flattening its already grouped vectors.
+    pub fn merge(&mut self, other: Self) {
+        self.merge_grouped(other.by_file);
+    }
+
+    fn merge_grouped(
+        &mut self,
+        grouped: BTreeMap<SourceFileId, Vec<(TextRange, LocalisationPreview)>>,
+    ) {
+        for (file_id, additions) in grouped {
+            let mut merged = self.by_file.remove(&file_id).unwrap_or_default();
+            merged.extend(additions);
+            let merged = sort_preview_entries(merged);
+            self.by_file.insert(file_id, merged);
+        }
+        self.recount_len();
+    }
+
+    /// Builds a map from a deterministic iterator.
+    #[must_use]
+    pub fn from_entries(
+        entries: impl IntoIterator<Item = ((SourceFileId, TextRange), LocalisationPreview)>,
+    ) -> Self {
+        let mut grouped = BTreeMap::<SourceFileId, Vec<(TextRange, LocalisationPreview)>>::new();
+        for ((file_id, range), preview) in entries {
+            grouped.entry(file_id).or_default().push((range, preview));
+        }
+        Self::from_grouped(grouped)
+    }
+
+    /// Builds a map from already file-grouped entries without another intermediate grouping.
+    pub(crate) fn from_grouped(
+        grouped: BTreeMap<SourceFileId, Vec<(TextRange, LocalisationPreview)>>,
+    ) -> Self {
+        let mut map = Self {
+            by_file: BTreeMap::new(),
+            len: 0,
+        };
+        for (file_id, entries) in grouped {
+            let entries = sort_preview_entries(entries);
+            map.len = map.len.saturating_add(entries.len());
+            if !entries.is_empty() {
+                map.by_file.insert(file_id, entries);
+            }
+        }
+        map
+    }
+
+    /// Removes all previews belonging to one file.
+    pub fn remove_file(&mut self, file_id: SourceFileId) {
+        if let Some(entries) = self.by_file.remove(&file_id) {
+            self.len = self.len.saturating_sub(entries.len());
+        }
+    }
+
+    /// Retains files satisfying `keep`.
+    pub fn retain_files(&mut self, mut keep: impl FnMut(SourceFileId) -> bool) {
+        let removed = self
+            .by_file
+            .keys()
+            .copied()
+            .filter(|file_id| !keep(*file_id))
+            .collect::<Vec<_>>();
+        for file_id in removed {
+            self.remove_file(file_id);
+        }
+    }
+
+    fn recount_len(&mut self) {
+        self.len = self.by_file.values().map(Vec::len).sum();
+    }
+}
+
+impl<'map> IntoIterator for &'map LocalisationPreviewMap {
+    type Item = ((SourceFileId, TextRange), &'map LocalisationPreview);
+    type IntoIter = LocalisationPreviewMapIter<'map>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl From<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>> for LocalisationPreviewMap {
+    fn from(entries: BTreeMap<(SourceFileId, TextRange), LocalisationPreview>) -> Self {
+        Self::from_entries(entries)
+    }
+}
+
+/// Iterator returned by [`LocalisationPreviewMap::iter`].
+pub struct LocalisationPreviewMapIter<'map> {
+    outer: std::collections::btree_map::Iter<
+        'map,
+        SourceFileId,
+        Vec<(TextRange, LocalisationPreview)>,
+    >,
+    current_file: Option<SourceFileId>,
+    current: Option<std::slice::Iter<'map, (TextRange, LocalisationPreview)>>,
+}
+
+impl<'map> Iterator for LocalisationPreviewMapIter<'map> {
+    type Item = ((SourceFileId, TextRange), &'map LocalisationPreview);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let (Some(file_id), Some(entries)) = (self.current_file, self.current.as_mut())
+                && let Some((range, preview)) = entries.next()
+            {
+                return Some(((file_id, *range), preview));
+            }
+            let (file_id, entries) = self.outer.next()?;
+            self.current_file = Some(*file_id);
+            self.current = Some(entries.iter());
+        }
+    }
+}
+
+fn sort_preview_entries(
+    mut entries: Vec<(TextRange, LocalisationPreview)>,
+) -> Vec<(TextRange, LocalisationPreview)> {
+    entries.sort_by_key(|(range, _)| *range);
+    let mut write = 0;
+    for read in 0..entries.len() {
+        if write > 0 && entries[write - 1].0 == entries[read].0 {
+            entries[write - 1] = entries[read].clone();
+        } else {
+            entries.swap(write, read);
+            write += 1;
+        }
+    }
+    entries.truncate(write);
+    entries
+}
+
+fn sort_position_entries(
+    mut entries: Vec<(TextRange, PositionRange)>,
+) -> Vec<(TextRange, PositionRange)> {
+    entries.sort_by_key(|(range, _)| *range);
+    let mut write = 0;
+    for read in 0..entries.len() {
+        if write > 0 && entries[write - 1].0 == entries[read].0 {
+            entries[write - 1] = entries[read];
+        } else {
+            entries.swap(write, read);
+            write += 1;
+        }
+    }
+    entries.truncate(write);
+    entries
+}
 
 /// One parameter in the callable signature of a scripted macro definition.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -92,7 +511,7 @@ pub struct WorkspaceIndex {
     definitions: BTreeMap<(String, String), Vec<DefinitionPointer>>,
     case_sensitive_kinds: BTreeSet<String>,
     /// Cached UTF-16 positions for files whose source text is not retained, such as Vanilla.
-    pub(crate) position_ranges: BTreeMap<(SourceFileId, TextRange), PositionRange>,
+    pub(crate) position_ranges: PositionMap,
 }
 
 impl WorkspaceIndex {
@@ -273,12 +692,12 @@ impl WorkspaceIndex {
     /// Returns a cached editor position for one indexed byte range, if available.
     #[must_use]
     pub fn position_for(&self, file_id: SourceFileId, range: TextRange) -> Option<PositionRange> {
-        self.position_ranges.get(&(file_id, range)).copied()
+        self.position_ranges.get((file_id, range)).copied()
     }
 
     /// Returns all cached editor positions retained by this index.
     #[must_use]
-    pub fn position_ranges(&self) -> &BTreeMap<(SourceFileId, TextRange), PositionRange> {
+    pub fn position_ranges(&self) -> &PositionMap {
         &self.position_ranges
     }
 
@@ -288,27 +707,17 @@ impl WorkspaceIndex {
         file_id: SourceFileId,
         positions: impl IntoIterator<Item = (TextRange, PositionRange)>,
     ) {
-        self.position_ranges
-            .retain(|(candidate, _), _| *candidate != file_id);
-        self.position_ranges.extend(
-            positions
-                .into_iter()
-                .map(|(range, position)| ((file_id, range), position)),
-        );
+        self.position_ranges.replace_file(file_id, positions);
     }
 
     /// Replaces all cached editor positions.
-    pub fn replace_all_position_ranges(
-        &mut self,
-        positions: BTreeMap<(SourceFileId, TextRange), PositionRange>,
-    ) {
-        self.position_ranges = positions;
+    pub fn replace_all_position_ranges(&mut self, positions: impl Into<PositionMap>) {
+        self.position_ranges = positions.into();
     }
 
     /// Removes cached editor positions for one source file.
     pub fn remove_position_ranges(&mut self, file_id: SourceFileId) {
-        self.position_ranges
-            .retain(|(candidate, _), _| *candidate != file_id);
+        self.position_ranges.remove_file(file_id);
     }
 
     fn definition_at(&self, pointer: DefinitionPointer) -> Option<&Definition> {

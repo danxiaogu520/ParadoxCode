@@ -2,7 +2,9 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
 use pdx_engine::hir::{HirFile, HirReference, HirReferenceOrigin};
-use pdx_engine::{AnalysisSnapshot, Definition, DocumentId, DocumentSource, SourceFileId};
+use pdx_engine::{
+    AnalysisSnapshot, Definition, DocumentId, DocumentSource, Reference, SourceFileId,
+};
 use pdx_rules::{KeyMatcher, RuleShape, SymbolResolutionPolicy};
 use pdx_text::{LogicalPath, TextRange, TextSize};
 #[cfg(test)]
@@ -725,44 +727,9 @@ pub(crate) fn all_semantics(
     #[cfg(test)]
     ALL_SEMANTICS_CALLS.with(|calls| calls.set(calls.get().saturating_add(1)));
     let mut all = SemanticWorkspace::default();
-    for definition in snapshot.index().definitions_iter() {
-        cancellation.checkpoint()?;
-        all.definitions
-            .push(index_definition_info(snapshot, definition));
-    }
-    for reference in snapshot.index().references_iter() {
-        cancellation.checkpoint()?;
-        if scripted_macro_type(snapshot, &reference.kind) {
-            if !workspace_member(snapshot, &reference.kind, &reference.name) {
-                continue;
-            }
-            if let Some(hir) = snapshot
-                .file_state(reference.file_id)
-                .and_then(|state| state.hir())
-                && !scripted_macro_reference_range_is_callable(
-                    snapshot,
-                    hir,
-                    &reference.kind,
-                    &reference.name,
-                    reference.range,
-                )
-            {
-                continue;
-            }
-        }
-        let path = snapshot
-            .source_files()
-            .get(&reference.file_id)
-            .map(|file| file.logical_path.clone());
-        all.references.push(ReferenceInternal {
-            kind: reference.kind.clone(),
-            name: reference.name.clone(),
-            range: reference.range,
-            document: None,
-            file: Some(reference.file_id),
-            path,
-        });
-    }
+    // Indexed definitions and references remain in `AnalysisSnapshot::index()` and are consulted
+    // by targeted candidate/reference iterators below. Keeping them out of this temporary
+    // semantic workspace avoids cloning every cached Vanilla symbol for each query.
     let overlay_files = snapshot
         .documents()
         .values()
@@ -866,12 +833,14 @@ pub(crate) fn symbol_candidates(
             priority: definition_priority(snapshot, definition),
         })
         .collect::<Vec<_>>();
-    // If a manually injected workspace shard has a definition with no source text, retain it as
-    // a navigation candidate.  Normal scanned files already appear above with exact ranges.
-    if candidates.is_empty() {
-        for definition in snapshot.index().definitions(kind, name) {
-            candidates.push(index_definition(snapshot, definition));
+    // Indexed definitions are the normal source of Vanilla/dependency candidates. Add them even
+    // when an overlay supplied a same-named semantic definition: merge/unique policies need to
+    // see every candidate, while overlay files hide their corresponding disk entries.
+    for definition in snapshot.index().definitions(kind, name) {
+        if overlay_files.contains(&definition.file_id) {
+            continue;
         }
+        candidates.push(index_definition(snapshot, definition));
     }
     candidates.sort_by(|left, right| {
         right.priority.cmp(&left.priority).then_with(|| {
@@ -1186,6 +1155,44 @@ pub(crate) fn index_definition(
         selection_range: indexed_definition_selection_range(snapshot, definition),
         priority: definition_priority_for_file(snapshot, definition.file_id),
     }
+}
+
+/// Converts one persisted reference into an editor-neutral location, retaining the same macro
+/// callability filters used when exhaustive semantic workspaces were built.
+pub(crate) fn indexed_reference(
+    snapshot: &AnalysisSnapshot,
+    reference: &Reference,
+) -> Option<ReferenceInternal> {
+    if scripted_macro_type(snapshot, &reference.kind) {
+        if !workspace_member(snapshot, &reference.kind, &reference.name) {
+            return None;
+        }
+        if let Some(hir) = snapshot
+            .file_state(reference.file_id)
+            .and_then(|state| state.hir())
+            && !scripted_macro_reference_range_is_callable(
+                snapshot,
+                hir,
+                &reference.kind,
+                &reference.name,
+                reference.range,
+            )
+        {
+            return None;
+        }
+    }
+    let path = snapshot
+        .source_files()
+        .get(&reference.file_id)
+        .map(|file| file.logical_path.clone());
+    Some(ReferenceInternal {
+        kind: reference.kind.clone(),
+        name: reference.name.clone(),
+        range: reference.range,
+        document: None,
+        file: Some(reference.file_id),
+        path,
+    })
 }
 
 pub(crate) fn index_definition_info(

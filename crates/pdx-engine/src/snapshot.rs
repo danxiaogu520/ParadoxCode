@@ -8,7 +8,7 @@ use std::sync::Arc;
 use pdx_rules::{FileResolutionPolicy, GameProfile, RuleSet};
 use pdx_text::{LogicalPath, TextRange};
 
-use crate::index::WorkspaceIndex;
+use crate::index::{LocalisationPreviewMap, WorkspaceIndex};
 use crate::model::{
     DocumentId, DocumentSnapshot, DocumentSource, FileState, LocalisationPreview, PreparedDocument,
     ResolvedCandidate, SourceFile, SourceFileId, SourceRoot, WorkspaceScanReport,
@@ -31,7 +31,7 @@ pub struct AnalysisSnapshot {
     pub(crate) file_states: Arc<BTreeMap<SourceFileId, Arc<FileState>>>,
     pub(crate) index: Arc<WorkspaceIndex>,
     pub(crate) scan_report: Arc<WorkspaceScanReport>,
-    pub(crate) localisation_previews: Arc<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>>,
+    pub(crate) localisation_previews: Arc<LocalisationPreviewMap>,
     pub(crate) query_cache: Arc<SnapshotQueryCache>,
 }
 
@@ -226,6 +226,6 @@ impl AnalysisSnapshot {
         file_id: SourceFileId,
         range: TextRange,
     ) -> Option<&LocalisationPreview> {
-        self.localisation_previews.get(&(file_id, range))
+        self.localisation_previews.get((file_id, range))
     }
 }

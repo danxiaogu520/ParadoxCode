@@ -135,7 +135,7 @@ pub(super) fn refresh_cancellable(
         let state = state.cache_only(positions_for_file);
         let shard = (*state.shard).clone();
         shards.insert(*id, shard);
-        positions.retain(|(file_id, _), _| *file_id != *id);
+        positions.remove_file(*id);
         if let Some(cached) = state.cached_positions.as_deref() {
             positions.extend(
                 cached
@@ -143,12 +143,13 @@ pub(super) fn refresh_cancellable(
                     .map(|(range, position)| ((*id, *range), *position)),
             );
         }
-        previews.retain(|(file_id, _), _| *file_id != *id);
+        previews.remove_file(*id);
         if let Some(cached) = state.cached_localisation_previews() {
-            previews.extend(
+            previews.replace_file(
+                *id,
                 cached
                     .iter()
-                    .map(|(range, preview)| ((*id, *range), preview.clone())),
+                    .map(|(range, preview)| (*range, preview.clone())),
             );
         }
         files.insert(*id, source_file);
@@ -166,8 +167,8 @@ pub(super) fn refresh_cancellable(
     for id in removed {
         files.remove(&id);
         shards.remove(&id);
-        positions.retain(|(file_id, _), _| *file_id != id);
-        previews.retain(|(file_id, _), _| *file_id != id);
+        positions.remove_file(id);
+        previews.remove_file(id);
         file_fingerprints.remove(&id);
     }
     if files.len() > MAX_CACHE_FILES {

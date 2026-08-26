@@ -1,6 +1,69 @@
 use super::*;
 
 #[test]
+fn grouped_position_map_keeps_sorted_lookup_and_replacement_semantics() {
+    let first = SourceFileId::new(1);
+    let second = SourceFileId::new(2);
+    let first_range = TextRange::new(10, 14).expect("range");
+    let second_range = TextRange::new(2, 8).expect("range");
+    let first_position = PositionRange::new(Position::new(1, 2), Position::new(1, 6));
+    let replacement = PositionRange::new(Position::new(4, 0), Position::new(4, 4));
+    let second_position = PositionRange::new(Position::new(0, 2), Position::new(0, 8));
+
+    let mut map = PositionMap::from_entries([
+        ((first, first_range), first_position),
+        ((first, first_range), replacement),
+        ((second, second_range), second_position),
+    ]);
+    assert_eq!(map.len(), 2);
+    assert_eq!(map.get((first, first_range)), Some(&replacement));
+    assert_eq!(map.get((second, second_range)), Some(&second_position));
+
+    map.replace_file(first, [(first_range, first_position)]);
+    assert_eq!(map.len(), 2);
+    assert_eq!(map.get((first, first_range)), Some(&first_position));
+    map.remove_file(second);
+    assert_eq!(map.len(), 1);
+    assert!(map.get((second, second_range)).is_none());
+}
+
+#[test]
+fn grouped_localisation_preview_map_keeps_sorted_lookup_and_replacement_semantics() {
+    let first = SourceFileId::new(1);
+    let second = SourceFileId::new(2);
+    let first_range = TextRange::new(10, 14).expect("range");
+    let second_range = TextRange::new(2, 8).expect("range");
+    let first_preview = LocalisationPreview {
+        language: Some("english".to_owned()),
+        value: "first".to_owned(),
+    };
+    let replacement = LocalisationPreview {
+        language: Some("french".to_owned()),
+        value: "replacement".to_owned(),
+    };
+    let second_preview = LocalisationPreview {
+        language: None,
+        value: "second".to_owned(),
+    };
+
+    let mut map = LocalisationPreviewMap::from_entries([
+        ((first, first_range), first_preview.clone()),
+        ((first, first_range), replacement.clone()),
+        ((second, second_range), second_preview.clone()),
+    ]);
+    assert_eq!(map.len(), 2);
+    assert_eq!(map.get((first, first_range)), Some(&replacement));
+    assert_eq!(map.get((second, second_range)), Some(&second_preview));
+
+    map.replace_file(first, [(first_range, first_preview.clone())]);
+    assert_eq!(map.len(), 2);
+    assert_eq!(map.get((first, first_range)), Some(&first_preview));
+    map.remove_file(second);
+    assert_eq!(map.len(), 1);
+    assert!(map.get((second, second_range)).is_none());
+}
+
+#[test]
 fn bulk_index_build_retains_every_shard_and_definition() {
     let first_file = SourceFileId::new(1);
     let second_file = SourceFileId::new(2);

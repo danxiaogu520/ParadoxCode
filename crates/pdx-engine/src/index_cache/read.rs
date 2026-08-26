@@ -8,8 +8,8 @@ use pdx_text::{LogicalPath, PositionRange, TextRange};
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
 
 use crate::index::{
-    Definition, FileIndexShard, MacroDefinitionSummary, MacroParameterSignature, Reference,
-    WorkspaceIndex,
+    Definition, FileIndexShard, LocalisationPreviewMap, MacroDefinitionSummary,
+    MacroParameterSignature, PositionMap, Reference, WorkspaceIndex,
 };
 use crate::model::LocalisationPreview;
 use crate::scan::stable_file_id;
@@ -437,11 +437,12 @@ fn load_index(
     progress.report(definition_count.saturating_add(reference_count));
     let localisation_previews =
         load_localisation_previews(connection, &shards, &localisation_ranges)?;
+    drop(localisation_ranges);
     progress.report(localisation_previews.len());
     let positions = load_navigation_positions(connection)?;
     progress.report(positions.len());
     for ((file_id, range), position) in &positions {
-        if !known_ranges.contains(&(*file_id, *range)) {
+        if !known_ranges.contains(&(file_id, range)) {
             return Err(IndexCacheError::InvalidData(format!(
                 "navigation position references unknown range {}..{}",
                 range.start(),
@@ -454,6 +455,7 @@ fn load_index(
             ));
         }
     }
+    drop(known_ranges);
     progress.report(positions.len());
     Ok((
         source_files,
@@ -605,7 +607,7 @@ fn load_localisation_previews(
     connection: &Connection,
     shards: &BTreeMap<SourceFileId, FileIndexShard>,
     localisation_ranges: &HashSet<(SourceFileId, TextRange)>,
-) -> Result<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>, IndexCacheError> {
+) -> Result<LocalisationPreviewMap, IndexCacheError> {
     let mut statement = connection.prepare(
         "SELECT file_id, range_start, range_end, language, value
          FROM localisation_previews ORDER BY file_id, range_start, range_end",
@@ -619,7 +621,8 @@ fn load_localisation_previews(
             row.get::<_, String>(4)?,
         ))
     })?;
-    let mut previews = BTreeMap::new();
+    let mut grouped = BTreeMap::<SourceFileId, Vec<(TextRange, LocalisationPreview)>>::new();
+    let mut rows_loaded = 0usize;
     for row in rows {
         let (file_id, start, end, language, value) = row?;
         let file_id = decode_file_id(&file_id)?;
@@ -642,14 +645,17 @@ fn load_localisation_previews(
                 "localisation preview value is empty".to_owned(),
             ));
         }
-        if previews
-            .insert((file_id, range), LocalisationPreview { language, value })
-            .is_some()
-        {
-            return Err(IndexCacheError::InvalidData(
-                "duplicate localisation preview".to_owned(),
-            ));
-        }
+        grouped
+            .entry(file_id)
+            .or_default()
+            .push((range, LocalisationPreview { language, value }));
+        rows_loaded = rows_loaded.saturating_add(1);
+    }
+    let previews = LocalisationPreviewMap::from_grouped(grouped);
+    if previews.len() != rows_loaded {
+        return Err(IndexCacheError::InvalidData(
+            "duplicate localisation preview".to_owned(),
+        ));
     }
     Ok(previews)
 }
@@ -749,25 +755,29 @@ fn load_references(
     Ok(rows_loaded)
 }
 
-fn load_navigation_positions(
-    connection: &Connection,
-) -> Result<BTreeMap<(SourceFileId, TextRange), PositionRange>, IndexCacheError> {
+fn load_navigation_positions(connection: &Connection) -> Result<PositionMap, IndexCacheError> {
     let mut statement =
         connection.prepare("SELECT file_id, payload FROM navigation_positions ORDER BY file_id")?;
     let rows = statement.query_map([], |row| {
         Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, Vec<u8>>(1)?))
     })?;
-    let mut positions = BTreeMap::new();
+    let mut grouped = BTreeMap::<SourceFileId, Vec<(TextRange, PositionRange)>>::new();
     for row in rows {
         let (file_id, payload) = row?;
         let file_id = decode_file_id(&file_id)?;
-        for (range, position) in position_codec::decode(&payload)? {
-            if positions.insert((file_id, range), position).is_some() {
-                return Err(IndexCacheError::InvalidData(
-                    "duplicate navigation position".to_owned(),
-                ));
-            }
-        }
+        grouped
+            .entry(file_id)
+            .or_default()
+            .extend(position_codec::decode(&payload)?);
+    }
+    let expected = grouped.values().map(Vec::len).sum::<usize>();
+    let positions = PositionMap::from_grouped(grouped);
+    // `PositionMap` keeps the last value when a duplicate range is supplied. A duplicate is
+    // malformed cache data, so compare the compacted count with the decoded row count.
+    if positions.len() != expected {
+        return Err(IndexCacheError::InvalidData(
+            "duplicate navigation position".to_owned(),
+        ));
     }
     Ok(positions)
 }
