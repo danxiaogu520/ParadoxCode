@@ -298,7 +298,7 @@ fn leaf_value_container_completion_offers_typed_workspace_members() {
 }
 
 #[test]
-fn leaf_value_exact_literals_and_date_keys_complete_remaining_matchers() {
+fn leaf_value_exact_literals_and_date_keys_avoid_arbitrary_samples() {
     let mut model = pdx_game::eu4::bootstrap_model();
     for rule in [
         SemanticRule {
@@ -438,7 +438,7 @@ fn leaf_value_exact_literals_and_date_keys_complete_remaining_matchers() {
             .collect::<Vec<_>>()
     );
 
-    // Date-keyed rules complete a campaign-date template.
+    // Date-keyed rules validate the key shape, but do not offer an arbitrary campaign date.
     let date_text = "trigger = { container = {  } }";
     host.stage_document_text(&id, 3, date_text.to_owned())
         .expect("stage date document");
@@ -459,9 +459,116 @@ fn leaf_value_exact_literals_and_date_keys_complete_remaining_matchers() {
         date_result
             .items
             .iter()
-            .any(|item| item.label == "1444.11.11"),
-        "date-keyed rules must complete a campaign date template"
+            .all(|item| item.label != "1444.11.11"),
+        "date-keyed rules must not offer an arbitrary campaign date: {:?}",
+        date_result.items
     );
+}
+
+#[test]
+fn open_ended_value_types_do_not_offer_arbitrary_samples() {
+    let mut model = pdx_game::eu4::bootstrap_model();
+    model.semantic.rules.extend([
+        SemanticRule {
+            id: "fixture:completion:int".to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("fixture_int_value".to_owned()),
+            operator: None,
+            value: ValueMatcher::Int {
+                min: Some(1),
+                max: Some(10),
+            },
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 1,
+        },
+        SemanticRule {
+            id: "fixture:completion:float".to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("fixture_float_value".to_owned()),
+            operator: None,
+            value: ValueMatcher::Float {
+                min: Some("1.5".to_owned()),
+                max: Some("2.5".to_owned()),
+            },
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 2,
+        },
+        SemanticRule {
+            id: "fixture:completion:date".to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("fixture_date_value".to_owned()),
+            operator: None,
+            value: ValueMatcher::Date,
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: true,
+            max_occurs: None,
+            source_file: "fixture.semantic".to_owned(),
+            line: 3,
+        },
+    ]);
+    let mut host = eu4_host(RuleSet::from_model(model));
+    for (index, key) in [
+        "fixture_int_value",
+        "fixture_float_value",
+        "fixture_date_value",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let id = DocumentId::new(format!("file:///tmp/common/events/open-ended-{index}.txt"));
+        let text = format!("trigger = {{ {key} = ");
+        host.open_document(id.clone(), 1, text.clone(), None)
+            .expect("open document");
+        let result = complete(
+            &host.snapshot(),
+            &id,
+            u32::try_from(text.len()).expect("position"),
+        );
+        assert!(
+            result.items.is_empty(),
+            "{key} must not offer arbitrary numeric/date samples: {:?}",
+            result.items
+        );
+    }
 }
 
 #[test]
@@ -1187,7 +1294,7 @@ fn scripted_macro_argument_values_follow_direct_and_nested_body_constraints() {
 
     let cases = [
         ("direct_bool", "VALUE", &["yes", "no"][..]),
-        ("direct_float", "VALUE", &["0"][..]),
+        ("direct_float", "VALUE", &[][..]),
         ("outer_bool", "OUTER", &["yes", "no"][..]),
     ];
     for (index, (macro_name, parameter, expected)) in cases.into_iter().enumerate() {
@@ -1208,6 +1315,12 @@ fn scripted_macro_argument_values_follow_direct_and_nested_body_constraints() {
             assert!(
                 labels.contains(label),
                 "{macro_name}.{parameter} missing {label}: {items:?}"
+            );
+        }
+        if macro_name == "direct_float" {
+            assert!(
+                labels.iter().all(|label| *label != "0"),
+                "open-ended float macro arguments must not offer `0`: {items:?}"
             );
         }
     }
