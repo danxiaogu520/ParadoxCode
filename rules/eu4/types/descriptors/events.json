@@ -10,7 +10,8 @@
     "name_field": "id",
     "name_from_file": false,
     "starts_with": null,
-    "type_key_filter": null
+    "type_key_filter": null,
+    "root_entries": "event_entries"
   },
   "decision": {
     "name": "decision",
@@ -27,7 +28,8 @@
     "name_field": null,
     "name_from_file": false,
     "starts_with": null,
-    "type_key_filter": null
+    "type_key_filter": null,
+    "root_entries": "decision_entries"
   },
   "mission": {
     "name": "mission",

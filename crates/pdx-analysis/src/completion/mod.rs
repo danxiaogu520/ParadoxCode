@@ -123,29 +123,10 @@ pub fn complete_with_cancellation(
             }
         }
     } else if !value_context {
-        // No rule-backed container covers the cursor; this is the document root of an
-        // otherwise empty file (or a gap between root blocks). Offer the profile's
-        // file-level entry keys, for example EU4's `country_decisions` wrapper.
-        add_file_root_entry_items(
-            snapshot,
-            &input,
-            &mut items,
-            replacement_range,
-            &prefix,
-            cancellation,
-        )?;
+        // No rule-backed container covers the cursor and no file-root entry context exists
+        // (for example an empty missions file, whose root series names are free-form).
     } else {
-        // A bare `key = ` at the document root: only file-level leaf entries carry value
-        // domains here (for example `normal_or_historical_nations = yes/no`).
-        add_file_root_entry_value_items(
-            snapshot,
-            &input,
-            &mut items,
-            replacement_range,
-            position,
-            &prefix,
-            cancellation,
-        )?;
+        // A bare `key = ` at the document root with no entry context: nothing to offer.
     }
     let mut items = finalize_completion_items(items);
     if let Some(context) = semantic_context.as_ref() {

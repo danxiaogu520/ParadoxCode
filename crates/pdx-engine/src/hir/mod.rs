@@ -16,6 +16,7 @@ mod templates;
 pub use model::*;
 pub use semantics::{
     semantic_file_root_context, semantic_root_context, semantic_root_context_is_fallback,
+    semantic_type_path_matches,
 };
 
 #[cfg(test)]

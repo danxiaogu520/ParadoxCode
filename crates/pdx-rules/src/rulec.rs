@@ -598,6 +598,17 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
             )));
         }
     }
+    for (type_name, descriptor) in &model.semantic.type_descriptors {
+        if let Some(entries) = descriptor.root_entries.as_deref()
+            && (entries.trim().is_empty()
+                || entries.contains(':')
+                || entries.chars().any(char::is_whitespace))
+        {
+            return Err(CompileError::Validation(format!(
+                "type descriptor {type_name} has an invalid root_entries name"
+            )));
+        }
+    }
     for (identity, descriptor) in &model.semantic.type_descriptors {
         if identity != &descriptor.name {
             return Err(CompileError::Validation(format!(
@@ -1060,7 +1071,7 @@ mod tests {
         assert_eq!(source_model.file_categories.len(), 121);
         assert_eq!(source_model.symbol_descriptors.len(), 2667);
         assert_eq!(source_model.records.len(), 13_719);
-        assert_eq!(source_model.semantic.rules.len(), 8_525);
+        assert_eq!(source_model.semantic.rules.len(), 8_530);
         assert_eq!(source_model.semantic.enum_values.len(), 72);
         assert_eq!(source_model.semantic.type_root_keys.len(), 5);
         assert_eq!(source_model.semantic.type_root_scopes.len(), 1);

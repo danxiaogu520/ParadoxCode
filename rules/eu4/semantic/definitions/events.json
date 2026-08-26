@@ -1432,5 +1432,113 @@
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5033
+  },
+  {
+    "id": "events/events:83:rule:root:event_entries:country_event",
+    "context": "root:event_entries",
+    "parent_path": [],
+    "key": {
+      "exact": "country_event"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Country event block; repeatable within one file."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1
+  },
+  {
+    "id": "events/events:84:rule:root:event_entries:province_event",
+    "context": "root:event_entries",
+    "parent_path": [],
+    "key": {
+      "exact": "province_event"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Province event block; repeatable within one file."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic-rules.json",
+    "line": 1
+  },
+  {
+    "id": "events/events:85:rule:root:event_entries:namespace",
+    "context": "root:event_entries",
+    "parent_path": [],
+    "key": {
+      "exact": "namespace"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Event id namespace; declared at most once per file."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1
+  },
+  {
+    "id": "events/events:86:rule:root:event_entries:normal_or_historical_nations",
+    "context": "root:event_entries",
+    "parent_path": [],
+    "key": {
+      "exact": "normal_or_historical_nations"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "deprecated": false,
+    "documentation": [
+      "Restrict events to normal or historical nations."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 1
   }
 ]

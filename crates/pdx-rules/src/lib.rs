@@ -22,15 +22,15 @@ pub use model::{
 };
 pub use profile::{
     GameProfile, ProfileConditionalDefinitionRule, ProfileContainerDefinitionRule,
-    ProfileContainerValueDefinitionRule, ProfileDefinitionRule, ProfileFileRootEntry,
-    ProfileMatchMode, ProfileMemberNameSuffixRule, ProfileReferenceRule, ProfileRootEntryShape,
-    ProfileRootScopeRule, ProfileScopeCompatibility, ProfileTextMatcher,
-    ProfileTokenDefinitionRule, ProfileValueDefinitionRule, SourceEncoding,
+    ProfileContainerValueDefinitionRule, ProfileDefinitionRule, ProfileMatchMode,
+    ProfileMemberNameSuffixRule, ProfileReferenceRule, ProfileRootScopeRule,
+    ProfileScopeCompatibility, ProfileTextMatcher, ProfileTokenDefinitionRule,
+    ProfileValueDefinitionRule, SourceEncoding,
 };
 pub use runtime::{RuleSet, RulesError};
 
 /// The first runtime schema version reserved for the generated rule database.
-pub const CURRENT_SCHEMA_VERSION: u32 = 21;
+pub const CURRENT_SCHEMA_VERSION: u32 = 22;
 
 #[cfg(test)]
 mod tests;

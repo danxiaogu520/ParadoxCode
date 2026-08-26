@@ -8,7 +8,7 @@ use crate::{
 use pdx_engine::AnalysisSnapshot;
 use pdx_engine::hir::HirFile;
 use pdx_rules::RuleShape;
-use pdx_text::TextSize;
+use pdx_text::{LogicalPath, TextSize};
 
 use crate::semantic::{
     cached_scope_fact_for_property, scope_context_from_hir, semantic_child_scope,
@@ -28,6 +28,11 @@ pub(crate) struct SemanticCompletionContext {
     /// Whether this context was inferred from a scripted-macro body rather than directly from
     /// the caller's syntax. Macro-inferred rules get the highest schema tier.
     pub(crate) macro_inferred: bool,
+    /// Whether this container is a type's file-root entry scaffold (`root_entries`).
+    ///
+    /// Only this container suppresses single-instance (`max_occurs = 1`) keys that are already
+    /// declared at the document root; ordinary containers keep offering declared keys.
+    pub(crate) root_entry_container: bool,
     pub(crate) scope: ScopeContext,
     pub(crate) container_property: Option<ScriptProperty>,
     pub(crate) property: Option<ScriptProperty>,
@@ -103,12 +108,74 @@ pub(crate) fn semantic_completion_context_with_cancellation(
                 position,
                 quoted_depth: 0,
                 embedded_value_context: None,
+                root_entry_container: false,
+            },
+            &mut quoted_scripts,
+        )
+        .map(Some);
+    }
+    // No root key selected a type; the cursor sits on the document root of a still-empty file
+    // or on a root gap. A type that declares `root_entries` offers its entry rules through the
+    // ordinary semantic container so their shapes, values, and cardinality behave exactly like
+    // every other rule (this replaces the former game-profile file-root entry table).
+    if let Some(entry_context) = semantic_root_entry_context(snapshot, input.path.as_ref()) {
+        let properties = script_properties(input, parsed.root());
+        return semantic_completion_container(
+            snapshot,
+            SemanticCompletionContainerInput {
+                hir: input.hir.as_deref(),
+                context: entry_context,
+                parent_path: Vec::new(),
+                structural_containers: Vec::new(),
+                alternative_containers: Vec::new(),
+                macro_inferred: false,
+                container_property: None,
+                skip_type_instance: false,
+                properties,
+                scope: ScopeContext::new(snapshot.game_profile_handle()),
+                position,
+                quoted_depth: 0,
+                embedded_value_context: None,
+                root_entry_container: true,
             },
             &mut quoted_scripts,
         )
         .map(Some);
     }
     Ok(None)
+}
+
+/// Selects the file-root entry context for a path, when the document's type declares one.
+///
+/// The context is `root:{name}` per the descriptor's `root_entries`; entry rules are ordinary
+/// semantic rules under that context. Types without a declaration (for example missions, whose
+/// root series names are free-form) never get a scaffold.
+fn semantic_root_entry_context(
+    snapshot: &AnalysisSnapshot,
+    logical_path: Option<&LogicalPath>,
+) -> Option<String> {
+    let logical_path = logical_path?;
+    snapshot
+        .rules()
+        .model()
+        .semantic
+        .type_descriptors
+        .iter()
+        .filter_map(|(type_name, descriptor)| {
+            let name = descriptor.root_entries.as_deref()?;
+            let context = format!("root:{name}");
+            if !pdx_engine::hir::semantic_type_path_matches(descriptor, Some(logical_path)) {
+                return None;
+            }
+            let has_rules = snapshot
+                .rules()
+                .semantic_rules_for_context(&context)
+                .next()
+                .is_some();
+            has_rules.then_some((type_name.clone(), context))
+        })
+        .map(|(_, context)| context)
+        .next()
 }
 
 struct SemanticCompletionContainerInput<'a> {
@@ -125,6 +192,7 @@ struct SemanticCompletionContainerInput<'a> {
     position: TextSize,
     quoted_depth: usize,
     embedded_value_context: Option<bool>,
+    root_entry_container: bool,
 }
 
 fn semantic_completion_container(
@@ -146,6 +214,7 @@ fn semantic_completion_container(
         position,
         quoted_depth,
         embedded_value_context,
+        root_entry_container,
     } = input;
     for property in &properties {
         let container_range = property.block_range.or_else(|| {
@@ -179,6 +248,7 @@ fn semantic_completion_container(
                     position,
                     quoted_depth,
                     embedded_value_context,
+                    root_entry_container: false,
                 },
                 quoted_scripts,
             );
@@ -247,6 +317,7 @@ fn semantic_completion_container(
                     position,
                     quoted_depth,
                     embedded_value_context,
+                    root_entry_container: false,
                 },
                 quoted_scripts,
             );
@@ -271,6 +342,7 @@ fn semantic_completion_container(
                 quoted_depth,
                 embedded_value_context,
                 wrapper_container: skip_type_instance,
+                root_entry_container: false,
             };
             let inferred = infer_macro_quoted_script_constraints(
                 snapshot,
@@ -311,6 +383,7 @@ fn semantic_completion_container(
                         position,
                         quoted_depth: quoted_depth.saturating_add(1),
                         embedded_value_context: Some(value_context),
+                        root_entry_container: false,
                     },
                     quoted_scripts,
                 );
@@ -407,6 +480,7 @@ fn semantic_completion_container(
                     position,
                     quoted_depth: quoted_depth.saturating_add(1),
                     embedded_value_context: Some(value_context),
+                    root_entry_container: false,
                 },
                 quoted_scripts,
             );
@@ -427,6 +501,7 @@ fn semantic_completion_container(
                 position,
                 quoted_depth,
                 embedded_value_context,
+                root_entry_container: false,
             },
             quoted_scripts,
         );
@@ -454,6 +529,7 @@ fn semantic_completion_container(
         quoted_depth,
         embedded_value_context,
         wrapper_container: skip_type_instance,
+        root_entry_container,
     })
 }
 

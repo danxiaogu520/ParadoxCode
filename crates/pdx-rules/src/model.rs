@@ -226,6 +226,12 @@ pub struct TypeDescriptor {
     ///
     /// Negated filters are represented by `negate = true`.
     pub type_key_filter: Option<(Vec<String>, bool)>,
+    /// Optional file-root entry context name; entry rules are declared under `root:{name}`.
+    ///
+    /// When no root key of a document selects any type, completion offers this type's entry
+    /// rules as the root scaffold (for example `country_decisions` or the event entries).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root_entries: Option<String>,
     /// Optional generic scripted-macro capabilities for this type.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scripted_macro: Option<ScriptedMacroDescriptor>,
