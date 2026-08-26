@@ -182,7 +182,7 @@ fn macro_parameter_completion(
             resolve_data: None,
         });
     }
-    items.sort_by_key(|item| item.label.to_ascii_lowercase());
+    items.sort_by(|left, right| completion_label_cmp(&left.label, &right.label));
     items.dedup_by(|left, right| left.label.eq_ignore_ascii_case(&right.label));
     Ok(Some(items))
 }

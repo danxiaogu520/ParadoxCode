@@ -399,10 +399,22 @@ fn memory_transport_completes_macro_argument_values_from_body_constraints() {
     assert!(items.iter().any(|item| item["label"] == "yes"), "{items:?}");
     assert!(items.iter().any(|item| item["label"] == "no"), "{items:?}");
     assert!(
-        items.iter().all(|item| item["sortText"]
-            .as_str()
-            .is_some_and(|sort_text| sort_text.len() == 8)),
-        "completion sortText must use fixed-width packed ranks: {items:?}"
+        items.iter().all(|item| {
+            item["sortText"].as_str().is_some_and(|sort_text| {
+                if sort_text.len() != 12 {
+                    return false;
+                }
+                let Some(rank) = sort_text.get(..8) else {
+                    return false;
+                };
+                let Some(ordinal) = sort_text.get(8..) else {
+                    return false;
+                };
+                rank.bytes().all(|byte| byte.is_ascii_digit())
+                    && ordinal.bytes().all(|byte| byte.is_ascii_digit())
+            })
+        }),
+        "completion sortText must use fixed-width ranks and tie ordinals: {items:?}"
     );
     let _: CompletionResponse = typed_result(&responses, 2);
     fs::remove_dir_all(root_dir).expect("cleanup");

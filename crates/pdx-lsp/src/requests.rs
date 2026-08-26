@@ -56,6 +56,24 @@ const MAX_WORKSPACE_FILES: usize = 32_768;
 const MAX_TEXT_DIAGNOSTIC_FILES: usize = 16;
 const MAX_TEXT_DIAGNOSTIC_BYTES: usize = 16 * 1024 * 1024;
 
+fn completion_sort_text(sort_score: u32, ordinal: usize) -> String {
+    // `ordinal` preserves the analysis order when a client (such as VS Code) receives several
+    // candidates with the same packed rank and applies its own label tie-breaker.
+    format!("{sort_score:08}{ordinal:04}")
+}
+
+#[cfg(test)]
+mod completion_sort_tests {
+    use super::completion_sort_text;
+
+    #[test]
+    fn completion_sort_text_orders_rank_before_response_ordinal() {
+        assert_eq!(completion_sort_text(22_010_000, 7), "220100000007");
+        assert!(completion_sort_text(22_010_000, 0) < completion_sort_text(22_010_000, 1));
+        assert!(completion_sort_text(22_010_000, 511) < completion_sort_text(22_010_001, 0));
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
 struct WorkspaceDiagnosticsParams {
@@ -637,7 +655,8 @@ impl SnapshotRequestContext {
             bounded_results(result.items, MAX_COMPLETION_RESULTS);
         let items = completion_items
             .into_iter()
-            .map(|item| {
+            .enumerate()
+            .map(|(ordinal, item)| {
                 let snippet_supported = self.client_snippets;
                 let insert_text = if snippet_supported {
                     item.insert_text
@@ -654,10 +673,10 @@ impl SnapshotRequestContext {
                     detail: Some(item.detail),
                     documentation: item.documentation.map(Documentation::String),
                     deprecated: Some(item.deprecated),
-                    // `sort_score` is a packed lexicographic rank. Keep a fixed-width decimal
-                    // representation so clients that compare `sortText` as strings preserve
-                    // the same order as the analysis result.
-                    sort_text: Some(format!("{:08}", item.sort_score)),
+                    // `sort_score` is a packed lexicographic rank. The ordinal makes the
+                    // fixed-width sort key unique within a response, so clients cannot replace
+                    // the analysis tie-break with a case-sensitive label comparison.
+                    sort_text: Some(completion_sort_text(item.sort_score, ordinal)),
                     insert_text: Some(insert_text.clone()),
                     insert_text_format: Some(if snippet_supported && insert_text.contains('$') {
                         InsertTextFormat::SNIPPET
