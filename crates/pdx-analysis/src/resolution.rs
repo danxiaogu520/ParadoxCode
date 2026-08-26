@@ -274,6 +274,7 @@ impl QuotedSemanticCollector<'_, '_, '_, '_, '_> {
                     property: Some(property.clone()),
                     quoted_depth: container.quoted_depth,
                     embedded_value_context: None,
+                    wrapper_container: false,
                 };
                 let inferred = infer_macro_quoted_script_constraints(
                     self.snapshot,
