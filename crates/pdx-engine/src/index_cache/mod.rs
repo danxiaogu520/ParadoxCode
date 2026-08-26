@@ -6,13 +6,11 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use pdx_rules::{GameProfile, RuleSet};
-use pdx_text::{PositionRange, TextRange};
 use sha2::{Digest, Sha256};
 
-use crate::index::WorkspaceIndex;
+use crate::index::{LocalisationPreviewMap, PositionMap, WorkspaceIndex};
 use crate::{
-    AnalysisSnapshot, LocalisationPreview, SourceFile, SourceFileId, SourceRoot, SourceRootKind,
-    WorkspaceScanToken,
+    AnalysisSnapshot, SourceFile, SourceFileId, SourceRoot, SourceRootKind, WorkspaceScanToken,
 };
 
 mod codec;
@@ -54,15 +52,15 @@ type IndexParts = (
     SourceRoot,
     BTreeMap<SourceFileId, SourceFile>,
     WorkspaceIndex,
-    BTreeMap<(SourceFileId, TextRange), PositionRange>,
-    BTreeMap<(SourceFileId, TextRange), LocalisationPreview>,
+    PositionMap,
+    LocalisationPreviewMap,
 );
 
 type LoadedIndex = (
     BTreeMap<SourceFileId, SourceFile>,
     WorkspaceIndex,
-    BTreeMap<(SourceFileId, TextRange), PositionRange>,
-    BTreeMap<(SourceFileId, TextRange), LocalisationPreview>,
+    PositionMap,
+    LocalisationPreviewMap,
     BTreeMap<SourceFileId, String>,
 );
 
@@ -95,7 +93,7 @@ pub struct IndexCache {
     root: SourceRoot,
     source_files: BTreeMap<SourceFileId, SourceFile>,
     index: WorkspaceIndex,
-    localisation_previews: BTreeMap<(SourceFileId, TextRange), LocalisationPreview>,
+    localisation_previews: LocalisationPreviewMap,
     file_fingerprints: BTreeMap<SourceFileId, String>,
 }
 
@@ -318,9 +316,7 @@ impl IndexCache {
 
     /// Returns bounded derived localisation text retained for Hover.
     #[must_use]
-    pub const fn localisation_previews(
-        &self,
-    ) -> &BTreeMap<(SourceFileId, TextRange), LocalisationPreview> {
+    pub const fn localisation_previews(&self) -> &LocalisationPreviewMap {
         &self.localisation_previews
     }
 

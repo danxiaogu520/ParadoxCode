@@ -7,8 +7,9 @@
 //! query worker observing the same revision.
 //!
 //! The engine intentionally stores opaque values (`Arc<dyn Any>`): the cache is a mechanism
-//! only. Contents belong to higher layers (currently `pdx-analysis`), which are free to evict
-//! stale entries by using a fresh key whenever their inputs change.
+//! only. Contents belong to higher layers (currently `pdx-analysis`). Entries from older
+//! revisions are discarded as soon as a newer revision is observed; an old worker that finishes
+//! later cannot repopulate the cache with stale data.
 
 use std::any::Any;
 use std::collections::BTreeMap;
@@ -19,58 +20,96 @@ use std::sync::{Arc, Mutex};
 ///
 /// Entries are immutable: a key is only ever inserted once per revision, and the owning
 /// snapshot guarantees that all callers observing that revision see the same inputs. When the
-/// capacity is exceeded the cache is cleared wholesale; revisions advance frequently enough
-/// that older entries are unlikely to be reused anyway.
+/// capacity is exceeded the cache is cleared wholesale. Only entries for the newest observed
+/// revision are retained, because an older immutable snapshot can always recompute a miss.
 pub struct SnapshotQueryCache {
-    entries: Mutex<BTreeMap<(u64, String), Arc<dyn Any + Send + Sync>>>,
+    state: Mutex<CacheState>,
     capacity: usize,
+}
+
+struct CacheState {
+    revision: Option<u64>,
+    entries: BTreeMap<String, Arc<dyn Any + Send + Sync>>,
 }
 
 impl SnapshotQueryCache {
     /// Creates a cache with a conservative entry bound.
     #[must_use]
     pub fn new() -> Self {
-        Self::with_capacity(4096)
+        Self::with_capacity(256)
     }
 
     /// Creates a cache with an explicit entry bound.
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            entries: Mutex::new(BTreeMap::new()),
+            state: Mutex::new(CacheState {
+                revision: None,
+                entries: BTreeMap::new(),
+            }),
             capacity,
         }
     }
 
     /// Returns the cached value for `(revision, key)` when it was inserted as `T`.
     pub fn get<T: Send + Sync + 'static>(&self, revision: u64, key: &str) -> Option<Arc<T>> {
-        let entries = self
-            .entries
+        let state = self
+            .state
             .lock()
             .expect("snapshot query cache lock poisoned");
-        entries
-            .get(&(revision, key.to_owned()))
+        if state.revision != Some(revision) {
+            return None;
+        }
+        state
+            .entries
+            .get(key)
             .and_then(|value| Arc::clone(value).downcast::<T>().ok())
     }
 
     /// Stores `value` under `(revision, key)`; a key that already exists is never replaced.
     pub fn insert<T: Send + Sync + 'static>(&self, revision: u64, key: String, value: Arc<T>) {
-        let mut entries = self
-            .entries
+        let mut state = self
+            .state
             .lock()
             .expect("snapshot query cache lock poisoned");
-        if entries.len() >= self.capacity && !entries.contains_key(&(revision, key.clone())) {
-            entries.clear();
+        match state.revision {
+            Some(current) if revision < current => return,
+            Some(current) if revision != current => {
+                state.entries.clear();
+                state.revision = Some(revision);
+            }
+            None => state.revision = Some(revision),
+            _ => {}
         }
-        entries.entry((revision, key)).or_insert(value);
+        if state.entries.len() >= self.capacity && !state.entries.contains_key(&key) {
+            state.entries.clear();
+        }
+        state.entries.entry(key).or_insert(value);
+    }
+
+    /// Advances the cache to a committed workspace revision and drops older query results.
+    pub fn advance_to(&self, revision: u64) {
+        let mut state = self
+            .state
+            .lock()
+            .expect("snapshot query cache lock poisoned");
+        match state.revision {
+            Some(current) if revision > current => {
+                state.entries.clear();
+                state.revision = Some(revision);
+            }
+            None => state.revision = Some(revision),
+            _ => {}
+        }
     }
 
     /// Returns the number of cached entries (for diagnostics and tests).
     #[must_use]
     pub fn len(&self) -> usize {
-        self.entries
+        self.state
             .lock()
             .expect("snapshot query cache lock poisoned")
+            .entries
             .len()
     }
 
@@ -110,13 +149,20 @@ mod tests {
         // Inserting a different type under the same key must not collide or replace.
         cache.insert(1, "key".to_owned(), Arc::new("replacement"));
         assert_eq!(*cache.get::<u32>(1, "key").expect("cached"), 7);
-        // Revisions are independent.
+        // Moving to a newer revision drops the old snapshot's entries.
         assert!(cache.get::<u32>(2, "key").is_none());
         cache.insert(2, "other".to_owned(), Arc::new(9_u32));
+        assert_eq!(cache.len(), 1);
+        assert!(cache.get::<u32>(1, "key").is_none());
+        // A stale worker cannot repopulate the cache after the revision advanced.
+        cache.insert(1, "stale".to_owned(), Arc::new(11_u32));
+        assert_eq!(cache.len(), 1);
+        assert!(cache.get::<u32>(1, "stale").is_none());
+        cache.insert(2, "third".to_owned(), Arc::new(11_u32));
         assert_eq!(cache.len(), 2);
         // Overflow clears wholesale and the newest entry survives.
-        cache.insert(1, "third".to_owned(), Arc::new(11_u32));
+        cache.insert(2, "fourth".to_owned(), Arc::new(13_u32));
         assert_eq!(cache.len(), 1);
-        assert_eq!(*cache.get::<u32>(1, "third").expect("newest entry"), 11);
+        assert_eq!(*cache.get::<u32>(2, "fourth").expect("newest entry"), 13);
     }
 }

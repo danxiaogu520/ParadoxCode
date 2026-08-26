@@ -35,11 +35,24 @@ pub fn definition_with_cancellation(
     if let Some((definition, _)) = local_parameter_target(&input, position) {
         return Ok(vec![local_location(&input, definition.name_range)]);
     }
-    let all = all_semantics(snapshot, cancellation)?;
+    // Definition navigation only needs the semantic facts at the cursor and the indexed
+    // candidates for that one symbol. Building `all_semantics` here would clone every cached
+    // Vanilla definition/reference into a temporary workspace before resolving a single target.
+    let all = document_semantic_workspace(snapshot, document, &input, cancellation)?;
     let Some((kind, name)) = symbol_at(&all, document, position) else {
         return Ok(Vec::new());
     };
-    Ok(match resolve_symbol(snapshot, &all, &kind, &name) {
+    let resolution = resolve_symbol(snapshot, &all, &kind, &name);
+    // Cache indexes contain the normal definition/reference shards. If a profile-specific
+    // semantic definition exists only inside an unopened disk file (for example a quoted-script
+    // construct that is intentionally not persisted), retain the old exhaustive fallback.
+    let resolution = if matches!(&resolution, Resolution::Missing) {
+        let exhaustive = all_semantics(snapshot, cancellation)?;
+        resolve_symbol(snapshot, &exhaustive, &kind, &name)
+    } else {
+        resolution
+    };
+    Ok(match resolution {
         Resolution::Unique(definition) => vec![definition_selection_location(&definition)],
         Resolution::Ambiguous | Resolution::Missing => Vec::new(),
     })
@@ -103,16 +116,29 @@ pub fn references_with_cancellation(
     if include_declaration {
         result.push(definition_selection_location(&target));
     }
-    for reference in &all.references {
+    let mut consider_reference = |reference: &ReferenceInternal| -> Result<(), Cancelled> {
         cancellation.checkpoint()?;
         if reference.kind != kind || !same_name(&reference.name, &name) {
-            continue;
+            return Ok(());
         }
         if let Resolution::Unique(candidate) =
             resolve_symbol(snapshot, &all, &kind, &reference.name)
             && same_location(&candidate.location, &target.location)
         {
             result.push(reference.location());
+        }
+        Ok(())
+    };
+    for reference in &all.references {
+        consider_reference(reference)?;
+    }
+    for reference in snapshot.index().references_iter() {
+        cancellation.checkpoint()?;
+        if reference.kind != kind || !same_name(&reference.name, &name) {
+            continue;
+        }
+        if let Some(reference) = indexed_reference(snapshot, reference) {
+            consider_reference(&reference)?;
         }
     }
     result.sort_by_key(|location| {
@@ -272,12 +298,12 @@ pub fn rename_with_cancellation(
         new_text: new_name.to_owned(),
     }];
     let overlay_files = overlay_file_ids(snapshot);
-    for reference in &all.references {
+    let mut consider_reference = |reference: &ReferenceInternal| -> Result<(), RenameFailure> {
         cancellation
             .checkpoint()
             .map_err(|Cancelled| RenameFailure::Cancelled)?;
         if reference.kind != target.kind || !same_name(&reference.name, &target.name) {
-            continue;
+            return Ok(());
         }
         // A document overlay replaces its disk candidate.  Do not return edits for the hidden
         // disk text as that would overwrite user changes when the client applies the WorkspaceEdit.
@@ -286,22 +312,37 @@ pub fn rename_with_cancellation(
                 .file
                 .is_some_and(|file| overlay_files.contains(&file))
         {
-            continue;
+            return Ok(());
         }
         let Resolution::Unique(candidate) =
             resolve_symbol(snapshot, &all, &target.kind, &reference.name)
         else {
-            continue;
+            return Ok(());
         };
         if !same_location(&candidate.location, &target.definition.location)
             || !writable_location(snapshot, &reference.location())
         {
-            continue;
+            return Ok(());
         }
         edits.push(WorkspaceTextEdit {
             location: reference.location(),
             new_text: new_name.to_owned(),
         });
+        Ok(())
+    };
+    for reference in &all.references {
+        consider_reference(reference)?;
+    }
+    for reference in snapshot.index().references_iter() {
+        cancellation
+            .checkpoint()
+            .map_err(|Cancelled| RenameFailure::Cancelled)?;
+        if reference.kind != target.kind || !same_name(&reference.name, &target.name) {
+            continue;
+        }
+        if let Some(reference) = indexed_reference(snapshot, reference) {
+            consider_reference(&reference)?;
+        }
     }
     edits.sort_by(|left, right| {
         edit_target_key(&left.location)
@@ -422,6 +463,31 @@ pub fn workspace_symbols_with_cancellation(
             result.push((score.unwrap_or(99), definition.symbol.clone()));
         }
     }
+    for definition in snapshot.index().definitions_iter() {
+        cancellation.checkpoint()?;
+        let name = definition.name.to_ascii_lowercase();
+        let score = if query.is_empty() {
+            Some(20)
+        } else if name.starts_with(&query) {
+            Some(0)
+        } else if name.contains(&query) {
+            Some(10)
+        } else if fuzzy_match(&name, &query) {
+            Some(30)
+        } else {
+            None
+        };
+        let Some(score) = score else {
+            continue;
+        };
+        let symbol = index_definition_info(snapshot, definition).symbol;
+        if let Resolution::Unique(active) =
+            resolve_symbol(snapshot, &all, &definition.kind, &definition.name)
+            && same_location(&active.location, &symbol.location)
+        {
+            result.push((score, symbol));
+        }
+    }
     result.sort_by_key(|(score, symbol)| {
         (
             *score,
@@ -442,8 +508,8 @@ pub(crate) fn rename_target(
         .checkpoint()
         .map_err(|Cancelled| RenameFailure::Cancelled)?;
     let input = input_for_document(snapshot, document).ok_or(RenameError::NoSymbol)?;
-    let all =
-        all_semantics(snapshot, cancellation).map_err(|Cancelled| RenameFailure::Cancelled)?;
+    let all = document_semantic_workspace(snapshot, document, &input, cancellation)
+        .map_err(|Cancelled| RenameFailure::Cancelled)?;
     let Some((kind, name)) = symbol_at(&all, document, position) else {
         return Err(RenameError::NoSymbol.into());
     };
@@ -498,11 +564,63 @@ pub(crate) fn check_rename_conflict(
             return Err(RenameError::Conflict.into());
         }
     }
+    for definition in snapshot.index().definitions_iter() {
+        cancellation
+            .checkpoint()
+            .map_err(|Cancelled| RenameFailure::Cancelled)?;
+        if definition.kind != target.kind
+            || !same_name(&definition.name, new_name)
+            || (Some(definition.file_id) == target.definition.location.file
+                && definition.range == target.definition.location.range)
+        {
+            continue;
+        }
+        let priority = definition_priority_for_file(snapshot, definition.file_id);
+        let conflict = match policy {
+            SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique => true,
+            SymbolResolutionPolicy::ReplaceBySymbol => priority >= target.definition.priority,
+        };
+        if conflict {
+            return Err(RenameError::Conflict.into());
+        }
+    }
     Ok(())
 }
 
 pub(crate) fn valid_rename_name(name: &str) -> bool {
     !name.is_empty() && name.bytes().all(is_word_byte)
+}
+
+fn document_semantic_workspace(
+    snapshot: &AnalysisSnapshot,
+    document: &DocumentId,
+    input: &ParsedInput,
+    cancellation: &CancellationToken,
+) -> Result<SemanticWorkspace, Cancelled> {
+    let semantic = semantic_data_with_cancellation(snapshot, input, cancellation)?;
+    let mut all = SemanticWorkspace {
+        definitions: semantic.definitions,
+        references: semantic.references,
+    };
+    // Other open overlays can define the target (for example a scripted effect in one open file
+    // referenced by another). Include those small, document-scoped semantic files without
+    // materializing the complete cached workspace.
+    for candidate in snapshot
+        .documents()
+        .values()
+        .filter(|candidate| candidate.source() == DocumentSource::Overlay)
+        .filter(|candidate| candidate.id() != document)
+    {
+        cancellation.checkpoint()?;
+        let Some(candidate_input) = input_for_document(snapshot, candidate.id()) else {
+            continue;
+        };
+        let candidate_semantic =
+            semantic_data_with_cancellation(snapshot, &candidate_input, cancellation)?;
+        all.definitions.extend(candidate_semantic.definitions);
+        all.references.extend(candidate_semantic.references);
+    }
+    Ok(all)
 }
 
 pub(crate) fn valid_parameter_name(name: &str) -> bool {

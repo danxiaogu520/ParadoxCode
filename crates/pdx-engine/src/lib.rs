@@ -18,7 +18,8 @@ mod snapshot;
 
 pub use host::AnalysisHost;
 pub use index::{
-    Definition, FileIndexShard, MacroDefinitionSummary, MacroParameterSignature, Reference,
+    Definition, FileIndexShard, LocalisationPreviewMap, LocalisationPreviewMapIter,
+    MacroDefinitionSummary, MacroParameterSignature, PositionMap, PositionMapIter, Reference,
     WorkspaceIndex,
 };
 pub use index_cache::{

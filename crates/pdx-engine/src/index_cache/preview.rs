@@ -3,16 +3,15 @@
 use std::collections::BTreeMap;
 
 use pdx_parser::{CstKind, FileFormat};
-use pdx_text::TextRange;
 
 use super::IndexCacheError;
-use crate::{AnalysisSnapshot, LocalisationPreview, ParsedSource, SourceFileId};
+use crate::{AnalysisSnapshot, LocalisationPreview, LocalisationPreviewMap, ParsedSource};
 
 const MAX_LOCALISATION_PREVIEW_CHARS: usize = 240;
 
 pub(super) fn collect_localisation_previews(
     snapshot: &AnalysisSnapshot,
-) -> Result<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>, IndexCacheError> {
+) -> Result<LocalisationPreviewMap, IndexCacheError> {
     let mut previews = BTreeMap::new();
     for (file_id, file) in snapshot.source_files() {
         let state = snapshot.file_state(*file_id).ok_or_else(|| {
@@ -93,7 +92,7 @@ pub(super) fn collect_localisation_previews(
             }
         }
     }
-    Ok(previews)
+    Ok(LocalisationPreviewMap::from(previews))
 }
 
 fn truncate_localisation_preview(value: &str) -> String {

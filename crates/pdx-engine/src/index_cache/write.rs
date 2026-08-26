@@ -343,16 +343,13 @@ fn write_cache(
     drop(insert_macro_parameter);
     let mut by_file: BTreeMap<SourceFileId, Vec<(TextRange, PositionRange)>> = BTreeMap::new();
     for ((file_id, range), position) in cache.index.position_ranges() {
-        if !cache.source_files.contains_key(file_id) {
+        if !cache.source_files.contains_key(&file_id) {
             return Err(IndexCacheError::InvalidData(format!(
                 "navigation position references unknown file {}",
                 file_id.get()
             )));
         }
-        by_file
-            .entry(*file_id)
-            .or_default()
-            .push((*range, *position));
+        by_file.entry(file_id).or_default().push((range, *position));
     }
     let mut insert_position = transaction
         .prepare("INSERT INTO navigation_positions(file_id, payload) VALUES (?1, ?2)")?;
@@ -368,20 +365,20 @@ fn write_cache(
          VALUES (?1, ?2, ?3, ?4, ?5)",
     )?;
     for ((file_id, range), preview) in &cache.localisation_previews {
-        let Some(file) = cache.source_files.get(file_id) else {
+        let Some(file) = cache.source_files.get(&file_id) else {
             return Err(IndexCacheError::InvalidData(format!(
                 "localisation preview references unknown file {}",
                 file_id.get()
             )));
         };
-        let Some(shard) = cache.index.shard(*file_id) else {
+        let Some(shard) = cache.index.shard(file_id) else {
             return Err(IndexCacheError::InvalidData(format!(
                 "localisation preview file {} has no index shard",
                 file.logical_path.as_str()
             )));
         };
         if !shard.definitions.iter().any(|definition| {
-            definition.range == *range && definition.kind.eq_ignore_ascii_case("localisation")
+            definition.range == range && definition.kind.eq_ignore_ascii_case("localisation")
         }) {
             return Err(IndexCacheError::InvalidData(format!(
                 "localisation preview range {}..{} is not a localisation definition",
@@ -390,7 +387,7 @@ fn write_cache(
             )));
         }
         insert_preview.execute(params![
-            encode_file_id(*file_id),
+            encode_file_id(file_id),
             i64::from(range.start()),
             i64::from(range.end()),
             preview.language,

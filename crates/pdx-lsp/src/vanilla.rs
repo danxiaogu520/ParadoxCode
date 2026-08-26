@@ -302,6 +302,10 @@ fn build_cache_from_source(
     let build_started = std::time::Instant::now();
     let cache = IndexCache::from_snapshot(&host.snapshot())
         .map_err(|error| format!("{activity} failed: {error}"))?;
+    // The cache owns only the compact source metadata and index shards.  Release the temporary
+    // parse/HIR-heavy Vanilla host before SQLite serialization so cache materialization does not
+    // keep the full source tree live alongside the artifact.
+    drop(host);
     if let Some(log) = context.log {
         log(&format!(
             "{activity}: cache built in {:.1} ms",
@@ -599,6 +603,9 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
             let build_started = std::time::Instant::now();
             let cache = IndexCache::from_snapshot(&host.snapshot())
                 .map_err(|error| format!("Vanilla cache creation failed: {error}"))?;
+            // The returned cache does not retain source text, parsed CSTs, or HIR. Drop the
+            // temporary full Vanilla host before saving and handing the cache to the event loop.
+            drop(host);
             if let Some(log) = log {
                 log(&format!(
                     "Vanilla cache built in {:.1} ms",

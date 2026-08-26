@@ -6,14 +6,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use pdx_rules::{GameProfile, ParserKind, RuleSet};
-use pdx_text::{LogicalPath, TextRange};
+use pdx_text::LogicalPath;
 
-use crate::index::{FileIndexShard, WorkspaceIndex};
+use crate::index::{FileIndexShard, LocalisationPreviewMap, PositionMap, WorkspaceIndex};
 use crate::index_cache::{IndexCache, IndexCacheError};
 use crate::model::{
     DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId, DocumentSnapshot,
-    DocumentSource, FileState, LocalisationPreview, PreparedDocument, SourceFile, SourceFileId,
-    SourceRoot, SourceRootId, SourceRootKind, TextChange, WorkspaceChange, WorkspaceError,
+    DocumentSource, FileState, PreparedDocument, SourceFile, SourceFileId, SourceRoot,
+    SourceRootId, SourceRootKind, TextChange, WorkspaceChange, WorkspaceError,
     WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
 };
 use crate::pipeline::{
@@ -43,7 +43,7 @@ pub struct AnalysisHost {
     index: Arc<WorkspaceIndex>,
     scan_report: Arc<WorkspaceScanReport>,
     installed_caches: BTreeSet<SourceRootId>,
-    localisation_previews: Arc<BTreeMap<(SourceFileId, TextRange), LocalisationPreview>>,
+    localisation_previews: Arc<LocalisationPreviewMap>,
     query_cache: Arc<SnapshotQueryCache>,
 }
 
@@ -77,7 +77,7 @@ impl AnalysisHost {
             index: Arc::new(WorkspaceIndex::empty()),
             scan_report: Arc::new(WorkspaceScanReport::default()),
             installed_caches: BTreeSet::new(),
-            localisation_previews: Arc::new(BTreeMap::new()),
+            localisation_previews: Arc::new(LocalisationPreviewMap::new()),
             query_cache: Arc::new(SnapshotQueryCache::new()),
         }
     }
@@ -104,11 +104,16 @@ impl AnalysisHost {
             WorkspaceChange::SetSourceRoots(roots) => {
                 self.roots = Arc::from(roots);
                 self.installed_caches = BTreeSet::new();
-                self.localisation_previews = Arc::new(BTreeMap::new());
+                self.localisation_previews = Arc::new(LocalisationPreviewMap::new());
             }
             WorkspaceChange::SetWorkspaceRoot(root) => self.workspace_root = root,
         }
+        self.advance_revision();
+    }
+
+    fn advance_revision(&mut self) {
         self.revision = self.revision.saturating_add(1);
+        self.query_cache.advance_to(self.revision);
     }
 
     /// Installs a validated persistent index cache for any configured source root.
@@ -140,8 +145,8 @@ impl AnalysisHost {
         let mut roots = self.roots.to_vec();
         let mut files = BTreeMap::new();
         let mut shards = Vec::new();
-        let mut cached_positions = BTreeMap::new();
-        let mut cached_previews = BTreeMap::new();
+        let mut cached_positions = PositionMap::new();
+        let mut cached_previews = LocalisationPreviewMap::new();
         let mut cached_root_ids = BTreeSet::new();
 
         for cache in caches {
@@ -232,8 +237,8 @@ impl AnalysisHost {
                 }
             }
             shards.extend(cached_index.shards.into_values());
-            cached_positions.extend(cache_positions);
-            cached_previews.extend(cache_previews);
+            cached_positions.merge(cache_positions);
+            cached_previews.merge(cache_previews);
         }
 
         for (id, file) in self.source_files.iter() {
@@ -250,9 +255,9 @@ impl AnalysisHost {
         // merged cache + workspace shards are not rebuilt twice.
         let mut index = WorkspaceIndex::from_shards_with_rules(shards, self.rules.as_ref());
         // Source-file IDs were checked for collisions above, so the cached and existing position
-        // keys are disjoint.  Merge the existing snapshot positions in one pass: calling
-        // `replace_position_ranges` once per Current Mod file would retain over the complete
-        // (often-million-entry) BTreeMap for every file and turn cache installation quadratic.
+        // keys are disjoint. Merge the existing snapshot positions in one pass: calling
+        // `replace_position_ranges` once per Current Mod file would repeatedly rebuild the
+        // complete (often-million-entry) position map and turn cache installation quadratic.
         let cached_position_count = cached_positions.len();
         let existing_positions = self.index.position_ranges();
         let existing_position_count = existing_positions.len();
@@ -260,7 +265,7 @@ impl AnalysisHost {
         position_ranges.extend(
             existing_positions
                 .iter()
-                .map(|(key, position)| (*key, *position)),
+                .map(|(key, position)| (key, *position)),
         );
         debug_assert_eq!(
             position_ranges.len(),
@@ -272,14 +277,14 @@ impl AnalysisHost {
         index.resolve_priorities(&priorities, self.rules.as_ref());
 
         let mut localisation_previews = (*self.localisation_previews).clone();
-        localisation_previews.extend(cached_previews);
+        localisation_previews.merge(cached_previews);
         self.roots = Arc::from(roots);
         self.source_files = Arc::new(files);
         self.source_file_paths = Arc::new(source_file_paths(&self.source_files));
         self.index = Arc::new(index);
         self.localisation_previews = Arc::new(localisation_previews);
         self.installed_caches.extend(cached_root_ids);
-        self.revision = self.revision.saturating_add(1);
+        self.advance_revision();
         Ok(())
     }
 
@@ -454,8 +459,8 @@ impl AnalysisHost {
             cancellation,
         )?;
         let mut position_ranges = self.index.position_ranges().clone();
-        position_ranges.retain(|(file_id, _), _| {
-            files.contains_key(file_id) && !file_states.contains_key(file_id)
+        position_ranges.retain_files(|file_id| {
+            files.contains_key(&file_id) && !file_states.contains_key(&file_id)
         });
         for (file_id, state) in &file_states {
             position_ranges.extend(
@@ -481,7 +486,7 @@ impl AnalysisHost {
         self.file_states = Arc::new(file_states);
         self.index = Arc::new(index);
         self.scan_report = Arc::new(report.clone());
-        self.revision = self.revision.saturating_add(1);
+        self.advance_revision();
         Ok(report)
     }
 
@@ -648,7 +653,7 @@ impl AnalysisHost {
             self.file_states = Arc::new(file_states);
             self.index = Arc::new(index);
             self.scan_report = Arc::new(report.clone());
-            self.revision = self.revision.saturating_add(1);
+            self.advance_revision();
         }
         Ok(report)
     }
@@ -670,7 +675,7 @@ impl AnalysisHost {
                 .replace_position_ranges(file_id, position_ranges_for_state(&replacement));
             Arc::make_mut(&mut self.file_states).insert(file_id, Arc::new(replacement));
         }
-        self.revision = self.revision.saturating_add(1);
+        self.advance_revision();
     }
 
     /// Opens a document overlay with a complete initial text.
@@ -696,7 +701,7 @@ impl AnalysisHost {
             path,
         );
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
-        self.revision = self.revision.saturating_add(1);
+        self.advance_revision();
         Ok(())
     }
 
@@ -720,7 +725,7 @@ impl AnalysisHost {
         }
         let document = staged_overlay_document(id.clone(), version, text, path);
         Arc::make_mut(&mut self.documents).insert(id, document);
-        self.revision = self.revision.saturating_add(1);
+        self.advance_revision();
         Ok(())
     }
 
@@ -747,7 +752,7 @@ impl AnalysisHost {
         }
         let document = staged_overlay_document(id.clone(), version, text, current.path.clone());
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
-        self.revision = self.revision.saturating_add(1);
+        self.advance_revision();
         Ok(())
     }
 
@@ -765,7 +770,7 @@ impl AnalysisHost {
             return false;
         }
         Arc::make_mut(&mut self.documents).insert(id, prepared.document);
-        self.revision = self.revision.saturating_add(1);
+        self.advance_revision();
         true
     }
 
@@ -822,7 +827,7 @@ impl AnalysisHost {
             path,
         );
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
-        self.revision = self.revision.saturating_add(1);
+        self.advance_revision();
         Ok(())
     }
 
@@ -854,7 +859,7 @@ impl AnalysisHost {
                 Arc::make_mut(&mut self.documents).insert(id.clone(), document);
             }
         }
-        self.revision = self.revision.saturating_add(1);
+        self.advance_revision();
         Ok(())
     }
 
