@@ -228,6 +228,22 @@ pub(super) fn is_scripted_macro_type(rules: &RuleSet, type_name: &str) -> bool {
     scripted_macro_type_context(rules, type_name).is_some()
 }
 
+/// Whether a top-level property key may be a type instance for `descriptor`.
+///
+/// Descriptors with an enumerated root-key set (`type_root_keys`) reject unrelated file
+/// headers; without an enumeration every root key is a candidate instance.
+#[must_use]
+pub(super) fn semantic_type_root_key_allowed(
+    rules: &RuleSet,
+    descriptor: &TypeDescriptor,
+    key: &str,
+) -> bool {
+    let Some(roots) = rules.model().semantic.type_root_keys.get(&descriptor.name) else {
+        return true;
+    };
+    roots.iter().any(|root| root.eq_ignore_ascii_case(key))
+}
+
 fn semantic_type_path_matches(
     descriptor: &TypeDescriptor,
     logical_path: Option<&LogicalPath>,
@@ -574,7 +590,14 @@ fn semantic_type_definitions(
             continue;
         }
         if descriptor.skip_root_paths.is_empty() {
+            // A descriptor whose legal root keys are enumerated (`type_root_keys`) must not
+            // collect unrelated file headers as type instances. For example EU4 event files
+            // accept `namespace` and `normal_or_historical_nations` at the root, but only
+            // `country_event`/`province_event` are event instances.
             for property in properties.iter().filter(|property| property.top_level) {
+                if !semantic_type_root_key_allowed(rules, descriptor, &property.key) {
+                    continue;
+                }
                 push_type_definition(&mut definitions, properties, descriptor, property);
             }
         } else {

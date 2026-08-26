@@ -584,9 +584,16 @@ fn collect_semantic_type_members(
 
         if descriptor.skip_root_paths.is_empty() {
             for child in parsed.root().children() {
-                if child.kind() == CstKind::Property {
-                    collect_semantic_type_definition(file, parsed, descriptor, child, definitions);
+                if child.kind() != CstKind::Property {
+                    continue;
                 }
+                let Some(key) = semantic_property_key(child, parsed) else {
+                    continue;
+                };
+                if !semantic_type_root_key_allowed(rules, descriptor, &key) {
+                    continue;
+                }
+                collect_semantic_type_definition(file, parsed, descriptor, child, definitions);
             }
         } else {
             for root in parsed.root().children() {
@@ -685,6 +692,21 @@ fn semantic_type_key_matches(descriptor: &pdx_rules::TypeDescriptor, key: &str) 
         .is_none_or(|(values, negate)| {
             (values.iter().any(|value| value.eq_ignore_ascii_case(key))) != *negate
         })
+}
+
+/// Whether a top-level property key may be a type instance for `descriptor`.
+///
+/// Mirrors `hir::semantics::semantic_type_root_key_allowed`: descriptors with an enumerated
+/// root-key set (`type_root_keys`) reject unrelated file headers such as EU4's `namespace`.
+fn semantic_type_root_key_allowed(
+    rules: &RuleSet,
+    descriptor: &pdx_rules::TypeDescriptor,
+    key: &str,
+) -> bool {
+    let Some(roots) = rules.model().semantic.type_root_keys.get(&descriptor.name) else {
+        return true;
+    };
+    roots.iter().any(|root| root.eq_ignore_ascii_case(key))
 }
 
 fn semantic_block_properties(node: &CstNode) -> impl Iterator<Item = &CstNode> {

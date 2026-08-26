@@ -1,6 +1,223 @@
 use super::support::*;
 
 #[test]
+fn event_file_root_offers_all_entries_with_correct_shapes() {
+    use std::path::PathBuf;
+
+    // An empty event file offers the four real entry keys: two repeatable event blocks,
+    // the namespace header, and the normal-or-historical-nations switch.
+    let text = "\n";
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/root-entries.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(PathBuf::from("events/root-entries.txt")),
+    )
+    .expect("open event document");
+    let snapshot = host.snapshot();
+    let result = complete(&snapshot, &id, 0);
+    let by_label = |label: &str| result.items.iter().find(|item| item.label == label);
+    for label in [
+        "country_event",
+        "province_event",
+        "namespace",
+        "normal_or_historical_nations",
+    ] {
+        assert!(
+            by_label(label).is_some(),
+            "event entry `{label}` missing: {:?}",
+            result.items
+        );
+    }
+    assert_eq!(
+        by_label("country_event")
+            .expect("country_event")
+            .insert_text,
+        "country_event = {\n\t$0\n}",
+        "block entries must insert a skeleton: {result:?}"
+    );
+    assert_eq!(
+        by_label("namespace").expect("namespace").insert_text,
+        "namespace = ",
+        "leaf entries must insert only the assignment: {result:?}"
+    );
+    assert_eq!(
+        by_label("normal_or_historical_nations")
+            .expect("normal_or_historical_nations")
+            .insert_text,
+        "normal_or_historical_nations = ",
+        "leaf entries must insert only the assignment: {result:?}"
+    );
+}
+
+#[test]
+fn event_file_root_leaf_entry_completes_its_value_domain() {
+    use std::path::PathBuf;
+
+    // `normal_or_historical_nations = ` picks yes/no from the entry's value domain.
+    let text = "normal_or_historical_nations = \n";
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/root-leaf-value.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(PathBuf::from("events/root-leaf-value.txt")),
+    )
+    .expect("open event document");
+    let snapshot = host.snapshot();
+    let position = u32::try_from(text.find("= ").expect("assignment") + 2).expect("position");
+    let result = complete(&snapshot, &id, position);
+    let labels = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(labels, vec!["no", "yes"], "{result:?}");
+
+    // A namespace declaration has no value domain: its value is free text.
+    let mut host2 = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id2 = DocumentId::new("file:///tmp/events/root-leaf-value-2.txt");
+    host2
+        .open_document(
+            id2.clone(),
+            1,
+            "namespace = \n".to_owned(),
+            Some(PathBuf::from("events/root-leaf-value-2.txt")),
+        )
+        .expect("open event document");
+    let snapshot2 = host2.snapshot();
+    let position2 =
+        u32::try_from("namespace = \n".find("= ").expect("assignment") + 2).expect("position");
+    let result2 = complete(&snapshot2, &id2, position2);
+    assert!(
+        result2.items.is_empty(),
+        "namespace has no static value domain: {result2:?}"
+    );
+}
+
+#[test]
+fn event_file_root_repeats_blocks_but_not_single_declarations() {
+    use std::path::PathBuf;
+
+    // After `namespace`, the cursor on the root gap must still scaffold another event
+    // block (repeatable), while the already-declared single entries disappear.
+    let text = "namespace = ns\ncountry_event = { id = ns.1 }\n\n";
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/root-gap.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(PathBuf::from("events/root-gap.txt")),
+    )
+    .expect("open event document");
+    let snapshot = host.snapshot();
+    let position = u32::try_from(text.find("\n\n").expect("root gap") + 1).expect("position");
+    let result = complete(&snapshot, &id, position);
+    let labels = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"country_event") && labels.contains(&"province_event"),
+        "event blocks must stay scaffoldable: {labels:?}"
+    );
+    assert!(
+        !labels.contains(&"namespace"),
+        "the declared namespace header must not repeat: {labels:?}"
+    );
+    assert!(
+        labels.contains(&"normal_or_historical_nations"),
+        "the undeclared file switch must stay available: {labels:?}"
+    );
+
+    // The same rule family keeps decisions wrappers non-repeatable.
+    let text2 = "country_decisions = {}\n";
+    let mut host2 = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id2 = DocumentId::new("file:///tmp/decisions/root-gap.txt");
+    host2
+        .open_document(
+            id2.clone(),
+            1,
+            text2.to_owned(),
+            Some(PathBuf::from("decisions/root-gap.txt")),
+        )
+        .expect("open decision document");
+    let snapshot2 = host2.snapshot();
+    let position2 = u32::try_from(text2.find("}\n").expect("tail") + 2).expect("position");
+    let result2 = complete(&snapshot2, &id2, position2);
+    assert!(
+        result2
+            .items
+            .iter()
+            .all(|item| item.label != "country_decisions"),
+        "an already-declared wrapper must not be re-offered: {result2:?}"
+    );
+}
+
+#[test]
+fn on_action_event_block_completion_excludes_namespace_headers() {
+    use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+    use std::fs;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-event-symbols-{nonce}"));
+    fs::create_dir_all(root.join("events")).expect("event directory");
+    fs::create_dir_all(root.join("common").join("on_actions")).expect("on_action directory");
+    let event_text = concat!(
+        "namespace = flavor_x\n",
+        "country_event = {\n",
+        "\tid = flavor_x.1\n",
+        "\ttitle = t\n",
+        "\tdesc = d\n",
+        "\toption = { name = a }\n",
+        "}\n",
+    );
+    fs::write(root.join("events/flavor_x.txt"), event_text).expect("write event document");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("index event document");
+    let id = DocumentId::new("file:///tmp/common/on_actions/completion.txt");
+    let text = "on_startup = {\n  events = {\n    \n  }\n}\n";
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(std::path::PathBuf::from("common/on_actions/completion.txt")),
+    )
+    .expect("open on_action document");
+    let snapshot = host.snapshot();
+    let position =
+        u32::try_from(text.find("    \n").expect("blank events body") + 4).expect("position");
+    let result = complete(&snapshot, &id, position);
+    let labels = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"flavor_x.1"),
+        "the indexed event id must complete: {labels:?}"
+    );
+    assert!(
+        !labels.contains(&"namespace"),
+        "the namespace header must not be indexed as an event: {labels:?}"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn event_modifier_completion_inherits_generic_modifier_keys() {
     let text = "my_modifier = {\n  dis\n}\n";
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
@@ -500,6 +717,192 @@ fn decision_completion_skips_type_instance_wrapper() {
         "potential must enter the trigger context: {:?}",
         nested_result.items
     );
+}
+
+#[test]
+fn decision_file_root_offers_only_the_country_decisions_entry() {
+    use std::path::PathBuf;
+
+    // An empty decision file: the only candidate is the `country_decisions` wrapper. No
+    // decision body keys may appear because no decision instance exists yet.
+    let text = "\n";
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/decisions/root-entry.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(PathBuf::from("decisions/root-entry.txt")),
+    )
+    .expect("open decision document");
+    let snapshot = host.snapshot();
+    let result = complete(&snapshot, &id, 0);
+    let labels = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(labels, vec!["country_decisions"], "{result:?}");
+    let entry = &result.items[0];
+    assert_eq!(
+        entry.insert_text, "country_decisions = {\n\t$0\n}",
+        "the wrapper entry must insert an empty block skeleton: {result:?}"
+    );
+    assert_eq!(entry.kind, CompletionKind::Key);
+
+    // A typed prefix narrows the candidate but keeps the same entry.
+    let mut host2 = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id2 = DocumentId::new("file:///tmp/decisions/root-entry-2.txt");
+    host2
+        .open_document(
+            id2.clone(),
+            1,
+            "cou".to_owned(),
+            Some(PathBuf::from("decisions/root-entry-2.txt")),
+        )
+        .expect("open prefixed document");
+    let snapshot2 = host2.snapshot();
+    let prefixed = complete(&snapshot2, &id2, 3);
+    assert!(
+        prefixed
+            .items
+            .iter()
+            .any(|item| item.label == "country_decisions"),
+        "prefix `cou` must still resolve the entry: {prefixed:?}"
+    );
+    assert!(
+        prefixed.items.iter().all(|item| item.label != "allow"),
+        "no decision body keys may leak into the file root: {prefixed:?}"
+    );
+
+    // The entry is path-scoped: event files must not offer the decision wrapper.
+    let mut host3 = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id3 = DocumentId::new("file:///tmp/events/root-entry.txt");
+    host3
+        .open_document(
+            id3.clone(),
+            1,
+            "\n".to_owned(),
+            Some(PathBuf::from("events/root-entry.txt")),
+        )
+        .expect("open event document");
+    let snapshot3 = host3.snapshot();
+    let event_root = complete(&snapshot3, &id3, 0);
+    assert!(
+        event_root
+            .items
+            .iter()
+            .all(|item| item.label != "country_decisions"),
+        "the decision wrapper must not leak into event files: {event_root:?}"
+    );
+
+    // Once the wrapper is declared, the file root stops suggesting it again.
+    let text4 = "country_decisions = {}\n";
+    let mut host4 = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id4 = DocumentId::new("file:///tmp/decisions/root-entry-4.txt");
+    host4
+        .open_document(
+            id4.clone(),
+            1,
+            text4.to_owned(),
+            Some(PathBuf::from("decisions/root-entry-4.txt")),
+        )
+        .expect("open populated document");
+    let snapshot4 = host4.snapshot();
+    let populated = complete(
+        &snapshot4,
+        &id4,
+        text4.len().try_into().expect("tail position"),
+    );
+    assert!(
+        populated
+            .items
+            .iter()
+            .all(|item| item.label != "country_decisions"),
+        "an already-declared wrapper must not be re-offered: {populated:?}"
+    );
+}
+
+#[test]
+fn decision_wrapper_body_without_instance_offers_no_key_candidates() {
+    use std::path::PathBuf;
+
+    // Inside `country_decisions = { … }` but before any decision instance, the only legal
+    // content is a free-form decision id, so no rule-backed key may be completed.
+    let text = "country_decisions = {\n  \n}\n";
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/decisions/wrapper-body.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(PathBuf::from("decisions/wrapper-body.txt")),
+    )
+    .expect("open decision document");
+    let snapshot = host.snapshot();
+    let position =
+        u32::try_from(text.find("  \n").expect("blank wrapper body") + 2).expect("position");
+    let result = complete(&snapshot, &id, position);
+    assert!(
+        result.items.is_empty(),
+        "the wrapper container must not offer decision body keys: {:?}",
+        result
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
+
+    // Same after an existing instance: the gap between instances is still an instance-name
+    // position, never a key position.
+    let text2 = "country_decisions = {\n  d1 = { allow = {} }\n  \n}\n";
+    let mut host2 = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id2 = DocumentId::new("file:///tmp/decisions/wrapper-body-2.txt");
+    host2
+        .open_document(
+            id2.clone(),
+            1,
+            text2.to_owned(),
+            Some(PathBuf::from("decisions/wrapper-body-2.txt")),
+        )
+        .expect("open decision document");
+    let snapshot2 = host2.snapshot();
+    let position2 =
+        u32::try_from(text2.find("  \n").expect("blank wrapper body") + 2).expect("position");
+    let result2 = complete(&snapshot2, &id2, position2);
+    assert!(
+        result2.items.is_empty(),
+        "the wrapper gap must stay empty: {:?}",
+        result2
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
+
+    // Sanity: once the cursor is inside a decision instance, body keys come back.
+    let text3 = "country_decisions = {\n  d1 = {\n    \n  }\n}\n";
+    let mut host3 = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id3 = DocumentId::new("file:///tmp/decisions/wrapper-body-3.txt");
+    host3
+        .open_document(
+            id3.clone(),
+            1,
+            text3.to_owned(),
+            Some(PathBuf::from("decisions/wrapper-body-3.txt")),
+        )
+        .expect("open decision document");
+    let snapshot3 = host3.snapshot();
+    let position3 =
+        u32::try_from(text3.find("    \n").expect("blank instance body") + 4).expect("position");
+    let result3 = complete(&snapshot3, &id3, position3);
+    for label in ["potential", "allow", "effect", "major", "ai_will_do"] {
+        assert!(
+            result3.items.iter().any(|item| item.label == label),
+            "decision key `{label}` was not completed inside the instance: {:?}",
+            result3.items
+        );
+    }
 }
 
 #[test]
@@ -1380,6 +1783,7 @@ fn scope_value_completion_offers_intrinsics_links_and_chains() {
         property: None,
         quoted_depth: 0,
         embedded_value_context: None,
+        wrapper_container: false,
     };
     let labels = crate::scope_expression_candidates(&snapshot, &context, Some("province"))
         .into_iter()
@@ -2192,4 +2596,253 @@ fn if_block_key_completion_still_offers_limit_clause() {
             .map(|item| item.label.as_str())
             .collect::<Vec<_>>()
     );
+}
+
+fn mission_probe(
+    text: &str,
+    needle: &str,
+    path: &str,
+) -> (Vec<String>, Option<(String, Vec<String>)>) {
+    use std::path::PathBuf;
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new(format!("file:///tmp/{path}"));
+    host.open_document(id.clone(), 1, text.to_owned(), Some(PathBuf::from(path)))
+        .expect("open mission document");
+    let snapshot = host.snapshot();
+    let position =
+        u32::try_from(text.find(needle).expect("needle") + needle.len()).expect("position");
+    let input = input_for_document(&snapshot, &id).expect("analysis input");
+    let ctx = semantic_completion_context(&snapshot, &input, position)
+        .map(|c| (c.context, c.parent_path.to_vec()));
+    let result = complete(&snapshot, &id, position);
+    let labels = result
+        .items
+        .iter()
+        .map(|item| item.label.clone())
+        .collect::<Vec<_>>();
+    (labels, ctx)
+}
+
+fn assert_sorted_labels_eq(labels: &[String], expected: &[&str], what: &str) {
+    let mut actual = labels.to_vec();
+    actual.sort();
+    let mut want = expected.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    want.sort();
+    assert_eq!(actual, want, "{what}: {labels:?}");
+}
+
+#[test]
+fn mission_file_root_and_root_gaps_offer_no_candidates() {
+    // An empty missions file has a free-form series name on the root, so no key candidates.
+    let (labels, ctx) = mission_probe("\n", "", "missions/root-entry.txt");
+    assert!(
+        labels.is_empty(),
+        "empty root must not offer candidates: {labels:?}"
+    );
+    assert!(
+        ctx.is_none(),
+        "empty root has no semantic container: {ctx:?}"
+    );
+
+    // A root gap after a finished series must stay candidate-free for the next series name.
+    let gap = "test_series = {\n  slot = 1\n}\n\n";
+    let (labels, ctx) = mission_probe(gap, "\n\n", "missions/root-gap.txt");
+    assert!(
+        labels.is_empty(),
+        "root gap must not offer candidates: {labels:?}"
+    );
+    assert!(ctx.is_none(), "root gap has no semantic container: {ctx:?}");
+}
+
+#[test]
+fn mission_series_block_offers_exactly_the_series_keys() {
+    let text = concat!(
+        "test_series = {\n",
+        "  slot = 1\n",
+        "  generic = no\n",
+        "  ai = yes\n",
+        "  has_country_shield = no\n",
+        "  \n",
+        "}\n",
+    );
+    let (labels, ctx) = mission_probe(text, "  \n", "missions/series-block.txt");
+    assert_eq!(ctx, Some(("type:mission_series".to_owned(), Vec::new())));
+    assert_sorted_labels_eq(
+        &labels,
+        &[
+            "ai",
+            "generic",
+            "has_country_shield",
+            "potential",
+            "potential_on_load",
+            "slot",
+        ],
+        "series body",
+    );
+}
+
+#[test]
+fn mission_instance_body_offers_exactly_the_instance_keys() {
+    let text = concat!(
+        "test_series = {\n",
+        "  slot = 1\n",
+        "  mission_a = {\n",
+        "    icon = mission_unknown position = 1\n",
+        "    \n",
+        "  }\n",
+        "}\n",
+    );
+    let (labels, ctx) = mission_probe(text, "    \n", "missions/instance-body.txt");
+    assert_eq!(
+        ctx,
+        Some((
+            "type:mission_series".to_owned(),
+            vec!["mission_a".to_owned()]
+        )),
+        "the instance key must become the semantic parent path"
+    );
+    assert_sorted_labels_eq(
+        &labels,
+        &[
+            "ai_weight",
+            "completed_by",
+            "effect",
+            "icon",
+            "position",
+            "provinces_to_highlight",
+            "required_missions",
+            "trigger",
+        ],
+        "instance body",
+    );
+}
+
+#[test]
+fn mission_potential_trigger_and_effect_blocks_enter_scoped_contexts() {
+    let potential_text = concat!(
+        "test_series = {\n",
+        "  potential = {\n",
+        "    \n",
+        "  }\n",
+        "  mission_a = {\n",
+        "    icon = mission_unknown position = 1\n",
+        "    trigger = {\n",
+        "      \n",
+        "    }\n",
+        "  }\n",
+        "}\n",
+    );
+    // Series-level potential enters the generic trigger context; the instance-level
+    // specialization rule must not leak into it.
+    let (labels, ctx) = mission_probe(potential_text, "    \n", "missions/series-potential.txt");
+    assert_eq!(ctx, Some(("trigger".to_owned(), Vec::new())));
+    for label in ["ai", "always", "custom_trigger_tooltip", "has_country_flag"] {
+        assert!(
+            labels.iter().any(|item| item == label),
+            "series potential must offer trigger `{label}`: {labels:?}"
+        );
+    }
+    assert!(
+        !labels.iter().any(|item| item == "mil_ideas"),
+        "the mission-only specialization leaf must not appear in series potential: {labels:?}"
+    );
+    assert!(
+        !labels.iter().any(|item| item == "slot"),
+        "series keys must not leak into the trigger context: {labels:?}"
+    );
+
+    // The instance trigger adds the mission specialization rule.
+    let (labels, ctx) = mission_probe(potential_text, "      \n", "missions/instance-trigger.txt");
+    assert_eq!(ctx, Some(("trigger".to_owned(), Vec::new())));
+    for label in [
+        "ai",
+        "has_country_flag",
+        "has_completed_idea_group_of_category",
+    ] {
+        assert!(
+            labels.iter().any(|item| item == label),
+            "instance trigger must offer `{label}`: {labels:?}"
+        );
+    }
+
+    // The instance effect enters the effect context.
+    let effect_text = concat!(
+        "test_series = {\n",
+        "  slot = 1\n",
+        "  mission_a = {\n",
+        "    icon = mission_unknown position = 1\n",
+        "    effect = {\n",
+        "      \n",
+        "    }\n",
+        "  }\n",
+        "}\n",
+    );
+    let (labels, ctx) = mission_probe(effect_text, "      \n", "missions/instance-effect.txt");
+    assert_eq!(ctx, Some(("effect".to_owned(), Vec::new())));
+    for label in [
+        "add_country_modifier",
+        "country_event",
+        "custom_tooltip",
+        "define_advisor",
+        "hidden_effect",
+    ] {
+        assert!(
+            labels.iter().any(|item| item == label),
+            "instance effect must offer `{label}`: {labels:?}"
+        );
+    }
+    assert!(
+        !labels.iter().any(|item| item == "slot"),
+        "series keys must not leak into the effect context: {labels:?}"
+    );
+}
+
+#[test]
+fn mission_provinces_to_highlight_scopes_trigger_to_province() {
+    let text = concat!(
+        "test_series = {\n",
+        "  slot = 1\n",
+        "  mission_a = {\n",
+        "    icon = mission_unknown position = 1\n",
+        "    provinces_to_highlight = {\n",
+        "      \n",
+        "    }\n",
+        "  }\n",
+        "}\n",
+    );
+    let (labels, ctx) = mission_probe(text, "      \n", "missions/provinces-to-highlight.txt");
+    assert_eq!(ctx, Some(("trigger".to_owned(), Vec::new())));
+    for label in ["area", "always", "base_tax", "province_id"] {
+        assert!(
+            labels.iter().any(|item| item == label),
+            "province-scoped trigger context must offer `{label}`: {labels:?}"
+        );
+    }
+    assert!(
+        !labels.iter().any(|item| item == "add_country_modifier"),
+        "effects must not appear in the province trigger context: {labels:?}"
+    );
+    assert!(
+        !labels.iter().any(|item| item == "slot"),
+        "series keys must not leak into the province trigger context: {labels:?}"
+    );
+}
+
+#[test]
+fn mission_ai_weight_offers_the_modifier_rule_keys() {
+    let text = concat!(
+        "test_series = {\n",
+        "  slot = 1\n",
+        "  mission_a = {\n",
+        "    icon = mission_unknown position = 1\n",
+        "    ai_weight = {\n",
+        "      \n",
+        "    }\n",
+        "  }\n",
+        "}\n",
+    );
+    let (labels, ctx) = mission_probe(text, "      \n", "missions/ai-weight.txt");
+    assert_eq!(ctx, Some(("modifier_rule".to_owned(), Vec::new())));
+    assert_sorted_labels_eq(&labels, &["factor", "modifier"], "ai_weight body");
 }

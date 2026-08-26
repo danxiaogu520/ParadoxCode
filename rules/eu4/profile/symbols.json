@@ -37,8 +37,23 @@
         "case_sensitive": false
       },
       "key": {
-        "mode": "any",
-        "pattern": "",
+        "mode": "exact",
+        "pattern": "country_event",
+        "case_sensitive": false
+      },
+      "kind": "event",
+      "name_field": "id",
+      "requires_value": false
+    },
+    {
+      "path": {
+        "mode": "contains",
+        "pattern": "events/",
+        "case_sensitive": false
+      },
+      "key": {
+        "mode": "exact",
+        "pattern": "province_event",
         "case_sensitive": false
       },
       "kind": "event",

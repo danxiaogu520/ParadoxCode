@@ -33,6 +33,10 @@ pub(crate) struct SemanticCompletionContext {
     pub(crate) property: Option<ScriptProperty>,
     pub(crate) quoted_depth: usize,
     pub(crate) embedded_value_context: Option<bool>,
+    /// Whether completion sits in a type-instance wrapper container without a concrete
+    /// instance under the cursor. A wrapper such as `country_decisions = { … }` only accepts
+    /// free-form instance names, so key candidates from the wrapped type must be suppressed.
+    pub(crate) wrapper_container: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -266,6 +270,7 @@ fn semantic_completion_container(
                 property: Some(property.clone()),
                 quoted_depth,
                 embedded_value_context,
+                wrapper_container: skip_type_instance,
             };
             let inferred = infer_macro_quoted_script_constraints(
                 snapshot,
@@ -448,6 +453,7 @@ fn semantic_completion_container(
         property,
         quoted_depth,
         embedded_value_context,
+        wrapper_container: skip_type_instance,
     })
 }
 

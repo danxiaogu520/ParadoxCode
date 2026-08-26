@@ -22,10 +22,10 @@ pub use model::{
 };
 pub use profile::{
     GameProfile, ProfileConditionalDefinitionRule, ProfileContainerDefinitionRule,
-    ProfileContainerValueDefinitionRule, ProfileDefinitionRule, ProfileMatchMode,
-    ProfileMemberNameSuffixRule, ProfileReferenceRule, ProfileRootScopeRule,
-    ProfileScopeCompatibility, ProfileTextMatcher, ProfileTokenDefinitionRule,
-    ProfileValueDefinitionRule, SourceEncoding,
+    ProfileContainerValueDefinitionRule, ProfileDefinitionRule, ProfileFileRootEntry,
+    ProfileMatchMode, ProfileMemberNameSuffixRule, ProfileReferenceRule, ProfileRootEntryShape,
+    ProfileRootScopeRule, ProfileScopeCompatibility, ProfileTextMatcher,
+    ProfileTokenDefinitionRule, ProfileValueDefinitionRule, SourceEncoding,
 };
 pub use runtime::{RuleSet, RulesError};
 

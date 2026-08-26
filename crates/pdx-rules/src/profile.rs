@@ -310,6 +310,49 @@ pub struct GameProfile {
     pub control_flow_keys: Vec<String>,
     /// Additional static enum members supplied by the profile.
     pub enum_extra_members: BTreeMap<String, Vec<String>>,
+    /// File-level completion entries offered when the cursor is outside any root block.
+    ///
+    /// These are the only candidates a file can accept before any root block exists; for
+    /// example EU4 decision files must start with the `country_decisions` wrapper, whose
+    /// instance names are free-form and therefore not rule-backed.
+    pub file_root_entries: Vec<ProfileFileRootEntry>,
+}
+
+/// One file-level entry key offered at the document root.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileFileRootEntry {
+    /// Path selector; the entry is offered only for matching logical paths.
+    pub path: ProfileTextMatcher,
+    /// Root key offered by completion.
+    pub key: String,
+    /// Whether the key opens a block (`key = { … }`) or is a plain scalar (`key = `).
+    #[serde(default)]
+    pub shape: ProfileRootEntryShape,
+    /// Whether the entry may be declared more than once per file.
+    ///
+    /// Single-instance wrappers such as `country_decisions` stop being offered once
+    /// declared; repeatable block entries such as `country_event` stay available so the
+    /// next event can be scaffolded.
+    #[serde(default)]
+    pub repeatable: bool,
+    /// Value candidates offered directly after `key = ` (for example `yes`/`no`).
+    #[serde(default)]
+    pub values: Vec<String>,
+    /// Short semantic detail shown by the editor.
+    #[serde(default)]
+    pub detail: Option<String>,
+}
+
+/// Insertion shape of a file-level root entry.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ProfileRootEntryShape {
+    /// `key = { … }` with a block skeleton.
+    #[default]
+    Node,
+    /// `key = ` leaving the cursor on the value.
+    Leaf,
 }
 
 impl GameProfile {
@@ -345,6 +388,7 @@ impl GameProfile {
             fallback_keys: Vec::new(),
             control_flow_keys: Vec::new(),
             enum_extra_members: BTreeMap::new(),
+            file_root_entries: Vec::new(),
         }
     }
 

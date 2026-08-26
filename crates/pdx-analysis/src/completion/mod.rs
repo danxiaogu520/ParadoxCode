@@ -108,16 +108,44 @@ pub fn complete_with_cancellation(
                 .property
                 .as_ref()
                 .is_none_or(|property| property.operator.is_none());
-            add_semantic_key_items_ranked(
-                snapshot,
-                context,
-                &mut member_cache,
-                &mut items,
-                replacement_range,
-                &prefix,
-                insert_assignment,
-            );
+            // A type-instance wrapper such as `country_decisions = { … }` accepts only
+            // free-form instance names; the wrapped type's keys must not be offered there.
+            if !context.wrapper_container {
+                add_semantic_key_items_ranked(
+                    snapshot,
+                    context,
+                    &mut member_cache,
+                    &mut items,
+                    replacement_range,
+                    &prefix,
+                    insert_assignment,
+                );
+            }
         }
+    } else if !value_context {
+        // No rule-backed container covers the cursor; this is the document root of an
+        // otherwise empty file (or a gap between root blocks). Offer the profile's
+        // file-level entry keys, for example EU4's `country_decisions` wrapper.
+        add_file_root_entry_items(
+            snapshot,
+            &input,
+            &mut items,
+            replacement_range,
+            &prefix,
+            cancellation,
+        )?;
+    } else {
+        // A bare `key = ` at the document root: only file-level leaf entries carry value
+        // domains here (for example `normal_or_historical_nations = yes/no`).
+        add_file_root_entry_value_items(
+            snapshot,
+            &input,
+            &mut items,
+            replacement_range,
+            position,
+            &prefix,
+            cancellation,
+        )?;
     }
     let mut items = finalize_completion_items(items);
     if let Some(context) = semantic_context.as_ref() {
