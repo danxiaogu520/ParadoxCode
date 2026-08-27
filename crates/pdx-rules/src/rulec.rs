@@ -15,6 +15,7 @@ use crate::{
     FileCategory, GameProfile, RuleRecord, RuleSet, RulesError, RulesModel, SemanticModel,
     SymbolDescriptor,
 };
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 
@@ -242,13 +243,35 @@ fn parse_source_files(
     validate_source_model(manifest, catalog, semantic, profile)
 }
 
+/// Parses independent JSON fragments in parallel while preserving manifest order.
+///
+/// CWTools' Rust loader fans out file parsing and performs one deterministic merge and reindex
+/// afterwards. The source compiler follows the same shape: JSON decoding is parallel, while
+/// duplicate detection and source-order-sensitive merging remain a single ordered operation.
+fn read_fragments_parallel<T>(
+    paths: &[String],
+    files: &BTreeMap<String, Vec<u8>>,
+) -> Result<Vec<T>, CompileError>
+where
+    T: DeserializeOwned + Send,
+{
+    let mut parsed = paths
+        .par_iter()
+        .enumerate()
+        .map(|(index, path)| (index, read_declared_json(path, files)))
+        .collect::<Vec<_>>();
+    // Rayon preserves order for indexed collection today, but sorting the explicit ordinal keeps
+    // that contract local to this compiler even if the collection implementation changes.
+    parsed.sort_unstable_by_key(|(index, _)| *index);
+    parsed.into_iter().map(|(_, result)| result).collect()
+}
+
 fn parse_catalog_fragments(
     paths: &[String],
     files: &BTreeMap<String, Vec<u8>>,
 ) -> Result<CatalogSource, CompileError> {
     let mut catalog = CatalogSource::default();
-    for path in paths {
-        let fragment: CatalogSource = read_declared_json(path, files)?;
+    for fragment in read_fragments_parallel::<CatalogSource>(paths, files)? {
         catalog.file_categories.extend(fragment.file_categories);
         catalog
             .symbol_descriptors
@@ -263,11 +286,48 @@ fn parse_semantic_fragments(
     files: &BTreeMap<String, Vec<u8>>,
 ) -> Result<Vec<crate::SemanticRule>, CompileError> {
     let mut rules = Vec::new();
-    for path in paths {
-        let fragment: Vec<crate::SemanticRule> = read_declared_json(path, files)?;
+    for fragment in read_fragments_parallel::<Vec<crate::SemanticRule>>(paths, files)? {
         rules.extend(fragment);
     }
     Ok(rules)
+}
+
+enum ParsedTypeFragment {
+    Descriptors(BTreeMap<String, crate::TypeDescriptor>),
+    RootKeys(BTreeMap<String, Vec<String>>),
+    RootScopes(BTreeMap<String, BTreeMap<String, String>>),
+}
+
+fn parse_type_fragment(
+    path: &str,
+    files: &BTreeMap<String, Vec<u8>>,
+) -> Result<ParsedTypeFragment, CompileError> {
+    if path.ends_with("root-keys.json") {
+        Ok(ParsedTypeFragment::RootKeys(read_declared_json(
+            path, files,
+        )?))
+    } else if path.ends_with("root-scopes.json") {
+        Ok(ParsedTypeFragment::RootScopes(read_declared_json(
+            path, files,
+        )?))
+    } else {
+        Ok(ParsedTypeFragment::Descriptors(read_declared_json(
+            path, files,
+        )?))
+    }
+}
+
+fn read_type_fragments_parallel(
+    paths: &[String],
+    files: &BTreeMap<String, Vec<u8>>,
+) -> Result<Vec<ParsedTypeFragment>, CompileError> {
+    let mut parsed = paths
+        .par_iter()
+        .enumerate()
+        .map(|(index, path)| (index, parse_type_fragment(path, files)))
+        .collect::<Vec<_>>();
+    parsed.sort_unstable_by_key(|(index, _)| *index);
+    parsed.into_iter().map(|(_, result)| result).collect()
 }
 
 fn parse_type_fragments(
@@ -277,23 +337,17 @@ fn parse_type_fragments(
     let mut descriptors = BTreeMap::new();
     let mut root_keys = BTreeMap::new();
     let mut root_scopes = BTreeMap::<String, BTreeMap<String, String>>::new();
-    for path in paths {
-        if path.ends_with("root-keys.json") {
-            merge_unique_map(
-                &mut root_keys,
-                read_declared_json(path, files)?,
-                "type root keys",
-            )?;
-        } else if path.ends_with("root-scopes.json") {
-            merge_unique_map(
-                &mut root_scopes,
-                read_declared_json(path, files)?,
-                "type root scopes",
-            )?;
-        } else {
-            let fragment: BTreeMap<String, crate::TypeDescriptor> =
-                read_declared_json(path, files)?;
-            merge_unique_map(&mut descriptors, fragment, "type descriptor")?;
+    for fragment in read_type_fragments_parallel(paths, files)? {
+        match fragment {
+            ParsedTypeFragment::RootKeys(fragment) => {
+                merge_unique_map(&mut root_keys, fragment, "type root keys")?;
+            }
+            ParsedTypeFragment::RootScopes(fragment) => {
+                merge_unique_map(&mut root_scopes, fragment, "type root scopes")?;
+            }
+            ParsedTypeFragment::Descriptors(fragment) => {
+                merge_unique_map(&mut descriptors, fragment, "type descriptor")?;
+            }
         }
     }
     Ok((descriptors, root_keys, root_scopes))
@@ -304,8 +358,7 @@ fn parse_value_fragments(
     files: &BTreeMap<String, Vec<u8>>,
 ) -> Result<BTreeMap<String, Vec<String>>, CompileError> {
     let mut values = BTreeMap::new();
-    for path in paths {
-        let fragment: BTreeMap<String, Vec<String>> = read_declared_json(path, files)?;
+    for fragment in read_fragments_parallel::<BTreeMap<String, Vec<String>>>(paths, files)? {
         merge_unique_map(&mut values, fragment, "enum value set")?;
     }
     Ok(values)
@@ -316,9 +369,9 @@ fn parse_localisation_fragments(
     files: &BTreeMap<String, Vec<u8>>,
 ) -> Result<Vec<crate::LocalisationBinding>, CompileError> {
     let mut source = BTreeMap::<String, Vec<LocalisationBindingSource>>::new();
-    for path in paths {
-        let fragment: BTreeMap<String, Vec<LocalisationBindingSource>> =
-            read_declared_json(path, files)?;
+    for fragment in
+        read_fragments_parallel::<BTreeMap<String, Vec<LocalisationBindingSource>>>(paths, files)?
+    {
         for (type_name, bindings) in fragment {
             source.entry(type_name).or_default().extend(bindings);
         }
@@ -331,8 +384,8 @@ fn parse_profile_fragments(
     files: &BTreeMap<String, Vec<u8>>,
 ) -> Result<GameProfile, CompileError> {
     let mut profile = serde_json::Map::new();
-    for path in paths {
-        let fragment: serde_json::Value = read_declared_json(path, files)?;
+    let fragments = read_fragments_parallel::<serde_json::Value>(paths, files)?;
+    for (path, fragment) in paths.iter().zip(fragments) {
         let serde_json::Value::Object(fragment) = fragment else {
             return Err(CompileError::Validation(format!(
                 "profile fragment must be an object: {path}"
@@ -1060,6 +1113,34 @@ mod tests {
         );
         let error = validate_model(&model).expect_err("empty macro usage must be rejected");
         assert!(error.to_string().contains("usage capability"));
+    }
+
+    #[test]
+    fn parallel_fragment_loader_preserves_manifest_order() {
+        let paths = vec![
+            "fragments/first.json".to_owned(),
+            "fragments/second.json".to_owned(),
+            "fragments/third.json".to_owned(),
+        ];
+        let files = BTreeMap::from([
+            (paths[0].clone(), br#"1"#.to_vec()),
+            (paths[1].clone(), br#"2"#.to_vec()),
+            (paths[2].clone(), br#"3"#.to_vec()),
+        ]);
+        let values = read_fragments_parallel::<u32>(&paths, &files).expect("parse fragments");
+        assert_eq!(values, [1, 2, 3]);
+    }
+
+    #[test]
+    fn parallel_fragment_loader_reports_the_first_manifest_error() {
+        let paths = vec![
+            "fragments/first.json".to_owned(),
+            "fragments/missing.json".to_owned(),
+        ];
+        let files = BTreeMap::from([(paths[0].clone(), br#"not-json"#.to_vec())]);
+        let error = read_fragments_parallel::<u32>(&paths, &files)
+            .expect_err("a missing or malformed fragment must fail");
+        assert!(error.to_string().contains("fragments/first.json"));
     }
 
     #[test]
