@@ -11,5 +11,8 @@ repository.workspace = true
 readme.workspace = true
 publish = false
 
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
 [lints]
 workspace = true

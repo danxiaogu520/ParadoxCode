@@ -12,6 +12,7 @@ readme.workspace = true
 publish = false
 
 [dependencies]
+bincode = "1.3"
 encoding_rs = "0.8"
 pdx-rules = { path = "../pdx-rules" }
 pdx-parser = { path = "../pdx-parser" }

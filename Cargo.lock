@@ -9,6 +9,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "bincode"
+version = "1.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -363,6 +372,7 @@ dependencies = [
 name = "pdx-engine"
 version = "0.1.4"
 dependencies = [
+ "bincode",
  "encoding_rs",
  "pdx-game",
  "pdx-parser",
@@ -414,6 +424,7 @@ name = "pdx-parser"
 version = "0.1.4"
 dependencies = [
  "pdx-text",
+ "serde",
  "unicode-width",
 ]
 
@@ -432,6 +443,9 @@ dependencies = [
 [[package]]
 name = "pdx-text"
 version = "0.1.4"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "pkg-config"

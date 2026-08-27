@@ -1,6 +1,57 @@
 use super::*;
 
 #[test]
+fn persistent_parse_cache_skips_reparsing_matching_disk_source() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-parse-cache-{nonce}"));
+    let events = root.join("events");
+    let cache = root.join("cache");
+    fs::create_dir_all(&events).expect("event directory");
+    fs::write(
+        events.join("cached.txt"),
+        "country_event = { id = cached.1 }\n",
+    )
+    .expect("cached fixture");
+
+    let configure = |host: &mut AnalysisHost| {
+        host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+            SourceRoot::new(
+                SourceRootId::new(1),
+                SourceRootKind::CurrentMod,
+                root.clone(),
+            ),
+        ]));
+    };
+    let mut first = eu4_host().with_parse_cache_dir(cache.clone());
+    configure(&mut first);
+    reset_pipeline_counts();
+    first.refresh_source_roots().expect("initial scan");
+    assert_eq!(pipeline_counts(), (1, 1));
+
+    let mut second = eu4_host().with_parse_cache_dir(cache);
+    configure(&mut second);
+    reset_pipeline_counts();
+    second.refresh_source_roots().expect("cached scan");
+    assert_eq!(
+        pipeline_counts(),
+        (0, 1),
+        "a matching persistent CST should skip parsing but still lower against active rules"
+    );
+    assert!(
+        second
+            .snapshot()
+            .index()
+            .active_definition("event", "cached.1")
+            .is_some()
+    );
+
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn physical_path_lookup_follows_scan_and_targeted_disk_changes() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

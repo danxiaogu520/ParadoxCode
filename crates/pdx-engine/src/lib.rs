@@ -11,6 +11,7 @@ mod host;
 mod index;
 mod index_cache;
 mod model;
+mod parse_cache;
 mod pipeline;
 mod query_cache;
 mod scan;
@@ -32,6 +33,7 @@ pub use model::{
     TextChange, WorkspaceChange, WorkspaceError, WorkspaceScanIssue, WorkspaceScanIssueKind,
     WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
 };
+pub use parse_cache::{CURRENT_PARSE_CACHE_SCHEMA_VERSION, ParseCache, ParseCacheError};
 pub use query_cache::SnapshotQueryCache;
 pub use snapshot::AnalysisSnapshot;
 

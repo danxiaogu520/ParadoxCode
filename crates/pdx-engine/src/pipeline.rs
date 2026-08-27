@@ -18,6 +18,7 @@ use crate::model::{
     SourceFileId, SourceRoot, WorkspaceError, WorkspaceScanLimits, WorkspaceScanReport,
     WorkspaceScanToken,
 };
+use crate::parse_cache::ParseCache;
 use crate::scan::read_source_file_cancellable;
 #[cfg(test)]
 use crate::{record_pipeline_lower, record_pipeline_parse};
@@ -29,11 +30,20 @@ pub(crate) fn parse_source(
     rules: &RuleSet,
     profile: &GameProfile,
 ) -> (Option<ParsedSource>, Option<Arc<HirFile>>) {
+    parse_source_with_cache(parser, source, logical_path, rules, profile, None)
+}
+
+fn parse_source_with_cache(
+    parser: &ParserKind,
+    source: &str,
+    logical_path: Option<&LogicalPath>,
+    rules: &RuleSet,
+    profile: &GameProfile,
+    cache: Option<(&SourceFile, &ParseCache)>,
+) -> (Option<ParsedSource>, Option<Arc<HirFile>>) {
     match parser {
         ParserKind::Script => {
-            #[cfg(test)]
-            record_pipeline_parse();
-            let parsed = Arc::new(parse(FileFormat::Script, source));
+            let parsed = cached_or_parse(FileFormat::Script, source, cache);
             #[cfg(test)]
             record_pipeline_lower();
             let hir = Arc::new(logical_path.map_or_else(
@@ -43,9 +53,7 @@ pub(crate) fn parse_source(
             (Some(ParsedSource::Text(parsed)), Some(hir))
         }
         ParserKind::Localisation => {
-            #[cfg(test)]
-            record_pipeline_parse();
-            let parsed = Arc::new(parse(FileFormat::Localisation, source));
+            let parsed = cached_or_parse(FileFormat::Localisation, source, cache);
             #[cfg(test)]
             record_pipeline_lower();
             let hir = Arc::new(logical_path.map_or_else(
@@ -56,6 +64,27 @@ pub(crate) fn parse_source(
         }
         ParserKind::Asset | ParserKind::SyntaxOnly => (None, None),
     }
+}
+
+fn cached_or_parse(
+    format: FileFormat,
+    source: &str,
+    cache: Option<(&SourceFile, &ParseCache)>,
+) -> Arc<ParsedFile> {
+    if let Some((file, cache)) = cache
+        && let Some(parsed) = cache.load(file, format, source)
+    {
+        return Arc::new(parsed);
+    }
+    #[cfg(test)]
+    record_pipeline_parse();
+    let parsed = Arc::new(parse(format, source));
+    if let Some((file, cache)) = cache {
+        // A cache write is an optimization only; a read-only or full disk cache must never make
+        // the workspace scan fail after the source has already been parsed successfully.
+        let _ = cache.store(file, format, source, &parsed);
+    }
+    parsed
 }
 
 fn parser_for_document(
@@ -185,6 +214,7 @@ pub(crate) struct SourceLoadContext<'a> {
     pub(crate) previous_states: &'a BTreeMap<SourceFileId, Arc<FileState>>,
     pub(crate) rules: &'a RuleSet,
     pub(crate) profile: &'a GameProfile,
+    pub(crate) parse_cache: Option<&'a ParseCache>,
     pub(crate) cancellation: &'a WorkspaceScanToken,
     pub(crate) progress: Option<&'a (dyn Fn(usize, usize) + Sync)>,
 }
@@ -322,12 +352,13 @@ fn load_source_file_job(
             );
         }
         let file_revision = previous.map_or(0, |state| state.revision().saturating_add(1));
-        let state = build_file_state(
+        let state = build_file_state_with_cache(
             &job.file,
             text,
             file_revision,
             context.rules,
             context.profile,
+            context.parse_cache,
         );
         if job.retain_frontend {
             Arc::new(state)
@@ -371,6 +402,17 @@ pub(crate) fn build_file_state(
     rules: &RuleSet,
     profile: &GameProfile,
 ) -> FileState {
+    build_file_state_with_cache(file, source, revision, rules, profile, None)
+}
+
+pub(crate) fn build_file_state_with_cache(
+    file: &SourceFile,
+    source: String,
+    revision: u64,
+    rules: &RuleSet,
+    profile: &GameProfile,
+    parse_cache: Option<&ParseCache>,
+) -> FileState {
     let Some(category) = rules.classify(&file.logical_path) else {
         return FileState {
             revision,
@@ -388,12 +430,13 @@ pub(crate) fn build_file_state(
             cached_localisation_previews: None,
         };
     };
-    let (parsed, hir) = parse_source(
+    let (parsed, hir) = parse_source_with_cache(
         &category.parser,
         &source,
         Some(&file.logical_path),
         rules,
         profile,
+        parse_cache.map(|cache| (file, cache)),
     );
     let mut shard = match (parsed.as_ref(), hir.as_deref()) {
         (Some(ParsedSource::Text(parsed)), Some(hir)) => {

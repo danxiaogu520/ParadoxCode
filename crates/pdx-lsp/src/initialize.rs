@@ -82,8 +82,22 @@ pub(crate) fn prepare_initialize_candidate(
                 INVALID_PARAMS,
                 "initialize requires at least one workspace folder; rootUri-only clients are not supported",
             )
-        })?;
+    })?;
     let client_root = workspace_root;
+    if let Some(configuration) = auto_vanilla {
+        let parse_cache = configuration
+            .user_paths
+            .cache_root
+            .join(game_id.as_str())
+            .join("parse-cache");
+        host.set_parse_cache_dir(Some(parse_cache.clone()));
+        if let Some(log) = callbacks.log {
+            log(&format!(
+                "Persistent syntax-tree cache enabled at {}",
+                parse_cache.display()
+            ));
+        }
+    }
     let watched_files_capability = params
         .capabilities
         .workspace
