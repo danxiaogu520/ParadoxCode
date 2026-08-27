@@ -60,6 +60,10 @@ pub struct ScopeFact {
     pub parent_path: Vec<String>,
     /// Initial persistent scope registers for this root.
     pub state: ScopeState,
+    /// Scope registers after this property applies its statically selected transition, when the
+    /// lowering can prove one. `None` means that the property is not a known transition or has
+    /// competing alternatives; consumers should keep the scope conservative in that case.
+    pub transition: Option<ScopeState>,
 }
 
 /// One scalar value attached directly to a property.
