@@ -48,7 +48,7 @@ rewritten without evidence that their boundaries are the bottleneck.
 
 ## Implemented stages
 
-The first twelve stages are now on `main`, each independently committed and pushed:
+The first thirteen stages are now on `main`, each independently committed and pushed:
 
 1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
    reporting stays deterministic.
@@ -81,6 +81,9 @@ The first twelve stages are now on `main`, each independently committed and push
 12. Workspace discovery accepts bounded file and directory ignore globs. Directory matches are
     pruned before recursion and file matches before scan-budget accounting; targeted watcher
     updates use the same predicate, so ignored paths cannot re-enter through the incremental path.
+13. Automatic Vanilla cache builds and rules-hash regenerations reuse the LSP's persistent
+    source-independent parse cache. Semantic shards are still rebuilt against the active rules,
+    but unchanged source files no longer pay the parser cost a second time.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an
