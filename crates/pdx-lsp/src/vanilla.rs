@@ -268,7 +268,7 @@ fn build_cache_from_source(
     context: &VanillaIndexContext<'_>,
     activity: &str,
 ) -> Result<IndexCache, String> {
-    let mut host = AnalysisHost::with_profile(context.rules.clone(), context.profile.clone());
+    let mut host = cache_build_host(context.rules, context.profile, context.auto_vanilla);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
@@ -329,6 +329,27 @@ fn build_cache_from_source(
         ));
     }
     Ok(cache)
+}
+
+/// Creates the temporary Vanilla indexing host with the same persistent parse-cache namespace
+/// used by initialization.  A rules-hash rebuild must re-run semantic lowering, but the parser
+/// output is source-dependent only and can safely be reused across that rebuild.
+fn cache_build_host(
+    rules: &RuleSet,
+    profile: &GameProfile,
+    auto_vanilla: Option<&AutoVanillaConfiguration>,
+) -> AnalysisHost {
+    let host = AnalysisHost::with_profile(rules.clone(), profile.clone());
+    let Some(auto_vanilla) = auto_vanilla else {
+        return host;
+    };
+    host.with_parse_cache_dir(
+        auto_vanilla
+            .user_paths
+            .cache_root
+            .join(auto_vanilla.descriptor.game_id)
+            .join("parse-cache"),
+    )
 }
 
 pub(crate) fn watched_files_registration(
@@ -568,7 +589,7 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
             ));
         }
 
-        let mut host = AnalysisHost::with_profile(rules, profile);
+        let mut host = cache_build_host(&rules, &profile, Some(auto_vanilla));
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(0),
             SourceRootKind::Vanilla,
