@@ -45,6 +45,17 @@ use crate::{
     METHOD_NOT_FOUND, REQUEST_CANCELLED, SERVER_NOT_INITIALIZED,
 };
 
+/// Trailing window used to coalesce editor watcher floods into one index update.
+///
+/// File watching backends commonly report a save as several create/modify events. Waiting for a
+/// short quiet period keeps those events from starting one parse/index pass each while still
+/// making ordinary changes visible promptly.
+pub(crate) const WATCHED_FILE_DEBOUNCE: Duration = Duration::from_millis(500);
+/// Number of distinct watched paths after which a targeted update is less useful than one bounded
+/// full scan. This mirrors the bulk guard in the reference server and prevents a generated-file
+/// storm from filling the event loop with hundreds of workers.
+pub(crate) const WATCHED_BULK_CAP: usize = 200;
+
 mod document_events;
 mod event_loop;
 mod workers;
@@ -343,6 +354,8 @@ pub struct LspServer {
     pending_parses: BTreeMap<DocumentId, PendingParse>,
     pending_diagnostics: BTreeMap<DocumentId, PendingDiagnostics>,
     pending_disk_changes: BTreeMap<PathBuf, DiskFileChangeKind>,
+    pending_disk_changes_due: Option<Instant>,
+    pending_disk_changes_rescan: bool,
     watcher_registration: Option<Value>,
     auto_vanilla: Option<AutoVanillaConfiguration>,
     /// Mission-preview texture store shared with snapshot requests.
@@ -393,6 +406,8 @@ impl LspServer {
             pending_parses: BTreeMap::new(),
             pending_diagnostics: BTreeMap::new(),
             pending_disk_changes: BTreeMap::new(),
+            pending_disk_changes_due: None,
+            pending_disk_changes_rescan: false,
             watcher_registration: None,
             auto_vanilla: None,
             textures: None,
@@ -531,6 +546,36 @@ impl LspServer {
 }
 
 impl LspServer {
+    /// Returns whether a watcher update or its bulk-rescan marker is waiting to be processed.
+    pub(crate) fn has_pending_disk_changes(&self) -> bool {
+        self.pending_disk_changes_rescan || !self.pending_disk_changes.is_empty()
+    }
+
+    /// Queues one watcher event and arms/resets the trailing coalescing window.
+    pub(crate) fn queue_watched_disk_change(&mut self, path: PathBuf, kind: DiskFileChangeKind) {
+        if !self.pending_disk_changes_rescan {
+            self.pending_disk_changes.insert(path, kind);
+            if self.pending_disk_changes.len() > WATCHED_BULK_CAP {
+                self.pending_disk_changes.clear();
+                self.pending_disk_changes_rescan = true;
+            }
+        }
+        self.pending_disk_changes_due = Instant::now().checked_add(WATCHED_FILE_DEBOUNCE);
+    }
+
+    /// Returns the event-loop wait needed before a coalesced watcher batch may start.
+    pub(crate) fn pending_disk_change_wait(
+        &self,
+        in_flight: Option<&InFlightDiskChanges>,
+    ) -> Option<Duration> {
+        if in_flight.is_some() || !self.has_pending_disk_changes() {
+            return None;
+        }
+        Some(self.pending_disk_changes_due.map_or(Duration::ZERO, |due| {
+            due.saturating_duration_since(Instant::now())
+        }))
+    }
+
     /// Records editor activity used by the idle gate for quiet background re-scans.
     pub(crate) fn mark_activity(&mut self) {
         self.last_activity = Instant::now();

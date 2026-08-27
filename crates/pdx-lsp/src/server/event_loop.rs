@@ -68,7 +68,7 @@ impl LspServer {
                     || in_flight_initialize.is_some()
                     || in_flight_index.is_some()
                     || in_flight_dependency.is_some()
-                    || !self.pending_disk_changes.is_empty()
+                    || self.has_pending_disk_changes()
                     || in_flight_disk_changes.is_some()
                     || in_flight_background_reindex.is_some()
                     || in_flight_reindex_command.is_some();
@@ -92,7 +92,7 @@ impl LspServer {
                 let parse_busy = !self.pending_parses.is_empty() || !in_flight_parses.is_empty();
                 let initialize_busy = in_flight_initialize.is_some();
                 let disk_changes_busy =
-                    !self.pending_disk_changes.is_empty() || in_flight_disk_changes.is_some();
+                    self.has_pending_disk_changes() || in_flight_disk_changes.is_some();
                 let vanilla_cache_busy = index_cache_in_flight && in_flight_index.is_some();
                 let dependency_cache_busy =
                     dependency_cache_in_flight && in_flight_dependency.is_some();
@@ -118,6 +118,7 @@ impl LspServer {
                             in_flight_background_reindex.as_ref(),
                             background_busy,
                         ))
+                        .chain(self.pending_disk_change_wait(in_flight_disk_changes.as_ref()))
                         .min();
                     let event = match timeout {
                         Some(timeout) => match event_receiver.recv_timeout(timeout) {
@@ -155,8 +156,8 @@ impl LspServer {
                         let parse_busy =
                             !self.pending_parses.is_empty() || !in_flight_parses.is_empty();
                         let initialize_busy = in_flight_initialize.is_some();
-                        let disk_changes_busy = !self.pending_disk_changes.is_empty()
-                            || in_flight_disk_changes.is_some();
+                        let disk_changes_busy =
+                            self.has_pending_disk_changes() || in_flight_disk_changes.is_some();
                         let vanilla_cache_busy = index_cache_in_flight && in_flight_index.is_some();
                         let dependency_cache_busy =
                             dependency_cache_in_flight && in_flight_dependency.is_some();
@@ -1115,7 +1116,7 @@ impl LspServer {
                         || !in_flight_requests.is_empty()
                         || in_flight_initialize.is_some()
                         || in_flight_index.is_some()
-                        || !self.pending_disk_changes.is_empty()
+                        || self.has_pending_disk_changes()
                         || in_flight_disk_changes.is_some()
                         || in_flight_background_reindex.is_some()
                         || in_flight_reindex_command.is_some());

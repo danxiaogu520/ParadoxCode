@@ -48,7 +48,7 @@ rewritten without evidence that their boundaries are the bottleneck.
 
 ## Implemented stages
 
-The first fourteen stages are now on `main`, each independently committed and pushed:
+The first fifteen stages are now on `main`, each independently committed and pushed:
 
 1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
    reporting stays deterministic.
@@ -87,6 +87,10 @@ The first fourteen stages are now on `main`, each independently committed and pu
 14. Source-independent parse-cache payloads are zstd-compressed with a bounded decompression
     limit. The cache namespace/schema changes together, and corrupt or legacy entries remain
     ordinary misses rather than scan failures.
+15. Watched-file notifications use a bounded 500 ms trailing window and coalesce repeated paths;
+    bursts over 200 distinct paths switch to one full rescan, preventing generator/checkout storms
+    from spawning hundreds of incremental workers while retaining stale-result and cancellation
+    safety.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an

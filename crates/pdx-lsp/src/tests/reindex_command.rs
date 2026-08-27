@@ -3,6 +3,8 @@ use std::io::Cursor;
 
 use serde_json::{Value, json};
 
+use crate::server::WATCHED_BULK_CAP;
+
 use super::*;
 
 #[test]
@@ -135,5 +137,87 @@ fn initialize_ignore_filters_are_applied_before_workspace_scan() {
             .active_definition("event", "filter.ignore")
             .is_none()
     );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn watched_file_bulk_burst_falls_back_to_a_full_rescan() {
+    let (root, root_uri) = temp_workspace_dir();
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("events directory");
+
+    // Keep one file outside the watcher batch. A bulk rescan must discover its edit too; a
+    // targeted pass over the 201 reported paths would leave this definition stale.
+    let paths = (0..=WATCHED_BULK_CAP + 1)
+        .map(|index| events.join(format!("burst-{index}.txt")))
+        .collect::<Vec<_>>();
+    for (index, path) in paths.iter().enumerate() {
+        fs::write(
+            path,
+            format!("country_event = {{ id = burst-old-{index} }}\n"),
+        )
+        .expect("initial burst source");
+    }
+    let changed_path = paths[0].clone();
+    let unreported_path = paths[WATCHED_BULK_CAP + 1].clone();
+    let changes = paths[..=WATCHED_BULK_CAP]
+        .iter()
+        .map(|path| json!({"uri": canonical_uri(path), "type": 2}))
+        .collect::<Vec<_>>();
+    let input = ScriptedReader::new([
+        (
+            json!({
+                "jsonrpc":"2.0",
+                "id":1,
+                "method":"initialize",
+                "params":{
+                    "workspaceFolders":[{"uri":root_uri,"name":"test"}],
+                    "capabilities":{}
+                }
+            }),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            None,
+        ),
+        (
+            json!({
+                "jsonrpc":"2.0",
+                "method":"workspace/didChangeWatchedFiles",
+                "params":{"changes":changes}
+            }),
+            Some(Box::new(move || {
+                fs::write(changed_path, "country_event = { id = burst-reported }\n")
+                    .expect("reported burst edit");
+                fs::write(
+                    unreported_path,
+                    "country_event = { id = burst-unreported }\n",
+                )
+                .expect("unreported burst edit");
+            }) as Box<dyn FnOnce() + Send>),
+        ),
+        (
+            json!({
+                "jsonrpc":"2.0",
+                "id":2,
+                "method":"workspace/symbol",
+                "params":{"query":"burst-unreported"}
+            }),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+            None,
+        ),
+        (json!({"jsonrpc":"2.0","method":"exit"}), None),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server.run_transport(input, &mut output).expect("transport");
+    let responses = decode_frames(&output);
+    let symbols = typed_result::<Vec<lsp_types::SymbolInformation>>(&responses, 2);
+    assert_eq!(symbols.len(), 1);
+    assert_eq!(symbols[0].name, "burst-unreported");
     fs::remove_dir_all(root).expect("cleanup");
 }

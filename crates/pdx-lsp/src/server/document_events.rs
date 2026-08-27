@@ -263,7 +263,7 @@ impl LspServer {
                     "didChangeWatchedFiles contains an unsupported change type",
                 ));
             };
-            self.pending_disk_changes.insert(path, kind);
+            self.queue_watched_disk_change(path, kind);
         }
         Ok(())
     }
