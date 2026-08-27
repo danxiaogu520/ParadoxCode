@@ -48,7 +48,7 @@ rewritten without evidence that their boundaries are the bottleneck.
 
 ## Implemented stages
 
-The first sixteen stages are now on `main`, each independently committed and pushed:
+The first seventeen stages are now on `main`, each independently committed and pushed:
 
 1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
    reporting stays deterministic.
@@ -95,6 +95,10 @@ The first sixteen stages are now on `main`, each independently committed and pus
     as `ignored_error_codes` in `.pdx/project.toml`). Filtering happens before publication caps,
     applies to live and caller-supplied diagnostic queries, and updates open documents on live
     configuration changes.
+17. Raw source comments support the CWTools-compatible `# cwtools-ignore <code>` directive. A
+    directive suppresses a known category on its own and adjacent lines, is applied before LSP
+    publication limits, and remains effective for recovered/syntax-error text without retaining
+    comments in the parsed CST.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an
