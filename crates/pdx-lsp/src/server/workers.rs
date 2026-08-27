@@ -232,6 +232,60 @@ impl LspServer {
         true
     }
 
+    /// Starts an automatic closed-file diagnostic pass once all foreground work has drained.
+    ///
+    /// This worker deliberately validates the current immutable snapshot without refreshing the
+    /// source roots. Refresh workers attach their own validation result so a watched-file burst or
+    /// quiet re-scan never pays for a second full diagnostics walk.
+    pub(super) fn spawn_pending_workspace_diagnostics<'scope, 'environment>(
+        &mut self,
+        scope: &'scope std::thread::Scope<'scope, 'environment>,
+        event_sender: &mpsc::Sender<TransportEvent>,
+        in_flight: &mut Option<InFlightWorkspaceDiagnostics>,
+        busy: bool,
+    ) {
+        if self.state != ServerState::Initialized
+            || !self.workspace_wide_diagnostics
+            || !self.workspace_diagnostics_pending
+            || in_flight.is_some()
+            || busy
+        {
+            return;
+        }
+        let base_revision = self.host.snapshot().revision();
+        let cancellation = WorkspaceScanToken::new();
+        let worker_cancellation = cancellation.clone();
+        let ignored_diagnostic_codes = Arc::clone(&self.ignored_diagnostic_codes);
+        let candidate = self.host.clone();
+        let sender = event_sender.clone();
+        self.workspace_diagnostics_pending = false;
+        *in_flight = Some(InFlightWorkspaceDiagnostics {
+            base_revision,
+            cancellation,
+        });
+        scope.spawn(move || {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                workspace_validation_result(
+                    &candidate,
+                    &worker_cancellation,
+                    &ignored_diagnostic_codes,
+                    true,
+                )
+            }))
+            .unwrap_or_else(|_| {
+                Err(WorkspaceError::Io(io::Error::other(
+                    "workspace diagnostics worker failed unexpectedly",
+                )))
+            });
+            let _ = sender.send(TransportEvent::WorkspaceDiagnostics(
+                WorkspaceDiagnosticsResult {
+                    base_revision,
+                    result,
+                },
+            ));
+        });
+    }
+
     /// Starts a quiet full source-root refresh once its cadence and idle gate are satisfied.
     ///
     /// The worker owns a cloned host and therefore never holds the event-loop state while
@@ -276,6 +330,8 @@ impl LspServer {
         let worker_cancellation = cancellation.clone();
         let mut candidate = self.host.clone();
         let sender = event_sender.clone();
+        let publish_workspace_diagnostics = self.workspace_wide_diagnostics;
+        let ignored_diagnostic_codes = Arc::clone(&self.ignored_diagnostic_codes);
         self.background_reindex_due = None;
         *in_flight = Some(InFlightBackgroundReindex {
             base_revision,
@@ -285,7 +341,19 @@ impl LspServer {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 candidate
                     .refresh_source_roots_cancellable_with_progress(&worker_cancellation, None)
-                    .map(|_| candidate)
+                    .and_then(|_| {
+                        let validation = publish_workspace_diagnostics
+                            .then(|| {
+                                workspace_validation_result(
+                                    &candidate,
+                                    &worker_cancellation,
+                                    &ignored_diagnostic_codes,
+                                    true,
+                                )
+                            })
+                            .transpose()?;
+                        Ok((candidate, validation))
+                    })
             }))
             .unwrap_or_else(|_| {
                 Err(WorkspaceError::Io(io::Error::other(
@@ -601,6 +669,8 @@ impl LspServer {
         let worker_changes = changes.clone();
         let mut candidate = self.host.clone();
         let sender = event_sender.clone();
+        let publish_workspace_diagnostics = self.workspace_wide_diagnostics;
+        let ignored_diagnostic_codes = Arc::clone(&self.ignored_diagnostic_codes);
         *in_flight = Some(InFlightDiskChanges {
             base_revision,
             cancellation,
@@ -610,11 +680,35 @@ impl LspServer {
                 if full_rescan {
                     candidate
                         .refresh_source_roots_cancellable(&worker_cancellation)
-                        .map(|_| candidate)
+                        .and_then(|_| {
+                            let validation = publish_workspace_diagnostics
+                                .then(|| {
+                                    workspace_validation_result(
+                                        &candidate,
+                                        &worker_cancellation,
+                                        &ignored_diagnostic_codes,
+                                        true,
+                                    )
+                                })
+                                .transpose()?;
+                            Ok((candidate, validation))
+                        })
                 } else {
                     candidate
                         .apply_disk_file_changes_cancellable(&worker_changes, &worker_cancellation)
-                        .map(|_| candidate)
+                        .and_then(|_| {
+                            let validation = publish_workspace_diagnostics
+                                .then(|| {
+                                    workspace_validation_result(
+                                        &candidate,
+                                        &worker_cancellation,
+                                        &ignored_diagnostic_codes,
+                                        true,
+                                    )
+                                })
+                                .transpose()?;
+                            Ok((candidate, validation))
+                        })
                 }
             }))
             .unwrap_or_else(|_| {

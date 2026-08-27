@@ -250,7 +250,8 @@ pub(crate) struct PreparedInitialize {
     pub(crate) background_reindex_idle_seconds: u64,
     /// Canonical diagnostic categories omitted from LSP output.
     pub(crate) ignored_diagnostic_codes: Vec<String>,
-    /// Whether explicit workspace refreshes publish diagnostics for closed Current Mod files.
+    /// Whether automatic and explicit workspace refreshes publish diagnostics for closed Current
+    /// Mod files.
     pub(crate) workspace_wide_diagnostics: bool,
 }
 
@@ -304,6 +305,12 @@ pub(crate) struct InFlightDiskChanges {
 
 #[derive(Debug)]
 pub(crate) struct InFlightBackgroundReindex {
+    pub(crate) base_revision: u64,
+    pub(crate) cancellation: WorkspaceScanToken,
+}
+
+#[derive(Debug)]
+pub(crate) struct InFlightWorkspaceDiagnostics {
     pub(crate) base_revision: u64,
     pub(crate) cancellation: WorkspaceScanToken,
 }
@@ -364,13 +371,19 @@ pub(crate) struct ReindexCommandResult {
 pub(crate) struct DiskChangesResult {
     base_revision: u64,
     changes: Vec<DiskFileChange>,
-    result: Result<AnalysisHost, WorkspaceError>,
+    result: Result<(AnalysisHost, Option<WorkspaceValidationResult>), WorkspaceError>,
 }
 
 #[derive(Debug)]
 pub(crate) struct BackgroundReindexResult {
     pub(crate) base_revision: u64,
-    pub(crate) result: Result<AnalysisHost, WorkspaceError>,
+    pub(crate) result: Result<(AnalysisHost, Option<WorkspaceValidationResult>), WorkspaceError>,
+}
+
+#[derive(Debug)]
+pub(crate) struct WorkspaceDiagnosticsResult {
+    pub(crate) base_revision: u64,
+    pub(crate) result: Result<WorkspaceValidationResult, WorkspaceError>,
 }
 
 enum TransportEvent {
@@ -387,6 +400,7 @@ enum TransportEvent {
     Log(Value),
     Progress(Progress),
     DiskChanges(DiskChangesResult),
+    WorkspaceDiagnostics(WorkspaceDiagnosticsResult),
 }
 
 /// An LSP server with a single event-loop-owned workspace host.
@@ -423,10 +437,12 @@ pub struct LspServer {
     pub(crate) background_reindex_due: Option<Instant>,
     /// Diagnostic categories hidden from published diagnostics and diagnostic query responses.
     pub(crate) ignored_diagnostic_codes: Arc<HashSet<String>>,
-    /// Whether explicit workspace refreshes also publish diagnostics for closed Current Mod
-    /// files. The bounded publication path is enabled by default and can be disabled by clients
-    /// that only want diagnostics for open documents.
+    /// Whether automatic and explicit workspace refreshes also publish diagnostics for closed
+    /// Current Mod files. The bounded publication path is enabled by default and can be disabled
+    /// by clients that only want diagnostics for open documents.
     pub(crate) workspace_wide_diagnostics: bool,
+    /// Whether an automatic closed-file validation pass is waiting for a quiet worker slot.
+    pub(crate) workspace_diagnostics_pending: bool,
     /// URIs for which the last workspace pass published closed-file diagnostics. This lets a
     /// subsequent pass clear deleted or ignored files without retaining diagnostic payloads.
     pub(crate) workspace_diagnostic_uris: BTreeSet<String>,
@@ -477,6 +493,7 @@ impl LspServer {
             background_reindex_due: None,
             ignored_diagnostic_codes: Arc::new(HashSet::new()),
             workspace_wide_diagnostics: true,
+            workspace_diagnostics_pending: false,
             workspace_diagnostic_uris: BTreeSet::new(),
             workspace_diagnostic_clear_queue: Vec::new(),
             startup_log: Vec::new(),
@@ -551,6 +568,7 @@ impl LspServer {
         output: &mut W,
         result: &WorkspaceValidationResult,
     ) -> Result<(), LspError> {
+        self.workspace_diagnostics_pending = false;
         let current = result.current_uris.iter().cloned().collect::<BTreeSet<_>>();
         let stale = self
             .workspace_diagnostic_uris
@@ -573,6 +591,23 @@ impl LspServer {
                 .insert(publication.uri.clone());
         }
         Ok(())
+    }
+
+    /// Queues an automatic closed-file validation pass. The event loop starts it once no
+    /// foreground scan is active; explicit `validateWorkspace` remains synchronous with its own
+    /// response and does not use this flag.
+    pub(crate) fn request_workspace_diagnostics(&mut self) {
+        if self.workspace_wide_diagnostics && self.state == ServerState::Initialized {
+            self.workspace_diagnostics_pending = true;
+        }
+    }
+
+    /// Removes one closed-file publication when that path becomes an open overlay. The regular
+    /// document diagnostic worker will publish the overlay result independently.
+    pub(crate) fn clear_workspace_diagnostic_uri(&mut self, uri: &str) {
+        if self.workspace_diagnostic_uris.remove(uri) {
+            self.workspace_diagnostic_clear_queue.push(uri.to_owned());
+        }
     }
 
     /// Runs the framed stdio transport used by `pdx-ls`.
@@ -656,6 +691,15 @@ impl LspServer {
             }
         }
         self.pending_disk_changes_due = Instant::now().checked_add(WATCHED_FILE_DEBOUNCE);
+    }
+
+    /// Requests a bounded full source-root refresh for a live configuration change. Ignore
+    /// filters alter the discovered file set, so replaying only the next watcher event would
+    /// leave removed entries active in the index.
+    pub(crate) fn request_full_disk_rescan(&mut self) {
+        self.pending_disk_changes.clear();
+        self.pending_disk_changes_rescan = true;
+        self.pending_disk_changes_due = Some(Instant::now());
     }
 
     /// Returns the event-loop wait needed before a coalesced watcher batch may start.

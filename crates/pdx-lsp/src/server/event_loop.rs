@@ -46,6 +46,7 @@ impl LspServer {
             let mut dependency_progress_token = None::<String>;
             let mut in_flight_disk_changes = None::<InFlightDiskChanges>;
             let mut in_flight_background_reindex = None::<InFlightBackgroundReindex>;
+            let mut in_flight_workspace_diagnostics = None::<InFlightWorkspaceDiagnostics>;
             let mut in_flight_reindex_command = None::<InFlightReindexCommand>;
             let mut deferred_messages = VecDeque::<Value>::new();
 
@@ -76,6 +77,7 @@ impl LspServer {
                     || self.has_pending_disk_changes()
                     || in_flight_disk_changes.is_some()
                     || in_flight_background_reindex.is_some()
+                    || in_flight_workspace_diagnostics.is_some()
                     || in_flight_reindex_command.is_some();
                 self.spawn_due_background_reindex(
                     scope,
@@ -89,6 +91,13 @@ impl LspServer {
                 background_busy = background_busy
                     || in_flight_background_reindex.is_some()
                     || in_flight_reindex_command.is_some();
+                self.spawn_pending_workspace_diagnostics(
+                    scope,
+                    &event_sender,
+                    &mut in_flight_workspace_diagnostics,
+                    background_busy,
+                );
+                background_busy = background_busy || in_flight_workspace_diagnostics.is_some();
                 if let Some(task) = in_flight_reindex_command.as_ref()
                     && self.cancelled.contains(&task.request_id)
                 {
@@ -234,6 +243,9 @@ impl LspServer {
                                 task.cancellation.cancel();
                             }
                             if let Some(task) = in_flight_background_reindex.as_ref() {
+                                task.cancellation.cancel();
+                            }
+                            if let Some(task) = in_flight_workspace_diagnostics.as_ref() {
                                 task.cancellation.cancel();
                             }
                             if let Some(task) = in_flight_reindex_command.as_ref() {
@@ -614,6 +626,7 @@ impl LspServer {
                             )?;
                             ready_logged = true;
                             self.arm_background_reindex();
+                            self.request_workspace_diagnostics();
                         }
                     }
                     TransportEvent::Parse(result) => {
@@ -824,6 +837,7 @@ impl LspServer {
                             )?;
                             ready_logged = true;
                             self.arm_background_reindex();
+                            self.request_workspace_diagnostics();
                         }
                     }
                     TransportEvent::VanillaSetup(result) => {
@@ -943,6 +957,7 @@ impl LspServer {
                             )?;
                             ready_logged = true;
                             self.arm_background_reindex();
+                            self.request_workspace_diagnostics();
                         }
                     }
                     TransportEvent::BackgroundReindex(result) => {
@@ -966,7 +981,7 @@ impl LspServer {
                             continue;
                         }
                         match result.result {
-                            Ok(host) => {
+                            Ok((host, workspace)) => {
                                 self.host = host;
                                 let snapshot = self.host.snapshot();
                                 write_message(
@@ -993,6 +1008,11 @@ impl LspServer {
                                         version,
                                         DIAGNOSTIC_DEBOUNCE,
                                     );
+                                }
+                                if self.workspace_wide_diagnostics
+                                    && let Some(workspace) = workspace.as_ref()
+                                {
+                                    self.publish_workspace_diagnostics(&mut output, workspace)?;
                                 }
                             }
                             Err(WorkspaceError::Cancelled) => {}
@@ -1130,7 +1150,7 @@ impl LspServer {
                             continue;
                         }
                         match result.result {
-                            Ok(host) => {
+                            Ok((host, workspace)) => {
                                 self.host = host;
                                 let open = self
                                     .host
@@ -1148,6 +1168,11 @@ impl LspServer {
                                         DIAGNOSTIC_DEBOUNCE,
                                     );
                                 }
+                                if self.workspace_wide_diagnostics
+                                    && let Some(workspace) = workspace.as_ref()
+                                {
+                                    self.publish_workspace_diagnostics(&mut output, workspace)?;
+                                }
                             }
                             Err(WorkspaceError::Cancelled) => {}
                             Err(error) => {
@@ -1157,6 +1182,44 @@ impl LspServer {
                                         "Workspace file changes could not be indexed: {error}"
                                     )),
                                 )?;
+                            }
+                        }
+                    }
+                    TransportEvent::WorkspaceDiagnostics(result) => {
+                        let current = in_flight_workspace_diagnostics
+                            .as_ref()
+                            .is_some_and(|task| task.base_revision == result.base_revision);
+                        if current {
+                            let _task = in_flight_workspace_diagnostics
+                                .take()
+                                .expect("checked workspace diagnostics task");
+                            if self.workspace_wide_diagnostics {
+                                if self.host.snapshot().revision() != result.base_revision {
+                                    // Any edit or source refresh while the worker was running
+                                    // invalidates its snapshot. Re-run once newer foreground work
+                                    // is complete.
+                                    self.workspace_diagnostics_pending = true;
+                                } else {
+                                    match result.result {
+                                        Ok(workspace) => {
+                                            self.publish_workspace_diagnostics(
+                                                &mut output,
+                                                &workspace,
+                                            )?;
+                                        }
+                                        Err(WorkspaceError::Cancelled) => {
+                                            self.workspace_diagnostics_pending = true;
+                                        }
+                                        Err(error) => {
+                                            write_message(
+                                                &mut output,
+                                                &show_warning_notification(format!(
+                                                    "Workspace diagnostics failed: {error}"
+                                                )),
+                                            )?;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1173,6 +1236,7 @@ impl LspServer {
                         || self.has_pending_disk_changes()
                         || in_flight_disk_changes.is_some()
                         || in_flight_background_reindex.is_some()
+                        || in_flight_workspace_diagnostics.is_some()
                         || in_flight_reindex_command.is_some());
                 if !reader_active && !draining_shutdown && deferred_messages.is_empty() {
                     read_sender.send(()).map_err(|_| {

@@ -48,7 +48,7 @@ rewritten without evidence that their boundaries are the bottleneck.
 
 ## Implemented stages
 
-The first eighteen stages are now on `main`, each independently committed and pushed:
+The first twenty stages are now on `main`, each independently committed and pushed:
 
 1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
    reporting stays deterministic.
@@ -108,6 +108,11 @@ The first eighteen stages are now on `main`, each independently committed and pu
     view; `workspaceWideDiagnostics`/`workspace_wide_diagnostics` disables the traffic while
     retaining complete `validateWorkspace` counts, and stale closed-file entries are cleared when
     a refresh no longer discovers them.
+20. Closed-file diagnostics now run automatically after the initial workspace becomes ready and
+    are carried by watched-file and quiet background refresh workers, so the Problems view follows
+    the same immutable, revision-checked snapshot as the index. Live ignore-filter and diagnostic
+    setting changes trigger a bounded refresh or revalidation; open overlays continue to use the
+    existing per-document path and are removed from the closed-file publication set immediately.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an

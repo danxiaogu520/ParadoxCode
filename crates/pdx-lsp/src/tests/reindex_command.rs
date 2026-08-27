@@ -195,6 +195,111 @@ fn workspace_wide_diagnostics_can_be_disabled_without_changing_validation() {
 }
 
 #[test]
+fn initial_ready_pass_publishes_closed_current_mod_diagnostics() {
+    let (root, root_uri) = temp_workspace_dir();
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("events directory");
+    let source = events.join("initial-invalid.txt");
+    fs::write(&source, "scope = nowhere\n").expect("invalid source");
+    let input = frames([
+        json!({
+            "jsonrpc":"2.0",
+            "id":1,
+            "method":"initialize",
+            "params":{
+                "workspaceFolders":[{"uri":root_uri,"name":"test"}],
+                "capabilities":{}
+            }
+        }),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let uri = canonical_uri(&source);
+    let responses = decode_frames(&output);
+    let published = responses
+        .iter()
+        .find(|value| {
+            value["method"] == "textDocument/publishDiagnostics" && value["params"]["uri"] == uri
+        })
+        .expect("initial closed-file diagnostics publication");
+    assert!(
+        published["params"]["diagnostics"]
+            .as_array()
+            .is_some_and(|items| !items.is_empty())
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn watched_refresh_republishes_closed_file_diagnostics() {
+    let (root, root_uri) = temp_workspace_dir();
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("events directory");
+    let source = events.join("watched-diagnostics.txt");
+    fs::write(&source, "scope = nowhere\n").expect("invalid source");
+    let changed_source = source.clone();
+    let source_uri = canonical_uri(&source);
+    let input = ScriptedReader::new([
+        (
+            json!({
+                "jsonrpc":"2.0",
+                "id":1,
+                "method":"initialize",
+                "params":{
+                    "workspaceFolders":[{"uri":root_uri,"name":"test"}],
+                    "capabilities":{}
+                }
+            }),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            None,
+        ),
+        (
+            json!({
+                "jsonrpc":"2.0",
+                "method":"workspace/didChangeWatchedFiles",
+                "params":{"changes":[{"uri":source_uri,"type":2}]}
+            }),
+            Some(Box::new(move || {
+                fs::write(changed_source, "").expect("write fixed source");
+            }) as Box<dyn FnOnce() + Send>),
+        ),
+        (
+            json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+            None,
+        ),
+        (json!({"jsonrpc":"2.0","method":"exit"}), None),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server.run_transport(input, &mut output).expect("transport");
+    let responses = decode_frames(&output);
+    let publications = responses
+        .iter()
+        .filter(|value| {
+            value["method"] == "textDocument/publishDiagnostics"
+                && value["params"]["uri"] == source_uri
+        })
+        .collect::<Vec<_>>();
+    assert!(publications.len() >= 2, "initial and watched publications");
+    assert!(
+        publications
+            .last()
+            .and_then(|value| value["params"]["diagnostics"].as_array())
+            .is_some_and(Vec::is_empty)
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn initialize_ignore_filters_are_applied_before_workspace_scan() {
     let (root, root_uri) = temp_workspace_dir();
     let events = root.join("events");
