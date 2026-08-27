@@ -31,7 +31,7 @@ const TABLE_LIMITS: [(&str, usize, &str); 7] = [
     (
         "source_files",
         MAX_CACHE_FILES,
-        "logical_path, category_id, resolution, fingerprint",
+        "logical_path, category_id, resolution, fingerprint, metadata_fingerprint",
     ),
     ("definitions", MAX_CACHE_SYMBOLS, "kind, name"),
     ("symbol_references", MAX_CACHE_SYMBOLS, "kind, name"),
@@ -153,7 +153,8 @@ fn load_connection(
         &metadata_blob(connection, "source_root")?,
         &metadata_text(connection, "path_encoding")?,
     )?;
-    // Schema 7 records the cached source root identity; older caches are rebuilt once.
+    // Schema 8 records the cached source root identity and per-file metadata stamps; older
+    // caches are rebuilt once.
     let root_id = u32::from_le_bytes(
         metadata_blob(connection, "root_id")?
             .try_into()
@@ -174,8 +175,14 @@ fn load_connection(
     let indexed_files = metadata_text(connection, "indexed_files")?
         .parse::<usize>()
         .map_err(|_| IndexCacheError::InvalidMetadata("indexed_files"))?;
-    let (source_files, index, positions, localisation_previews, file_fingerprints) =
-        load_index(connection, &root, build_lookup_maps, &mut progress)?;
+    let (
+        source_files,
+        index,
+        positions,
+        localisation_previews,
+        file_fingerprints,
+        file_metadata_fingerprints,
+    ) = load_index(connection, &root, build_lookup_maps, &mut progress)?;
     if indexed_files != source_files.len() {
         return Err(IndexCacheError::InvalidData(format!(
             "metadata records {indexed_files} files but cache contains {}",
@@ -199,6 +206,7 @@ fn load_connection(
         index,
         localisation_previews,
         file_fingerprints,
+        file_metadata_fingerprints,
     })
 }
 
@@ -345,8 +353,9 @@ fn load_index(
     let mut source_files = BTreeMap::new();
     let mut shards = BTreeMap::new();
     let mut file_fingerprints = BTreeMap::new();
+    let mut file_metadata_fingerprints = BTreeMap::new();
     let mut statement = connection.prepare(
-        "SELECT file_id, logical_path, category_id, resolution, syntax_error_count, fingerprint
+        "SELECT file_id, logical_path, category_id, resolution, syntax_error_count, fingerprint, metadata_fingerprint
          FROM source_files ORDER BY file_id",
     )?;
     let rows = statement.query_map([], |row| {
@@ -357,14 +366,32 @@ fn load_index(
             row.get::<_, String>(3)?,
             row.get::<_, i64>(4)?,
             row.get::<_, String>(5)?,
+            row.get::<_, Option<String>>(6)?,
         ))
     })?;
     for row in rows {
-        let (id, logical_path, category_id, resolution, syntax_error_count, fingerprint) = row?;
+        let (
+            id,
+            logical_path,
+            category_id,
+            resolution,
+            syntax_error_count,
+            fingerprint,
+            metadata_fingerprint,
+        ) = row?;
         let id = decode_file_id(&id)?;
         if fingerprint.len() != 64 {
             return Err(IndexCacheError::InvalidData(format!(
                 "file {} has a malformed fingerprint",
+                id.get()
+            )));
+        }
+        if metadata_fingerprint
+            .as_ref()
+            .is_some_and(|fingerprint| fingerprint.len() != 64)
+        {
+            return Err(IndexCacheError::InvalidData(format!(
+                "file {} has a malformed metadata fingerprint",
                 id.get()
             )));
         }
@@ -395,6 +422,15 @@ fn load_index(
         if file_fingerprints.insert(id, fingerprint).is_some() {
             return Err(IndexCacheError::InvalidData(format!(
                 "duplicate source file fingerprint for {}",
+                id.get()
+            )));
+        }
+        if file_metadata_fingerprints
+            .insert(id, metadata_fingerprint)
+            .is_some()
+        {
+            return Err(IndexCacheError::InvalidData(format!(
+                "duplicate source file metadata fingerprint for {}",
                 id.get()
             )));
         }
@@ -471,6 +507,7 @@ fn load_index(
         positions,
         localisation_previews,
         file_fingerprints,
+        file_metadata_fingerprints,
     ))
 }
 
