@@ -189,6 +189,7 @@ impl LspServer {
         self.background_reindex_idle_seconds = prepared.background_reindex_idle_seconds;
         self.ignored_diagnostic_codes =
             Arc::new(prepared.ignored_diagnostic_codes.iter().cloned().collect());
+        self.workspace_wide_diagnostics = prepared.workspace_wide_diagnostics;
         self.last_activity = Instant::now();
         self.state = ServerState::Initialized;
         Ok(prepared.result)
@@ -311,6 +312,10 @@ impl LspServer {
             .or_else(|| settings.get("ignoreDiagnosticCodes"))
             .map(parse_ignored_diagnostic_codes)
             .transpose()?;
+        let workspace_wide_diagnostics = settings
+            .get("workspaceWideDiagnostics")
+            .or_else(|| settings.get("workspace_wide_diagnostics"))
+            .and_then(Value::as_bool);
         if file_patterns.is_some() || directory_patterns.is_some() {
             let current = self.host.scan_filters();
             let filters = WorkspaceScanFilters::new(
@@ -338,6 +343,16 @@ impl LspServer {
                 .collect::<Vec<_>>();
             for (id, version) in open {
                 self.schedule_diagnostics_for_document(id, version, Duration::ZERO);
+            }
+        }
+        if let Some(enabled) = workspace_wide_diagnostics
+            && enabled != self.workspace_wide_diagnostics
+        {
+            self.workspace_wide_diagnostics = enabled;
+            if !enabled {
+                self.workspace_diagnostic_clear_queue
+                    .extend(self.workspace_diagnostic_uris.iter().cloned());
+                self.workspace_diagnostic_uris.clear();
             }
         }
         if interval_changed {

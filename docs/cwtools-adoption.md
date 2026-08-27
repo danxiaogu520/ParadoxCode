@@ -103,6 +103,11 @@ The first eighteen stages are now on `main`, each independently committed and pu
     source-root candidate as `pdx/reindexWorkspace`, validates every parsed Current Mod file in
     deterministic path order, and returns bounded file and severity totals without mutating the
     event-loop host until the revision check succeeds.
+19. Workspace refresh and validation results can publish closed Current Mod diagnostics through a
+    bounded 2,000-file notification budget. The default is enabled to match CWTools' workspace
+    view; `workspaceWideDiagnostics`/`workspace_wide_diagnostics` disables the traffic while
+    retaining complete `validateWorkspace` counts, and stale closed-file entries are cleared when
+    a refresh no longer discovers them.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an

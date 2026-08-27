@@ -1,13 +1,17 @@
 use super::*;
+use crate::MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS;
+use crate::uri::path_to_uri;
 
 /// Validates every parsed Current Mod source file in a refreshed candidate and aggregates the
 /// result for the explicit `validateWorkspace` command. The source-root refresh has already
 /// produced a deterministic file set; sorting here keeps the cancellation and count semantics
 /// stable even when the underlying map representation changes.
-fn workspace_validation_summary(
+fn workspace_validation_result(
     host: &AnalysisHost,
     scan_cancellation: &WorkspaceScanToken,
-) -> Result<WorkspaceValidationSummary, WorkspaceError> {
+    ignored_diagnostic_codes: &HashSet<String>,
+    publish_diagnostics: bool,
+) -> Result<WorkspaceValidationResult, WorkspaceError> {
     let snapshot = host.snapshot();
     let mut files = snapshot
         .source_files()
@@ -35,20 +39,57 @@ fn workspace_validation_summary(
         total_files: files.len(),
         ..WorkspaceValidationSummary::default()
     };
+    let open_documents = snapshot
+        .documents()
+        .values()
+        .filter(|document| document.source() == DocumentSource::Overlay)
+        .filter_map(|document| document.path().map(|path| (path.to_owned(), document)))
+        .collect::<HashMap<_, _>>();
+    let mut current_uris = Vec::new();
+    let mut publications = Vec::new();
     let cancellation = CancellationToken::new();
+    let mut published_files = 0usize;
     for file in files {
         if scan_cancellation.is_cancelled() {
             return Err(WorkspaceError::Cancelled);
         }
-        let diagnostics =
-            source_file_diagnostics_with_cancellation(&snapshot, file.id, &cancellation)
-                .map_err(|_| WorkspaceError::Cancelled)?;
+        let (diagnostics, source, line_index, closed_uri) =
+            if let Some(document) = open_documents.get(&file.physical_path) {
+                let diagnostics =
+                    diagnostics_with_cancellation(&snapshot, document.id(), &cancellation)
+                        .map_err(|_| WorkspaceError::Cancelled)?;
+                (
+                    diagnostics,
+                    document.text_handle(),
+                    document.line_index().clone(),
+                    None,
+                )
+            } else {
+                let state = snapshot.file_state(file.id).ok_or_else(|| {
+                    WorkspaceError::Io(io::Error::other("workspace file state disappeared"))
+                })?;
+                let diagnostics =
+                    source_file_diagnostics_with_cancellation(&snapshot, file.id, &cancellation)
+                        .map_err(|_| WorkspaceError::Cancelled)?;
+                (
+                    diagnostics,
+                    state.source_handle(),
+                    LineIndex::new(state.source()),
+                    Some(path_to_uri(&file.physical_path)),
+                )
+            };
         if scan_cancellation.is_cancelled() {
             return Err(WorkspaceError::Cancelled);
         }
+        let filtered = filter_diagnostics_with_ignored(
+            diagnostics,
+            &line_index,
+            &source,
+            ignored_diagnostic_codes,
+        );
         summary.validated_files = summary.validated_files.saturating_add(1);
         let mut file_has_error = false;
-        for diagnostic in diagnostics {
+        for diagnostic in &filtered {
             match diagnostic.severity {
                 Severity::Error => {
                     file_has_error = true;
@@ -68,8 +109,30 @@ fn workspace_validation_summary(
         if file_has_error {
             summary.files_with_errors = summary.files_with_errors.saturating_add(1);
         }
+        if let Some(uri) = closed_uri {
+            current_uris.push(uri.clone());
+            if publish_diagnostics && published_files < MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS {
+                let values = diagnostic_values_for_text_with_ignored(
+                    filtered,
+                    &line_index,
+                    &source,
+                    &HashSet::new(),
+                );
+                let values = serde_json::to_value(values).map_err(|error| {
+                    WorkspaceError::Io(io::Error::other(format!(
+                        "failed to serialize workspace diagnostics: {error}"
+                    )))
+                })?;
+                publications.push(WorkspaceDiagnosticPublication { uri, values });
+                published_files = published_files.saturating_add(1);
+            }
+        }
     }
-    Ok(summary)
+    Ok(WorkspaceValidationResult {
+        summary,
+        publications,
+        current_uris,
+    })
 }
 
 impl LspServer {
@@ -122,6 +185,8 @@ impl LspServer {
         let base_revision = self.host.snapshot().revision();
         let cancellation = WorkspaceScanToken::new();
         let worker_cancellation = cancellation.clone();
+        let publish_workspace_diagnostics = self.workspace_wide_diagnostics;
+        let ignored_diagnostic_codes = Arc::clone(&self.ignored_diagnostic_codes);
         let mut candidate = self.host.clone();
         let sender = event_sender.clone();
         self.background_reindex_due = None;
@@ -137,8 +202,16 @@ impl LspServer {
                 candidate
                     .refresh_source_roots_cancellable_with_progress(&worker_cancellation, None)
                     .and_then(|_| {
-                        let summary = (command == WorkspaceCommand::Validate)
-                            .then(|| workspace_validation_summary(&candidate, &worker_cancellation))
+                        let summary = (command == WorkspaceCommand::Validate
+                            || publish_workspace_diagnostics)
+                            .then(|| {
+                                workspace_validation_result(
+                                    &candidate,
+                                    &worker_cancellation,
+                                    &ignored_diagnostic_codes,
+                                    publish_workspace_diagnostics,
+                                )
+                            })
                             .transpose()?;
                         Ok((candidate, summary))
                     })

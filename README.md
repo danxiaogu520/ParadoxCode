@@ -272,6 +272,12 @@ ignored_error_codes = ["UnknownScope", "UnknownBareValue"]
 Codes use the stable LSP names shown in diagnostics. Unknown codes are rejected so a misspelled
 setting cannot silently suppress nothing.
 
+Workspace refreshes publish diagnostics for closed Current Mod files by default, bounded to 2,000
+files per pass. Set `workspace_wide_diagnostics = false` in `.pdx/project.toml`, or send
+`workspaceWideDiagnostics: false` in initialization/configuration settings, when the Problems view
+should remain limited to open documents. `validateWorkspace` still computes its complete summary
+when publication is disabled.
+
 For a one-off suppression beside a piece of source, add `# cwtools-ignore <code>` to the same
 line (or the immediately preceding/following line). The directive is read from raw text, so it
 also works when the file has syntax errors; unknown names are ignored rather than hiding a

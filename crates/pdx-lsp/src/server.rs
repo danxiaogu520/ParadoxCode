@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::io::{self, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -11,7 +11,10 @@ use lsp_types::{
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
     ExecuteCommandParams, FileChangeType, InitializeParams, MessageType,
 };
-use pdx_analysis::{CancellationToken, Severity, source_file_diagnostics_with_cancellation};
+use pdx_analysis::{
+    CancellationToken, Severity, diagnostics_with_cancellation,
+    source_file_diagnostics_with_cancellation,
+};
 use pdx_engine::{
     AnalysisHost, AnalysisSnapshot, DiskFileChange, DiskFileChangeKind, DocumentId, DocumentSource,
     IndexCache, PreparedDocument, SourceRootKind, WorkspaceError, WorkspaceScanFilters,
@@ -28,10 +31,11 @@ use crate::initialize::{
 };
 use crate::protocol::{
     LspError, RequestId, RpcError, cancel_initialize_from_notification,
-    cancel_request_from_notification, diagnostic_values_with_ignored, diagnostics_notification,
-    document_error, is_execute_command_message, is_initialize_control_message, is_snapshot_request,
-    is_snapshot_request_message, log_message_notification, parse_file_uri_str, request_id_from_lsp,
-    show_info_notification, show_warning_notification, typed_params,
+    cancel_request_from_notification, diagnostic_values_for_text_with_ignored,
+    diagnostic_values_with_ignored, diagnostics_notification, document_error,
+    filter_diagnostics_with_ignored, is_execute_command_message, is_initialize_control_message,
+    is_snapshot_request, is_snapshot_request_message, log_message_notification, parse_file_uri_str,
+    request_id_from_lsp, show_info_notification, show_warning_notification, typed_params,
 };
 use crate::requests::SnapshotRequestContext;
 use crate::text::{
@@ -246,6 +250,8 @@ pub(crate) struct PreparedInitialize {
     pub(crate) background_reindex_idle_seconds: u64,
     /// Canonical diagnostic categories omitted from LSP output.
     pub(crate) ignored_diagnostic_codes: Vec<String>,
+    /// Whether explicit workspace refreshes publish diagnostics for closed Current Mod files.
+    pub(crate) workspace_wide_diagnostics: bool,
 }
 
 #[derive(Debug)]
@@ -330,12 +336,28 @@ pub(crate) struct WorkspaceValidationSummary {
 }
 
 #[derive(Debug)]
+pub(crate) struct WorkspaceDiagnosticPublication {
+    pub(crate) uri: String,
+    pub(crate) values: Value,
+}
+
+#[derive(Debug)]
+pub(crate) struct WorkspaceValidationResult {
+    pub(crate) summary: WorkspaceValidationSummary,
+    /// Notifications for the bounded prefix of closed Current Mod files. Files beyond the
+    /// publication budget remain represented by `current_uris` so previously published entries
+    /// can be retained rather than flooding the client with clears.
+    pub(crate) publications: Vec<WorkspaceDiagnosticPublication>,
+    pub(crate) current_uris: Vec<String>,
+}
+
+#[derive(Debug)]
 pub(crate) struct ReindexCommandResult {
     pub(crate) request_id: RequestId,
     pub(crate) id: Value,
     pub(crate) base_revision: u64,
     pub(crate) command: WorkspaceCommand,
-    pub(crate) result: Result<(AnalysisHost, Option<WorkspaceValidationSummary>), WorkspaceError>,
+    pub(crate) result: Result<(AnalysisHost, Option<WorkspaceValidationResult>), WorkspaceError>,
 }
 
 #[derive(Debug)]
@@ -401,6 +423,16 @@ pub struct LspServer {
     pub(crate) background_reindex_due: Option<Instant>,
     /// Diagnostic categories hidden from published diagnostics and diagnostic query responses.
     pub(crate) ignored_diagnostic_codes: Arc<HashSet<String>>,
+    /// Whether explicit workspace refreshes also publish diagnostics for closed Current Mod
+    /// files. The bounded publication path is enabled by default and can be disabled by clients
+    /// that only want diagnostics for open documents.
+    pub(crate) workspace_wide_diagnostics: bool,
+    /// URIs for which the last workspace pass published closed-file diagnostics. This lets a
+    /// subsequent pass clear deleted or ignored files without retaining diagnostic payloads.
+    pub(crate) workspace_diagnostic_uris: BTreeSet<String>,
+    /// Notifications queued by a live setting change; drained by the transport loop so the
+    /// configuration handler remains a pure state transition.
+    pub(crate) workspace_diagnostic_clear_queue: Vec<String>,
     /// Process-start messages collected before an LSP client can receive
     /// `window/logMessage`. They are replayed at the beginning of the first
     /// initialize worker so the editor's log has no unexplained pre-initialize gap.
@@ -444,6 +476,9 @@ impl LspServer {
             last_activity: Instant::now(),
             background_reindex_due: None,
             ignored_diagnostic_codes: Arc::new(HashSet::new()),
+            workspace_wide_diagnostics: true,
+            workspace_diagnostic_uris: BTreeSet::new(),
+            workspace_diagnostic_clear_queue: Vec::new(),
             startup_log: Vec::new(),
             clean_exit: false,
         })
@@ -505,6 +540,39 @@ impl LspServer {
     #[must_use]
     pub fn diagnostics(&self, uri: &str) -> Option<&Value> {
         self.diagnostics.get(&DocumentId::new(uri))
+    }
+
+    /// Publishes the bounded closed-file diagnostic batch returned by a workspace worker and
+    /// clears entries that disappeared from the refreshed Current Mod. Files beyond the worker's
+    /// publication budget remain in `workspace_diagnostic_uris`, so a large workspace does not
+    /// generate a second storm of empty notifications just because it was truncated.
+    pub(crate) fn publish_workspace_diagnostics<W: Write>(
+        &mut self,
+        output: &mut W,
+        result: &WorkspaceValidationResult,
+    ) -> Result<(), LspError> {
+        let current = result.current_uris.iter().cloned().collect::<BTreeSet<_>>();
+        let stale = self
+            .workspace_diagnostic_uris
+            .difference(&current)
+            .cloned()
+            .collect::<Vec<_>>();
+        for uri in stale
+            .into_iter()
+            .take(crate::MAX_WORKSPACE_DIAGNOSTIC_CLEARS)
+        {
+            write_message(output, &diagnostics_notification(&uri, json!([])))?;
+            self.workspace_diagnostic_uris.remove(&uri);
+        }
+        for publication in &result.publications {
+            write_message(
+                output,
+                &diagnostics_notification(&publication.uri, publication.values.clone()),
+            )?;
+            self.workspace_diagnostic_uris
+                .insert(publication.uri.clone());
+        }
+        Ok(())
     }
 
     /// Runs the framed stdio transport used by `pdx-ls`.

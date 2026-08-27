@@ -50,6 +50,11 @@ impl LspServer {
             let mut deferred_messages = VecDeque::<Value>::new();
 
             loop {
+                let pending_workspace_clears =
+                    std::mem::take(&mut self.workspace_diagnostic_clear_queue);
+                for uri in pending_workspace_clears {
+                    write_message(&mut output, &diagnostics_notification(&uri, json!([])))?;
+                }
                 self.spawn_pending_disk_changes(scope, &event_sender, &mut in_flight_disk_changes);
                 self.cancel_stale_parses(&in_flight_parses);
                 self.spawn_pending_parses(scope, &event_sender, &mut in_flight_parses);
@@ -272,6 +277,8 @@ impl LspServer {
                                     self.ignored_diagnostic_codes = Arc::new(
                                         prepared.ignored_diagnostic_codes.iter().cloned().collect(),
                                     );
+                                    self.workspace_wide_diagnostics =
+                                        prepared.workspace_wide_diagnostics;
                                     self.last_activity = Instant::now();
                                     (
                                         json!({
@@ -1046,17 +1053,22 @@ impl LspServer {
                                             DIAGNOSTIC_DEBOUNCE,
                                         );
                                     }
-                                    let result_value = match (result.command, summary) {
-                                        (WorkspaceCommand::Validate, Some(summary)) => json!({
+                                    if self.workspace_wide_diagnostics
+                                        && let Some(workspace) = summary.as_ref()
+                                    {
+                                        self.publish_workspace_diagnostics(&mut output, workspace)?;
+                                    }
+                                    let result_value = match (result.command, summary.as_ref()) {
+                                        (WorkspaceCommand::Validate, Some(workspace)) => json!({
                                             "revision": snapshot.revision(),
                                             "sourceFiles": snapshot.source_files().len(),
-                                            "totalFiles": summary.total_files,
-                                            "validatedFiles": summary.validated_files,
-                                            "filesWithErrors": summary.files_with_errors,
-                                            "totalErrors": summary.total_errors,
-                                            "totalWarnings": summary.total_warnings,
-                                            "totalInfos": summary.total_infos,
-                                            "totalHints": summary.total_hints,
+                                            "totalFiles": workspace.summary.total_files,
+                                            "validatedFiles": workspace.summary.validated_files,
+                                            "filesWithErrors": workspace.summary.files_with_errors,
+                                            "totalErrors": workspace.summary.total_errors,
+                                            "totalWarnings": workspace.summary.total_warnings,
+                                            "totalInfos": workspace.summary.total_infos,
+                                            "totalHints": workspace.summary.total_hints,
                                         }),
                                         (WorkspaceCommand::Reindex, _) => json!({
                                             "revision": snapshot.revision(),
@@ -1084,11 +1096,17 @@ impl LspServer {
                                     RpcError::new(REQUEST_CANCELLED, "request was cancelled")
                                         .response(result.id)
                                 }
-                                Err(error) => RpcError::new(
-                                    INTERNAL_ERROR,
-                                    format!("workspace reindex failed: {error}"),
-                                )
-                                .response(result.id),
+                                Err(error) => {
+                                    let operation = match result.command {
+                                        WorkspaceCommand::Reindex => "reindex",
+                                        WorkspaceCommand::Validate => "validation",
+                                    };
+                                    RpcError::new(
+                                        INTERNAL_ERROR,
+                                        format!("workspace {operation} failed: {error}"),
+                                    )
+                                    .response(result.id)
+                                }
                             }
                         };
                         self.arm_background_reindex();
