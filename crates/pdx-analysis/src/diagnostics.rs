@@ -2,6 +2,7 @@ use crate::macro_expansion::{ExpansionEnterFailure, ExpansionFailure, MacroExpan
 use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
 use crate::resolution::*;
 use crate::semantic::*;
+use crate::suggest::best_suggestion;
 use crate::support::*;
 use crate::types::*;
 use pdx_engine::hir::{
@@ -46,7 +47,17 @@ impl DiagnosticCollector {
             )
         });
         self.values.dedup_by(|left, right| {
-            left.code == right.code && left.range == right.range && left.message == right.message
+            if left.code == right.code && left.range == right.range && left.message == right.message
+            {
+                for fix in right.fixes.drain(..) {
+                    if !left.fixes.contains(&fix) {
+                        left.fixes.push(fix);
+                    }
+                }
+                true
+            } else {
+                false
+            }
         });
         self.values
     }
@@ -671,6 +682,20 @@ fn validate_semantic_container(
                     source_file: Some(applicable[0].source_file.clone()),
                     source_line: Some(applicable[0].line),
                 });
+                if diagnostic_code == DiagnosticCode::InvalidValue
+                    && let Some((value, value_range)) = property.scalar.as_ref()
+                    && let Some(candidate) = enum_value_suggestion(snapshot, applicable, value)
+                {
+                    let replacement = format!(
+                        "\"{}\"",
+                        candidate.replace('\\', "\\\\").replace('"', "\\\"")
+                    );
+                    diagnostic = diagnostic.with_fix(QuickFix::replace(
+                        format!("Did you mean '{candidate}'?"),
+                        *value_range,
+                        replacement,
+                    ));
+                }
                 diagnostics.push(diagnostic);
             }
             let parameterized_invocation = hir.is_some_and(|hir| {
@@ -1062,6 +1087,38 @@ fn validate_semantic_container(
         }
     }
     Ok(())
+}
+
+/// Finds a unique close static/workspace enum member for an invalid scalar value.
+///
+/// Enum values are normally sourced from the first-party model.  Workspace members are included
+/// as well because several EU4 enums intentionally alias dynamic definition kinds (for example
+/// country tags); the same visibility rules used by completion and semantic matching apply.
+fn enum_value_suggestion(
+    snapshot: &AnalysisSnapshot,
+    rules: &[&pdx_rules::SemanticRule],
+    value: &str,
+) -> Option<String> {
+    let mut candidates = Vec::new();
+    for rule in rules {
+        let pdx_rules::ValueMatcher::Enum(enum_name) = &rule.value else {
+            continue;
+        };
+        if let Some((_, values)) = snapshot
+            .rules()
+            .model()
+            .semantic
+            .enum_values
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case(enum_name))
+        {
+            candidates.extend(values.iter().cloned());
+        }
+        candidates.extend(effective_workspace_member_names(snapshot, enum_name));
+    }
+    candidates.sort_by_key(|candidate| candidate.to_ascii_lowercase());
+    candidates.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+    best_suggestion(value, candidates.iter().map(String::as_str)).map(str::to_owned)
 }
 
 fn property_contains_parameter_token(property: &ScriptProperty) -> bool {

@@ -18,6 +18,8 @@ ParadoxCode **与 Paradox Interactive 无任何关联，也未获得其背书**�
 - 诊断使用稳定的 PascalCase ID（例如 `UnknownKey`、`UnknownBareValue`、`UnknownScope`、
   `TargetWrongScope`）；严重度在分析层类型化，LSP 元数据提供确定性，不暴露内部规则来源
   或旧版本迁移字段。
+- 规则诊断可提供有界的 `textDocument/codeAction` 快速修复，例如为拼写接近且唯一的静态
+  枚举值生成“你是否想要”替换。
 - 补全、悬停、跳转定义、查找引用、文档/工作区符号。
 - 完整语义 token 支持增量 `full/delta` 响应，并使用有界、按快照版本校验的缓存；编辑与工作区刷新时自动失效。
 - 支持按视口请求 `textDocument/semanticTokens/range`，在分类前剪枝范围外的语法树子树，使可见编辑器高亮成本与视口相关。

@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use lsp_types::{
+    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, CodeActionResponse,
     CompletionItem, CompletionList, CompletionResponse, CompletionTextEdit,
     DocumentFormattingParams, DocumentSymbol as LspDocumentSymbol, DocumentSymbolParams,
     Documentation, Hover as LspHover, HoverContents, InlayHint, InlayHintKind, InlayHintLabel,
@@ -16,10 +17,11 @@ use pdx_analysis::{
     CancellationToken, Cancelled, CompletionKind, SemanticToken, SemanticTokenType,
     complete_with_cancellation, completion_resolve, definition_with_cancellation,
     document_symbols_with_cancellation, hover_with_cancellation, localisation_values_by_key,
-    prepare_rename_with_cancellation, references_with_cancellation, rename_with_cancellation,
-    scope_inlay_hints_with_cancellation, semantic_tokens_in_range_with_cancellation,
-    semantic_tokens_with_cancellation, source_file_diagnostics_with_cancellation,
-    text_diagnostics_with_cancellation, workspace_symbols_with_cancellation,
+    prepare_rename_with_cancellation, quick_fixes_with_cancellation, references_with_cancellation,
+    rename_with_cancellation, scope_inlay_hints_with_cancellation,
+    semantic_tokens_in_range_with_cancellation, semantic_tokens_with_cancellation,
+    source_file_diagnostics_with_cancellation, text_diagnostics_with_cancellation,
+    workspace_symbols_with_cancellation,
 };
 use pdx_engine::{AnalysisSnapshot, DocumentId, ParsedSource, SourceRootKind};
 use pdx_game::eu4::mission::Severity;
@@ -162,6 +164,7 @@ impl SnapshotRequestContext {
             "textDocument/references" => self.references(params),
             "textDocument/prepareRename" => self.prepare_rename(params),
             "textDocument/rename" => self.rename(params),
+            "textDocument/codeAction" => self.code_action(params),
             "textDocument/documentSymbol" => self.document_symbols(params),
             "textDocument/inlayHint" => self.inlay_hints(params),
             "textDocument/semanticTokens/full" => self.semantic_tokens(params),
@@ -861,6 +864,43 @@ impl SnapshotRequestContext {
         typed_value(WorkspaceEdit::new(changes), "rename response")
     }
 
+    fn code_action(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = typed_params::<CodeActionParams>(params, "code action")?;
+        if !code_action_kind_requested(params.context.only.as_deref(), &CodeActionKind::QUICKFIX) {
+            self.ensure_active()?;
+            return typed_value(Vec::<CodeActionOrCommand>::new(), "code action response");
+        }
+        let id = DocumentId::new(params.text_document.uri.as_str());
+        let document = self
+            .snapshot
+            .document(&id)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
+        let range = lsp_range_to_text_range(&params.range, document.line_index(), document.text())?;
+        let fixes =
+            quick_fixes_with_cancellation(&self.snapshot, &id, Some(range), &self.cancellation)
+                .map_err(cancelled_error)?;
+        let actions = fixes
+            .into_iter()
+            .map(|fix| {
+                let edit = WorkspaceEdit::new(HashMap::from([(
+                    params.text_document.uri.clone(),
+                    vec![TextEdit {
+                        range: range_to_lsp(document.line_index(), document.text(), fix.range),
+                        new_text: fix.new_text,
+                    }],
+                )]));
+                CodeActionOrCommand::CodeAction(CodeAction {
+                    title: fix.title,
+                    kind: Some(CodeActionKind::QUICKFIX),
+                    edit: Some(edit),
+                    ..CodeAction::default()
+                })
+            })
+            .collect::<CodeActionResponse>();
+        self.ensure_active()?;
+        typed_value(actions, "code action response")
+    }
+
     #[expect(deprecated)] // LSP response types retain this optional field for wire-shape completeness.
     fn document_symbols(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<DocumentSymbolParams>(params, "document symbols")?;
@@ -1126,6 +1166,23 @@ pub(crate) fn bounded_results<T>(mut values: Vec<T>, maximum: usize) -> (Vec<T>,
     let incomplete = values.len() > maximum;
     values.truncate(maximum);
     (values, incomplete)
+}
+
+fn code_action_kind_requested(only: Option<&[CodeActionKind]>, candidate: &CodeActionKind) -> bool {
+    only.is_none_or(|kinds| {
+        kinds.iter().any(|requested| {
+            let requested = requested.as_str();
+            let candidate = candidate.as_str();
+            requested.is_empty()
+                || requested == candidate
+                || requested
+                    .strip_prefix(candidate)
+                    .is_some_and(|suffix| suffix.starts_with('.'))
+                || candidate
+                    .strip_prefix(requested)
+                    .is_some_and(|suffix| suffix.starts_with('.'))
+        })
+    })
 }
 
 /// Encodes editor-neutral semantic tokens as LSP relative-encoding rows
