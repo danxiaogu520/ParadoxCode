@@ -3,6 +3,7 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+use pdx_analysis::DiagnosticCode;
 use pdx_engine::{
     SourceRoot, SourceRootId, SourceRootKind, WorkspaceScanFilters, WorkspaceScanToken,
 };
@@ -18,6 +19,7 @@ pub(crate) const DEFAULT_BACKGROUND_REINDEX_INTERVAL_MINUTES: u64 = 0;
 pub(crate) const DEFAULT_BACKGROUND_REINDEX_IDLE_SECONDS: u64 = 15;
 const MAX_BACKGROUND_REINDEX_INTERVAL_MINUTES: u64 = 7 * 24 * 60;
 const MAX_BACKGROUND_REINDEX_IDLE_SECONDS: u64 = 24 * 60 * 60;
+pub(crate) const MAX_IGNORED_DIAGNOSTIC_CODES: usize = 256;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
@@ -37,6 +39,9 @@ struct WorkspaceInitializationOptions {
     /// Optional glob patterns for directories pruned before workspace discovery.
     #[serde(alias = "ignoreDirs")]
     ignore_directories: Option<Vec<String>>,
+    /// Optional diagnostic categories hidden from published LSP diagnostics.
+    #[serde(alias = "ignoreDiagnosticCodes")]
+    ignored_error_codes: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -76,6 +81,9 @@ struct ProjectConfiguration {
     /// Glob patterns for directories pruned before workspace discovery.
     #[serde(alias = "ignoreDirectories", alias = "ignoreDirs")]
     ignore_directories: Option<Vec<String>>,
+    /// Diagnostic categories hidden from published LSP diagnostics.
+    #[serde(alias = "ignoredErrorCodes", alias = "ignoreDiagnosticCodes")]
+    ignored_error_codes: Option<Vec<String>>,
     /// Extension-only `[server]` table (e.g. the language-server binary path
     /// used by the Zed / VS Code toolkits). Declared so a single
     /// `.pdx/project.toml` can serve both editors and pdx-ls, while
@@ -102,6 +110,8 @@ pub(crate) struct ResolvedSourceRoots {
     pub(crate) background_reindex_idle_seconds: u64,
     /// Bounded file and directory globs applied to live source-root scans.
     pub(crate) scan_filters: WorkspaceScanFilters,
+    /// Canonical wire-facing diagnostic categories hidden from LSP output.
+    pub(crate) ignored_diagnostic_codes: Vec<String>,
 }
 
 /// A dependency configured with a persistent index cache.
@@ -173,6 +183,9 @@ pub(crate) fn resolve_source_roots(
     if inline.ignore_directories.is_some() {
         project.ignore_directories = inline.ignore_directories;
     }
+    if inline.ignored_error_codes.is_some() {
+        project.ignored_error_codes = inline.ignored_error_codes;
+    }
     let background_reindex_interval_minutes = project
         .background_reindex_interval_minutes
         .unwrap_or(DEFAULT_BACKGROUND_REINDEX_INTERVAL_MINUTES);
@@ -205,6 +218,8 @@ pub(crate) fn resolve_source_roots(
             format!("invalid workspace ignore filters: {error}"),
         )
     })?;
+    let ignored_diagnostic_codes =
+        normalize_ignored_diagnostic_codes(project.ignored_error_codes.unwrap_or_default())?;
     let game_directory = project
         .game_directory
         .as_deref()
@@ -372,7 +387,36 @@ pub(crate) fn resolve_source_roots(
         background_reindex_interval_minutes,
         background_reindex_idle_seconds,
         scan_filters,
+        ignored_diagnostic_codes,
     })
+}
+
+/// Validates and canonicalizes user-selected diagnostic categories. Unknown values are rejected so
+/// a typo cannot make a setting appear to work while silently suppressing nothing.
+pub(crate) fn normalize_ignored_diagnostic_codes(
+    values: Vec<String>,
+) -> Result<Vec<String>, RpcError> {
+    if values.len() > MAX_IGNORED_DIAGNOSTIC_CODES {
+        return Err(RpcError::new(
+            INVALID_PARAMS,
+            format!("ignoredErrorCodes accepts at most {MAX_IGNORED_DIAGNOSTIC_CODES} entries"),
+        ));
+    }
+    let mut normalized = Vec::with_capacity(values.len());
+    for value in values {
+        let trimmed = value.trim();
+        let Some(code) = DiagnosticCode::parse_name(trimmed) else {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!("unknown diagnostic code in ignoredErrorCodes: {value}"),
+            ));
+        };
+        let canonical = code.as_str().to_owned();
+        if !normalized.iter().any(|existing| existing == &canonical) {
+            normalized.push(canonical);
+        }
+    }
+    Ok(normalized)
 }
 
 fn resolve_configured_path(

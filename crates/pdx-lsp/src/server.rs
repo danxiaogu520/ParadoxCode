@@ -27,8 +27,8 @@ use crate::initialize::{
 };
 use crate::protocol::{
     LspError, RequestId, RpcError, cancel_initialize_from_notification,
-    cancel_request_from_notification, diagnostic_values, diagnostics_notification, document_error,
-    is_execute_command_message, is_initialize_control_message, is_snapshot_request,
+    cancel_request_from_notification, diagnostic_values_with_ignored, diagnostics_notification,
+    document_error, is_execute_command_message, is_initialize_control_message, is_snapshot_request,
     is_snapshot_request_message, log_message_notification, parse_file_uri_str, request_id_from_lsp,
     show_info_notification, show_warning_notification, typed_params,
 };
@@ -243,6 +243,8 @@ pub(crate) struct PreparedInitialize {
     pub(crate) background_reindex_interval_minutes: u64,
     /// User-idle window required before a quiet workspace re-scan.
     pub(crate) background_reindex_idle_seconds: u64,
+    /// Canonical diagnostic categories omitted from LSP output.
+    pub(crate) ignored_diagnostic_codes: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -375,6 +377,8 @@ pub struct LspServer {
     /// Next eligible background re-scan deadline. It is armed once the initial workspace/index
     /// setup is ready and reset after each pass or live cadence change.
     pub(crate) background_reindex_due: Option<Instant>,
+    /// Diagnostic categories hidden from published diagnostics and diagnostic query responses.
+    pub(crate) ignored_diagnostic_codes: Arc<HashSet<String>>,
     /// Process-start messages collected before an LSP client can receive
     /// `window/logMessage`. They are replayed at the beginning of the first
     /// initialize worker so the editor's log has no unexplained pre-initialize gap.
@@ -417,6 +421,7 @@ impl LspServer {
             background_reindex_idle_seconds: 15,
             last_activity: Instant::now(),
             background_reindex_due: None,
+            ignored_diagnostic_codes: Arc::new(HashSet::new()),
             startup_log: Vec::new(),
             clean_exit: false,
         })

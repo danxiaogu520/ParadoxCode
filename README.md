@@ -261,6 +261,17 @@ Patterns are bounded to 200 entries per list and 1024 characters per entry. `*` 
 within one path component; `**` spans directories; a pattern without `/` matches a basename at
 any depth. The same filters apply to watched-file updates.
 
+To hide a known diagnostic category, configure `ignored_error_codes` in `.pdx/project.toml`, or
+pass `ignoredErrorCodes` through `initializationOptions` (the setting also updates live through
+`workspace/didChangeConfiguration`):
+
+```toml
+ignored_error_codes = ["UnknownScope", "UnknownBareValue"]
+```
+
+Codes use the stable LSP names shown in diagnostics. Unknown codes are rejected so a misspelled
+setting cannot silently suppress nothing.
+
 For an immediate refresh, invoke the advertised LSP `workspace/executeCommand` command
 `pdx/reindexWorkspace`. It uses the same cancellation, serialized-worker, and revision-checked
 commit path as the quiet pass and returns the new snapshot revision and source-file count.

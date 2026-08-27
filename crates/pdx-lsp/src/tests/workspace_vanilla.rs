@@ -1137,6 +1137,7 @@ fn explicit_project_cache_precedes_user_discovery_configuration() {
         background_reindex_interval_minutes: 0,
         background_reindex_idle_seconds: 15,
         scan_filters: pdx_engine::WorkspaceScanFilters::default(),
+        ignored_diagnostic_codes: Vec::new(),
     };
     let mut warnings = Vec::new();
     let setup =
