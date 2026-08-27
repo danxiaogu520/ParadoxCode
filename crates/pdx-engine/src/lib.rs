@@ -30,8 +30,9 @@ pub use model::{
     DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId, DocumentSnapshot,
     DocumentSource, FileState, LocalisationPreview, ParsedSource, PreparedDocument,
     ResolvedCandidate, SourceFile, SourceFileId, SourceRoot, SourceRootId, SourceRootKind,
-    TextChange, WorkspaceChange, WorkspaceError, WorkspaceScanIssue, WorkspaceScanIssueKind,
-    WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
+    TextChange, WorkspaceChange, WorkspaceError, WorkspaceScanFilterError, WorkspaceScanFilters,
+    WorkspaceScanIssue, WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanReport,
+    WorkspaceScanToken,
 };
 pub use parse_cache::{CURRENT_PARSE_CACHE_SCHEMA_VERSION, ParseCache, ParseCacheError};
 pub use query_cache::SnapshotQueryCache;

@@ -10,8 +10,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::index::WorkspaceIndex;
 use crate::model::{
-    SourceFile, SourceFileId, WorkspaceError, WorkspaceScanLimits, WorkspaceScanReport,
-    WorkspaceScanToken,
+    SourceFile, SourceFileId, WorkspaceError, WorkspaceScanFilters, WorkspaceScanLimits,
+    WorkspaceScanReport, WorkspaceScanToken,
 };
 use crate::pipeline::{build_file_state, position_ranges_for_state};
 use crate::scan::{collect_whitelisted_files, read_source_file_cancellable, stable_file_id};
@@ -44,10 +44,12 @@ pub(super) fn refresh_cancellable(
     }
     let mut report = WorkspaceScanReport::default();
     let limits = WorkspaceScanLimits::default();
+    let filters = WorkspaceScanFilters::default();
     let mut walked = Vec::new();
     collect_whitelisted_files(
         &cache.root.path,
         profile,
+        &filters,
         limits,
         &mut report,
         &mut walked,

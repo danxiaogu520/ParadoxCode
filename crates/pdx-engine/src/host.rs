@@ -14,7 +14,8 @@ use crate::model::{
     DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId, DocumentSnapshot,
     DocumentSource, FileState, PreparedDocument, SourceFile, SourceFileId, SourceRoot,
     SourceRootId, SourceRootKind, TextChange, WorkspaceChange, WorkspaceError,
-    WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
+    WorkspaceScanFilters, WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanReport,
+    WorkspaceScanToken,
 };
 use crate::parse_cache::ParseCache;
 use crate::pipeline::{
@@ -47,6 +48,7 @@ pub struct AnalysisHost {
     localisation_previews: Arc<LocalisationPreviewMap>,
     query_cache: Arc<SnapshotQueryCache>,
     parse_cache: Option<ParseCache>,
+    scan_filters: Arc<WorkspaceScanFilters>,
 }
 
 impl AnalysisHost {
@@ -82,6 +84,7 @@ impl AnalysisHost {
             localisation_previews: Arc::new(LocalisationPreviewMap::new()),
             query_cache: Arc::new(SnapshotQueryCache::new()),
             parse_cache: None,
+            scan_filters: Arc::new(WorkspaceScanFilters::default()),
         }
     }
 
@@ -104,6 +107,23 @@ impl AnalysisHost {
     #[must_use]
     pub fn parse_cache_dir(&self) -> Option<&Path> {
         self.parse_cache.as_ref().map(ParseCache::directory)
+    }
+
+    /// Replaces the bounded file/directory filters used by subsequent workspace scans.
+    ///
+    /// The host does not scan immediately; callers can apply the filters and then choose when
+    /// to refresh, preserving the same atomic refresh boundary as other workspace configuration.
+    pub fn set_scan_filters(&mut self, filters: WorkspaceScanFilters) {
+        if self.scan_filters.as_ref() != &filters {
+            self.scan_filters = Arc::new(filters);
+            self.advance_revision();
+        }
+    }
+
+    /// Returns the active file/directory scan filters.
+    #[must_use]
+    pub fn scan_filters(&self) -> &WorkspaceScanFilters {
+        self.scan_filters.as_ref()
     }
 
     fn document_snapshot(
@@ -376,6 +396,7 @@ impl AnalysisHost {
             collect_whitelisted_files(
                 &root.path,
                 self.profile.as_ref(),
+                self.scan_filters.as_ref(),
                 limits,
                 &mut report,
                 &mut paths,
@@ -566,6 +587,10 @@ impl AnalysisHost {
             let logical = LogicalPath::parse(&relative)
                 .map_err(|_| WorkspaceError::InvalidLogicalPath(change.path.clone()))?;
             if !self.profile.allows_scan_file(logical.as_str()) {
+                continue;
+            }
+            let ignored = self.scan_filters.ignores_file(logical.as_str());
+            if ignored && change.kind != DiskFileChangeKind::Deleted {
                 continue;
             }
             let id = SourceFileId::new(stable_file_id(root.id, &logical));

@@ -248,6 +248,19 @@ background_reindex_idle_seconds = 15
 The pass never replaces a newer edit or watched-file refresh, and changing either setting through
 `workspace/didChangeConfiguration` takes effect without restarting the server.
 
+Large workspaces can prune generated files or directories before they consume the scan budget.
+Configure `ignore_file_patterns` and `ignore_directories` in `.pdx/project.toml`, or pass
+`ignoreFilePatterns` and `ignoreDirectories` through `initializationOptions`:
+
+```toml
+ignore_file_patterns = ["**/*.generated.txt"]
+ignore_directories = ["generated", "build/cache"]
+```
+
+Patterns are bounded to 200 entries per list and 1024 characters per entry. `*` and `?` stay
+within one path component; `**` spans directories; a pattern without `/` matches a basename at
+any depth. The same filters apply to watched-file updates.
+
 For an immediate refresh, invoke the advertised LSP `workspace/executeCommand` command
 `pdx/reindexWorkspace`. It uses the same cancellation, serialized-worker, and revision-checked
 commit path as the quiet pass and returns the new snapshot revision and source-file count.
