@@ -323,7 +323,7 @@ fn extract_inline_ignored_codes(text: &str) -> Option<HashMap<u32, HashSet<Strin
             if trailing
                 .chars()
                 .next()
-                .is_some_and(|character| !character.is_whitespace())
+                .is_some_and(|character| !character.is_whitespace() && character != '#')
             {
                 continue;
             }
