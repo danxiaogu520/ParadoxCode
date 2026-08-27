@@ -272,6 +272,11 @@ ignored_error_codes = ["UnknownScope", "UnknownBareValue"]
 Codes use the stable LSP names shown in diagnostics. Unknown codes are rejected so a misspelled
 setting cannot silently suppress nothing.
 
+For a one-off suppression beside a piece of source, add `# cwtools-ignore <code>` to the same
+line (or the immediately preceding/following line). The directive is read from raw text, so it
+also works when the file has syntax errors; unknown names are ignored rather than hiding a
+different diagnostic.
+
 For an immediate refresh, invoke the advertised LSP `workspace/executeCommand` command
 `pdx/reindexWorkspace`. It uses the same cancellation, serialized-worker, and revision-checked
 commit path as the quiet pass and returns the new snapshot revision and source-file count.

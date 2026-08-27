@@ -127,6 +127,49 @@ fn initialization_can_filter_selected_diagnostic_codes() {
 }
 
 #[test]
+fn inline_cwtools_ignore_filters_selected_diagnostic_codes() {
+    let (root, root_uri) = temp_workspace_dir();
+    let uri = format!("{root_uri}/events/inline-filtered.txt");
+    let input = frames([
+        json!({
+            "jsonrpc":"2.0",
+            "id":1,
+            "method":"initialize",
+            "params":{
+                "workspaceFolders":[{"uri":root_uri,"name":"test"}],
+                "capabilities":{}
+            }
+        }),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
+            "textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":"scope = nowhere # cwtools-ignore UnknownScope\n"}
+        }}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("server");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let published = responses
+        .iter()
+        .find(|value| {
+            value["method"] == "textDocument/publishDiagnostics" && value["params"]["uri"] == uri
+        })
+        .expect("diagnostic notification");
+    assert!(
+        published["params"]["diagnostics"]
+            .as_array()
+            .is_some_and(|items| items.iter().all(|item| item["code"] != "UnknownScope")),
+        "inline ignored diagnostic code was published: {}",
+        published["params"]["diagnostics"]
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn cancel_notification_marks_the_matching_in_flight_request() {
     let request_id = RequestId::String("active-query".to_owned());
     let cancellation = CancellationToken::new();

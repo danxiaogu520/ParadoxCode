@@ -9,8 +9,8 @@ use lsp_types::{
     Range as LspRange, ShowMessageParams, SymbolKind, Uri,
 };
 use pdx_analysis::{
-    CancellationToken, Cancelled, CompletionKind, Diagnostic, Location, RenameError, RenameFailure,
-    diagnostics_with_cancellation,
+    CancellationToken, Cancelled, CompletionKind, Diagnostic, DiagnosticCode, Location,
+    RenameError, RenameFailure, diagnostics_with_cancellation,
 };
 use pdx_engine::{AnalysisSnapshot, DocumentError, DocumentId, WorkspaceError};
 use pdx_rules::RulesError;
@@ -227,9 +227,24 @@ pub(crate) fn diagnostic_values_for_text_with_ignored(
     text: &str,
     ignored: &HashSet<String>,
 ) -> Vec<LspDiagnostic> {
+    let inline_ignored = extract_inline_ignored_codes(text);
     let diagnostics = diagnostics
         .into_iter()
-        .filter(|diagnostic| !ignored.contains(diagnostic.code.as_str()))
+        .filter(|diagnostic| {
+            if ignored.contains(diagnostic.code.as_str()) {
+                return false;
+            }
+            let Some(inline_ignored) = inline_ignored.as_ref() else {
+                return true;
+            };
+            let Some(line) = line_index
+                .position(text, diagnostic.range.start())
+                .map(|position| position.line.saturating_add(1))
+            else {
+                return true;
+            };
+            !inline_diagnostic_suppressed(inline_ignored, line, diagnostic.code.as_str())
+        })
         .collect::<Vec<_>>();
     let (retained, omitted) =
         diagnostic_result_counts(diagnostics.len(), MAX_PUBLISHED_DIAGNOSTICS);
@@ -273,6 +288,96 @@ pub(crate) fn diagnostic_values_for_text_with_ignored(
         ));
     }
     values
+}
+
+/// The inline suppression directive accepted by CWTools-compatible source comments.
+const INLINE_IGNORE_DIRECTIVE: &str = "cwtools-ignore";
+
+/// Extracts one-based source-line directives without requiring comments to survive parsing.
+/// `None` is returned for the common case where the directive substring is absent, avoiding a
+/// per-diagnostic allocation on ordinary files.
+fn extract_inline_ignored_codes(text: &str) -> Option<HashMap<u32, HashSet<String>>> {
+    let needle = INLINE_IGNORE_DIRECTIVE.as_bytes();
+    if !text
+        .as_bytes()
+        .windows(needle.len())
+        .any(|window| window.eq_ignore_ascii_case(needle))
+    {
+        return None;
+    }
+    let mut directives = HashMap::new();
+    for (line_index, line) in text.lines().enumerate() {
+        let mut codes = None;
+        for (index, _) in line.match_indices('#') {
+            let rest = &line[index + 1..];
+            let after = rest.trim_start();
+            let Some(head) = after.get(..INLINE_IGNORE_DIRECTIVE.len()) else {
+                continue;
+            };
+            if !head.eq_ignore_ascii_case(INLINE_IGNORE_DIRECTIVE) {
+                continue;
+            }
+            let trailing = after
+                .get(INLINE_IGNORE_DIRECTIVE.len()..)
+                .unwrap_or_default();
+            if trailing
+                .chars()
+                .next()
+                .is_some_and(|character| !character.is_whitespace())
+            {
+                continue;
+            }
+            let values = trailing
+                .split('#')
+                .next()
+                .unwrap_or_default()
+                .split_whitespace()
+                .filter_map(|value| {
+                    DiagnosticCode::parse_name(value).map(|code| code.as_str().to_ascii_lowercase())
+                })
+                .collect::<HashSet<_>>();
+            codes = Some(values);
+            break;
+        }
+        if let Some(codes) = codes {
+            directives.insert(
+                u32::try_from(line_index)
+                    .unwrap_or(u32::MAX)
+                    .saturating_add(1),
+                codes,
+            );
+        }
+    }
+    Some(directives)
+}
+
+/// A directive on a line suppresses the named category on that line and its immediate neighbours.
+/// This supports both trailing comments and a standalone comment beside the offending line.
+fn inline_diagnostic_suppressed(
+    directives: &HashMap<u32, HashSet<String>>,
+    line: u32,
+    code: &str,
+) -> bool {
+    if line == 0 || code.is_empty() {
+        return false;
+    }
+    let code = code.to_ascii_lowercase();
+    let start = line.saturating_sub(1);
+    let end = line.saturating_add(1);
+    let mut candidate = start;
+    while candidate <= end {
+        if directives
+            .get(&candidate)
+            .is_some_and(|codes| codes.contains(&code))
+        {
+            return true;
+        }
+        if candidate == u32::MAX {
+            break;
+        }
+        candidate = candidate.saturating_add(1);
+    }
+    false
 }
 
 pub(crate) fn diagnostics_notification(uri: &str, values: Value) -> Value {
@@ -651,5 +756,69 @@ mod tests {
             values[0].code,
             Some(NumberOrString::String("UnknownSymbol".to_owned()))
         );
+    }
+
+    #[test]
+    fn inline_cwtools_ignore_covers_adjacent_lines_and_known_codes_only() {
+        let text =
+            "scope = nowhere\n😀 # cwtools-ignore UnknownScope UnknownKey # note\nother = value\n";
+        let directive = u32::try_from(text.find("# cwtools-ignore").expect("directive"))
+            .expect("directive offset");
+        let below = u32::try_from(text.find("other").expect("below line")).expect("below offset");
+        let diagnostics = vec![
+            Diagnostic::new(
+                DiagnosticCode::UnknownScope,
+                Severity::Error,
+                TextRange::new(0, 5).expect("range"),
+                "above".to_owned(),
+            ),
+            Diagnostic::new(
+                DiagnosticCode::UnknownScope,
+                Severity::Error,
+                TextRange::new(directive, directive + 1).expect("range"),
+                "same".to_owned(),
+            ),
+            Diagnostic::new(
+                DiagnosticCode::UnknownKey,
+                Severity::Error,
+                TextRange::new(below, below + 5).expect("range"),
+                "below".to_owned(),
+            ),
+            Diagnostic::new(
+                DiagnosticCode::UnknownSymbol,
+                Severity::Error,
+                TextRange::new(below, below + 5).expect("range"),
+                "visible".to_owned(),
+            ),
+        ];
+        let values = diagnostic_values_for_text_with_ignored(
+            diagnostics,
+            &LineIndex::new(text),
+            text,
+            &HashSet::new(),
+        );
+        assert_eq!(values.len(), 1);
+        assert_eq!(
+            values[0].code,
+            Some(NumberOrString::String("UnknownSymbol".to_owned()))
+        );
+    }
+
+    #[test]
+    fn inline_cwtools_ignore_does_not_match_partial_directive_words() {
+        let text = "scope = nowhere # cwtools-ignore-typo UnknownScope\n";
+        let diagnostics = vec![Diagnostic::new(
+            DiagnosticCode::UnknownScope,
+            Severity::Error,
+            TextRange::new(0, 5).expect("range"),
+            "visible".to_owned(),
+        )];
+        let values = diagnostic_values_for_text_with_ignored(
+            diagnostics,
+            &LineIndex::new(text),
+            text,
+            &HashSet::new(),
+        );
+        assert_eq!(values.len(), 1);
     }
 }
