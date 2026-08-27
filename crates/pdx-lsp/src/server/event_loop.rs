@@ -276,6 +276,7 @@ impl LspServer {
                             match result.result {
                                 Ok(prepared) if !task.cancellation.is_cancelled() => {
                                     self.host = prepared.host;
+                                    self.invalidate_all_semantic_tokens();
                                     self.state = ServerState::Initialized;
                                     self.textures = prepared.textures;
                                     self.watcher_registration = prepared.watcher_registration;
@@ -750,6 +751,7 @@ impl LspServer {
                             let installed = std::time::Instant::now();
                             match self.host.install_index_caches(install_caches) {
                                 Ok(()) => {
+                                    self.invalidate_all_semantic_tokens();
                                     diagnostics_dirty = true;
                                     write_message(
                                         &mut output,
@@ -874,6 +876,7 @@ impl LspServer {
                                 let installed = std::time::Instant::now();
                                 match self.host.install_index_cache(cache) {
                                     Ok(()) => {
+                                        self.invalidate_all_semantic_tokens();
                                         write_message(
                                             &mut output,
                                             &log_message_notification(
@@ -983,6 +986,7 @@ impl LspServer {
                         match result.result {
                             Ok((host, workspace)) => {
                                 self.host = host;
+                                self.invalidate_all_semantic_tokens();
                                 let snapshot = self.host.snapshot();
                                 write_message(
                                     &mut output,
@@ -1058,6 +1062,7 @@ impl LspServer {
                             match result.result {
                                 Ok((host, summary)) => {
                                     self.host = host;
+                                    self.invalidate_all_semantic_tokens();
                                     let snapshot = self.host.snapshot();
                                     let open = snapshot
                                         .documents()
@@ -1152,6 +1157,7 @@ impl LspServer {
                         match result.result {
                             Ok((host, workspace)) => {
                                 self.host = host;
+                                self.invalidate_all_semantic_tokens();
                                 let open = self
                                     .host
                                     .snapshot()

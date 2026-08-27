@@ -5,9 +5,10 @@ use lsp_types::{
     CompletionItem, CompletionList, CompletionResponse, CompletionTextEdit,
     DocumentFormattingParams, DocumentSymbol as LspDocumentSymbol, DocumentSymbolParams,
     Documentation, Hover as LspHover, HoverContents, InsertTextFormat, MarkupContent, MarkupKind,
-    PrepareRenameResponse, ReferenceParams, RenameParams, SemanticTokens as LspSemanticTokens,
-    SemanticTokensParams, SymbolInformation, TextDocumentPositionParams, TextEdit, Uri,
-    WorkspaceEdit, WorkspaceSymbolParams,
+    PrepareRenameResponse, ReferenceParams, RenameParams, SemanticToken as LspSemanticToken,
+    SemanticTokens as LspSemanticTokens, SemanticTokensDelta, SemanticTokensDeltaParams,
+    SemanticTokensEdit, SemanticTokensFullDeltaResult, SemanticTokensParams, SymbolInformation,
+    TextDocumentPositionParams, TextEdit, Uri, WorkspaceEdit, WorkspaceSymbolParams,
 };
 use pdx_analysis::{
     CancellationToken, Cancelled, CompletionKind, SemanticToken, SemanticTokenType,
@@ -31,6 +32,7 @@ use crate::protocol::{
     location_range_to_lsp, location_to_lsp, range_to_lsp, range_to_lsp_for_location,
     rename_failure, symbol_kind, typed_params, typed_value,
 };
+use crate::server::SemanticTokensCache;
 use crate::uri::path_to_uri;
 use crate::{
     INVALID_PARAMS, MAX_COMPLETION_RESULTS, MAX_WORKSPACE_DIAGNOSTIC_FILES,
@@ -124,6 +126,8 @@ pub(crate) struct SnapshotRequestContext {
     textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
     /// Diagnostic categories hidden by workspace configuration.
     ignored_diagnostic_codes: Arc<HashSet<String>>,
+    /// Shared bounded cache for semantic-token full/delta responses.
+    semantic_tokens_cache: Arc<SemanticTokensCache>,
 }
 
 impl SnapshotRequestContext {
@@ -133,6 +137,7 @@ impl SnapshotRequestContext {
         client_snippets: bool,
         textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
         ignored_diagnostic_codes: Arc<HashSet<String>>,
+        semantic_tokens_cache: Arc<SemanticTokensCache>,
     ) -> Self {
         Self {
             snapshot,
@@ -140,6 +145,7 @@ impl SnapshotRequestContext {
             client_snippets,
             textures,
             ignored_diagnostic_codes,
+            semantic_tokens_cache,
         }
     }
 
@@ -154,6 +160,7 @@ impl SnapshotRequestContext {
             "textDocument/rename" => self.rename(params),
             "textDocument/documentSymbol" => self.document_symbols(params),
             "textDocument/semanticTokens/full" => self.semantic_tokens(params),
+            "textDocument/semanticTokens/full/delta" => self.semantic_tokens_delta(params),
             "textDocument/formatting" => self.formatting(params),
             "workspace/symbol" => self.workspace_symbols(params),
             "pdx/workspaceDiagnostics" => self.workspace_diagnostics(params),
@@ -876,24 +883,95 @@ impl SnapshotRequestContext {
 
     fn semantic_tokens(&self, params: Option<&Value>) -> Result<Value, RpcError> {
         let params = typed_params::<SemanticTokensParams>(params, "semantic tokens")?;
-        let id = DocumentId::new(params.text_document.uri.as_str());
+        let uri = params.text_document.uri.as_str().to_owned();
+        let id = DocumentId::new(uri.clone());
         let document = self
             .snapshot
             .document(&id)
             .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
+        let revision = self.snapshot.revision();
+        if let Some(entry) = self.semantic_tokens_cache.get(&uri, revision) {
+            self.ensure_active()?;
+            return typed_value(
+                LspSemanticTokens {
+                    result_id: Some(entry.result_id),
+                    data: entry.data,
+                },
+                "semantic tokens response",
+            );
+        }
         let result = semantic_tokens_with_cancellation(&self.snapshot, &id, &self.cancellation)
             .map_err(cancelled_error)?;
         self.ensure_active()?;
         let line_index = document.line_index();
         let text = document.text();
         let data = encode_semantic_tokens(line_index, text, &result);
+        let result_id = self.semantic_tokens_cache.next_result_id();
+        self.semantic_tokens_cache
+            .insert(uri, revision, result_id.clone(), data.clone());
+        self.ensure_active()?;
         typed_value(
             LspSemanticTokens {
-                result_id: None,
+                result_id: Some(result_id),
                 data,
             },
             "semantic tokens response",
         )
+    }
+
+    fn semantic_tokens_delta(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = typed_params::<SemanticTokensDeltaParams>(params, "semantic tokens delta")?;
+        let uri = params.text_document.uri.as_str().to_owned();
+        let id = DocumentId::new(uri.clone());
+        let document = self
+            .snapshot
+            .document(&id)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
+        let revision = self.snapshot.revision();
+        self.ensure_active()?;
+
+        // A matching revision and result id means that no document/index change occurred since
+        // the previous response. Return an empty edit without walking the semantic-token query.
+        let cached = self.semantic_tokens_cache.get(&uri, revision);
+        if let Some(entry) = cached.as_ref()
+            && entry.result_id == params.previous_result_id
+        {
+            let result_id = self.semantic_tokens_cache.next_result_id();
+            self.semantic_tokens_cache
+                .insert(uri, revision, result_id.clone(), entry.data.clone());
+            return typed_value(
+                SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+                    result_id: Some(result_id),
+                    edits: Vec::new(),
+                }),
+                "semantic tokens delta response",
+            );
+        }
+
+        let result = semantic_tokens_with_cancellation(&self.snapshot, &id, &self.cancellation)
+            .map_err(cancelled_error)?;
+        self.ensure_active()?;
+        let data = encode_semantic_tokens(document.line_index(), document.text(), &result);
+        let result_id = self.semantic_tokens_cache.next_result_id();
+        let response = if let Some(entry) =
+            cached.filter(|entry| entry.result_id == params.previous_result_id)
+        {
+            SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+                result_id: Some(result_id.clone()),
+                edits: semantic_tokens_delta_edits(&entry.data, &data),
+            })
+        } else {
+            // The client may send an expired/unknown result id. The protocol permits a full
+            // response in that case, which also repairs the client's baseline for later deltas.
+            SemanticTokensFullDeltaResult::Tokens(LspSemanticTokens {
+                result_id: Some(result_id.clone()),
+                data: data.clone(),
+            })
+        };
+        self.semantic_tokens_cache
+            .insert(uri, revision, result_id, data);
+        self.ensure_active()?;
+        typed_value(response, "semantic tokens delta response")
     }
 
     fn formatting(&self, params: Option<&Value>) -> Result<Value, RpcError> {
@@ -1020,6 +1098,76 @@ pub(crate) fn encode_semantic_tokens(
         previous_start = start.character;
     }
     data
+}
+
+/// Computes one flat LSP semantic-token edit from the common token prefix/suffix. The wire format
+/// stores five integers per token, so token-level comparison avoids decoding or copying the
+/// unchanged portions while the offsets still use the protocol's flat integer units.
+fn semantic_tokens_delta_edits(
+    previous: &[LspSemanticToken],
+    next: &[LspSemanticToken],
+) -> Vec<SemanticTokensEdit> {
+    if previous == next {
+        return Vec::new();
+    }
+    let mut prefix = 0usize;
+    while prefix < previous.len() && prefix < next.len() && previous[prefix] == next[prefix] {
+        prefix += 1;
+    }
+    let mut suffix = 0usize;
+    while suffix < previous.len().saturating_sub(prefix)
+        && suffix < next.len().saturating_sub(prefix)
+        && previous[previous.len() - 1 - suffix] == next[next.len() - 1 - suffix]
+    {
+        suffix += 1;
+    }
+    let start = u32::try_from(prefix.saturating_mul(5)).unwrap_or(u32::MAX);
+    let delete_count = u32::try_from(
+        previous
+            .len()
+            .saturating_sub(prefix)
+            .saturating_sub(suffix)
+            .saturating_mul(5),
+    )
+    .unwrap_or(u32::MAX);
+    let data = next[prefix..next.len() - suffix].to_vec();
+    vec![SemanticTokensEdit {
+        start,
+        delete_count,
+        data: (!data.is_empty()).then_some(data),
+    }]
+}
+
+#[cfg(test)]
+mod semantic_tokens_delta_tests {
+    use super::{LspSemanticToken, semantic_tokens_delta_edits};
+
+    fn token(delta_start: u32) -> LspSemanticToken {
+        LspSemanticToken {
+            delta_line: 0,
+            delta_start,
+            length: 1,
+            token_type: 0,
+            token_modifiers_bitset: 0,
+        }
+    }
+
+    #[test]
+    fn unchanged_tokens_produce_empty_delta() {
+        let tokens = vec![token(0), token(2)];
+        assert!(semantic_tokens_delta_edits(&tokens, &tokens).is_empty());
+    }
+
+    #[test]
+    fn delta_offsets_use_flat_five_integer_units() {
+        let previous = vec![token(0), token(2), token(4)];
+        let next = vec![token(0), token(7), token(4)];
+        let edits = semantic_tokens_delta_edits(&previous, &next);
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].start, 5);
+        assert_eq!(edits[0].delete_count, 5);
+        assert_eq!(edits[0].data.as_deref(), Some(&[token(7)][..]));
+    }
 }
 
 fn semantic_token_type_index(token_type: SemanticTokenType) -> u32 {

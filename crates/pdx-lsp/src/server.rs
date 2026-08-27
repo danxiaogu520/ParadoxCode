@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::io::{self, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
@@ -181,6 +181,103 @@ struct PendingDiagnostics {
 #[derive(Debug)]
 struct PendingParse {
     version: i64,
+}
+
+/// One immutable semantic-token result retained for LSP `full/delta` requests.
+#[derive(Clone, Debug)]
+pub(crate) struct SemanticTokensCacheEntry {
+    pub(crate) revision: u64,
+    pub(crate) result_id: String,
+    pub(crate) data: Vec<lsp_types::SemanticToken>,
+}
+
+/// Bounded protocol cache shared by snapshot workers and owned by the event-loop server.
+///
+/// Entries are keyed by URI but tagged with the immutable workspace revision that produced them.
+/// A worker finishing for an older snapshot can therefore never satisfy a delta request against a
+/// newer host revision. The cache is intentionally small and is cleared wholesale at its bound;
+/// semantic tokens are cheap to recompute and stale cache state must not grow with a workspace.
+#[derive(Debug)]
+pub(crate) struct SemanticTokensCache {
+    entries: std::sync::Mutex<BTreeMap<String, SemanticTokensCacheEntry>>,
+    next_result_id: AtomicU64,
+}
+
+impl SemanticTokensCache {
+    pub(crate) const MAX_ENTRIES: usize = 1_024;
+
+    pub(crate) fn new() -> Self {
+        Self {
+            entries: std::sync::Mutex::new(BTreeMap::new()),
+            next_result_id: AtomicU64::new(0),
+        }
+    }
+
+    pub(crate) fn next_result_id(&self) -> String {
+        self.next_result_id
+            .fetch_add(1, Ordering::Relaxed)
+            .saturating_add(1)
+            .to_string()
+    }
+
+    pub(crate) fn get(&self, uri: &str, revision: u64) -> Option<SemanticTokensCacheEntry> {
+        self.entries
+            .lock()
+            .expect("semantic token cache lock poisoned")
+            .get(uri)
+            .filter(|entry| entry.revision == revision)
+            .cloned()
+    }
+
+    pub(crate) fn insert(
+        &self,
+        uri: String,
+        revision: u64,
+        result_id: String,
+        data: Vec<lsp_types::SemanticToken>,
+    ) {
+        let mut entries = self
+            .entries
+            .lock()
+            .expect("semantic token cache lock poisoned");
+        if entries
+            .get(&uri)
+            .is_some_and(|entry| entry.revision > revision)
+        {
+            return;
+        }
+        if entries.len() >= Self::MAX_ENTRIES && !entries.contains_key(&uri) {
+            entries.clear();
+        }
+        entries.insert(
+            uri,
+            SemanticTokensCacheEntry {
+                revision,
+                result_id,
+                data,
+            },
+        );
+    }
+
+    pub(crate) fn remove(&self, uri: &str) {
+        self.entries
+            .lock()
+            .expect("semantic token cache lock poisoned")
+            .remove(uri);
+    }
+
+    pub(crate) fn clear(&self) {
+        self.entries
+            .lock()
+            .expect("semantic token cache lock poisoned")
+            .clear();
+    }
+}
+
+impl Default for SemanticTokensCache {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(Debug)]
@@ -426,6 +523,9 @@ pub struct LspServer {
     /// Whether the client advertises snippet support for completion items. When absent, snippet
     /// placeholders are stripped so the inserted text stays valid plain text.
     client_snippet_support: bool,
+    /// Bounded semantic-token results used to answer `full/delta` requests without retaining
+    /// unbounded per-document protocol state.
+    pub(crate) semantic_tokens_cache: Arc<SemanticTokensCache>,
     /// Opt-in quiet source-root re-scan cadence. Zero disables the loop.
     pub(crate) background_reindex_interval_minutes: u64,
     /// Idle window required before a quiet source-root re-scan may start.
@@ -487,6 +587,7 @@ impl LspServer {
             textures: None,
             client_work_done_progress: false,
             client_snippet_support: false,
+            semantic_tokens_cache: Arc::new(SemanticTokensCache::new()),
             background_reindex_interval_minutes: 0,
             background_reindex_idle_seconds: 15,
             last_activity: Instant::now(),
@@ -608,6 +709,18 @@ impl LspServer {
         if self.workspace_diagnostic_uris.remove(uri) {
             self.workspace_diagnostic_clear_queue.push(uri.to_owned());
         }
+    }
+
+    /// Drops the semantic-token result for one document after an overlay lifecycle change.
+    pub(crate) fn invalidate_semantic_tokens(&self, uri: &str) {
+        self.semantic_tokens_cache.remove(uri);
+    }
+
+    /// Drops all semantic-token results after a workspace/index revision change. Revision tags
+    /// already protect against stale workers, while this eager clear bounds retained payloads
+    /// during large refreshes.
+    pub(crate) fn invalidate_all_semantic_tokens(&self) {
+        self.semantic_tokens_cache.clear();
     }
 
     /// Runs the framed stdio transport used by `pdx-ls`.
@@ -736,5 +849,50 @@ impl LspServer {
         (self.background_reindex_interval_minutes != 0).then(|| {
             Duration::from_secs(self.background_reindex_interval_minutes.saturating_mul(60))
         })
+    }
+}
+
+#[cfg(test)]
+mod semantic_tokens_cache_tests {
+    use super::SemanticTokensCache;
+
+    #[test]
+    fn cache_rejects_results_from_older_revisions() {
+        let cache = SemanticTokensCache::new();
+        cache.insert(
+            "file:///test.txt".to_owned(),
+            2,
+            "new".to_owned(),
+            Vec::new(),
+        );
+        cache.insert(
+            "file:///test.txt".to_owned(),
+            1,
+            "old".to_owned(),
+            Vec::new(),
+        );
+        assert_eq!(
+            cache
+                .get("file:///test.txt", 2)
+                .expect("current entry")
+                .result_id,
+            "new"
+        );
+    }
+
+    #[test]
+    fn cache_clears_when_the_bounded_entry_count_is_reached() {
+        let cache = SemanticTokensCache::new();
+        cache.insert("first".to_owned(), 1, "first".to_owned(), Vec::new());
+        for index in 0..SemanticTokensCache::MAX_ENTRIES {
+            let uri = format!("file:///entry-{index}.txt");
+            cache.insert(uri, 1, index.to_string(), Vec::new());
+        }
+        assert!(cache.get("first", 1).is_none());
+        let last_uri = format!(
+            "file:///entry-{}.txt",
+            SemanticTokensCache::MAX_ENTRIES.saturating_sub(1)
+        );
+        assert!(cache.get(&last_uri, 1).is_some());
     }
 }

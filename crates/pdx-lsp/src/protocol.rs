@@ -120,6 +120,7 @@ pub(crate) fn is_snapshot_request(method: &str) -> bool {
             | "textDocument/rename"
             | "textDocument/documentSymbol"
             | "textDocument/semanticTokens/full"
+            | "textDocument/semanticTokens/full/delta"
             | "textDocument/formatting"
             | "workspace/symbol"
             | "pdx/workspaceDiagnostics"
@@ -637,8 +638,8 @@ mod tests {
     use lsp_types::request::Request;
     use lsp_types::request::{
         Completion, DocumentSymbolRequest, Formatting, GotoDefinition, HoverRequest,
-        PrepareRenameRequest, References, Rename, ResolveCompletionItem, SemanticTokensFullRequest,
-        WorkspaceSymbolRequest,
+        PrepareRenameRequest, References, Rename, ResolveCompletionItem,
+        SemanticTokensFullDeltaRequest, SemanticTokensFullRequest, WorkspaceSymbolRequest,
     };
     use lsp_types::{CompletionItemKind, NumberOrString};
     use pdx_analysis::{
@@ -657,6 +658,7 @@ mod tests {
             Completion::METHOD,
             ResolveCompletionItem::METHOD,
             SemanticTokensFullRequest::METHOD,
+            SemanticTokensFullDeltaRequest::METHOD,
             HoverRequest::METHOD,
             GotoDefinition::METHOD,
             References::METHOD,

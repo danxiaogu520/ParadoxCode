@@ -444,6 +444,7 @@ impl LspServer {
             self.client_snippet_support,
             self.textures.clone(),
             Arc::clone(&self.ignored_diagnostic_codes),
+            Arc::clone(&self.semantic_tokens_cache),
         );
         let method = method.to_owned();
         let params = object.get("params").cloned();
