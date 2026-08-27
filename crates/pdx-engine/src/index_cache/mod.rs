@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -23,15 +24,14 @@ mod write;
 
 /// Current on-disk cache schema.
 ///
-/// Schema 7 stores per-file content fingerprints, keeps navigation positions in one compact
-/// per-file payload, and records the cached source root identity (`root_id` and `root_kind`
-/// metadata). Schema 6 and older caches are rebuilt once by the CLI or LSP, the same way a
-/// rules update triggers a rebuild; the table shapes for source files and positions changed,
-/// so no legacy reader is retained.
-pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 7;
+/// Schema 8 adds an optional per-file filesystem metadata fingerprint so refresh can skip reading
+/// unchanged files on platforms with reliable file metadata. Schema 7 and older caches are
+/// rebuilt once by the CLI or LSP, the same way a rules update triggers a rebuild; the table shape
+/// for source files changed, so no legacy reader is retained.
+pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 8;
 
 /// Oldest on-disk cache schema this executable can still load.
-pub const MIN_SUPPORTED_CACHE_SCHEMA_VERSION: u32 = 7;
+pub const MIN_SUPPORTED_CACHE_SCHEMA_VERSION: u32 = 8;
 
 const APPLICATION_ID: i32 = 0x5044_5856;
 const MAX_CACHE_BYTES: u64 = 1024 * 1024 * 1024;
@@ -62,6 +62,7 @@ type LoadedIndex = (
     PositionMap,
     LocalisationPreviewMap,
     BTreeMap<SourceFileId, String>,
+    BTreeMap<SourceFileId, Option<String>>,
 );
 
 /// Observable metadata recorded when an index cache is built manually.
@@ -76,8 +77,9 @@ pub struct IndexCacheMetadata {
     pub rule_hash: String,
     /// Human-readable source directory identity.
     pub source_identity: String,
-    /// SHA-256 over indexed logical paths and materialized source text at build time. Opaque
-    /// assets intentionally contribute no source bytes because they are never read by indexing.
+    /// SHA-256 over indexed logical paths and per-file content fingerprints at build time.
+    /// Opaque assets intentionally contribute no source bytes because they are never read by
+    /// indexing.
     pub source_fingerprint: String,
     /// Cache creation time as Unix seconds.
     pub created_unix_seconds: u64,
@@ -95,6 +97,7 @@ pub struct IndexCache {
     index: WorkspaceIndex,
     localisation_previews: LocalisationPreviewMap,
     file_fingerprints: BTreeMap<SourceFileId, String>,
+    file_metadata_fingerprints: BTreeMap<SourceFileId, Option<String>>,
 }
 
 impl IndexCache {
@@ -154,8 +157,9 @@ impl IndexCache {
                 .sum::<usize>(),
         )?;
         let mut hasher = Sha256::new();
-        hasher.update(b"paradoxcode/vanilla-source/v1\0");
+        hasher.update(b"paradoxcode/vanilla-source/v2\0");
         let mut file_fingerprints = BTreeMap::new();
+        let mut file_metadata_fingerprints = BTreeMap::new();
         for (id, file) in snapshot.source_files() {
             if file.root_id != root.id {
                 return Err(IndexCacheError::InvalidData(format!(
@@ -170,14 +174,11 @@ impl IndexCache {
                 ))
             })?;
             put_fingerprint_field(&mut hasher, file.logical_path.as_str().as_bytes());
-            put_fingerprint_field(&mut hasher, state.source().as_bytes());
-            file_fingerprints.insert(
-                *id,
-                Sha256::digest(state.source().as_bytes())
-                    .iter()
-                    .map(|byte| format!("{byte:02x}"))
-                    .collect(),
-            );
+            let digest = content_fingerprint(state.source());
+            put_fingerprint_field(&mut hasher, digest.as_bytes());
+            file_fingerprints.insert(*id, digest);
+            file_metadata_fingerprints
+                .insert(*id, source_metadata_fingerprint(&file.physical_path));
         }
         let source_fingerprint: String = hasher
             .finalize()
@@ -205,13 +206,14 @@ impl IndexCache {
             index: snapshot.index().clone(),
             localisation_previews,
             file_fingerprints,
+            file_metadata_fingerprints,
         })
     }
 }
 
 impl IndexCache {
-    /// Reindexes this cache against its recorded source directory, parsing only files whose
-    /// content fingerprint changed.
+    /// Reindexes this cache against its recorded source directory, avoiding reads for files whose
+    /// recorded filesystem metadata is unchanged and parsing only files whose content changed.
     ///
     /// The rules must match the hash recorded in the cache: shard contents (kinds, macro
     /// summaries, references) depend on the rules, so a different hash needs a full rebuild.
@@ -325,6 +327,15 @@ impl IndexCache {
     pub fn file_fingerprint(&self, file_id: SourceFileId) -> Option<&str> {
         self.file_fingerprints.get(&file_id).map(String::as_str)
     }
+
+    /// Returns the recorded filesystem metadata fingerprint for one source file, when the
+    /// platform exposed a reliable metadata snapshot while the cache was built or refreshed.
+    #[must_use]
+    pub fn file_metadata_fingerprint(&self, file_id: SourceFileId) -> Option<&str> {
+        self.file_metadata_fingerprints
+            .get(&file_id)
+            .and_then(Option::as_deref)
+    }
 }
 /// Errors raised while building, persisting, loading, or installing an index cache.
 #[derive(Debug)]
@@ -437,6 +448,60 @@ fn validate_cache_limits(
 pub(super) fn put_fingerprint_field(hasher: &mut Sha256, value: &[u8]) {
     hasher.update(u64::try_from(value.len()).unwrap_or(u64::MAX).to_le_bytes());
     hasher.update(value);
+}
+
+/// Stable content digest used by the per-file cache and the aggregate source fingerprint.
+pub(super) fn content_fingerprint(source: &str) -> String {
+    Sha256::digest(source.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// Compute a conservative, platform-specific fingerprint for a regular source file's metadata.
+///
+/// A missing or unsupported metadata field returns `None`, which deliberately disables the fast
+/// path for that file and keeps the existing content-read validation as the safe fallback. The
+/// cache key already includes the stable logical path, so the stamp only needs to distinguish a
+/// replacement or edit at that path.
+pub(super) fn source_metadata_fingerprint(path: &Path) -> Option<String> {
+    let metadata = fs::symlink_metadata(path).ok()?;
+    if !metadata.is_file() {
+        return None;
+    }
+    let mut hasher = Sha256::new();
+    hasher.update(b"paradoxcode/source-metadata/v1\0");
+    hasher.update(metadata.len().to_le_bytes());
+    if let Ok(modified) = metadata.modified()
+        && let Ok(duration) = modified.duration_since(UNIX_EPOCH)
+    {
+        hasher.update(duration.as_secs().to_le_bytes());
+        hasher.update(duration.subsec_nanos().to_le_bytes());
+    } else {
+        hasher.update([0_u8; 12]);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        hasher.update(metadata.dev().to_le_bytes());
+        hasher.update(metadata.ino().to_le_bytes());
+        hasher.update(metadata.ctime().to_le_bytes());
+        hasher.update(metadata.ctime_nsec().to_le_bytes());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        hasher.update(metadata.creation_time().to_le_bytes());
+        hasher.update(metadata.last_write_time().to_le_bytes());
+        hasher.update(metadata.file_attributes().to_le_bytes());
+    }
+    Some(
+        hasher
+            .finalize()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect(),
+    )
 }
 
 /// Canonical on-disk spelling of a cached source root kind.

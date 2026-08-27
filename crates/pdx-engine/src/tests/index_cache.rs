@@ -237,6 +237,10 @@ fn refreshed_cache_reindexes_changed_files_and_drops_deleted_ones() {
         .expect("unchanged path stays indexed");
     assert!(file_ids.contains(&unchanged.id));
     assert!(reloaded.file_fingerprint(unchanged.id).is_some());
+    assert!(
+        reloaded.file_metadata_fingerprint(unchanged.id).is_some(),
+        "metadata fingerprint enables a no-read refresh on supported filesystems"
+    );
     // Positions must be retained for every surviving symbol.
     let definition = reloaded
         .index()

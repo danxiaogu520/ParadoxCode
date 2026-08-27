@@ -48,7 +48,7 @@ rewritten without evidence that their boundaries are the bottleneck.
 
 ## Implemented stages
 
-The first ten stages are now on `main`, each independently committed and pushed:
+The first eleven stages are now on `main`, each independently committed and pushed:
 
 1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
    reporting stays deterministic.
@@ -73,8 +73,11 @@ The first ten stages are now on `main`, each independently committed and pushed:
    the already-read source on a validated hit, avoiding a second copy of every file in the cache
    payload while bumping the schema for safe invalidation.
 10. Parsed CSTs and immutable `FileState` values share one `Arc<str>` source allocation, so the
-    lossless text remains available to formatting, lowering, and editor queries without retaining
-    duplicate in-memory copies.
+   lossless text remains available to formatting, lowering, and editor queries without retaining
+   duplicate in-memory copies.
+11. Index caches persist a conservative per-file filesystem metadata fingerprint. Refreshes can
+    retain unchanged shards, positions, previews, and content digests without reopening or hashing
+    those files; platforms without a usable metadata stamp continue through the content-read path.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an
