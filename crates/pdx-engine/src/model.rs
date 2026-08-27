@@ -126,6 +126,247 @@ pub struct WorkspaceScanLimits {
     pub max_reported_issues: usize,
 }
 
+/// User-configurable file and directory filters applied before workspace discovery consumes
+/// scan budget.  Patterns use `/` as the separator; `*` and `?` match within one path component,
+/// while a `**` component spans any number of components.  A pattern without a separator is
+/// matched against the basename at any depth, which keeps simple entries such as `generated.txt`
+/// useful for both Unix and Windows workspaces.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct WorkspaceScanFilters {
+    ignore_file_patterns: Arc<[String]>,
+    ignore_directory_patterns: Arc<[String]>,
+}
+
+/// Validation failure for user-provided workspace scan filters.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum WorkspaceScanFilterError {
+    /// More than the bounded number of patterns was supplied.
+    TooMany {
+        /// Whether file or directory patterns exceeded the bound.
+        kind: &'static str,
+        /// Number of accepted patterns.
+        limit: usize,
+    },
+    /// One pattern exceeded the bounded length.
+    TooLong {
+        /// Whether a file or directory pattern was too long.
+        kind: &'static str,
+        /// The configured character limit.
+        limit: usize,
+    },
+    /// A pattern contained a NUL byte, which cannot describe a filesystem path.
+    Nul {
+        /// Whether a file or directory pattern was invalid.
+        kind: &'static str,
+    },
+}
+
+impl fmt::Display for WorkspaceScanFilterError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TooMany { kind, limit } => {
+                write!(
+                    formatter,
+                    "too many {kind} ignore patterns (maximum {limit})"
+                )
+            }
+            Self::TooLong { kind, limit } => {
+                write!(
+                    formatter,
+                    "{kind} ignore pattern exceeds {limit} characters"
+                )
+            }
+            Self::Nul { kind } => write!(formatter, "{kind} ignore pattern contains NUL"),
+        }
+    }
+}
+
+impl std::error::Error for WorkspaceScanFilterError {}
+
+impl WorkspaceScanFilters {
+    /// Maximum number of file or directory patterns accepted from one configuration.
+    pub const MAX_PATTERNS: usize = 200;
+    /// Maximum Unicode scalar length of one pattern.
+    pub const MAX_PATTERN_LENGTH: usize = 1024;
+
+    /// Validates and normalizes user-provided file and directory patterns.
+    pub fn new(
+        ignore_file_patterns: Vec<String>,
+        ignore_directory_patterns: Vec<String>,
+    ) -> Result<Self, WorkspaceScanFilterError> {
+        Ok(Self {
+            ignore_file_patterns: normalize_patterns(ignore_file_patterns, "file")?.into(),
+            ignore_directory_patterns: normalize_patterns(ignore_directory_patterns, "directory")?
+                .into(),
+        })
+    }
+
+    /// Returns the normalized file patterns.
+    #[must_use]
+    pub fn ignore_file_patterns(&self) -> &[String] {
+        &self.ignore_file_patterns
+    }
+
+    /// Returns the normalized directory patterns.
+    #[must_use]
+    pub fn ignore_directory_patterns(&self) -> &[String] {
+        &self.ignore_directory_patterns
+    }
+
+    /// Returns whether a relative directory should be pruned before recursion.
+    #[must_use]
+    pub fn ignores_directory(&self, relative_path: &str) -> bool {
+        self.ignore_directory_patterns
+            .iter()
+            .any(|pattern| pattern_matches(pattern, relative_path, true))
+    }
+
+    /// Returns whether a relative file should be skipped, including files below an ignored
+    /// directory.
+    #[must_use]
+    pub fn ignores_file(&self, relative_path: &str) -> bool {
+        if self
+            .ignore_file_patterns
+            .iter()
+            .any(|pattern| pattern_matches(pattern, relative_path, false))
+        {
+            return true;
+        }
+        let mut parent = relative_path;
+        while let Some((prefix, _)) = parent.rsplit_once('/') {
+            if self.ignores_directory(prefix) {
+                return true;
+            }
+            parent = prefix;
+        }
+        false
+    }
+}
+
+const fn pattern_kind_limit() -> usize {
+    WorkspaceScanFilters::MAX_PATTERNS
+}
+
+fn normalize_patterns(
+    patterns: Vec<String>,
+    kind: &'static str,
+) -> Result<Vec<String>, WorkspaceScanFilterError> {
+    if patterns.len() > pattern_kind_limit() {
+        return Err(WorkspaceScanFilterError::TooMany {
+            kind,
+            limit: pattern_kind_limit(),
+        });
+    }
+    let mut normalized = Vec::with_capacity(patterns.len());
+    for pattern in patterns {
+        if pattern.chars().count() > WorkspaceScanFilters::MAX_PATTERN_LENGTH {
+            return Err(WorkspaceScanFilterError::TooLong {
+                kind,
+                limit: WorkspaceScanFilters::MAX_PATTERN_LENGTH,
+            });
+        }
+        if pattern.contains('\0') {
+            return Err(WorkspaceScanFilterError::Nul { kind });
+        }
+        let pattern = pattern.replace('\\', "/");
+        let pattern = pattern
+            .strip_prefix("./")
+            .unwrap_or(&pattern)
+            .trim_start_matches('/')
+            .to_owned();
+        if !pattern.is_empty() && !normalized.iter().any(|item| item == &pattern) {
+            normalized.push(pattern);
+        }
+    }
+    Ok(normalized)
+}
+
+fn pattern_matches(pattern: &str, path: &str, directory: bool) -> bool {
+    let pattern = pattern.trim_end_matches('/');
+    if pattern.is_empty() {
+        return false;
+    }
+    let mut path = path.trim_matches('/');
+    if directory && path.is_empty() {
+        return false;
+    }
+    let basename_only = !pattern.contains('/');
+    if basename_only {
+        path = path.rsplit('/').next().unwrap_or(path);
+    }
+    let pattern_parts = pattern.split('/').collect::<Vec<_>>();
+    let path_parts = path.split('/').collect::<Vec<_>>();
+    glob_path_matches(&pattern_parts, &path_parts)
+}
+
+fn glob_path_matches(pattern: &[&str], path: &[&str]) -> bool {
+    let mut pattern_index = 0usize;
+    let mut path_index = 0usize;
+    let mut doublestar = None;
+    let mut doublestar_path = 0usize;
+    while path_index < path.len() {
+        if pattern_index < pattern.len() && pattern[pattern_index] == "**" {
+            doublestar = Some(pattern_index);
+            doublestar_path = path_index;
+            pattern_index += 1;
+            continue;
+        }
+        if pattern_index < pattern.len()
+            && wildcard_component_matches(pattern[pattern_index], path[path_index])
+        {
+            pattern_index += 1;
+            path_index += 1;
+            continue;
+        }
+        if let Some(star) = doublestar {
+            pattern_index = star + 1;
+            doublestar_path += 1;
+            path_index = doublestar_path;
+            continue;
+        }
+        return false;
+    }
+    while pattern_index < pattern.len() && pattern[pattern_index] == "**" {
+        pattern_index += 1;
+    }
+    pattern_index == pattern.len()
+}
+
+fn wildcard_component_matches(pattern: &str, value: &str) -> bool {
+    let pattern = pattern.chars().collect::<Vec<_>>();
+    let value = value.chars().collect::<Vec<_>>();
+    let mut pattern_index = 0usize;
+    let mut value_index = 0usize;
+    let mut star = None;
+    let mut star_value = 0usize;
+    while value_index < value.len() {
+        if pattern_index < pattern.len()
+            && (pattern[pattern_index] == '?' || pattern[pattern_index] == value[value_index])
+        {
+            pattern_index += 1;
+            value_index += 1;
+            continue;
+        }
+        if pattern_index < pattern.len() && pattern[pattern_index] == '*' {
+            star = Some(pattern_index);
+            star_value = value_index;
+            pattern_index += 1;
+            continue;
+        }
+        if let Some(star) = star {
+            pattern_index = star + 1;
+            star_value += 1;
+            value_index = star_value;
+            continue;
+        }
+        return false;
+    }
+    while pattern_index < pattern.len() && pattern[pattern_index] == '*' {
+        pattern_index += 1;
+    }
+    pattern_index == pattern.len()
+}
+
 /// Shared cooperative-cancellation state for source-root discovery and indexing.
 #[derive(Clone, Debug)]
 pub struct WorkspaceScanToken {

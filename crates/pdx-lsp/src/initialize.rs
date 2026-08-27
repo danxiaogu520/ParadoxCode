@@ -204,6 +204,7 @@ pub(crate) fn prepare_initialize_candidate(
         ));
     }
     host.apply_change(WorkspaceChange::SetWorkspaceRoot(resolved.workspace_root));
+    host.set_scan_filters(resolved.scan_filters.clone());
     host.apply_change(WorkspaceChange::SetSourceRoots(resolved.roots.clone()));
     if scan_workspace && !resolved.roots.is_empty() {
         if let Some(stage) = callbacks.stage {

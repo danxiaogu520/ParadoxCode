@@ -31,6 +31,32 @@ fn background_reindex_options_are_bounded_and_default_to_opt_in() {
     assert_eq!(configured.background_reindex_interval_minutes, 2);
     assert_eq!(configured.background_reindex_idle_seconds, 30);
 
+    let filtered = resolve_source_roots(
+        Some(&root),
+        Some(json!({
+            "ignoreFilePatterns": ["**/*.generated.txt"],
+            "ignoreDirectories": ["generated", "common/ignored"]
+        })),
+        &pdx_engine::WorkspaceScanToken::new(),
+    )
+    .expect("configured workspace filters");
+    assert_eq!(
+        filtered.scan_filters.ignore_file_patterns(),
+        &["**/*.generated.txt".to_owned()]
+    );
+    assert_eq!(
+        filtered.scan_filters.ignore_directory_patterns(),
+        &["generated".to_owned(), "common/ignored".to_owned()]
+    );
+
+    let invalid_filters = resolve_source_roots(
+        Some(&root),
+        Some(json!({ "ignoreFilePatterns": ["x".repeat(1025)] })),
+        &pdx_engine::WorkspaceScanToken::new(),
+    )
+    .expect_err("oversized filters must be rejected");
+    assert!(invalid_filters.message.contains("ignore filters"));
+
     let invalid = resolve_source_roots(
         Some(&root),
         Some(json!({ "backgroundReindexIntervalMinutes": 7 * 24 * 60 + 1 })),
@@ -1110,6 +1136,7 @@ fn explicit_project_cache_precedes_user_discovery_configuration() {
         dependency_caches: Vec::new(),
         background_reindex_interval_minutes: 0,
         background_reindex_idle_seconds: 15,
+        scan_filters: pdx_engine::WorkspaceScanFilters::default(),
     };
     let mut warnings = Vec::new();
     let setup =

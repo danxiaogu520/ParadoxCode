@@ -48,7 +48,7 @@ rewritten without evidence that their boundaries are the bottleneck.
 
 ## Implemented stages
 
-The first eleven stages are now on `main`, each independently committed and pushed:
+The first twelve stages are now on `main`, each independently committed and pushed:
 
 1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
    reporting stays deterministic.
@@ -78,12 +78,19 @@ The first eleven stages are now on `main`, each independently committed and push
 11. Index caches persist a conservative per-file filesystem metadata fingerprint. Refreshes can
     retain unchanged shards, positions, previews, and content digests without reopening or hashing
     those files; platforms without a usable metadata stamp continue through the content-read path.
+12. Workspace discovery accepts bounded file and directory ignore globs. Directory matches are
+    pruned before recursion and file matches before scan-budget accounting; targeted watcher
+    updates use the same predicate, so ignored paths cannot re-enter through the incremental path.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an
-interned string table, persists per-file ASTs, and uses compact prefix-searchable indexes for large
-localisation/type sets. ParadoxCode adopted the last three techniques where they fit its existing
-JSON-authority, stable-ID, and immutable-snapshot contracts; `.cwt` remains reference material only.
+interned string table, persists per-file ASTs, prunes user-configured ignore globs before walking,
+and uses compact prefix-searchable indexes for large localisation/type sets. ParadoxCode adopted
+parallel/ordered loading, source-independent persistent state, metadata fast paths, compact indexes,
+and bounded ignore filtering where they fit its existing JSON-authority, stable-ID, and
+immutable-snapshot contracts; global StringTable IDs remain a separately gated migration because
+the current lossless CST uses source ranges as its cross-layer identity. `.cwt` remains reference
+material only.
 
 The release-shaped synthetic workspace benchmark remains within its prior envelope after the
 changes (2,000 EU4 event files: roughly 26 ms initial scan and 25 ms targeted disk refresh in an

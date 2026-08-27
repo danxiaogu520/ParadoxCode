@@ -293,9 +293,53 @@ impl LspServer {
         if let Some(idle) = idle.filter(|value| *value <= 24 * 60 * 60) {
             self.background_reindex_idle_seconds = idle;
         }
+        let file_patterns = settings
+            .get("ignoreFilePatterns")
+            .or_else(|| settings.get("ignoreFiles"))
+            .map(parse_ignore_patterns)
+            .transpose()?;
+        let directory_patterns = settings
+            .get("ignoreDirectories")
+            .or_else(|| settings.get("ignoreDirs"))
+            .map(parse_ignore_patterns)
+            .transpose()?;
+        if file_patterns.is_some() || directory_patterns.is_some() {
+            let current = self.host.scan_filters();
+            let filters = WorkspaceScanFilters::new(
+                file_patterns.unwrap_or_else(|| current.ignore_file_patterns().to_vec()),
+                directory_patterns.unwrap_or_else(|| current.ignore_directory_patterns().to_vec()),
+            )
+            .map_err(|error| {
+                RpcError::new(
+                    INVALID_PARAMS,
+                    format!("invalid workspace ignore filters: {error}"),
+                )
+            })?;
+            self.host.set_scan_filters(filters);
+        }
         if interval_changed {
             self.arm_background_reindex();
         }
         Ok(())
     }
+}
+
+fn parse_ignore_patterns(value: &Value) -> Result<Vec<String>, RpcError> {
+    let Some(values) = value.as_array() else {
+        return Err(RpcError::new(
+            INVALID_PARAMS,
+            "workspace ignore filters must be arrays of strings",
+        ));
+    };
+    values
+        .iter()
+        .map(|value| {
+            value.as_str().map(str::to_owned).ok_or_else(|| {
+                RpcError::new(
+                    INVALID_PARAMS,
+                    "workspace ignore filters must be arrays of strings",
+                )
+            })
+        })
+        .collect()
 }

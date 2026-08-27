@@ -800,3 +800,106 @@ fn workspace_scan_skips_tool_generated_directories() {
     );
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn workspace_scan_filters_prune_files_before_budget_and_targeted_updates() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-scan-filters-{nonce}"));
+    let events = root.join("events");
+    let generated = root.join("generated/nested");
+    let ignored_tree = root.join("common/ignored");
+    fs::create_dir_all(&events).expect("events directory");
+    fs::create_dir_all(&generated).expect("generated directory");
+    fs::create_dir_all(&ignored_tree).expect("ignored directory");
+    fs::write(
+        events.join("kept.txt"),
+        "country_event = { id = filters.kept }\n",
+    )
+    .expect("kept fixture");
+    fs::write(
+        events.join("skip.generated.txt"),
+        "country_event = { id = filters.file }\n",
+    )
+    .expect("ignored file fixture");
+    fs::write(
+        generated.join("nested.txt"),
+        "country_event = { id = filters.generated }\n",
+    )
+    .expect("ignored subtree fixture");
+    fs::write(
+        ignored_tree.join("nested.txt"),
+        "country_event = { id = filters.common }\n",
+    )
+    .expect("ignored nested fixture");
+
+    let filters = WorkspaceScanFilters::new(
+        vec!["**/*.generated.txt".to_owned()],
+        vec!["generated".to_owned(), "common/ignored".to_owned()],
+    )
+    .expect("valid filters");
+    assert!(filters.ignores_file("events/skip.generated.txt"));
+    assert!(filters.ignores_file("generated/nested/nested.txt"));
+    assert!(filters.ignores_directory("common/ignored"));
+    assert!(!filters.ignores_file("events/kept.txt"));
+
+    let mut host = eu4_host();
+    host.set_scan_filters(filters);
+    host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        ),
+    ]));
+    let report = host
+        .refresh_source_roots_with_limits(WorkspaceScanLimits {
+            max_files: 1,
+            ..WorkspaceScanLimits::default()
+        })
+        .expect("filtered scan");
+    assert_eq!(
+        report.discovered_files, 1,
+        "ignored files do not consume budget"
+    );
+    assert_eq!(report.indexed_files, 1);
+    assert!(
+        host.snapshot()
+            .index()
+            .active_definition("event", "filters.kept")
+            .is_some()
+    );
+    assert!(
+        host.snapshot()
+            .index()
+            .active_definition("event", "filters.file")
+            .is_none()
+    );
+    assert!(
+        host.snapshot()
+            .index()
+            .active_definition("event", "filters.generated")
+            .is_none()
+    );
+
+    fs::write(
+        events.join("new.generated.txt"),
+        "country_event = { id = filters.new }\n",
+    )
+    .expect("ignored watched fixture");
+    host.apply_disk_file_changes(&[DiskFileChange::new(
+        events.join("new.generated.txt"),
+        DiskFileChangeKind::Created,
+    )])
+    .expect("ignored targeted update");
+    assert!(
+        host.snapshot()
+            .index()
+            .active_definition("event", "filters.new")
+            .is_none()
+    );
+
+    fs::remove_dir_all(root).expect("cleanup");
+}

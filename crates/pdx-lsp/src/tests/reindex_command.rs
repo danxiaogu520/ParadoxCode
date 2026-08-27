@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::Cursor;
 
 use serde_json::{Value, json};
 
@@ -81,6 +82,58 @@ fn execute_reindex_workspace_refreshes_sources_and_reports_capability() {
             .active_definition("event", "reindexed.1")
             .is_some(),
         "explicit reindex installs the newly created source file"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn initialize_ignore_filters_are_applied_before_workspace_scan() {
+    let (root, root_uri) = temp_workspace_dir();
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("events directory");
+    fs::write(
+        events.join("kept.txt"),
+        "country_event = { id = filter.keep }\\n",
+    )
+    .expect("kept source");
+    fs::write(
+        events.join("ignored.txt"),
+        "country_event = { id = filter.ignore }\\n",
+    )
+    .expect("ignored source");
+    let input = frames([
+        json!({
+            "jsonrpc":"2.0",
+            "id":1,
+            "method":"initialize",
+            "params":{
+                "workspaceFolders":[{"uri":root_uri,"name":"test"}],
+                "capabilities":{},
+                "initializationOptions":{"ignoreFilePatterns":["ignored.txt"]}
+            }
+        }),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    assert!(
+        server
+            .snapshot()
+            .index()
+            .active_definition("event", "filter.keep")
+            .is_some()
+    );
+    assert!(
+        server
+            .snapshot()
+            .index()
+            .active_definition("event", "filter.ignore")
+            .is_none()
     );
     fs::remove_dir_all(root).expect("cleanup");
 }

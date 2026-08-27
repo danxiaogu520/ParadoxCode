@@ -14,7 +14,7 @@ use lsp_types::{
 use pdx_analysis::CancellationToken;
 use pdx_engine::{
     AnalysisHost, AnalysisSnapshot, DiskFileChange, DiskFileChangeKind, DocumentId, DocumentSource,
-    IndexCache, PreparedDocument, WorkspaceError, WorkspaceScanToken,
+    IndexCache, PreparedDocument, WorkspaceError, WorkspaceScanFilters, WorkspaceScanToken,
 };
 use pdx_game::DiscoveryToken;
 use pdx_rules::{GameProfile, RuleSet};

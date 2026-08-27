@@ -10,8 +10,9 @@ use pdx_rules::{GameProfile, SourceEncoding};
 use pdx_text::LogicalPath;
 
 use crate::model::{
-    SourceFile, SourceFileId, SourceRoot, SourceRootId, WorkspaceError, WorkspaceScanIssue,
-    WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
+    SourceFile, SourceFileId, SourceRoot, SourceRootId, WorkspaceError, WorkspaceScanFilters,
+    WorkspaceScanIssue, WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanReport,
+    WorkspaceScanToken,
 };
 
 pub(crate) fn record_scan_issue(
@@ -34,6 +35,7 @@ pub(crate) fn record_scan_issue(
 pub(crate) fn collect_whitelisted_files(
     root: &std::path::Path,
     profile: &GameProfile,
+    filters: &WorkspaceScanFilters,
     limits: WorkspaceScanLimits,
     report: &mut WorkspaceScanReport,
     output: &mut Vec<(LogicalPath, PathBuf)>,
@@ -96,6 +98,7 @@ pub(crate) fn collect_whitelisted_files(
     let mut scan = DiskScanContext {
         limits,
         profile,
+        filters,
         report,
         output,
         seen: &mut seen,
@@ -103,6 +106,9 @@ pub(crate) fn collect_whitelisted_files(
     };
     for scan_root in collapsed_roots {
         scan.cancellation.checkpoint()?;
+        if scan.filters.ignores_directory(scan_root.as_str()) {
+            continue;
+        }
         let depth = scan_root
             .as_str()
             .split('/')
@@ -168,6 +174,7 @@ pub(crate) fn collect_whitelisted_files(
 struct DiskScanContext<'a> {
     limits: WorkspaceScanLimits,
     profile: &'a GameProfile,
+    filters: &'a WorkspaceScanFilters,
     report: &'a mut WorkspaceScanReport,
     output: &'a mut Vec<(LogicalPath, PathBuf)>,
     seen: &'a mut BTreeSet<LogicalPath>,
@@ -240,6 +247,14 @@ fn collect_disk_files(
             continue;
         }
         if file_type.is_dir() {
+            let relative = path
+                .strip_prefix(root)
+                .map_err(|_| WorkspaceError::InvalidLogicalPath(path.clone()))?
+                .to_string_lossy()
+                .replace('\\', "/");
+            if scan.filters.ignores_directory(&relative) {
+                continue;
+            }
             let relative_depth = depth.saturating_sub(root_depth);
             if root_max_relative_depth.is_some_and(|max_depth| relative_depth >= max_depth) {
                 continue;
@@ -273,17 +288,20 @@ fn collect_disk_files(
         if !file_type.is_file() {
             continue;
         }
+        let relative = path
+            .strip_prefix(root)
+            .map_err(|_| WorkspaceError::InvalidLogicalPath(path.clone()))?
+            .to_string_lossy()
+            .replace('\\', "/");
+        if scan.filters.ignores_file(&relative) {
+            continue;
+        }
         if scan.report.discovered_files >= scan.limits.max_files {
             return Err(WorkspaceError::FileLimitExceeded {
                 limit: scan.limits.max_files,
             });
         }
         scan.report.discovered_files = scan.report.discovered_files.saturating_add(1);
-        let relative = path
-            .strip_prefix(root)
-            .map_err(|_| WorkspaceError::InvalidLogicalPath(path.clone()))?
-            .to_string_lossy()
-            .replace('\\', "/");
         if !scan.profile.allows_scan_file(&relative) {
             continue;
         }

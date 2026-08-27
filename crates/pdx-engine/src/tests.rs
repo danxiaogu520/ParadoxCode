@@ -7,8 +7,8 @@ pub(crate) use super::{
     DocumentSource, FileIndexShard, IndexCache, IndexCacheError, LocalisationPreview,
     LocalisationPreviewMap, MacroParameterSignature, ParsedSource, PositionMap, Reference,
     SourceFileId, SourceRoot, SourceRootId, SourceRootKind, TextChange, WorkspaceChange,
-    WorkspaceError, WorkspaceIndex, WorkspaceScanIssueKind, WorkspaceScanLimits,
-    WorkspaceScanToken, pipeline_counts, reset_pipeline_counts,
+    WorkspaceError, WorkspaceIndex, WorkspaceScanFilters, WorkspaceScanIssueKind,
+    WorkspaceScanLimits, WorkspaceScanToken, pipeline_counts, reset_pipeline_counts,
 };
 use pdx_rules::{RuleSet, RulesModel, SymbolDescriptor, SymbolResolutionPolicy};
 use pdx_text::{LogicalPath, Position, PositionRange, TextRange};

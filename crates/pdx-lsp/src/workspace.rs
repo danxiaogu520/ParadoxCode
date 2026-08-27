@@ -3,7 +3,9 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceScanToken};
+use pdx_engine::{
+    SourceRoot, SourceRootId, SourceRootKind, WorkspaceScanFilters, WorkspaceScanToken,
+};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -29,6 +31,12 @@ struct WorkspaceInitializationOptions {
     background_reindex_interval_minutes: Option<u64>,
     /// Minimum editor-idle window before a quiet re-scan is allowed to start.
     background_reindex_idle_seconds: Option<u64>,
+    /// Optional glob patterns for files excluded before workspace discovery.
+    #[serde(alias = "ignoreFiles")]
+    ignore_file_patterns: Option<Vec<String>>,
+    /// Optional glob patterns for directories pruned before workspace discovery.
+    #[serde(alias = "ignoreDirs")]
+    ignore_directories: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -62,6 +70,12 @@ struct ProjectConfiguration {
     /// Minimum editor-idle window before a quiet re-scan is allowed to start.
     #[serde(alias = "backgroundReindexIdleSeconds")]
     background_reindex_idle_seconds: Option<u64>,
+    /// Glob patterns for files excluded before workspace discovery.
+    #[serde(alias = "ignoreFilePatterns", alias = "ignoreFiles")]
+    ignore_file_patterns: Option<Vec<String>>,
+    /// Glob patterns for directories pruned before workspace discovery.
+    #[serde(alias = "ignoreDirectories", alias = "ignoreDirs")]
+    ignore_directories: Option<Vec<String>>,
     /// Extension-only `[server]` table (e.g. the language-server binary path
     /// used by the Zed / VS Code toolkits). Declared so a single
     /// `.pdx/project.toml` can serve both editors and pdx-ls, while
@@ -86,6 +100,8 @@ pub(crate) struct ResolvedSourceRoots {
     pub(crate) background_reindex_interval_minutes: u64,
     /// User-idle window required before a quiet background re-scan.
     pub(crate) background_reindex_idle_seconds: u64,
+    /// Bounded file and directory globs applied to live source-root scans.
+    pub(crate) scan_filters: WorkspaceScanFilters,
 }
 
 /// A dependency configured with a persistent index cache.
@@ -151,6 +167,12 @@ pub(crate) fn resolve_source_roots(
     if inline.background_reindex_idle_seconds.is_some() {
         project.background_reindex_idle_seconds = inline.background_reindex_idle_seconds;
     }
+    if inline.ignore_file_patterns.is_some() {
+        project.ignore_file_patterns = inline.ignore_file_patterns;
+    }
+    if inline.ignore_directories.is_some() {
+        project.ignore_directories = inline.ignore_directories;
+    }
     let background_reindex_interval_minutes = project
         .background_reindex_interval_minutes
         .unwrap_or(DEFAULT_BACKGROUND_REINDEX_INTERVAL_MINUTES);
@@ -173,6 +195,16 @@ pub(crate) fn resolve_source_roots(
             ),
         ));
     }
+    let scan_filters = WorkspaceScanFilters::new(
+        project.ignore_file_patterns.unwrap_or_default(),
+        project.ignore_directories.unwrap_or_default(),
+    )
+    .map_err(|error| {
+        RpcError::new(
+            INVALID_PARAMS,
+            format!("invalid workspace ignore filters: {error}"),
+        )
+    })?;
     let game_directory = project
         .game_directory
         .as_deref()
@@ -339,6 +371,7 @@ pub(crate) fn resolve_source_roots(
         dependency_caches,
         background_reindex_interval_minutes,
         background_reindex_idle_seconds,
+        scan_filters,
     })
 }
 
