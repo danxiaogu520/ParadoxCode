@@ -580,13 +580,7 @@ fn initial_scope_state(
 ) -> ScopeState {
     let scope = context
         .strip_prefix("type:")
-        .and_then(|type_name| rules.model().semantic.type_root_scopes.get(type_name))
-        .and_then(|roots| {
-            roots
-                .iter()
-                .find(|(key, _)| key.eq_ignore_ascii_case(root_key))
-                .map(|(_, scope)| scope.as_str())
-        })
+        .and_then(|type_name| rules.type_root_scope(type_name, root_key))
         .or_else(|| profile.root_scope(root_key))
         .map_or(ScopeValue::Unknown, |scope| {
             ScopeValue::Known(vec![scope.to_owned()])

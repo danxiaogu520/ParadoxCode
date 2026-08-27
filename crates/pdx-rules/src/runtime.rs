@@ -277,6 +277,34 @@ impl RuleSet {
             .map(|index| &self.model.semantic.rules[*index])
     }
 
+    /// Returns the profile-declared initial scope for a type root key.
+    ///
+    /// Type and root-key identities are logical names, so callers should not have to know how
+    /// the source compiler cased them. The fast path serves canonical source spelling while the
+    /// fallback keeps hand-authored or legacy artifacts case-insensitive.
+    #[must_use]
+    pub fn type_root_scope(&self, type_name: &str, root_key: &str) -> Option<&str> {
+        let scopes = self
+            .model
+            .semantic
+            .type_root_scopes
+            .get(type_name)
+            .or_else(|| {
+                self.model
+                    .semantic
+                    .type_root_scopes
+                    .iter()
+                    .find(|(candidate, _)| candidate.eq_ignore_ascii_case(type_name))
+                    .map(|(_, scopes)| scopes)
+            })?;
+        scopes.get(root_key).map(String::as_str).or_else(|| {
+            scopes
+                .iter()
+                .find(|(candidate, _)| candidate.eq_ignore_ascii_case(root_key))
+                .map(|(_, scope)| scope.as_str())
+        })
+    }
+
     /// Returns the matching file category.
     #[must_use]
     pub fn classify(&self, path: &LogicalPath) -> Option<&FileCategory> {

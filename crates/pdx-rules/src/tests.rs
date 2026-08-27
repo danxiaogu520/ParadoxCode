@@ -31,6 +31,20 @@ fn profile_text_matchers_are_case_insensitive_and_bounded() {
 }
 
 #[test]
+fn profile_scope_member_aliases_are_data_driven_and_case_insensitive() {
+    let mut profile = GameProfile::empty("test");
+    profile
+        .scope_member_aliases
+        .insert("capital_scope".to_owned(), "province".to_owned());
+    assert_eq!(
+        profile.scope_member_alias("CAPITAL_SCOPE"),
+        Some("province")
+    );
+    assert_eq!(profile.scope_member_alias("capitalscope"), Some("province"));
+    assert_eq!(profile.scope_member_alias("owner"), None);
+}
+
+#[test]
 fn file_matcher_path_prefix_is_directory_bounded() {
     let matcher = FileMatcher {
         path_prefix: Some("localisation".to_owned()),
@@ -266,6 +280,21 @@ fn exact_semantic_rule_index_is_case_insensitive_and_excludes_dynamic_matchers()
         vec!["dynamic", "exact"]
     );
     assert!(rules.semantic_rules_for_context("trigger").next().is_none());
+}
+
+#[test]
+fn type_root_scope_lookup_is_case_insensitive() {
+    let mut model = RulesModel::default();
+    model.semantic.type_root_scopes.insert(
+        "event".to_owned(),
+        BTreeMap::from([("country_event".to_owned(), "country".to_owned())]),
+    );
+    let rules = RuleSet::from_model(model);
+    assert_eq!(
+        rules.type_root_scope("EVENT", "COUNTRY_EVENT"),
+        Some("country")
+    );
+    assert_eq!(rules.type_root_scope("missing", "country_event"), None);
 }
 
 #[test]

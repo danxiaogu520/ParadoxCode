@@ -1837,20 +1837,12 @@ pub(crate) fn resolve_scope_member(
         // type cannot be disproved from a static workspace snapshot.
         return ScopeResolution::Dynamic;
     }
+    if let Some(scope) = context.profile.scope_member_alias(member) {
+        return ScopeResolution::Known {
+            scope: scope.to_owned(),
+        };
+    }
     let lowered = member.to_ascii_lowercase().replace('_', "");
-    if matches!(
-        lowered.as_str(),
-        "owner" | "controller" | "emperor" | "overlord"
-    ) {
-        return ScopeResolution::Known {
-            scope: "country".to_owned(),
-        };
-    }
-    if matches!(lowered.as_str(), "capital" | "capitalscope" | "location") {
-        return ScopeResolution::Known {
-            scope: "province".to_owned(),
-        };
-    }
     if let Some(destination) = snapshot
         .rules()
         .exact_semantic_rules(member)

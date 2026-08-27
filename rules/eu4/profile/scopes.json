@@ -33,6 +33,15 @@
     "event_target",
     "global_event_target"
   ],
+  "scope_member_aliases": {
+    "owner": "country",
+    "controller": "country",
+    "emperor": "country",
+    "overlord": "country",
+    "capital": "province",
+    "capital_scope": "province",
+    "location": "province"
+  },
   "scope_completions": [
     "ROOT",
     "THIS",
