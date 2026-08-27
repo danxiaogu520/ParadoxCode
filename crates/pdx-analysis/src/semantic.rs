@@ -1507,6 +1507,35 @@ pub(crate) fn effective_workspace_member_names(
     snapshot: &AnalysisSnapshot,
     type_name: &str,
 ) -> Vec<String> {
+    workspace_member_names_cached(snapshot, type_name)
+        .as_ref()
+        .clone()
+}
+
+/// Returns the workspace member names for one type as a shared snapshot-owned vector.
+///
+/// The source index and live overlays are immutable for a snapshot revision.  Keeping this
+/// normalized name vector in the snapshot query cache avoids rewalking every definition for each
+/// completion request and gives the prefix index below one stable backing allocation.
+fn workspace_member_names_cached(snapshot: &AnalysisSnapshot, type_name: &str) -> Arc<Vec<String>> {
+    let revision = snapshot.revision();
+    let key = format!("workspace-member-names:{}", type_name.to_ascii_lowercase());
+    if let Some(cached) = snapshot.query_cache().get::<Vec<String>>(revision, &key) {
+        return cached;
+    }
+    let names = Arc::new(effective_workspace_member_names_uncached(
+        snapshot, type_name,
+    ));
+    snapshot
+        .query_cache()
+        .insert(revision, key, Arc::clone(&names));
+    names
+}
+
+fn effective_workspace_member_names_uncached(
+    snapshot: &AnalysisSnapshot,
+    type_name: &str,
+) -> Vec<String> {
     let hidden_files = overlay_file_ids(snapshot);
     let kinds = workspace_member_kinds(snapshot, type_name);
     let mut names = Vec::new();
@@ -1543,6 +1572,99 @@ pub(crate) fn effective_workspace_member_names(
     names.sort_by_key(|name| name.to_ascii_lowercase());
     names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
     names
+}
+
+/// Prefix/sub-string lookup over the immutable workspace member names for one snapshot.
+///
+/// CWTools-rs uses a sorted compact localisation index for the same workload.  This variant
+/// keeps the existing completion contract (case-insensitive prefix *or* contiguous substring)
+/// while making the common prefix bucket a binary search and rejecting most fallback candidates
+/// with a cheap character mask.
+pub(crate) struct WorkspaceMemberIndex {
+    names: Arc<Vec<String>>,
+    masks: Vec<u64>,
+}
+
+impl WorkspaceMemberIndex {
+    fn new(names: Arc<Vec<String>>) -> Self {
+        let masks = names
+            .iter()
+            .map(|name| member_char_mask(name, u64::MAX))
+            .collect();
+        Self { names, masks }
+    }
+
+    pub(crate) fn select(&self, prefix: &str) -> Vec<String> {
+        if prefix.is_empty() {
+            return self.names.as_ref().clone();
+        }
+        let folded = prefix.to_ascii_lowercase();
+        let start = self
+            .names
+            .partition_point(|name| name.to_ascii_lowercase().as_str() < folded.as_str());
+        let mut selected = Vec::new();
+        for name in self.names.iter().skip(start) {
+            if !starts_with_ignore_ascii_case(name, prefix) {
+                break;
+            }
+            selected.push(name.clone());
+        }
+        let needle = member_char_mask(prefix, 0);
+        for (index, mask) in self.masks.iter().enumerate() {
+            if mask & needle != needle {
+                continue;
+            }
+            let name = &self.names[index];
+            if starts_with_ignore_ascii_case(name, prefix)
+                || !contains_ignore_ascii_case(name, prefix)
+            {
+                continue;
+            }
+            selected.push(name.clone());
+        }
+        selected.sort_by_key(|name| name.to_ascii_lowercase());
+        selected.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+        selected
+    }
+}
+
+/// Returns the shared name index for one type and snapshot revision.
+pub(crate) fn workspace_member_index(
+    snapshot: &AnalysisSnapshot,
+    type_name: &str,
+) -> Arc<WorkspaceMemberIndex> {
+    let revision = snapshot.revision();
+    let key = format!("workspace-member-index:{}", type_name.to_ascii_lowercase());
+    if let Some(cached) = snapshot
+        .query_cache()
+        .get::<WorkspaceMemberIndex>(revision, &key)
+    {
+        return cached;
+    }
+    let index = Arc::new(WorkspaceMemberIndex::new(workspace_member_names_cached(
+        snapshot, type_name,
+    )));
+    snapshot
+        .query_cache()
+        .insert(revision, key, Arc::clone(&index));
+    index
+}
+
+fn contains_ignore_ascii_case(value: &str, needle: &str) -> bool {
+    !needle.is_empty()
+        && value
+            .as_bytes()
+            .windows(needle.len())
+            .any(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
+}
+
+fn member_char_mask(text: &str, non_ascii: u64) -> u64 {
+    if !text.is_ascii() {
+        return non_ascii;
+    }
+    text.bytes().fold(0_u64, |mask, byte| {
+        mask | 1_u64 << (byte.to_ascii_lowercase() & 63)
+    })
 }
 
 pub(crate) fn scripted_macro_type(snapshot: &AnalysisSnapshot, type_name: &str) -> bool {
@@ -1607,20 +1729,10 @@ fn workspace_member_uncached(snapshot: &AnalysisSnapshot, type_name: &str, membe
 }
 
 fn workspace_kind_has_members(snapshot: &AnalysisSnapshot, type_name: &str) -> bool {
-    let hidden_files = overlay_file_ids(snapshot);
     let kinds = workspace_member_kinds(snapshot, type_name);
-    if kinds.iter().any(|kind| {
-        snapshot
-            .index()
-            .definitions_for_kind(kind)
-            .any(|definition| definition.active && !hidden_files.contains(&definition.file_id))
-    }) {
-        return true;
-    }
-    let members = overlay_members(snapshot);
     kinds
         .iter()
-        .any(|kind| members.kinds.contains(&kind.to_ascii_lowercase()))
+        .any(|kind| !workspace_member_names_cached(snapshot, kind).is_empty())
 }
 
 /// Lowercased overlay definition identity, built once per snapshot revision and shared by every
@@ -1800,5 +1912,50 @@ pub(crate) fn scope_member(
         // Dynamic targets and untracked registers are valid but cannot be checked statically.
         ScopeResolution::Dynamic | ScopeResolution::Unresolved => true,
         ScopeResolution::Unknown => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::WorkspaceMemberIndex;
+    use std::sync::Arc;
+
+    fn linear(names: &[String], prefix: &str) -> Vec<String> {
+        let mut selected = names
+            .iter()
+            .filter(|name| {
+                prefix.is_empty()
+                    || name
+                        .as_bytes()
+                        .windows(prefix.len())
+                        .any(|window| window.eq_ignore_ascii_case(prefix.as_bytes()))
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        selected.sort_by_key(|name| name.to_ascii_lowercase());
+        selected.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+        selected
+    }
+
+    #[test]
+    fn workspace_member_index_matches_linear_substring_selection() {
+        let mut sorted = vec![
+            "Zed_event".to_owned(),
+            "country_event".to_owned(),
+            "EVENT_special".to_owned(),
+            "province".to_owned(),
+            "country_flag".to_owned(),
+            "nonascii_é".to_owned(),
+        ];
+        sorted.sort_by_key(|name| name.to_ascii_lowercase());
+        let names = Arc::new(sorted);
+        let index = WorkspaceMemberIndex::new(Arc::clone(&names));
+        for prefix in ["", "e", "EVENT", "event_", "flag", "zzz", "é"] {
+            assert_eq!(
+                index.select(prefix),
+                linear(names.as_ref(), prefix),
+                "{prefix:?}"
+            );
+        }
     }
 }
