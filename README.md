@@ -280,6 +280,10 @@ different diagnostic.
 For an immediate refresh, invoke the advertised LSP `workspace/executeCommand` command
 `pdx/reindexWorkspace`. It uses the same cancellation, serialized-worker, and revision-checked
 commit path as the quiet pass and returns the new snapshot revision and source-file count.
+For a complete Current Mod validation pass, invoke `validateWorkspace`; it performs the same
+refresh and returns bounded counts for discovered/validated files and diagnostics by severity
+(`totalFiles`, `validatedFiles`, `filesWithErrors`, `totalErrors`, `totalWarnings`, `totalInfos`,
+and `totalHints`).
 
 Run a repeatable whole-Current-Mod diagnostic pass against that Vanilla cache with the development
 script below. It opens each relevant file through the real `pdx-ls` transport and writes ignored

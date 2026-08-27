@@ -1002,6 +1002,7 @@ impl LspServer {
                         let current = in_flight_reindex_command.as_ref().is_some_and(|task| {
                             task.request_id == result.request_id
                                 && task.base_revision == result.base_revision
+                                && task.command == result.command
                         });
                         if !current {
                             continue;
@@ -1016,12 +1017,19 @@ impl LspServer {
                         } else if self.host.snapshot().revision() != result.base_revision {
                             RpcError::new(
                                 INVALID_REQUEST,
-                                "workspace changed while reindexing; run pdx/reindexWorkspace again",
+                                match result.command {
+                                    WorkspaceCommand::Reindex => {
+                                        "workspace changed while reindexing; run pdx/reindexWorkspace again"
+                                    }
+                                    WorkspaceCommand::Validate => {
+                                        "workspace changed while validating; run validateWorkspace again"
+                                    }
+                                },
                             )
                             .response(result.id)
                         } else {
                             match result.result {
-                                Ok(host) => {
+                                Ok((host, summary)) => {
                                     self.host = host;
                                     let snapshot = self.host.snapshot();
                                     let open = snapshot
@@ -1038,13 +1046,38 @@ impl LspServer {
                                             DIAGNOSTIC_DEBOUNCE,
                                         );
                                     }
+                                    let result_value = match (result.command, summary) {
+                                        (WorkspaceCommand::Validate, Some(summary)) => json!({
+                                            "revision": snapshot.revision(),
+                                            "sourceFiles": snapshot.source_files().len(),
+                                            "totalFiles": summary.total_files,
+                                            "validatedFiles": summary.validated_files,
+                                            "filesWithErrors": summary.files_with_errors,
+                                            "totalErrors": summary.total_errors,
+                                            "totalWarnings": summary.total_warnings,
+                                            "totalInfos": summary.total_infos,
+                                            "totalHints": summary.total_hints,
+                                        }),
+                                        (WorkspaceCommand::Reindex, _) => json!({
+                                            "revision": snapshot.revision(),
+                                            "sourceFiles": snapshot.source_files().len(),
+                                        }),
+                                        (WorkspaceCommand::Validate, None) => json!({
+                                            "revision": snapshot.revision(),
+                                            "sourceFiles": snapshot.source_files().len(),
+                                            "totalFiles": 0,
+                                            "validatedFiles": 0,
+                                            "filesWithErrors": 0,
+                                            "totalErrors": 0,
+                                            "totalWarnings": 0,
+                                            "totalInfos": 0,
+                                            "totalHints": 0,
+                                        }),
+                                    };
                                     json!({
                                         "jsonrpc": JSON_RPC_VERSION,
                                         "id": result.id,
-                                        "result": {
-                                            "revision": snapshot.revision(),
-                                            "sourceFiles": snapshot.source_files().len(),
-                                        },
+                                        "result": result_value,
                                     })
                                 }
                                 Err(WorkspaceError::Cancelled) => {

@@ -134,7 +134,7 @@ impl LspServer {
             }
             "workspace/executeCommand" => Err(RpcError::new(
                 INVALID_REQUEST,
-                "only the pdx/reindexWorkspace command is supported",
+                "only the pdx/reindexWorkspace and validateWorkspace commands are supported",
             )),
             method if is_snapshot_request(method) => SnapshotRequestContext::new(
                 self.host.snapshot(),
