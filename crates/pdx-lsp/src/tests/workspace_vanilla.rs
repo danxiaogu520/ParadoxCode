@@ -18,18 +18,21 @@ fn background_reindex_options_are_bounded_and_default_to_opt_in() {
         .expect("default workspace roots");
     assert_eq!(defaults.background_reindex_interval_minutes, 0);
     assert_eq!(defaults.background_reindex_idle_seconds, 15);
+    assert!(defaults.workspace_wide_diagnostics);
 
     let configured = resolve_source_roots(
         Some(&root),
         Some(json!({
             "backgroundReindexIntervalMinutes": 2,
-            "backgroundReindexIdleSeconds": 30
+            "backgroundReindexIdleSeconds": 30,
+            "workspaceWideDiagnostics": false
         })),
         &pdx_engine::WorkspaceScanToken::new(),
     )
     .expect("configured workspace roots");
     assert_eq!(configured.background_reindex_interval_minutes, 2);
     assert_eq!(configured.background_reindex_idle_seconds, 30);
+    assert!(!configured.workspace_wide_diagnostics);
 
     let filtered = resolve_source_roots(
         Some(&root),
@@ -1138,6 +1141,7 @@ fn explicit_project_cache_precedes_user_discovery_configuration() {
         background_reindex_idle_seconds: 15,
         scan_filters: pdx_engine::WorkspaceScanFilters::default(),
         ignored_diagnostic_codes: Vec::new(),
+        workspace_wide_diagnostics: true,
     };
     let mut warnings = Vec::new();
     let setup =

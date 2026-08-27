@@ -17,6 +17,7 @@ use crate::{INVALID_PARAMS, PROJECT_CONFIG_MAX_BYTES, REQUEST_CANCELLED};
 /// server's opt-in behavior so existing clients never acquire an unexpected periodic disk walk.
 pub(crate) const DEFAULT_BACKGROUND_REINDEX_INTERVAL_MINUTES: u64 = 0;
 pub(crate) const DEFAULT_BACKGROUND_REINDEX_IDLE_SECONDS: u64 = 15;
+pub(crate) const DEFAULT_WORKSPACE_WIDE_DIAGNOSTICS: bool = true;
 const MAX_BACKGROUND_REINDEX_INTERVAL_MINUTES: u64 = 7 * 24 * 60;
 const MAX_BACKGROUND_REINDEX_IDLE_SECONDS: u64 = 24 * 60 * 60;
 pub(crate) const MAX_IGNORED_DIAGNOSTIC_CODES: usize = 256;
@@ -42,6 +43,8 @@ struct WorkspaceInitializationOptions {
     /// Optional diagnostic categories hidden from published LSP diagnostics.
     #[serde(alias = "ignoreDiagnosticCodes")]
     ignored_error_codes: Option<Vec<String>>,
+    /// Whether workspace refreshes publish diagnostics for closed Current Mod files.
+    workspace_wide_diagnostics: Option<bool>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -84,6 +87,9 @@ struct ProjectConfiguration {
     /// Diagnostic categories hidden from published LSP diagnostics.
     #[serde(alias = "ignoredErrorCodes", alias = "ignoreDiagnosticCodes")]
     ignored_error_codes: Option<Vec<String>>,
+    /// Whether workspace refreshes publish diagnostics for closed Current Mod files.
+    #[serde(alias = "workspaceWideDiagnostics")]
+    workspace_wide_diagnostics: Option<bool>,
     /// Extension-only `[server]` table (e.g. the language-server binary path
     /// used by the Zed / VS Code toolkits). Declared so a single
     /// `.pdx/project.toml` can serve both editors and pdx-ls, while
@@ -112,6 +118,8 @@ pub(crate) struct ResolvedSourceRoots {
     pub(crate) scan_filters: WorkspaceScanFilters,
     /// Canonical wire-facing diagnostic categories hidden from LSP output.
     pub(crate) ignored_diagnostic_codes: Vec<String>,
+    /// Whether workspace refreshes publish diagnostics for closed Current Mod files.
+    pub(crate) workspace_wide_diagnostics: bool,
 }
 
 /// A dependency configured with a persistent index cache.
@@ -186,6 +194,9 @@ pub(crate) fn resolve_source_roots(
     if inline.ignored_error_codes.is_some() {
         project.ignored_error_codes = inline.ignored_error_codes;
     }
+    if inline.workspace_wide_diagnostics.is_some() {
+        project.workspace_wide_diagnostics = inline.workspace_wide_diagnostics;
+    }
     let background_reindex_interval_minutes = project
         .background_reindex_interval_minutes
         .unwrap_or(DEFAULT_BACKGROUND_REINDEX_INTERVAL_MINUTES);
@@ -220,6 +231,9 @@ pub(crate) fn resolve_source_roots(
     })?;
     let ignored_diagnostic_codes =
         normalize_ignored_diagnostic_codes(project.ignored_error_codes.unwrap_or_default())?;
+    let workspace_wide_diagnostics = project
+        .workspace_wide_diagnostics
+        .unwrap_or(DEFAULT_WORKSPACE_WIDE_DIAGNOSTICS);
     let game_directory = project
         .game_directory
         .as_deref()
@@ -388,6 +402,7 @@ pub(crate) fn resolve_source_roots(
         background_reindex_idle_seconds,
         scan_filters,
         ignored_diagnostic_codes,
+        workspace_wide_diagnostics,
     })
 }
 

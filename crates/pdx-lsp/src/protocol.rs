@@ -227,25 +227,7 @@ pub(crate) fn diagnostic_values_for_text_with_ignored(
     text: &str,
     ignored: &HashSet<String>,
 ) -> Vec<LspDiagnostic> {
-    let inline_ignored = extract_inline_ignored_codes(text);
-    let diagnostics = diagnostics
-        .into_iter()
-        .filter(|diagnostic| {
-            if ignored.contains(diagnostic.code.as_str()) {
-                return false;
-            }
-            let Some(inline_ignored) = inline_ignored.as_ref() else {
-                return true;
-            };
-            let Some(line) = line_index
-                .position(text, diagnostic.range.start())
-                .map(|position| position.line.saturating_add(1))
-            else {
-                return true;
-            };
-            !inline_diagnostic_suppressed(inline_ignored, line, diagnostic.code.as_str())
-        })
-        .collect::<Vec<_>>();
+    let diagnostics = filter_diagnostics_with_ignored(diagnostics, line_index, text, ignored);
     let (retained, omitted) =
         diagnostic_result_counts(diagnostics.len(), MAX_PUBLISHED_DIAGNOSTICS);
     let mut values = diagnostics
@@ -288,6 +270,36 @@ pub(crate) fn diagnostic_values_for_text_with_ignored(
         ));
     }
     values
+}
+
+/// Applies workspace and source-level diagnostic suppressions before publication. Keeping this
+/// as a reusable raw-diagnostic pass lets workspace-wide validation aggregate the same filtered
+/// categories without duplicating the inline-directive rules.
+pub(crate) fn filter_diagnostics_with_ignored(
+    diagnostics: Vec<Diagnostic>,
+    line_index: &LineIndex,
+    text: &str,
+    ignored: &HashSet<String>,
+) -> Vec<Diagnostic> {
+    let inline_ignored = extract_inline_ignored_codes(text);
+    diagnostics
+        .into_iter()
+        .filter(|diagnostic| {
+            if ignored.contains(diagnostic.code.as_str()) {
+                return false;
+            }
+            let Some(inline_ignored) = inline_ignored.as_ref() else {
+                return true;
+            };
+            let Some(line) = line_index
+                .position(text, diagnostic.range.start())
+                .map(|position| position.line.saturating_add(1))
+            else {
+                return true;
+            };
+            !inline_diagnostic_suppressed(inline_ignored, line, diagnostic.code.as_str())
+        })
+        .collect()
 }
 
 /// The inline suppression directive accepted by CWTools-compatible source comments.
