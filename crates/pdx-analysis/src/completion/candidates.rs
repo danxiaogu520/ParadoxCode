@@ -37,15 +37,9 @@ impl CompletionMemberCache {
         prefix: &str,
     ) -> &[String] {
         let cache_key = (type_name.to_ascii_lowercase(), prefix.to_ascii_lowercase());
-        self.workspace.entry(cache_key).or_insert_with(|| {
-            let mut names = effective_workspace_member_names(snapshot, type_name)
-                .into_iter()
-                .filter(|name| completion_matches(name, prefix))
-                .collect::<Vec<_>>();
-            names.sort_by_key(|name| name.to_ascii_lowercase());
-            names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
-            names
-        })
+        self.workspace
+            .entry(cache_key)
+            .or_insert_with(|| workspace_member_index(snapshot, type_name).select(prefix))
     }
 
     fn enum_member_names(

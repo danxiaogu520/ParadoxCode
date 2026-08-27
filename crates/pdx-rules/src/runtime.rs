@@ -4,7 +4,7 @@ use crate::model::{FileCategory, RulesModel, SemanticModel, SemanticRule};
 use crate::{CURRENT_SCHEMA_VERSION, sqlite};
 use pdx_text::LogicalPath;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::fs;
 use std::path::Path;
@@ -98,12 +98,12 @@ pub struct RuleSet {
     pub(crate) schema_version: u32,
     pub(crate) rule_hash: RuleHash,
     pub(crate) model: RulesModel,
-    pub(crate) exact_semantic_rules: BTreeMap<String, Vec<usize>>,
-    pub(crate) semantic_rules_by_context: BTreeMap<String, Vec<usize>>,
+    pub(crate) exact_semantic_rules: HashMap<String, Vec<usize>>,
+    pub(crate) semantic_rules_by_context: HashMap<String, Vec<usize>>,
     /// Lowercased context -> (lowercased exact key -> rule indices).
-    pub(crate) semantic_exact_rules_by_context_key: BTreeMap<String, BTreeMap<String, Vec<usize>>>,
+    pub(crate) semantic_exact_rules_by_context_key: HashMap<String, HashMap<String, Vec<usize>>>,
     /// Lowercased context -> rule indices whose key is not exact.
-    pub(crate) semantic_non_exact_rules_by_context: BTreeMap<String, Vec<usize>>,
+    pub(crate) semantic_non_exact_rules_by_context: HashMap<String, Vec<usize>>,
 }
 
 impl RuleSet {
@@ -128,10 +128,10 @@ impl RuleSet {
                 },
                 profile: crate::GameProfile::default(),
             },
-            exact_semantic_rules: BTreeMap::new(),
-            semantic_rules_by_context: BTreeMap::new(),
-            semantic_exact_rules_by_context_key: BTreeMap::new(),
-            semantic_non_exact_rules_by_context: BTreeMap::new(),
+            exact_semantic_rules: HashMap::new(),
+            semantic_rules_by_context: HashMap::new(),
+            semantic_exact_rules_by_context_key: HashMap::new(),
+            semantic_non_exact_rules_by_context: HashMap::new(),
         }
     }
 
@@ -178,34 +178,36 @@ impl RuleSet {
             values.dedup();
         }
         let rule_hash = canonical_hash(&model);
-        let mut exact_semantic_rules = BTreeMap::<String, Vec<usize>>::new();
-        let mut semantic_rules_by_context = BTreeMap::<String, Vec<usize>>::new();
+        let mut exact_semantic_rules = HashMap::<String, Vec<usize>>::new();
+        let mut semantic_rules_by_context = HashMap::<String, Vec<usize>>::new();
         let mut semantic_exact_rules_by_context_key =
-            BTreeMap::<String, BTreeMap<String, Vec<usize>>>::new();
-        let mut semantic_non_exact_rules_by_context = BTreeMap::<String, Vec<usize>>::new();
+            HashMap::<String, HashMap<String, Vec<usize>>>::new();
+        let mut semantic_non_exact_rules_by_context = HashMap::<String, Vec<usize>>::new();
         for (index, rule) in model.semantic.rules.iter().enumerate() {
+            let context_key = rule.context.to_ascii_lowercase();
             match &rule.key {
                 KeyMatcher::Exact(key) => {
+                    let key = key.to_ascii_lowercase();
                     exact_semantic_rules
-                        .entry(key.to_ascii_lowercase())
+                        .entry(key.clone())
                         .or_default()
                         .push(index);
                     semantic_exact_rules_by_context_key
-                        .entry(rule.context.to_ascii_lowercase())
+                        .entry(context_key.clone())
                         .or_default()
-                        .entry(key.to_ascii_lowercase())
+                        .entry(key)
                         .or_default()
                         .push(index);
                 }
                 _ => {
                     semantic_non_exact_rules_by_context
-                        .entry(rule.context.to_ascii_lowercase())
+                        .entry(context_key.clone())
                         .or_default()
                         .push(index);
                 }
             }
             semantic_rules_by_context
-                .entry(rule.context.to_ascii_lowercase())
+                .entry(context_key)
                 .or_default()
                 .push(index);
         }
@@ -257,16 +259,17 @@ impl RuleSet {
         context: &str,
         key: &str,
     ) -> impl Iterator<Item = &SemanticRule> {
-        let context_key = context.to_ascii_lowercase();
+        let context_key = normalized_ascii_query(context);
+        let key = normalized_ascii_query(key);
         let exact = self
             .semantic_exact_rules_by_context_key
-            .get(&context_key)
-            .and_then(|by_key| by_key.get(&key.to_ascii_lowercase()))
+            .get(context_key.as_ref())
+            .and_then(|by_key| by_key.get(key.as_ref()))
             .into_iter()
             .flatten();
         let non_exact = self
             .semantic_non_exact_rules_by_context
-            .get(&context_key)
+            .get(context_key.as_ref())
             .into_iter()
             .flatten();
         exact
@@ -350,12 +353,17 @@ impl RuleSet {
     }
 }
 fn case_insensitive_indices<'a>(
-    index: &'a BTreeMap<String, Vec<usize>>,
+    index: &'a HashMap<String, Vec<usize>>,
     key: &str,
 ) -> Option<&'a Vec<usize>> {
-    if key.bytes().any(|byte| byte.is_ascii_uppercase()) {
-        index.get(&key.to_ascii_lowercase())
+    let key = normalized_ascii_query(key);
+    index.get(key.as_ref())
+}
+
+fn normalized_ascii_query(value: &str) -> std::borrow::Cow<'_, str> {
+    if value.bytes().any(|byte| byte.is_ascii_uppercase()) {
+        std::borrow::Cow::Owned(value.to_ascii_lowercase())
     } else {
-        index.get(key)
+        std::borrow::Cow::Borrowed(value)
     }
 }
