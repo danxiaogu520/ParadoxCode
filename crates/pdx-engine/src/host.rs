@@ -16,6 +16,7 @@ use crate::model::{
     SourceRootId, SourceRootKind, TextChange, WorkspaceChange, WorkspaceError,
     WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanReport, WorkspaceScanToken,
 };
+use crate::parse_cache::ParseCache;
 use crate::pipeline::{
     SourceLoadContext, SourceReadJob, build_file_state, empty_file_state, load_source_files,
     position_ranges_for_state, prepare_document_snapshot, staged_overlay_document,
@@ -45,6 +46,7 @@ pub struct AnalysisHost {
     installed_caches: BTreeSet<SourceRootId>,
     localisation_previews: Arc<LocalisationPreviewMap>,
     query_cache: Arc<SnapshotQueryCache>,
+    parse_cache: Option<ParseCache>,
 }
 
 impl AnalysisHost {
@@ -79,7 +81,29 @@ impl AnalysisHost {
             installed_caches: BTreeSet::new(),
             localisation_previews: Arc::new(LocalisationPreviewMap::new()),
             query_cache: Arc::new(SnapshotQueryCache::new()),
+            parse_cache: None,
         }
+    }
+
+    /// Returns a clone of this host that writes and reads syntax trees below `directory`.
+    ///
+    /// The cache stores only parser output. HIR and rule-dependent semantic state are always
+    /// rebuilt for the active snapshot, so changing a rule artifact cannot reuse stale semantics.
+    #[must_use]
+    pub fn with_parse_cache_dir(mut self, directory: impl Into<PathBuf>) -> Self {
+        self.parse_cache = Some(ParseCache::new(directory));
+        self
+    }
+
+    /// Enables or disables the persistent syntax-tree cache for subsequent disk scans.
+    pub fn set_parse_cache_dir(&mut self, directory: Option<PathBuf>) {
+        self.parse_cache = directory.map(ParseCache::new);
+    }
+
+    /// Returns the configured syntax-tree cache directory, if one is active.
+    #[must_use]
+    pub fn parse_cache_dir(&self) -> Option<&Path> {
+        self.parse_cache.as_ref().map(ParseCache::directory)
     }
 
     fn document_snapshot(
@@ -413,6 +437,7 @@ impl AnalysisHost {
             previous_states: self.file_states.as_ref(),
             rules: self.rules.as_ref(),
             profile: self.profile.as_ref(),
+            parse_cache: self.parse_cache.as_ref(),
             cancellation,
             progress,
         };

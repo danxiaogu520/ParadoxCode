@@ -5,11 +5,13 @@
 
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
+
 /// A UTF-8 byte offset into a source document.
 pub type TextSize = u32;
 
 /// A half-open UTF-8 byte range in a source document.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct TextRange {
     start: TextSize,
     end: TextSize,

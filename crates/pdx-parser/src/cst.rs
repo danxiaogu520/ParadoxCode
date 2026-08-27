@@ -1,9 +1,10 @@
 use std::fmt;
 
 use pdx_text::TextRange;
+use serde::{Deserialize, Serialize};
 
 /// A loss-aware CST node kind shared by the EU4 syntax frontends.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum CstKind {
     /// Root node for a Script document.
     Document,
@@ -53,7 +54,7 @@ pub enum CstKind {
 ///
 /// Node text is always read from the owning [`crate::ParsedFile`] source. The node therefore
 /// stores no copied scalar or comment text and remains loss-aware for formatting and diagnostics.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CstNode {
     kind: CstKind,
     range: TextRange,
@@ -95,7 +96,7 @@ impl CstNode {
 }
 
 /// A lexical token retained by a parsed file for token-preservation checks.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum TokenKind {
     /// An unquoted scalar.
     Bare,
@@ -124,7 +125,7 @@ impl TokenKind {
 }
 
 /// A token range in a parsed source.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct SyntaxToken {
     kind: TokenKind,
     range: TextRange,
@@ -149,7 +150,7 @@ impl SyntaxToken {
 }
 
 /// Stable categories of syntax errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum SyntaxErrorKind {
     /// A token cannot be interpreted at the current grammar position.
     UnexpectedToken,
@@ -184,7 +185,7 @@ impl SyntaxErrorKind {
 }
 
 /// A stable, source-ranged syntax diagnostic candidate.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SyntaxError {
     /// Stable error category.
     pub kind: SyntaxErrorKind,

@@ -5,6 +5,7 @@
 //! selects the appropriate frontend.
 
 use pdx_text::TextRange;
+use serde::{Deserialize, Serialize};
 
 mod cst;
 pub mod format;
@@ -18,7 +19,7 @@ pub use quoted_script::{
 };
 
 /// One of the reusable Paradox text frontends.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum FileFormat {
     /// Paradox key/value script.
     Script,
@@ -86,7 +87,7 @@ pub(crate) struct ParseParts {
 }
 
 /// A loss-aware parsed EU4 document.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ParsedFile {
     format: FileFormat,
     source: String,
@@ -165,6 +166,31 @@ impl ParsedFile {
         self.revision
     }
 
+    /// Returns whether a deserialized parse can safely be reused for the supplied source.
+    ///
+    /// Persistent parse caches are untrusted input. Besides matching the source fingerprint,
+    /// callers use this structural check to reject out-of-range or cross-parent CST ranges before
+    /// the tree reaches lowering and editor queries.
+    #[must_use]
+    pub fn is_valid_for(&self, format: FileFormat, source: &str) -> bool {
+        self.format == format
+            && self.source == source
+            && matches!(
+                (format, self.root.kind()),
+                (FileFormat::Script, CstKind::Document)
+                    | (FileFormat::Localisation, CstKind::LocalisationDocument)
+            )
+            && valid_node(&self.root, None, source)
+            && self
+                .tokens
+                .iter()
+                .all(|token| valid_range(token.range(), source))
+            && self
+                .errors
+                .iter()
+                .all(|error| valid_range(error.range, source))
+    }
+
     /// Applies one edit and reparses the affected frontend.
     ///
     /// The public operation is deliberately edit-shaped so the workspace can later replace the
@@ -208,6 +234,27 @@ fn parse_with_revision(format: FileFormat, source: &str, revision: u64) -> Parse
         FileFormat::Localisation => localisation::parse(source),
     };
     ParsedFile::from_parts(format, source, parts, revision)
+}
+
+fn valid_node(node: &CstNode, parent: Option<TextRange>, source: &str) -> bool {
+    valid_range(node.range(), source)
+        && parent.is_none_or(|parent| {
+            parent.start() <= node.range().start() && node.range().end() <= parent.end()
+        })
+        && node
+            .children()
+            .iter()
+            .all(|child| valid_node(child, Some(node.range()), source))
+}
+
+fn valid_range(range: TextRange, source: &str) -> bool {
+    let Some(start) = usize::try_from(range.start()).ok() else {
+        return false;
+    };
+    let Some(end) = usize::try_from(range.end()).ok() else {
+        return false;
+    };
+    start <= end && end <= source.len() && source.get(start..end).is_some()
 }
 
 pub(crate) fn range(start: usize, end: usize) -> TextRange {
