@@ -10,6 +10,13 @@ use serde_json::Value;
 use crate::protocol::RpcError;
 use crate::{INVALID_PARAMS, PROJECT_CONFIG_MAX_BYTES, REQUEST_CANCELLED};
 
+/// A zero interval disables the optional quiet background re-scan.  This mirrors the reference
+/// server's opt-in behavior so existing clients never acquire an unexpected periodic disk walk.
+pub(crate) const DEFAULT_BACKGROUND_REINDEX_INTERVAL_MINUTES: u64 = 0;
+pub(crate) const DEFAULT_BACKGROUND_REINDEX_IDLE_SECONDS: u64 = 15;
+const MAX_BACKGROUND_REINDEX_INTERVAL_MINUTES: u64 = 7 * 24 * 60;
+const MAX_BACKGROUND_REINDEX_IDLE_SECONDS: u64 = 24 * 60 * 60;
+
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
 struct WorkspaceInitializationOptions {
@@ -18,6 +25,10 @@ struct WorkspaceInitializationOptions {
     dependencies: Option<Vec<DependencyConfiguration>>,
     vanilla_index_cache: Option<PathBuf>,
     game_directory: Option<PathBuf>,
+    /// Optional quiet workspace re-scan cadence. Zero disables it.
+    background_reindex_interval_minutes: Option<u64>,
+    /// Minimum editor-idle window before a quiet re-scan is allowed to start.
+    background_reindex_idle_seconds: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -45,6 +56,12 @@ struct ProjectConfiguration {
     /// Optional: when absent, the server performs a one-time quick discovery at initialize.
     #[serde(alias = "gameDirectory")]
     game_directory: Option<PathBuf>,
+    /// Optional quiet workspace re-scan cadence. Zero disables it.
+    #[serde(alias = "backgroundReindexIntervalMinutes")]
+    background_reindex_interval_minutes: Option<u64>,
+    /// Minimum editor-idle window before a quiet re-scan is allowed to start.
+    #[serde(alias = "backgroundReindexIdleSeconds")]
+    background_reindex_idle_seconds: Option<u64>,
     /// Extension-only `[server]` table (e.g. the language-server binary path
     /// used by the Zed / VS Code toolkits). Declared so a single
     /// `.pdx/project.toml` can serve both editors and pdx-ls, while
@@ -65,6 +82,10 @@ pub(crate) struct ResolvedSourceRoots {
     /// Dependencies configured with a persistent index cache. These roots are excluded from
     /// live scanning and are installed from their cache files instead.
     pub(crate) dependency_caches: Vec<DependencyIndexCache>,
+    /// Cadence for the optional quiet background source-root re-scan.
+    pub(crate) background_reindex_interval_minutes: u64,
+    /// User-idle window required before a quiet background re-scan.
+    pub(crate) background_reindex_idle_seconds: u64,
 }
 
 /// A dependency configured with a persistent index cache.
@@ -123,6 +144,34 @@ pub(crate) fn resolve_source_roots(
     }
     if inline.game_directory.is_some() {
         project.game_directory = inline.game_directory;
+    }
+    if inline.background_reindex_interval_minutes.is_some() {
+        project.background_reindex_interval_minutes = inline.background_reindex_interval_minutes;
+    }
+    if inline.background_reindex_idle_seconds.is_some() {
+        project.background_reindex_idle_seconds = inline.background_reindex_idle_seconds;
+    }
+    let background_reindex_interval_minutes = project
+        .background_reindex_interval_minutes
+        .unwrap_or(DEFAULT_BACKGROUND_REINDEX_INTERVAL_MINUTES);
+    if background_reindex_interval_minutes > MAX_BACKGROUND_REINDEX_INTERVAL_MINUTES {
+        return Err(RpcError::new(
+            INVALID_PARAMS,
+            format!(
+                "backgroundReindexIntervalMinutes must be at most {MAX_BACKGROUND_REINDEX_INTERVAL_MINUTES}"
+            ),
+        ));
+    }
+    let background_reindex_idle_seconds = project
+        .background_reindex_idle_seconds
+        .unwrap_or(DEFAULT_BACKGROUND_REINDEX_IDLE_SECONDS);
+    if background_reindex_idle_seconds > MAX_BACKGROUND_REINDEX_IDLE_SECONDS {
+        return Err(RpcError::new(
+            INVALID_PARAMS,
+            format!(
+                "backgroundReindexIdleSeconds must be at most {MAX_BACKGROUND_REINDEX_IDLE_SECONDS}"
+            ),
+        ));
     }
     let game_directory = project
         .game_directory
@@ -288,6 +337,8 @@ pub(crate) fn resolve_source_roots(
         vanilla_explicit,
         game_directory,
         dependency_caches,
+        background_reindex_interval_minutes,
+        background_reindex_idle_seconds,
     })
 }
 

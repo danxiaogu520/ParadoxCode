@@ -45,6 +45,7 @@ impl LspServer {
             let mut dependency_cache_in_flight = false;
             let mut dependency_progress_token = None::<String>;
             let mut in_flight_disk_changes = None::<InFlightDiskChanges>;
+            let mut in_flight_background_reindex = None::<InFlightBackgroundReindex>;
             let mut deferred_messages = VecDeque::<Value>::new();
 
             loop {
@@ -57,6 +58,23 @@ impl LspServer {
                     &event_sender,
                     &mut in_flight,
                     self.state == ServerState::ShuttingDown,
+                );
+                let background_busy = !self.pending_parses.is_empty()
+                    || !in_flight_parses.is_empty()
+                    || !self.pending_diagnostics.is_empty()
+                    || !in_flight.is_empty()
+                    || !in_flight_requests.is_empty()
+                    || in_flight_initialize.is_some()
+                    || in_flight_index.is_some()
+                    || in_flight_dependency.is_some()
+                    || !self.pending_disk_changes.is_empty()
+                    || in_flight_disk_changes.is_some();
+                self.spawn_due_background_reindex(
+                    scope,
+                    &event_sender,
+                    &mut in_flight_background_reindex,
+                    ready_logged,
+                    background_busy,
                 );
                 let parse_busy = !self.pending_parses.is_empty() || !in_flight_parses.is_empty();
                 let initialize_busy = in_flight_initialize.is_some();
@@ -75,7 +93,15 @@ impl LspServer {
                     let message = deferred_messages.pop_front().expect("checked non-empty");
                     (TransportEvent::Input(Ok(Some(message))), false)
                 } else {
-                    let timeout = self.next_diagnostic_wait(&in_flight);
+                    let timeout = self
+                        .next_diagnostic_wait(&in_flight)
+                        .into_iter()
+                        .chain(self.background_reindex_wait(
+                            ready_logged,
+                            in_flight_background_reindex.as_ref(),
+                            background_busy,
+                        ))
+                        .min();
                     let event = match timeout {
                         Some(timeout) => match event_receiver.recv_timeout(timeout) {
                             Ok(event) => event,
@@ -175,6 +201,9 @@ impl LspServer {
                             if let Some(task) = in_flight_disk_changes.as_ref() {
                                 task.cancellation.cancel();
                             }
+                            if let Some(task) = in_flight_background_reindex.as_ref() {
+                                task.cancellation.cancel();
+                            }
                             return if self.clean_exit {
                                 Ok(())
                             } else {
@@ -206,6 +235,11 @@ impl LspServer {
                                     self.client_work_done_progress =
                                         prepared.client_work_done_progress;
                                     self.client_snippet_support = prepared.client_snippet_support;
+                                    self.background_reindex_interval_minutes =
+                                        prepared.background_reindex_interval_minutes;
+                                    self.background_reindex_idle_seconds =
+                                        prepared.background_reindex_idle_seconds;
+                                    self.last_activity = Instant::now();
                                     (
                                         json!({
                                             "jsonrpc": JSON_RPC_VERSION,
@@ -539,6 +573,7 @@ impl LspServer {
                                 ),
                             )?;
                             ready_logged = true;
+                            self.arm_background_reindex();
                         }
                     }
                     TransportEvent::Parse(result) => {
@@ -748,6 +783,7 @@ impl LspServer {
                                 ),
                             )?;
                             ready_logged = true;
+                            self.arm_background_reindex();
                         }
                     }
                     TransportEvent::VanillaSetup(result) => {
@@ -866,7 +902,68 @@ impl LspServer {
                                 ),
                             )?;
                             ready_logged = true;
+                            self.arm_background_reindex();
                         }
+                    }
+                    TransportEvent::BackgroundReindex(result) => {
+                        let current = in_flight_background_reindex
+                            .as_ref()
+                            .is_some_and(|task| task.base_revision == result.base_revision);
+                        if !current {
+                            continue;
+                        }
+                        let task = in_flight_background_reindex
+                            .take()
+                            .expect("checked background reindex task");
+                        if task.cancellation.is_cancelled() {
+                            self.arm_background_reindex();
+                            continue;
+                        }
+                        if self.host.snapshot().revision() != result.base_revision {
+                            // A foreground edit or disk refresh won while the quiet pass was
+                            // running. Its candidate is stale and must never replace newer state.
+                            self.arm_background_reindex();
+                            continue;
+                        }
+                        match result.result {
+                            Ok(host) => {
+                                self.host = host;
+                                let snapshot = self.host.snapshot();
+                                write_message(
+                                    &mut output,
+                                    &log_message_notification(
+                                        MessageType::INFO,
+                                        format!(
+                                            "Background workspace reindex completed (revision {}, {} source file(s))",
+                                            snapshot.revision(),
+                                            snapshot.source_files().len(),
+                                        ),
+                                    ),
+                                )?;
+                                let open = snapshot
+                                    .documents()
+                                    .iter()
+                                    .filter_map(|(id, document)| {
+                                        document.version().map(|version| (id.clone(), version))
+                                    })
+                                    .collect::<Vec<_>>();
+                                for (id, version) in open {
+                                    self.schedule_diagnostics_for_document(
+                                        id,
+                                        version,
+                                        DIAGNOSTIC_DEBOUNCE,
+                                    );
+                                }
+                            }
+                            Err(WorkspaceError::Cancelled) => {}
+                            Err(error) => write_message(
+                                &mut output,
+                                &show_warning_notification(format!(
+                                    "Background workspace reindex failed: {error}"
+                                )),
+                            )?,
+                        }
+                        self.arm_background_reindex();
                     }
                     TransportEvent::DiskChanges(result) => {
                         let current = in_flight_disk_changes
@@ -927,7 +1024,8 @@ impl LspServer {
                         || in_flight_initialize.is_some()
                         || in_flight_index.is_some()
                         || !self.pending_disk_changes.is_empty()
-                        || in_flight_disk_changes.is_some());
+                        || in_flight_disk_changes.is_some()
+                        || in_flight_background_reindex.is_some());
                 if !reader_active && !draining_shutdown && deferred_messages.is_empty() {
                     read_sender.send(()).map_err(|_| {
                         LspError::Protocol("LSP transport reader stopped unexpectedly".to_owned())

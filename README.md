@@ -236,6 +236,18 @@ While `index` is set, the dependency is not scanned live; after changing the dep
 its cache with `pdx index dependency` and restart the language server (command palette
 `pdx-ls: restart`). Remove the `index` field to fall back to live scanning.
 
+Long-running sessions can opt into a quiet, idle-gated source-root re-scan. The default is off;
+set the cadence and idle window in `.pdx/project.toml` (or pass the camelCase keys through
+`initializationOptions`):
+
+```toml
+background_reindex_interval_minutes = 30
+background_reindex_idle_seconds = 15
+```
+
+The pass never replaces a newer edit or watched-file refresh, and changing either setting through
+`workspace/didChangeConfiguration` takes effect without restarting the server.
+
 Run a repeatable whole-Current-Mod diagnostic pass against that Vanilla cache with the development
 script below. It opens each relevant file through the real `pdx-ls` transport and writes ignored
 JSON and Markdown reports under `diagnostic-reports/`:

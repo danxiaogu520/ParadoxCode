@@ -48,7 +48,7 @@ rewritten without evidence that their boundaries are the bottleneck.
 
 ## Implemented stages
 
-The first five stages are now on `main`, each independently committed and pushed:
+The first seven stages are now on `main`, each independently committed and pushed:
 
 1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
    reporting stays deterministic.
@@ -60,6 +60,12 @@ The first five stages are now on `main`, each independently committed and pushed
    snapshot-owned name vector and a prefix/substring index with a character-mask prefilter.
 5. EU4 scope intrinsics and type-root initial scopes are represented through profile/rule data and
    case-insensitive runtime APIs; the generic semantic engine no longer hardcodes those EU4 names.
+6. Localisation completion uses a snapshot-owned compact key blob with binary prefix lookup and a
+   character-mask substring filter, while preserving the existing result order and cancellation
+   behavior.
+7. The LSP has an opt-in, idle-gated quiet workspace re-scan. It is bounded, serialized against
+   foreground work, cancellation-safe, and rejects stale worker snapshots; cadence can be changed
+   live through `workspace/didChangeConfiguration`.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an
@@ -69,5 +75,6 @@ JSON-authority, stable-ID, and immutable-snapshot contracts; `.cwt` remains refe
 
 The release-shaped synthetic workspace benchmark remains within its prior envelope after the
 changes (2,000 EU4 event files: roughly 26 ms initial scan and 25 ms targeted disk refresh in an
-optimized build). The rules and completion changes are covered by their focused tests plus the full
-core quality gates; no benchmark result is used as a semantic correctness substitute.
+optimized build). The rules, completion, and LSP scheduling changes are covered by their focused
+tests plus the full core quality gates; no benchmark result is used as a semantic correctness
+substitute.

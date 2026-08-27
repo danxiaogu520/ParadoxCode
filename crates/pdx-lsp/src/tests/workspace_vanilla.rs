@@ -12,6 +12,36 @@ use serde_json::{Value, json};
 use super::*;
 
 #[test]
+fn background_reindex_options_are_bounded_and_default_to_opt_in() {
+    let (root, _) = temp_workspace_dir();
+    let defaults = resolve_source_roots(Some(&root), None, &pdx_engine::WorkspaceScanToken::new())
+        .expect("default workspace roots");
+    assert_eq!(defaults.background_reindex_interval_minutes, 0);
+    assert_eq!(defaults.background_reindex_idle_seconds, 15);
+
+    let configured = resolve_source_roots(
+        Some(&root),
+        Some(json!({
+            "backgroundReindexIntervalMinutes": 2,
+            "backgroundReindexIdleSeconds": 30
+        })),
+        &pdx_engine::WorkspaceScanToken::new(),
+    )
+    .expect("configured workspace roots");
+    assert_eq!(configured.background_reindex_interval_minutes, 2);
+    assert_eq!(configured.background_reindex_idle_seconds, 30);
+
+    let invalid = resolve_source_roots(
+        Some(&root),
+        Some(json!({ "backgroundReindexIntervalMinutes": 7 * 24 * 60 + 1 })),
+        &pdx_engine::WorkspaceScanToken::new(),
+    )
+    .expect_err("an unbounded interval must be rejected");
+    assert!(invalid.message.contains("backgroundReindexIntervalMinutes"));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn workspace_root_is_scanned_as_current_mod_without_project_config() {
     let (root, root_uri) = temp_workspace_dir();
     fs::create_dir_all(root.join("common/country_tags")).expect("country tags directory");
@@ -1078,6 +1108,8 @@ fn explicit_project_cache_precedes_user_discovery_configuration() {
         vanilla_explicit: true,
         game_directory: None,
         dependency_caches: Vec::new(),
+        background_reindex_interval_minutes: 0,
+        background_reindex_idle_seconds: 15,
     };
     let mut warnings = Vec::new();
     let setup =

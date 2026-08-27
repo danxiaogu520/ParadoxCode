@@ -1,6 +1,108 @@
 use super::*;
 
 impl LspServer {
+    /// Starts a quiet full source-root refresh once its cadence and idle gate are satisfied.
+    ///
+    /// The worker owns a cloned host and therefore never holds the event-loop state while
+    /// walking disk. The result is committed only when the base revision is still current; a
+    /// foreground edit or watched-file refresh always wins.
+    pub(super) fn spawn_due_background_reindex<'scope, 'environment>(
+        &mut self,
+        scope: &'scope std::thread::Scope<'scope, 'environment>,
+        event_sender: &mpsc::Sender<TransportEvent>,
+        in_flight: &mut Option<InFlightBackgroundReindex>,
+        ready: bool,
+        busy: bool,
+    ) {
+        if !ready
+            || self.state != ServerState::Initialized
+            || self.background_reindex_interval().is_none()
+            || in_flight.is_some()
+        {
+            return;
+        }
+        let Some(due) = self.background_reindex_due else {
+            return;
+        };
+        let now = Instant::now();
+        if due > now {
+            return;
+        }
+        if now.duration_since(self.last_activity)
+            < Duration::from_secs(self.background_reindex_idle_seconds)
+        {
+            return;
+        }
+        if busy {
+            // A foreground scan/edit is already queued. Retry shortly after it completes rather
+            // than spinning on an overdue deadline or competing with user-visible work.
+            self.background_reindex_due = now.checked_add(Duration::from_secs(1));
+            return;
+        }
+
+        let base_revision = self.host.snapshot().revision();
+        let cancellation = WorkspaceScanToken::new();
+        let worker_cancellation = cancellation.clone();
+        let mut candidate = self.host.clone();
+        let sender = event_sender.clone();
+        self.background_reindex_due = None;
+        *in_flight = Some(InFlightBackgroundReindex {
+            base_revision,
+            cancellation,
+        });
+        scope.spawn(move || {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                candidate
+                    .refresh_source_roots_cancellable_with_progress(&worker_cancellation, None)
+                    .map(|_| candidate)
+            }))
+            .unwrap_or_else(|_| {
+                Err(WorkspaceError::Io(io::Error::other(
+                    "background workspace reindex worker failed unexpectedly",
+                )))
+            });
+            let _ = sender.send(TransportEvent::BackgroundReindex(BackgroundReindexResult {
+                base_revision,
+                result,
+            }));
+        });
+    }
+
+    /// Computes the event-loop wait until the next quiet pass can be considered. A pending pass
+    /// is still idle-gated, so the loop wakes at the remaining idle duration rather than polling
+    /// a deadline that has already elapsed.
+    pub(super) fn background_reindex_wait(
+        &self,
+        ready: bool,
+        in_flight: Option<&InFlightBackgroundReindex>,
+        busy: bool,
+    ) -> Option<Duration> {
+        if !ready
+            || self.state != ServerState::Initialized
+            || self.background_reindex_interval().is_none()
+            || in_flight.is_some()
+        {
+            return None;
+        }
+        let due = self.background_reindex_due?;
+        let now = Instant::now();
+        if due > now {
+            return Some(due.duration_since(now));
+        }
+        let idle = Duration::from_secs(self.background_reindex_idle_seconds);
+        let elapsed = now.duration_since(self.last_activity);
+        if elapsed < idle {
+            return Some(idle - elapsed);
+        }
+        // Keep an overdue pass from causing a zero-timeout busy loop while another worker is
+        // draining. The next normal event or this short retry will re-evaluate the guard.
+        Some(if busy {
+            Duration::from_secs(1)
+        } else {
+            Duration::ZERO
+        })
+    }
+
     pub(super) fn spawn_snapshot_request<'scope, 'environment>(
         &self,
         scope: &'scope std::thread::Scope<'scope, 'environment>,
@@ -481,5 +583,40 @@ impl LspServer {
                 }));
             });
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn background_reindex_wait_is_disabled_until_armed() {
+        let mut server = LspServer::try_new(InitializeOptions).expect("identity server");
+        server.state = ServerState::Initialized;
+        assert!(server.background_reindex_wait(true, None, false).is_none());
+
+        server.background_reindex_interval_minutes = 1;
+        server.background_reindex_due = Some(Instant::now());
+        server.background_reindex_idle_seconds = 0;
+        assert_eq!(
+            server.background_reindex_wait(true, None, false),
+            Some(Duration::ZERO)
+        );
+        assert_eq!(
+            server.background_reindex_wait(true, None, true),
+            Some(Duration::from_secs(1))
+        );
+    }
+
+    #[test]
+    fn arm_background_reindex_respects_zero_interval() {
+        let mut server = LspServer::try_new(InitializeOptions).expect("identity server");
+        server.arm_background_reindex();
+        assert!(server.background_reindex_due.is_none());
+
+        server.background_reindex_interval_minutes = 1;
+        server.arm_background_reindex();
+        assert!(server.background_reindex_due.is_some());
     }
 }
