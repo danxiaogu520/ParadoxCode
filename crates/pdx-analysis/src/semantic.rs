@@ -1667,6 +1667,140 @@ fn member_char_mask(text: &str, non_ascii: u64) -> u64 {
     })
 }
 
+/// Compact prefix/sub-string index for the localisation namespace.
+///
+/// Localisation keys are commonly the largest symbol set in an EU4 workspace (Vanilla plus a
+/// mod can contain hundreds of thousands of entries).  Keeping the labels in one contiguous
+/// blob avoids the pointer chasing of a `Vec<String>` during the fallback substring sweep.  The
+/// index is deliberately query-only: labels remain owned by the snapshot's ordinary workspace
+/// index, and a corrupt/missing cache can always rebuild this derived view.
+pub(crate) struct LocalisationKeyIndex {
+    blob: String,
+    offsets: Vec<usize>,
+    masks: Vec<u64>,
+}
+
+impl LocalisationKeyIndex {
+    fn new(names: &[String]) -> Self {
+        let mut sorted = names.iter().map(String::as_str).collect::<Vec<_>>();
+        sorted.sort_by(|left, right| {
+            left.to_ascii_lowercase()
+                .cmp(&right.to_ascii_lowercase())
+                .then_with(|| left.cmp(right))
+        });
+        sorted.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+
+        let capacity = sorted.iter().map(|name| name.len()).sum();
+        let mut blob = String::with_capacity(capacity);
+        let mut offsets = Vec::with_capacity(sorted.len() + 1);
+        let mut masks = Vec::with_capacity(sorted.len());
+        for name in sorted {
+            offsets.push(blob.len());
+            masks.push(member_char_mask(name, u64::MAX));
+            blob.push_str(name);
+        }
+        offsets.push(blob.len());
+        Self {
+            blob,
+            offsets,
+            masks,
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.offsets.len().saturating_sub(1)
+    }
+
+    fn key(&self, index: usize) -> &str {
+        &self.blob[self.offsets[index]..self.offsets[index + 1]]
+    }
+
+    fn prefix_start(&self, prefix: &str) -> usize {
+        let folded = prefix.to_ascii_lowercase();
+        let (mut low, mut high) = (0, self.len());
+        while low < high {
+            let middle = low + (high - low) / 2;
+            if self.key(middle).to_ascii_lowercase() < folded {
+                low = middle + 1;
+            } else {
+                high = middle;
+            }
+        }
+        low
+    }
+
+    /// Selects every key matching the existing completion contract.  The cancellable variant
+    /// checks once per small batch, so a large localisation namespace cannot make an obsolete
+    /// request run to completion before the worker notices cancellation.
+    pub(crate) fn select_with_cancellation(
+        &self,
+        prefix: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<String>, Cancelled> {
+        if prefix.is_empty() {
+            let mut names = Vec::with_capacity(self.len());
+            for index in 0..self.len() {
+                if index & 255 == 0 {
+                    cancellation.checkpoint()?;
+                }
+                names.push(self.key(index).to_owned());
+            }
+            return Ok(names);
+        }
+
+        let mut selected = Vec::new();
+        let start = self.prefix_start(prefix);
+        for index in start..self.len() {
+            if index & 255 == 0 {
+                cancellation.checkpoint()?;
+            }
+            let key = self.key(index);
+            if !starts_with_ignore_ascii_case(key, prefix) {
+                break;
+            }
+            selected.push(key.to_owned());
+        }
+
+        let needle = member_char_mask(prefix, 0);
+        for (index, mask) in self.masks.iter().enumerate() {
+            if index & 255 == 0 {
+                cancellation.checkpoint()?;
+            }
+            if mask & needle != needle {
+                continue;
+            }
+            let key = self.key(index);
+            if starts_with_ignore_ascii_case(key, prefix)
+                || !contains_ignore_ascii_case(key, prefix)
+            {
+                continue;
+            }
+            selected.push(key.to_owned());
+        }
+        selected.sort_by_key(|name| name.to_ascii_lowercase());
+        selected.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+        Ok(selected)
+    }
+}
+
+/// Returns the compact localisation-key index for this immutable snapshot revision.
+pub(crate) fn localisation_key_index(snapshot: &AnalysisSnapshot) -> Arc<LocalisationKeyIndex> {
+    let revision = snapshot.revision();
+    let key = "localisation-key-index";
+    if let Some(cached) = snapshot
+        .query_cache()
+        .get::<LocalisationKeyIndex>(revision, key)
+    {
+        return cached;
+    }
+    let names = workspace_member_names_cached(snapshot, "localisation");
+    let index = Arc::new(LocalisationKeyIndex::new(names.as_ref()));
+    snapshot
+        .query_cache()
+        .insert(revision, key.to_owned(), Arc::clone(&index));
+    index
+}
+
 pub(crate) fn scripted_macro_type(snapshot: &AnalysisSnapshot, type_name: &str) -> bool {
     snapshot
         .rules()
@@ -1909,7 +2043,7 @@ pub(crate) fn scope_member(
 
 #[cfg(test)]
 mod tests {
-    use super::WorkspaceMemberIndex;
+    use super::{LocalisationKeyIndex, WorkspaceMemberIndex};
     use std::sync::Arc;
 
     fn linear(names: &[String], prefix: &str) -> Vec<String> {
@@ -1946,6 +2080,31 @@ mod tests {
             assert_eq!(
                 index.select(prefix),
                 linear(names.as_ref(), prefix),
+                "{prefix:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn localisation_key_index_matches_linear_substring_selection() {
+        let names = vec![
+            "Zed_event".to_owned(),
+            "country_event".to_owned(),
+            "EVENT_special".to_owned(),
+            "province".to_owned(),
+            "country_flag".to_owned(),
+            "nonascii_é".to_owned(),
+            "event_special".to_owned(),
+        ];
+        let index = LocalisationKeyIndex::new(&names);
+        let cancellation = crate::CancellationToken::new();
+        for prefix in ["", "e", "EVENT", "event_", "flag", "zzz", "é"] {
+            let expected = linear(&names, prefix);
+            assert_eq!(
+                index
+                    .select_with_cancellation(prefix, &cancellation)
+                    .expect("uncancelled selection"),
+                expected,
                 "{prefix:?}"
             );
         }

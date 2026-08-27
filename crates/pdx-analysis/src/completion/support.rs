@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 use crate::resolution::*;
+use crate::semantic::localisation_key_index;
 use crate::support::*;
 use crate::types::*;
 use pdx_engine::{AnalysisSnapshot, DocumentSource};
@@ -14,6 +15,19 @@ pub(crate) fn completion_definitions_for_kinds(
     kinds: &[&str],
     cancellation: &CancellationToken,
 ) -> Result<Vec<(String, String)>, Cancelled> {
+    // Localisation is the one definition family that can grow to hundreds of thousands of
+    // entries once Vanilla is installed.  Its snapshot-owned compact index answers the same
+    // prefix/substring query without walking every definition bucket on each keystroke.
+    if kinds.len() == 1 && kinds[0].eq_ignore_ascii_case("localisation") {
+        return localisation_key_index(snapshot)
+            .select_with_cancellation(prefix, cancellation)
+            .map(|names| {
+                names
+                    .into_iter()
+                    .map(|name| ("localisation".to_owned(), name))
+                    .collect()
+            });
+    }
     let mut definitions = Vec::new();
     for kind in kinds {
         for definition in snapshot.index().definitions_for_kind(kind) {
