@@ -48,7 +48,7 @@ rewritten without evidence that their boundaries are the bottleneck.
 
 ## Implemented stages
 
-The first seventeen stages are now on `main`, each independently committed and pushed:
+The first eighteen stages are now on `main`, each independently committed and pushed:
 
 1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
    reporting stays deterministic.
@@ -99,6 +99,10 @@ The first seventeen stages are now on `main`, each independently committed and p
     directive suppresses a known category on its own and adjacent lines, is applied before LSP
     publication limits, and remains effective for recovered/syntax-error text without retaining
     comments in the parsed CST.
+18. The LSP advertises a cancellable `validateWorkspace` command. It refreshes the same atomic
+    source-root candidate as `pdx/reindexWorkspace`, validates every parsed Current Mod file in
+    deterministic path order, and returns bounded file and severity totals without mutating the
+    event-loop host until the revision check succeeds.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an

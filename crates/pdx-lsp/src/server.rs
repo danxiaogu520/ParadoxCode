@@ -11,10 +11,11 @@ use lsp_types::{
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
     ExecuteCommandParams, FileChangeType, InitializeParams, MessageType,
 };
-use pdx_analysis::CancellationToken;
+use pdx_analysis::{CancellationToken, Severity, source_file_diagnostics_with_cancellation};
 use pdx_engine::{
     AnalysisHost, AnalysisSnapshot, DiskFileChange, DiskFileChangeKind, DocumentId, DocumentSource,
-    IndexCache, PreparedDocument, WorkspaceError, WorkspaceScanFilters, WorkspaceScanToken,
+    IndexCache, PreparedDocument, SourceRootKind, WorkspaceError, WorkspaceScanFilters,
+    WorkspaceScanToken,
 };
 use pdx_game::DiscoveryToken;
 use pdx_rules::{GameProfile, RuleSet};
@@ -305,7 +306,27 @@ pub(crate) struct InFlightBackgroundReindex {
 pub(crate) struct InFlightReindexCommand {
     pub(crate) request_id: RequestId,
     pub(crate) base_revision: u64,
+    pub(crate) command: WorkspaceCommand,
     pub(crate) cancellation: WorkspaceScanToken,
+}
+
+/// Explicit workspace command executed by the single serialized scan worker.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum WorkspaceCommand {
+    Reindex,
+    Validate,
+}
+
+/// Aggregate diagnostics returned by `validateWorkspace`.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct WorkspaceValidationSummary {
+    pub(crate) total_files: usize,
+    pub(crate) validated_files: usize,
+    pub(crate) files_with_errors: usize,
+    pub(crate) total_errors: usize,
+    pub(crate) total_warnings: usize,
+    pub(crate) total_infos: usize,
+    pub(crate) total_hints: usize,
 }
 
 #[derive(Debug)]
@@ -313,7 +334,8 @@ pub(crate) struct ReindexCommandResult {
     pub(crate) request_id: RequestId,
     pub(crate) id: Value,
     pub(crate) base_revision: u64,
-    pub(crate) result: Result<AnalysisHost, WorkspaceError>,
+    pub(crate) command: WorkspaceCommand,
+    pub(crate) result: Result<(AnalysisHost, Option<WorkspaceValidationSummary>), WorkspaceError>,
 }
 
 #[derive(Debug)]

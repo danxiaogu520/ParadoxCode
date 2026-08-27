@@ -1,8 +1,81 @@
 use super::*;
 
+/// Validates every parsed Current Mod source file in a refreshed candidate and aggregates the
+/// result for the explicit `validateWorkspace` command. The source-root refresh has already
+/// produced a deterministic file set; sorting here keeps the cancellation and count semantics
+/// stable even when the underlying map representation changes.
+fn workspace_validation_summary(
+    host: &AnalysisHost,
+    scan_cancellation: &WorkspaceScanToken,
+) -> Result<WorkspaceValidationSummary, WorkspaceError> {
+    let snapshot = host.snapshot();
+    let mut files = snapshot
+        .source_files()
+        .values()
+        .filter(|file| {
+            snapshot
+                .source_roots()
+                .iter()
+                .any(|root| root.id == file.root_id && root.kind == SourceRootKind::CurrentMod)
+        })
+        .filter(|file| {
+            snapshot
+                .file_state(file.id)
+                .is_some_and(|state| state.parsed().is_some())
+        })
+        .collect::<Vec<_>>();
+    files.sort_by(|left, right| {
+        left.logical_path
+            .as_str()
+            .cmp(right.logical_path.as_str())
+            .then_with(|| left.physical_path.cmp(&right.physical_path))
+    });
+
+    let mut summary = WorkspaceValidationSummary {
+        total_files: files.len(),
+        ..WorkspaceValidationSummary::default()
+    };
+    let cancellation = CancellationToken::new();
+    for file in files {
+        if scan_cancellation.is_cancelled() {
+            return Err(WorkspaceError::Cancelled);
+        }
+        let diagnostics =
+            source_file_diagnostics_with_cancellation(&snapshot, file.id, &cancellation)
+                .map_err(|_| WorkspaceError::Cancelled)?;
+        if scan_cancellation.is_cancelled() {
+            return Err(WorkspaceError::Cancelled);
+        }
+        summary.validated_files = summary.validated_files.saturating_add(1);
+        let mut file_has_error = false;
+        for diagnostic in diagnostics {
+            match diagnostic.severity {
+                Severity::Error => {
+                    file_has_error = true;
+                    summary.total_errors = summary.total_errors.saturating_add(1);
+                }
+                Severity::Warning => {
+                    summary.total_warnings = summary.total_warnings.saturating_add(1);
+                }
+                Severity::Information => {
+                    summary.total_infos = summary.total_infos.saturating_add(1);
+                }
+                Severity::Hint => {
+                    summary.total_hints = summary.total_hints.saturating_add(1);
+                }
+            }
+        }
+        if file_has_error {
+            summary.files_with_errors = summary.files_with_errors.saturating_add(1);
+        }
+    }
+    Ok(summary)
+}
+
 impl LspServer {
-    /// Starts the explicit `workspace/executeCommand` reindex request. The command shares the
-    /// same cloned-host and revision-checked commit path as the quiet pass, but is not idle gated.
+    /// Starts an explicit `workspace/executeCommand` refresh or validation request. Both commands
+    /// share the same cloned-host and revision-checked commit path as the quiet pass, but are not
+    /// idle gated.
     pub(super) fn spawn_reindex_command<'scope, 'environment>(
         &mut self,
         scope: &'scope std::thread::Scope<'scope, 'environment>,
@@ -38,9 +111,11 @@ impl LspServer {
         else {
             return false;
         };
-        if params.command != "pdx/reindexWorkspace" && params.command != "reindexWorkspace" {
-            return false;
-        }
+        let command = match params.command.as_str() {
+            "pdx/reindexWorkspace" | "reindexWorkspace" => WorkspaceCommand::Reindex,
+            "pdx/validateWorkspace" | "validateWorkspace" => WorkspaceCommand::Validate,
+            _ => return false,
+        };
         let _ = params.arguments;
         self.mark_activity();
 
@@ -53,6 +128,7 @@ impl LspServer {
         *in_flight = Some(InFlightReindexCommand {
             request_id: request_id.clone(),
             base_revision,
+            command,
             cancellation,
         });
         let id = id.clone();
@@ -60,17 +136,23 @@ impl LspServer {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 candidate
                     .refresh_source_roots_cancellable_with_progress(&worker_cancellation, None)
-                    .map(|_| candidate)
+                    .and_then(|_| {
+                        let summary = (command == WorkspaceCommand::Validate)
+                            .then(|| workspace_validation_summary(&candidate, &worker_cancellation))
+                            .transpose()?;
+                        Ok((candidate, summary))
+                    })
             }))
             .unwrap_or_else(|_| {
                 Err(WorkspaceError::Io(io::Error::other(
-                    "reindex command worker failed unexpectedly",
+                    "workspace command worker failed unexpectedly",
                 )))
             });
             let _ = sender.send(TransportEvent::ReindexCommand(ReindexCommandResult {
                 request_id,
                 id,
                 base_revision,
+                command,
                 result,
             }));
         });

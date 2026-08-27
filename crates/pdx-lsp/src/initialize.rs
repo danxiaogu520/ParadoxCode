@@ -321,7 +321,10 @@ pub(crate) fn prepare_initialize_candidate(
                 ..CompletionOptions::default()
             }),
             execute_command_provider: Some(ExecuteCommandOptions {
-                commands: vec!["pdx/reindexWorkspace".to_owned()],
+                commands: vec![
+                    "pdx/reindexWorkspace".to_owned(),
+                    "validateWorkspace".to_owned(),
+                ],
                 ..ExecuteCommandOptions::default()
             }),
             hover_provider: Some(HoverProviderCapability::Simple(true)),

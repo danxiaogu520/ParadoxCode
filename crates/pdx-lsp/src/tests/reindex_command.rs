@@ -67,7 +67,7 @@ fn execute_reindex_workspace_refreshes_sources_and_reports_capability() {
         .expect("initialize response");
     assert_eq!(
         initialize["result"]["capabilities"]["executeCommandProvider"]["commands"],
-        json!(["pdx/reindexWorkspace"])
+        json!(["pdx/reindexWorkspace", "validateWorkspace"])
     );
 
     let reindex = responses
@@ -85,6 +85,50 @@ fn execute_reindex_workspace_refreshes_sources_and_reports_capability() {
             .is_some(),
         "explicit reindex installs the newly created source file"
     );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn validate_workspace_returns_a_bounded_diagnostic_summary() {
+    let (root, root_uri) = temp_workspace_dir();
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("events directory");
+    fs::write(events.join("invalid.txt"), "scope = nowhere\n").expect("invalid source");
+    let input = frames([
+        json!({
+            "jsonrpc":"2.0",
+            "id":1,
+            "method":"initialize",
+            "params":{
+                "workspaceFolders":[{"uri":root_uri,"name":"test"}],
+                "capabilities":{}
+            }
+        }),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({
+            "jsonrpc":"2.0",
+            "id":2,
+            "method":"workspace/executeCommand",
+            "params":{"command":"validateWorkspace","arguments":[]}
+        }),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let validation = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("validateWorkspace response");
+    assert_eq!(validation["error"], Value::Null);
+    assert_eq!(validation["result"]["totalFiles"], 1);
+    assert_eq!(validation["result"]["validatedFiles"], 1);
+    assert_eq!(validation["result"]["filesWithErrors"], 1);
+    assert!(validation["result"]["totalErrors"].as_u64().unwrap_or(0) > 0);
     fs::remove_dir_all(root).expect("cleanup");
 }
 
