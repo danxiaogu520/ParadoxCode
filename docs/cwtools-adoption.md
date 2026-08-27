@@ -48,7 +48,7 @@ rewritten without evidence that their boundaries are the bottleneck.
 
 ## Implemented stages
 
-The first thirteen stages are now on `main`, each independently committed and pushed:
+The first fourteen stages are now on `main`, each independently committed and pushed:
 
 1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
    reporting stays deterministic.
@@ -84,6 +84,9 @@ The first thirteen stages are now on `main`, each independently committed and pu
 13. Automatic Vanilla cache builds and rules-hash regenerations reuse the LSP's persistent
     source-independent parse cache. Semantic shards are still rebuilt against the active rules,
     but unchanged source files no longer pay the parser cost a second time.
+14. Source-independent parse-cache payloads are zstd-compressed with a bounded decompression
+    limit. The cache namespace/schema changes together, and corrupt or legacy entries remain
+    ordinary misses rather than scan failures.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an
