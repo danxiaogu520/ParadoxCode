@@ -276,6 +276,12 @@ pub struct GameProfile {
     pub token_definitions: Vec<ProfileTokenDefinitionRule>,
     /// Known concrete scopes and scope expressions.
     pub scope_names: Vec<String>,
+    /// Scope-valued intrinsic expressions supplied by the game profile.
+    ///
+    /// Some games expose keywords such as `owner` or `capital_scope` that resolve to a concrete
+    /// scope without appearing as ordinary `push_scope` rules. Keeping the mapping in profile
+    /// data lets the generic semantic engine remain game-agnostic.
+    pub scope_member_aliases: BTreeMap<String, String>,
     /// Scope spellings offered by completion.
     pub scope_completions: Vec<String>,
     /// Root-key fallbacks used when semantic type metadata has no initial scope.
@@ -331,6 +337,7 @@ impl GameProfile {
             conditional_definitions: Vec::new(),
             token_definitions: Vec::new(),
             scope_names: Vec::new(),
+            scope_member_aliases: BTreeMap::new(),
             scope_completions: Vec::new(),
             root_scopes: Vec::new(),
             scope_compatibilities: Vec::new(),
@@ -625,6 +632,20 @@ impl GameProfile {
         self.scope_names
             .iter()
             .any(|scope| scope.eq_ignore_ascii_case(value))
+    }
+
+    /// Returns the concrete scope selected by a profile-defined intrinsic expression.
+    #[must_use]
+    pub fn scope_member_alias(&self, value: &str) -> Option<&str> {
+        self.scope_member_aliases
+            .iter()
+            .find(|(alias, _)| {
+                alias.eq_ignore_ascii_case(value)
+                    || (alias
+                        .replace('_', "")
+                        .eq_ignore_ascii_case(&value.replace('_', "")))
+            })
+            .map(|(_, scope)| scope.as_str())
     }
 
     /// Tests profile scope compatibility, including the generic `any` scope.

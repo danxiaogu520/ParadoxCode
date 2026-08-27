@@ -46,3 +46,28 @@ If an internal compatibility-preserving refactor cannot meet those gates, the af
 subsystem may be rewritten. The whole workspace, snapshot, and LSP protocol are not
 rewritten without evidence that their boundaries are the bottleneck.
 
+## Implemented stages
+
+The first five stages are now on `main`, each independently committed and pushed:
+
+1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
+   reporting stays deterministic.
+2. The EU4 composition root checks the generated artifact manifest before parsing embedded JSON;
+   a matching SQLite cache is now the normal warm-start path.
+3. Disk-file CSTs use a bounded, content-addressed bincode cache with schema/source validation,
+   atomic writes, and no effect on correctness when a cache entry is missing or corrupt.
+4. Semantic rule lookups use direct hash buckets, while workspace member completion reuses a
+   snapshot-owned name vector and a prefix/substring index with a character-mask prefilter.
+5. EU4 scope intrinsics and type-root initial scopes are represented through profile/rule data and
+   case-insensitive runtime APIs; the generic semantic engine no longer hardcodes those EU4 names.
+
+The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
+rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an
+interned string table, persists per-file ASTs, and uses compact prefix-searchable indexes for large
+localisation/type sets. ParadoxCode adopted the last three techniques where they fit its existing
+JSON-authority, stable-ID, and immutable-snapshot contracts; `.cwt` remains reference material only.
+
+The release-shaped synthetic workspace benchmark remains within its prior envelope after the
+changes (2,000 EU4 event files: roughly 26 ms initial scan and 25 ms targeted disk refresh in an
+optimized build). The rules and completion changes are covered by their focused tests plus the full
+core quality gates; no benchmark result is used as a semantic correctness substitute.
