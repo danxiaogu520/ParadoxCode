@@ -3,7 +3,8 @@
 //! The cache mirrors the useful part of CWTools Rust's `.cwb` parse cache without persisting
 //! semantic HIR, source text, or source-root state. Entries are keyed by stable file identity and
 //! validated by parser schema, frontend format, source digest, and CST range safety before they
-//! are reused.
+//! are reused. The compact bincode payload is zstd-compressed to keep the disk cache cheap while
+//! decompression remains bounded by the same 64 MiB safety limit.
 
 use std::fmt;
 use std::fs::{self, OpenOptions};
@@ -18,10 +19,10 @@ use sha2::{Digest, Sha256};
 use crate::SourceFile;
 
 /// Current on-disk syntax-tree cache schema.
-pub const CURRENT_PARSE_CACHE_SCHEMA_VERSION: u32 = 2;
+pub const CURRENT_PARSE_CACHE_SCHEMA_VERSION: u32 = 3;
 
 const MAX_PARSE_CACHE_BYTES: u64 = 64 * 1024 * 1024;
-const CACHE_NAMESPACE: &[u8] = b"paradoxcode/parse-cache/v2\0";
+const CACHE_NAMESPACE: &[u8] = b"paradoxcode/parse-cache/v3\0";
 static WRITE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 /// A user-local directory containing independent syntax-tree cache entries.
@@ -108,7 +109,9 @@ impl ParseCache {
         if u64::try_from(bytes.len()).ok()? > MAX_PARSE_CACHE_BYTES {
             return None;
         }
-        let entry: ParseCacheEntry = bincode::deserialize(&bytes).ok()?;
+        let decompressed =
+            zstd::bulk::decompress(&bytes, usize::try_from(MAX_PARSE_CACHE_BYTES).ok()?).ok()?;
+        let entry: ParseCacheEntry = bincode::deserialize(&decompressed).ok()?;
         if entry.schema_version != CURRENT_PARSE_CACHE_SCHEMA_VERSION
             || entry.format != format
             || entry.source_sha256 != digest(source)
@@ -138,7 +141,15 @@ impl ParseCache {
             source_sha256: digest(source),
             parsed: parsed.cache_data(),
         };
-        let bytes = bincode::serialize(&entry)
+        let encoded = bincode::serialize(&entry)
+            .map_err(|error| ParseCacheError::Encode(error.to_string()))?;
+        if u64::try_from(encoded.len()).unwrap_or(u64::MAX) > MAX_PARSE_CACHE_BYTES {
+            return Err(ParseCacheError::TooLarge {
+                bytes: encoded.len(),
+                limit: MAX_PARSE_CACHE_BYTES,
+            });
+        }
+        let bytes = zstd::bulk::compress(&encoded, 3)
             .map_err(|error| ParseCacheError::Encode(error.to_string()))?;
         if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > MAX_PARSE_CACHE_BYTES {
             return Err(ParseCacheError::TooLarge {
@@ -287,6 +298,13 @@ mod tests {
             .expect("store parse cache");
 
         let bytes = fs::read(cache.entry_path(&source_file)).expect("read cache entry");
+        assert_eq!(
+            bytes.get(..4),
+            Some([0x28, 0xb5, 0x2f, 0xfd].as_slice()),
+            "parse cache entries are compressed"
+        );
+        let bytes = zstd::bulk::decompress(&bytes, MAX_PARSE_CACHE_BYTES as usize)
+            .expect("decompress cache entry");
         let entry: ParseCacheEntry = bincode::deserialize(&bytes).expect("decode cache entry");
         let compact = bincode::serialize(&entry.parsed).expect("encode compact payload");
         let legacy = bincode::serialize(&parsed).expect("encode source-bearing payload");
