@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use lsp_types::{
     CancelParams, DidChangeTextDocumentParams, DidChangeWatchedFilesParams,
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    FileChangeType, InitializeParams, MessageType,
+    ExecuteCommandParams, FileChangeType, InitializeParams, MessageType,
 };
 use pdx_analysis::CancellationToken;
 use pdx_engine::{
@@ -28,9 +28,9 @@ use crate::initialize::{
 use crate::protocol::{
     LspError, RequestId, RpcError, cancel_initialize_from_notification,
     cancel_request_from_notification, diagnostic_values, diagnostics_notification, document_error,
-    is_initialize_control_message, is_snapshot_request, is_snapshot_request_message,
-    log_message_notification, parse_file_uri_str, request_id_from_lsp, show_info_notification,
-    show_warning_notification, typed_params,
+    is_execute_command_message, is_initialize_control_message, is_snapshot_request,
+    is_snapshot_request_message, log_message_notification, parse_file_uri_str, request_id_from_lsp,
+    show_info_notification, show_warning_notification, typed_params,
 };
 use crate::requests::SnapshotRequestContext;
 use crate::text::{
@@ -289,6 +289,21 @@ pub(crate) struct InFlightBackgroundReindex {
 }
 
 #[derive(Debug)]
+pub(crate) struct InFlightReindexCommand {
+    pub(crate) request_id: RequestId,
+    pub(crate) base_revision: u64,
+    pub(crate) cancellation: WorkspaceScanToken,
+}
+
+#[derive(Debug)]
+pub(crate) struct ReindexCommandResult {
+    pub(crate) request_id: RequestId,
+    pub(crate) id: Value,
+    pub(crate) base_revision: u64,
+    pub(crate) result: Result<AnalysisHost, WorkspaceError>,
+}
+
+#[derive(Debug)]
 pub(crate) struct DiskChangesResult {
     base_revision: u64,
     changes: Vec<DiskFileChange>,
@@ -310,6 +325,7 @@ enum TransportEvent {
     VanillaSetup(IndexSetupResult),
     DependencySetup(DependencySetupResult),
     BackgroundReindex(BackgroundReindexResult),
+    ReindexCommand(ReindexCommandResult),
     /// A server-side `window/logMessage` notification produced by a worker.
     Log(Value),
     Progress(Progress),

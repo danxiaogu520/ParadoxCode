@@ -248,6 +248,10 @@ background_reindex_idle_seconds = 15
 The pass never replaces a newer edit or watched-file refresh, and changing either setting through
 `workspace/didChangeConfiguration` takes effect without restarting the server.
 
+For an immediate refresh, invoke the advertised LSP `workspace/executeCommand` command
+`pdx/reindexWorkspace`. It uses the same cancellation, serialized-worker, and revision-checked
+commit path as the quiet pass and returns the new snapshot revision and source-file count.
+
 Run a repeatable whole-Current-Mod diagnostic pass against that Vanilla cache with the development
 script below. It opens each relevant file through the real `pdx-ls` transport and writes ignored
 JSON and Markdown reports under `diagnostic-reports/`:

@@ -138,6 +138,14 @@ pub(crate) fn is_snapshot_request_message(message: &Value) -> bool {
         .is_some_and(is_snapshot_request)
 }
 
+pub(crate) fn is_execute_command_message(message: &Value) -> bool {
+    message
+        .as_object()
+        .and_then(|object| object.get("method"))
+        .and_then(Value::as_str)
+        == Some("workspace/executeCommand")
+}
+
 pub(crate) fn is_initialize_control_message(message: &Value) -> bool {
     message
         .as_object()

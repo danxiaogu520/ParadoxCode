@@ -48,7 +48,7 @@ rewritten without evidence that their boundaries are the bottleneck.
 
 ## Implemented stages
 
-The first seven stages are now on `main`, each independently committed and pushed:
+The first eight stages are now on `main`, each independently committed and pushed:
 
 1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
    reporting stays deterministic.
@@ -66,6 +66,9 @@ The first seven stages are now on `main`, each independently committed and pushe
 7. The LSP has an opt-in, idle-gated quiet workspace re-scan. It is bounded, serialized against
    foreground work, cancellation-safe, and rejects stale worker snapshots; cadence can be changed
    live through `workspace/didChangeConfiguration`.
+8. The LSP advertises `pdx/reindexWorkspace` through `workspace/executeCommand` for an immediate
+   full refresh. The command shares the quiet worker's cancellation and revision checks, returns a
+   structured revision/file-count result, and never overlaps a foreground or quiet scan.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an
