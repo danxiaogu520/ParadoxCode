@@ -29,7 +29,8 @@ and Paradox Interactive are trademarks of their respective owners.
   unique did-you-mean replacements for misspelled static enum values.
 - Scripted-localisation definitions are discovered from the EU4 profile's supported directory
   spellings, indexed as `defined_text`, and used for localisation-command completion and
-  registry-aware unknown-command warnings.
+  registry-aware unknown-command warnings. The query is path-partitioned and hash-backed, so
+  large Vanilla indexes do not require a full symbol-table walk.
 - Completion, hover, go-to-definition, references, and document/workspace symbols.
 - Full semantic tokens support incremental `full/delta` responses with a bounded, revision-aware
   cache that is invalidated by edits and workspace refreshes.

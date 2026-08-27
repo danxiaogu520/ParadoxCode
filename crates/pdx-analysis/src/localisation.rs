@@ -6,6 +6,7 @@
 //! ordinary `defined_text` symbol family; this module adds the snapshot query and the editor
 //! behaviour that consumes it.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use pdx_engine::{AnalysisSnapshot, DocumentSource};
@@ -62,22 +63,30 @@ fn scripted_localisation_names_cached_with_cancellation(
     let hidden_files = crate::support::overlay_file_ids(snapshot);
     let profile = snapshot.game_profile();
     let mut names = Vec::new();
-    for (index, definition) in snapshot
-        .index()
-        .definitions_for_kind("defined_text")
-        .enumerate()
-    {
-        if index & 255 == 0 {
+    // Partition by the profile path before touching the definition buckets.  A large Vanilla
+    // index can contain hundreds of thousands of `defined_text` records, while scripted
+    // localisation normally occupies only a small set of dedicated files.  Walking those
+    // shards directly mirrors CWTools' per-file TypeIndex and keeps a cold query proportional to
+    // the relevant files rather than the entire symbol table.
+    for (file_index, file) in snapshot.source_files().values().enumerate() {
+        if file_index & 31 == 0 {
             cancellation.checkpoint()?;
         }
-        if !definition.active || hidden_files.contains(&definition.file_id) {
+        if hidden_files.contains(&file.id)
+            || !profile.is_scripted_localisation_path(file.logical_path.as_str())
+        {
             continue;
         }
-        let Some(file) = snapshot.source_files().get(&definition.file_id) else {
+        let Some(shard) = snapshot.index().shard(file.id) else {
             continue;
         };
-        if profile.is_scripted_localisation_path(file.logical_path.as_str()) {
-            names.push(definition.name.clone());
+        for (definition_index, definition) in shard.definitions.iter().enumerate() {
+            if definition_index & 255 == 0 {
+                cancellation.checkpoint()?;
+            }
+            if definition.active && definition.kind.eq_ignore_ascii_case("defined_text") {
+                names.push(definition.name.clone());
+            }
         }
     }
 
@@ -128,6 +137,7 @@ fn scripted_localisation_names_cached_with_cancellation(
 /// A merged command registry used by diagnostics and completion.
 struct LocalisationCommandRegistry {
     names: Vec<String>,
+    lookup: HashSet<String>,
     has_scripted_localisations: bool,
 }
 
@@ -145,10 +155,18 @@ fn localisation_command_registry(
             .then_with(|| left.cmp(right))
     });
     names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+    let lookup = names.iter().map(|name| name_key(name)).collect();
     Ok(LocalisationCommandRegistry {
         names,
+        lookup,
         has_scripted_localisations: !scripted.is_empty(),
     })
+}
+
+impl LocalisationCommandRegistry {
+    fn contains(&self, name: &str) -> bool {
+        self.lookup.contains(&name_key(name))
+    }
 }
 
 fn static_localisation_command_names(
@@ -251,10 +269,7 @@ pub(crate) fn localisation_command_diagnostics(
                 || command
                     .get(..3)
                     .is_some_and(|prefix| prefix.eq_ignore_ascii_case("get"))
-                || registry
-                    .names
-                    .iter()
-                    .any(|candidate| candidate.eq_ignore_ascii_case(&command))
+                || registry.contains(&command)
             {
                 continue;
             }
@@ -437,6 +452,11 @@ fn localisation_command_is_bypassed(command: &str) -> bool {
         || command.parse::<f64>().is_ok()
 }
 
+#[inline]
+fn name_key(name: &str) -> String {
+    name.to_ascii_lowercase()
+}
+
 fn escaped_at(source: &str, offset: usize) -> bool {
     let mut slashes = 0usize;
     let bytes = source.as_bytes();
@@ -446,4 +466,23 @@ fn escaped_at(source: &str, offset: usize) -> bool {
         index -= 1;
     }
     slashes % 2 == 1
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{LocalisationCommandRegistry, name_key};
+
+    #[test]
+    fn command_registry_uses_case_insensitive_lookup() {
+        let names = vec!["GetName".to_owned(), "Scripted.One".to_owned()];
+        let lookup = names.iter().map(|name| name_key(name)).collect();
+        let registry = LocalisationCommandRegistry {
+            names,
+            lookup,
+            has_scripted_localisations: true,
+        };
+        assert!(registry.contains("getname"));
+        assert!(registry.contains("SCRIPTED.ONE"));
+        assert!(!registry.contains("Scripted.Two"));
+    }
 }
