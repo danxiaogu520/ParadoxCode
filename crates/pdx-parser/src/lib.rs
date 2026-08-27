@@ -86,6 +86,25 @@ pub(crate) struct ParseParts {
     errors: Vec<SyntaxError>,
 }
 
+/// Source-independent syntax data suitable for a persistent parse cache.
+///
+/// The lossless source remains owned by the caller because formatter, diagnostics, and lowering
+/// all need to read it. Keeping it out of this representation avoids writing the same file text
+/// twice when a cache entry is materialized.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ParsedFileCache {
+    /// Frontend used to construct the syntax tree.
+    pub format: FileFormat,
+    /// Typed CST root with source-relative ranges.
+    pub root: CstNode,
+    /// Lexical tokens in source order.
+    pub tokens: Vec<SyntaxToken>,
+    /// Recoverable syntax diagnostics.
+    pub errors: Vec<SyntaxError>,
+    /// Monotonic parse revision retained for callers that use it as a cache-local marker.
+    pub revision: u64,
+}
+
 /// A loss-aware parsed EU4 document.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ParsedFile {
@@ -164,6 +183,31 @@ impl ParsedFile {
     #[must_use]
     pub const fn revision(&self) -> u64 {
         self.revision
+    }
+
+    /// Extracts the source-independent portion used by persistent parse caches.
+    #[must_use]
+    pub fn cache_data(&self) -> ParsedFileCache {
+        ParsedFileCache {
+            format: self.format,
+            root: self.root.clone(),
+            tokens: self.tokens.clone(),
+            errors: self.errors.clone(),
+            revision: self.revision,
+        }
+    }
+
+    /// Rehydrates a cached syntax tree with the source text it was validated against.
+    #[must_use]
+    pub fn from_cache_data(data: ParsedFileCache, source: &str) -> Self {
+        Self {
+            format: data.format,
+            source: source.to_owned(),
+            root: data.root,
+            tokens: data.tokens,
+            errors: data.errors,
+            revision: data.revision,
+        }
     }
 
     /// Returns whether a deserialized parse can safely be reused for the supplied source.
