@@ -117,6 +117,7 @@ impl LspServer {
             "textDocument/didSave" => {
                 let params = typed_params::<DidSaveTextDocumentParams>(params, "didSave")?;
                 let uri = params.text_document.uri.as_str();
+                self.invalidate_semantic_tokens(uri);
                 if let Ok(path) = parse_file_uri_str(uri) {
                     self.pending_disk_changes
                         .insert(normalize_workspace_path(path), DiskFileChangeKind::Changed);
@@ -143,6 +144,7 @@ impl LspServer {
                 self.client_snippet_support,
                 self.textures.clone(),
                 Arc::clone(&self.ignored_diagnostic_codes),
+                Arc::clone(&self.semantic_tokens_cache),
             )
             .dispatch(method, params),
             _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
@@ -184,6 +186,7 @@ impl LspServer {
             },
         )?;
         self.host = prepared.host;
+        self.invalidate_all_semantic_tokens();
         self.textures = prepared.textures;
         self.watcher_registration = prepared.watcher_registration;
         self.background_reindex_interval_minutes = prepared.background_reindex_interval_minutes;
@@ -202,6 +205,7 @@ impl LspServer {
         let version = i64::from(params.text_document.version);
         let text = params.text_document.text;
         changed_document_len(0, None, text.len())?;
+        self.invalidate_semantic_tokens(&uri);
         let path = uri_to_path(&uri).ok().map(normalize_workspace_path);
         self.host
             .stage_open_document(DocumentId::new(uri.clone()), version, text, path)
@@ -234,6 +238,7 @@ impl LspServer {
         self.host
             .stage_document_text(&id, version, text)
             .map_err(document_error)?;
+        self.invalidate_semantic_tokens(&uri);
         Ok(uri)
     }
 
@@ -242,6 +247,7 @@ impl LspServer {
         let uri = params.text_document.uri.as_str().to_owned();
         let id = DocumentId::new(uri.clone());
         self.host.close_document(&id).map_err(document_error)?;
+        self.invalidate_semantic_tokens(&uri);
         self.pending_parses.remove(&id);
         self.pending_diagnostics.remove(&id);
         self.diagnostics.remove(&id);
@@ -331,6 +337,7 @@ impl LspServer {
                 )
             })?;
             self.host.set_scan_filters(filters);
+            self.invalidate_all_semantic_tokens();
             self.request_full_disk_rescan();
         }
         if let Some(codes) = ignored_diagnostic_codes {

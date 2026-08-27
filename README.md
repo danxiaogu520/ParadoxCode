@@ -26,6 +26,8 @@ and Paradox Interactive are trademarks of their respective owners.
   `UnknownScope`, and `TargetWrongScope`; severity is typed internally and LSP metadata carries
   certainty without exposing internal rule provenance or legacy migration fields.
 - Completion, hover, go-to-definition, references, and document/workspace symbols.
+- Full semantic tokens support incremental `full/delta` responses with a bounded, revision-aware
+  cache that is invalidated by edits and workspace refreshes.
 - Conflict-aware rename restricted to writable Mod sources.
 - A conservative formatter that refuses to rewrite unsafe or malformed files.
 - Workspace resolution across unsaved buffers, the current Mod, ordered dependency Mods, and a

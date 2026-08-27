@@ -4,7 +4,7 @@ use std::io::Cursor;
 use lsp_types::{
     CompletionItem, CompletionResponse, Diagnostic, DocumentSymbol, Hover, Location,
     PrepareRenameResponse, SemanticToken as LspSemanticToken, SemanticTokens as LspSemanticTokens,
-    SymbolInformation, SymbolKind, WorkspaceEdit,
+    SemanticTokensFullDeltaResult, SymbolInformation, SymbolKind, WorkspaceEdit,
 };
 use pdx_text::{LineIndex, Position};
 use serde_json::{Value, json};
@@ -554,8 +554,11 @@ fn semantic_tokens_are_advertised_and_encoded_in_relative_order() {
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri.clone(),"languageId":"eu4","version":1,"text":text}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":uri.clone()}}}),
-        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":format!("{root_uri}/events/closed.txt")}}}),
-        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/semanticTokens/full/delta","params":{"textDocument":{"uri":uri.clone()},"previousResultId":"1"}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":uri.clone(),"version":2},"contentChanges":[{"text":"@cost = 200\ncountry_event = { favorable = no }\n"}]}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"textDocument/semanticTokens/full/delta","params":{"textDocument":{"uri":uri.clone()},"previousResultId":"2"}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":format!("{root_uri}/events/closed.txt")}}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
     ]);
     let mut output = Vec::new();
@@ -581,9 +584,10 @@ fn semantic_tokens_are_advertised_and_encoded_in_relative_order() {
             .as_array()
             .is_some_and(|modifiers| modifiers.contains(&json!("definition")))
     );
-    assert_eq!(provider["full"], json!(true));
+    assert_eq!(provider["full"], json!({"delta": true}));
 
     let tokens: LspSemanticTokens = typed_result(&responses, 2);
+    assert!(tokens.result_id.is_some());
     let index_of = |name: &str| {
         legend_types
             .iter()
@@ -610,10 +614,39 @@ fn semantic_tokens_are_advertised_and_encoded_in_relative_order() {
     assert_eq!(second_line.length, 13);
     let _: LspSemanticToken = tokens.data[0];
 
+    let delta: SemanticTokensFullDeltaResult = typed_result(&responses, 3);
+    match delta {
+        SemanticTokensFullDeltaResult::TokensDelta(delta) => {
+            assert!(delta.result_id.is_some());
+            assert!(
+                delta.edits.is_empty(),
+                "unchanged tokens should be empty delta"
+            );
+        }
+        SemanticTokensFullDeltaResult::Tokens(tokens) => {
+            // Requests are allowed to overlap in this in-memory transport. If the delta worker
+            // wins the race before the full response populates the cache, it repairs the client
+            // baseline with a legal complete response instead.
+            assert!(tokens.result_id.is_some());
+        }
+        other => panic!("expected semantic token delta or full fallback, got {other:?}"),
+    }
+
+    // Editing the overlay invalidates the old baseline. The next delta request is therefore
+    // allowed to return a complete token set, giving the client a fresh result id.
+    let changed: SemanticTokensFullDeltaResult = typed_result(&responses, 4);
+    match changed {
+        SemanticTokensFullDeltaResult::Tokens(changed) => assert!(changed.result_id.is_some()),
+        SemanticTokensFullDeltaResult::TokensDelta(changed) => {
+            assert!(changed.result_id.is_some());
+        }
+        other => panic!("expected semantic token delta or full fallback after edit, got {other:?}"),
+    }
+
     // An unopened document is rejected with invalid-params semantics.
     let unopened = responses
         .iter()
-        .find(|value| value["id"] == 3)
+        .find(|value| value["id"] == 5)
         .expect("unopened document response");
     assert_eq!(unopened["error"]["code"], json!(INVALID_PARAMS));
 
