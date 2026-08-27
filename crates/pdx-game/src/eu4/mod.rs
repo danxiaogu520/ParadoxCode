@@ -12,7 +12,7 @@ use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::{GameInstallDescriptor, PlatformExecutablePaths};
-use pdx_rules::rulec::{SourceBundle, SourceFile, load_source_bundle};
+use pdx_rules::rulec::{ArtifactManifest, SourceBundle, SourceFile, load_source_bundle};
 use pdx_rules::{
     FileCategory, FileMatcher, FileResolutionPolicy, GameProfile, ParserKind, RuleSet, RulesModel,
     SymbolDescriptor, SymbolResolutionPolicy,
@@ -213,9 +213,12 @@ const FIRST_PARTY_SOURCE: SourceBundle<'static> = SourceBundle {
     manifest: include_bytes!("../../../../rules/eu4/manifest.json"),
     files: FIRST_PARTY_FILES,
 };
+const FIRST_PARTY_ARTIFACT_MANIFEST: &[u8] = include_bytes!("../../../../rules/manifest.json");
 
 static RULE_CACHE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 static FIRST_PARTY_PROFILE: OnceLock<GameProfile> = OnceLock::new();
+static FIRST_PARTY_RULES: OnceLock<Result<RuleSet, String>> = OnceLock::new();
+static FIRST_PARTY_ARTIFACT: OnceLock<Result<ArtifactManifest, String>> = OnceLock::new();
 
 /// Stable identity stored by EU4 rule artifacts and selected by the server.
 pub const GAME_ID: &str = "eu4";
@@ -239,7 +242,7 @@ pub const INSTALL_DESCRIPTOR: GameInstallDescriptor = GameInstallDescriptor {
 /// language-server entry point uses [`first_party_rules_cached`] so runtime queries still consume
 /// a validated, read-only SQLite artifact.
 pub fn first_party_rules() -> Result<RuleSet, pdx_rules::RulesError> {
-    source_rules()
+    Ok(source_rules_cached()?.clone())
 }
 
 /// Compiles the embedded first-party JSON source into a user-local SQLite artifact when needed,
@@ -249,12 +252,18 @@ pub fn first_party_rules() -> Result<RuleSet, pdx_rules::RulesError> {
 /// stale, corrupt, or mismatched cache is replaced only after a complete source validation and
 /// SQLite round-trip succeeds. No external source path can replace the embedded JSON bundle.
 pub fn first_party_rules_cached(cache_path: &Path) -> Result<RuleSet, pdx_rules::RulesError> {
-    let rules = source_rules()?;
+    let expected = first_party_artifact_manifest()?;
     if let Ok(cached) = RuleSet::load(cache_path)
-        && cached == rules
+        && artifact_matches(&cached, expected)
     {
         return Ok(cached);
     }
+
+    // Only a cache miss or identity mismatch reaches the source compiler. The generated
+    // manifest is a fast-path hint; the embedded JSON remains authoritative and is checked
+    // against the manifest before a replacement artifact can be published.
+    let rules = source_rules_cached()?;
+    verify_artifact_manifest(rules, expected)?;
 
     let parent = cache_path.parent().ok_or_else(|| {
         pdx_rules::RulesError::Source(format!(
@@ -268,7 +277,7 @@ pub fn first_party_rules_cached(cache_path: &Path) -> Result<RuleSet, pdx_rules:
         cache_path.file_name().and_then(|name| name.to_str()),
     )?;
     let result = (|| {
-        let loaded = compile_and_load(&rules, &temporary)?;
+        let loaded = compile_and_load(rules, &temporary)?;
         if cache_path.exists() {
             fs::remove_file(cache_path)?;
         }
@@ -284,9 +293,9 @@ pub fn first_party_rules_cached(cache_path: &Path) -> Result<RuleSet, pdx_rules:
 /// Compiles the first-party source to a process-local temporary SQLite artifact and removes the
 /// file after loading. This is used only when a platform cache directory cannot be resolved.
 pub fn first_party_rules_ephemeral() -> Result<RuleSet, pdx_rules::RulesError> {
-    let rules = source_rules()?;
+    let rules = source_rules_cached()?;
     let temporary = temporary_rule_path(&std::env::temp_dir(), Some("pdx-ls-rules.pdxrules"))?;
-    let result = compile_and_load(&rules, &temporary);
+    let result = compile_and_load(rules, &temporary);
     let _ = fs::remove_file(&temporary);
     result
 }
@@ -322,6 +331,48 @@ fn source_rules() -> Result<RuleSet, pdx_rules::RulesError> {
     let rules = RuleSet::from_model(model);
     rules.ensure_game(GAME_ID)?;
     Ok(rules)
+}
+
+fn source_rules_cached() -> Result<&'static RuleSet, pdx_rules::RulesError> {
+    match FIRST_PARTY_RULES.get_or_init(|| source_rules().map_err(|error| error.to_string())) {
+        Ok(rules) => Ok(rules),
+        Err(error) => Err(pdx_rules::RulesError::Source(error.clone())),
+    }
+}
+
+fn first_party_artifact_manifest() -> Result<&'static ArtifactManifest, pdx_rules::RulesError> {
+    match FIRST_PARTY_ARTIFACT.get_or_init(|| {
+        serde_json::from_slice(FIRST_PARTY_ARTIFACT_MANIFEST)
+            .map_err(|error| format!("embedded first-party artifact manifest is invalid: {error}"))
+    }) {
+        Ok(manifest) => Ok(manifest),
+        Err(error) => Err(pdx_rules::RulesError::Source(error.clone())),
+    }
+}
+
+fn artifact_matches(rules: &RuleSet, expected: &ArtifactManifest) -> bool {
+    rules.schema_version() == expected.schema_version
+        && rules.game_id() == expected.game_id
+        && rules.rule_hash().to_hex() == expected.rule_hash
+}
+
+fn verify_artifact_manifest(
+    rules: &RuleSet,
+    expected: &ArtifactManifest,
+) -> Result<(), pdx_rules::RulesError> {
+    if artifact_matches(rules, expected) {
+        Ok(())
+    } else {
+        Err(pdx_rules::RulesError::Source(format!(
+            "embedded first-party source disagrees with artifact manifest (expected game={}, schema={}, hash={}; source game={}, schema={}, hash={})",
+            expected.game_id,
+            expected.schema_version,
+            expected.rule_hash,
+            rules.game_id(),
+            rules.schema_version(),
+            rules.rule_hash().to_hex()
+        )))
+    }
 }
 
 /// The built-in EU4 profile.
@@ -479,8 +530,9 @@ mod tests {
     use std::path::Path;
 
     use super::{
-        Eu4Profile, GAME_ID, bootstrap_rules, first_party_rules, first_party_rules_cached,
-        first_party_rules_ephemeral, profile,
+        Eu4Profile, GAME_ID, bootstrap_rules, first_party_artifact_manifest, first_party_rules,
+        first_party_rules_cached, first_party_rules_ephemeral, profile, source_rules,
+        verify_artifact_manifest,
     };
     use pdx_rules::{RuleSet, SourceEncoding};
     use pdx_text::LogicalPath;
@@ -629,6 +681,13 @@ mod tests {
     }
 
     #[test]
+    fn embedded_artifact_manifest_matches_the_authoritative_source() {
+        let rules = source_rules().expect("embedded EU4 source");
+        let manifest = first_party_artifact_manifest().expect("embedded artifact manifest");
+        verify_artifact_manifest(&rules, manifest).expect("source and generated metadata match");
+    }
+
+    #[test]
     fn first_party_file_categories_are_closed_over_common_and_generated_map_paths() {
         let rules = first_party_rules().expect("embedded EU4 source");
         let classify = |path: &str| {
@@ -685,6 +744,8 @@ mod tests {
         let first = first_party_rules_cached(&cache).expect("compile first-party source");
         assert!(cache.is_file());
         assert_eq!(pdx_rules::RuleSet::load(&cache).expect("load cache"), first);
+        let warm = first_party_rules_cached(&cache).expect("reuse matching rules cache");
+        assert_eq!(warm, first);
 
         let stale = directory.path().join("rules/eu4/stale.pdxrules");
         bootstrap_rules()
