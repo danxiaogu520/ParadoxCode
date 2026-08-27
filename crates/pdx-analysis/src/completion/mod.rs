@@ -1,3 +1,4 @@
+use crate::localisation::{localisation_command_completion, localisation_command_fragment};
 use crate::support::*;
 use crate::types::*;
 use pdx_engine::{AnalysisSnapshot, DocumentId};
@@ -62,6 +63,16 @@ pub fn complete_with_cancellation(
                 revision: snapshot.revision(),
                 items: Vec::new(),
             });
+        }
+        if let Some((command_range, command_prefix)) =
+            localisation_command_fragment(&input, position)
+        {
+            return localisation_command_completion(
+                snapshot,
+                command_range,
+                &command_prefix,
+                cancellation,
+            );
         }
         return if default_value_context {
             localisation_value_completion(snapshot, replacement_range, &prefix, cancellation)

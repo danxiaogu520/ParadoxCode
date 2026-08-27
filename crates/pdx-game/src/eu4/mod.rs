@@ -558,7 +558,7 @@ mod tests {
         let profile = profile();
         assert_eq!(profile.game_id, GAME_ID);
         assert_eq!(profile.source_encoding, SourceEncoding::Windows1252);
-        assert_eq!(profile.scan_roots().len(), 123);
+        assert_eq!(profile.scan_roots().len(), 126);
         assert!(profile.scan_roots().iter().any(|root| root == "common"));
         assert_eq!(profile.scan_root_max_depth("common"), Some(0));
         assert_eq!(
@@ -571,6 +571,16 @@ mod tests {
                 .iter()
                 .any(|root| root == "common/ai_army")
         );
+        assert_eq!(
+            profile.scripted_localisation_directories,
+            [
+                "scripted_localisation".to_owned(),
+                "scripted_localization".to_owned(),
+                "scripted_loc".to_owned(),
+            ]
+        );
+        assert!(profile.is_scripted_localisation_path("dlc/foo/common/scripted_loc/defs.txt"));
+        assert!(!profile.is_scripted_localisation_path("common/ideas/scripted_loc.txt"));
         assert_eq!(profile.scan_root_max_depth("common/ai_army"), Some(0));
         assert_eq!(profile.scan_root_max_depth("events"), Some(0));
         assert_eq!(

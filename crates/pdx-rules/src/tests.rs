@@ -130,6 +130,20 @@ fn profile_scan_roots_are_directory_bounded() {
 }
 
 #[test]
+fn profile_scripted_localisation_directory_matching_uses_path_segments() {
+    let mut profile = GameProfile::empty("test");
+    profile.scripted_localisation_directories = vec![
+        "scripted_localisation".to_owned(),
+        "scripted_localization".to_owned(),
+        "scripted_loc".to_owned(),
+    ];
+
+    assert!(profile.is_scripted_localisation_path("common/scripted_localisation/defs.txt"));
+    assert!(profile.is_scripted_localisation_path("dlc/foo/common/scripted_loc/defs.txt"));
+    assert!(!profile.is_scripted_localisation_path("common/ideas/scripted_loc.txt"));
+}
+
+#[test]
 fn profile_scan_extensions_are_case_insensitive_and_directory_bounded() {
     let mut profile = GameProfile::empty("test");
     profile.scan_roots = vec!["events".to_owned()];

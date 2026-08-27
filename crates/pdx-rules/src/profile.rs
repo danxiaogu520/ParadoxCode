@@ -260,6 +260,12 @@ pub struct GameProfile {
     /// Entries omit the leading dot and are compared case-insensitively. An empty list keeps
     /// every extension, preserving the generic profile behavior.
     pub scan_extensions: Vec<String>,
+    /// Directory names whose top-level `name` fields declare scripted-localisation commands.
+    ///
+    /// The match is path-segment based and case-insensitive so a game profile can support
+    /// spellings such as `scripted_localisation`, `scripted_localization`, and `scripted_loc`
+    /// without teaching the generic engine a concrete game layout.
+    pub scripted_localisation_directories: Vec<String>,
     /// Ordered top-level definition rules; the first match wins.
     pub definitions: Vec<ProfileDefinitionRule>,
     /// Ordered scalar-reference rules; the first match wins.
@@ -329,6 +335,7 @@ impl GameProfile {
             scan_root_max_depths: BTreeMap::new(),
             scan_root_files: BTreeMap::new(),
             scan_extensions: Vec::new(),
+            scripted_localisation_directories: Vec::new(),
             definitions: Vec::new(),
             references: Vec::new(),
             value_definitions: Vec::new(),
@@ -470,6 +477,18 @@ impl GameProfile {
     #[must_use]
     pub fn scan_extensions(&self) -> &[String] {
         &self.scan_extensions
+    }
+
+    /// Returns whether a logical path is inside one of the profile-declared scripted
+    /// localisation directories.
+    #[must_use]
+    pub fn is_scripted_localisation_path(&self, logical_path: &str) -> bool {
+        let path = logical_path.replace('\\', "/");
+        path.split('/').any(|segment| {
+            self.scripted_localisation_directories
+                .iter()
+                .any(|directory| segment.eq_ignore_ascii_case(directory))
+        })
     }
 
     /// Returns whether a logical file path belongs to a whitelisted scan directory.

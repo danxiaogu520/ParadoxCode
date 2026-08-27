@@ -1,3 +1,4 @@
+use crate::localisation::localisation_command_diagnostics;
 use crate::macro_expansion::{ExpansionEnterFailure, ExpansionFailure, MacroExpansionSession};
 use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
 use crate::resolution::*;
@@ -186,6 +187,11 @@ pub(crate) fn analyze_input_with_cancellation(
     diagnostics
         .values
         .extend(semantic_rule_diagnostics(snapshot, input, cancellation)?);
+    diagnostics.values.extend(localisation_command_diagnostics(
+        snapshot,
+        input,
+        cancellation,
+    )?);
     for property in properties(input) {
         cancellation.checkpoint()?;
         if property.key.eq_ignore_ascii_case("scope")

@@ -411,6 +411,11 @@ pub(super) fn lower_semantics(
         }
 
         definitions.extend(quoted_script_value_definitions(properties, profile));
+        definitions.extend(scripted_localisation_definitions(
+            properties,
+            logical_path,
+            profile,
+        ));
     }
 
     definitions.extend(semantic_type_definitions(properties, logical_path, rules));
@@ -614,6 +619,46 @@ fn semantic_type_definitions(
                     );
                 }
             }
+        }
+    }
+    definitions
+}
+
+/// Collects path-driven scripted-localisation definitions.
+///
+/// CWTools reads `name = ...` from every top-level clause under a profile-declared scripted
+/// localisation directory.  It intentionally does not require a particular clause key because
+/// game versions use both `defined_text` and custom wrapper spellings.  Keeping this extraction
+/// in profile-aware HIR lowering makes disk files and overlays produce the same definition facts,
+/// while the profile owns the concrete directory spellings.
+fn scripted_localisation_definitions(
+    properties: &[HirProperty],
+    logical_path: Option<&LogicalPath>,
+    profile: &GameProfile,
+) -> Vec<HirDefinition> {
+    let Some(logical_path) = logical_path else {
+        return Vec::new();
+    };
+    if !profile.is_scripted_localisation_path(logical_path.as_str()) {
+        return Vec::new();
+    }
+    let mut definitions = Vec::new();
+    for property in properties.iter().filter(|property| property.top_level) {
+        for child in immediate_children(properties, property)
+            .filter(|child| child.key.eq_ignore_ascii_case("name"))
+        {
+            let Some(scalar) = child.scalar.as_ref() else {
+                continue;
+            };
+            if scalar.value.is_empty() || scalar.value.contains('$') {
+                continue;
+            }
+            definitions.push(HirDefinition {
+                kind: "defined_text".to_owned(),
+                name: scalar.value.clone(),
+                range: property.range,
+                selection_range: scalar.range,
+            });
         }
     }
     definitions

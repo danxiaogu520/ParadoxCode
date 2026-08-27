@@ -27,6 +27,9 @@ and Paradox Interactive are trademarks of their respective owners.
   certainty without exposing internal rule provenance or legacy migration fields.
 - Rule-backed diagnostics can expose bounded `textDocument/codeAction` quick fixes, including
   unique did-you-mean replacements for misspelled static enum values.
+- Scripted-localisation definitions are discovered from the EU4 profile's supported directory
+  spellings, indexed as `defined_text`, and used for localisation-command completion and
+  registry-aware unknown-command warnings.
 - Completion, hover, go-to-definition, references, and document/workspace symbols.
 - Full semantic tokens support incremental `full/delta` responses with a bounded, revision-aware
   cache that is invalidated by edits and workspace refreshes.
