@@ -382,6 +382,7 @@ dependencies = [
  "pdx-rules",
  "pdx-text",
  "serde",
+ "serde_json",
  "tempfile",
  "toml",
 ]
