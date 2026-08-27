@@ -276,6 +276,10 @@ fn unchanged_file_states_are_reused_and_only_changed_files_advance() {
     let Some(ParsedSource::Text(parsed)) = first.file_state(a).expect("a state").parsed() else {
         panic!("event file should retain a text parse");
     };
+    assert!(Arc::ptr_eq(
+        &parsed.source_handle(),
+        &first.file_state(a).expect("a state").source_handle(),
+    ));
     assert!(std::ptr::eq(
         parsed.as_ref(),
         first

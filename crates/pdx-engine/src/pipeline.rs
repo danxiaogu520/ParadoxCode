@@ -466,9 +466,13 @@ pub(crate) fn build_file_state_with_cache(
             definition.range,
         ))
     });
+    let shared_source = match parsed.as_ref() {
+        Some(ParsedSource::Text(parsed)) => parsed.source_handle(),
+        None => Arc::from(source.as_str()),
+    };
     FileState {
         revision,
-        source: Arc::from(source),
+        source: shared_source,
         parsed,
         hir,
         shard: Arc::new(shard),
