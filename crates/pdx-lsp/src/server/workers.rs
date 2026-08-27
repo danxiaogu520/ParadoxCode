@@ -425,14 +425,20 @@ impl LspServer {
             self.state,
             ServerState::Initialized | ServerState::ShuttingDown
         ) || in_flight.is_some()
-            || self.pending_disk_changes.is_empty()
+            || !self.has_pending_disk_changes()
+            || self
+                .pending_disk_changes_due
+                .is_some_and(|due| due > Instant::now())
         {
             return;
         }
+        let full_rescan = self.pending_disk_changes_rescan;
         let changes = std::mem::take(&mut self.pending_disk_changes)
             .into_iter()
             .map(|(path, kind)| DiskFileChange::new(path, kind))
             .collect::<Vec<_>>();
+        self.pending_disk_changes_due = None;
+        self.pending_disk_changes_rescan = false;
         let base_revision = self.host.snapshot().revision();
         let cancellation = WorkspaceScanToken::new();
         let worker_cancellation = cancellation.clone();
@@ -445,9 +451,15 @@ impl LspServer {
         });
         scope.spawn(move || {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                candidate
-                    .apply_disk_file_changes_cancellable(&worker_changes, &worker_cancellation)
-                    .map(|_| candidate)
+                if full_rescan {
+                    candidate
+                        .refresh_source_roots_cancellable(&worker_cancellation)
+                        .map(|_| candidate)
+                } else {
+                    candidate
+                        .apply_disk_file_changes_cancellable(&worker_changes, &worker_cancellation)
+                        .map(|_| candidate)
+                }
             }))
             .unwrap_or_else(|_| {
                 Err(WorkspaceError::Io(io::Error::other(
@@ -467,6 +479,9 @@ impl LspServer {
             self.pending_disk_changes
                 .entry(change.path)
                 .or_insert(change.kind);
+        }
+        if self.has_pending_disk_changes() {
+            self.pending_disk_changes_due = Some(Instant::now());
         }
     }
 
@@ -694,5 +709,45 @@ mod tests {
         server.background_reindex_interval_minutes = 1;
         server.arm_background_reindex();
         assert!(server.background_reindex_due.is_some());
+    }
+
+    #[test]
+    fn watched_changes_reset_a_bounded_trailing_window() {
+        let mut server = LspServer::try_new(InitializeOptions).expect("identity server");
+        server.queue_watched_disk_change(
+            PathBuf::from("events/one.txt"),
+            DiskFileChangeKind::Changed,
+        );
+        let first_due = server.pending_disk_changes_due.expect("debounce deadline");
+        assert!(server.has_pending_disk_changes());
+        assert!(
+            server
+                .pending_disk_change_wait(None)
+                .is_some_and(|wait| { wait <= WATCHED_FILE_DEBOUNCE && wait > Duration::ZERO })
+        );
+
+        server.queue_watched_disk_change(
+            PathBuf::from("events/two.txt"),
+            DiskFileChangeKind::Changed,
+        );
+        let second_due = server.pending_disk_changes_due.expect("reset deadline");
+        assert!(second_due >= first_due);
+        assert_eq!(server.pending_disk_changes.len(), 2);
+        assert!(!server.pending_disk_changes_rescan);
+    }
+
+    #[test]
+    fn watched_change_bulk_cap_switches_to_one_full_rescan() {
+        let mut server = LspServer::try_new(InitializeOptions).expect("identity server");
+        for index in 0..=WATCHED_BULK_CAP {
+            server.queue_watched_disk_change(
+                PathBuf::from(format!("events/{index}.txt")),
+                DiskFileChangeKind::Changed,
+            );
+        }
+        assert!(server.pending_disk_changes_rescan);
+        assert!(server.pending_disk_changes.is_empty());
+        assert!(server.has_pending_disk_changes());
+        assert!(server.pending_disk_change_wait(None).is_some());
     }
 }
