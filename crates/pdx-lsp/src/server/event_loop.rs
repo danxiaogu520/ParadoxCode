@@ -46,6 +46,7 @@ impl LspServer {
             let mut dependency_progress_token = None::<String>;
             let mut in_flight_disk_changes = None::<InFlightDiskChanges>;
             let mut in_flight_background_reindex = None::<InFlightBackgroundReindex>;
+            let mut in_flight_reindex_command = None::<InFlightReindexCommand>;
             let mut deferred_messages = VecDeque::<Value>::new();
 
             loop {
@@ -59,7 +60,7 @@ impl LspServer {
                     &mut in_flight,
                     self.state == ServerState::ShuttingDown,
                 );
-                let background_busy = !self.pending_parses.is_empty()
+                let mut background_busy = !self.pending_parses.is_empty()
                     || !in_flight_parses.is_empty()
                     || !self.pending_diagnostics.is_empty()
                     || !in_flight.is_empty()
@@ -68,7 +69,9 @@ impl LspServer {
                     || in_flight_index.is_some()
                     || in_flight_dependency.is_some()
                     || !self.pending_disk_changes.is_empty()
-                    || in_flight_disk_changes.is_some();
+                    || in_flight_disk_changes.is_some()
+                    || in_flight_background_reindex.is_some()
+                    || in_flight_reindex_command.is_some();
                 self.spawn_due_background_reindex(
                     scope,
                     &event_sender,
@@ -76,6 +79,16 @@ impl LspServer {
                     ready_logged,
                     background_busy,
                 );
+                // A due quiet pass may have been launched by the call above. Recompute the
+                // guard before accepting an explicit command so the two full scans never overlap.
+                background_busy = background_busy
+                    || in_flight_background_reindex.is_some()
+                    || in_flight_reindex_command.is_some();
+                if let Some(task) = in_flight_reindex_command.as_ref()
+                    && self.cancelled.contains(&task.request_id)
+                {
+                    task.cancellation.cancel();
+                }
                 let parse_busy = !self.pending_parses.is_empty() || !in_flight_parses.is_empty();
                 let initialize_busy = in_flight_initialize.is_some();
                 let disk_changes_busy =
@@ -88,6 +101,10 @@ impl LspServer {
                     && !disk_changes_busy
                     && !vanilla_cache_busy
                     && !dependency_cache_busy
+                    && !(background_busy
+                        && deferred_messages
+                            .front()
+                            .is_some_and(is_execute_command_message))
                     && !deferred_messages.is_empty();
                 let (event, from_reader) = if deferred_ready {
                     let message = deferred_messages.pop_front().expect("checked non-empty");
@@ -143,11 +160,14 @@ impl LspServer {
                         let vanilla_cache_busy = index_cache_in_flight && in_flight_index.is_some();
                         let dependency_cache_busy =
                             dependency_cache_in_flight && in_flight_dependency.is_some();
+                        let execute_command_busy =
+                            background_busy && is_execute_command_message(&message);
                         if from_reader
                             && (((parse_busy || disk_changes_busy)
                                 && is_snapshot_request_message(&message))
                                 || (vanilla_cache_busy && is_snapshot_request_message(&message))
                                 || (dependency_cache_busy && is_snapshot_request_message(&message))
+                                || execute_command_busy
                                 || (initialize_busy && !is_initialize_control_message(&message)))
                         {
                             deferred_messages.push_back(message);
@@ -159,7 +179,13 @@ impl LspServer {
                                 &message,
                                 &mut output,
                                 &mut initialize_progress_token,
-                            )? || self.spawn_snapshot_request(
+                            )? || self.spawn_reindex_command(
+                                scope,
+                                &event_sender,
+                                &mut in_flight_reindex_command,
+                                background_busy,
+                                &message,
+                            ) || self.spawn_snapshot_request(
                                 scope,
                                 &event_sender,
                                 &mut in_flight_requests,
@@ -202,6 +228,9 @@ impl LspServer {
                                 task.cancellation.cancel();
                             }
                             if let Some(task) = in_flight_background_reindex.as_ref() {
+                                task.cancellation.cancel();
+                            }
+                            if let Some(task) = in_flight_reindex_command.as_ref() {
                                 task.cancellation.cancel();
                             }
                             return if self.clean_exit {
@@ -965,6 +994,69 @@ impl LspServer {
                         }
                         self.arm_background_reindex();
                     }
+                    TransportEvent::ReindexCommand(result) => {
+                        let current = in_flight_reindex_command.as_ref().is_some_and(|task| {
+                            task.request_id == result.request_id
+                                && task.base_revision == result.base_revision
+                        });
+                        if !current {
+                            continue;
+                        }
+                        let task = in_flight_reindex_command
+                            .take()
+                            .expect("checked explicit reindex command task");
+                        self.cancelled.remove(&result.request_id);
+                        let response = if task.cancellation.is_cancelled() {
+                            RpcError::new(REQUEST_CANCELLED, "request was cancelled")
+                                .response(result.id)
+                        } else if self.host.snapshot().revision() != result.base_revision {
+                            RpcError::new(
+                                INVALID_REQUEST,
+                                "workspace changed while reindexing; run pdx/reindexWorkspace again",
+                            )
+                            .response(result.id)
+                        } else {
+                            match result.result {
+                                Ok(host) => {
+                                    self.host = host;
+                                    let snapshot = self.host.snapshot();
+                                    let open = snapshot
+                                        .documents()
+                                        .iter()
+                                        .filter_map(|(id, document)| {
+                                            document.version().map(|version| (id.clone(), version))
+                                        })
+                                        .collect::<Vec<_>>();
+                                    for (id, version) in open {
+                                        self.schedule_diagnostics_for_document(
+                                            id,
+                                            version,
+                                            DIAGNOSTIC_DEBOUNCE,
+                                        );
+                                    }
+                                    json!({
+                                        "jsonrpc": JSON_RPC_VERSION,
+                                        "id": result.id,
+                                        "result": {
+                                            "revision": snapshot.revision(),
+                                            "sourceFiles": snapshot.source_files().len(),
+                                        },
+                                    })
+                                }
+                                Err(WorkspaceError::Cancelled) => {
+                                    RpcError::new(REQUEST_CANCELLED, "request was cancelled")
+                                        .response(result.id)
+                                }
+                                Err(error) => RpcError::new(
+                                    INTERNAL_ERROR,
+                                    format!("workspace reindex failed: {error}"),
+                                )
+                                .response(result.id),
+                            }
+                        };
+                        self.arm_background_reindex();
+                        write_message(&mut output, &response)?;
+                    }
                     TransportEvent::DiskChanges(result) => {
                         let current = in_flight_disk_changes
                             .as_ref()
@@ -1025,7 +1117,8 @@ impl LspServer {
                         || in_flight_index.is_some()
                         || !self.pending_disk_changes.is_empty()
                         || in_flight_disk_changes.is_some()
-                        || in_flight_background_reindex.is_some());
+                        || in_flight_background_reindex.is_some()
+                        || in_flight_reindex_command.is_some());
                 if !reader_active && !draining_shutdown && deferred_messages.is_empty() {
                     read_sender.send(()).map_err(|_| {
                         LspError::Protocol("LSP transport reader stopped unexpectedly".to_owned())

@@ -1,6 +1,82 @@
 use super::*;
 
 impl LspServer {
+    /// Starts the explicit `workspace/executeCommand` reindex request. The command shares the
+    /// same cloned-host and revision-checked commit path as the quiet pass, but is not idle gated.
+    pub(super) fn spawn_reindex_command<'scope, 'environment>(
+        &mut self,
+        scope: &'scope std::thread::Scope<'scope, 'environment>,
+        event_sender: &mpsc::Sender<TransportEvent>,
+        in_flight: &mut Option<InFlightReindexCommand>,
+        busy: bool,
+        message: &Value,
+    ) -> bool {
+        if self.state != ServerState::Initialized || in_flight.is_some() || busy {
+            return false;
+        }
+        let Some(object) = message.as_object() else {
+            return false;
+        };
+        if object.get("jsonrpc").and_then(Value::as_str) != Some(JSON_RPC_VERSION)
+            || object.get("method").and_then(Value::as_str) != Some("workspace/executeCommand")
+        {
+            return false;
+        }
+        let Some(id) = object.get("id").filter(|id| !id.is_null()) else {
+            return false;
+        };
+        let Ok(request_id) = RequestId::parse(id) else {
+            return false;
+        };
+        if self.cancelled.contains(&request_id) {
+            // Let the ordinary dispatcher produce the standard cancellation response before a
+            // worker is created for a request the client already abandoned.
+            return false;
+        }
+        let Ok(params) =
+            typed_params::<ExecuteCommandParams>(object.get("params"), "executeCommand")
+        else {
+            return false;
+        };
+        if params.command != "pdx/reindexWorkspace" && params.command != "reindexWorkspace" {
+            return false;
+        }
+        let _ = params.arguments;
+        self.mark_activity();
+
+        let base_revision = self.host.snapshot().revision();
+        let cancellation = WorkspaceScanToken::new();
+        let worker_cancellation = cancellation.clone();
+        let mut candidate = self.host.clone();
+        let sender = event_sender.clone();
+        self.background_reindex_due = None;
+        *in_flight = Some(InFlightReindexCommand {
+            request_id: request_id.clone(),
+            base_revision,
+            cancellation,
+        });
+        let id = id.clone();
+        scope.spawn(move || {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                candidate
+                    .refresh_source_roots_cancellable_with_progress(&worker_cancellation, None)
+                    .map(|_| candidate)
+            }))
+            .unwrap_or_else(|_| {
+                Err(WorkspaceError::Io(io::Error::other(
+                    "reindex command worker failed unexpectedly",
+                )))
+            });
+            let _ = sender.send(TransportEvent::ReindexCommand(ReindexCommandResult {
+                request_id,
+                id,
+                base_revision,
+                result,
+            }));
+        });
+        true
+    }
+
     /// Starts a quiet full source-root refresh once its cadence and idle gate are satisfied.
     ///
     /// The worker owns a cloned host and therefore never holds the event-loop state while

@@ -132,6 +132,10 @@ impl LspServer {
                 self.handle_did_change_configuration(params)?;
                 Ok(Value::Null)
             }
+            "workspace/executeCommand" => Err(RpcError::new(
+                INVALID_REQUEST,
+                "only the pdx/reindexWorkspace command is supported",
+            )),
             method if is_snapshot_request(method) => SnapshotRequestContext::new(
                 self.host.snapshot(),
                 CancellationToken::new(),

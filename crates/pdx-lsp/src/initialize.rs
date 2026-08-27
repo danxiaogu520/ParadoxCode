@@ -1,6 +1,6 @@
 use lsp_types::{
-    CompletionOptions, HoverProviderCapability, InitializeParams, InitializeResult, OneOf,
-    RenameOptions, SemanticTokenModifier as LspSemanticTokenModifier,
+    CompletionOptions, ExecuteCommandOptions, HoverProviderCapability, InitializeParams,
+    InitializeResult, OneOf, RenameOptions, SemanticTokenModifier as LspSemanticTokenModifier,
     SemanticTokenType as LspSemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend,
     SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
@@ -318,6 +318,10 @@ pub(crate) fn prepare_initialize_candidate(
                 trigger_characters: Some(vec!["=".to_owned(), " ".to_owned(), ":".to_owned()]),
                 resolve_provider: Some(true),
                 ..CompletionOptions::default()
+            }),
+            execute_command_provider: Some(ExecuteCommandOptions {
+                commands: vec!["pdx/reindexWorkspace".to_owned()],
+                ..ExecuteCommandOptions::default()
             }),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
             definition_provider: Some(OneOf::Left(true)),
