@@ -297,6 +297,33 @@ pub struct DiagnosticProvenance {
     pub source_line: Option<u32>,
 }
 
+/// A safe, editor-neutral source edit suggested by a diagnostic.
+///
+/// The analysis layer owns the semantic decision and only returns a bounded, explicit
+/// replacement. Protocol adapters convert the UTF-8 range to the editor's native position
+/// representation and never infer edits from the diagnostic message.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct QuickFix {
+    /// Short action title shown by the editor.
+    pub title: String,
+    /// Source range to replace.
+    pub range: TextRange,
+    /// Replacement text, already escaped for the source language.
+    pub new_text: String,
+}
+
+impl QuickFix {
+    /// Creates a replacement edit.
+    #[must_use]
+    pub fn replace(title: String, range: TextRange, new_text: String) -> Self {
+        Self {
+            title,
+            range,
+            new_text,
+        }
+    }
+}
+
 impl DiagnosticProvenance {
     #[must_use]
     pub const fn empty() -> Self {
@@ -324,6 +351,8 @@ pub struct Diagnostic {
     pub certainty: DiagnosticCertainty,
     /// Optional internal rule/source provenance for explainability.
     pub provenance: Option<DiagnosticProvenance>,
+    /// Safe source edits that directly address this diagnostic.
+    pub fixes: Vec<QuickFix>,
 }
 
 impl Diagnostic {
@@ -342,6 +371,7 @@ impl Diagnostic {
             message,
             certainty: DiagnosticCertainty::Certain,
             provenance: None,
+            fixes: Vec::new(),
         }
     }
 
@@ -356,6 +386,13 @@ impl Diagnostic {
     #[must_use]
     pub fn with_provenance(mut self, provenance: DiagnosticProvenance) -> Self {
         self.provenance = Some(provenance);
+        self
+    }
+
+    /// Attaches one safe source edit to this diagnostic.
+    #[must_use]
+    pub fn with_fix(mut self, fix: QuickFix) -> Self {
+        self.fixes.push(fix);
         self
     }
 }

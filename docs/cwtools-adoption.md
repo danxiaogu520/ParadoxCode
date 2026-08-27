@@ -48,7 +48,7 @@ rewritten without evidence that their boundaries are the bottleneck.
 
 ## Implemented stages
 
-The first twenty-three stages are now on `main`, each independently committed and pushed:
+The first twenty-four stages are now on `main`, each independently committed and pushed:
 
 1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
    reporting stays deterministic.
@@ -121,6 +121,10 @@ The first twenty-three stages are now on `main`, each independently committed an
 23. `textDocument/semanticTokens/range` now prunes CST subtrees outside the requested UTF-8
     viewport before classification and advertises the range capability, while full/delta behavior
     remains unchanged.
+24. Diagnostics carry bounded, editor-neutral quick fixes. A deterministic, case-insensitive
+    Levenshtein suggestioner supplies unique close static/workspace enum members, and the LSP
+    exposes them as range-filtered `textDocument/codeAction` quick fixes with explicit workspace
+    edits and diagnostic metadata.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an

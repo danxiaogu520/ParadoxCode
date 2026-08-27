@@ -25,6 +25,8 @@ and Paradox Interactive are trademarks of their respective owners.
 - Diagnostics expose stable PascalCase IDs such as `UnknownKey`, `UnknownBareValue`,
   `UnknownScope`, and `TargetWrongScope`; severity is typed internally and LSP metadata carries
   certainty without exposing internal rule provenance or legacy migration fields.
+- Rule-backed diagnostics can expose bounded `textDocument/codeAction` quick fixes, including
+  unique did-you-mean replacements for misspelled static enum values.
 - Completion, hover, go-to-definition, references, and document/workspace symbols.
 - Full semantic tokens support incremental `full/delta` responses with a bounded, revision-aware
   cache that is invalidated by edits and workspace refreshes.

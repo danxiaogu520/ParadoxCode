@@ -1,10 +1,10 @@
 use lsp_types::{
-    CompletionOptions, ExecuteCommandOptions, HoverProviderCapability, InitializeParams,
-    InitializeResult, OneOf, RenameOptions, SemanticTokenModifier as LspSemanticTokenModifier,
-    SemanticTokenType as LspSemanticTokenType, SemanticTokensFullOptions, SemanticTokensLegend,
-    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    WorkDoneProgressOptions,
+    CodeActionProviderCapability, CompletionOptions, ExecuteCommandOptions,
+    HoverProviderCapability, InitializeParams, InitializeResult, OneOf, RenameOptions,
+    SemanticTokenModifier as LspSemanticTokenModifier, SemanticTokenType as LspSemanticTokenType,
+    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -330,6 +330,7 @@ pub(crate) fn prepare_initialize_candidate(
             hover_provider: Some(HoverProviderCapability::Simple(true)),
             definition_provider: Some(OneOf::Left(true)),
             references_provider: Some(OneOf::Left(true)),
+            code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
             rename_provider: Some(OneOf::Right(RenameOptions {
                 prepare_provider: Some(true),
                 work_done_progress_options: WorkDoneProgressOptions::default(),

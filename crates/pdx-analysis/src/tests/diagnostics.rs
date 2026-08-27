@@ -1,5 +1,7 @@
 use super::support::*;
-use crate::{Diagnostic, DiagnosticCertainty, DiagnosticProvenance, Severity};
+use crate::{
+    Diagnostic, DiagnosticCertainty, DiagnosticProvenance, Severity, quick_fixes_with_cancellation,
+};
 
 #[test]
 fn diagnostic_ids_are_pascal_case_and_metadata_is_structured() {
@@ -542,6 +544,111 @@ fn semantic_matcher_rejects_invalid_values_and_unknown_keys() {
         diagnostics
             .iter()
             .any(|item| item.code == DiagnosticCode::UnknownKey)
+    );
+}
+
+#[test]
+fn invalid_enum_value_carries_one_unique_did_you_mean_fix() {
+    let mut model = pdx_game::eu4::bootstrap_model();
+    model.semantic.enum_values.insert(
+        "fixture_modes".to_owned(),
+        vec!["historic".to_owned(), "dynamic".to_owned()],
+    );
+    model.semantic.rules.push(SemanticRule {
+        id: "fixture:trigger:mode".to_owned(),
+        context: "trigger".to_owned(),
+        parent_path: Vec::new(),
+        key: KeyMatcher::Exact("mode".to_owned()),
+        operator: Some("=".to_owned()),
+        value: ValueMatcher::Enum("fixture_modes".to_owned()),
+        shape: RuleShape::Leaf,
+        child_context: None,
+        alternative_id: None,
+        severity: None,
+        required: false,
+        deprecated: false,
+        documentation: Vec::new(),
+        allowed_scopes: Vec::new(),
+        push_scope: None,
+        replace_scope: Vec::new(),
+        min_occurs: None,
+        strict_min: true,
+        max_occurs: None,
+        source_file: "fixture.semantic".to_owned(),
+        line: 1,
+    });
+    let mut host = eu4_host(RuleSet::from_model(model));
+    let id = DocumentId::new("file:///tmp/common/events/enum-fix.txt");
+    let text = "trigger = { mode = histori }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open enum fixture");
+
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    let invalid = diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue)
+        .expect("invalid enum value diagnostic");
+    assert_eq!(invalid.fixes.len(), 1);
+    let fix = &invalid.fixes[0];
+    assert_eq!(fix.title, "Did you mean 'historic'?");
+    assert_eq!(fix.new_text, "\"historic\"");
+    assert_eq!(
+        fix.range.start(),
+        u32::try_from(text.find("histori").expect("invalid value")).expect("offset")
+    );
+    let fixes = quick_fixes_with_cancellation(
+        &host.snapshot(),
+        &id,
+        Some(fix.range),
+        &CancellationToken::new(),
+    )
+    .expect("quick-fix query");
+    assert_eq!(fixes, vec![fix.clone()]);
+}
+
+#[test]
+fn ambiguous_enum_suggestions_do_not_produce_a_fix() {
+    let mut model = pdx_game::eu4::bootstrap_model();
+    model.semantic.enum_values.insert(
+        "fixture_modes".to_owned(),
+        vec!["cat".to_owned(), "bat".to_owned()],
+    );
+    model.semantic.rules.push(SemanticRule {
+        id: "fixture:trigger:mode".to_owned(),
+        context: "trigger".to_owned(),
+        parent_path: Vec::new(),
+        key: KeyMatcher::Exact("mode".to_owned()),
+        operator: Some("=".to_owned()),
+        value: ValueMatcher::Enum("fixture_modes".to_owned()),
+        shape: RuleShape::Leaf,
+        child_context: None,
+        alternative_id: None,
+        severity: None,
+        required: false,
+        deprecated: false,
+        documentation: Vec::new(),
+        allowed_scopes: Vec::new(),
+        push_scope: None,
+        replace_scope: Vec::new(),
+        min_occurs: None,
+        strict_min: true,
+        max_occurs: None,
+        source_file: "fixture.semantic".to_owned(),
+        line: 1,
+    });
+    let mut host = eu4_host(RuleSet::from_model(model));
+    let id = DocumentId::new("file:///tmp/common/events/enum-tie.txt");
+    host.open_document(id.clone(), 1, "trigger = { mode = rat }\n".to_owned(), None)
+        .expect("open enum tie fixture");
+
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    let invalid = diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue)
+        .expect("invalid enum value diagnostic");
+    assert!(
+        invalid.fixes.is_empty(),
+        "ambiguous values must not be auto-fixed"
     );
 }
 

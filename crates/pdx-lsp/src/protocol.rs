@@ -118,6 +118,7 @@ pub(crate) fn is_snapshot_request(method: &str) -> bool {
             | "textDocument/references"
             | "textDocument/prepareRename"
             | "textDocument/rename"
+            | "textDocument/codeAction"
             | "textDocument/documentSymbol"
             | "textDocument/inlayHint"
             | "textDocument/semanticTokens/full"
@@ -244,6 +245,17 @@ pub(crate) fn diagnostic_values_for_text_with_ignored(
                 4 => Some(DiagnosticSeverity::HINT),
                 _ => None,
             };
+            let fix_data = diagnostic
+                .fixes
+                .iter()
+                .map(|fix| {
+                    json!({
+                        "title": fix.title,
+                        "range": range_to_lsp(line_index, text, fix.range),
+                        "newText": fix.new_text,
+                    })
+                })
+                .collect::<Vec<_>>();
             let mut value = LspDiagnostic::new(
                 range_to_lsp(line_index, text, diagnostic.range),
                 severity,
@@ -255,9 +267,13 @@ pub(crate) fn diagnostic_values_for_text_with_ignored(
             );
             // Certainty is current client-facing metadata; internal rule provenance never
             // crosses the LSP boundary.
-            value.data = Some(json!({
+            let mut metadata = json!({
                 "certainty": diagnostic.certainty.as_str(),
-            }));
+            });
+            if !fix_data.is_empty() {
+                metadata["fixes"] = Value::Array(fix_data);
+            }
+            value.data = Some(metadata);
             value
         })
         .collect::<Vec<_>>();
@@ -639,14 +655,14 @@ mod tests {
     };
     use lsp_types::request::Request;
     use lsp_types::request::{
-        Completion, DocumentSymbolRequest, Formatting, GotoDefinition, HoverRequest,
-        InlayHintRequest, PrepareRenameRequest, References, Rename, ResolveCompletionItem,
-        SemanticTokensFullDeltaRequest, SemanticTokensFullRequest, SemanticTokensRangeRequest,
-        WorkspaceSymbolRequest,
+        CodeActionRequest, Completion, DocumentSymbolRequest, Formatting, GotoDefinition,
+        HoverRequest, InlayHintRequest, PrepareRenameRequest, References, Rename,
+        ResolveCompletionItem, SemanticTokensFullDeltaRequest, SemanticTokensFullRequest,
+        SemanticTokensRangeRequest, WorkspaceSymbolRequest,
     };
     use lsp_types::{CompletionItemKind, NumberOrString};
     use pdx_analysis::{
-        CompletionKind, Diagnostic, DiagnosticCode, DiagnosticProvenance, Severity,
+        CompletionKind, Diagnostic, DiagnosticCode, DiagnosticProvenance, QuickFix, Severity,
     };
     use pdx_text::TextRange;
 
@@ -669,6 +685,7 @@ mod tests {
             References::METHOD,
             PrepareRenameRequest::METHOD,
             Rename::METHOD,
+            CodeActionRequest::METHOD,
             DocumentSymbolRequest::METHOD,
             Formatting::METHOD,
             WorkspaceSymbolRequest::METHOD,
@@ -730,6 +747,11 @@ mod tests {
             TextRange::new(0, 1).expect("range"),
             "unknown key".to_owned(),
         )
+        .with_fix(QuickFix::replace(
+            "Rename key".to_owned(),
+            TextRange::new(0, 1).expect("fix range"),
+            "known_key".to_owned(),
+        ))
         .with_provenance(DiagnosticProvenance {
             rule_id: Some("internal:rule".to_owned()),
             context: Some("internal-context".to_owned()),
@@ -740,6 +762,8 @@ mod tests {
         let value = serde_json::to_value(&values[0]).expect("diagnostic JSON");
 
         assert_eq!(value["data"]["certainty"], "certain");
+        assert_eq!(value["data"]["fixes"][0]["title"], "Rename key");
+        assert_eq!(value["data"]["fixes"][0]["newText"], "known_key");
         assert!(value["data"].get("legacyCode").is_none());
         assert!(value["data"].get("provenance").is_none());
         let serialized = value.to_string();

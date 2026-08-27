@@ -2,10 +2,10 @@ use std::fs;
 use std::io::Cursor;
 
 use lsp_types::{
-    CompletionItem, CompletionResponse, Diagnostic, DocumentSymbol, Hover, Location,
-    PrepareRenameResponse, SemanticToken as LspSemanticToken, SemanticTokens as LspSemanticTokens,
-    SemanticTokensFullDeltaResult, SemanticTokensRangeResult, SymbolInformation, SymbolKind,
-    WorkspaceEdit,
+    CodeActionOrCommand, CodeActionResponse, CompletionItem, CompletionResponse, Diagnostic,
+    DocumentSymbol, Hover, Location, PrepareRenameResponse, SemanticToken as LspSemanticToken,
+    SemanticTokens as LspSemanticTokens, SemanticTokensFullDeltaResult, SemanticTokensRangeResult,
+    SymbolInformation, SymbolKind, WorkspaceEdit,
 };
 use pdx_text::{LineIndex, Position};
 use serde_json::{Value, json};
@@ -713,6 +713,53 @@ fn inlay_hints_expose_rule_proven_scope_transitions() {
     assert!(hints.iter().all(|hint| {
         !matches!(&hint.label, lsp_types::InlayHintLabel::String(label) if label == "→ country")
     }));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+#[expect(clippy::mutable_key_type)]
+fn code_actions_expose_rule_backed_enum_suggestions() {
+    let (root, root_uri) = temp_workspace_dir();
+    let uri = format!("{root_uri}/map/terrain.txt");
+    let text = "terrain = { type = foresst }\n";
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri.clone(),"languageId":"eu4","version":1,"text":text}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/codeAction","params":{"textDocument":{"uri":uri.clone()},"range":{"start":{"line":0,"character":0},"end":{"line":1,"character":0}},"context":{"diagnostics":[],"only":["quickfix"]}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let initialize = responses
+        .iter()
+        .find(|value| value["id"] == 1)
+        .expect("initialize response");
+    assert_eq!(
+        initialize["result"]["capabilities"]["codeActionProvider"],
+        json!(true)
+    );
+
+    let actions: CodeActionResponse = typed_result(&responses, 2);
+    assert_eq!(actions.len(), 1);
+    let CodeActionOrCommand::CodeAction(action) = &actions[0] else {
+        panic!("expected a code action");
+    };
+    assert_eq!(action.title, "Did you mean 'forest'?");
+    assert_eq!(action.kind, Some(lsp_types::CodeActionKind::QUICKFIX));
+    let edit = action.edit.as_ref().expect("quick fix edit");
+    let changes = edit.changes.as_ref().expect("text edit changes");
+    let edits = changes.get(&uri.parse().expect("URI")).expect("URI edits");
+    assert_eq!(edits.len(), 1);
+    assert_eq!(edits[0].new_text, "\"forest\"");
+    assert_eq!(edits[0].range.start.line, 0);
+    assert_eq!(edits[0].range.start.character, 19);
+    assert_eq!(edits[0].range.end.character, 26);
     fs::remove_dir_all(root).expect("cleanup");
 }
 
