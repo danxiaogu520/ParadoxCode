@@ -43,7 +43,7 @@ struct WorkspaceInitializationOptions {
     /// Optional diagnostic categories hidden from published LSP diagnostics.
     #[serde(alias = "ignoreDiagnosticCodes")]
     ignored_error_codes: Option<Vec<String>>,
-    /// Whether workspace refreshes publish diagnostics for closed Current Mod files.
+    /// Whether workspace scans publish diagnostics for closed Current Mod files.
     workspace_wide_diagnostics: Option<bool>,
 }
 
@@ -87,7 +87,7 @@ struct ProjectConfiguration {
     /// Diagnostic categories hidden from published LSP diagnostics.
     #[serde(alias = "ignoredErrorCodes", alias = "ignoreDiagnosticCodes")]
     ignored_error_codes: Option<Vec<String>>,
-    /// Whether workspace refreshes publish diagnostics for closed Current Mod files.
+    /// Whether workspace scans publish diagnostics for closed Current Mod files.
     #[serde(alias = "workspaceWideDiagnostics")]
     workspace_wide_diagnostics: Option<bool>,
     /// Extension-only `[server]` table (e.g. the language-server binary path

@@ -104,6 +104,7 @@ impl LspServer {
             }
             "textDocument/didOpen" => {
                 let uri = self.handle_did_open(params)?;
+                self.clear_workspace_diagnostic_uri(&uri);
                 self.schedule_parse(&uri);
                 Ok(Value::Null)
             }
@@ -244,6 +245,7 @@ impl LspServer {
         self.pending_parses.remove(&id);
         self.pending_diagnostics.remove(&id);
         self.diagnostics.remove(&id);
+        self.request_workspace_diagnostics();
         Ok(json!({
             "jsonrpc": JSON_RPC_VERSION,
             "method": "textDocument/publishDiagnostics",
@@ -329,6 +331,7 @@ impl LspServer {
                 )
             })?;
             self.host.set_scan_filters(filters);
+            self.request_full_disk_rescan();
         }
         if let Some(codes) = ignored_diagnostic_codes {
             self.ignored_diagnostic_codes = Arc::new(codes.into_iter().collect());
@@ -344,15 +347,19 @@ impl LspServer {
             for (id, version) in open {
                 self.schedule_diagnostics_for_document(id, version, Duration::ZERO);
             }
+            self.request_workspace_diagnostics();
         }
         if let Some(enabled) = workspace_wide_diagnostics
             && enabled != self.workspace_wide_diagnostics
         {
             self.workspace_wide_diagnostics = enabled;
             if !enabled {
+                self.workspace_diagnostics_pending = false;
                 self.workspace_diagnostic_clear_queue
                     .extend(self.workspace_diagnostic_uris.iter().cloned());
                 self.workspace_diagnostic_uris.clear();
+            } else {
+                self.request_workspace_diagnostics();
             }
         }
         if interval_changed {

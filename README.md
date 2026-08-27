@@ -272,7 +272,8 @@ ignored_error_codes = ["UnknownScope", "UnknownBareValue"]
 Codes use the stable LSP names shown in diagnostics. Unknown codes are rejected so a misspelled
 setting cannot silently suppress nothing.
 
-Workspace refreshes publish diagnostics for closed Current Mod files by default, bounded to 2,000
+Initialization completion, watched-file refreshes, quiet background re-scans, and explicit
+workspace refreshes publish diagnostics for closed Current Mod files by default, bounded to 2,000
 files per pass. Set `workspace_wide_diagnostics = false` in `.pdx/project.toml`, or send
 `workspaceWideDiagnostics: false` in initialization/configuration settings, when the Problems view
 should remain limited to open documents. `validateWorkspace` still computes its complete summary
