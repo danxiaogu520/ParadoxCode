@@ -48,7 +48,7 @@ rewritten without evidence that their boundaries are the bottleneck.
 
 ## Implemented stages
 
-The first twenty-five stages are now on `main`, each independently committed and pushed:
+The first twenty-six stages are now on `main`, each independently committed and pushed:
 
 1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
    reporting stays deterministic.
@@ -131,19 +131,27 @@ The first twenty-five stages are now on `main`, each independently committed and
     CWTools-compatible, registry-aware localisation command diagnostics. Unknown tails remain
     lenient until a project actually exposes scripted-localisation names; dynamic and `Get*`
     forms remain accepted, and every traversal is cancellable and bounded.
+26. The scripted-localisation query follows a path-partitioned index: it filters candidate source
+    files before reading their shards, avoiding a full `defined_text` walk in large Vanilla
+    snapshots. The merged command registry also keeps a case-insensitive hash set for O(1)
+    unknown-tail checks while retaining its deterministic sorted completion vector. A dedicated
+    2,016-file benchmark records the cold registry query, warm snapshot path, diagnostics, and
+    completion latency so this optimization remains measurable rather than anecdotal.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an
 interned string table, persists per-file ASTs, prunes user-configured ignore globs before walking,
 and uses compact prefix-searchable indexes for large localisation/type sets. ParadoxCode adopted
 parallel/ordered loading, source-independent persistent state, metadata fast paths, compact indexes,
-and bounded ignore filtering where they fit its existing JSON-authority, stable-ID, and
-immutable-snapshot contracts; global StringTable IDs remain a separately gated migration because
-the current lossless CST uses source ranges as its cross-layer identity. `.cwt` remains reference
-material only.
+path-partitioned runtime registries, and bounded ignore filtering where they fit its existing
+JSON-authority, stable-ID, and immutable-snapshot contracts. A global StringTable ID layer is not
+carried over: the lossless CST already shares source storage and uses source ranges as its
+cross-layer identity, while the measurable hot paths are served by compact snapshot indexes.
+`.cwt` remains reference material only.
 
 The release-shaped synthetic workspace benchmark remains within its prior envelope after the
 changes (2,000 EU4 event files: roughly 26 ms initial scan and 25 ms targeted disk refresh in an
-optimized build). The rules, completion, and LSP scheduling changes are covered by their focused
-tests plus the full core quality gates; no benchmark result is used as a semantic correctness
-substitute.
+optimized build). The scripted-localisation benchmark reports approximately 0.58 ms for its cold
+registry query and 0.034 ms for the warm snapshot path on the reference development machine.
+The rules, completion, and LSP scheduling changes are covered by their focused tests plus the
+full core quality gates; no benchmark result is used as a semantic correctness substitute.

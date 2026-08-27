@@ -34,3 +34,7 @@ harness = false
 [[bench]]
 name = "mission_preview"
 harness = false
+
+[[bench]]
+name = "scripted_localisation"
+harness = false
