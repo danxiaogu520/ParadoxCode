@@ -6,6 +6,7 @@
 
 use pdx_text::TextRange;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 mod cst;
 pub mod format;
@@ -109,7 +110,7 @@ pub struct ParsedFileCache {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ParsedFile {
     format: FileFormat,
-    source: String,
+    source: Arc<str>,
     root: CstNode,
     tokens: Vec<SyntaxToken>,
     errors: Vec<SyntaxError>,
@@ -130,10 +131,10 @@ impl PartialEq for ParsedFile {
 impl Eq for ParsedFile {}
 
 impl ParsedFile {
-    fn from_parts(format: FileFormat, source: &str, parts: ParseParts, revision: u64) -> Self {
+    fn from_parts(format: FileFormat, source: Arc<str>, parts: ParseParts, revision: u64) -> Self {
         Self {
             format,
-            source: source.to_owned(),
+            source,
             root: parts.root,
             tokens: parts.tokens,
             errors: parts.errors,
@@ -151,6 +152,12 @@ impl ParsedFile {
     #[must_use]
     pub fn source(&self) -> &str {
         &self.source
+    }
+
+    /// Clones the shared source handle without copying the source text.
+    #[must_use]
+    pub fn source_handle(&self) -> Arc<str> {
+        Arc::clone(&self.source)
     }
 
     /// Returns the typed CST root.
@@ -202,7 +209,7 @@ impl ParsedFile {
     pub fn from_cache_data(data: ParsedFileCache, source: &str) -> Self {
         Self {
             format: data.format,
-            source: source.to_owned(),
+            source: Arc::from(source),
             root: data.root,
             tokens: data.tokens,
             errors: data.errors,
@@ -218,7 +225,7 @@ impl ParsedFile {
     #[must_use]
     pub fn is_valid_for(&self, format: FileFormat, source: &str) -> bool {
         self.format == format
-            && self.source == source
+            && self.source.as_ref() == source
             && matches!(
                 (format, self.root.kind()),
                 (FileFormat::Script, CstKind::Document)
@@ -242,7 +249,7 @@ impl ParsedFile {
     /// The Phase 3 correctness boundary is that its root, token sequence, and diagnostics are
     /// identical to a full parse of the resulting source.
     pub fn apply_edit(&self, edit: &SyntaxEdit) -> Result<Self, EditError> {
-        let mut source = self.source.clone();
+        let mut source = self.source.to_string();
         if let Some(range) = edit.range {
             let start = usize::try_from(range.start()).ok();
             let end = usize::try_from(range.end()).ok();
@@ -273,9 +280,10 @@ pub fn parse(format: FileFormat, source: &str) -> ParsedFile {
 }
 
 fn parse_with_revision(format: FileFormat, source: &str, revision: u64) -> ParsedFile {
+    let source: Arc<str> = Arc::from(source);
     let parts = match format {
-        FileFormat::Script => script::parse(source),
-        FileFormat::Localisation => localisation::parse(source),
+        FileFormat::Script => script::parse(source.as_ref()),
+        FileFormat::Localisation => localisation::parse(source.as_ref()),
     };
     ParsedFile::from_parts(format, source, parts, revision)
 }

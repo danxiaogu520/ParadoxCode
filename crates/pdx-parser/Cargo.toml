@@ -13,7 +13,7 @@ publish = false
 
 [dependencies]
 pdx-text = { path = "../pdx-text" }
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive", "rc"] }
 unicode-width = "0.2"
 
 [lints]
