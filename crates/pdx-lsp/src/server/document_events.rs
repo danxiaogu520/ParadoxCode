@@ -91,6 +91,11 @@ impl LspServer {
             ));
         }
 
+        // Every client interaction resets the quiet-pass idle clock. This is intentionally broad
+        // (including navigation and configuration notifications): a request arriving while the
+        // user is working should never race a background disk walk.
+        self.mark_activity();
+
         match method {
             "initialized" => Ok(self.watcher_registration.take().unwrap_or(Value::Null)),
             "shutdown" => {
@@ -121,6 +126,10 @@ impl LspServer {
             }
             "workspace/didChangeWatchedFiles" => {
                 self.handle_did_change_watched_files(params)?;
+                Ok(Value::Null)
+            }
+            "workspace/didChangeConfiguration" => {
+                self.handle_did_change_configuration(params)?;
                 Ok(Value::Null)
             }
             method if is_snapshot_request(method) => SnapshotRequestContext::new(
@@ -171,6 +180,9 @@ impl LspServer {
         self.host = prepared.host;
         self.textures = prepared.textures;
         self.watcher_registration = prepared.watcher_registration;
+        self.background_reindex_interval_minutes = prepared.background_reindex_interval_minutes;
+        self.background_reindex_idle_seconds = prepared.background_reindex_idle_seconds;
+        self.last_activity = Instant::now();
         self.state = ServerState::Initialized;
         Ok(prepared.result)
     }
@@ -248,6 +260,37 @@ impl LspServer {
                 ));
             };
             self.pending_disk_changes.insert(path, kind);
+        }
+        Ok(())
+    }
+
+    fn handle_did_change_configuration(&mut self, params: Option<&Value>) -> Result<(), RpcError> {
+        #[derive(Default, serde::Deserialize)]
+        #[serde(default, deny_unknown_fields)]
+        struct DidChangeConfigurationParams {
+            settings: Value,
+        }
+
+        let params =
+            typed_params::<DidChangeConfigurationParams>(params, "didChangeConfiguration")?;
+        let Some(settings) = params.settings.as_object() else {
+            return Ok(());
+        };
+        let interval = settings
+            .get("backgroundReindexIntervalMinutes")
+            .and_then(Value::as_u64);
+        let idle = settings
+            .get("backgroundReindexIdleSeconds")
+            .and_then(Value::as_u64);
+        let interval_changed = interval.is_some();
+        if let Some(interval) = interval.filter(|value| *value <= 7 * 24 * 60) {
+            self.background_reindex_interval_minutes = interval;
+        }
+        if let Some(idle) = idle.filter(|value| *value <= 24 * 60 * 60) {
+            self.background_reindex_idle_seconds = idle;
+        }
+        if interval_changed {
+            self.arm_background_reindex();
         }
         Ok(())
     }

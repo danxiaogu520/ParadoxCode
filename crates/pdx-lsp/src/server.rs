@@ -228,6 +228,10 @@ pub(crate) struct PreparedInitialize {
     pub(crate) watcher_registration: Option<Value>,
     pub(crate) client_work_done_progress: bool,
     pub(crate) client_snippet_support: bool,
+    /// Optional quiet workspace re-scan cadence selected from initialization/project config.
+    pub(crate) background_reindex_interval_minutes: u64,
+    /// User-idle window required before a quiet workspace re-scan.
+    pub(crate) background_reindex_idle_seconds: u64,
 }
 
 #[derive(Debug)]
@@ -279,10 +283,22 @@ pub(crate) struct InFlightDiskChanges {
 }
 
 #[derive(Debug)]
+pub(crate) struct InFlightBackgroundReindex {
+    pub(crate) base_revision: u64,
+    pub(crate) cancellation: WorkspaceScanToken,
+}
+
+#[derive(Debug)]
 pub(crate) struct DiskChangesResult {
     base_revision: u64,
     changes: Vec<DiskFileChange>,
     result: Result<AnalysisHost, WorkspaceError>,
+}
+
+#[derive(Debug)]
+pub(crate) struct BackgroundReindexResult {
+    pub(crate) base_revision: u64,
+    pub(crate) result: Result<AnalysisHost, WorkspaceError>,
 }
 
 enum TransportEvent {
@@ -293,6 +309,7 @@ enum TransportEvent {
     Request(SnapshotRequestResult),
     VanillaSetup(IndexSetupResult),
     DependencySetup(DependencySetupResult),
+    BackgroundReindex(BackgroundReindexResult),
     /// A server-side `window/logMessage` notification produced by a worker.
     Log(Value),
     Progress(Progress),
@@ -320,6 +337,15 @@ pub struct LspServer {
     /// Whether the client advertises snippet support for completion items. When absent, snippet
     /// placeholders are stripped so the inserted text stays valid plain text.
     client_snippet_support: bool,
+    /// Opt-in quiet source-root re-scan cadence. Zero disables the loop.
+    pub(crate) background_reindex_interval_minutes: u64,
+    /// Idle window required before a quiet source-root re-scan may start.
+    pub(crate) background_reindex_idle_seconds: u64,
+    /// Monotonic timestamp of the most recent editor activity handled by the event loop.
+    pub(crate) last_activity: Instant,
+    /// Next eligible background re-scan deadline. It is armed once the initial workspace/index
+    /// setup is ready and reset after each pass or live cadence change.
+    pub(crate) background_reindex_due: Option<Instant>,
     /// Process-start messages collected before an LSP client can receive
     /// `window/logMessage`. They are replayed at the beginning of the first
     /// initialize worker so the editor's log has no unexplained pre-initialize gap.
@@ -356,6 +382,10 @@ impl LspServer {
             textures: None,
             client_work_done_progress: false,
             client_snippet_support: false,
+            background_reindex_interval_minutes: 0,
+            background_reindex_idle_seconds: 15,
+            last_activity: Instant::now(),
+            background_reindex_due: None,
             startup_log: Vec::new(),
             clean_exit: false,
         })
@@ -481,5 +511,30 @@ impl LspServer {
             Self::try_new_with_rules(options, rules, profile)?.with_auto_vanilla(auto_vanilla);
         server.startup_log = startup_log;
         server.run_transport(stdin, stdout.lock())
+    }
+}
+
+impl LspServer {
+    /// Records editor activity used by the idle gate for quiet background re-scans.
+    pub(crate) fn mark_activity(&mut self) {
+        self.last_activity = Instant::now();
+    }
+
+    /// Arms the next quiet re-scan deadline after initial setup or a completed pass.
+    pub(crate) fn arm_background_reindex(&mut self) {
+        self.background_reindex_due = if self.background_reindex_interval_minutes == 0 {
+            None
+        } else {
+            let seconds = self.background_reindex_interval_minutes.saturating_mul(60);
+            Instant::now().checked_add(Duration::from_secs(seconds))
+        };
+    }
+
+    /// Returns the configured cadence as a duration. Configuration validation bounds the value,
+    /// but saturating arithmetic keeps the worker safe if a caller constructs a server directly.
+    pub(crate) fn background_reindex_interval(&self) -> Option<Duration> {
+        (self.background_reindex_interval_minutes != 0).then(|| {
+            Duration::from_secs(self.background_reindex_interval_minutes.saturating_mul(60))
+        })
     }
 }

@@ -365,6 +365,8 @@ pub(crate) fn prepare_initialize_candidate(
         watcher_registration,
         client_work_done_progress,
         client_snippet_support,
+        background_reindex_interval_minutes: resolved.background_reindex_interval_minutes,
+        background_reindex_idle_seconds: resolved.background_reindex_idle_seconds,
     })
 }
 
