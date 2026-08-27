@@ -269,6 +269,9 @@ impl LspServer {
                                         prepared.background_reindex_interval_minutes;
                                     self.background_reindex_idle_seconds =
                                         prepared.background_reindex_idle_seconds;
+                                    self.ignored_diagnostic_codes = Arc::new(
+                                        prepared.ignored_diagnostic_codes.iter().cloned().collect(),
+                                    );
                                     self.last_activity = Instant::now();
                                     (
                                         json!({

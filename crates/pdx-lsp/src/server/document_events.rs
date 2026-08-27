@@ -141,6 +141,7 @@ impl LspServer {
                 CancellationToken::new(),
                 self.client_snippet_support,
                 self.textures.clone(),
+                Arc::clone(&self.ignored_diagnostic_codes),
             )
             .dispatch(method, params),
             _ => Err(RpcError::new(METHOD_NOT_FOUND, "method is not implemented")),
@@ -186,6 +187,8 @@ impl LspServer {
         self.watcher_registration = prepared.watcher_registration;
         self.background_reindex_interval_minutes = prepared.background_reindex_interval_minutes;
         self.background_reindex_idle_seconds = prepared.background_reindex_idle_seconds;
+        self.ignored_diagnostic_codes =
+            Arc::new(prepared.ignored_diagnostic_codes.iter().cloned().collect());
         self.last_activity = Instant::now();
         self.state = ServerState::Initialized;
         Ok(prepared.result)
@@ -303,6 +306,11 @@ impl LspServer {
             .or_else(|| settings.get("ignoreDirs"))
             .map(parse_ignore_patterns)
             .transpose()?;
+        let ignored_diagnostic_codes = settings
+            .get("ignoredErrorCodes")
+            .or_else(|| settings.get("ignoreDiagnosticCodes"))
+            .map(parse_ignored_diagnostic_codes)
+            .transpose()?;
         if file_patterns.is_some() || directory_patterns.is_some() {
             let current = self.host.scan_filters();
             let filters = WorkspaceScanFilters::new(
@@ -316,6 +324,21 @@ impl LspServer {
                 )
             })?;
             self.host.set_scan_filters(filters);
+        }
+        if let Some(codes) = ignored_diagnostic_codes {
+            self.ignored_diagnostic_codes = Arc::new(codes.into_iter().collect());
+            let open = self
+                .host
+                .snapshot()
+                .documents()
+                .iter()
+                .filter_map(|(id, document)| {
+                    document.version().map(|version| (id.clone(), version))
+                })
+                .collect::<Vec<_>>();
+            for (id, version) in open {
+                self.schedule_diagnostics_for_document(id, version, Duration::ZERO);
+            }
         }
         if interval_changed {
             self.arm_background_reindex();
@@ -342,4 +365,25 @@ fn parse_ignore_patterns(value: &Value) -> Result<Vec<String>, RpcError> {
             })
         })
         .collect()
+}
+
+fn parse_ignored_diagnostic_codes(value: &Value) -> Result<Vec<String>, RpcError> {
+    let Some(values) = value.as_array() else {
+        return Err(RpcError::new(
+            INVALID_PARAMS,
+            "ignoredErrorCodes must be an array of strings",
+        ));
+    };
+    let values = values
+        .iter()
+        .map(|value| {
+            value.as_str().map(str::to_owned).ok_or_else(|| {
+                RpcError::new(
+                    INVALID_PARAMS,
+                    "ignoredErrorCodes must be an array of strings",
+                )
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    crate::workspace::normalize_ignored_diagnostic_codes(values)
 }

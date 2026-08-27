@@ -372,6 +372,7 @@ pub(crate) fn prepare_initialize_candidate(
         client_snippet_support,
         background_reindex_interval_minutes: resolved.background_reindex_interval_minutes,
         background_reindex_idle_seconds: resolved.background_reindex_idle_seconds,
+        ignored_diagnostic_codes: resolved.ignored_diagnostic_codes,
     })
 }
 

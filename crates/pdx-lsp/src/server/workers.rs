@@ -220,6 +220,7 @@ impl LspServer {
             cancellation.clone(),
             self.client_snippet_support,
             self.textures.clone(),
+            Arc::clone(&self.ignored_diagnostic_codes),
         );
         let method = method.to_owned();
         let params = object.get("params").cloned();
@@ -648,6 +649,7 @@ impl LspServer {
             let snapshot = self.host.snapshot();
             let sender = event_sender.clone();
             let cancellation = CancellationToken::new();
+            let ignored_diagnostic_codes = Arc::clone(&self.ignored_diagnostic_codes);
             in_flight.insert(
                 id.clone(),
                 InFlightDiagnostics {
@@ -660,7 +662,12 @@ impl LspServer {
                     None
                 } else {
                     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        diagnostic_values(&snapshot, &id, &cancellation)
+                        diagnostic_values_with_ignored(
+                            &snapshot,
+                            &id,
+                            &cancellation,
+                            &ignored_diagnostic_codes,
+                        )
                     }))
                     .ok()
                     .flatten()

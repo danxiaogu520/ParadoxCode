@@ -27,9 +27,9 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::protocol::{
-    RpcError, cancelled_error, completion_kind, diagnostic_values_for_text, location_range_to_lsp,
-    location_to_lsp, range_to_lsp, range_to_lsp_for_location, rename_failure, symbol_kind,
-    typed_params, typed_value,
+    RpcError, cancelled_error, completion_kind, diagnostic_values_for_text_with_ignored,
+    location_range_to_lsp, location_to_lsp, range_to_lsp, range_to_lsp_for_location,
+    rename_failure, symbol_kind, typed_params, typed_value,
 };
 use crate::uri::path_to_uri;
 use crate::{
@@ -122,6 +122,8 @@ pub(crate) struct SnapshotRequestContext {
     /// Game sprite textures for the mission preview, when a game installation
     /// is available. `None` renders a texture-less preview.
     textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
+    /// Diagnostic categories hidden by workspace configuration.
+    ignored_diagnostic_codes: Arc<HashSet<String>>,
 }
 
 impl SnapshotRequestContext {
@@ -130,12 +132,14 @@ impl SnapshotRequestContext {
         cancellation: CancellationToken,
         client_snippets: bool,
         textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
+        ignored_diagnostic_codes: Arc<HashSet<String>>,
     ) -> Self {
         Self {
             snapshot,
             cancellation,
             client_snippets,
             textures,
+            ignored_diagnostic_codes,
         }
     }
 
@@ -208,7 +212,12 @@ impl SnapshotRequestContext {
             let line_index = LineIndex::new(&file.text);
             results.push(serde_json::json!({
                 "path": file.path,
-                "diagnostics": diagnostic_values_for_text(diagnostics, &line_index, &file.text),
+                "diagnostics": diagnostic_values_for_text_with_ignored(
+                    diagnostics,
+                    &line_index,
+                    &file.text,
+                    &self.ignored_diagnostic_codes,
+                ),
             }));
         }
         Ok(Value::Array(results))
@@ -546,10 +555,11 @@ impl SnapshotRequestContext {
                 items.push(serde_json::json!({
                     "uri": path_to_uri(&file.physical_path),
                     "logicalPath": file.logical_path.as_str(),
-                    "diagnostics": diagnostic_values_for_text(
+                    "diagnostics": diagnostic_values_for_text_with_ignored(
                         diagnostics,
                         &line_index,
                         state.source(),
+                        &self.ignored_diagnostic_codes,
                     ),
                 }));
             }

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::io;
 use std::path::PathBuf;
@@ -192,25 +192,45 @@ pub(crate) fn cancel_initialize_from_notification(
     }
 }
 
-pub(crate) fn diagnostic_values(
+pub(crate) fn diagnostic_values_with_ignored(
     snapshot: &AnalysisSnapshot,
     id: &DocumentId,
     cancellation: &CancellationToken,
+    ignored: &HashSet<String>,
 ) -> Option<Value> {
     let values = snapshot.document(id).map_or_else(Vec::new, |document| {
         let diagnostics = diagnostics_with_cancellation(snapshot, id, cancellation)
             .ok()
             .unwrap_or_default();
-        diagnostic_values_for_text(diagnostics, document.line_index(), document.text())
+        diagnostic_values_for_text_with_ignored(
+            diagnostics,
+            document.line_index(),
+            document.text(),
+            ignored,
+        )
     });
     serde_json::to_value(values).ok()
 }
 
+#[cfg(test)]
 pub(crate) fn diagnostic_values_for_text(
     diagnostics: Vec<Diagnostic>,
     line_index: &LineIndex,
     text: &str,
 ) -> Vec<LspDiagnostic> {
+    diagnostic_values_for_text_with_ignored(diagnostics, line_index, text, &HashSet::new())
+}
+
+pub(crate) fn diagnostic_values_for_text_with_ignored(
+    diagnostics: Vec<Diagnostic>,
+    line_index: &LineIndex,
+    text: &str,
+    ignored: &HashSet<String>,
+) -> Vec<LspDiagnostic> {
+    let diagnostics = diagnostics
+        .into_iter()
+        .filter(|diagnostic| !ignored.contains(diagnostic.code.as_str()))
+        .collect::<Vec<_>>();
     let (retained, omitted) =
         diagnostic_result_counts(diagnostics.len(), MAX_PUBLISHED_DIAGNOSTICS);
     let mut values = diagnostics
@@ -491,14 +511,19 @@ impl RpcError {
 
 #[cfg(test)]
 mod tests {
-    use super::{LineIndex, completion_kind, diagnostic_values_for_text, is_snapshot_request};
-    use lsp_types::CompletionItemKind;
+    use std::collections::HashSet;
+
+    use super::{
+        LineIndex, completion_kind, diagnostic_values_for_text,
+        diagnostic_values_for_text_with_ignored, is_snapshot_request,
+    };
     use lsp_types::request::Request;
     use lsp_types::request::{
         Completion, DocumentSymbolRequest, Formatting, GotoDefinition, HoverRequest,
         PrepareRenameRequest, References, Rename, ResolveCompletionItem, SemanticTokensFullRequest,
         WorkspaceSymbolRequest,
     };
+    use lsp_types::{CompletionItemKind, NumberOrString};
     use pdx_analysis::{
         CompletionKind, Diagnostic, DiagnosticCode, DiagnosticProvenance, Severity,
     };
@@ -596,5 +621,35 @@ mod tests {
         let serialized = value.to_string();
         assert!(!serialized.contains("ruleId"));
         assert!(!serialized.contains("internal.json"));
+    }
+
+    #[test]
+    fn ignored_diagnostic_codes_are_filtered_before_publication_limits() {
+        let ignored = HashSet::from(["UnknownKey".to_owned()]);
+        let diagnostics = vec![
+            Diagnostic::new(
+                DiagnosticCode::UnknownKey,
+                Severity::Error,
+                TextRange::new(0, 1).expect("range"),
+                "hidden".to_owned(),
+            ),
+            Diagnostic::new(
+                DiagnosticCode::UnknownSymbol,
+                Severity::Error,
+                TextRange::new(0, 1).expect("range"),
+                "visible".to_owned(),
+            ),
+        ];
+        let values = diagnostic_values_for_text_with_ignored(
+            diagnostics,
+            &LineIndex::new("x"),
+            "x",
+            &ignored,
+        );
+        assert_eq!(values.len(), 1);
+        assert_eq!(
+            values[0].code,
+            Some(NumberOrString::String("UnknownSymbol".to_owned()))
+        );
     }
 }

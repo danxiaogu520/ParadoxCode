@@ -123,6 +123,33 @@ pub enum DiagnosticCode {
 }
 
 impl DiagnosticCode {
+    /// Every diagnostic category emitted by the analysis layer, in stable wire order.
+    pub const ALL: &'static [Self] = &[
+        Self::Syntax,
+        Self::UnknownKey,
+        Self::UnknownSymbol,
+        Self::AmbiguousSymbol,
+        Self::UnknownScope,
+        Self::InvalidValue,
+        Self::UnknownBareValue,
+        Self::Cardinality,
+        Self::RuleWrongScope,
+        Self::InvalidTarget,
+        Self::TargetWrongScope,
+        Self::InvalidScopeCommand,
+        Self::MacroExpansionCycle,
+        Self::AnalysisIncomplete,
+    ];
+
+    /// Parses a wire-facing diagnostic category.
+    #[must_use]
+    pub fn parse_name(value: &str) -> Option<Self> {
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|code| code.as_str().eq_ignore_ascii_case(value))
+    }
+
     /// Returns the stable wire-facing code.
     #[must_use]
     pub const fn as_str(self) -> &'static str {

@@ -573,6 +573,11 @@ fn initialization_options_schema() -> serde_json::Value {
             "gameDirectory": {
                 "type": "string",
                 "description": "EU4 installation root (the folder containing `eu4.exe`). Backs the VS Code mission-tree preview with real game textures; the Zed extension does not render a preview. When empty, the server attempts one-time automatic discovery."
+            },
+            "ignoredErrorCodes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Stable diagnostic codes to hide from pdx-ls responses, for example `UnknownScope`."
             }
         }
     })
@@ -768,6 +773,7 @@ binary = "C:\\tools\\pdx-ls.exe""#;
             "modDirectory",
             "vanillaIndexCache",
             "dependencies",
+            "ignoredErrorCodes",
         ] {
             assert!(properties.contains_key(key), "missing {key}");
         }

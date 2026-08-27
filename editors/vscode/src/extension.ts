@@ -32,6 +32,7 @@ const SERVER_SETTING_KEYS = [
     'vanillaIndexCache',
     'dependencies',
     'gameDirectory',
+    'diagnosticIgnoreCodes',
     'serverInstallDirectory',
 ] as const;
 
@@ -134,6 +135,10 @@ function readInitializationOptions(): Record<string, unknown> {
         if (value !== undefined && value !== '') {
             options[key] = value;
         }
+    }
+    const ignoredCodes = config.get<unknown>('diagnosticIgnoreCodes');
+    if (Array.isArray(ignoredCodes) && ignoredCodes.length > 0) {
+        options.ignoredErrorCodes = ignoredCodes;
     }
     return options;
 }

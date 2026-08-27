@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs;
 use std::io::Cursor;
 
 use pdx_engine::TextChange;
@@ -79,6 +80,50 @@ fn rapid_changes_debounce_and_publish_only_the_latest_diagnostics() {
     assert_eq!(document.text(), "scope = country\n");
     assert!(document.parsed().is_some());
     assert!(document.hir().is_some());
+}
+
+#[test]
+fn initialization_can_filter_selected_diagnostic_codes() {
+    let (root, root_uri) = temp_workspace_dir();
+    let uri = format!("{root_uri}/events/filtered.txt");
+    let input = frames([
+        json!({
+            "jsonrpc":"2.0",
+            "id":1,
+            "method":"initialize",
+            "params":{
+                "workspaceFolders":[{"uri":root_uri,"name":"test"}],
+                "capabilities":{},
+                "initializationOptions":{"ignoredErrorCodes":["UnknownScope"]}
+            }
+        }),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
+            "textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":"scope = nowhere\n"}
+        }}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("server");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let published = responses
+        .iter()
+        .find(|value| {
+            value["method"] == "textDocument/publishDiagnostics" && value["params"]["uri"] == uri
+        })
+        .expect("diagnostic notification");
+    assert!(
+        published["params"]["diagnostics"]
+            .as_array()
+            .is_some_and(|items| items.iter().all(|item| item["code"] != "UnknownScope")),
+        "ignored diagnostic code was published: {}",
+        published["params"]["diagnostics"]
+    );
+    fs::remove_dir_all(root).expect("cleanup");
 }
 
 #[test]

@@ -48,7 +48,7 @@ rewritten without evidence that their boundaries are the bottleneck.
 
 ## Implemented stages
 
-The first fifteen stages are now on `main`, each independently committed and pushed:
+The first sixteen stages are now on `main`, each independently committed and pushed:
 
 1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
    reporting stays deterministic.
@@ -91,6 +91,10 @@ The first fifteen stages are now on `main`, each independently committed and pus
     bursts over 200 distinct paths switch to one full rescan, preventing generator/checkout storms
     from spawning hundreds of incremental workers while retaining stale-result and cancellation
     safety.
+16. Diagnostic publication accepts a bounded, validated `ignoredErrorCodes` list (also available
+    as `ignored_error_codes` in `.pdx/project.toml`). Filtering happens before publication caps,
+    applies to live and caller-supplied diagnostic queries, and updates open documents on live
+    configuration changes.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an
