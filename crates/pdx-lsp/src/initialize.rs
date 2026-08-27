@@ -347,7 +347,7 @@ pub(crate) fn prepare_initialize_candidate(
                             .collect(),
                         token_modifiers: vec![LspSemanticTokenModifier::DEFINITION],
                     },
-                    range: Some(false),
+                    range: Some(true),
                     full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
                     work_done_progress_options: WorkDoneProgressOptions::default(),
                 }),

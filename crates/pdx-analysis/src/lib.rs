@@ -29,7 +29,9 @@ pub use navigation::{
     rename, rename_with_cancellation, workspace_symbols, workspace_symbols_with_cancellation,
 };
 pub use resolution::localisation_values_by_key;
-pub use semantic_tokens::{semantic_tokens, semantic_tokens_with_cancellation};
+pub use semantic_tokens::{
+    semantic_tokens, semantic_tokens_in_range_with_cancellation, semantic_tokens_with_cancellation,
+};
 pub use types::{
     AnalysisResult, CancellationToken, Cancelled, CompletionItem, CompletionKind, CompletionResult,
     Diagnostic, DiagnosticCertainty, DiagnosticCode, DiagnosticProvenance, FileAnalysis, Hover,
