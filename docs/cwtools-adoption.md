@@ -48,7 +48,7 @@ rewritten without evidence that their boundaries are the bottleneck.
 
 ## Implemented stages
 
-The first twenty-four stages are now on `main`, each independently committed and pushed:
+The first twenty-five stages are now on `main`, each independently committed and pushed:
 
 1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
    reporting stays deterministic.
@@ -125,6 +125,12 @@ The first twenty-four stages are now on `main`, each independently committed and
     Levenshtein suggestioner supplies unique close static/workspace enum members, and the LSP
     exposes them as range-filtered `textDocument/codeAction` quick fixes with explicit workspace
     edits and diagnostic metadata.
+25. Scripted localisation is absorbed as profile data rather than a hardcoded EU4 exception:
+    all supported directory spellings are scanned, top-level `name` fields lower into the normal
+    `defined_text` HIR/index family, and a snapshot-cached query feeds both command completion and
+    CWTools-compatible, registry-aware localisation command diagnostics. Unknown tails remain
+    lenient until a project actually exposes scripted-localisation names; dynamic and `Get*`
+    forms remain accepted, and every traversal is cancellable and bounded.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an

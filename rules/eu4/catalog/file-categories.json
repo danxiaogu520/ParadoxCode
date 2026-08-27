@@ -1183,6 +1183,45 @@
       }
     },
     {
+      "id": "eu4-path-common-scripted_localisation",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/scripted_localisation",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-scripted_localization",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/scripted_localization",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
+      "id": "eu4-path-common-scripted_loc",
+      "parser": "script",
+      "resolution": "merge",
+      "matcher": {
+        "path_prefix": "common/scripted_loc",
+        "extensions": [
+          "txt"
+        ],
+        "path_suffix": null,
+        "case_sensitive": false
+      }
+    },
+    {
       "id": "eu4-path-common-scripted_triggers",
       "parser": "script",
       "resolution": "merge",

@@ -1149,7 +1149,7 @@ mod tests {
         let expected: ArtifactManifest =
             read_json(&root.join("rules/manifest.json")).expect("committed manifest");
         let (_, source_model) = load_source(&root.join("rules/eu4")).expect("source model");
-        assert_eq!(source_model.file_categories.len(), 121);
+        assert_eq!(source_model.file_categories.len(), 124);
         assert_eq!(source_model.symbol_descriptors.len(), 2667);
         assert_eq!(source_model.records.len(), 13_719);
         assert_eq!(source_model.semantic.rules.len(), 8_530);
@@ -1158,7 +1158,7 @@ mod tests {
         assert_eq!(source_model.semantic.type_root_scopes.len(), 1);
         assert_eq!(source_model.semantic.type_descriptors.len(), 148);
         assert_eq!(source_model.semantic.localisation_bindings.len(), 187);
-        assert_eq!(source_model.profile.scan_roots.len(), 123);
+        assert_eq!(source_model.profile.scan_roots.len(), 126);
         let quoted_script_rules = source_model
             .semantic
             .rules

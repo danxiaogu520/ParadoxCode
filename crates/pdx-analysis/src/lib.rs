@@ -7,6 +7,7 @@ mod completion;
 mod diagnostics;
 mod hover;
 mod inlay;
+mod localisation;
 mod macro_expansion;
 mod navigation;
 mod quick_fix;
@@ -25,6 +26,9 @@ pub use diagnostics::{
 };
 pub use hover::{hover, hover_with_cancellation};
 pub use inlay::{MAX_SCOPE_INLAY_HINTS, scope_inlay_hints_with_cancellation};
+pub use localisation::{
+    scripted_localisation_names, scripted_localisation_names_with_cancellation,
+};
 pub use navigation::{
     definition, definition_with_cancellation, document_symbols, document_symbols_with_cancellation,
     prepare_rename, prepare_rename_with_cancellation, references, references_with_cancellation,

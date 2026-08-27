@@ -1,6 +1,7 @@
 use super::support::*;
 use crate::{
     Diagnostic, DiagnosticCertainty, DiagnosticProvenance, Severity, quick_fixes_with_cancellation,
+    scripted_localisation_names,
 };
 
 #[test]
@@ -30,6 +31,86 @@ fn diagnostic_ids_are_pascal_case_and_metadata_is_structured() {
     assert_eq!(diagnostic.severity, Severity::Error);
     assert_eq!(diagnostic.certainty, DiagnosticCertainty::Contextual);
     assert_eq!(diagnostic.provenance.as_ref().unwrap().source_line, Some(7));
+}
+
+#[test]
+fn scripted_localisation_names_feed_indexed_diagnostics_and_completion() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-scripted-loc-{nonce}"));
+    let definitions = root.join("common/scripted_localisation");
+    let localisation = root.join("localisation");
+    std::fs::create_dir_all(&definitions).expect("scripted localisation directory");
+    std::fs::create_dir_all(&localisation).expect("localisation directory");
+    std::fs::write(
+        definitions.join("00_defs.txt"),
+        "defined_text = { name = Scripted.One text = yes }\nother = { name = Scripted.Two }\n",
+    )
+    .expect("scripted localisation definitions");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots()
+        .expect("scan scripted localisation");
+    let snapshot = host.snapshot();
+    let names = scripted_localisation_names(&snapshot);
+    assert_eq!(names, ["Scripted.One", "Scripted.Two"]);
+
+    let id = DocumentId::new("file:///tmp/scripted-localisation-use.yml");
+    let text = "l_english:\nentry: \"[ROOT.Scripted.One] [ROOT.MissingScripted]\"\n";
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(localisation.join("use.yml")),
+    )
+    .expect("open localisation use site");
+    let snapshot = host.snapshot();
+    let diagnostics = crate::diagnostics(&snapshot, &id);
+    let unknown = diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message.contains("MissingScripted"))
+        .expect("unknown scripted localisation command");
+    assert_eq!(unknown.code, DiagnosticCode::UnknownSymbol);
+    assert_eq!(unknown.severity, Severity::Warning);
+    assert_eq!(
+        unknown.range.start(),
+        u32::try_from(text.find("MissingScripted").expect("missing command")).expect("offset")
+    );
+
+    let completion_text = "l_english:\nentry: \"[ROOT.Scripted.O]\"\n";
+    let completion_id = DocumentId::new("file:///tmp/scripted-localisation-completion.yml");
+    host.open_document(
+        completion_id.clone(),
+        1,
+        completion_text.to_owned(),
+        Some(localisation.join("completion.yml")),
+    )
+    .expect("open localisation completion");
+    let position = u32::try_from(
+        completion_text
+            .find("Scripted.O")
+            .expect("completion prefix")
+            + "Scripted.O".len(),
+    )
+    .expect("position");
+    let completion = crate::complete(&host.snapshot(), &completion_id, position);
+    assert!(
+        completion
+            .items
+            .iter()
+            .any(|item| item.label == "Scripted.One"),
+        "scripted localisation completion missing: {:?}",
+        completion.items
+    );
+
+    std::fs::remove_dir_all(root).expect("cleanup");
 }
 
 #[test]

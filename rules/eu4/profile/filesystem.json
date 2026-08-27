@@ -81,6 +81,9 @@
     "common/ruler_personalities",
     "common/scripted_effects",
     "common/scripted_functions",
+    "common/scripted_localisation",
+    "common/scripted_localization",
+    "common/scripted_loc",
     "common/scripted_triggers",
     "common/state_edicts",
     "common/static_modifiers",
@@ -206,6 +209,9 @@
     "common/ruler_personalities": 0,
     "common/scripted_effects": 0,
     "common/scripted_functions": 0,
+    "common/scripted_localisation": 0,
+    "common/scripted_localization": 0,
+    "common/scripted_loc": 0,
     "common/scripted_triggers": 0,
     "common/state_edicts": 0,
     "common/static_modifiers": 0,
@@ -248,6 +254,11 @@
     "sound/battle/naval": 0,
     "tutorial": 0
   },
+  "scripted_localisation_directories": [
+    "scripted_localisation",
+    "scripted_localization",
+    "scripted_loc"
+  ],
   "scan_root_files": {
     "common": [
       "achievements.txt",
