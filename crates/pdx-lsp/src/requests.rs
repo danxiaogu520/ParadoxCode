@@ -8,7 +8,8 @@ use lsp_types::{
     InlayHintParams, InsertTextFormat, MarkupContent, MarkupKind, PrepareRenameResponse,
     ReferenceParams, RenameParams, SemanticToken as LspSemanticToken,
     SemanticTokens as LspSemanticTokens, SemanticTokensDelta, SemanticTokensDeltaParams,
-    SemanticTokensEdit, SemanticTokensFullDeltaResult, SemanticTokensParams, SymbolInformation,
+    SemanticTokensEdit, SemanticTokensFullDeltaResult, SemanticTokensParams,
+    SemanticTokensRangeParams, SemanticTokensRangeResult, SymbolInformation,
     TextDocumentPositionParams, TextEdit, Uri, WorkspaceEdit, WorkspaceSymbolParams,
 };
 use pdx_analysis::{
@@ -16,9 +17,9 @@ use pdx_analysis::{
     complete_with_cancellation, completion_resolve, definition_with_cancellation,
     document_symbols_with_cancellation, hover_with_cancellation, localisation_values_by_key,
     prepare_rename_with_cancellation, references_with_cancellation, rename_with_cancellation,
-    scope_inlay_hints_with_cancellation, semantic_tokens_with_cancellation,
-    source_file_diagnostics_with_cancellation, text_diagnostics_with_cancellation,
-    workspace_symbols_with_cancellation,
+    scope_inlay_hints_with_cancellation, semantic_tokens_in_range_with_cancellation,
+    semantic_tokens_with_cancellation, source_file_diagnostics_with_cancellation,
+    text_diagnostics_with_cancellation, workspace_symbols_with_cancellation,
 };
 use pdx_engine::{AnalysisSnapshot, DocumentId, ParsedSource, SourceRootKind};
 use pdx_game::eu4::mission::Severity;
@@ -165,6 +166,7 @@ impl SnapshotRequestContext {
             "textDocument/inlayHint" => self.inlay_hints(params),
             "textDocument/semanticTokens/full" => self.semantic_tokens(params),
             "textDocument/semanticTokens/full/delta" => self.semantic_tokens_delta(params),
+            "textDocument/semanticTokens/range" => self.semantic_tokens_range(params),
             "textDocument/formatting" => self.formatting(params),
             "workspace/symbol" => self.workspace_symbols(params),
             "pdx/workspaceDiagnostics" => self.workspace_diagnostics(params),
@@ -1013,6 +1015,32 @@ impl SnapshotRequestContext {
             .insert(uri, revision, result_id, data);
         self.ensure_active()?;
         typed_value(response, "semantic tokens delta response")
+    }
+
+    fn semantic_tokens_range(&self, params: Option<&Value>) -> Result<Value, RpcError> {
+        let params = typed_params::<SemanticTokensRangeParams>(params, "semantic tokens range")?;
+        let id = DocumentId::new(params.text_document.uri.as_str());
+        let document = self
+            .snapshot
+            .document(&id)
+            .ok_or_else(|| RpcError::new(INVALID_PARAMS, "document is not open"))?;
+        let range = lsp_range_to_text_range(&params.range, document.line_index(), document.text())?;
+        let result = semantic_tokens_in_range_with_cancellation(
+            &self.snapshot,
+            &id,
+            Some(range),
+            &self.cancellation,
+        )
+        .map_err(cancelled_error)?;
+        self.ensure_active()?;
+        let data = encode_semantic_tokens(document.line_index(), document.text(), &result);
+        typed_value(
+            SemanticTokensRangeResult::Tokens(LspSemanticTokens {
+                result_id: None,
+                data,
+            }),
+            "semantic tokens range response",
+        )
     }
 
     fn formatting(&self, params: Option<&Value>) -> Result<Value, RpcError> {

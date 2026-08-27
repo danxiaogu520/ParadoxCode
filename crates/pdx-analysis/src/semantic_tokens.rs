@@ -35,6 +35,21 @@ pub fn semantic_tokens_with_cancellation(
     document: &DocumentId,
     cancellation: &CancellationToken,
 ) -> Result<Vec<SemanticToken>, Cancelled> {
+    semantic_tokens_in_range_with_cancellation(snapshot, document, None, cancellation)
+}
+
+/// Returns semantic tokens intersecting `range` with cooperative cancellation.
+///
+/// The range is a UTF-8 byte span in the document.  CST nodes whose complete source range is
+/// outside the viewport are skipped before descending, so a large generated file does not pay
+/// the classification cost for entities the editor did not request.  Passing `None` is the full
+/// document query used by [`semantic_tokens_with_cancellation`].
+pub fn semantic_tokens_in_range_with_cancellation(
+    snapshot: &AnalysisSnapshot,
+    document: &DocumentId,
+    range: Option<TextRange>,
+    cancellation: &CancellationToken,
+) -> Result<Vec<SemanticToken>, Cancelled> {
     cancellation.checkpoint()?;
     let Some(input) = input_for_document(snapshot, document) else {
         return Ok(Vec::new());
@@ -53,6 +68,7 @@ pub fn semantic_tokens_with_cancellation(
         profile,
         &mut tokens,
         cancellation,
+        range,
     )?;
     Ok(tokens)
 }
@@ -115,44 +131,74 @@ fn collect_tokens(
     profile: &pdx_rules::GameProfile,
     tokens: &mut Vec<SemanticToken>,
     cancellation: &CancellationToken,
+    range: Option<TextRange>,
 ) -> Result<(), Cancelled> {
     cancellation.checkpoint()?;
+    if let Some(viewport) = range
+        && (node.range().end() <= viewport.start() || node.range().start() >= viewport.end())
+    {
+        return Ok(());
+    }
     match node.kind() {
-        CstKind::Comment => tokens.push(token(node.range(), SemanticTokenType::Comment, false)),
+        CstKind::Comment => push_token_if_visible(
+            tokens,
+            node.range(),
+            SemanticTokenType::Comment,
+            false,
+            range,
+        ),
         CstKind::Key => {
             if let Some(text) = parsed.text(node.range()) {
                 let (token_type, definition) = classify_identifier(text, true, keys, profile);
-                tokens.push(token(node.range(), token_type, definition));
+                push_token_if_visible(tokens, node.range(), token_type, definition, range);
             }
         }
-        CstKind::Operator => tokens.push(token(node.range(), SemanticTokenType::Operator, false)),
+        CstKind::Operator => push_token_if_visible(
+            tokens,
+            node.range(),
+            SemanticTokenType::Operator,
+            false,
+            range,
+        ),
         CstKind::HeaderBlock => {
             // The header is the leading scalar child; its block content follows.
             if let Some(header) = node.children().first() {
                 if header.kind() == CstKind::BareValue {
-                    tokens.push(token(header.range(), SemanticTokenType::Type, false));
+                    push_token_if_visible(
+                        tokens,
+                        header.range(),
+                        SemanticTokenType::Type,
+                        false,
+                        range,
+                    );
                 } else {
-                    collect_tokens(parsed, header, keys, profile, tokens, cancellation)?;
+                    collect_tokens(parsed, header, keys, profile, tokens, cancellation, range)?;
                 }
             }
             for child in node.children().iter().skip(1) {
-                collect_tokens(parsed, child, keys, profile, tokens, cancellation)?;
+                collect_tokens(parsed, child, keys, profile, tokens, cancellation, range)?;
             }
         }
         CstKind::ParameterCondition => {
             // The condition name is a parameter selector such as `country` in `[[!country] … ]`.
             for child in node.children() {
                 if child.kind() == CstKind::BareValue {
-                    tokens.push(token(child.range(), SemanticTokenType::Parameter, false));
+                    push_token_if_visible(
+                        tokens,
+                        child.range(),
+                        SemanticTokenType::Parameter,
+                        false,
+                        range,
+                    );
                 } else {
-                    collect_tokens(parsed, child, keys, profile, tokens, cancellation)?;
+                    collect_tokens(parsed, child, keys, profile, tokens, cancellation, range)?;
                 }
             }
         }
         CstKind::BareValue | CstKind::QuotedString => {
             if let Some(text) = parsed.text(node.range()) {
                 let (token_type, definition) = classify_identifier(text, false, keys, profile);
-                tokens.push(token(node.range(), token_type, definition));
+                push_token_if_visible(tokens, node.range(), token_type, definition, range);
             }
         }
         CstKind::Property
@@ -162,7 +208,7 @@ fn collect_tokens(
         | CstKind::Document
         | CstKind::Error => {
             for child in node.children() {
-                collect_tokens(parsed, child, keys, profile, tokens, cancellation)?;
+                collect_tokens(parsed, child, keys, profile, tokens, cancellation, range)?;
             }
         }
         // The BOM and localisation node kinds never reach a Script document walk.
@@ -249,5 +295,19 @@ fn token(range: TextRange, token_type: SemanticTokenType, definition: bool) -> S
         range,
         token_type,
         definition,
+    }
+}
+
+fn push_token_if_visible(
+    tokens: &mut Vec<SemanticToken>,
+    token_range: TextRange,
+    token_type: SemanticTokenType,
+    definition: bool,
+    viewport: Option<TextRange>,
+) {
+    if viewport
+        .is_none_or(|range| token_range.end() > range.start() && token_range.start() < range.end())
+    {
+        tokens.push(token(token_range, token_type, definition));
     }
 }

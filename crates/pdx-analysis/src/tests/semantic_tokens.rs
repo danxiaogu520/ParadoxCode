@@ -1,5 +1,8 @@
 use crate::tests::support::*;
-use crate::{SemanticTokenType, semantic_tokens};
+use crate::{
+    CancellationToken, SemanticTokenType, semantic_tokens,
+    semantic_tokens_in_range_with_cancellation,
+};
 use pdx_engine::DocumentId;
 use pdx_text::TextRange;
 
@@ -204,4 +207,37 @@ fn syntax_errors_do_not_suppress_recoverable_tokens() {
     )));
     assert!(tokens.contains(&("quux".to_owned(), SemanticTokenType::Property, false)));
     assert!(tokens.contains(&("3".to_owned(), SemanticTokenType::Number, false)));
+}
+
+#[test]
+fn ranged_semantic_tokens_skip_tokens_outside_the_viewport() {
+    let text = "country_event = { id = first.1 }\ncountry_event = { id = second.1 }\n";
+    let (host, id) = snapshot(text);
+    let line_start = text
+        .find("country_event = { id = second")
+        .expect("second line");
+    let range = TextRange::new(
+        u32::try_from(line_start).expect("range start"),
+        u32::try_from(text.len()).expect("range end"),
+    )
+    .expect("valid range");
+    let tokens = semantic_tokens_in_range_with_cancellation(
+        &host.snapshot(),
+        &id,
+        Some(range),
+        &CancellationToken::new(),
+    )
+    .expect("range query");
+    assert!(!tokens.is_empty());
+    assert!(
+        tokens
+            .iter()
+            .all(|token| token.range.start() >= range.start())
+    );
+    assert!(tokens.iter().any(|token| {
+        let start = usize::try_from(token.range.start()).expect("token start");
+        text[start..]
+            .strip_prefix("country_event")
+            .is_some_and(|_| start == line_start)
+    }));
 }

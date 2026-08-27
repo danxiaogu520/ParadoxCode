@@ -4,7 +4,8 @@ use std::io::Cursor;
 use lsp_types::{
     CompletionItem, CompletionResponse, Diagnostic, DocumentSymbol, Hover, Location,
     PrepareRenameResponse, SemanticToken as LspSemanticToken, SemanticTokens as LspSemanticTokens,
-    SemanticTokensFullDeltaResult, SymbolInformation, SymbolKind, WorkspaceEdit,
+    SemanticTokensFullDeltaResult, SemanticTokensRangeResult, SymbolInformation, SymbolKind,
+    WorkspaceEdit,
 };
 use pdx_text::{LineIndex, Position};
 use serde_json::{Value, json};
@@ -557,8 +558,9 @@ fn semantic_tokens_are_advertised_and_encoded_in_relative_order() {
         json!({"jsonrpc":"2.0","id":3,"method":"textDocument/semanticTokens/full/delta","params":{"textDocument":{"uri":uri.clone()},"previousResultId":"1"}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":uri.clone(),"version":2},"contentChanges":[{"text":"@cost = 200\ncountry_event = { favorable = no }\n"}]}}),
         json!({"jsonrpc":"2.0","id":4,"method":"textDocument/semanticTokens/full/delta","params":{"textDocument":{"uri":uri.clone()},"previousResultId":"2"}}),
-        json!({"jsonrpc":"2.0","id":5,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":format!("{root_uri}/events/closed.txt")}}}),
-        json!({"jsonrpc":"2.0","id":6,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","id":5,"method":"textDocument/semanticTokens/range","params":{"textDocument":{"uri":uri.clone()},"range":{"start":{"line":1,"character":0},"end":{"line":2,"character":0}}}}),
+        json!({"jsonrpc":"2.0","id":6,"method":"textDocument/semanticTokens/full","params":{"textDocument":{"uri":format!("{root_uri}/events/closed.txt")}}}),
+        json!({"jsonrpc":"2.0","id":7,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
     ]);
     let mut output = Vec::new();
@@ -585,6 +587,7 @@ fn semantic_tokens_are_advertised_and_encoded_in_relative_order() {
             .is_some_and(|modifiers| modifiers.contains(&json!("definition")))
     );
     assert_eq!(provider["full"], json!({"delta": true}));
+    assert_eq!(provider["range"], json!(true));
 
     let tokens: LspSemanticTokens = typed_result(&responses, 2);
     assert!(tokens.result_id.is_some());
@@ -643,10 +646,33 @@ fn semantic_tokens_are_advertised_and_encoded_in_relative_order() {
         other => panic!("expected semantic token delta or full fallback after edit, got {other:?}"),
     }
 
+    let ranged: SemanticTokensRangeResult = typed_result(&responses, 5);
+    let ranged = match ranged {
+        SemanticTokensRangeResult::Tokens(tokens) => tokens,
+        other => panic!("expected complete ranged semantic tokens, got {other:?}"),
+    };
+    assert_eq!(
+        ranged.data.first().map(|token| token.delta_line),
+        Some(1),
+        "the first ranged token should remain on the requested second line: {ranged:?}"
+    );
+    assert!(
+        ranged
+            .data
+            .iter()
+            .skip(1)
+            .all(|token| token.delta_line == 0),
+        "a one-line viewport should not contain tokens from another line: {ranged:?}"
+    );
+    assert!(
+        !ranged.data.is_empty(),
+        "the visible line should have tokens"
+    );
+
     // An unopened document is rejected with invalid-params semantics.
     let unopened = responses
         .iter()
-        .find(|value| value["id"] == 5)
+        .find(|value| value["id"] == 6)
         .expect("unopened document response");
     assert_eq!(unopened["error"]["code"], json!(INVALID_PARAMS));
 

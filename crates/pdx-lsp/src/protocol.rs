@@ -122,6 +122,7 @@ pub(crate) fn is_snapshot_request(method: &str) -> bool {
             | "textDocument/inlayHint"
             | "textDocument/semanticTokens/full"
             | "textDocument/semanticTokens/full/delta"
+            | "textDocument/semanticTokens/range"
             | "textDocument/formatting"
             | "workspace/symbol"
             | "pdx/workspaceDiagnostics"
@@ -640,7 +641,8 @@ mod tests {
     use lsp_types::request::{
         Completion, DocumentSymbolRequest, Formatting, GotoDefinition, HoverRequest,
         InlayHintRequest, PrepareRenameRequest, References, Rename, ResolveCompletionItem,
-        SemanticTokensFullDeltaRequest, SemanticTokensFullRequest, WorkspaceSymbolRequest,
+        SemanticTokensFullDeltaRequest, SemanticTokensFullRequest, SemanticTokensRangeRequest,
+        WorkspaceSymbolRequest,
     };
     use lsp_types::{CompletionItemKind, NumberOrString};
     use pdx_analysis::{
@@ -660,6 +662,7 @@ mod tests {
             ResolveCompletionItem::METHOD,
             SemanticTokensFullRequest::METHOD,
             SemanticTokensFullDeltaRequest::METHOD,
+            SemanticTokensRangeRequest::METHOD,
             InlayHintRequest::METHOD,
             HoverRequest::METHOD,
             GotoDefinition::METHOD,

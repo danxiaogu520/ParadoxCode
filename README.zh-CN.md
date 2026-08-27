@@ -20,6 +20,7 @@ ParadoxCode **与 Paradox Interactive 无任何关联，也未获得其背书**�
   或旧版本迁移字段。
 - 补全、悬停、跳转定义、查找引用、文档/工作区符号。
 - 完整语义 token 支持增量 `full/delta` 响应，并使用有界、按快照版本校验的缓存；编辑与工作区刷新时自动失效。
+- 支持按视口请求 `textDocument/semanticTokens/range`，在分类前剪枝范围外的语法树子树，使可见编辑器高亮成本与视口相关。
 - 规则证明的作用域转换可通过有界的 `textDocument/inlayHint` 注解显示。
 - 冲突感知的重命名（仅限可写的 Mod 源）。
 - 保守的格式化器，拒绝改写不安全或残缺的文件。

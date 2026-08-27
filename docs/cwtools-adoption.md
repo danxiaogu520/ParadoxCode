@@ -48,7 +48,7 @@ rewritten without evidence that their boundaries are the bottleneck.
 
 ## Implemented stages
 
-The first twenty stages are now on `main`, each independently committed and pushed:
+The first twenty-three stages are now on `main`, each independently committed and pushed:
 
 1. Rule fragments are decoded in parallel and merged in manifest order, so duplicate/error
    reporting stays deterministic.
@@ -113,6 +113,14 @@ The first twenty stages are now on `main`, each independently committed and push
     the same immutable, revision-checked snapshot as the index. Live ignore-filter and diagnostic
     setting changes trigger a bounded refresh or revalidation; open overlays continue to use the
     existing per-document path and are removed from the closed-file publication set immediately.
+21. Semantic-token results support bounded, revision-aware full/delta caching with stale-baseline
+    fallback, so unchanged visible files can answer without rewalking the CST and edits only
+    replace the changed flat token slice.
+22. Rule-proven scope transitions are lowered into HIR facts and exposed through a bounded,
+    cancellable `textDocument/inlayHint` query; the LSP adapter only converts positions and labels.
+23. `textDocument/semanticTokens/range` now prunes CST subtrees outside the requested UTF-8
+    viewport before classification and advertises the range capability, while full/delta behavior
+    remains unchanged.
 
 The reference comparison explains the choices. Classic CWTools loads `.cwt` files into an in-memory
 rule model, while `cwtools-rs` separates parallel file parsing from ordered merge, shares an
