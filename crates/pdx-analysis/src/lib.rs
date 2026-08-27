@@ -6,6 +6,7 @@
 mod completion;
 mod diagnostics;
 mod hover;
+mod inlay;
 mod macro_expansion;
 mod navigation;
 mod quoted_script;
@@ -21,6 +22,7 @@ pub use diagnostics::{
     source_file_diagnostics_with_cancellation, text_diagnostics_with_cancellation,
 };
 pub use hover::{hover, hover_with_cancellation};
+pub use inlay::{MAX_SCOPE_INLAY_HINTS, scope_inlay_hints_with_cancellation};
 pub use navigation::{
     definition, definition_with_cancellation, document_symbols, document_symbols_with_cancellation,
     prepare_rename, prepare_rename_with_cancellation, references, references_with_cancellation,
@@ -31,8 +33,9 @@ pub use semantic_tokens::{semantic_tokens, semantic_tokens_with_cancellation};
 pub use types::{
     AnalysisResult, CancellationToken, Cancelled, CompletionItem, CompletionKind, CompletionResult,
     Diagnostic, DiagnosticCertainty, DiagnosticCode, DiagnosticProvenance, FileAnalysis, Hover,
-    Location, PrepareRenameResult, ReferenceInfo, RenameError, RenameFailure, SemanticToken,
-    SemanticTokenType, Severity, Symbol, WorkspaceEditPlan, WorkspaceSymbol, WorkspaceTextEdit,
+    Location, PrepareRenameResult, ReferenceInfo, RenameError, RenameFailure, ScopeInlayHint,
+    SemanticToken, SemanticTokenType, Severity, Symbol, WorkspaceEditPlan, WorkspaceSymbol,
+    WorkspaceTextEdit,
 };
 
 // These crate-visible re-exports keep the existing in-crate test and helper paths stable while

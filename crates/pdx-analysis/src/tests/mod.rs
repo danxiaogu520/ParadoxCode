@@ -2,6 +2,7 @@ mod completion;
 mod diagnostics;
 mod hover;
 mod hover_improvements;
+mod inlay;
 mod navigation;
 mod rename;
 mod scope;

@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use pdx_engine::hir::Scope;
 use pdx_engine::{DocumentId, SourceFileId};
 use pdx_parser::FileFormat;
-use pdx_text::{LogicalPath, TextRange};
+use pdx_text::{LogicalPath, TextRange, TextSize};
 
 /// Shared cooperative-cancellation state for editor-neutral analysis queries.
 ///
@@ -461,6 +461,17 @@ pub struct SemanticToken {
     pub token_type: SemanticTokenType,
     /// Whether this token introduces a local definition (an `@name` variable in key position).
     pub definition: bool,
+}
+
+/// One rule-proven scope transition suitable for an editor inlay hint. The position is the byte
+/// offset at the beginning of the block value (`key = { ... }`); protocol adapters convert it to
+/// the client's position encoding and choose presentation details.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScopeInlayHint {
+    /// Byte offset at which the hint should be inserted.
+    pub position: TextSize,
+    /// Concrete scope name selected by the rule transition.
+    pub scope: String,
 }
 
 /// Stable semantic token types. The ordering of [`Self::ALL`] is the protocol legend contract:

@@ -792,6 +792,23 @@ fn profile_lowering_caches_semantic_root_context_and_initial_scope() {
         tax_scope.parent_path.is_empty(),
         "an explicit same-name effect child context resets the semantic path"
     );
+    let capital = hir
+        .properties()
+        .iter()
+        .find(|property| property.key == "capital_scope")
+        .expect("capital scope transition");
+    let capital_fact = hir
+        .scope_facts()
+        .iter()
+        .find(|fact| fact.range == capital.key_range)
+        .expect("capital scope fact");
+    assert_eq!(
+        capital_fact
+            .transition
+            .as_ref()
+            .and_then(|state| state.current.first()),
+        Some(&ScopeValue::Known(vec!["province".to_owned()]))
+    );
 }
 
 #[test]

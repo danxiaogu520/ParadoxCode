@@ -654,6 +654,43 @@ fn semantic_tokens_are_advertised_and_encoded_in_relative_order() {
 }
 
 #[test]
+fn inlay_hints_expose_rule_proven_scope_transitions() {
+    let (root, root_uri) = temp_workspace_dir();
+    let uri = format!("{root_uri}/events/inlay.txt");
+    let text = "country_event = { immediate = { capital_scope = { add_base_tax = 1 } } }\n";
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri.clone(),"languageId":"eu4","version":1,"text":text}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/inlayHint","params":{"textDocument":{"uri":uri.clone()},"range":{"start":{"line":0,"character":0},"end":{"line":1,"character":0}}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let initialize = responses
+        .iter()
+        .find(|value| value["id"] == 1)
+        .expect("initialize response");
+    assert_eq!(
+        initialize["result"]["capabilities"]["inlayHintProvider"],
+        json!(true)
+    );
+    let hints: Vec<lsp_types::InlayHint> = typed_result(&responses, 2);
+    assert!(hints.iter().any(|hint| {
+        matches!(&hint.label, lsp_types::InlayHintLabel::String(label) if label == "→ province")
+    }));
+    assert!(hints.iter().all(|hint| {
+        !matches!(&hint.label, lsp_types::InlayHintLabel::String(label) if label == "→ country")
+    }));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn memory_transport_preserves_hir_disambiguated_mixed_context_completion() {
     let (root_dir, root_uri) = temp_workspace_dir();
     let events_dir = root_dir.join("events");

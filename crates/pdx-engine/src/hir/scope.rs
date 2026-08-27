@@ -36,6 +36,7 @@ pub(super) fn lower_scope_facts(
             state: initial_scope_state(rules, profile, &context, &property.key),
             context: context.clone(),
             parent_path: Vec::new(),
+            transition: None,
         });
         let initial = lowering
             .facts
@@ -71,6 +72,7 @@ pub(super) fn lower_scope_facts(
                 state: child_state.clone(),
                 context: context.clone(),
                 parent_path: Vec::new(),
+                transition: None,
             });
             lowering.lower_nested(child_index, &context, &[], &child_state);
         }
@@ -183,11 +185,13 @@ impl ScopeFactLowering<'_> {
                 self.profile,
                 state,
             );
+            let fact_index = self.facts.len();
             self.facts.push(ScopeFact {
                 range: property.key_range,
                 context: context.to_owned(),
                 parent_path: parent_path.to_vec(),
                 state: state.clone(),
+                transition: None,
             });
             let transparent = context.eq_ignore_ascii_case("trigger")
                 && self.profile.is_transparent_scope_wrapper(&property.key);
@@ -206,6 +210,7 @@ impl ScopeFactLowering<'_> {
             let (next_context, next_path) =
                 transition_destination(rule, context, parent_path, &property.key, transparent);
             let next_state = child_scope_state(state, rule, self.rules, self.profile);
+            self.facts[fact_index].transition = Some(next_state.clone());
             self.lower_nested(property_index, &next_context, &next_path, &next_state);
         }
     }

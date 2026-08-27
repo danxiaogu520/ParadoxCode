@@ -28,6 +28,7 @@ and Paradox Interactive are trademarks of their respective owners.
 - Completion, hover, go-to-definition, references, and document/workspace symbols.
 - Full semantic tokens support incremental `full/delta` responses with a bounded, revision-aware
   cache that is invalidated by edits and workspace refreshes.
+- Rule-proven scope transitions are available as bounded `textDocument/inlayHint` annotations.
 - Conflict-aware rename restricted to writable Mod sources.
 - A conservative formatter that refuses to rewrite unsafe or malformed files.
 - Workspace resolution across unsaved buffers, the current Mod, ordered dependency Mods, and a

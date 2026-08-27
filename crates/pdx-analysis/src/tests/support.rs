@@ -2,8 +2,8 @@ pub(crate) use crate::{
     CancellationToken, Cancelled, CompletionKind, DiagnosticCode, RenameError, RenameFailure,
     complete, complete_with_cancellation, definition, diagnostics, diagnostics_with_cancellation,
     document_symbols, hover, input_for_document, prepare_rename, references, rename,
-    rename_with_cancellation, semantic_completion_context, semantic_root_context,
-    workspace_symbols, workspace_symbols_with_cancellation,
+    rename_with_cancellation, scope_inlay_hints_with_cancellation, semantic_completion_context,
+    semantic_root_context, workspace_symbols, workspace_symbols_with_cancellation,
 };
 pub(crate) use pdx_engine::{
     AnalysisHost, DocumentId, IndexCache, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
