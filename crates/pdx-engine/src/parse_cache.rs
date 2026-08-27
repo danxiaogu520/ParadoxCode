@@ -1,8 +1,9 @@
 //! Bounded persistent per-file syntax-tree cache.
 //!
 //! The cache mirrors the useful part of CWTools Rust's `.cwb` parse cache without persisting
-//! semantic HIR or source-root state. Entries are keyed by stable file identity and validated by
-//! parser schema, frontend format, source digest, and CST range safety before they are reused.
+//! semantic HIR, source text, or source-root state. Entries are keyed by stable file identity and
+//! validated by parser schema, frontend format, source digest, and CST range safety before they
+//! are reused.
 
 use std::fmt;
 use std::fs::{self, OpenOptions};
@@ -10,17 +11,17 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use pdx_parser::{FileFormat, ParsedFile};
+use pdx_parser::{FileFormat, ParsedFile, ParsedFileCache};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::SourceFile;
 
 /// Current on-disk syntax-tree cache schema.
-pub const CURRENT_PARSE_CACHE_SCHEMA_VERSION: u32 = 1;
+pub const CURRENT_PARSE_CACHE_SCHEMA_VERSION: u32 = 2;
 
 const MAX_PARSE_CACHE_BYTES: u64 = 64 * 1024 * 1024;
-const CACHE_NAMESPACE: &[u8] = b"paradoxcode/parse-cache/v1\0";
+const CACHE_NAMESPACE: &[u8] = b"paradoxcode/parse-cache/v2\0";
 static WRITE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 /// A user-local directory containing independent syntax-tree cache entries.
@@ -34,7 +35,7 @@ struct ParseCacheEntry {
     schema_version: u32,
     format: FileFormat,
     source_sha256: [u8; 32],
-    parsed: ParsedFile,
+    parsed: ParsedFileCache,
 }
 
 /// Errors returned when a parsed tree cannot be persisted.
@@ -111,11 +112,12 @@ impl ParseCache {
         if entry.schema_version != CURRENT_PARSE_CACHE_SCHEMA_VERSION
             || entry.format != format
             || entry.source_sha256 != digest(source)
-            || !entry.parsed.is_valid_for(format, source)
+            || entry.parsed.format != format
         {
             return None;
         }
-        Some(entry.parsed)
+        let parsed = ParsedFile::from_cache_data(entry.parsed, source);
+        parsed.is_valid_for(format, source).then_some(parsed)
     }
 
     /// Atomically stores one validated parsed frontend. Write errors are reported to the caller;
@@ -134,7 +136,7 @@ impl ParseCache {
             schema_version: CURRENT_PARSE_CACHE_SCHEMA_VERSION,
             format,
             source_sha256: digest(source),
-            parsed: parsed.clone(),
+            parsed: parsed.cache_data(),
         };
         let bytes = bincode::serialize(&entry)
             .map_err(|error| ParseCacheError::Encode(error.to_string()))?;
@@ -269,6 +271,31 @@ mod tests {
                     "country_event = { id = cached.1 }\n"
                 )
                 .is_none()
+        );
+        fs::remove_dir_all(directory).expect("cleanup");
+    }
+
+    #[test]
+    fn cache_payload_does_not_duplicate_source_text() {
+        let directory = test_directory("source-elision");
+        let source = "country_event = { id = cached.1 }\n".repeat(32);
+        let parsed = pdx_parser::parse(FileFormat::Script, &source);
+        let cache = ParseCache::new(directory.join("parse-cache"));
+        let source_file = file(&directory);
+        cache
+            .store(&source_file, FileFormat::Script, &source, &parsed)
+            .expect("store parse cache");
+
+        let bytes = fs::read(cache.entry_path(&source_file)).expect("read cache entry");
+        let entry: ParseCacheEntry = bincode::deserialize(&bytes).expect("decode cache entry");
+        let compact = bincode::serialize(&entry.parsed).expect("encode compact payload");
+        let legacy = bincode::serialize(&parsed).expect("encode source-bearing payload");
+        assert!(compact.len() < legacy.len());
+        assert!(
+            cache
+                .load(&source_file, FileFormat::Script, &source)
+                .is_some(),
+            "source text is reattached after the compact payload is loaded"
         );
         fs::remove_dir_all(directory).expect("cleanup");
     }
