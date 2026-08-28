@@ -148,8 +148,10 @@ pub(crate) fn semantic_completion_context_with_cancellation(
 /// Selects the file-root entry context for a path, when the document's type declares one.
 ///
 /// The context is `root:{name}` per the descriptor's `root_entries`; entry rules are ordinary
-/// semantic rules under that context. Types without a declaration (for example missions, whose
-/// root series names are free-form) never get a scaffold.
+/// semantic rules under that context. Enumerated type roots (for example on_actions) may use the
+/// same container with their `type_root_keys` as the candidate source. Types without either a
+/// declaration or an enumerated root set (for example missions, whose root series names are
+/// free-form) never get a scaffold.
 fn semantic_root_entry_context(
     snapshot: &AnalysisSnapshot,
     logical_path: Option<&LogicalPath>,
@@ -172,7 +174,14 @@ fn semantic_root_entry_context(
                 .semantic_rules_for_context(&context)
                 .next()
                 .is_some();
-            has_rules.then_some((type_name.clone(), context))
+            let has_type_root_keys = snapshot
+                .rules()
+                .model()
+                .semantic
+                .type_root_keys
+                .get(type_name)
+                .is_some_and(|roots| !roots.is_empty());
+            (has_rules || has_type_root_keys).then_some((type_name.clone(), context))
         })
         .map(|(_, context)| context)
         .next()

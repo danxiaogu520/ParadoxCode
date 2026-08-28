@@ -218,6 +218,106 @@ fn on_action_event_block_completion_excludes_namespace_headers() {
 }
 
 #[test]
+fn on_action_file_root_offers_declared_actions() {
+    use std::path::PathBuf;
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/common/on_actions/root-entries.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "\n".to_owned(),
+        Some(PathBuf::from("common/on_actions/root-entries.txt")),
+    )
+    .expect("open on_action document");
+    let result = complete(&host.snapshot(), &id, 0);
+    let by_label = |label: &str| result.items.iter().find(|item| item.label == label);
+    let expected_count = host
+        .snapshot()
+        .rules()
+        .model()
+        .semantic
+        .type_root_keys
+        .get("on_action")
+        .expect("on_action root keys")
+        .len();
+    assert_eq!(
+        result.items.len(),
+        expected_count,
+        "the root must expose exactly the declared on_action keys"
+    );
+    for label in ["on_startup", "on_religion_change", "on_battle_won_unit"] {
+        assert!(
+            by_label(label).is_some(),
+            "on_action root `{label}` missing: {:?}",
+            result.items
+        );
+    }
+    assert!(
+        by_label("add_stability").is_none(),
+        "effect keys must not leak into the on_action file root: {:?}",
+        result.items
+    );
+    assert_eq!(
+        by_label("on_startup").expect("on_startup").insert_text,
+        "on_startup = {\n\t$0\n}",
+        "on_action roots must insert a block skeleton"
+    );
+
+    let mut prefixed_host =
+        eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let prefixed_id = DocumentId::new("file:///tmp/common/on_actions/root-prefix.txt");
+    let prefix = "on_rel";
+    prefixed_host
+        .open_document(
+            prefixed_id.clone(),
+            1,
+            prefix.to_owned(),
+            Some(PathBuf::from("common/on_actions/root-prefix.txt")),
+        )
+        .expect("open prefixed on_action document");
+    let prefixed = complete(
+        &prefixed_host.snapshot(),
+        &prefixed_id,
+        u32::try_from(prefix.len()).expect("prefix position"),
+    );
+    assert!(
+        prefixed
+            .items
+            .iter()
+            .any(|item| item.label == "on_religion_change"),
+        "a partial root action must complete: {:?}",
+        prefixed.items
+    );
+
+    let mut gap_host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let gap_id = DocumentId::new("file:///tmp/common/on_actions/root-gap.txt");
+    let gap_text = "on_startup = {}\n\n";
+    gap_host
+        .open_document(
+            gap_id.clone(),
+            1,
+            gap_text.to_owned(),
+            Some(PathBuf::from("common/on_actions/root-gap.txt")),
+        )
+        .expect("open on_action root gap");
+    let gap = complete(
+        &gap_host.snapshot(),
+        &gap_id,
+        u32::try_from(gap_text.len()).expect("root gap position"),
+    );
+    assert!(
+        gap.items.iter().all(|item| item.label != "on_startup")
+            && gap
+                .items
+                .iter()
+                .any(|item| item.label == "on_religion_change"),
+        "declared actions must not repeat at the root gap: {:?}",
+        gap.items
+    );
+}
+
+#[test]
 fn event_modifier_completion_inherits_generic_modifier_keys() {
     let text = "my_modifier = {\n  dis\n}\n";
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
