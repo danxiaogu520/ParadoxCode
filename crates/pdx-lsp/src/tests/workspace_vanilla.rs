@@ -375,6 +375,17 @@ path = "dependencies/high"
         .find(|value| value["id"] == 4)
         .expect("Vanilla definition response");
     assert_eq!(vanilla_definition_response["error"], Value::Null);
+    let vanilla_definition_uri = vanilla_definition_response["result"][0]["uri"]
+        .as_str()
+        .expect("Vanilla definition URI");
+    assert!(vanilla_definition_uri.starts_with("file://"));
+    #[cfg(windows)]
+    {
+        assert!(
+            !vanilla_definition_uri.contains("%5C") && !vanilla_definition_uri.contains("%3F"),
+            "definition URI must use a standard Windows file path: {vanilla_definition_uri}"
+        );
+    }
     assert_eq!(
         vanilla_definition_response["result"][0]["range"],
         json!({

@@ -67,6 +67,16 @@ fn uri_round_trip_preserves_unicode_and_spaces() {
     assert_eq!(uri_to_path(&uri).expect("URI should decode"), path);
 }
 
+#[cfg(windows)]
+#[test]
+fn windows_file_uri_normalizes_extended_canonical_paths() {
+    let path = std::path::Path::new(r"\\?\C:\Paradox Code\events\test.txt");
+    let uri = path_to_uri(path);
+    assert_eq!(uri, "file:///C:/Paradox%20Code/events/test.txt");
+    assert!(!uri.contains("%5C"));
+    assert!(!uri.contains("%3F"));
+}
+
 #[test]
 fn selected_game_rejects_a_mismatched_rules_artifact() {
     let rules = RuleSet::from_model(RulesModel {

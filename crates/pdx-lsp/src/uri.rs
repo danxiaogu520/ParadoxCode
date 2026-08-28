@@ -28,7 +28,28 @@ pub fn uri_to_path(uri: &str) -> Result<PathBuf, UriError> {
 /// Converts an absolute filesystem path to a percent-encoded `file://` URI.
 #[must_use]
 pub fn path_to_uri(path: &Path) -> String {
-    let raw = path.to_string_lossy();
+    // `fs::canonicalize` returns an extended-length path on Windows (for example
+    // `\\\\?\\C:\\mods\\common\\events.txt`).  That spelling is valid for Win32
+    // file APIs, but it is not a portable file URI path: encoding the backslashes
+    // and the `\\\\?\\` prefix produces a URI that VS Code cannot open.  Normalize
+    // only the URI representation; the engine keeps its canonical path unchanged.
+    #[cfg(windows)]
+    let raw = {
+        let original = path.to_string_lossy();
+        let drive_path = original
+            .strip_prefix("\\\\?\\")
+            .filter(|value| value.as_bytes().get(1) == Some(&b':'))
+            .unwrap_or(&original);
+        if drive_path.as_bytes().get(1) == Some(&b':') {
+            drive_path.replace('\\', "/")
+        } else {
+            // Keep UNC paths on the existing local-authority path until URI
+            // authority support is added to uri_to_path.
+            drive_path.to_owned()
+        }
+    };
+    #[cfg(not(windows))]
+    let raw = path.to_string_lossy().into_owned();
     let mut uri = String::from("file://");
     if !raw.starts_with('/') {
         uri.push('/');
