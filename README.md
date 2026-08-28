@@ -95,10 +95,10 @@ that send only the deprecated `rootUri` field are intentionally unsupported and 
 
 ## Project status
 
-**Latest release: v0.1.4** (26 Aug 2026). The core EU4 language features are implemented, tested,
-and released through the tag-driven release pipeline (see [Releases](#releases)). Early adopters
-should expect rough edges while 0.1.x matures; please report problems through the issue templates
-so they can be fixed in the next release.
+**Latest release: v0.2.0** (28 Aug 2026). The CWTools-inspired EU4 analysis and indexing features
+are implemented, tested, and released through the tag-driven release pipeline (see
+[Releases](#releases)). Early adopters should expect rough edges while 0.2.x matures; please
+report problems through the issue templates so they can be fixed in the next release.
 
 Known limitations of the current scope:
 
