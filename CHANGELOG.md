@@ -7,6 +7,33 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-28
+
+This release brings the CWTools-inspired analysis and workspace infrastructure into the
+EU4-first engine while keeping the first-party JSON rule source authoritative.
+
+### Added
+
+- Code actions and diagnostic quick fixes, scope-transition inlay hints, and ranged/delta semantic
+  token requests.
+- Workspace validation, explicit reindexing, bounded workspace diagnostics, diagnostic suppression,
+  and configurable workspace scan filters.
+- Scripted-localisation indexing and completion, persistent syntax-tree caching, and expanded EU4
+  profile/rule coverage for file categories, scopes, events, and decisions.
+
+### Changed
+
+- Workspace loading, per-file indexing, immutable snapshots, and analysis query caching now reuse
+  shared parsed data and scale better across large mods.
+- The persistent parse cache uses the maintained `postcard` codec; its schema and namespace were
+  advanced so existing entries are safely rebuilt.
+- Windows definition and diagnostic URIs are normalized consistently across editor clients.
+
+### Fixed
+
+- Diagnostics and completion retain the correct semantic context after assignments and nested blocks,
+  including scripted-localisation and mixed-scope cases.
+
 ## [0.1.4] - 2026-08-26
 
 Maintenance release focused on EU4 rule coverage, semantic completion quality, and editor
@@ -125,7 +152,8 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.1...v0.1.2
