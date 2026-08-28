@@ -54,7 +54,7 @@ The first twenty-six stages are now on `main`, each independently committed and 
    reporting stays deterministic.
 2. The EU4 composition root checks the generated artifact manifest before parsing embedded JSON;
    a matching SQLite cache is now the normal warm-start path.
-3. Disk-file CSTs use a bounded, content-addressed bincode cache with schema/source validation,
+3. Disk-file CSTs use a bounded, content-addressed postcard cache with schema/source validation,
    atomic writes, and no effect on correctness when a cache entry is missing or corrupt.
 4. Semantic rule lookups use direct hash buckets, while workspace member completion reuses a
    snapshot-owned name vector and a prefix/substring index with a character-mask prefilter.

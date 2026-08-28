@@ -12,10 +12,10 @@ readme.workspace = true
 publish = false
 
 [dependencies]
-bincode = { version = "2.0", features = ["serde"] }
 encoding_rs = "0.8"
 pdx-rules = { path = "../pdx-rules" }
 pdx-parser = { path = "../pdx-parser" }
+postcard = { version = "1.1", default-features = false, features = ["alloc"] }
 pdx-text = { path = "../pdx-text" }
 rusqlite = { version = "0.40", features = ["bundled", "hooks"] }
 serde = { version = "1", features = ["derive"] }
