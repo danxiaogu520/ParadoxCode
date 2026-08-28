@@ -518,13 +518,19 @@ fn memory_transport_delegates_phase5_requests_to_analysis() {
         Some(2)
     );
     assert!(
-        rename["result"]["changes"][uri]
+        rename["result"]["changes"][uri.clone()]
             .as_array()
             .is_some_and(|edits| { edits.iter().all(|edit| edit["newText"] == "renamed.1") })
     );
     let diagnostics = responses
         .iter()
-        .find(|value| value["method"] == "textDocument/publishDiagnostics")
+        .find(|value| {
+            value["method"] == "textDocument/publishDiagnostics"
+                && value["params"]["uri"].as_str() == Some(uri.as_str())
+                && value["params"]["diagnostics"]
+                    .as_array()
+                    .is_some_and(|items| items.iter().any(|item| item["code"] == "UnknownScope"))
+        })
         .expect("diagnostic notification");
     assert!(
         diagnostics["params"]["diagnostics"]
@@ -817,7 +823,13 @@ fn memory_transport_preserves_hir_disambiguated_mixed_context_completion() {
 
     let diagnostics = responses
         .iter()
-        .find(|value| value["method"] == "textDocument/publishDiagnostics")
+        .find(|value| {
+            value["method"] == "textDocument/publishDiagnostics"
+                && value["params"]["uri"].as_str() == Some(uri.as_str())
+                && value["params"]["diagnostics"]
+                    .as_array()
+                    .is_some_and(|items| items.iter().any(|item| item["code"] == "InvalidValue"))
+        })
         .expect("diagnostic notification");
     let diagnostics = diagnostics["params"]["diagnostics"]
         .as_array()
