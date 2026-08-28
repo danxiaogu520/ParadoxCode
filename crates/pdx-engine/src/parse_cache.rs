@@ -3,9 +3,9 @@
 //! The cache mirrors the useful part of CWTools Rust's `.cwb` parse cache without persisting
 //! semantic HIR, source text, or source-root state. Entries are keyed by stable file identity and
 //! validated by parser schema, frontend format, source digest, and CST range safety before they
-//! are reused. The compact bincode payload is zstd-compressed to keep the disk cache cheap while
+//! are reused. The compact postcard payload is zstd-compressed to keep the disk cache cheap while
 //! decompression remains bounded by the same 64 MiB safety limit. Cache entries use the maintained
-//! bincode 2 serde adapter and are versioned so older payloads are ordinary misses.
+//! postcard serde adapter and are versioned so older payloads are ordinary misses.
 
 use std::fmt;
 use std::fs::{self, OpenOptions};
@@ -20,10 +20,10 @@ use sha2::{Digest, Sha256};
 use crate::SourceFile;
 
 /// Current on-disk syntax-tree cache schema.
-pub const CURRENT_PARSE_CACHE_SCHEMA_VERSION: u32 = 4;
+pub const CURRENT_PARSE_CACHE_SCHEMA_VERSION: u32 = 5;
 
 const MAX_PARSE_CACHE_BYTES: u64 = 64 * 1024 * 1024;
-const CACHE_NAMESPACE: &[u8] = b"paradoxcode/parse-cache/v4\0";
+const CACHE_NAMESPACE: &[u8] = b"paradoxcode/parse-cache/v5\0";
 static WRITE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 /// A user-local directory containing independent syntax-tree cache entries.
@@ -112,9 +112,9 @@ impl ParseCache {
         }
         let decompressed =
             zstd::bulk::decompress(&bytes, usize::try_from(MAX_PARSE_CACHE_BYTES).ok()?).ok()?;
-        let (entry, consumed): (ParseCacheEntry, usize) =
-            bincode::serde::decode_from_slice(&decompressed, bincode::config::legacy()).ok()?;
-        if consumed != decompressed.len() {
+        let (entry, remaining) =
+            postcard::take_from_bytes::<ParseCacheEntry>(&decompressed).ok()?;
+        if !remaining.is_empty() {
             return None;
         }
         if entry.schema_version != CURRENT_PARSE_CACHE_SCHEMA_VERSION
@@ -146,7 +146,7 @@ impl ParseCache {
             source_sha256: digest(source),
             parsed: parsed.cache_data(),
         };
-        let encoded = bincode::serde::encode_to_vec(&entry, bincode::config::legacy())
+        let encoded = postcard::to_allocvec(&entry)
             .map_err(|error| ParseCacheError::Encode(error.to_string()))?;
         if u64::try_from(encoded.len()).unwrap_or(u64::MAX) > MAX_PARSE_CACHE_BYTES {
             return Err(ParseCacheError::TooLarge {
@@ -310,14 +310,11 @@ mod tests {
         );
         let bytes = zstd::bulk::decompress(&bytes, MAX_PARSE_CACHE_BYTES as usize)
             .expect("decompress cache entry");
-        let (entry, consumed): (ParseCacheEntry, usize) =
-            bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
-                .expect("decode cache entry");
-        assert_eq!(consumed, bytes.len());
-        let compact = bincode::serde::encode_to_vec(&entry.parsed, bincode::config::legacy())
-            .expect("encode compact payload");
-        let legacy = bincode::serde::encode_to_vec(&parsed, bincode::config::legacy())
-            .expect("encode source-bearing payload");
+        let (entry, remaining) =
+            postcard::take_from_bytes::<ParseCacheEntry>(&bytes).expect("decode cache entry");
+        assert!(remaining.is_empty());
+        let compact = postcard::to_allocvec(&entry.parsed).expect("encode compact payload");
+        let legacy = postcard::to_allocvec(&parsed).expect("encode source-bearing payload");
         assert!(compact.len() < legacy.len());
         assert!(
             cache
