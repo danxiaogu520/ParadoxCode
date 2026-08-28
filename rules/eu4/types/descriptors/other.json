@@ -1017,7 +1017,8 @@
     "name_field": null,
     "name_from_file": false,
     "starts_with": "on_harmonized_",
-    "type_key_filter": null
+    "type_key_filter": null,
+    "root_entries": "on_action_entries"
   },
   "opinion_modifier": {
     "name": "opinion_modifier",

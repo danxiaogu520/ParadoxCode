@@ -260,6 +260,14 @@ pub(crate) fn add_semantic_key_items_ranked(
     prefix: &str,
     insert_assignment: bool,
 ) {
+    add_type_root_key_items(
+        snapshot,
+        context,
+        items,
+        replacement_range,
+        prefix,
+        insert_assignment,
+    );
     for candidate in semantic_rules_for_completion(snapshot, context) {
         let rule = candidate.rule;
         if !semantic_scope_allows(rule, candidate.scope) {
@@ -427,6 +435,81 @@ pub(crate) fn add_semantic_key_items_ranked(
             // keys are validated as a shape, but a fixed sample date is not a useful candidate.
             KeyMatcher::AnyScalar | KeyMatcher::Date => {}
         }
+    }
+}
+
+/// Adds the concrete keys that instantiate an enumerated type at a file root.
+///
+/// These roots are not workspace members: `type_root_keys` is the first-party declaration of the
+/// legal names (for example EU4's `on_startup`). The ordinary `root_entries` container carries
+/// the path selection and duplicate suppression, while this helper supplies the type-instance
+/// names when that container has no per-key semantic rule rows.
+fn add_type_root_key_items(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    items: &mut Vec<RankedCompletionItem>,
+    replacement_range: TextRange,
+    prefix: &str,
+    insert_assignment: bool,
+) {
+    if !context.root_entry_container {
+        return;
+    }
+    let Some(entry_name) = context.context.strip_prefix("root:") else {
+        return;
+    };
+    let semantic = &snapshot.rules().model().semantic;
+    let Some((type_name, _)) = semantic.type_descriptors.iter().find(|(_, descriptor)| {
+        descriptor
+            .root_entries
+            .as_deref()
+            .is_some_and(|name| name.eq_ignore_ascii_case(entry_name))
+    }) else {
+        return;
+    };
+    let Some(roots) = semantic.type_root_keys.get(type_name).or_else(|| {
+        semantic
+            .type_root_keys
+            .iter()
+            .find(|(candidate, _)| candidate.eq_ignore_ascii_case(type_name))
+            .map(|(_, roots)| roots)
+    }) else {
+        return;
+    };
+    for label in roots {
+        if context
+            .existing_keys
+            .iter()
+            .any(|key| key.eq_ignore_ascii_case(label))
+        {
+            continue;
+        }
+        let insert_text = if insert_assignment {
+            format!("{label} = {{\n\t$0\n}}")
+        } else {
+            label.clone()
+        };
+        push_completion(
+            items,
+            CompletionItem {
+                label: label.clone(),
+                kind: CompletionKind::Key,
+                detail: type_name.clone(),
+                documentation: None,
+                replacement_range,
+                insert_text,
+                sort_score: 0,
+                deprecated: false,
+                resolve_data: None,
+            },
+            prefix,
+            CompletionRankContext::new(
+                CompletionSchemaTier::CurrentContext,
+                CompletionSpecificity::Exact,
+                false,
+                false,
+            ),
+        );
     }
 }
 
