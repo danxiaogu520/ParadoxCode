@@ -583,12 +583,46 @@ fn initial_scope_state(
     context: &str,
     root_key: &str,
 ) -> ScopeState {
-    let scope = context
-        .strip_prefix("type:")
-        .and_then(|type_name| rules.type_root_scope(type_name, root_key))
-        .or_else(|| profile.root_scope(root_key))
+    if let Some(type_name) = context.strip_prefix("type:") {
+        if let Some(registers) = rules.type_root_scope_registers(type_name, root_key) {
+            let root = initial_scope_value(&registers.root, None, None);
+            let current = initial_scope_value(&registers.this, Some(&root), None);
+            let from = initial_scope_value(&registers.from, Some(&root), Some(&current));
+            return ScopeState::initial_registers(root, current, from);
+        }
+        // A custom type root has no declared concrete scope, but its register defaults still
+        // apply: ROOT/THIS remain unknown and FROM is an unconstrained register.
+        return ScopeState::initial_registers(
+            ScopeValue::Unknown,
+            ScopeValue::Unknown,
+            ScopeValue::Unknown,
+        );
+    }
+    let scope = profile
+        .root_scope(root_key)
         .map_or(ScopeValue::Unknown, |scope| {
             ScopeValue::Known(vec![scope.to_owned()])
         });
     ScopeState::initial(scope)
+}
+
+fn initial_scope_value(
+    expression: &str,
+    root: Option<&ScopeValue>,
+    current: Option<&ScopeValue>,
+) -> ScopeValue {
+    let expression = expression.trim();
+    if expression.is_empty() || expression.eq_ignore_ascii_case("any") {
+        return ScopeValue::Unknown;
+    }
+    if expression.eq_ignore_ascii_case("root") {
+        return root.cloned().unwrap_or(ScopeValue::Unknown);
+    }
+    if expression.eq_ignore_ascii_case("this") {
+        return current
+            .cloned()
+            .or_else(|| root.cloned())
+            .unwrap_or(ScopeValue::Unknown);
+    }
+    ScopeValue::Known(vec![expression.to_owned()])
 }

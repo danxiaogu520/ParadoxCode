@@ -1,6 +1,6 @@
 use crate::canonical::{RuleHash, canonical_hash};
 use crate::matcher::KeyMatcher;
-use crate::model::{FileCategory, RulesModel, SemanticModel, SemanticRule};
+use crate::model::{FileCategory, RulesModel, SemanticModel, SemanticRule, TypeRootScope};
 use crate::{CURRENT_SCHEMA_VERSION, sqlite};
 use pdx_text::LogicalPath;
 
@@ -284,6 +284,20 @@ impl RuleSet {
     /// fallback keeps hand-authored or legacy artifacts case-insensitive.
     #[must_use]
     pub fn type_root_scope(&self, type_name: &str, root_key: &str) -> Option<&str> {
+        self.type_root_scope_registers(type_name, root_key)
+            .map(|scopes| scopes.root.as_str())
+    }
+
+    /// Returns the initial `ROOT`, `THIS`, and `FROM` scope registers for a type root key.
+    ///
+    /// Legacy scalar declarations are normalized by the source compiler to `THIS = ROOT` and
+    /// `FROM = any`, so callers can rely on all three fields being populated.
+    #[must_use]
+    pub fn type_root_scope_registers(
+        &self,
+        type_name: &str,
+        root_key: &str,
+    ) -> Option<&TypeRootScope> {
         let scopes = self
             .model
             .semantic
@@ -297,11 +311,11 @@ impl RuleSet {
                     .find(|(candidate, _)| candidate.eq_ignore_ascii_case(type_name))
                     .map(|(_, scopes)| scopes)
             })?;
-        scopes.get(root_key).map(String::as_str).or_else(|| {
+        scopes.get(root_key).or_else(|| {
             scopes
                 .iter()
                 .find(|(candidate, _)| candidate.eq_ignore_ascii_case(root_key))
-                .map(|(_, scope)| scope.as_str())
+                .map(|(_, scope)| scope)
         })
     }
 

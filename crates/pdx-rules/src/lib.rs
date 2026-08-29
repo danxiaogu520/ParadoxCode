@@ -19,6 +19,7 @@ pub use model::{
     FileCategory, FileResolutionPolicy, LocalisationBinding, LocalisationBindingCondition,
     ParserKind, RuleRecord, RuleShape, RulesModel, ScriptedMacroDescriptor, ScriptedMacroUsage,
     SemanticModel, SemanticRule, SymbolDescriptor, SymbolResolutionPolicy, TypeDescriptor,
+    TypeRootScope,
 };
 pub use profile::{
     GameProfile, ProfileConditionalDefinitionRule, ProfileContainerDefinitionRule,
@@ -30,7 +31,7 @@ pub use profile::{
 pub use runtime::{RuleSet, RulesError};
 
 /// The first runtime schema version reserved for the generated rule database.
-pub const CURRENT_SCHEMA_VERSION: u32 = 22;
+pub const CURRENT_SCHEMA_VERSION: u32 = 24;
 
 #[cfg(test)]
 mod tests;

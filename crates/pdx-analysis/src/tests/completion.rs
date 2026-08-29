@@ -258,10 +258,25 @@ fn on_action_file_root_offers_declared_actions() {
         "effect keys must not leak into the on_action file root: {:?}",
         result.items
     );
+    let startup = by_label("on_startup").expect("on_startup");
     assert_eq!(
-        by_label("on_startup").expect("on_startup").insert_text,
-        "on_startup = {\n\t$0\n}",
+        startup.insert_text, "on_startup = {\n\t$0\n}",
         "on_action roots must insert a block skeleton"
+    );
+    assert_eq!(
+        startup.documentation.as_deref(),
+        Some(
+            "ROOT is the country. Prefer a scripted effect for complex startup logic so the on_action remains easy to overview."
+        )
+    );
+    assert_eq!(
+        by_label("on_mercenary_recruited")
+            .expect("on_mercenary_recruited")
+            .documentation
+            .as_deref(),
+        Some(
+            "ROOT is the mercenary company; THIS is the recruiting province; FROM is the recruiting country."
+        )
     );
 
     let mut prefixed_host =
@@ -315,6 +330,42 @@ fn on_action_file_root_offers_declared_actions() {
         "declared actions must not repeat at the root gap: {:?}",
         gap.items
     );
+}
+
+#[test]
+fn on_action_entries_seed_documented_initial_scopes() {
+    use std::path::PathBuf;
+
+    for (action, expected_root, expected_this, expected_from) in [
+        ("on_startup", "country", "country", "any"),
+        ("on_adm_development", "province", "province", "any"),
+        ("on_battle_won_unit", "unit", "unit", "any"),
+        ("on_battle_won_province", "province", "province", "country"),
+        (
+            "on_mercenary_recruited",
+            "mercenary_company",
+            "province",
+            "country",
+        ),
+    ] {
+        let text = format!("{action} = {{\n\t\n}}\n");
+        let path = format!("common/on_actions/{action}.txt");
+        let id = DocumentId::new(format!("file:///tmp/{path}"));
+        let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+        host.open_document(id.clone(), 1, text.clone(), Some(PathBuf::from(&path)))
+            .expect("open on_action document");
+
+        let snapshot = host.snapshot();
+        let input = input_for_document(&snapshot, &id).expect("analysis input");
+        let position = u32::try_from(text.find("\t\n").expect("empty action body") + 1)
+            .expect("completion position");
+        let context = semantic_completion_context(&snapshot, &input, position)
+            .expect("on_action semantic context");
+        assert_eq!(context.context, "type:on_action");
+        assert_eq!(context.scope.root, expected_root, "{action} root scope");
+        assert_eq!(context.scope.current, expected_this, "{action} THIS scope");
+        assert_eq!(context.scope.from, [expected_from], "{action} FROM scope");
+    }
 }
 
 #[test]

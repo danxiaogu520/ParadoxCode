@@ -2,5 +2,804 @@
   "event": {
     "country_event": "country",
     "province_event": "province"
+  },
+  "on_action": {
+    "consort_on_shipwreck": "country",
+    "heir_on_shipwreck": "country",
+    "monarch_on_shipwreck": {
+      "root": "country",
+      "documentation": ["ROOT is the country whose monarch was lost in the shipwreck."]
+    },
+    "on_abandon_colony": {
+      "root": "province",
+      "from": "country",
+      "documentation": [
+        "ROOT is the colony province; FROM is the country abandoning it. This action fires before the colony is abandoned."
+      ]
+    },
+    "on_accept_tribute": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the country receiving tribute; FROM is its overlord."]
+    },
+    "on_add_pasha": {
+      "root": "province",
+      "documentation": ["THIS/ROOT is one province in the state receiving the pasha."]
+    },
+    "on_added_to_trade_company": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the province added to a trade company; FROM is the country doing it."]
+    },
+    "on_adm_advisor_hired": {
+      "root": "country",
+      "documentation": ["This action executes after on_advisor_hired for an ADM advisor."]
+    },
+    "on_adm_development": {
+      "root": "province",
+      "documentation": ["ROOT is the province where administrative development changed."]
+    },
+    "on_adm_exploited": {
+      "root": "province",
+      "documentation": ["ROOT is the province whose administrative development was exploited."]
+    },
+    "on_adm_tech_taken": {
+      "root": "country",
+      "documentation": ["This action executes after on_tech_taken for an ADM technology."]
+    },
+    "on_admiral_recruited": {
+      "root": "country",
+      "documentation": ["ROOT is the country recruiting the admiral."]
+    },
+    "on_advisor_hired": {
+      "root": "country",
+      "documentation": ["ROOT is the country hiring the advisor."]
+    },
+    "on_alliance_broken": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the original alliance creator; FROM is the alliance accepter."]
+    },
+    "on_alliance_created": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the alliance sender; FROM is the alliance accepter."]
+    },
+    "on_annexed": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the annexed nation; FROM is the nation performing the annexation."]
+    },
+    "on_bankruptcy": {
+      "root": "country",
+      "documentation": ["ROOT is the country entering bankruptcy."]
+    },
+    "on_banner_raised": "province",
+    "on_barrage": {
+      "root": "country",
+      "from": "province",
+      "documentation": ["ROOT is the country performing the barrage; FROM is the province being barraged."]
+    },
+    "on_battle_lost_country": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the losing country; FROM is the winning country."]
+    },
+    "on_battle_lost_province": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the battle location; FROM is the winning country."]
+    },
+    "on_battle_lost_unit": {
+      "root": "unit",
+      "documentation": ["This is the unit-scope on_action for a lost battle."]
+    },
+    "on_battle_won_country": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the winning country; FROM is the losing country."]
+    },
+    "on_battle_won_province": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the battle location; FROM is the losing country."]
+    },
+    "on_battle_won_unit": {
+      "root": "unit",
+      "documentation": ["This is the unit-scope on_action for a won battle."]
+    },
+    "on_become_free_city": "country",
+    "on_bi_yearly_pulse": "country",
+    "on_bi_yearly_pulse_2": "country",
+    "on_bi_yearly_pulse_3": "country",
+    "on_bi_yearly_pulse_4": "country",
+    "on_bi_yearly_pulse_5": "country",
+    "on_buy_religious_reform": "country",
+    "on_capital_moved": {
+      "root": "province",
+      "from": "province",
+      "documentation": ["ROOT is the new capital province; FROM is the old capital province."]
+    },
+    "on_caravel_raised": "province",
+    "on_carolean_raised": "province",
+    "on_cawa_raised": "province",
+    "on_center_of_trade_downgrade": "province",
+    "on_center_of_trade_upgrade": "province",
+    "on_centralized_state": {
+      "root": "province",
+      "documentation": ["ROOT is the province that was centralized."]
+    },
+    "on_change_hre_religion": "country",
+    "on_change_revolution_target": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["THIS is the new revolution target; FROM is the previous target. Either tag may be absent."]
+    },
+    "on_chinese_empire_dismantled": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the current nation; FROM is the former Emperor when the Chinese Empire is dismantled."]
+    },
+    "on_circumnavigation": "country",
+    "on_colonial_liberation": {
+      "root": "country",
+      "documentation": ["ROOT is the country involved in colonial liberation."]
+    },
+    "on_colonial_nation_established": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the new colonial nation; FROM is its parent country."]
+    },
+    "on_colonial_pulse": "province",
+    "on_colonial_reintegration": {
+      "root": "country",
+      "documentation": ["ROOT is the country involved in colonial reintegration."]
+    },
+    "on_colonial_type_change": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the colony; FROM is its overlord."]
+    },
+    "on_colonist_boosting_colony": {
+      "root": "province",
+      "from": "any",
+      "documentation": ["ROOT/THIS is the colony province; FROM is the owner country or a source province for minority expulsion."]
+    },
+    "on_colony_established": {
+      "root": "province",
+      "from": "any",
+      "documentation": ["ROOT/THIS is the newly created colony province; FROM is normally its owner country or a source province for minority expulsion."]
+    },
+    "on_colony_finished": {
+      "root": "province",
+      "documentation": ["ROOT is the province where the colony finished."]
+    },
+    "on_company_chartered": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the trade-company province; FROM is the previous country."]
+    },
+    "on_company_disolved": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the trade-company province; FROM is the country performing the change."]
+    },
+    "on_company_formed": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the trade-company province; FROM is the country forming the company."]
+    },
+    "on_concentrate_development": "province",
+    "on_conquest": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the province taken by a new owner; FROM is the previous owner. The action fires when the takeover occurs."]
+    },
+    "on_conquistador_empty": { "root": "province", "from": "country" },
+    "on_conquistador_native": { "root": "province", "from": "country" },
+    "on_conquistador_recruited": {
+      "root": "country",
+      "documentation": ["ROOT is the country recruiting the conquistador."]
+    },
+    "on_consecrate_patriarch": {
+      "root": "province",
+      "documentation": ["ROOT is the province being consecrated."]
+    },
+    "on_convert_by_trade_policy": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["THIS/ROOT is the province; FROM is the country propagating the conversion through its trade policy."]
+    },
+    "on_core": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the province receiving a core; FROM is the country receiving that core."]
+    },
+    "on_cossack_raised": "province",
+    "on_country_creation": "country",
+    "on_country_released": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["THIS/ROOT is the released country; FROM is the country releasing it."]
+    },
+    "on_create_client_state": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["THIS/ROOT is the new client state; FROM is its parent country."]
+    },
+    "on_create_vassal": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the new vassal; FROM is its overlord."]
+    },
+    "on_culture_demoted": "country",
+    "on_culture_promoted": "province",
+    "on_death_election": {
+      "root": "country",
+      "documentation": ["ROOT is the country where a ruler's death triggers an election."]
+    },
+    "on_death_foreign_slave_ruler": {
+      "root": "country",
+      "documentation": ["ROOT is the country whose foreign slave ruler died."]
+    },
+    "on_death_has_harem": "country",
+    "on_defender_of_faith_claim": "country",
+    "on_defender_of_faith_loss": {
+      "root": "country",
+      "documentation": ["ROOT is the country losing Defender of the Faith status."]
+    },
+    "on_dependency_gained": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the overlord; FROM is the minor country gaining the dependency."]
+    },
+    "on_dependency_lost": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the overlord; FROM is the minor country losing the dependency."]
+    },
+    "on_dip_advisor_hired": {
+      "root": "country",
+      "documentation": ["This action executes after on_advisor_hired for a DIP advisor."]
+    },
+    "on_dip_development": {
+      "root": "province",
+      "documentation": ["ROOT is the province where diplomatic development changed."]
+    },
+    "on_dip_exploited": "province",
+    "on_dip_tech_taken": {
+      "root": "country",
+      "documentation": ["This action executes after on_tech_taken for a DIP technology."]
+    },
+    "on_diplomatic_annex": {
+      "root": "country",
+      "documentation": ["The action runs in the annexing country; ROOT identifies the annexation target."]
+    },
+    "on_dismantle_revolution": {
+      "root": "country",
+      "this": "country",
+      "from": "country",
+      "documentation": ["THIS is the revolutionary country being defeated; FROM is the country enforcing the peace treaty."]
+    },
+    "on_embrace_revolution": "country",
+    "on_emperor_elected": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the newly elected Emperor; FROM is the previous Emperor."]
+    },
+    "on_enforce_rebel_demands": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["This action fires when rebel demands are enforced through a Support Rebels war."]
+    },
+    "on_estate_led_regency": "country",
+    "on_estate_led_regency_surpassed": "country",
+    "on_estate_removed": "country",
+    "on_expanded_infrastructure": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the province whose infrastructure was expanded; FROM is the country doing it."]
+    },
+    "on_expanded_infrastructure_removed": "province",
+    "on_explore_coast": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the discovered province; FROM is the country performing the exploration."]
+    },
+    "on_explorer_recruited": {
+      "root": "country",
+      "documentation": ["ROOT is the country recruiting the explorer."]
+    },
+    "on_extend_regency": {
+      "root": "country",
+      "documentation": ["ROOT is the country extending its regency."]
+    },
+    "on_extended_regency": "country",
+    "on_federation_leader_change": "country",
+    "on_fetishist_cult_change": "country",
+    "on_five_year_pulse": "country",
+    "on_five_year_pulse_2": {
+      "root": "country",
+      "documentation": ["This is the estates pulse."]
+    },
+    "on_five_year_pulse_3": "country",
+    "on_five_year_pulse_4": "country",
+    "on_flagship_captured": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the country capturing the flagship; FROM is the country losing it."]
+    },
+    "on_flagship_destroyed": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the country destroying the flagship; FROM is the country losing it."]
+    },
+    "on_force_conversion": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the converted country; FROM is the country forcing the conversion. This can come from a religious peace or an enforce-religion interaction."]
+    },
+    "on_four_year_pulse": "country",
+    "on_four_year_pulse_2": "country",
+    "on_four_year_pulse_3": "country",
+    "on_four_year_pulse_4": "country",
+    "on_gain_great_power_status": {
+      "root": "country",
+      "documentation": ["ROOT is the country gaining great-power status."]
+    },
+    "on_galleass_raised": "province",
+    "on_galleon_raised": "province",
+    "on_general_recruited": {
+      "root": "country",
+      "documentation": ["ROOT is the country recruiting the general."]
+    },
+    "on_geobukseon_raised": "province",
+    "on_golden_bull_enacted": {
+      "root": "country",
+      "documentation": ["THIS/ROOT is the Curia controller enacting the Golden Bull."]
+    },
+    "on_government_change": {
+      "root": "country",
+      "documentation": ["This action fires when a non-native country changes government type."]
+    },
+    "on_grant_estate_land": "province",
+    "on_great_project_constructed": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the great-project province; FROM is its owner. The action fires after construction finishes."]
+    },
+    "on_harmonized_buddhism": {
+      "root": "country",
+      "documentation": ["This action is used for Theravada harmonization."]
+    },
+    "on_harmonized_christian": "country",
+    "on_harmonized_dharmic": "country",
+    "on_harmonized_jewish_group": "country",
+    "on_harmonized_mahayana": "country",
+    "on_harmonized_muslim": "country",
+    "on_harmonized_pagan": {
+      "root": "country",
+      "documentation": ["This action is used for pagan harmonization."]
+    },
+    "on_harmonized_shinto": "country",
+    "on_harmonized_vajrayana": "country",
+    "on_harmonized_zoroastrian_group": "country",
+    "on_heir_death": {
+      "root": "country",
+      "documentation": ["ROOT is the country whose heir died."]
+    },
+    "on_heir_disinherited": "country",
+    "on_heir_needed_theocracy": {
+      "root": "country",
+      "documentation": ["This action fires when a theocracy has no heir."]
+    },
+    "on_holy_order_established": {
+      "root": "country",
+      "documentation": ["ROOT is the country establishing the holy order; its first province in the state is set."]
+    },
+    "on_hre_defense": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["This action fires when the Emperor comes to the defense of an HRE member."]
+    },
+    "on_hre_dismantled": "country",
+    "on_hre_member_annexed": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["This action fires when an HRE member is annexed by a non-HRE country."]
+    },
+    "on_hre_member_false_religion": {
+      "root": "country",
+      "documentation": ["This action fires when an HRE prince converts to a religion other than the Emperor's."]
+    },
+    "on_hre_member_true_religion": {
+      "root": "country",
+      "documentation": ["This action fires when an HRE prince converts to the Emperor's religion."]
+    },
+    "on_hre_non_defense": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["This action fires when the Emperor does not come to the defense of an HRE member."]
+    },
+    "on_hre_province_reconquest": {
+      "root": "province",
+      "documentation": ["ROOT is the HRE province reconquered by an HRE member in a peace treaty."]
+    },
+    "on_hre_reform_passed": "country",
+    "on_hre_released_vassal": {
+      "root": "country",
+      "documentation": ["This action fires when an HRE member is released from non-HRE vassalage."]
+    },
+    "on_hre_religion_white_peace": "country",
+    "on_hre_transfered_vassal": {
+      "root": "country",
+      "documentation": ["This action fires when an HRE member becomes a vassal of the Emperor instead of a non-HRE country."]
+    },
+    "on_hre_wins_defensive_war": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["This action fires when the Emperor wins an HRE defensive war."]
+    },
+    "on_hussars_raised": "province",
+    "on_institution_embracement": "country",
+    "on_integrate": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["This action fires after a nation is integrated following a union."]
+    },
+    "on_janissaries_raised": {
+      "root": "province",
+      "documentation": ["THIS/ROOT is the province where the Janissaries are raised."]
+    },
+    "on_leader_recruited": {
+      "root": "country",
+      "documentation": ["ROOT is the country recruiting the leader."]
+    },
+    "on_loan_repaid": {
+      "root": "country",
+      "documentation": ["THIS/ROOT is the country repaying the loan."]
+    },
+    "on_lock_hre_religion": "country",
+    "on_lose_great_power_status": {
+      "root": "country",
+      "documentation": ["ROOT is the country losing great-power status."]
+    },
+    "on_main_war_lost": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the losing country; FROM is the winning country."]
+    },
+    "on_main_war_won": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the winning country; FROM is the losing country."]
+    },
+    "on_mamluks_raised": "province",
+    "on_man_of_war_raised": "province",
+    "on_mandate_of_heaven_gained": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the new Emperor of China; FROM is the old Emperor."]
+    },
+    "on_mandate_of_heaven_lost": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the old Emperor of China; FROM is the new Emperor."]
+    },
+    "on_mandate_reform_passed": "country",
+    "on_marine_raised": "province",
+    "on_mercenary_recruited": {
+      "root": "mercenary_company",
+      "this": "province",
+      "from": "country",
+      "documentation": ["ROOT is the mercenary company; THIS is the recruiting province; FROM is the recruiting country."]
+    },
+    "on_mil_advisor_hired": {
+      "root": "country",
+      "documentation": ["This action executes after on_advisor_hired for a MIL advisor."]
+    },
+    "on_mil_development": {
+      "root": "province",
+      "documentation": ["ROOT is the province where military development changed."]
+    },
+    "on_mil_exploited": "province",
+    "on_mil_tech_taken": {
+      "root": "country",
+      "documentation": ["This action executes after on_tech_taken for a MIL technology."]
+    },
+    "on_minority_expelled": {
+      "root": "province",
+      "this": "province",
+      "from": "province",
+      "documentation": ["ROOT/THIS is the colony receiving the minority; FROM is the home province."]
+    },
+    "on_monarch_death": {
+      "root": "country",
+      "documentation": ["ROOT is the country whose monarch died."]
+    },
+    "on_monthly_pulse": {
+      "root": "country",
+      "documentation": ["This is the country-scoped monthly random-events pulse."]
+    },
+    "on_musketeer_raised": "province",
+    "on_national_focus_change": "country",
+    "on_native_change_government": {
+      "root": "country",
+      "documentation": ["This action fires when a native changes government after completing all advancement groups."]
+    },
+    "on_naval_barrage": {
+      "root": "country",
+      "from": "province",
+      "documentation": ["ROOT is the country performing the naval barrage; FROM is the province being barraged."]
+    },
+    "on_new_age": "country",
+    "on_new_consort": "country",
+    "on_new_heir": {
+      "root": "country",
+      "documentation": ["ROOT is the country receiving the new heir."]
+    },
+    "on_new_monarch": {
+      "root": "country",
+      "documentation": ["ROOT is the country with the new monarch; personal-union junior countries may also trigger this action."]
+    },
+    "on_new_term_election": {
+      "root": "country",
+      "documentation": ["ROOT is the country holding the new-term election."]
+    },
+    "on_overextension_pulse": "country",
+    "on_overrun": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the winner; FROM is the loser when a stack is wiped out."]
+    },
+    "on_parliament_debate_failed": {
+      "root": "country",
+      "documentation": ["ROOT is the country whose parliament debate failed."]
+    },
+    "on_parliament_debate_reset": {
+      "root": "country",
+      "documentation": ["ROOT is the country whose parliament debate was reset."]
+    },
+    "on_parliament_debate_succeeded": {
+      "root": "country",
+      "documentation": ["ROOT is the country whose parliament debate succeeded."]
+    },
+    "on_parliament_seat_given": {
+      "root": "province",
+      "documentation": ["ROOT is the province receiving a parliament seat."]
+    },
+    "on_parliament_seat_lost": {
+      "root": "province",
+      "documentation": ["ROOT is the province losing a parliament seat."]
+    },
+    "on_peace_actor": {
+      "root": "country",
+      "documentation": ["ROOT is the country acting in the peace interaction."]
+    },
+    "on_peace_recipient": {
+      "root": "country",
+      "documentation": ["ROOT is the country receiving the peace interaction."]
+    },
+    "on_pillaged_capital": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the country doing the pillaging; FROM is the country whose capital was pillaged."]
+    },
+    "on_post_adm_advisor_fired": {
+      "root": "country",
+      "documentation": ["THIS/ROOT is the country after its ADM advisor is fired or replaced."]
+    },
+    "on_post_dip_advisor_fired": {
+      "root": "country",
+      "documentation": ["THIS/ROOT is the country after its DIP advisor is fired or replaced."]
+    },
+    "on_post_mil_advisor_fired": {
+      "root": "country",
+      "documentation": ["THIS/ROOT is the country after its MIL advisor is fired or replaced."]
+    },
+    "on_pre_adm_advisor_fired": {
+      "root": "country",
+      "documentation": ["THIS/ROOT is the country before its ADM advisor is removed; define a replacement in the post action instead."]
+    },
+    "on_pre_dip_advisor_fired": {
+      "root": "country",
+      "documentation": ["THIS/ROOT is the country before its DIP advisor is removed."]
+    },
+    "on_pre_mil_advisor_fired": {
+      "root": "country",
+      "documentation": ["THIS/ROOT is the country before its MIL advisor is removed."]
+    },
+    "on_primary_culture_changed": "country",
+    "on_province_culture_changed": {
+      "root": "province",
+      "documentation": ["ROOT is the province affected by a general culture conversion through effects."]
+    },
+    "on_province_culture_converted": {
+      "root": "province",
+      "documentation": ["ROOT is the province affected by manual culture conversion."]
+    },
+    "on_province_owner_change": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the province whose owner changed; FROM is the old owner."]
+    },
+    "on_province_religion_changed": "province",
+    "on_province_religion_converted": {
+      "root": "province",
+      "documentation": ["ROOT is the province whose religion was converted."]
+    },
+    "on_qizilbash_raised": "province",
+    "on_queen_death": {
+      "root": "country",
+      "documentation": ["ROOT is the country whose queen died."]
+    },
+    "on_raid_coast": {
+      "root": "country",
+      "from": "province",
+      "documentation": ["THIS/ROOT is the raiding country; FROM is the sea province."]
+    },
+    "on_rajput_raised": "province",
+    "on_raze": "province",
+    "on_rebels_break_country": {
+      "root": "country",
+      "documentation": ["THIS/ROOT is the country broken by rebels."]
+    },
+    "on_reform_changed": "province",
+    "on_reform_enacted": "province",
+    "on_refuse_tribute": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the country handling the tribute; FROM is its overlord."]
+    },
+    "on_regent": {
+      "root": "country",
+      "documentation": ["ROOT is the country with a regent."]
+    },
+    "on_regiment_recruited": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["THIS/ROOT is the recruiting province; FROM is the recruiting country."]
+    },
+    "on_released_hre_member": {
+      "root": "country",
+      "documentation": ["ROOT is the HRE prince released by the Emperor."]
+    },
+    "on_religion_change": {
+      "root": "country",
+      "documentation": ["ROOT is the country whose religion changed."]
+    },
+    "on_remove_free_city": "country",
+    "on_remove_pasha": {
+      "root": "province",
+      "documentation": ["THIS/ROOT is one province in the state losing the pasha."]
+    },
+    "on_removed_from_company": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the trade-company province; FROM is the country doing it."]
+    },
+    "on_replace_governor": {
+      "root": "country",
+      "documentation": ["ROOT is the country replacing its governor."]
+    },
+    "on_revoke_estate_land": "province",
+    "on_revoke_estate_land_ai": {
+      "root": "province",
+      "documentation": ["ROOT is the province involved in the AI estate-land revocation; gradual revocation and rebel handling are not reliable here."]
+    },
+    "on_revoke_estate_land_ai_post": "province",
+    "on_revoke_estate_land_post": "province",
+    "on_revolutionary_guard_raised": "province",
+    "on_royal_marriage": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the marriage sender; FROM is the marriage accepter."]
+    },
+    "on_royal_marriage_broken": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the original marriage creator; FROM is the marriage accepter."]
+    },
+    "on_samurai_raised": "province",
+    "on_scorch_earth": {
+      "root": "country",
+      "from": "province",
+      "documentation": ["ROOT is the country scorching earth; FROM is the scorched province."]
+    },
+    "on_secondary_religion_change": {
+      "root": "country",
+      "documentation": ["ROOT is the country whose secondary religion changed."]
+    },
+    "on_select_heir_from_harem": "country",
+    "on_separate_war_lost": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the losing country; FROM is the winning country."]
+    },
+    "on_separate_war_won": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the winning country; FROM is the losing country."]
+    },
+    "on_siberian_pulse": "province",
+    "on_siege_lost_country": {
+      "root": "country",
+      "from": "province",
+      "documentation": ["ROOT is the losing country; FROM is the siege location."]
+    },
+    "on_siege_lost_province": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the siege location; FROM is the winning country."]
+    },
+    "on_siege_won_country": {
+      "root": "country",
+      "from": "province",
+      "documentation": ["ROOT is the winning country; FROM is the siege location."]
+    },
+    "on_siege_won_province": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the siege location; FROM is the losing country."]
+    },
+    "on_slacken_start": "country",
+    "on_slacken_stop": "country",
+    "on_startup": {
+      "root": "country",
+      "documentation": ["ROOT is the country. Prefer a scripted effect for complex startup logic so the on_action remains easy to overview."]
+    },
+    "on_streltsy_raised": "province",
+    "on_successive_emperor": {
+      "root": "country",
+      "documentation": ["ROOT is the Emperor from the same dynasty as the previous Emperor."]
+    },
+    "on_tech_taken": {
+      "root": "country",
+      "documentation": ["ROOT is the country taking the technology."]
+    },
+    "on_tercio_raised": "province",
+    "on_thri_yearly_pulse": {
+      "root": "country",
+      "documentation": ["This is the country-scoped three-year random-events pulse."]
+    },
+    "on_thri_yearly_pulse_2": "country",
+    "on_thri_yearly_pulse_3": "country",
+    "on_thri_yearly_pulse_4": "country",
+    "on_trade_company_investment": "province",
+    "on_trade_good_changed": {
+      "root": "province",
+      "from": "country",
+      "documentation": ["ROOT is the province whose trade good changed; FROM is the country triggering the change."]
+    },
+    "on_transfer_development": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the country receiving development; FROM is the country it was transferred from. Normal concentration may leave FROM unset."]
+    },
+    "on_voc_indiamen_raised": "province",
+    "on_war_ended": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the winning country; FROM is the losing country when the war ends."]
+    },
+    "on_war_lost": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the losing country; FROM is the winning country."]
+    },
+    "on_war_won": {
+      "root": "country",
+      "from": "country",
+      "documentation": ["ROOT is the winning country; FROM is the losing country."]
+    },
+    "on_weak_heir_claim": {
+      "root": "country",
+      "documentation": ["ROOT is the country whose heir has a weak claim."]
+    },
+    "on_yearly_pulse": "country",
+    "on_yearly_pulse_2": "country",
+    "on_yearly_pulse_3": "country",
+    "on_yearly_pulse_4": "country",
+    "on_yearly_pulse_5": "country"
   }
 }

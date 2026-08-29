@@ -2,7 +2,7 @@ use super::{
     CURRENT_SCHEMA_VERSION, FileCategory, FileMatcher, FileResolutionPolicy, GameProfile,
     KeyMatcher, ParserKind, ProfileMatchMode, ProfileTextMatcher, RuleRecord, RuleSet, RuleShape,
     RulesModel, ScriptedMacroDescriptor, ScriptedMacroUsage, SemanticRule, TypeDescriptor,
-    ValueMatcher,
+    TypeRootScope, ValueMatcher,
 };
 use pdx_text::LogicalPath;
 use std::collections::BTreeMap;
@@ -301,14 +301,51 @@ fn type_root_scope_lookup_is_case_insensitive() {
     let mut model = RulesModel::default();
     model.semantic.type_root_scopes.insert(
         "event".to_owned(),
-        BTreeMap::from([("country_event".to_owned(), "country".to_owned())]),
+        BTreeMap::from([(
+            "country_event".to_owned(),
+            TypeRootScope {
+                root: "country".to_owned(),
+                this: "country".to_owned(),
+                from: "any".to_owned(),
+                documentation: Vec::new(),
+            },
+        )]),
     );
     let rules = RuleSet::from_model(model);
     assert_eq!(
         rules.type_root_scope("EVENT", "COUNTRY_EVENT"),
         Some("country")
     );
+    let registers = rules
+        .type_root_scope_registers("EVENT", "COUNTRY_EVENT")
+        .expect("scope registers");
+    assert_eq!(registers.root, "country");
+    assert_eq!(registers.this, "country");
+    assert_eq!(registers.from, "any");
     assert_eq!(rules.type_root_scope("missing", "country_event"), None);
+}
+
+#[test]
+fn type_root_scope_registers_apply_legacy_and_structured_defaults() {
+    let legacy: TypeRootScope = serde_json::from_str("\"country\"").expect("legacy scope");
+    assert_eq!(
+        legacy,
+        TypeRootScope {
+            root: "country".to_owned(),
+            this: "country".to_owned(),
+            from: "any".to_owned(),
+            documentation: Vec::new(),
+        }
+    );
+
+    let structured: TypeRootScope = serde_json::from_str(
+        r#"{"root":"province","from":"country","documentation":["scope note"]}"#,
+    )
+    .expect("structured scope");
+    assert_eq!(structured.root, "province");
+    assert_eq!(structured.this, "province");
+    assert_eq!(structured.from, "country");
+    assert_eq!(structured.documentation, ["scope note"]);
 }
 
 #[test]
@@ -383,6 +420,40 @@ fn canonical_hash_includes_root_entries_metadata() {
         .get_mut("entry_type")
         .expect("entry descriptor")
         .root_entries = None;
+
+    assert_ne!(
+        RuleSet::from_model(first).rule_hash(),
+        RuleSet::from_model(second).rule_hash()
+    );
+}
+
+#[test]
+fn canonical_hash_includes_type_root_documentation() {
+    let mut first = RulesModel {
+        game_id: "test-game".to_owned(),
+        ..RulesModel::default()
+    };
+    first.semantic.type_root_scopes.insert(
+        "on_action".to_owned(),
+        BTreeMap::from([(
+            "on_startup".to_owned(),
+            TypeRootScope {
+                root: "country".to_owned(),
+                this: "country".to_owned(),
+                from: "any".to_owned(),
+                documentation: vec!["startup note".to_owned()],
+            },
+        )]),
+    );
+    let mut second = first.clone();
+    second
+        .semantic
+        .type_root_scopes
+        .get_mut("on_action")
+        .expect("on_action scopes")
+        .get_mut("on_startup")
+        .expect("on_startup scope")
+        .documentation = vec!["different startup note".to_owned()];
 
     assert_ne!(
         RuleSet::from_model(first).rule_hash(),
@@ -486,11 +557,30 @@ fn sqlite_round_trip_validates_logical_hash() {
             ..TypeDescriptor::default()
         },
     );
+    model.semantic.type_root_scopes.insert(
+        "on_action".to_owned(),
+        BTreeMap::from([(
+            "on_mercenary_recruited".to_owned(),
+            TypeRootScope {
+                root: "mercenary_company".to_owned(),
+                this: "province".to_owned(),
+                from: "country".to_owned(),
+                documentation: vec!["Mercenary scope documentation".to_owned()],
+            },
+        )]),
+    );
     let rules = RuleSet::from_model(model);
     rules.write_sqlite(&path).expect("write rules");
     let loaded = RuleSet::load(&path).expect("load rules");
     assert_eq!(loaded, rules);
     assert_eq!(loaded.game_id(), "test-game");
+    let registers = loaded
+        .type_root_scope_registers("on_action", "on_mercenary_recruited")
+        .expect("persisted scope registers");
+    assert_eq!(registers.root, "mercenary_company");
+    assert_eq!(registers.this, "province");
+    assert_eq!(registers.from, "country");
+    assert_eq!(registers.documentation, ["Mercenary scope documentation"]);
     assert!(loaded.ensure_game("test-game").is_ok());
     assert!(matches!(
         loaded.ensure_game("another-game"),

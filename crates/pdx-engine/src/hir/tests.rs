@@ -773,6 +773,7 @@ fn profile_lowering_caches_semantic_root_context_and_initial_scope() {
         fact.state.current,
         vec![ScopeValue::Known(vec!["country".to_owned()])]
     );
+    assert_eq!(fact.state.from, vec![ScopeValue::Unknown]);
     assert_eq!(hir.scope_fact(fact.range, "TYPE:EVENT"), Some(fact));
     let tax = hir
         .properties()
@@ -808,6 +809,36 @@ fn profile_lowering_caches_semantic_root_context_and_initial_scope() {
             .as_ref()
             .and_then(|state| state.current.first()),
         Some(&ScopeValue::Known(vec!["province".to_owned()]))
+    );
+}
+
+#[test]
+fn on_action_lowering_seeds_distinct_root_this_and_from_registers() {
+    let rules = first_party_rules().expect("embedded rules");
+    let path = LogicalPath::parse("common/on_actions/mercenary.txt").expect("logical path");
+    let hir = lower_with_profile(
+        parse(
+            FileFormat::Script,
+            "on_mercenary_recruited = { on_mercenary_recruited_effect = yes }\n",
+        ),
+        &path,
+        &rules,
+        &profile(),
+    );
+
+    let fact = hir.scope_facts().first().expect("on_action scope fact");
+    assert_eq!(fact.context, "type:on_action");
+    assert_eq!(
+        fact.state.root,
+        ScopeValue::Known(vec!["mercenary_company".to_owned()])
+    );
+    assert_eq!(
+        fact.state.current,
+        vec![ScopeValue::Known(vec!["province".to_owned()])]
+    );
+    assert_eq!(
+        fact.state.from,
+        vec![ScopeValue::Known(vec!["country".to_owned()])]
     );
 }
 

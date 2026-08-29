@@ -1,7 +1,7 @@
 use crate::matcher::{FileMatcher, KeyMatcher, ValueMatcher};
 use crate::runtime::RulesError;
 use pdx_text::LogicalPath;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 /// Parser families understood by the workspace.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Ord, PartialOrd, Serialize)]
@@ -357,6 +357,75 @@ pub struct SemanticRule {
     pub line: u32,
 }
 
+/// Initial scope-register metadata for one semantic type root.
+///
+/// A type root may enter the game with different values in the `ROOT`, `THIS`, and `FROM`
+/// registers. The authoring format accepts the legacy scalar form (`"country"`) as shorthand for
+/// `root = country`, `this = country`, and `from = any`; structured values can override the latter
+/// two fields explicitly.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct TypeRootScope {
+    /// Scope type held by the `ROOT` register.
+    pub root: String,
+    /// Scope type held by the active `THIS` register.
+    pub this: String,
+    /// Scope type held by the nearest `FROM` register, or `any` when it is not defined.
+    pub from: String,
+    /// Documentation comments attached to the type-root declaration.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub documentation: Vec<String>,
+}
+
+impl TypeRootScope {
+    fn from_root(root: String) -> Self {
+        Self {
+            this: root.clone(),
+            root,
+            from: "any".to_owned(),
+            documentation: Vec::new(),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum TypeRootScopeSource {
+    Legacy(String),
+    Structured(TypeRootScopeFields),
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TypeRootScopeFields {
+    root: String,
+    #[serde(default)]
+    this: Option<String>,
+    #[serde(default)]
+    from: Option<String>,
+    #[serde(default)]
+    documentation: Vec<String>,
+}
+
+impl<'de> Deserialize<'de> for TypeRootScope {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match TypeRootScopeSource::deserialize(deserializer)? {
+            TypeRootScopeSource::Legacy(root) => Ok(Self::from_root(root)),
+            TypeRootScopeSource::Structured(fields) => {
+                let root = fields.root;
+                Ok(Self {
+                    this: fields.this.unwrap_or_else(|| root.clone()),
+                    from: fields.from.unwrap_or_else(|| "any".to_owned()),
+                    root,
+                    documentation: fields.documentation,
+                })
+            }
+        }
+    }
+}
+
 /// Static semantic rule data needed by runtime matching.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -367,8 +436,8 @@ pub struct SemanticModel {
     pub enum_values: BTreeMap<String, Vec<String>>,
     /// Concrete root keys selected by `type_key_filter` for each semantic type.
     pub type_root_keys: BTreeMap<String, Vec<String>>,
-    /// Initial scope selected by a type subtype's `type_key_filter` and `push_scope`.
-    pub type_root_scopes: BTreeMap<String, BTreeMap<String, String>>,
+    /// Initial `ROOT`, `THIS`, and `FROM` registers selected by a type root entry.
+    pub type_root_scopes: BTreeMap<String, BTreeMap<String, TypeRootScope>>,
     /// File/root metadata declared by semantic type blocks.
     pub type_descriptors: BTreeMap<String, TypeDescriptor>,
     /// Type-instance to localisation-key mappings.
