@@ -84,10 +84,17 @@ pub fn complete_with_cancellation(
     let mut member_cache = CompletionMemberCache::default();
     let semantic_context =
         semantic_completion_context_with_cancellation(snapshot, &input, position, cancellation)?;
-    let value_context = semantic_context
+    let value_context = if semantic_context
         .as_ref()
-        .and_then(|context| context.embedded_value_context)
-        .unwrap_or(default_value_context);
+        .is_some_and(|context| semantic_root_entry_uses_bare_values(snapshot, context))
+    {
+        false
+    } else {
+        semantic_context
+            .as_ref()
+            .and_then(|context| context.embedded_value_context)
+            .unwrap_or(default_value_context)
+    };
     if let Some(context) = semantic_context.as_ref() {
         cancellation.checkpoint()?;
         if value_context {

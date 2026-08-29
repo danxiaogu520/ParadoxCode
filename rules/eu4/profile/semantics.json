@@ -1,4 +1,27 @@
 {
+  "root_entry_specs": {
+    "country_tag_entries": {
+      "source": {
+        "kind": "workspace",
+        "type_name": "country_tag"
+      },
+      "insertion": "quoted_assignment"
+    },
+    "graphical_culture_entries": {
+      "source": {
+        "kind": "enum",
+        "enum_name": "graphical_cultures"
+      },
+      "insertion": "bare"
+    },
+    "custom_gui_entries": {
+      "source": {
+        "kind": "type_root_keys"
+      },
+      "insertion": "block",
+      "repeatable": true
+    }
+  },
   "transparent_scope_wrappers": [
     "AND",
     "OR",

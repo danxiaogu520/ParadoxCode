@@ -1178,7 +1178,7 @@ mod tests {
         assert_eq!(source_model.records.len(), 13_719);
         assert_eq!(source_model.semantic.rules.len(), 8_530);
         assert_eq!(source_model.semantic.enum_values.len(), 72);
-        assert_eq!(source_model.semantic.type_root_keys.len(), 5);
+        assert_eq!(source_model.semantic.type_root_keys.len(), 7);
         assert_eq!(source_model.semantic.type_root_scopes.len(), 2);
         assert_eq!(
             source_model
@@ -1221,7 +1221,7 @@ mod tests {
         assert_eq!(startup.this, "country");
         assert_eq!(startup.from, "any");
         assert!(!startup.documentation.is_empty());
-        assert_eq!(source_model.semantic.type_descriptors.len(), 148);
+        assert_eq!(source_model.semantic.type_descriptors.len(), 152);
         assert_eq!(source_model.semantic.localisation_bindings.len(), 187);
         assert_eq!(source_model.profile.scan_roots.len(), 126);
         let quoted_script_rules = source_model

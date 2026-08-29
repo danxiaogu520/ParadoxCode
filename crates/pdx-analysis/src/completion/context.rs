@@ -7,7 +7,7 @@ use crate::{
 };
 use pdx_engine::AnalysisSnapshot;
 use pdx_engine::hir::HirFile;
-use pdx_rules::RuleShape;
+use pdx_rules::{ProfileRootEntryInsertion, RuleShape};
 use pdx_text::{LogicalPath, TextSize};
 
 use crate::semantic::{
@@ -181,10 +181,33 @@ fn semantic_root_entry_context(
                 .type_root_keys
                 .get(type_name)
                 .is_some_and(|roots| !roots.is_empty());
-            (has_rules || has_type_root_keys).then_some((type_name.clone(), context))
+            let has_profile_root_source = snapshot.game_profile().root_entry_spec(name).is_some();
+            (has_rules || has_type_root_keys || has_profile_root_source)
+                .then_some((type_name.clone(), context))
         })
         .map(|(_, context)| context)
         .next()
+}
+
+/// Returns whether a file-root entry container accepts bare scalar entries.
+///
+/// Bare root values (for example `westerngfx` in `graphicalculturetype.txt`) must stay on the
+/// key-completion path even though the parser also exposes them as scalar values. Other root
+/// containers continue to use the ordinary value-context detection.
+pub(crate) fn semantic_root_entry_uses_bare_values(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+) -> bool {
+    if !context.root_entry_container {
+        return false;
+    }
+    let Some(entry_name) = context.context.strip_prefix("root:") else {
+        return false;
+    };
+    snapshot
+        .game_profile()
+        .root_entry_spec(entry_name)
+        .is_some_and(|spec| matches!(spec.insertion, ProfileRootEntryInsertion::Bare))
 }
 
 struct SemanticCompletionContainerInput<'a> {

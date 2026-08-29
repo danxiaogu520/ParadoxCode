@@ -231,6 +231,50 @@ pub struct ProfileScopeCompatibility {
     pub expected: String,
 }
 
+/// A root entry source tells the generic completion engine where a file-root type's legal entry
+/// names come from.  First-party rules already describe the file path and semantic container;
+/// this small profile-level discriminator covers the cases where entries are static enum values
+/// or workspace-defined members rather than a `type_root_keys` list.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ProfileRootEntrySource {
+    /// Read the names from the type descriptor's `type_root_keys` declaration.
+    TypeRootKeys,
+    /// Read the names from a semantic enum, including profile/workspace extensions.
+    Enum { enum_name: String },
+    /// Read the names from workspace definitions of the given semantic type.
+    Workspace { type_name: String },
+}
+
+/// Text shape inserted for a file-root completion item.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProfileRootEntryInsertion {
+    /// Insert `name = { ... }`.
+    #[default]
+    Block,
+    /// Insert a bare scalar such as `westerngfx`.
+    Bare,
+    /// Insert `name = ` and leave the value to the user.
+    Assignment,
+    /// Insert `name = "$0"` for a quoted scalar mapping.
+    QuotedAssignment,
+}
+
+/// Completion metadata for one `TypeDescriptor.root_entries` container.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileRootEntrySpec {
+    /// Source of legal root entry names.
+    pub source: ProfileRootEntrySource,
+    /// Snippet shape used when inserting a selected entry.
+    #[serde(default)]
+    pub insertion: ProfileRootEntryInsertion,
+    /// Whether the same root entry may be declared more than once in a file.
+    #[serde(default)]
+    pub repeatable: bool,
+}
+
 /// Data-only game-specific interpretation selected by the composition root.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -322,6 +366,11 @@ pub struct GameProfile {
     pub control_flow_keys: Vec<String>,
     /// Additional static enum members supplied by the profile.
     pub enum_extra_members: BTreeMap<String, Vec<String>>,
+    /// Optional sources and insertion styles for non-`type_root_keys` file-root entries.
+    ///
+    /// The map is keyed by the `root_entries` context name from a type descriptor.  An absent
+    /// entry preserves the legacy behavior: semantic rules and `type_root_keys` are used as-is.
+    pub root_entry_specs: BTreeMap<String, ProfileRootEntrySpec>,
 }
 
 impl GameProfile {
@@ -359,6 +408,7 @@ impl GameProfile {
             fallback_keys: Vec::new(),
             control_flow_keys: Vec::new(),
             enum_extra_members: BTreeMap::new(),
+            root_entry_specs: BTreeMap::new(),
         }
     }
 
@@ -369,6 +419,15 @@ impl GameProfile {
             .iter()
             .find(|(candidate, _)| candidate.eq_ignore_ascii_case(context))
             .map_or(&[], |(_, inherited)| inherited.as_slice())
+    }
+
+    /// Returns root-entry completion metadata using case-insensitive context matching.
+    #[must_use]
+    pub fn root_entry_spec(&self, context: &str) -> Option<&ProfileRootEntrySpec> {
+        self.root_entry_specs
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case(context))
+            .map(|(_, spec)| spec)
     }
 
     /// Returns whether `context` directly or transitively inherits `ancestor`.

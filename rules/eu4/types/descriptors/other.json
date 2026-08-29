@@ -23,7 +23,8 @@
     "name_field": null,
     "name_from_file": false,
     "starts_with": null,
-    "type_key_filter": null
+    "type_key_filter": null,
+    "root_entries": "alerts"
   },
   "advisor_id": {
     "name": "advisor_id",

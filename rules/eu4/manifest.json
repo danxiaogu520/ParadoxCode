@@ -38,6 +38,7 @@
       "types/descriptors/interface.json",
       "types/descriptors/map.json",
       "types/descriptors/other.json",
+      "types/descriptors/root-files.json",
       "types/root-keys.json",
       "types/root-scopes.json"
     ],
