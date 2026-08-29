@@ -140,7 +140,9 @@ effect、trigger、modifier、on_action 以及 event、decision、mission、hist
 
 ## 开发环境
 
-可从配置路径或 `PATH` 启动 `pdx-ls`。工作区源根通过 `.pdx/project.toml` 配置，或在 Zed 中通过 `.zed/settings.json` 的 `lsp.pdx-ls.initialization_options` 配置。本文档所述方式面向贡献者，并非最终安装体验。
+可从配置路径或 `PATH` 启动 `pdx-ls`。编辑器配置彼此独立：VS Code 使用 `paradoxcode.*` 设置，
+Zed 使用 `.zed/settings.json` 中的 `lsp.pdx-ls.initialization_options`。两者不会读取共享项目文件。
+本文档所述方式面向贡献者，并非最终安装体验。
 
 让 ParadoxCode 自动发现、校验、索引并记住本地 EU4 安装：
 
@@ -148,7 +150,7 @@ effect、trigger、modifier、on_action 以及 event、decision、mission、hist
 pdx setup vanilla
 ```
 
-首次 `pdx-ls` 启动时，若没有项目覆盖配置或之前的尝试记录，也会执行一次非阻塞的快速探测。如果常见位置没有产生唯一候选，请运行 `pdx setup vanilla --deep` 或用 `--source` 指定目录。正常启动时不会重复搜索。
+首次 `pdx-ls` 启动时，若没有显式缓存或之前的尝试记录，也会执行一次非阻塞的快速探测。如果常见位置没有产生唯一候选，请运行 `pdx setup vanilla --deep` 或用 `--source` 指定目录。正常启动时不会重复搜索。
 
 使用底层命令在显式位置构建或手动刷新缓存：
 

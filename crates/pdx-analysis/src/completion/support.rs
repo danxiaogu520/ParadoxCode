@@ -2,7 +2,9 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 use crate::resolution::*;
-use crate::semantic::localisation_key_index;
+use crate::semantic::{
+    completion_overlay_allowed, completion_source_file_allowed, localisation_key_index,
+};
 use crate::support::*;
 use crate::types::*;
 use pdx_engine::{AnalysisSnapshot, DocumentSource};
@@ -32,14 +34,16 @@ pub(crate) fn completion_definitions_for_kinds(
     for kind in kinds {
         for definition in snapshot.index().definitions_for_kind(kind) {
             cancellation.checkpoint()?;
-            if completion_matches(&definition.name, prefix) {
+            if completion_source_file_allowed(snapshot, definition.file_id)
+                && completion_matches(&definition.name, prefix)
+            {
                 definitions.push((definition.kind.clone(), definition.name.clone()));
             }
         }
     }
     for document in snapshot.documents().values() {
         cancellation.checkpoint()?;
-        if document.source() != DocumentSource::Overlay {
+        if document.source() != DocumentSource::Overlay || !completion_overlay_allowed(snapshot) {
             continue;
         }
         if let Some(input) = input_for_document(snapshot, document.id()) {

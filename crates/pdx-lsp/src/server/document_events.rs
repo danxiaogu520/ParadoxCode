@@ -144,6 +144,7 @@ impl LspServer {
                 self.client_snippet_support,
                 self.textures.clone(),
                 Arc::clone(&self.ignored_diagnostic_codes),
+                Arc::clone(&self.diagnostic_severity_overrides),
                 Arc::clone(&self.semantic_tokens_cache),
             )
             .dispatch(method, params),
@@ -193,6 +194,8 @@ impl LspServer {
         self.background_reindex_idle_seconds = prepared.background_reindex_idle_seconds;
         self.ignored_diagnostic_codes =
             Arc::new(prepared.ignored_diagnostic_codes.iter().cloned().collect());
+        self.diagnostic_severity_overrides =
+            Arc::new(prepared.diagnostic_severity_overrides.clone());
         self.workspace_wide_diagnostics = prepared.workspace_wide_diagnostics;
         self.last_activity = Instant::now();
         self.state = ServerState::Initialized;

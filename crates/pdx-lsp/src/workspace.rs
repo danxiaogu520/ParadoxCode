@@ -1,17 +1,17 @@
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use pdx_analysis::DiagnosticCode;
+use pdx_analysis::{DiagnosticCode, Severity};
 use pdx_engine::{
-    SourceRoot, SourceRootId, SourceRootKind, WorkspaceScanFilters, WorkspaceScanToken,
+    SourceRoot, SourceRootId, SourceRootKind, WorkspaceScanFilters, WorkspaceScanLimits,
+    WorkspaceScanToken,
 };
 use serde::Deserialize;
 use serde_json::Value;
 
 use crate::protocol::RpcError;
-use crate::{INVALID_PARAMS, PROJECT_CONFIG_MAX_BYTES, REQUEST_CANCELLED};
+use crate::{INVALID_PARAMS, REQUEST_CANCELLED};
 
 /// A zero interval disables the optional quiet background re-scan.  This mirrors the reference
 /// server's opt-in behavior so existing clients never acquire an unexpected periodic disk walk.
@@ -21,11 +21,37 @@ pub(crate) const DEFAULT_WORKSPACE_WIDE_DIAGNOSTICS: bool = true;
 const MAX_BACKGROUND_REINDEX_INTERVAL_MINUTES: u64 = 7 * 24 * 60;
 const MAX_BACKGROUND_REINDEX_IDLE_SECONDS: u64 = 24 * 60 * 60;
 pub(crate) const MAX_IGNORED_DIAGNOSTIC_CODES: usize = 256;
+const MAX_DIAGNOSTIC_SEVERITY_OVERRIDES: usize = 256;
+const MAX_PREFERRED_LOCALISATION_LANGUAGES: usize = 32;
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum VanillaMode {
+    /// Use explicit editor/user caches and the normal one-time automatic discovery path.
+    #[default]
+    Auto,
+    /// Use an available cache, but never discover or build a new Vanilla cache automatically.
+    CacheOnly,
+    /// Do not install a Vanilla source root for this workspace.
+    Disabled,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum PerformanceProfile {
+    /// Balanced parsing concurrency for ordinary workspaces.
+    #[default]
+    Balanced,
+    /// Fewer parsing workers and tighter resource bounds for laptops or very large trees.
+    Conservative,
+    /// Use the engine's maximum bounded parsing concurrency.
+    Fast,
+}
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
 struct WorkspaceInitializationOptions {
-    project_config: Option<PathBuf>,
+    /// Compatibility sentinel for clients that still send the removed shared project file.
+    /// The value is never read; initialization fails with an actionable migration message.
+    project_config: Option<Value>,
     mod_directory: Option<PathBuf>,
     dependencies: Option<Vec<DependencyConfiguration>>,
     vanilla_index_cache: Option<PathBuf>,
@@ -45,6 +71,16 @@ struct WorkspaceInitializationOptions {
     ignored_error_codes: Option<Vec<String>>,
     /// Whether workspace scans publish diagnostics for closed Current Mod files.
     workspace_wide_diagnostics: Option<bool>,
+    /// Vanilla symbol source policy. Defaults to automatic discovery/build.
+    vanilla_mode: Option<String>,
+    /// Preferred localisation language order used by hover and mission titles.
+    preferred_localisation_languages: Option<Vec<String>>,
+    /// Source-root layers eligible to contribute completion members.
+    completion_source_layers: Option<Vec<String>>,
+    /// Coarse bounded parsing-concurrency profile.
+    performance_profile: Option<String>,
+    /// Per-category diagnostic severity overrides (`error`, `warning`, `info`, `hint`, `off`).
+    diagnostic_severity_overrides: Option<BTreeMap<String, String>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -56,46 +92,6 @@ struct DependencyConfiguration {
     /// not scanned live; the cache is loaded (or built once in the background) instead.
     #[serde(default)]
     index: Option<PathBuf>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
-#[serde(default, deny_unknown_fields)]
-struct ProjectConfiguration {
-    #[serde(alias = "modDirectory")]
-    mod_directory: Option<PathBuf>,
-    dependencies: Option<Vec<DependencyConfiguration>>,
-    #[serde(alias = "vanillaIndexCache")]
-    vanilla_index_cache: Option<PathBuf>,
-    /// Game installation root whose `interface/*.gfx` and `gfx/interface/missions`
-    /// textures back the mission-tree preview. When supplied by an editor, this
-    /// path also becomes the explicit source for the guided Vanilla setup.
-    /// Optional: when absent, the server performs a one-time quick discovery at initialize.
-    #[serde(alias = "gameDirectory")]
-    game_directory: Option<PathBuf>,
-    /// Optional quiet workspace re-scan cadence. Zero disables it.
-    #[serde(alias = "backgroundReindexIntervalMinutes")]
-    background_reindex_interval_minutes: Option<u64>,
-    /// Minimum editor-idle window before a quiet re-scan is allowed to start.
-    #[serde(alias = "backgroundReindexIdleSeconds")]
-    background_reindex_idle_seconds: Option<u64>,
-    /// Glob patterns for files excluded before workspace discovery.
-    #[serde(alias = "ignoreFilePatterns", alias = "ignoreFiles")]
-    ignore_file_patterns: Option<Vec<String>>,
-    /// Glob patterns for directories pruned before workspace discovery.
-    #[serde(alias = "ignoreDirectories", alias = "ignoreDirs")]
-    ignore_directories: Option<Vec<String>>,
-    /// Diagnostic categories hidden from published LSP diagnostics.
-    #[serde(alias = "ignoredErrorCodes", alias = "ignoreDiagnosticCodes")]
-    ignored_error_codes: Option<Vec<String>>,
-    /// Whether workspace scans publish diagnostics for closed Current Mod files.
-    #[serde(alias = "workspaceWideDiagnostics")]
-    workspace_wide_diagnostics: Option<bool>,
-    /// Extension-only `[server]` table (e.g. the language-server binary path
-    /// used by the Zed / VS Code toolkits). Declared so a single
-    /// `.pdx/project.toml` can serve both editors and pdx-ls, while
-    /// `deny_unknown_fields` still rejects genuine typos.
-    #[serde(default)]
-    server: Option<serde_json::Value>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -120,6 +116,18 @@ pub(crate) struct ResolvedSourceRoots {
     pub(crate) ignored_diagnostic_codes: Vec<String>,
     /// Whether workspace refreshes publish diagnostics for closed Current Mod files.
     pub(crate) workspace_wide_diagnostics: bool,
+    /// Vanilla symbol source policy selected for this workspace.
+    pub(crate) vanilla_mode: VanillaMode,
+    /// Preferred localisation language order used by analysis queries.
+    pub(crate) preferred_localisation_languages: Vec<String>,
+    /// Source-root layers eligible to contribute completion members.
+    pub(crate) completion_source_layers: Vec<SourceRootKind>,
+    /// Coarse bounded parsing-concurrency profile.
+    pub(crate) performance_profile: PerformanceProfile,
+    /// Resource limits derived from the selected performance profile.
+    pub(crate) scan_limits: WorkspaceScanLimits,
+    /// Per-category diagnostic severity overrides.
+    pub(crate) diagnostic_severity_overrides: BTreeMap<String, Option<Severity>>,
 }
 
 /// A dependency configured with a persistent index cache.
@@ -135,6 +143,9 @@ pub(crate) fn resolve_source_roots(
     initialization_options: Option<Value>,
     cancellation: &WorkspaceScanToken,
 ) -> Result<ResolvedSourceRoots, RpcError> {
+    if cancellation.is_cancelled() {
+        return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
+    }
     let inline = initialization_options.map_or_else(
         || Ok(WorkspaceInitializationOptions::default()),
         |value| {
@@ -147,56 +158,21 @@ pub(crate) fn resolve_source_roots(
         },
     )?;
     let base = client_root.map(Path::to_path_buf);
-    let mut project = if let Some(project_config) = inline.project_config.as_deref() {
-        let path = resolve_path(project_config, base.as_deref(), "projectConfig")?;
-        if !path.is_file() {
-            return Err(RpcError::new(
-                INVALID_PARAMS,
-                format!("projectConfig is not a file: {}", path.display()),
-            ));
-        }
-        load_project_config(&path, cancellation)?
-    } else if let Some(workspace_root) = base.as_deref()
-        && workspace_root.join(".pdx/project.toml").is_file()
+    if inline.project_config.is_some() {
+        return Err(RpcError::new(
+            INVALID_PARAMS,
+            "projectConfig is no longer supported; configure pdx-ls separately in VS Code or Zed",
+        ));
+    }
+    if let Some(workspace_root) = base.as_deref()
+        && workspace_root.join(".pdx").join("project.toml").is_file()
     {
-        // Universal configuration: a `.pdx/project.toml` next to the workspace
-        // root is discovered automatically, so Zed and VS Code share the same
-        // config with no per-editor setup. An explicitly configured
-        // `projectConfig` always wins over this file.
-        load_project_config(&workspace_root.join(".pdx/project.toml"), cancellation)?
-    } else {
-        ProjectConfiguration::default()
-    };
-    if inline.mod_directory.is_some() {
-        project.mod_directory = inline.mod_directory;
+        return Err(RpcError::new(
+            INVALID_PARAMS,
+            "the shared .pdx/project.toml configuration is no longer supported; remove it and configure VS Code or Zed separately",
+        ));
     }
-    if inline.dependencies.is_some() {
-        project.dependencies = inline.dependencies;
-    }
-    if inline.vanilla_index_cache.is_some() {
-        project.vanilla_index_cache = inline.vanilla_index_cache;
-    }
-    if inline.game_directory.is_some() {
-        project.game_directory = inline.game_directory;
-    }
-    if inline.background_reindex_interval_minutes.is_some() {
-        project.background_reindex_interval_minutes = inline.background_reindex_interval_minutes;
-    }
-    if inline.background_reindex_idle_seconds.is_some() {
-        project.background_reindex_idle_seconds = inline.background_reindex_idle_seconds;
-    }
-    if inline.ignore_file_patterns.is_some() {
-        project.ignore_file_patterns = inline.ignore_file_patterns;
-    }
-    if inline.ignore_directories.is_some() {
-        project.ignore_directories = inline.ignore_directories;
-    }
-    if inline.ignored_error_codes.is_some() {
-        project.ignored_error_codes = inline.ignored_error_codes;
-    }
-    if inline.workspace_wide_diagnostics.is_some() {
-        project.workspace_wide_diagnostics = inline.workspace_wide_diagnostics;
-    }
+    let project = inline;
     let background_reindex_interval_minutes = project
         .background_reindex_interval_minutes
         .unwrap_or(DEFAULT_BACKGROUND_REINDEX_INTERVAL_MINUTES);
@@ -234,6 +210,18 @@ pub(crate) fn resolve_source_roots(
     let workspace_wide_diagnostics = project
         .workspace_wide_diagnostics
         .unwrap_or(DEFAULT_WORKSPACE_WIDE_DIAGNOSTICS);
+    let vanilla_mode = normalize_vanilla_mode(project.vanilla_mode.as_deref())?;
+    let preferred_localisation_languages = normalize_preferred_localisation_languages(
+        project.preferred_localisation_languages.unwrap_or_default(),
+    )?;
+    let completion_source_layers =
+        normalize_completion_source_layers(project.completion_source_layers.unwrap_or_default())?;
+    let performance_profile =
+        normalize_performance_profile(project.performance_profile.as_deref())?;
+    let scan_limits = scan_limits_for_performance_profile(performance_profile);
+    let diagnostic_severity_overrides = normalize_diagnostic_severity_overrides(
+        project.diagnostic_severity_overrides.unwrap_or_default(),
+    )?;
     let game_directory = project
         .game_directory
         .as_deref()
@@ -403,7 +391,159 @@ pub(crate) fn resolve_source_roots(
         scan_filters,
         ignored_diagnostic_codes,
         workspace_wide_diagnostics,
+        vanilla_mode,
+        preferred_localisation_languages,
+        completion_source_layers,
+        performance_profile,
+        scan_limits,
+        diagnostic_severity_overrides,
     })
+}
+
+pub(crate) fn normalize_vanilla_mode(value: Option<&str>) -> Result<VanillaMode, RpcError> {
+    match value.unwrap_or("auto").trim().to_ascii_lowercase().as_str() {
+        "auto" => Ok(VanillaMode::Auto),
+        "cacheonly" | "cache_only" | "cache-only" => Ok(VanillaMode::CacheOnly),
+        "disabled" | "off" => Ok(VanillaMode::Disabled),
+        value => Err(RpcError::new(
+            INVALID_PARAMS,
+            format!("vanillaMode must be auto, cacheOnly, or disabled (got {value})"),
+        )),
+    }
+}
+
+pub(crate) fn normalize_performance_profile(
+    value: Option<&str>,
+) -> Result<PerformanceProfile, RpcError> {
+    match value
+        .unwrap_or("balanced")
+        .trim()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "balanced" => Ok(PerformanceProfile::Balanced),
+        "conservative" => Ok(PerformanceProfile::Conservative),
+        "fast" => Ok(PerformanceProfile::Fast),
+        value => Err(RpcError::new(
+            INVALID_PARAMS,
+            format!("performanceProfile must be conservative, balanced, or fast (got {value})"),
+        )),
+    }
+}
+
+pub(crate) fn scan_limits_for_performance_profile(
+    profile: PerformanceProfile,
+) -> WorkspaceScanLimits {
+    WorkspaceScanLimits {
+        max_workers: match profile {
+            PerformanceProfile::Conservative => 2,
+            PerformanceProfile::Balanced => 8,
+            PerformanceProfile::Fast => 12,
+        },
+        ..WorkspaceScanLimits::default()
+    }
+}
+
+pub(crate) fn normalize_preferred_localisation_languages(
+    values: Vec<String>,
+) -> Result<Vec<String>, RpcError> {
+    if values.len() > MAX_PREFERRED_LOCALISATION_LANGUAGES {
+        return Err(RpcError::new(
+            INVALID_PARAMS,
+            format!(
+                "preferredLocalisationLanguages accepts at most {MAX_PREFERRED_LOCALISATION_LANGUAGES} entries"
+            ),
+        ));
+    }
+    let mut normalized = Vec::with_capacity(values.len());
+    for value in values {
+        let value = value.trim().to_ascii_lowercase();
+        if value.is_empty()
+            || !value
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric() || character == '_')
+        {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!("invalid localisation language: {value}"),
+            ));
+        }
+        if !normalized.iter().any(|existing| existing == &value) {
+            normalized.push(value);
+        }
+    }
+    Ok(normalized)
+}
+
+pub(crate) fn normalize_completion_source_layers(
+    values: Vec<String>,
+) -> Result<Vec<SourceRootKind>, RpcError> {
+    if values.is_empty() {
+        return Ok(vec![
+            SourceRootKind::CurrentMod,
+            SourceRootKind::Dependency,
+            SourceRootKind::Vanilla,
+        ]);
+    }
+    let mut normalized = Vec::with_capacity(values.len());
+    for value in values {
+        let layer = match value.trim().to_ascii_lowercase().as_str() {
+            "currentmod" | "current_mod" | "current-mod" => SourceRootKind::CurrentMod,
+            "dependency" | "dependencies" => SourceRootKind::Dependency,
+            "vanilla" => SourceRootKind::Vanilla,
+            value => {
+                return Err(RpcError::new(
+                    INVALID_PARAMS,
+                    format!(
+                        "completionSourceLayers entries must be currentMod, dependencies, or vanilla (got {value})"
+                    ),
+                ));
+            }
+        };
+        if !normalized.contains(&layer) {
+            normalized.push(layer);
+        }
+    }
+    Ok(normalized)
+}
+
+pub(crate) fn normalize_diagnostic_severity_overrides(
+    values: BTreeMap<String, String>,
+) -> Result<BTreeMap<String, Option<Severity>>, RpcError> {
+    if values.len() > MAX_DIAGNOSTIC_SEVERITY_OVERRIDES {
+        return Err(RpcError::new(
+            INVALID_PARAMS,
+            format!(
+                "diagnosticSeverityOverrides accepts at most {MAX_DIAGNOSTIC_SEVERITY_OVERRIDES} entries"
+            ),
+        ));
+    }
+    let mut normalized = BTreeMap::new();
+    for (raw_code, raw_severity) in values {
+        let Some(code) = DiagnosticCode::parse_name(raw_code.trim()) else {
+            return Err(RpcError::new(
+                INVALID_PARAMS,
+                format!("unknown diagnostic code in diagnosticSeverityOverrides: {raw_code}"),
+            ));
+        };
+        let severity = match raw_severity.trim().to_ascii_lowercase().as_str() {
+            "error" => Some(Severity::Error),
+            "warning" | "warn" => Some(Severity::Warning),
+            "info" | "information" => Some(Severity::Information),
+            "hint" => Some(Severity::Hint),
+            "off" | "none" => None,
+            value => {
+                return Err(RpcError::new(
+                    INVALID_PARAMS,
+                    format!(
+                        "diagnosticSeverityOverrides values must be error, warning, info, hint, or off (got {value})"
+                    ),
+                ));
+            }
+        };
+        normalized.insert(code.as_str().to_owned(), severity);
+    }
+    Ok(normalized)
 }
 
 /// Validates and canonicalizes user-selected diagnostic categories. Unknown values are rejected so
@@ -449,41 +589,6 @@ fn resolve_configured_path(
         )
     })?;
     Ok(base.join(path))
-}
-
-/// Loads and parses a `.pdx/project.toml` project configuration. Fails loudly
-/// on unreadable, oversized, or ill-formed config — never silently ignored.
-fn load_project_config(
-    path: &Path,
-    cancellation: &WorkspaceScanToken,
-) -> Result<ProjectConfiguration, RpcError> {
-    if cancellation.is_cancelled() {
-        return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
-    }
-    let file = fs::File::open(path).map_err(|error| {
-        RpcError::new(
-            INVALID_PARAMS,
-            format!("cannot open projectConfig {}: {error}", path.display()),
-        )
-    })?;
-    let mut text = String::new();
-    file.take(PROJECT_CONFIG_MAX_BYTES + 1)
-        .read_to_string(&mut text)
-        .map_err(|error| {
-            RpcError::new(
-                INVALID_PARAMS,
-                format!("cannot read projectConfig {}: {error}", path.display()),
-            )
-        })?;
-    if text.len() as u64 > PROJECT_CONFIG_MAX_BYTES {
-        return Err(RpcError::new(INVALID_PARAMS, "projectConfig exceeds 1 MiB"));
-    }
-    toml::from_str::<ProjectConfiguration>(&text).map_err(|error| {
-        RpcError::new(
-            INVALID_PARAMS,
-            format!("invalid projectConfig TOML: {error}"),
-        )
-    })
 }
 
 fn resolve_directory(

@@ -422,6 +422,12 @@ pub(super) fn lower_semantics(
     deduplicate_definitions(&mut definitions);
 
     references.extend(scripted_macro_references(properties, scope_facts, rules));
+    references.extend(semantic_typed_references(
+        properties,
+        scope_facts,
+        rules,
+        profile,
+    ));
 
     let enum_localisation_rules = rules
         .model()
@@ -927,6 +933,162 @@ fn semantic_localisation_reference(
         range: scalar.range,
         origin: HirReferenceOrigin::Semantic,
     })
+}
+
+/// Collects scalar values whose first-party semantic rule points at a workspace symbol type.
+///
+/// Profile references cover the common shorthand forms (`event = foo.1`), but event effects and
+/// many other commands use a block with a typed child (`country_event = { id = foo.1 }`).  The
+/// child value is described by the semantic rule database rather than by the profile's flat
+/// property-key table.  Lowering it here keeps the fact available to both disk indexes and live
+/// overlays, so navigation does not need a game-specific special case.
+fn semantic_typed_references(
+    properties: &[HirProperty],
+    scope_facts: &[ScopeFact],
+    rules: &RuleSet,
+    profile: Option<&GameProfile>,
+) -> Vec<HirReference> {
+    let mut references = Vec::new();
+    for property in properties {
+        let Some(scalar) = property.scalar.as_ref() else {
+            continue;
+        };
+        if scalar.quoted
+            || scalar.value.is_empty()
+            || scalar.value.contains('$')
+            || scalar.value.eq_ignore_ascii_case("yes")
+            || scalar.value.eq_ignore_ascii_case("no")
+        {
+            continue;
+        }
+        let fact = scope_facts
+            .iter()
+            .find(|fact| fact.range == property.key_range)
+            .or_else(|| {
+                scope_facts
+                    .iter()
+                    .rfind(|fact| fact.range.end() <= property.key_range.start())
+            });
+        let Some(fact) = fact else {
+            continue;
+        };
+        let property_parent_path = property
+            .path
+            .get(1..property.path.len().saturating_sub(1))
+            .unwrap_or_default();
+        let actual_parent_path = if fact.range == property.key_range {
+            fact.parent_path.as_slice()
+        } else {
+            property_parent_path
+        };
+
+        let mut kinds = Vec::<String>::new();
+        let contexts = semantic_reference_contexts(profile, &fact.context);
+        for rule in contexts
+            .iter()
+            .flat_map(|context| rules.semantic_rules_for_context_key(context, &property.key))
+            .filter(|rule| {
+                semantic_reference_context_matches(profile, &fact.context, &rule.context)
+            })
+            .filter(|rule| {
+                matches!(rule.shape, RuleShape::Leaf)
+                    && localisation_parent_path_matches(
+                        rules,
+                        &rule.parent_path,
+                        actual_parent_path,
+                    )
+                    && semantic_reference_key_matches(rules, &rule.key, &property.key)
+                    && rule
+                        .operator
+                        .as_deref()
+                        .is_none_or(|operator| property.operator.as_deref() == Some(operator))
+            })
+        {
+            let pdx_rules::ValueMatcher::Type(type_name) = &rule.value else {
+                continue;
+            };
+            let base = type_name
+                .split_once('.')
+                .map_or(type_name.as_str(), |(base, _)| base);
+            let kind = profile
+                .and_then(|profile| {
+                    profile
+                        .member_kind_alias(type_name)
+                        .or_else(|| profile.member_kind_alias(base))
+                })
+                .unwrap_or(base)
+                .to_owned();
+            if !kinds
+                .iter()
+                .any(|candidate| candidate.eq_ignore_ascii_case(&kind))
+            {
+                kinds.push(kind);
+            }
+        }
+        // A scalar can have several semantic alternatives (for example a culture key may also
+        // accept an enum or a scope).  Emit a typed reference only when all typed alternatives
+        // agree on the workspace kind; otherwise navigation must not guess an interpretation.
+        if kinds.len() == 1 {
+            references.push(HirReference {
+                kind: kinds.remove(0),
+                name: scalar.value.clone(),
+                range: scalar.range,
+                origin: HirReferenceOrigin::SemanticTyped,
+            });
+        }
+    }
+    references
+}
+
+fn semantic_reference_contexts(profile: Option<&GameProfile>, actual: &str) -> Vec<String> {
+    let mut contexts = vec![actual.to_owned()];
+    if let Some(type_name) = actual.strip_prefix("type:") {
+        contexts.push(format!("root:{type_name}"));
+    }
+    let mut index = 0;
+    while let Some(context) = contexts.get(index).cloned() {
+        if let Some(profile) = profile {
+            for ancestor in profile.inherited_semantic_contexts(&context) {
+                if !contexts
+                    .iter()
+                    .any(|candidate| candidate.eq_ignore_ascii_case(ancestor))
+                {
+                    contexts.push(ancestor.clone());
+                }
+            }
+        }
+        index += 1;
+    }
+    contexts
+}
+
+fn semantic_reference_context_matches(
+    profile: Option<&GameProfile>,
+    actual: &str,
+    expected: &str,
+) -> bool {
+    actual.eq_ignore_ascii_case(expected)
+        || actual.strip_prefix("type:").is_some_and(|type_name| {
+            expected
+                .strip_prefix("root:")
+                .is_some_and(|root_type| root_type.eq_ignore_ascii_case(type_name))
+        })
+        || profile.is_some_and(|profile| profile.semantic_context_inherits(actual, expected))
+}
+
+fn semantic_reference_key_matches(rules: &RuleSet, matcher: &KeyMatcher, key: &str) -> bool {
+    match matcher {
+        KeyMatcher::Exact(expected) => expected.eq_ignore_ascii_case(key),
+        KeyMatcher::Enum(enum_name) => rules
+            .model()
+            .semantic
+            .enum_values
+            .get(enum_name)
+            .is_some_and(|values| values.iter().any(|value| value.eq_ignore_ascii_case(key))),
+        KeyMatcher::AnyScalar => !key.is_empty(),
+        KeyMatcher::Date => matcher.matches(key, |_, _| false, |_, _| false),
+        KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) => false,
+    }
 }
 
 fn localisation_parent_path_matches(

@@ -9,7 +9,7 @@ use pdx_engine::hir::{
 };
 use pdx_engine::{
     AnalysisSnapshot, DocumentId, DocumentSource, MacroDefinitionSummary, MacroParameterSignature,
-    SourceFileId,
+    SourceFileId, SourceRootKind,
 };
 use pdx_rules::{GameProfile, KeyMatcher, RuleShape, ValueMatcher};
 use pdx_text::{LogicalPath, TextRange};
@@ -1568,7 +1568,9 @@ fn effective_workspace_member_names_uncached(
                 .index()
                 .definitions_for_kind(kind)
                 .filter(|definition| {
-                    definition.active && !hidden_files.contains(&definition.file_id)
+                    definition.active
+                        && !hidden_files.contains(&definition.file_id)
+                        && completion_source_file_allowed(snapshot, definition.file_id)
                 })
                 .map(|definition| definition.name.clone()),
         );
@@ -1578,6 +1580,9 @@ fn effective_workspace_member_names_uncached(
         .values()
         .filter(|document| document.source() == DocumentSource::Overlay)
     {
+        if !completion_overlay_allowed(snapshot) {
+            break;
+        }
         let Some(hir) = document.hir_handle() else {
             continue;
         };
@@ -1870,10 +1875,17 @@ fn workspace_member_uncached(snapshot: &AnalysisSnapshot, type_name: &str, membe
                 .index()
                 .definitions(kind, name)
                 .into_iter()
-                .any(|definition| definition.active && !hidden_files.contains(&definition.file_id))
+                .any(|definition| {
+                    definition.active
+                        && !hidden_files.contains(&definition.file_id)
+                        && completion_source_file_allowed(snapshot, definition.file_id)
+                })
         })
     }) {
         return true;
+    }
+    if !completion_overlay_allowed(snapshot) {
+        return false;
     }
     let members = overlay_members(snapshot);
     names.iter().any(|name| {
@@ -1883,6 +1895,31 @@ fn workspace_member_uncached(snapshot: &AnalysisSnapshot, type_name: &str, membe
                 .contains(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
         })
     })
+}
+
+/// Returns whether an indexed definition's source layer is enabled for completion members.
+/// Resolution, diagnostics, navigation, and hover intentionally continue to see every layer;
+/// this preference only narrows the candidate list offered while typing.
+pub(crate) fn completion_source_file_allowed(
+    snapshot: &AnalysisSnapshot,
+    file_id: SourceFileId,
+) -> bool {
+    let Some(file) = snapshot.source_files().get(&file_id) else {
+        return false;
+    };
+    let Some(root) = snapshot
+        .source_roots()
+        .iter()
+        .find(|root| root.id == file.root_id)
+    else {
+        return false;
+    };
+    snapshot.completion_source_layer_enabled(root.kind)
+}
+
+/// Open overlays are always owned by the Current Mod layer for completion filtering.
+pub(crate) fn completion_overlay_allowed(snapshot: &AnalysisSnapshot) -> bool {
+    snapshot.completion_source_layer_enabled(SourceRootKind::CurrentMod)
 }
 
 fn workspace_kind_has_members(snapshot: &AnalysisSnapshot, type_name: &str) -> bool {

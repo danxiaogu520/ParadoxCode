@@ -83,6 +83,9 @@ suite('ParadoxCode VS Code extension host', () => {
         'paradoxcode.installServer',
         'paradoxcode.selectServer',
         'paradoxcode.selectGameDirectory',
+        'paradoxcode.addDependency',
+        'paradoxcode.removeDependency',
+        'paradoxcode.openDependencySettings',
         'paradoxcode.reloadServer',
         'paradoxcode.openOutput',
       ]) {
@@ -91,6 +94,26 @@ suite('ParadoxCode VS Code extension host', () => {
       const config = vscode.workspace.getConfiguration('paradoxcode');
       assert.equal(typeof config.get('diagnosticIgnoreCodes'), 'object');
       assert.equal(typeof config.get('preview.zoomSensitivity'), 'number');
+      assert.equal(config.get('workspaceWideDiagnostics'), true);
+      assert.equal(config.get('backgroundReindexIntervalMinutes'), 0);
+      assert.equal(config.get('backgroundReindexIdleSeconds'), 15);
+      assert.deepEqual(config.get('ignoreFilePatterns'), []);
+      assert.deepEqual(config.get('ignoreDirectories'), []);
+      assert.equal(config.get('server.installPolicy'), 'auto');
+      assert.equal(config.get('vanilla.mode'), 'auto');
+      assert.equal(config.get('preview.refreshMode'), 'always');
+      assert.equal(config.get('preview.persistViewport'), false);
+      assert.equal(config.get('preview.showExternalPrerequisites'), true);
+      assert.equal(config.get('preview.showDiagnostics'), true);
+      assert.equal(config.get('preview.defaultExportDirectory'), '');
+      assert.deepEqual(config.get('diagnostics.severityOverrides'), {});
+      assert.deepEqual(config.get('localisation.preferredLanguages'), []);
+      assert.deepEqual(config.get('completion.sourceLayers'), [
+        'currentMod',
+        'dependencies',
+        'vanilla',
+      ]);
+      assert.equal(config.get('performance.profile'), 'balanced');
     });
   });
 

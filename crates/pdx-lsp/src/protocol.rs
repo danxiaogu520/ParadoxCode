@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::io;
 use std::path::PathBuf;
@@ -10,7 +10,7 @@ use lsp_types::{
 };
 use pdx_analysis::{
     CancellationToken, Cancelled, CompletionKind, Diagnostic, DiagnosticCode, Location,
-    RenameError, RenameFailure, diagnostics_with_cancellation,
+    RenameError, RenameFailure, Severity, diagnostics_with_cancellation,
 };
 use pdx_engine::{AnalysisSnapshot, DocumentError, DocumentId, WorkspaceError};
 use pdx_rules::RulesError;
@@ -196,21 +196,26 @@ pub(crate) fn cancel_initialize_from_notification(
     }
 }
 
-pub(crate) fn diagnostic_values_with_ignored(
+/// Converts diagnostics for one snapshot document while applying both category suppression and
+/// user-selected severity remapping. The raw analysis values are adjusted before publication so
+/// truncation and all downstream aggregate counts observe the effective severity.
+pub(crate) fn diagnostic_values_with_ignored_and_overrides(
     snapshot: &AnalysisSnapshot,
     id: &DocumentId,
     cancellation: &CancellationToken,
     ignored: &HashSet<String>,
+    overrides: &BTreeMap<String, Option<Severity>>,
 ) -> Option<Value> {
     let values = snapshot.document(id).map_or_else(Vec::new, |document| {
         let diagnostics = diagnostics_with_cancellation(snapshot, id, cancellation)
             .ok()
             .unwrap_or_default();
-        diagnostic_values_for_text_with_ignored(
+        diagnostic_values_for_text_with_ignored_and_overrides(
             diagnostics,
             document.line_index(),
             document.text(),
             ignored,
+            overrides,
         )
     });
     serde_json::to_value(values).ok()
@@ -222,16 +227,45 @@ pub(crate) fn diagnostic_values_for_text(
     line_index: &LineIndex,
     text: &str,
 ) -> Vec<LspDiagnostic> {
-    diagnostic_values_for_text_with_ignored(diagnostics, line_index, text, &HashSet::new())
+    diagnostic_values_for_text_with_ignored_and_overrides(
+        diagnostics,
+        line_index,
+        text,
+        &HashSet::new(),
+        &BTreeMap::new(),
+    )
 }
 
+#[cfg(test)]
 pub(crate) fn diagnostic_values_for_text_with_ignored(
     diagnostics: Vec<Diagnostic>,
     line_index: &LineIndex,
     text: &str,
     ignored: &HashSet<String>,
 ) -> Vec<LspDiagnostic> {
-    let diagnostics = filter_diagnostics_with_ignored(diagnostics, line_index, text, ignored);
+    diagnostic_values_for_text_with_ignored_and_overrides(
+        diagnostics,
+        line_index,
+        text,
+        ignored,
+        &BTreeMap::new(),
+    )
+}
+
+pub(crate) fn diagnostic_values_for_text_with_ignored_and_overrides(
+    diagnostics: Vec<Diagnostic>,
+    line_index: &LineIndex,
+    text: &str,
+    ignored: &HashSet<String>,
+    overrides: &BTreeMap<String, Option<Severity>>,
+) -> Vec<LspDiagnostic> {
+    let diagnostics = filter_diagnostics_with_ignored_and_overrides(
+        diagnostics,
+        line_index,
+        text,
+        ignored,
+        overrides,
+    );
     let (retained, omitted) =
         diagnostic_result_counts(diagnostics.len(), MAX_PUBLISHED_DIAGNOSTICS);
     let mut values = diagnostics
@@ -294,31 +328,50 @@ pub(crate) fn diagnostic_values_for_text_with_ignored(
 /// Applies workspace and source-level diagnostic suppressions before publication. Keeping this
 /// as a reusable raw-diagnostic pass lets workspace-wide validation aggregate the same filtered
 /// categories without duplicating the inline-directive rules.
-pub(crate) fn filter_diagnostics_with_ignored(
+pub(crate) fn filter_diagnostics_with_ignored_and_overrides(
     diagnostics: Vec<Diagnostic>,
     line_index: &LineIndex,
     text: &str,
     ignored: &HashSet<String>,
+    overrides: &BTreeMap<String, Option<Severity>>,
 ) -> Vec<Diagnostic> {
     let inline_ignored = extract_inline_ignored_codes(text);
     diagnostics
         .into_iter()
-        .filter(|diagnostic| {
+        .filter_map(|diagnostic| {
             if ignored.contains(diagnostic.code.as_str()) {
-                return false;
+                return None;
             }
             let Some(inline_ignored) = inline_ignored.as_ref() else {
-                return true;
+                return apply_severity_override(diagnostic, overrides);
             };
             let Some(line) = line_index
                 .position(text, diagnostic.range.start())
                 .map(|position| position.line.saturating_add(1))
             else {
-                return true;
+                return apply_severity_override(diagnostic, overrides);
             };
-            !inline_diagnostic_suppressed(inline_ignored, line, diagnostic.code.as_str())
+            if inline_diagnostic_suppressed(inline_ignored, line, diagnostic.code.as_str()) {
+                None
+            } else {
+                apply_severity_override(diagnostic, overrides)
+            }
         })
         .collect()
+}
+
+fn apply_severity_override(
+    mut diagnostic: Diagnostic,
+    overrides: &BTreeMap<String, Option<Severity>>,
+) -> Option<Diagnostic> {
+    match overrides.get(diagnostic.code.as_str()) {
+        Some(None) => None,
+        Some(Some(severity)) => {
+            diagnostic.severity = *severity;
+            Some(diagnostic)
+        }
+        None => Some(diagnostic),
+    }
 }
 
 /// The inline suppression directive accepted by CWTools-compatible source comments.
@@ -647,11 +700,12 @@ impl RpcError {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::collections::{BTreeMap, HashSet};
 
     use super::{
         LineIndex, completion_kind, diagnostic_values_for_text,
-        diagnostic_values_for_text_with_ignored, is_snapshot_request,
+        diagnostic_values_for_text_with_ignored,
+        diagnostic_values_for_text_with_ignored_and_overrides, is_snapshot_request,
     };
     use lsp_types::request::Request;
     use lsp_types::request::{
@@ -798,6 +852,44 @@ mod tests {
         assert_eq!(
             values[0].code,
             Some(NumberOrString::String("UnknownSymbol".to_owned()))
+        );
+    }
+
+    #[test]
+    fn severity_overrides_remap_and_suppress_before_lsp_conversion() {
+        let diagnostics = vec![
+            Diagnostic::new(
+                DiagnosticCode::UnknownScope,
+                Severity::Error,
+                TextRange::new(0, 1).expect("range"),
+                "downgraded".to_owned(),
+            ),
+            Diagnostic::new(
+                DiagnosticCode::UnknownKey,
+                Severity::Error,
+                TextRange::new(1, 2).expect("range"),
+                "hidden".to_owned(),
+            ),
+        ];
+        let overrides = BTreeMap::from([
+            ("UnknownScope".to_owned(), Some(Severity::Warning)),
+            ("UnknownKey".to_owned(), None),
+        ]);
+        let values = diagnostic_values_for_text_with_ignored_and_overrides(
+            diagnostics,
+            &LineIndex::new("xy"),
+            "xy",
+            &HashSet::new(),
+            &overrides,
+        );
+        assert_eq!(values.len(), 1);
+        assert_eq!(
+            values[0].severity,
+            Some(lsp_types::DiagnosticSeverity::WARNING)
+        );
+        assert_eq!(
+            values[0].code,
+            Some(NumberOrString::String("UnknownScope".to_owned()))
         );
     }
 

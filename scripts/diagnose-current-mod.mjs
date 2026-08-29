@@ -69,7 +69,6 @@ Options:
   --vanilla-cache PATH       Vanilla .pdxindex (also PDX_DIAGNOSTIC_VANILLA_CACHE)
   --server PATH              pdx-ls executable (auto-detected from target/{debug,release})
   --workspace PATH           LSP workspace root (default: parent of --mod)
-  --project-config PATH      optional .pdx/project.toml
   --output DIR               report directory (default: ${DEFAULT_OUTPUT_DIR})
   --timeout-ms N             overall server timeout (default: ${DEFAULT_TIMEOUT_MS})
   --file-timeout-ms N        timeout for one file (default: ${DEFAULT_FILE_TIMEOUT_MS})
@@ -84,7 +83,7 @@ Options:
   --help                     show this help
 
 Environment equivalents: PDX_DIAGNOSTIC_VANILLA_CACHE, PDX_DIAGNOSTIC_SERVER,
-PDX_DIAGNOSTIC_WORKSPACE, PDX_DIAGNOSTIC_PROJECT_CONFIG, PDX_DIAGNOSTIC_OUTPUT,
+PDX_DIAGNOSTIC_WORKSPACE, PDX_DIAGNOSTIC_OUTPUT,
 PDX_DIAGNOSTIC_TIMEOUT_MS, PDX_DIAGNOSTIC_FILE_TIMEOUT_MS, PDX_DIAGNOSTIC_MAX_FILES,
 PDX_DIAGNOSTIC_PATH_PREFIX, PDX_DIAGNOSTIC_SHARD_COUNT, PDX_DIAGNOSTIC_SHARD_INDEX,
 PDX_DIAGNOSTIC_BATCH_SIZE, PDX_DIAGNOSTIC_CONCURRENCY, PDX_DIAGNOSTIC_CHECKPOINT_EVERY,
@@ -148,7 +147,6 @@ function parseArgs(argv) {
       envValue('PDX_DIAGNOSTIC_VANILLA_CACHE') || envValue('PDX_PERF_CACHE') || undefined,
     server: envValue('PDX_DIAGNOSTIC_SERVER'),
     workspace: envValue('PDX_DIAGNOSTIC_WORKSPACE'),
-    projectConfig: envValue('PDX_DIAGNOSTIC_PROJECT_CONFIG'),
     output: envValue('PDX_DIAGNOSTIC_OUTPUT') || DEFAULT_OUTPUT_DIR,
     timeoutMs: parsePositiveInteger(
       envValue('PDX_DIAGNOSTIC_TIMEOUT_MS') || DEFAULT_TIMEOUT_MS,
@@ -189,7 +187,6 @@ function parseArgs(argv) {
     ['--vanilla', 'vanillaCache'],
     ['--server', 'server'],
     ['--workspace', 'workspace'],
-    ['--project-config', 'projectConfig'],
     ['--output', 'output'],
     ['--timeout-ms', 'timeoutMs'],
     ['--file-timeout-ms', 'fileTimeoutMs'],
@@ -275,18 +272,6 @@ function tomlQuotedValue(line, key) {
   return match ? match[2] : undefined;
 }
 
-function configuredVanillaCache(projectConfig, workspace) {
-  if (!projectConfig || !existsSync(projectConfig)) return undefined;
-  const text = readFileSync(projectConfig, 'utf8');
-  for (const line of text.split(/\r?\n/)) {
-    const snake = tomlQuotedValue(line, 'vanilla_index_cache');
-    if (snake) return resolve(workspace, snake);
-    const alias = tomlQuotedValue(line, 'vanillaIndexCache');
-    if (alias) return resolve(workspace, alias);
-  }
-  return undefined;
-}
-
 function userConfigCandidates() {
   const home = process.env.USERPROFILE || process.env.HOME;
   if (process.platform === 'win32') {
@@ -333,20 +318,11 @@ function resolveOptions(raw) {
     mod = realpathSync(virtualOverlayRoot);
   }
   const workspace = canonicalDirectory(raw.workspace || (vanillaSource ? mod : dirname(mod)), '--workspace');
-  let projectConfig = raw.projectConfig;
-  if (!projectConfig) {
-    const candidates = [join(workspace, '.pdx', 'project.toml'), join(mod, '.pdx', 'project.toml')];
-    projectConfig = candidates.find((candidate) => existsSync(candidate));
-  } else {
-    projectConfig = canonicalFile(projectConfig, '--project-config');
-  }
-
   let vanillaCache = raw.vanillaCache;
-  if (!vanillaCache) vanillaCache = configuredVanillaCache(projectConfig, workspace);
   if (!vanillaCache) vanillaCache = userConfiguredVanillaCache();
   if (!vanillaCache) {
     throw new CliUsageError(
-      'a Vanilla cache is required; pass --vanilla-cache PATH or configure vanilla_index_cache in .pdx/project.toml',
+      'a Vanilla cache is required; pass --vanilla-cache PATH or configure it with `pdx setup vanilla`',
     );
   }
   vanillaCache = canonicalFile(vanillaCache, '--vanilla-cache');
@@ -365,7 +341,6 @@ function resolveOptions(raw) {
     vanillaSource,
     virtualOverlayRoot,
     workspace,
-    projectConfig,
     vanillaCache,
     server,
     pathPrefix,
@@ -572,7 +547,6 @@ function baseReport(options, files, skippedSymlinks, omittedSymlinks, depthLimit
       source: options.source,
       current_mod: options.vanillaSource ? null : options.mod,
       workspace: options.workspace,
-      project_config: options.projectConfig || null,
       vanilla_cache: {
         path: options.vanillaCache,
         size_bytes: cacheStat.size,
@@ -1104,7 +1078,6 @@ async function run(rawOptions) {
         textDocument: { completion: { completionItem: { snippetSupport: false } } },
       },
       initializationOptions: {
-        ...(options.projectConfig ? { projectConfig: options.projectConfig } : {}),
         modDirectory: options.mod,
         vanillaIndexCache: options.vanillaCache,
       },

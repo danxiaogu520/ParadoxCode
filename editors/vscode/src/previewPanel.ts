@@ -77,7 +77,14 @@ type OutboundMessage =
     | { type: 'preview'; payload: MissionPreview }
     | { type: 'empty'; message: string }
     | { type: 'error'; message: string }
-    | { type: 'options'; zoomSensitivity: number; showTextures: boolean };
+    | {
+        type: 'options';
+        zoomSensitivity: number;
+        showTextures: boolean;
+        persistViewport: boolean;
+        showExternalPrerequisites: boolean;
+        showDiagnostics: boolean;
+    };
 
 /** Webview messages received from the renderer. */
 type InboundMessage =
@@ -406,7 +413,22 @@ export class MissionPreviewPanel {
             type: 'options',
             zoomSensitivity: config.get<number>('zoomSensitivity', 1),
             showTextures: config.get<boolean>('showTextures', true),
+            persistViewport: config.get<boolean>('persistViewport', false),
+            showExternalPrerequisites: config.get<boolean>('showExternalPrerequisites', true),
+            showDiagnostics: config.get<boolean>('showDiagnostics', true),
         });
+    }
+
+    private static defaultExportUri(filename: string): vscode.Uri {
+        const config = vscode.workspace.getConfiguration('paradoxcode.preview');
+        const configured = config.get<string>('defaultExportDirectory', '').trim();
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+        const directory = configured
+            ? path.isAbsolute(configured)
+                ? configured
+                : path.join(workspaceRoot, configured)
+            : workspaceRoot;
+        return vscode.Uri.file(path.join(directory, filename));
     }
 
     private static async jump(
@@ -458,10 +480,7 @@ export class MissionPreviewPanel {
         const target = await vscode.window.showSaveDialog({
             saveLabel: 'Export Mission Tree PNG',
             filters: { 'PNG image': ['png'] },
-            defaultUri: vscode.Uri.file(path.join(
-                vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd(),
-                'mission-tree.png',
-            )),
+            defaultUri: MissionPreviewPanel.defaultExportUri('mission-tree.png'),
         });
         if (!target) {
             return;
@@ -473,10 +492,7 @@ export class MissionPreviewPanel {
         const target = await vscode.window.showSaveDialog({
             saveLabel: 'Export Mission Tree JSON',
             filters: { JSON: ['json'] },
-            defaultUri: vscode.Uri.file(path.join(
-                vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd(),
-                'mission-tree.json',
-            )),
+            defaultUri: MissionPreviewPanel.defaultExportUri('mission-tree.json'),
         });
         if (!target) {
             return;
@@ -488,10 +504,7 @@ export class MissionPreviewPanel {
         const target = await vscode.window.showSaveDialog({
             saveLabel: 'Export Mission Tree SVG',
             filters: { 'SVG image': ['svg'] },
-            defaultUri: vscode.Uri.file(path.join(
-                vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd(),
-                'mission-tree.svg',
-            )),
+            defaultUri: MissionPreviewPanel.defaultExportUri('mission-tree.svg'),
         });
         if (!target) {
             return;

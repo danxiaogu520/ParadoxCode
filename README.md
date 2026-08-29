@@ -187,10 +187,10 @@ same canonical `rule_hash` covers both semantic data and profile data.
 
 ## Development setup
 
-Launch `pdx-ls` from a configured path or from `PATH`. Workspace source roots are configured
-through `.pdx/project.toml` or, in Zed, through `lsp.pdx-ls.initialization_options` in
-`.zed/settings.json`. The documented setup is for contributors, not the final installation
-experience.
+Launch `pdx-ls` from a configured path or from `PATH`. Editor configuration is intentionally
+separate: VS Code uses its `paradoxcode.*` settings, while Zed uses
+`lsp.pdx-ls.initialization_options` in `.zed/settings.json`. The two editors do not read a shared
+project file. The documented setup is for contributors, not the final installation experience.
 
 Let ParadoxCode discover, validate, index, and remember the local EU4 installation:
 
@@ -198,7 +198,7 @@ Let ParadoxCode discover, validate, index, and remember the local EU4 installati
 pdx setup vanilla
 ```
 
-The first `pdx-ls` launch also performs one non-blocking quick attempt when no project override or
+The first `pdx-ls` launch also performs one non-blocking quick attempt when no explicit cache or
 previous attempt exists. If common locations do not produce exactly one candidate, run
 `pdx setup vanilla --deep` or select a directory with `--source`. Searches are not repeated on
 normal startup.
@@ -213,6 +213,11 @@ pdx index vanilla \
 
 Large dependency Mods can be indexed once and loaded from the persistent cache on every launch
 instead of being rescanned:
+
+In the VS Code extension, **ParadoxCode: Add Dependency** opens a folder-and-cache wizard and
+writes the ordered entry to the workspace `paradoxcode.dependencies` setting. The matching Remove
+and Open Dependency Settings commands are available from the Command Palette; new entries are
+appended as the highest-priority dependency.
 
 ```bash
 pdx index dependency \
@@ -247,48 +252,88 @@ While `index` is set, the dependency is not scanned live; after changing the dep
 its cache with `pdx index dependency` and restart the language server (command palette
 `pdx-ls: restart`). Remove the `index` field to fall back to live scanning.
 
-Long-running sessions can opt into a quiet, idle-gated source-root re-scan. The default is off;
-set the cadence and idle window in `.pdx/project.toml` (or pass the camelCase keys through
-`initializationOptions`):
+Long-running sessions can opt into a quiet, idle-gated source-root re-scan. The default is off.
+In VS Code, set `paradoxcode.backgroundReindexIntervalMinutes` and
+`paradoxcode.backgroundReindexIdleSeconds`; in Zed, pass the camelCase keys through its
+`initialization_options`:
 
-```toml
-background_reindex_interval_minutes = 30
-background_reindex_idle_seconds = 15
+```json
+{
+  "backgroundReindexIntervalMinutes": 30,
+  "backgroundReindexIdleSeconds": 15
+}
 ```
 
 The pass never replaces a newer edit or watched-file refresh, and changing either setting through
 `workspace/didChangeConfiguration` takes effect without restarting the server.
 
 Large workspaces can prune generated files or directories before they consume the scan budget.
-Configure `ignore_file_patterns` and `ignore_directories` in `.pdx/project.toml`, or pass
-`ignoreFilePatterns` and `ignoreDirectories` through `initializationOptions`:
+Configure `paradoxcode.ignoreFilePatterns` and `paradoxcode.ignoreDirectories` in VS Code, or pass
+`ignoreFilePatterns` and `ignoreDirectories` through Zed's `initialization_options`:
 
-```toml
-ignore_file_patterns = ["**/*.generated.txt"]
-ignore_directories = ["generated", "build/cache"]
+```json
+{
+  "ignoreFilePatterns": ["**/*.generated.txt"],
+  "ignoreDirectories": ["generated", "build/cache"]
+}
 ```
 
 Patterns are bounded to 200 entries per list and 1024 characters per entry. `*` and `?` stay
 within one path component; `**` spans directories; a pattern without `/` matches a basename at
 any depth. The same filters apply to watched-file updates.
 
-To hide a known diagnostic category, configure `ignored_error_codes` in `.pdx/project.toml`, or
-pass `ignoredErrorCodes` through `initializationOptions` (the setting also updates live through
-`workspace/didChangeConfiguration`):
+To hide a known diagnostic category, configure `paradoxcode.diagnosticIgnoreCodes` in VS Code, or
+pass `ignoredErrorCodes` through Zed's `initialization_options` (the setting also updates live
+through `workspace/didChangeConfiguration`):
 
-```toml
-ignored_error_codes = ["UnknownScope", "UnknownBareValue"]
+```json
+{
+  "ignoredErrorCodes": ["UnknownScope", "UnknownBareValue"]
+}
 ```
 
 Codes use the stable LSP names shown in diagnostics. Unknown codes are rejected so a misspelled
 setting cannot silently suppress nothing.
 
+Diagnostic categories can also be remapped without changing the analysis result. Configure
+`paradoxcode.diagnostics.severityOverrides` in VS Code, or `diagnosticSeverityOverrides` in Zed,
+with stable codes and `error`, `warning`, `info`, `hint`, or `off`; the effective severity is
+applied before publication limits and `validateWorkspace` aggregation:
+
+```json
+{
+  "diagnosticSeverityOverrides": {
+    "UnknownScope": "warning",
+    "AnalysisIncomplete": "info"
+  }
+}
+```
+
+Use `paradoxcode.vanilla.mode = "cacheOnly"` in VS Code, or `vanillaMode: "cacheOnly"` in Zed,
+to require an already available Vanilla cache. The `disabled` value omits the Vanilla source root
+entirely. The default `auto` keeps the normal explicit-cache and one-time discovery behavior.
+`performance.profile` / `performanceProfile` accepts `conservative`, `balanced`, or `fast` and
+changes only bounded scan concurrency.
+
+Completion sources can be narrowed independently of fixed source resolution priority with
+`paradoxcode.completion.sourceLayers` in VS Code or `completionSourceLayers` in Zed. Localisation
+hover and mission titles use the ordered preferred-language list, falling back to English when no
+preferred language is present:
+
+```json
+{
+  "preferredLocalisationLanguages": ["french", "english"],
+  "completionSourceLayers": ["currentMod", "dependencies"],
+  "performanceProfile": "conservative"
+}
+```
+
 Initialization completion, watched-file refreshes, quiet background re-scans, and explicit
 workspace refreshes publish diagnostics for closed Current Mod files by default, bounded to 2,000
-files per pass. Set `workspace_wide_diagnostics = false` in `.pdx/project.toml`, or send
-`workspaceWideDiagnostics: false` in initialization/configuration settings, when the Problems view
-should remain limited to open documents. `validateWorkspace` still computes its complete summary
-when publication is disabled.
+files per pass. Set `paradoxcode.workspaceWideDiagnostics = false` in VS Code, or send
+`workspaceWideDiagnostics: false` in Zed initialization/configuration settings, when the Problems
+view should remain limited to open documents. `validateWorkspace` still computes its complete
+summary when publication is disabled.
 
 For a one-off suppression beside a piece of source, add `# cwtools-ignore <code>` to the same
 line (or the immediately preceding/following line). The directive is read from raw text, so it

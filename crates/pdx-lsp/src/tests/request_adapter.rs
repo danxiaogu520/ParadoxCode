@@ -552,6 +552,49 @@ fn memory_transport_delegates_phase5_requests_to_analysis() {
 }
 
 #[test]
+fn memory_transport_resolves_typed_event_call_definition() {
+    let (root_dir, root_uri) = temp_workspace_dir();
+    let events_dir = root_dir.join("events");
+    fs::create_dir_all(&events_dir).expect("create events dir");
+    let file_path = events_dir.join("typed-event-call.txt");
+    fs::write(&file_path, "").expect("create placeholder file");
+    let uri = canonical_uri(&file_path);
+    let text = concat!(
+        "country_event = { id = target.1 }\n",
+        "country_event = { id = caller.1 immediate = { ",
+        "country_event = { id = target.1 } } }\n",
+    );
+    let input = frames([
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{}}}),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":text}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":{"line":1,"character":70}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let definition = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("definition response");
+    assert_eq!(definition["error"], Value::Null);
+    assert_eq!(definition["result"].as_array().map(Vec::len), Some(1));
+    assert_eq!(
+        definition["result"][0]["range"],
+        json!({
+            "start": {"line": 0, "character": 23},
+            "end": {"line": 0, "character": 31}
+        })
+    );
+    fs::remove_dir_all(root_dir).expect("cleanup");
+}
+
+#[test]
 fn semantic_tokens_are_advertised_and_encoded_in_relative_order() {
     let (root, root_uri) = temp_workspace_dir();
     let uri = format!("{root_uri}/events/test.txt");
@@ -1221,7 +1264,7 @@ fn initialize_reports_stages_via_log_message_and_work_done_progress() {
     for expected in [
         "startup: first-party rules already loaded",
         "initialize request accepted:",
-        "Initialization phase: resolving project configuration and source roots",
+        "Initialization phase: resolving editor configuration and source roots",
         "Initialization phase: scanning",
         "Workspace scan finished",
         "Source-root watcher registration prepared",

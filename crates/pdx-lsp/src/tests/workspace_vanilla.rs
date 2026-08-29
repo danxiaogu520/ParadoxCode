@@ -34,6 +34,52 @@ fn background_reindex_options_are_bounded_and_default_to_opt_in() {
     assert_eq!(configured.background_reindex_idle_seconds, 30);
     assert!(!configured.workspace_wide_diagnostics);
 
+    let advanced = resolve_source_roots(
+        Some(&root),
+        Some(json!({
+            "vanillaMode": "cacheOnly",
+            "preferredLocalisationLanguages": ["French", "english", "french"],
+            "completionSourceLayers": ["currentMod", "dependencies"],
+            "performanceProfile": "conservative",
+            "diagnosticSeverityOverrides": {
+                "UnknownScope": "warning",
+                "AnalysisIncomplete": "off"
+            }
+        })),
+        &pdx_engine::WorkspaceScanToken::new(),
+    )
+    .expect("advanced workspace settings");
+    assert_eq!(
+        advanced.vanilla_mode,
+        crate::workspace::VanillaMode::CacheOnly
+    );
+    assert_eq!(
+        advanced.preferred_localisation_languages,
+        ["french".to_owned(), "english".to_owned()]
+    );
+    assert_eq!(
+        advanced.completion_source_layers,
+        [SourceRootKind::CurrentMod, SourceRootKind::Dependency,]
+    );
+    assert_eq!(
+        advanced.performance_profile,
+        crate::workspace::PerformanceProfile::Conservative
+    );
+    assert_eq!(
+        advanced.scan_limits.max_workers, 2,
+        "conservative scans use the bounded worker profile"
+    );
+    assert_eq!(
+        advanced.diagnostic_severity_overrides.get("UnknownScope"),
+        Some(&Some(pdx_analysis::Severity::Warning))
+    );
+    assert_eq!(
+        advanced
+            .diagnostic_severity_overrides
+            .get("AnalysisIncomplete"),
+        Some(&None)
+    );
+
     let filtered = resolve_source_roots(
         Some(&root),
         Some(json!({
@@ -71,7 +117,7 @@ fn background_reindex_options_are_bounded_and_default_to_opt_in() {
 }
 
 #[test]
-fn workspace_root_is_scanned_as_current_mod_without_project_config() {
+fn workspace_root_is_scanned_as_current_mod_without_editor_override() {
     let (root, root_uri) = temp_workspace_dir();
     fs::create_dir_all(root.join("common/country_tags")).expect("country tags directory");
     fs::create_dir_all(root.join("missions")).expect("missions directory");
@@ -202,18 +248,18 @@ fn watched_file_registration_and_notification_update_the_disk_index() {
 }
 
 #[test]
-fn project_config_loads_ordered_dependencies_and_keeps_them_read_only() {
+fn editor_options_load_ordered_dependencies_and_keep_them_read_only() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-lsp-project-config-{nonce}"));
-    let config_dir = root.join(".pdx");
+    let root = std::env::temp_dir().join(format!("pdx-lsp-editor-options-{nonce}"));
+    let cache_dir = root.join("cache");
     let current = root.join("mod");
     let low = root.join("dependencies/low");
     let high = root.join("dependencies/high");
     let vanilla = root.join("vanilla");
-    fs::create_dir_all(&config_dir).expect("config directory");
+    fs::create_dir_all(&cache_dir).expect("cache directory");
     for directory in [&current, &low, &high, &vanilla] {
         fs::create_dir_all(directory.join("events")).expect("fixture directory");
     }
@@ -265,27 +311,12 @@ fn project_config_loads_ordered_dependencies_and_keeps_them_read_only() {
         .expect("scan Vanilla once");
     let vanilla_cache =
         IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("build Vanilla cache");
-    let vanilla_cache_path = config_dir.join("vanilla.pdxindex");
+    let vanilla_cache_path = cache_dir.join("vanilla.pdxindex");
     vanilla_cache
         .save(&vanilla_cache_path)
         .expect("save Vanilla cache");
     fs::rename(&vanilla, root.join("vanilla-moved"))
         .expect("make Vanilla source unavailable after caching");
-    fs::write(
-        config_dir.join("project.toml"),
-        r#"mod_directory = "mod"
-vanilla_index_cache = ".pdx/vanilla.pdxindex"
-
-[[dependencies]]
-id = "low"
-path = "dependencies/low"
-
-[[dependencies]]
-id = "high"
-path = "dependencies/high"
-"#,
-    )
-    .expect("project config");
     fs::write(
         low.join("events/definitions.txt"),
         concat!(
@@ -312,7 +343,7 @@ path = "dependencies/high"
     let reference_uri = canonical_uri(&reference_path);
     let root_uri = canonical_uri(&canonical_root);
     let input = frames([
-        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{},"initializationOptions":{"projectConfig":".pdx/project.toml"}}}),
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"workspaceFolders":[{"uri":root_uri,"name":"test"}],"capabilities":{},"initializationOptions":{"modDirectory":"mod","vanillaIndexCache":"cache/vanilla.pdxindex","dependencies":[{"id":"low","path":"dependencies/low"},{"id":"high","path":"dependencies/high"}]}}}),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":reference_uri,"languageId":"eu4","version":1,"text":"event = dependency.1\nevent = vanilla.1\n"}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":reference_uri},"position":{"line":0,"character":10},"newName":"renamed.1"}}),
@@ -852,6 +883,7 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
             auto_vanilla: Some(&automatic),
             log: None,
             progress: None,
+            scan_limits: pdx_engine::WorkspaceScanLimits::default(),
             cancellation: &cancellation,
         },
         &discovery_options,
@@ -875,6 +907,7 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
             auto_vanilla: Some(&automatic),
             log: None,
             progress: None,
+            scan_limits: pdx_engine::WorkspaceScanLimits::default(),
             cancellation: &cancellation,
         },
         &discovery_options,
@@ -1121,7 +1154,7 @@ fn initialize_game_directory_guides_a_previous_failed_discovery() {
 }
 
 #[test]
-fn explicit_project_cache_precedes_user_discovery_configuration() {
+fn explicit_cache_precedes_user_discovery_configuration() {
     let (root, _) = temp_workspace_dir();
     let automatic = AutoVanillaConfiguration {
         descriptor: pdx_game::eu4::INSTALL_DESCRIPTOR,
@@ -1140,11 +1173,11 @@ fn explicit_project_cache_precedes_user_discovery_configuration() {
         .save(&automatic.user_paths.config_file)
         .expect("save user configuration");
 
-    let project_cache = root.join("project/vanilla.pdxindex");
+    let explicit_cache = root.join("cache/vanilla.pdxindex");
     let mut resolved = ResolvedSourceRoots {
         workspace_root: None,
         roots: Vec::new(),
-        index_cache: Some(project_cache.clone()),
+        index_cache: Some(explicit_cache.clone()),
         vanilla_explicit: true,
         game_directory: None,
         dependency_caches: Vec::new(),
@@ -1153,12 +1186,13 @@ fn explicit_project_cache_precedes_user_discovery_configuration() {
         scan_filters: pdx_engine::WorkspaceScanFilters::default(),
         ignored_diagnostic_codes: Vec::new(),
         workspace_wide_diagnostics: true,
+        ..ResolvedSourceRoots::default()
     };
     let mut warnings = Vec::new();
     let setup =
         apply_user_vanilla_configuration(&mut resolved, Some(&automatic), "eu4", &mut warnings);
     assert!(setup.is_none());
-    assert_eq!(resolved.index_cache, Some(project_cache));
+    assert_eq!(resolved.index_cache, Some(explicit_cache));
     assert!(warnings.is_empty());
     fs::remove_dir_all(root).expect("cleanup");
 }
@@ -1211,67 +1245,41 @@ fn unsuccessful_automatic_discovery_is_recorded_and_not_repeated() {
 }
 
 #[test]
-fn project_config_is_auto_discovered_from_the_workspace_root() {
-    let (root, _) = temp_workspace_dir();
-    fs::create_dir_all(root.join("mod/events")).expect("current directory");
-    fs::create_dir_all(root.join("deps/low/events")).expect("low dependency");
-    fs::create_dir_all(root.join("deps/high/events")).expect("high dependency");
-    fs::create_dir_all(root.join(".pdx")).expect("config directory");
-    fs::write(
-        root.join(".pdx/project.toml"),
-        r#"mod_directory = "mod"
-
-[[dependencies]]
-id = "低优先级"
-path = "deps/low"
-
-[[dependencies]]
-id = "high priority"
-path = "deps/high"
-
-[server]
-binary = "C:/tools/pdx-ls.exe"
-"#,
-    )
-    .expect("write project config");
-    let canonical_root = fs::canonicalize(&root).expect("canonical root");
-    let resolved = super::resolve_source_roots(
-        Some(&canonical_root),
-        None,
-        &pdx_engine::WorkspaceScanToken::new(),
-    )
-    .expect("auto-discovered project config");
-    // Current mod + both dependencies become live roots in priority order
-    // without any per-editor `projectConfig` option.
-    assert_eq!(resolved.roots.len(), 3);
-    assert_eq!(resolved.roots[0].kind, SourceRootKind::Dependency);
-    assert_eq!(resolved.roots[0].order, 1);
-    assert_eq!(resolved.roots[0].path, canonical_root.join("deps/low"));
-    assert_eq!(resolved.roots[1].kind, SourceRootKind::Dependency);
-    assert_eq!(resolved.roots[1].order, 2);
-    assert_eq!(resolved.roots[1].path, canonical_root.join("deps/high"));
-    assert_eq!(resolved.roots[2].kind, SourceRootKind::CurrentMod);
-    assert_eq!(resolved.roots[2].order, 3);
-    assert_eq!(resolved.roots[2].path, canonical_root.join("mod"));
-    fs::remove_dir_all(root).expect("cleanup");
-}
-
-#[test]
-fn invalid_auto_discovered_project_config_fails_loudly() {
+fn legacy_project_file_is_rejected_without_being_read() {
     let (root, _) = temp_workspace_dir();
     fs::create_dir_all(root.join(".pdx")).expect("config directory");
-    fs::write(root.join(".pdx/project.toml"), "mod_directory = [").expect("write config");
+    fs::write(root.join(".pdx/project.toml"), "this is not TOML").expect("write legacy file");
     let canonical_root = fs::canonicalize(&root).expect("canonical root");
     let error = super::resolve_source_roots(
         Some(&canonical_root),
         None,
         &pdx_engine::WorkspaceScanToken::new(),
     )
-    .expect_err("invalid auto-discovered config must fail loudly");
+    .expect_err("legacy shared config must be rejected");
+    assert_eq!(error.code, INVALID_PARAMS);
     assert!(
-        error.message.contains("projectConfig"),
-        "unexpected error: {:?}",
-        error.message
+        error
+            .message
+            .contains("shared .pdx/project.toml configuration is no longer supported")
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn removed_project_config_option_is_rejected_explicitly() {
+    let (root, _) = temp_workspace_dir();
+    let canonical_root = fs::canonicalize(&root).expect("canonical root");
+    let error = super::resolve_source_roots(
+        Some(&canonical_root),
+        Some(json!({"projectConfig": ".pdx/project.toml"})),
+        &pdx_engine::WorkspaceScanToken::new(),
+    )
+    .expect_err("removed projectConfig option must be rejected");
+    assert_eq!(error.code, INVALID_PARAMS);
+    assert!(
+        error
+            .message
+            .contains("projectConfig is no longer supported")
     );
     fs::remove_dir_all(root).expect("cleanup");
 }

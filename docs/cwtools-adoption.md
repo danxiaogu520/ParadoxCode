@@ -91,8 +91,8 @@ The first twenty-six stages are now on `main`, each independently committed and 
     bursts over 200 distinct paths switch to one full rescan, preventing generator/checkout storms
     from spawning hundreds of incremental workers while retaining stale-result and cancellation
     safety.
-16. Diagnostic publication accepts a bounded, validated `ignoredErrorCodes` list (also available
-    as `ignored_error_codes` in `.pdx/project.toml`). Filtering happens before publication caps,
+16. Diagnostic publication accepts a bounded, validated `ignoredErrorCodes` list (configured by
+    each editor independently). Filtering happens before publication caps,
     applies to live and caller-supplied diagnostic queries, and updates open documents on live
     configuration changes.
 17. Raw source comments support the CWTools-compatible `# cwtools-ignore <code>` directive. A

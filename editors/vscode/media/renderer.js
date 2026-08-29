@@ -66,7 +66,13 @@
     let zoom = 1;
     let dragging = null; // { startX, startY, panX, panY }
     let keyboardIndex = -1;
-    let options = { zoomSensitivity: 1, showTextures: true };
+    let options = {
+        zoomSensitivity: 1,
+        showTextures: true,
+        persistViewport: false,
+        showExternalPrerequisites: true,
+        showDiagnostics: true,
+    };
     let drawPending = false;
     let groupWidths = new WeakMap();
     let externalWidths = new Map();
@@ -162,6 +168,38 @@
         };
     }
 
+    function viewportStateKey() {
+        return preview && preview.documentUri ? preview.documentUri : null;
+    }
+
+    function saveViewport() {
+        const key = viewportStateKey();
+        if (!options.persistViewport || !key) {
+            return;
+        }
+        const state = vscode.getState() || {};
+        const viewports = { ...(state.viewports || {}) };
+        viewports[key] = { x: pan.x, y: pan.y, zoom };
+        vscode.setState({ ...state, viewports });
+    }
+
+    function restoreViewport() {
+        const key = viewportStateKey();
+        if (!options.persistViewport || !key) {
+            fitView();
+            return;
+        }
+        const state = vscode.getState() || {};
+        const saved = state.viewports && state.viewports[key];
+        if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)
+            && Number.isFinite(saved.zoom) && saved.zoom >= 0.35 && saved.zoom <= 2.5) {
+            pan = { x: saved.x, y: saved.y };
+            zoom = saved.zoom;
+        } else {
+            fitView();
+        }
+    }
+
     function roundRect(x, y, w, h, r) {
         ctx.beginPath();
         ctx.moveTo(x + r, y);
@@ -195,10 +233,10 @@
     }
 
     function nodeColor(node) {
-        if (node.hasError) {
+        if (options.showDiagnostics && node.hasError) {
             return COLORS.error;
         }
-        if (node.hasWarning) {
+        if (options.showDiagnostics && node.hasWarning) {
             return COLORS.warning;
         }
         if (node.isRoot) {
@@ -462,7 +500,7 @@
     }
 
     function drawExternal(node, pos) {
-        if (!preview) {
+        if (!preview || !options.showExternalPrerequisites) {
             return;
         }
         const external = externalByNode.get(nodeKey(node));
@@ -531,7 +569,7 @@
         const isHovered = hovered && hovered.kind === 'node' && hovered.index === i;
         drawImageWorld(textureImage(node.icon), node.x + EMT_ICON_X, node.y + EMT_ICON_Y);
         drawImageWorld(frame, node.x, node.y);
-        if (isHovered || node.hasError || node.hasWarning || node.isRoot) {
+        if (isHovered || (options.showDiagnostics && (node.hasError || node.hasWarning)) || node.isRoot) {
             ctx.strokeStyle = isHovered ? COLORS.borderSelected : nodeColor(node);
             ctx.lineWidth = isHovered ? 3 : 2;
             roundRect(pos.x, pos.y, w, h, 4 * zoom);
@@ -554,7 +592,9 @@
         const w = NODE_WIDTH * zoom;
         const h = NODE_HEIGHT * zoom;
         const isHovered = hovered && hovered.kind === 'node' && hovered.index === i;
-        ctx.fillStyle = node.hasError ? COLORS.errorBg : node.isRoot ? COLORS.rootBg : COLORS.card;
+        ctx.fillStyle = options.showDiagnostics && node.hasError
+            ? COLORS.errorBg
+            : node.isRoot ? COLORS.rootBg : COLORS.card;
         roundRect(pos.x, pos.y, w, h, 6 * zoom);
         ctx.fill();
         ctx.strokeStyle = isHovered ? COLORS.borderSelected : nodeColor(node);
@@ -586,7 +626,8 @@
     }
 
     function renderSummary() {
-        if (!preview) {
+        if (!preview || !options.showDiagnostics) {
+            hideStatus();
             return;
         }
         const errors = preview.diagnostics.filter((d) => d.severity === 1).length;
@@ -603,8 +644,8 @@
     function nodeLabel(node) {
         const title = node.title && node.title.value ? node.title.value : node.id;
         const flags = [];
-        if (node.hasError) flags.push('error');
-        if (node.hasWarning) flags.push('warning');
+        if (options.showDiagnostics && node.hasError) flags.push('error');
+        if (options.showDiagnostics && node.hasWarning) flags.push('warning');
         if (node.isRoot) flags.push('root');
         return `${title}${flags.length ? ` · ${flags.join(', ')}` : ''}`;
     }
@@ -634,8 +675,8 @@
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'node-entry';
-            if (node.hasError) button.classList.add('error');
-            else if (node.hasWarning) button.classList.add('warning');
+            if (options.showDiagnostics && node.hasError) button.classList.add('error');
+            else if (options.showDiagnostics && node.hasWarning) button.classList.add('warning');
             else if (node.isRoot) button.classList.add('root');
             button.textContent = nodeLabel(node);
             button.title = node.titleKey || node.id;
@@ -733,7 +774,7 @@
         }
         const parts = [
             `<svg xmlns="http://www.w3.org/2000/svg" width="${maxX}" height="${maxY}" viewBox="0 0 ${maxX} ${maxY}">`,
-            `<rect width="100%" height="100%" fill="${escapeXml(themeColor('--vscode-editor-background', '#20252d'))}"/>`,
+            `<rect width="100%" height="100%" fill="${escapeXml(getComputedStyle(document.body).getPropertyValue('--vscode-editor-background').trim() || '#20252d')}"/>`,
         ];
         for (const segment of preview.arrows) {
             const x = Number(segment.x) || 0;
@@ -756,8 +797,14 @@
             parts.push(`<text x="${group.x + 8}" y="${group.y + 14}" fill="${escapeXml(COLORS.dim)}" font-family="sans-serif" font-size="11">${escapeXml(group.label)}</text>`);
         }
         for (const node of preview.nodes) {
-            const stroke = node.hasError ? COLORS.error : node.hasWarning ? COLORS.warning : node.isRoot ? COLORS.root : COLORS.border;
-            const fill = node.hasError ? COLORS.errorBg : node.isRoot ? COLORS.rootBg : COLORS.card;
+            const stroke = options.showDiagnostics && node.hasError
+                ? COLORS.error
+                : options.showDiagnostics && node.hasWarning
+                    ? COLORS.warning
+                    : node.isRoot ? COLORS.root : COLORS.border;
+            const fill = options.showDiagnostics && node.hasError
+                ? COLORS.errorBg
+                : node.isRoot ? COLORS.rootBg : COLORS.card;
             parts.push(`<rect x="${node.x}" y="${node.y}" width="${NODE_WIDTH}" height="${NODE_HEIGHT}" rx="6" fill="${escapeXml(fill)}" stroke="${escapeXml(stroke)}"/>`);
             parts.push(`<text x="${node.x + NODE_WIDTH / 2}" y="${node.y + NODE_HEIGHT / 2}" text-anchor="middle" fill="${escapeXml(COLORS.text)}" font-family="sans-serif" font-size="11">${escapeXml(node.title?.value || node.id)}</text>`);
         }
@@ -770,7 +817,7 @@
         if (message.type === 'preview') {
             setPreview(message.payload);
             keyboardIndex = -1;
-            fitView();
+            restoreViewport();
             hideStatus();
             scheduleDraw();
             renderNodeList();
@@ -784,7 +831,12 @@
             options = {
                 zoomSensitivity: Math.min(2, Math.max(0.5, Number(message.zoomSensitivity) || 1)),
                 showTextures: message.showTextures !== false,
+                persistViewport: message.persistViewport === true,
+                showExternalPrerequisites: message.showExternalPrerequisites !== false,
+                showDiagnostics: message.showDiagnostics !== false,
             };
+            renderNodeList();
+            renderSummary();
             scheduleDraw();
         }
     });
@@ -821,6 +873,7 @@
     });
 
     window.addEventListener('mouseup', () => {
+        saveViewport();
         dragging = null;
     });
 
@@ -837,11 +890,13 @@
         zoom = nextZoom;
         pan.x = sx - world.x * zoom;
         pan.y = sy - world.y * zoom;
+        saveViewport();
         scheduleDraw();
     }, { passive: false });
 
     canvas.addEventListener('dblclick', () => {
         fitView();
+        saveViewport();
         scheduleDraw();
     });
 
@@ -861,21 +916,24 @@
         } else if (event.key === '+' || event.key === '=') {
             event.preventDefault();
             zoom = Math.min(2.5, zoom * 1.15);
+            saveViewport();
             scheduleDraw();
         } else if (event.key === '-') {
             event.preventDefault();
             zoom = Math.max(0.35, zoom / 1.15);
+            saveViewport();
             scheduleDraw();
         } else if (event.key.toLowerCase() === 'f') {
             event.preventDefault();
             fitView();
+            saveViewport();
             scheduleDraw();
         }
     });
 
-    document.getElementById('fit')?.addEventListener('click', () => { fitView(); scheduleDraw(); });
-    document.getElementById('zoom-in')?.addEventListener('click', () => { zoom = Math.min(2.5, zoom * 1.15); scheduleDraw(); });
-    document.getElementById('zoom-out')?.addEventListener('click', () => { zoom = Math.max(0.35, zoom / 1.15); scheduleDraw(); });
+    document.getElementById('fit')?.addEventListener('click', () => { fitView(); saveViewport(); scheduleDraw(); });
+    document.getElementById('zoom-in')?.addEventListener('click', () => { zoom = Math.min(2.5, zoom * 1.15); saveViewport(); scheduleDraw(); });
+    document.getElementById('zoom-out')?.addEventListener('click', () => { zoom = Math.max(0.35, zoom / 1.15); saveViewport(); scheduleDraw(); });
     document.getElementById('export-png')?.addEventListener('click', exportPng);
     document.getElementById('export-svg')?.addEventListener('click', exportSvg);
     document.getElementById('export-json')?.addEventListener('click', exportJson);

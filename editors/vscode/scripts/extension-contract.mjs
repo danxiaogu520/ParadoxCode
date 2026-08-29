@@ -17,7 +17,16 @@ const localisationConfiguration = readJson('localisation-language-configuration.
 if (!manifest.files?.includes('node_modules/**')) {
   fail('production node_modules must be included in the VSIX file allowlist');
 }
-for (const dependency of ['smol-toml', 'vscode-languageclient']) {
+if (manifest.activationEvents?.includes('workspaceContains:.pdx/project.toml')) {
+  fail('the extension must not activate from the removed shared project configuration');
+}
+if (manifest.contributes?.configuration?.properties?.['paradoxcode.projectConfig']) {
+  fail('the removed paradoxcode.projectConfig setting must not be exposed');
+}
+if (existsSync(join(root, 'src', 'sharedConfig.ts'))) {
+  fail('the removed sharedConfig module must not be packaged');
+}
+for (const dependency of ['vscode-languageclient']) {
   if (typeof manifest.dependencies?.[dependency] !== 'string') {
     fail(`runtime dependency ${dependency} must remain in dependencies`);
   }
@@ -334,6 +343,48 @@ for (const marker of [
 ]) {
   if (!extensionSource.includes(marker)) {
     fail(`Automatic server setup marker missing: ${marker}`);
+  }
+}
+const requiredSettings = [
+  'paradoxcode.workspaceWideDiagnostics',
+  'paradoxcode.backgroundReindexIntervalMinutes',
+  'paradoxcode.backgroundReindexIdleSeconds',
+  'paradoxcode.ignoreFilePatterns',
+  'paradoxcode.ignoreDirectories',
+  'paradoxcode.server.installPolicy',
+  'paradoxcode.vanilla.mode',
+  'paradoxcode.preview.refreshMode',
+  'paradoxcode.preview.persistViewport',
+  'paradoxcode.preview.showExternalPrerequisites',
+  'paradoxcode.preview.showDiagnostics',
+  'paradoxcode.preview.defaultExportDirectory',
+  'paradoxcode.diagnostics.severityOverrides',
+  'paradoxcode.localisation.preferredLanguages',
+  'paradoxcode.completion.sourceLayers',
+  'paradoxcode.performance.profile',
+];
+for (const setting of requiredSettings) {
+  const property = manifest.contributes.configuration?.properties?.[setting];
+  if (!property || typeof property.markdownDescription !== 'string') {
+    fail(`missing configured setting ${setting}`);
+  }
+  const nlsKey = property.markdownDescription.match(/^%(.+)%$/)?.[1];
+  if (!nlsKey || typeof nls[nlsKey] !== 'string' || typeof zh[nlsKey] !== 'string') {
+    fail(`English and Chinese NLS entries are required for ${setting}`);
+  }
+}
+for (const command of [
+  'paradoxcode.addDependency',
+  'paradoxcode.removeDependency',
+  'paradoxcode.openDependencySettings',
+]) {
+  const contribution = manifest.contributes.commands?.find((entry) => entry.command === command);
+  if (!contribution || typeof contribution.title !== 'string') {
+    fail(`missing dependency-management command ${command}`);
+  }
+  const nlsKey = contribution.title.match(/^%(.+)%$/)?.[1];
+  if (!nlsKey || typeof nls[nlsKey] !== 'string' || typeof zh[nlsKey] !== 'string') {
+    fail(`English and Chinese NLS entries are required for ${command}`);
   }
 }
 const installerSource = readFileSync(join(root, 'src', 'serverInstaller.ts'), 'utf8');
