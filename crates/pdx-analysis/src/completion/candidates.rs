@@ -4,7 +4,9 @@ use crate::semantic::*;
 use crate::support::*;
 use crate::types::*;
 use pdx_engine::AnalysisSnapshot;
-use pdx_rules::{KeyMatcher, RuleShape, ValueMatcher};
+use pdx_rules::{
+    KeyMatcher, ProfileRootEntryInsertion, ProfileRootEntrySource, RuleShape, ValueMatcher,
+};
 use pdx_text::TextRange;
 
 use super::context::SemanticCompletionContext;
@@ -263,6 +265,7 @@ pub(crate) fn add_semantic_key_items_ranked(
     add_type_root_key_items(
         snapshot,
         context,
+        member_cache,
         items,
         replacement_range,
         prefix,
@@ -438,15 +441,16 @@ pub(crate) fn add_semantic_key_items_ranked(
     }
 }
 
-/// Adds the concrete keys that instantiate an enumerated type at a file root.
+/// Adds the concrete keys that instantiate a type at a file root.
 ///
-/// These roots are not workspace members: `type_root_keys` is the first-party declaration of the
-/// legal names (for example EU4's `on_startup`). The ordinary `root_entries` container carries
-/// the path selection and duplicate suppression, while this helper supplies the type-instance
-/// names when that container has no per-key semantic rule rows.
+/// The ordinary `root_entries` container carries path selection and duplicate suppression, while
+/// this helper supplies type-instance names when that container has no per-key semantic rule rows.
+/// Static `type_root_keys`, profile enums, and workspace members are all supported through the
+/// profile's source selector.
 fn add_type_root_key_items(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
+    member_cache: &mut CompletionMemberCache,
     items: &mut Vec<RankedCompletionItem>,
     replacement_range: TextRange,
     prefix: &str,
@@ -467,38 +471,96 @@ fn add_type_root_key_items(
     }) else {
         return;
     };
-    let Some(roots) = semantic.type_root_keys.get(type_name).or_else(|| {
-        semantic
+    let profile_spec = snapshot.game_profile().root_entry_spec(entry_name);
+    let source = profile_spec.map_or(ProfileRootEntrySource::TypeRootKeys, |spec| {
+        spec.source.clone()
+    });
+    let mut roots = match &source {
+        ProfileRootEntrySource::TypeRootKeys => semantic
             .type_root_keys
-            .iter()
-            .find(|(candidate, _)| candidate.eq_ignore_ascii_case(type_name))
-            .map(|(_, roots)| roots)
-    }) else {
-        return;
+            .get(type_name)
+            .or_else(|| {
+                semantic
+                    .type_root_keys
+                    .iter()
+                    .find(|(candidate, _)| candidate.eq_ignore_ascii_case(type_name))
+                    .map(|(_, roots)| roots)
+            })
+            .cloned()
+            .unwrap_or_default(),
+        ProfileRootEntrySource::Enum { enum_name } => {
+            let mut values = semantic
+                .enum_values
+                .iter()
+                .find(|(candidate, _)| candidate.eq_ignore_ascii_case(enum_name))
+                .map_or_else(Vec::new, |(_, values)| values.clone());
+            if let Some((_, extras)) = snapshot
+                .game_profile()
+                .enum_extra_members
+                .iter()
+                .find(|(candidate, _)| candidate.eq_ignore_ascii_case(enum_name))
+            {
+                values.extend(extras.iter().cloned());
+            }
+            values.extend(
+                member_cache
+                    .workspace_member_names(snapshot, enum_name, prefix)
+                    .iter()
+                    .cloned(),
+            );
+            values
+        }
+        ProfileRootEntrySource::Workspace { type_name } => {
+            let mut values = member_cache
+                .workspace_member_names(snapshot, type_name, prefix)
+                .to_vec();
+            // Profile extras are keyed by the user-facing collection name in a few cases
+            // (`country_tags`) while the workspace member kind is singular (`country_tag`).
+            // Accept both spellings, including aliases declared by the active game profile.
+            for (candidate, extras) in &snapshot.game_profile().enum_extra_members {
+                if candidate.eq_ignore_ascii_case(type_name)
+                    || snapshot
+                        .game_profile()
+                        .member_kind_alias(candidate)
+                        .is_some_and(|kind| kind.eq_ignore_ascii_case(type_name))
+                {
+                    values.extend(extras.iter().cloned());
+                }
+            }
+            values
+        }
+    };
+    roots.retain(|label| completion_matches(label, prefix));
+    roots.sort_by_key(|label| label.to_ascii_lowercase());
+    roots.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+    let insertion = profile_spec.map_or(ProfileRootEntryInsertion::Block, |spec| spec.insertion);
+    let repeatable = profile_spec.is_some_and(|spec| spec.repeatable);
+    let kind = match &source {
+        ProfileRootEntrySource::TypeRootKeys => CompletionKind::Key,
+        ProfileRootEntrySource::Enum { .. } | ProfileRootEntrySource::Workspace { .. } => {
+            CompletionKind::EnumMember
+        }
     };
     for label in roots {
-        if context
-            .existing_keys
-            .iter()
-            .any(|key| key.eq_ignore_ascii_case(label))
+        if !repeatable
+            && context
+                .existing_keys
+                .iter()
+                .any(|key| key.eq_ignore_ascii_case(&label))
         {
             continue;
         }
-        let insert_text = if insert_assignment {
-            format!("{label} = {{\n\t$0\n}}")
-        } else {
-            label.clone()
-        };
+        let insert_text = root_entry_insert_text(insertion, &label, insert_assignment);
         let documentation = snapshot
             .rules()
-            .type_root_scope_registers(type_name, label)
+            .type_root_scope_registers(type_name, &label)
             .filter(|scope| !scope.documentation.is_empty())
             .map(|scope| scope.documentation.join("\n"));
         push_completion(
             items,
             CompletionItem {
                 label: label.clone(),
-                kind: CompletionKind::Key,
+                kind,
                 detail: type_name.clone(),
                 documentation,
                 replacement_range,
@@ -515,6 +577,25 @@ fn add_type_root_key_items(
                 false,
             ),
         );
+    }
+}
+
+fn root_entry_insert_text(
+    insertion: ProfileRootEntryInsertion,
+    label: &str,
+    insert_assignment: bool,
+) -> String {
+    match insertion {
+        ProfileRootEntryInsertion::Block => {
+            if insert_assignment {
+                format!("{label} = {{\n\t$0\n}}")
+            } else {
+                label.to_owned()
+            }
+        }
+        ProfileRootEntryInsertion::Bare => label.to_owned(),
+        ProfileRootEntryInsertion::Assignment => format!("{label} = $0"),
+        ProfileRootEntryInsertion::QuotedAssignment => format!("{label} = \"$0\""),
     }
 }
 

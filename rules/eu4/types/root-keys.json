@@ -13,6 +13,17 @@
   "government_reform": [
     "defaults_reform"
   ],
+  "custom_gui": [
+    "custom_button",
+    "custom_icon",
+    "custom_shield",
+    "custom_text_box",
+    "custom_window"
+  ],
+  "technology_file": [
+    "groups",
+    "tables"
+  ],
   "on_action": [
     "consort_on_shipwreck",
     "heir_on_shipwreck",

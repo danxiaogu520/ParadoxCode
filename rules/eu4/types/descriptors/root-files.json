@@ -1,0 +1,58 @@
+{
+  "country_tag": {
+    "name": "country_tag",
+    "path": "game/common/country_tags",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null,
+    "root_entries": "country_tag_entries"
+  },
+  "custom_gui": {
+    "name": "custom_gui",
+    "path": "game/common/custom_gui",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null,
+    "root_entries": "custom_gui_entries"
+  },
+  "graphical_cultures": {
+    "name": "graphical_cultures",
+    "path": "game/common",
+    "path_file": "graphicalculturetype.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null,
+    "root_entries": "graphical_culture_entries"
+  },
+  "technology_file": {
+    "name": "technology_file",
+    "path": "game/common",
+    "path_file": "technology.txt",
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null,
+    "root_entries": "technology_file_entries"
+  }
+}

@@ -140,6 +140,10 @@ const FIRST_PARTY_FILES: &[SourceFile<'static>] = &[
         bytes: include_bytes!("../../../../rules/eu4/types/descriptors/other.json"),
     },
     SourceFile {
+        path: "types/descriptors/root-files.json",
+        bytes: include_bytes!("../../../../rules/eu4/types/descriptors/root-files.json"),
+    },
+    SourceFile {
         path: "types/root-keys.json",
         bytes: include_bytes!("../../../../rules/eu4/types/root-keys.json"),
     },

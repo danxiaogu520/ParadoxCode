@@ -3169,3 +3169,208 @@ fn mission_ai_weight_offers_the_modifier_rule_keys() {
     assert_eq!(ctx, Some(("modifier_rule".to_owned(), Vec::new())));
     assert_sorted_labels_eq(&labels, &["factor", "modifier"], "ai_weight body");
 }
+
+#[test]
+fn custom_gui_file_root_offers_all_declared_entry_types() {
+    use std::path::PathBuf;
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/common/custom_gui/root-entries.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "\n".to_owned(),
+        Some(PathBuf::from("common/custom_gui/root-entries.txt")),
+    )
+    .expect("open custom gui document");
+    let result = complete(&host.snapshot(), &id, 0);
+    let labels = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        labels,
+        vec![
+            "custom_button",
+            "custom_icon",
+            "custom_shield",
+            "custom_text_box",
+            "custom_window",
+        ],
+        "custom_gui root types must be offered: {result:?}"
+    );
+    assert_eq!(
+        result.items[0].insert_text, "custom_button = {\n\t$0\n}",
+        "custom_gui root types must insert block skeletons"
+    );
+
+    let mut repeat_host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let repeat_id = DocumentId::new("file:///tmp/common/custom_gui/repeat-root-entries.txt");
+    let repeat_text = "custom_button = { name = first_button }\n\n";
+    repeat_host
+        .open_document(
+            repeat_id.clone(),
+            1,
+            repeat_text.to_owned(),
+            Some(PathBuf::from("common/custom_gui/repeat-root-entries.txt")),
+        )
+        .expect("open repeated custom gui document");
+    let repeat = complete(
+        &repeat_host.snapshot(),
+        &repeat_id,
+        repeat_text.len() as u32,
+    );
+    assert!(
+        repeat
+            .items
+            .iter()
+            .any(|item| item.label == "custom_button"),
+        "custom GUI type entries may be declared repeatedly: {repeat:?}"
+    );
+}
+
+#[test]
+fn graphical_culture_file_root_offers_bare_enum_values() {
+    use std::path::PathBuf;
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/common/graphicalculturetype.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "\n".to_owned(),
+        Some(PathBuf::from("common/graphicalculturetype.txt")),
+    )
+    .expect("open graphical culture document");
+    let result = complete(&host.snapshot(), &id, 0);
+    let by_label = |label: &str| result.items.iter().find(|item| item.label == label);
+    assert_eq!(
+        result.items.len(),
+        12,
+        "all graphical cultures must be offered"
+    );
+    assert_eq!(
+        by_label("westerngfx").expect("westerngfx").insert_text,
+        "westerngfx",
+        "graphical cultures are bare root values"
+    );
+}
+
+#[test]
+fn country_tag_file_root_offers_workspace_and_profile_members() {
+    use std::path::PathBuf;
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let source_id = DocumentId::new("file:///tmp/common/country_tags/definitions.txt");
+    host.open_document(
+        source_id,
+        1,
+        "ABC = \"countries/Abc.txt\"\n".to_owned(),
+        Some(PathBuf::from("common/country_tags/definitions.txt")),
+    )
+    .expect("open country tag definitions");
+    let id = DocumentId::new("file:///tmp/common/country_tags/root-entries.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "F0".to_owned(),
+        Some(PathBuf::from("common/country_tags/root-entries.txt")),
+    )
+    .expect("open country tag document");
+    let result = complete(&host.snapshot(), &id, 2);
+    let by_label = |label: &str| result.items.iter().find(|item| item.label == label);
+    let profile_member =
+        by_label("F00").unwrap_or_else(|| panic!("profile country tag member missing: {result:?}"));
+    assert_eq!(
+        profile_member.insert_text, "F00 = \"$0\"",
+        "country tag roots must insert a quoted mapping value"
+    );
+    assert_eq!(
+        by_label("ABC"),
+        None,
+        "the prefix should filter unrelated workspace country tags"
+    );
+
+    let mut host2 = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let source_id2 = DocumentId::new("file:///tmp/common/country_tags/definitions-2.txt");
+    host2
+        .open_document(
+            source_id2,
+            1,
+            "ABC = \"countries/Abc.txt\"\n".to_owned(),
+            Some(PathBuf::from("common/country_tags/definitions-2.txt")),
+        )
+        .expect("open country tag definitions");
+    let id2 = DocumentId::new("file:///tmp/common/country_tags/root-entries-2.txt");
+    host2
+        .open_document(
+            id2.clone(),
+            1,
+            "AB".to_owned(),
+            Some(PathBuf::from("common/country_tags/root-entries-2.txt")),
+        )
+        .expect("open country tag document");
+    let result2 = complete(&host2.snapshot(), &id2, 2);
+    assert!(
+        result2.items.iter().any(|item| item.label == "ABC"),
+        "workspace country tags must be offered: {result2:?}"
+    );
+}
+
+#[test]
+fn alerts_file_root_offers_file_wrappers() {
+    use std::path::PathBuf;
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/common/alerts.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "\n".to_owned(),
+        Some(PathBuf::from("common/alerts.txt")),
+    )
+    .expect("open alerts document");
+    let result = complete(&host.snapshot(), &id, 0);
+    let labels = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(labels, vec!["alerts", "icon", "sound"]);
+    assert_eq!(
+        result
+            .items
+            .iter()
+            .find(|item| item.label == "alerts")
+            .expect("alerts")
+            .insert_text,
+        "alerts = {\n\t$0\n}"
+    );
+}
+
+#[test]
+fn technology_file_root_offers_groups_and_tables() {
+    use std::path::PathBuf;
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/common/technology.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "\n".to_owned(),
+        Some(PathBuf::from("common/technology.txt")),
+    )
+    .expect("open technology document");
+    let result = complete(&host.snapshot(), &id, 0);
+    let labels = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(labels, vec!["groups", "tables"]);
+    assert_eq!(
+        result.items[0].insert_text, "groups = {\n\t$0\n}",
+        "technology wrappers must insert block skeletons"
+    );
+}
