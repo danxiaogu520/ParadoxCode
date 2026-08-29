@@ -47,6 +47,11 @@ pub(crate) const MAX_WORKSPACE_DIAGNOSTIC_FILES: usize = 128;
 /// Explicit validation still counts every file; the cap only protects the JSON-RPC client from
 /// a notification storm on very large mods.
 pub(crate) const MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS: usize = 2_000;
+/// Maximum attempts for the initial background workspace scan before deferring
+/// to an explicit `pdx/reindexWorkspace`. Each attempt restarts from a fresh
+/// host clone after a revision race, and the persistent parse cache keeps
+/// retries cheap; the bound only stops unbounded loops under continuous edits.
+pub(crate) const MAX_BACKGROUND_SCAN_RETRIES: u8 = 10;
 /// Maximum number of stale closed-file diagnostic entries cleared by one pass.
 pub(crate) const MAX_WORKSPACE_DIAGNOSTIC_CLEARS: usize = 2_000;
 pub(crate) const MAX_PUBLISHED_DIAGNOSTICS: usize = 1_000;

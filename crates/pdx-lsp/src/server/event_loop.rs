@@ -1,5 +1,3 @@
-use crate::dependency::run_dependency_cache_loads;
-
 use super::*;
 
 impl LspServer {
@@ -38,12 +36,11 @@ impl LspServer {
             let mut in_flight_initialize = None::<InFlightInitialize>;
             let mut initialize_progress_token = None::<String>;
             let mut ready_logged = false;
-            let mut in_flight_index = None::<IndexSetupCancellation>;
-            let mut index_cache_in_flight = false;
+            let mut in_flight_index = None::<InFlightIndexSlot>;
             let mut index_progress_token = None::<String>;
-            let mut in_flight_dependency = None::<WorkspaceScanToken>;
-            let mut dependency_cache_in_flight = false;
+            let mut in_flight_dependency = None::<InFlightDependencySlot>;
             let mut dependency_progress_token = None::<String>;
+            let mut in_flight_scan = None::<InFlightScan>;
             let mut in_flight_disk_changes = None::<InFlightDiskChanges>;
             let mut in_flight_background_reindex = None::<InFlightBackgroundReindex>;
             let mut in_flight_workspace_diagnostics = None::<InFlightWorkspaceDiagnostics>;
@@ -57,6 +54,7 @@ impl LspServer {
                     write_message(&mut output, &diagnostics_notification(&uri, json!([])))?;
                 }
                 self.spawn_pending_disk_changes(scope, &event_sender, &mut in_flight_disk_changes);
+                self.spawn_pending_scan(scope, &event_sender, &mut in_flight_scan, &mut output)?;
                 self.cancel_stale_parses(&in_flight_parses);
                 self.spawn_pending_parses(scope, &event_sender, &mut in_flight_parses);
                 self.cancel_stale_diagnostics(&in_flight);
@@ -74,6 +72,7 @@ impl LspServer {
                     || in_flight_initialize.is_some()
                     || in_flight_index.is_some()
                     || in_flight_dependency.is_some()
+                    || in_flight_scan.is_some()
                     || self.has_pending_disk_changes()
                     || in_flight_disk_changes.is_some()
                     || in_flight_background_reindex.is_some()
@@ -107,14 +106,25 @@ impl LspServer {
                 let initialize_busy = in_flight_initialize.is_some();
                 let disk_changes_busy =
                     self.has_pending_disk_changes() || in_flight_disk_changes.is_some();
-                let vanilla_cache_busy = index_cache_in_flight && in_flight_index.is_some();
-                let dependency_cache_busy =
-                    dependency_cache_in_flight && in_flight_dependency.is_some();
+                // Snapshot requests are only deferred behind work that would
+                // make their answer stale: a reparse of the edited document, an
+                // in-flight disk-change batch, or the one initial workspace
+                // scan. Background cache loads and rebuilds commit atomically,
+                // so a request during them reads a consistent (possibly
+                // not-yet-complete) snapshot — serving it beats blocking every
+                // editor interaction for the duration of a vanilla rebuild.
+                let scan_busy = in_flight_scan.is_some();
+                // Bounded cache loads keep snapshot requests waiting so answers
+                // include the freshly installed symbols; unbounded background
+                // rebuilds serve partial state instead of freezing the editor.
+                let vanilla_load_busy = in_flight_index.as_ref().is_some_and(|task| task.is_load);
+                let dependency_load_busy = in_flight_dependency.is_some();
                 let deferred_ready = !parse_busy
                     && !initialize_busy
                     && !disk_changes_busy
-                    && !vanilla_cache_busy
-                    && !dependency_cache_busy
+                    && !scan_busy
+                    && !vanilla_load_busy
+                    && !dependency_load_busy
                     && !(background_busy
                         && deferred_messages
                             .front()
@@ -172,16 +182,23 @@ impl LspServer {
                         let initialize_busy = in_flight_initialize.is_some();
                         let disk_changes_busy =
                             self.has_pending_disk_changes() || in_flight_disk_changes.is_some();
-                        let vanilla_cache_busy = index_cache_in_flight && in_flight_index.is_some();
-                        let dependency_cache_busy =
-                            dependency_cache_in_flight && in_flight_dependency.is_some();
+                        // The initial background scan defers snapshot requests
+                        // (not document notifications or lifecycle control)
+                        // until it commits, preserving complete answers without
+                        // holding the initialize handshake hostage.
+                        let scan_busy = in_flight_scan.is_some();
+                        let vanilla_load_busy =
+                            in_flight_index.as_ref().is_some_and(|task| task.is_load);
+                        let dependency_load_busy = in_flight_dependency.is_some();
                         let execute_command_busy =
                             background_busy && is_execute_command_message(&message);
                         if from_reader
-                            && (((parse_busy || disk_changes_busy)
+                            && (((parse_busy
+                                || disk_changes_busy
+                                || scan_busy
+                                || vanilla_load_busy
+                                || dependency_load_busy)
                                 && is_snapshot_request_message(&message))
-                                || (vanilla_cache_busy && is_snapshot_request_message(&message))
-                                || (dependency_cache_busy && is_snapshot_request_message(&message))
                                 || execute_command_busy
                                 || (initialize_busy && !is_initialize_control_message(&message)))
                         {
@@ -234,10 +251,13 @@ impl LspServer {
                                 task.cancellation.cancel();
                             }
                             if let Some(task) = in_flight_index.as_ref() {
-                                task.cancel();
+                                task.cancellation.cancel();
+                            }
+                            if let Some(task) = in_flight_scan.as_ref() {
+                                task.cancellation.cancel();
                             }
                             if let Some(task) = in_flight_dependency.as_ref() {
-                                task.cancel();
+                                task.cancellation.cancel();
                             }
                             if let Some(task) = in_flight_disk_changes.as_ref() {
                                 task.cancellation.cancel();
@@ -294,6 +314,8 @@ impl LspServer {
                                         Arc::new(prepared.diagnostic_severity_overrides.clone());
                                     self.workspace_wide_diagnostics =
                                         prepared.workspace_wide_diagnostics;
+                                    self.scan_pending = prepared.scan_pending;
+                                    self.scan_retries = 0;
                                     self.last_activity = Instant::now();
                                     (
                                         json!({
@@ -348,276 +370,41 @@ impl LspServer {
                         for warning in warnings {
                             write_message(&mut output, &show_warning_notification(warning))?;
                         }
-                        if let Some(path) = index_cache {
-                            write_message(
-                                &mut output,
-                                &log_message_notification(
-                                    MessageType::INFO,
-                                    format!("Vanilla index: loading cache from {}", path.display()),
-                                ),
-                            )?;
-                            let cancellation = IndexSetupCancellation::new();
-                            let sender = event_sender.clone();
-                            let worker_cancellation = cancellation.clone();
-                            let rules = self.host.snapshot().rules().clone();
-                            let profile = self.host.snapshot().game_profile().clone();
-                            let scan_limits = self.host.snapshot().scan_limits();
-                            let current_rule_hash = rules.rule_hash().to_hex();
-                            let progress_token = format!("pdx-vanilla-{}", progress_nonce());
-                            let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
-                                if self.client_work_done_progress {
-                                    write_message(
-                                        &mut output,
-                                        &work_done_progress_create(&progress_token),
-                                    )?;
-                                    write_message(
-                                        &mut output,
-                                        &work_done_progress_begin(
-                                            &progress_token,
-                                            "Loading Vanilla index…",
-                                        ),
-                                    )?;
-                                    Some(Box::new(progress_sender(
-                                        sender.clone(),
-                                        progress_token.clone(),
-                                        "Loading Vanilla index",
-                                        "Loading Vanilla index",
-                                    )))
-                                } else {
-                                    write_message(
-                                        &mut output,
-                                        &show_info_notification(
-                                            "Vanilla index is being loaded in the background…"
-                                                .to_owned(),
-                                        ),
-                                    )?;
-                                    None
-                                };
-                            index_progress_token = if self.client_work_done_progress {
-                                Some(progress_token.clone())
-                            } else {
-                                None
+                        if self.scan_pending {
+                            // The initial scan commits by swapping the host;
+                            // running cache installs concurrently would let the
+                            // swap clobber them, so the inputs wait for the
+                            // scan completion event.
+                            self.pending_cache_setup = PendingCacheSetup {
+                                index_cache,
+                                dependency_caches,
+                                auto_vanilla,
                             };
-                            in_flight_index = Some(cancellation);
-                            index_cache_in_flight = true;
-                            // The user-level auto configuration survives `apply_user_vanilla_configuration`,
-                            // so an unavailable configured cache can still fall back to discovery.
-                            let auto_vanilla = self.auto_vanilla.clone();
-                            let log = {
-                                let sender = event_sender.clone();
-                                move |message: &str| {
-                                    let _ =
-                                        sender.send(TransportEvent::Log(log_message_notification(
-                                            MessageType::INFO,
-                                            message.to_owned(),
-                                        )));
-                                }
-                            };
-                            scope.spawn(move || {
-                                let log_ref: &(dyn Fn(&str) + Sync) = &log;
-                                let result = run_index_cache_load(IndexCacheLoadRequest {
-                                    path: &path,
-                                    rules,
-                                    profile,
-                                    current_rule_hash,
-                                    auto_vanilla: auto_vanilla.as_ref(),
-                                    log: Some(log_ref),
-                                    progress: progress
-                                        .as_deref()
-                                        .map(|callback| callback as &(dyn Fn(usize, usize) + Sync)),
-                                    scan_limits,
-                                    cancellation: &worker_cancellation,
-                                });
-                                let _ =
-                                    sender.send(TransportEvent::VanillaSetup(IndexSetupResult {
-                                        result,
-                                    }));
-                            });
-                        } else if let Some(configuration) = auto_vanilla {
-                            write_message(
-                                &mut output,
-                                &log_message_notification(
-                                    MessageType::INFO,
-                                    "Vanilla index: discovering installation and building cache…"
-                                        .to_owned(),
-                                ),
-                            )?;
-                            let cancellation = IndexSetupCancellation::new();
-                            let sender = event_sender.clone();
-                            let rules = self.host.snapshot().rules().clone();
-                            let profile = self.host.snapshot().game_profile().clone();
-                            let scan_limits = self.host.snapshot().scan_limits();
-                            let worker_cancellation = cancellation.clone();
-                            let progress_token = format!("pdx-vanilla-{}", progress_nonce());
-                            let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
-                                if self.client_work_done_progress {
-                                    write_message(
-                                        &mut output,
-                                        &work_done_progress_create(&progress_token),
-                                    )?;
-                                    write_message(
-                                        &mut output,
-                                        &work_done_progress_begin(
-                                            &progress_token,
-                                            "Building Vanilla index…",
-                                        ),
-                                    )?;
-                                    Some(Box::new(progress_sender(
-                                        sender.clone(),
-                                        progress_token.clone(),
-                                        "Discovering Vanilla files",
-                                        "Indexing Vanilla files",
-                                    )))
-                                } else {
-                                    write_message(
-                                        &mut output,
-                                        &show_info_notification(
-                                            "Vanilla index is being built in the background…"
-                                                .to_owned(),
-                                        ),
-                                    )?;
-                                    None
-                                };
-                            index_progress_token = if self.client_work_done_progress {
-                                Some(progress_token.clone())
-                            } else {
-                                None
-                            };
-                            in_flight_index = Some(cancellation);
-                            index_cache_in_flight = false;
-                            let log = {
-                                let sender = event_sender.clone();
-                                move |message: &str| {
-                                    let _ =
-                                        sender.send(TransportEvent::Log(log_message_notification(
-                                            MessageType::INFO,
-                                            message.to_owned(),
-                                        )));
-                                }
-                            };
-                            scope.spawn(move || {
-                                let log_ref: &(dyn Fn(&str) + Sync) = &log;
-                                let result =
-                                    crate::vanilla::run_auto_vanilla_setup_with_options_and_limits(
-                                        &configuration,
-                                        rules,
-                                        profile,
-                                        Some(log_ref),
-                                        progress.as_deref().map(|callback| {
-                                            callback as &(dyn Fn(usize, usize) + Sync)
-                                        }),
-                                        &worker_cancellation,
-                                        &pdx_game::DiscoveryOptions::default(),
-                                        scan_limits,
-                                    );
-                                let _ =
-                                    sender.send(TransportEvent::VanillaSetup(IndexSetupResult {
-                                        result,
-                                    }));
-                            });
                         } else {
-                            write_message(
+                            let spawned = self.spawn_background_cache_workers(
+                                scope,
+                                &event_sender,
+                                index_cache,
+                                dependency_caches,
+                                auto_vanilla,
                                 &mut output,
-                                &log_message_notification(
-                                    MessageType::INFO,
-                                    "Vanilla index: no cache or automatic discovery worker scheduled; continuing without Vanilla symbols"
-                                        .to_owned(),
-                                ),
                             )?;
+                            in_flight_index = spawned.index;
+                            index_progress_token = spawned.index_progress_token;
+                            in_flight_dependency = spawned.dependency;
+                            dependency_progress_token = spawned.dependency_progress_token;
                         }
-                        if !dependency_caches.is_empty() {
-                            write_message(
-                                &mut output,
-                                &log_message_notification(
-                                    MessageType::INFO,
-                                    format!(
-                                        "Dependency indexes: loading {} cache(s)…",
-                                        dependency_caches.len()
-                                    ),
-                                ),
-                            )?;
-                            let cancellation = WorkspaceScanToken::new();
-                            let sender = event_sender.clone();
-                            let worker_cancellation = cancellation.clone();
-                            let rules = self.host.snapshot().rules().clone();
-                            let profile = self.host.snapshot().game_profile().clone();
-                            let scan_limits = self.host.snapshot().scan_limits();
-                            let current_rule_hash = rules.rule_hash().to_hex();
-                            let progress_token = format!("pdx-dependency-{}", progress_nonce());
-                            let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
-                                if self.client_work_done_progress {
-                                    write_message(
-                                        &mut output,
-                                        &work_done_progress_create(&progress_token),
-                                    )?;
-                                    write_message(
-                                        &mut output,
-                                        &work_done_progress_begin(
-                                            &progress_token,
-                                            "Loading dependency index…",
-                                        ),
-                                    )?;
-                                    Some(Box::new(progress_sender(
-                                        sender.clone(),
-                                        progress_token.clone(),
-                                        "Loading dependency index",
-                                        "Indexing dependency files",
-                                    )))
-                                } else {
-                                    write_message(
-                                        &mut output,
-                                        &show_info_notification(
-                                            "Dependency indexes are being loaded in the background…"
-                                                .to_owned(),
-                                        ),
-                                    )?;
-                                    None
-                                };
-                            dependency_progress_token = if self.client_work_done_progress {
-                                Some(progress_token.clone())
-                            } else {
-                                None
-                            };
-                            in_flight_dependency = Some(cancellation);
-                            dependency_cache_in_flight = true;
-                            let log = {
-                                let sender = event_sender.clone();
-                                move |message: &str| {
-                                    let _ =
-                                        sender.send(TransportEvent::Log(log_message_notification(
-                                            MessageType::INFO,
-                                            message.to_owned(),
-                                        )));
-                                }
-                            };
-                            scope.spawn(move || {
-                                let results = run_dependency_cache_loads(
-                                    dependency_caches,
-                                    rules,
-                                    profile,
-                                    current_rule_hash,
-                                    scan_limits,
-                                    Some(&log),
-                                    progress
-                                        .as_deref()
-                                        .map(|callback| callback as &(dyn Fn(usize, usize) + Sync)),
-                                    &worker_cancellation,
-                                );
-                                let _ = sender.send(TransportEvent::DependencySetup(
-                                    DependencySetupResult { results },
-                                ));
-                            });
-                        } else {
-                            write_message(
-                                &mut output,
-                                &log_message_notification(
-                                    MessageType::INFO,
-                                    "Dependency indexes: none configured".to_owned(),
-                                ),
-                            )?;
-                        }
+                        // Readiness requires not just idle workers but also no
+                        // deferred setup: a stashed cache spawn or a scan that
+                        // has not started yet leaves every slot momentarily
+                        // empty without the workspace being complete.
+                        let setup_idle = !self.scan_pending
+                            && self.pending_cache_setup.index_cache.is_none()
+                            && self.pending_cache_setup.dependency_caches.is_empty();
                         if in_flight_index.is_none()
                             && in_flight_dependency.is_none()
+                            && in_flight_scan.is_none()
+                            && setup_idle
                             && !ready_logged
                         {
                             write_message(
@@ -699,9 +486,144 @@ impl LspServer {
                     TransportEvent::Log(value) => {
                         write_message(&mut output, &value)?;
                     }
+                    TransportEvent::ScanSetup(result) => {
+                        let current = in_flight_scan
+                            .as_ref()
+                            .is_some_and(|task| task.base_revision == result.base_revision);
+                        if !current {
+                            continue;
+                        }
+                        let task = in_flight_scan.take().expect("checked scan task");
+                        if let Some(token) = &task.progress_token {
+                            let message = match &result.result {
+                                Ok((_, report)) => {
+                                    format!("Scanned {} file(s)", report.indexed_files)
+                                }
+                                Err(WorkspaceError::Cancelled) => "Scan cancelled".to_owned(),
+                                Err(error) => format!("Workspace scan failed: {error}"),
+                            };
+                            write_message(&mut output, &work_done_progress_end(token, &message))?;
+                        }
+                        if task.cancellation.is_cancelled() {
+                            continue;
+                        }
+                        if self.host.snapshot().revision() != result.base_revision {
+                            // Document edits raced the scan; restart from a
+                            // fresh clone so the commit never drops overlay
+                            // state. The attempt counter is bumped by each
+                            // spawn, so a bounded number of races defers to an
+                            // explicit `pdx/reindexWorkspace` instead of
+                            // looping forever.
+                            if self.scan_retries < crate::MAX_BACKGROUND_SCAN_RETRIES {
+                                self.scan_pending = true;
+                            } else {
+                                self.scan_retries = 0;
+                                write_message(
+                                    &mut output,
+                                    &show_warning_notification(
+                                        "workspace kept changing during the background scan; run pdx/reindexWorkspace once editing pauses"
+                                            .to_owned(),
+                                    ),
+                                )?;
+                            }
+                            continue;
+                        }
+                        match result.result {
+                            Ok((host, report)) => {
+                                self.host = host;
+                                self.invalidate_all_semantic_tokens();
+                                write_message(
+                                    &mut output,
+                                    &log_message_notification(
+                                        MessageType::INFO,
+                                        format!(
+                                            "Workspace scan finished: discovered={}, indexed={}, legacy-encoded={}, skipped={}, issues={}, source file(s) active={}",
+                                            report.discovered_files,
+                                            report.indexed_files,
+                                            report.legacy_encoded_files,
+                                            report.skipped_entries,
+                                            report.issues.len() + report.omitted_issues,
+                                            self.host.snapshot().source_files().len(),
+                                        ),
+                                    ),
+                                )?;
+                                // Open overlays existed before the scan only
+                                // when documents raced it; re-run their
+                                // diagnostics against the now-complete index.
+                                let open = self
+                                    .host
+                                    .snapshot()
+                                    .documents()
+                                    .iter()
+                                    .filter_map(|(id, document)| {
+                                        document.version().map(|version| (id.clone(), version))
+                                    })
+                                    .collect::<Vec<_>>();
+                                for (id, version) in open {
+                                    self.schedule_diagnostics_for_document(
+                                        id,
+                                        version,
+                                        DIAGNOSTIC_DEBOUNCE,
+                                    );
+                                }
+                            }
+                            Err(WorkspaceError::Cancelled) => {}
+                            Err(error) => {
+                                write_message(
+                                    &mut output,
+                                    &show_warning_notification(format!(
+                                        "Initial workspace scan failed: {error}"
+                                    )),
+                                )?;
+                            }
+                        }
+                        // Cache installs deferred behind the scan start now
+                        // that the host commit landed.
+                        let pending = std::mem::take(&mut self.pending_cache_setup);
+                        if pending.index_cache.is_some()
+                            || !pending.dependency_caches.is_empty()
+                            || pending.auto_vanilla.is_some()
+                        {
+                            let spawned = self.spawn_background_cache_workers(
+                                scope,
+                                &event_sender,
+                                pending.index_cache,
+                                pending.dependency_caches,
+                                pending.auto_vanilla,
+                                &mut output,
+                            )?;
+                            in_flight_index = spawned.index;
+                            index_progress_token = spawned.index_progress_token;
+                            in_flight_dependency = spawned.dependency;
+                            dependency_progress_token = spawned.dependency_progress_token;
+                        }
+                        if in_flight_index.is_none()
+                            && in_flight_dependency.is_none()
+                            && in_flight_scan.is_none()
+                            && !ready_logged
+                        {
+                            write_message(
+                                &mut output,
+                                &log_message_notification(
+                                    MessageType::INFO,
+                                    "pdx-ls ready — workspace indexed".to_owned(),
+                                ),
+                            )?;
+                            let snapshot = self.host.snapshot();
+                            write_message(
+                                &mut output,
+                                &ready_notification(
+                                    snapshot.revision(),
+                                    snapshot.source_files().len(),
+                                ),
+                            )?;
+                            ready_logged = true;
+                            self.arm_background_reindex();
+                            self.request_workspace_diagnostics();
+                        }
+                    }
                     TransportEvent::DependencySetup(result) => {
                         in_flight_dependency = None;
-                        dependency_cache_in_flight = false;
                         let outcome_message = result
                             .results
                             .iter()
@@ -829,6 +751,7 @@ impl LspServer {
                         }
                         if in_flight_index.is_none()
                             && in_flight_dependency.is_none()
+                            && in_flight_scan.is_none()
                             && !ready_logged
                         {
                             write_message(
@@ -854,7 +777,6 @@ impl LspServer {
                     }
                     TransportEvent::VanillaSetup(result) => {
                         in_flight_index = None;
-                        index_cache_in_flight = false;
                         let outcome_message = match &result.result {
                             Ok((_, message)) => message.clone(),
                             Err(message) => message.clone(),
@@ -950,6 +872,7 @@ impl LspServer {
                         }
                         if in_flight_index.is_none()
                             && in_flight_dependency.is_none()
+                            && in_flight_scan.is_none()
                             && !ready_logged
                         {
                             write_message(
@@ -1249,6 +1172,8 @@ impl LspServer {
                         || !in_flight_requests.is_empty()
                         || in_flight_initialize.is_some()
                         || in_flight_index.is_some()
+                        || in_flight_scan.is_some()
+                        || self.scan_pending
                         || self.has_pending_disk_changes()
                         || in_flight_disk_changes.is_some()
                         || in_flight_background_reindex.is_some()

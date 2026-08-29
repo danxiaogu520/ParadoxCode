@@ -321,7 +321,10 @@ fn temporary_rule_path(
 fn compile_and_load(rules: &RuleSet, path: &Path) -> Result<RuleSet, pdx_rules::RulesError> {
     rules.write_sqlite(path)?;
     let loaded = RuleSet::load(path)?;
-    if loaded != *rules {
+    // The canonical rule hash covers the artifact's logical content, so hash
+    // equality proves the SQLite round-trip preserved the embedded source
+    // without paying a full deep comparison of the rule model.
+    if loaded.rule_hash() != rules.rule_hash() {
         return Err(pdx_rules::RulesError::Source(
             "generated rules artifact did not round-trip to the embedded source".to_owned(),
         ));
