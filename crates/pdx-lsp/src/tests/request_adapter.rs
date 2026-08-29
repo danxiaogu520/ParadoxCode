@@ -1265,7 +1265,7 @@ fn initialize_reports_stages_via_log_message_and_work_done_progress() {
         "startup: first-party rules already loaded",
         "initialize request accepted:",
         "Initialization phase: resolving editor configuration and source roots",
-        "Initialization phase: scanning",
+        "Initialization phase: scheduling background scan",
         "Workspace scan finished",
         "Source-root watcher registration prepared",
     ] {

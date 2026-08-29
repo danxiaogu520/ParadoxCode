@@ -18,7 +18,7 @@ use pdx_analysis::{
 use pdx_engine::{
     AnalysisHost, AnalysisSnapshot, DiskFileChange, DiskFileChangeKind, DocumentId, DocumentSource,
     IndexCache, PreparedDocument, SourceRootKind, WorkspaceError, WorkspaceScanFilters,
-    WorkspaceScanToken,
+    WorkspaceScanReport, WorkspaceScanToken,
 };
 use pdx_game::DiscoveryToken;
 use pdx_rules::{GameProfile, RuleSet};
@@ -113,9 +113,10 @@ fn work_done_progress_end(token: &str, message: &str) -> Value {
 
 /// Announces that the initial workspace/index setup has completed.
 ///
-/// `LanguageClient` reaching `Running` only means that the LSP handshake finished.  Vanilla and
-/// dependency indexes may still be loading in the background, so editors need a separate,
-/// protocol-level signal before presenting the server as fully ready.
+/// `LanguageClient` reaching `Running` only means that the LSP handshake finished — the
+/// initialize response returns before the workspace scan, and Vanilla/dependency indexes may
+/// still be loading in the background, so editors need a separate, protocol-level signal before
+/// presenting the server as fully ready.
 fn ready_notification(revision: u64, source_files: usize) -> Value {
     json!({
         "jsonrpc": JSON_RPC_VERSION,
@@ -333,12 +334,15 @@ pub(crate) struct PreparedInitialize {
     pub(crate) warnings: Vec<String>,
     pub(crate) auto_vanilla: Option<AutoVanillaConfiguration>,
     pub(crate) index_cache: Option<PathBuf>,
-    /// Mission-preview texture store (game sprites), when a game installation
-    /// was configured or discovered.
-    pub(crate) textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
+    /// Mission-preview textures, resolved lazily from the captured discovery
+    /// inputs on the first preview request.
+    pub(crate) textures: Arc<crate::initialize::TextureStore>,
     /// Dependencies configured with persistent index caches, loaded in the background after
     /// the initialize response is sent.
     pub(crate) dependency_caches: Vec<DependencyIndexCache>,
+    /// Whether the initial workspace scan still needs to run as a background
+    /// worker after the initialize response is sent.
+    pub(crate) scan_pending: bool,
     pub(crate) watcher_registration: Option<Value>,
     pub(crate) client_work_done_progress: bool,
     pub(crate) client_snippet_support: bool,
@@ -416,6 +420,48 @@ pub(crate) struct InFlightWorkspaceDiagnostics {
 }
 
 #[derive(Debug)]
+/// In-flight Vanilla cache worker slot. `is_load` distinguishes the bounded
+/// cache-load flavor (snapshot requests wait for complete answers) from an
+/// unbounded background rebuild (requests are served from partial state).
+pub(crate) struct InFlightIndexSlot {
+    pub(crate) cancellation: IndexSetupCancellation,
+    pub(crate) is_load: bool,
+}
+
+/// In-flight dependency cache worker slot. Dependency installs always load or
+/// build bounded caches before installing in place.
+pub(crate) struct InFlightDependencySlot {
+    pub(crate) cancellation: WorkspaceScanToken,
+}
+
+/// Cache workers started by one `spawn_background_cache_workers` call.
+pub(crate) struct CacheWorkersSpawned {
+    pub(crate) index: Option<InFlightIndexSlot>,
+    pub(crate) index_progress_token: Option<String>,
+    pub(crate) dependency: Option<InFlightDependencySlot>,
+    pub(crate) dependency_progress_token: Option<String>,
+}
+
+/// Inputs for background cache workers, stashed while the initial workspace
+/// scan runs so cache installs never race the scan's host commit.
+#[derive(Debug, Default)]
+pub(crate) struct PendingCacheSetup {
+    pub(crate) index_cache: Option<PathBuf>,
+    pub(crate) dependency_caches: Vec<DependencyIndexCache>,
+    /// User-level automatic Vanilla configuration captured by the initialize
+    /// handshake, replayed when the deferred workers finally start.
+    pub(crate) auto_vanilla: Option<AutoVanillaConfiguration>,
+}
+
+/// In-flight initial background workspace scan.
+pub(crate) struct InFlightScan {
+    pub(crate) base_revision: u64,
+    pub(crate) cancellation: WorkspaceScanToken,
+    /// Progress token created for this scan, when the client supports
+    /// `window.workDoneProgress`; the event loop ends it on completion.
+    pub(crate) progress_token: Option<String>,
+}
+
 pub(crate) struct InFlightReindexCommand {
     pub(crate) request_id: RequestId,
     pub(crate) base_revision: u64,
@@ -486,6 +532,14 @@ pub(crate) struct WorkspaceDiagnosticsResult {
     pub(crate) result: Result<WorkspaceValidationResult, WorkspaceError>,
 }
 
+/// Background initial workspace scan completion. The worker refreshes a host
+/// clone; the event loop commits it only when the live revision still matches.
+#[derive(Debug)]
+pub(crate) struct ScanSetupResult {
+    pub(crate) base_revision: u64,
+    pub(crate) result: Result<(AnalysisHost, WorkspaceScanReport), WorkspaceError>,
+}
+
 enum TransportEvent {
     Input(Result<Option<Value>, LspError>),
     Initialize(Box<InitializeTaskResult>),
@@ -494,6 +548,7 @@ enum TransportEvent {
     Request(SnapshotRequestResult),
     VanillaSetup(IndexSetupResult),
     DependencySetup(DependencySetupResult),
+    ScanSetup(ScanSetupResult),
     BackgroundReindex(BackgroundReindexResult),
     ReindexCommand(ReindexCommandResult),
     /// A server-side `window/logMessage` notification produced by a worker.
@@ -518,8 +573,8 @@ pub struct LspServer {
     pending_disk_changes_rescan: bool,
     watcher_registration: Option<Value>,
     auto_vanilla: Option<AutoVanillaConfiguration>,
-    /// Mission-preview texture store shared with snapshot requests.
-    textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
+    /// Mission-preview textures, resolved lazily on first preview use.
+    textures: Arc<crate::initialize::TextureStore>,
     /// Whether the client advertises `window.workDoneProgress`, so server-initiated background
     /// work can be surfaced as a progress bar instead of only start/end messages.
     client_work_done_progress: bool,
@@ -548,6 +603,16 @@ pub struct LspServer {
     pub(crate) workspace_wide_diagnostics: bool,
     /// Whether an automatic closed-file validation pass is waiting for a quiet worker slot.
     pub(crate) workspace_diagnostics_pending: bool,
+    /// Whether the initial background workspace scan still needs to start. Set
+    /// during the initialize handshake when live roots exist; the scan worker
+    /// commits while the live revision is unchanged and retries otherwise.
+    pub(crate) scan_pending: bool,
+    /// Cache worker inputs deferred until the initial background scan commits.
+    pub(crate) pending_cache_setup: PendingCacheSetup,
+    /// Consecutive background-scan attempts that lost the revision race. After
+    /// a bounded number of retries the scan is abandoned with an explicit
+    /// warning instead of looping forever under continuous edits.
+    pub(crate) scan_retries: u8,
     /// URIs for which the last workspace pass published closed-file diagnostics. This lets a
     /// subsequent pass clear deleted or ignored files without retaining diagnostic payloads.
     pub(crate) workspace_diagnostic_uris: BTreeSet<String>,
@@ -589,7 +654,7 @@ impl LspServer {
             pending_disk_changes_rescan: false,
             watcher_registration: None,
             auto_vanilla: None,
-            textures: None,
+            textures: Arc::new(crate::initialize::TextureStore::new(None, None)),
             client_work_done_progress: false,
             client_snippet_support: false,
             semantic_tokens_cache: Arc::new(SemanticTokensCache::new()),
@@ -601,6 +666,9 @@ impl LspServer {
             diagnostic_severity_overrides: Arc::new(BTreeMap::new()),
             workspace_wide_diagnostics: true,
             workspace_diagnostics_pending: false,
+            scan_pending: false,
+            pending_cache_setup: PendingCacheSetup::default(),
+            scan_retries: 0,
             workspace_diagnostic_uris: BTreeSet::new(),
             workspace_diagnostic_clear_queue: Vec::new(),
             startup_log: Vec::new(),

@@ -7,14 +7,14 @@ use lsp_types::{
     TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use pdx_analysis::SemanticTokenType;
 use pdx_engine::{AnalysisHost, WorkspaceChange, WorkspaceScanToken};
 use pdx_game::eu4::mission::TextureAssets;
 use pdx_game::{DiscoveryOptions, DiscoveryToken, GameInstallDescriptor, UserPaths};
 
-use crate::protocol::{RpcError, parse_file_uri_str, workspace_scan_error};
+use crate::protocol::{RpcError, parse_file_uri_str};
 use crate::server::PreparedInitialize;
 use crate::vanilla::{apply_user_vanilla_configuration, watched_files_registration};
 use crate::workspace::{VanillaMode, resolve_source_roots};
@@ -40,12 +40,12 @@ pub struct AutoVanillaConfiguration {
 }
 /// Progress-reporting callbacks for the initialize worker. Each is optional so
 /// in-memory transport paths (tests) can pass none; the stdio worker supplies
-/// all three. `stage` feeds the work-done-progress bar, `log` the
-/// `window/logMessage` trail, and `progress` the workspace-scan file counter.
+/// both. `stage` feeds the work-done-progress bar and `log` the
+/// `window/logMessage` trail. The workspace-scan file counter lives on the
+/// background scan worker, which owns the scan after the initialize response.
 pub(crate) struct InitializeCallbacks<'a> {
     pub(crate) stage: Option<&'a (dyn Fn(&str) + Sync)>,
     pub(crate) log: Option<&'a (dyn Fn(&str) + Sync)>,
-    pub(crate) progress: Option<&'a (dyn Fn(usize, usize) + Sync)>,
 }
 
 pub(crate) fn prepare_initialize_candidate(
@@ -232,39 +232,26 @@ pub(crate) fn prepare_initialize_candidate(
     host.apply_change(WorkspaceChange::SetWorkspaceRoot(resolved.workspace_root));
     host.set_scan_filters(resolved.scan_filters.clone());
     host.apply_change(WorkspaceChange::SetSourceRoots(resolved.roots.clone()));
-    if scan_workspace && !resolved.roots.is_empty() {
-        if let Some(stage) = callbacks.stage {
-            stage("Discovering and indexing workspace files…");
-        }
-        if let Some(log) = callbacks.log {
+    // The workspace scan runs as a background worker after the initialize
+    // response is sent. Scanning thousands of mod files synchronously held the
+    // response for tens of seconds while saturating every core; the LSP
+    // handshake only needs the configuration and capabilities resolved here.
+    // `pdx/ready` is emitted once the scan and any cache installs finish.
+    let scan_pending = scan_workspace && !resolved.roots.is_empty();
+    if let Some(log) = callbacks.log {
+        if scan_pending {
             log(&format!(
-                "Initialization phase: scanning {} live source root(s)",
+                "Initialization phase: scheduling background scan of {} live source root(s)",
                 resolved.roots.len()
             ));
-        }
-        let scan_started = std::time::Instant::now();
-        let scan_report = host
-            .refresh_source_roots_cancellable_with_progress(cancellation, callbacks.progress)
-            .map_err(workspace_scan_error)?;
-        if let Some(log) = callbacks.log {
-            log(&format!(
-                "Workspace scan finished in {:.1} ms: discovered={}, indexed={}, legacy-encoded={}, skipped={}, issues={}, source file(s) active={}",
-                scan_started.elapsed().as_secs_f64() * 1000.0,
-                scan_report.discovered_files,
-                scan_report.indexed_files,
-                scan_report.legacy_encoded_files,
-                scan_report.skipped_entries,
-                scan_report.issues.len() + scan_report.omitted_issues,
-                host.snapshot().source_files().len(),
-            ));
-        }
-    } else if let Some(log) = callbacks.log {
-        let reason = if !scan_workspace {
-            "the active rules profile has no game-specific scan"
         } else {
-            "no live source roots were configured"
-        };
-        log(&format!("Workspace scan skipped: {reason}"));
+            let reason = if !scan_workspace {
+                "the active rules profile has no game-specific scan"
+            } else {
+                "no live source roots were configured"
+            };
+            log(&format!("Workspace scan skipped: {reason}"));
+        }
     }
     let index_cache = match resolved.index_cache.take() {
         None => None,
@@ -279,33 +266,17 @@ pub(crate) fn prepare_initialize_candidate(
         // to automatic discovery and rebuilds the cache in place.
         Some(path) => Some(path),
     };
-    // Mission-preview textures: an explicitly configured game directory wins;
-    // otherwise a one-time quick discovery via the profile descriptor. This is
-    // independent of the Vanilla cache configuration — a configured
-    // `vanilla_index_cache` must not disable textures. Texture failures are
-    // silent — the preview simply renders without textures.
-    if let Some(stage) = callbacks.stage {
-        stage("Preparing mission preview textures…");
-    }
-    if let Some(log) = callbacks.log {
-        log("Initialization phase: discovering and indexing mission-preview textures");
-    }
-    let texture_started = std::time::Instant::now();
-    let textures =
-        resolve_texture_assets(resolved.game_directory.take(), texture_descriptor.as_ref());
-    if let Some(log) = callbacks.log {
-        match textures.as_ref() {
-            Some(textures) => log(&format!(
-                "Mission textures ready in {:.1} ms: {} sprite(s) from the game installation",
-                texture_started.elapsed().as_secs_f64() * 1000.0,
-                textures.sprite_count(),
-            )),
-            None => log(&format!(
-                "Mission textures unavailable after {:.1} ms (no usable game installation found)",
-                texture_started.elapsed().as_secs_f64() * 1000.0
-            )),
-        }
-    }
+    // Mission-preview textures are resolved lazily on the first preview
+    // request: discovery scans the game installation's interface definitions
+    // and most sessions never open a preview, so startup only captures the
+    // (cheap, `Copy`) inputs. An explicitly configured game directory wins;
+    // otherwise a one-time quick discovery via the profile descriptor is
+    // deferred to the same lazy path. Texture failures stay silent — the
+    // preview simply renders without textures.
+    let textures = Arc::new(TextureStore::new(
+        resolved.game_directory.take(),
+        texture_descriptor,
+    ));
     if cancellation.is_cancelled() {
         return Err(RpcError::new(REQUEST_CANCELLED, "request was cancelled"));
     }
@@ -398,6 +369,7 @@ pub(crate) fn prepare_initialize_candidate(
         index_cache,
         textures,
         dependency_caches: resolved.dependency_caches,
+        scan_pending,
         watcher_registration,
         client_work_done_progress,
         client_snippet_support,
@@ -407,6 +379,46 @@ pub(crate) fn prepare_initialize_candidate(
         diagnostic_severity_overrides: resolved.diagnostic_severity_overrides,
         workspace_wide_diagnostics: resolved.workspace_wide_diagnostics,
     })
+}
+
+/// Lazily resolved mission-preview texture assets.
+///
+/// Texture discovery scans the game installation's interface definitions,
+/// which costs real time at startup and is only needed when a mission preview
+/// is actually opened. The initialize path captures the inputs (both cheap to
+/// hold: an optional path and a `Copy` descriptor) and the first preview
+/// request materializes the store exactly once.
+#[derive(Debug)]
+pub(crate) struct TextureStore {
+    game_directory: Option<PathBuf>,
+    descriptor: Option<GameInstallDescriptor>,
+    resolved: OnceLock<Option<Arc<TextureAssets>>>,
+}
+
+impl TextureStore {
+    /// Captures discovery inputs without touching the game installation.
+    pub(crate) fn new(
+        game_directory: Option<PathBuf>,
+        descriptor: Option<GameInstallDescriptor>,
+    ) -> Self {
+        Self {
+            game_directory,
+            descriptor,
+            resolved: OnceLock::new(),
+        }
+    }
+
+    /// Returns the texture assets, discovering them on first use.
+    ///
+    /// Always `None` for stores created without any input. Repeated calls
+    /// return clones of the first resolution.
+    pub(crate) fn get(&self) -> Option<Arc<TextureAssets>> {
+        self.resolved
+            .get_or_init(|| {
+                resolve_texture_assets(self.game_directory.clone(), self.descriptor.as_ref())
+            })
+            .clone()
+    }
 }
 
 /// Builds the mission-preview texture store for the active game installation.

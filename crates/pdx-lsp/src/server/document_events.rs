@@ -183,7 +183,6 @@ impl LspServer {
             &InitializeCallbacks {
                 stage: None,
                 log: None,
-                progress: None,
             },
         )?;
         self.host = prepared.host;
@@ -254,7 +253,10 @@ impl LspServer {
         self.pending_parses.remove(&id);
         self.pending_diagnostics.remove(&id);
         self.diagnostics.remove(&id);
-        self.request_workspace_diagnostics();
+        // Closing an overlay does not invalidate any indexed state: the disk
+        // content was already validated, so no workspace-wide revalidation is
+        // armed here. Each close previously triggered a full pass that pegged
+        // one core for seconds.
         Ok(json!({
             "jsonrpc": JSON_RPC_VERSION,
             "method": "textDocument/publishDiagnostics",
