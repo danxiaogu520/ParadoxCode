@@ -887,7 +887,7 @@ fn symbol_localisation_preview(
                     .references(file)
                     .iter()
                     .filter(|reference| reference.kind.eq_ignore_ascii_case("localisation"))
-                    .map(|reference| (reference.name.clone(), reference.range)),
+                    .map(|reference| (reference.name.to_string(), reference.range)),
             );
         }
     }
@@ -1082,9 +1082,12 @@ pub(crate) fn known_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<String>> {
             .map(|descriptor| descriptor.kind_id.to_ascii_lowercase()),
     );
     let keys = Arc::new(keys);
-    snapshot
-        .query_cache()
-        .insert(revision, key.to_owned(), Arc::clone(&keys));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Index,
+        key.to_owned(),
+        Arc::clone(&keys),
+    );
     keys
 }
 

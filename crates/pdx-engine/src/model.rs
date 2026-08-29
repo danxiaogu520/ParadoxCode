@@ -659,8 +659,16 @@ impl FileState {
         self.hir.as_ref().map(Arc::clone)
     }
 
-    /// Returns the index shard produced atomically with this parse/HIR state.
+    /// Returns the index shard shared with the workspace index.
+    ///
+    /// The shard lives behind an `Arc` that the workspace index shares, so
+    /// installing or merging indexes never deep-copies every definition and
+    /// reference string in the workspace.
     #[must_use]
+    pub fn shard_handle(&self) -> Arc<FileIndexShard> {
+        Arc::clone(&self.shard)
+    }
+
     pub fn shard(&self) -> &FileIndexShard {
         &self.shard
     }

@@ -1,6 +1,7 @@
 //! Per-file shards and deterministic workspace symbol lookup.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use pdx_rules::{RuleSet, SymbolResolutionPolicy};
 use pdx_text::{PositionRange, TextRange};
@@ -458,10 +459,11 @@ pub struct MacroDefinitionSummary {
 /// One symbol definition retained in an index shard.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Definition {
-    /// Semantic kind, for example event or localisation.
-    pub kind: String,
-    /// Symbol name as written in source.
-    pub name: String,
+    /// Semantic kind, for example event or localisation. Interned through the
+    /// process-wide pool: kinds repeat for every definition in the workspace.
+    pub kind: Arc<str>,
+    /// Symbol name as written in source, interned through the process pool.
+    pub name: Arc<str>,
     /// Defining file.
     pub file_id: SourceFileId,
     /// Source range of the definition.
@@ -473,10 +475,10 @@ pub struct Definition {
 /// A source reference retained for later semantic resolution.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Reference {
-    /// Reference category.
-    pub kind: String,
-    /// Referenced name.
-    pub name: String,
+    /// Reference category, interned through the process pool.
+    pub kind: Arc<str>,
+    /// Referenced name, interned through the process pool.
+    pub name: Arc<str>,
     /// Referencing file.
     pub file_id: SourceFileId,
     /// Source range of the reference.
@@ -503,11 +505,15 @@ pub struct FileIndexShard {
 struct DefinitionPointer {
     file_id: SourceFileId,
     ordinal: usize,
+    /// Priority-resolution result for this entry, tracked on the pointer so
+    /// shards stay immutable and can be shared by `Arc` between the index and
+    /// file states. Initialized from the shard definition's own flag.
+    active: bool,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct WorkspaceIndex {
-    pub(crate) shards: BTreeMap<SourceFileId, FileIndexShard>,
+    pub(crate) shards: BTreeMap<SourceFileId, Arc<FileIndexShard>>,
     definitions: BTreeMap<(String, String), Vec<DefinitionPointer>>,
     case_sensitive_kinds: BTreeSet<String>,
     /// Cached UTF-16 positions for files whose source text is not retained, such as Vanilla.
@@ -539,7 +545,7 @@ impl WorkspaceIndex {
 
     /// Builds an index from a complete set of file shards and derives lookup maps once.
     #[must_use]
-    pub fn from_shards(shards: impl IntoIterator<Item = FileIndexShard>) -> Self {
+    pub fn from_shards(shards: impl IntoIterator<Item: Into<Arc<FileIndexShard>>>) -> Self {
         match Self::from_shards_cancellable(shards, &WorkspaceScanToken::new()) {
             Ok(index) => index,
             Err(WorkspaceError::Cancelled) => {
@@ -552,7 +558,7 @@ impl WorkspaceIndex {
     /// Builds an index with the symbol case policy applied in the same single pass.
     #[must_use]
     pub fn from_shards_with_rules(
-        shards: impl IntoIterator<Item = FileIndexShard>,
+        shards: impl IntoIterator<Item: Into<Arc<FileIndexShard>>>,
         rules: &RuleSet,
     ) -> Self {
         match Self::from_shards_cancellable_with_rules(shards, rules, &WorkspaceScanToken::new()) {
@@ -565,12 +571,13 @@ impl WorkspaceIndex {
     }
 
     fn from_shards_cancellable(
-        shards: impl IntoIterator<Item = FileIndexShard>,
+        shards: impl IntoIterator<Item: Into<Arc<FileIndexShard>>>,
         cancellation: &WorkspaceScanToken,
     ) -> Result<Self, WorkspaceError> {
         let mut index = Self::empty();
         for shard in shards {
             cancellation.checkpoint()?;
+            let shard = shard.into();
             index.shards.insert(shard.file_id, shard);
         }
         index.rebuild_maps_cancellable(cancellation)?;
@@ -578,7 +585,7 @@ impl WorkspaceIndex {
     }
 
     pub(crate) fn from_shards_cancellable_with_rules(
-        shards: impl IntoIterator<Item = FileIndexShard>,
+        shards: impl IntoIterator<Item: Into<Arc<FileIndexShard>>>,
         rules: &RuleSet,
         cancellation: &WorkspaceScanToken,
     ) -> Result<Self, WorkspaceError> {
@@ -592,10 +599,26 @@ impl WorkspaceIndex {
             .collect();
         for shard in shards {
             cancellation.checkpoint()?;
+            let shard = shard.into();
             index.shards.insert(shard.file_id, shard);
         }
         index.rebuild_maps_cancellable(cancellation)?;
         Ok(index)
+    }
+
+    /// Returns retained definitions for a kind/name with their live
+    /// priority-resolution state from the pointer buckets.
+    #[must_use]
+    pub fn definitions_with_state(&self, kind: &str, name: &str) -> Vec<(&Definition, bool)> {
+        self.definitions
+            .get(&(kind.to_owned(), self.lookup_name(kind, name)))
+            .into_iter()
+            .flatten()
+            .filter_map(|pointer| {
+                self.definition_at(*pointer)
+                    .map(|definition| (definition, pointer.active))
+            })
+            .collect()
     }
 
     /// Returns all retained definitions for a kind/name, including shadowed ones.
@@ -612,10 +635,11 @@ impl WorkspaceIndex {
     /// Returns the active definition for a kind/name, if one exists.
     #[must_use]
     pub fn active_definition(&self, kind: &str, name: &str) -> Option<&Definition> {
-        let definitions = self.definitions(kind, name);
+        let definitions = self.definitions_with_state(kind, name);
         let mut active = definitions
             .into_iter()
-            .filter(|definition| definition.active);
+            .filter(|(_definition, is_active)| *is_active)
+            .map(|(definition, _)| definition);
         let definition = active.next()?;
         active
             .all(|candidate| {
@@ -651,7 +675,7 @@ impl WorkspaceIndex {
     /// Returns the shard for a file.
     #[must_use]
     pub fn shard(&self, file_id: SourceFileId) -> Option<&FileIndexShard> {
-        self.shards.get(&file_id)
+        self.shards.get(&file_id).map(Arc::as_ref)
     }
 
     /// Returns all references from a file.
@@ -729,7 +753,7 @@ impl WorkspaceIndex {
 
     /// Replaces one shard and updates only lookup buckets touched by that file.
     pub fn replace_shard(&mut self, shard: FileIndexShard) {
-        self.replace_shard_entries(shard);
+        self.replace_shard_entries(Arc::new(shard));
     }
 
     /// Removes a file shard and updates only lookup buckets touched by that file.
@@ -780,7 +804,7 @@ impl WorkspaceIndex {
 
     pub(crate) fn replace_shard_resolved(
         &mut self,
-        shard: FileIndexShard,
+        shard: Arc<FileIndexShard>,
         priorities: &BTreeMap<SourceFileId, u64>,
         rules: &RuleSet,
     ) {
@@ -789,7 +813,7 @@ impl WorkspaceIndex {
         self.resolve_definition_buckets(&affected, priorities, &policies);
     }
 
-    fn replace_shard_entries(&mut self, shard: FileIndexShard) -> Vec<(String, String)> {
+    fn replace_shard_entries(&mut self, shard: Arc<FileIndexShard>) -> Vec<(String, String)> {
         let file_id = shard.file_id;
         let mut affected = self.remove_shard_entries(file_id);
         for (ordinal, definition) in shard.definitions.iter().enumerate() {
@@ -797,7 +821,11 @@ impl WorkspaceIndex {
             self.definitions
                 .entry(key.clone())
                 .or_default()
-                .push(DefinitionPointer { file_id, ordinal });
+                .push(DefinitionPointer {
+                    file_id,
+                    ordinal,
+                    active: definition.active,
+                });
             affected.push(key);
         }
         self.shards.insert(file_id, shard);
@@ -850,39 +878,40 @@ impl WorkspaceIndex {
             }) else {
                 continue;
             };
-            let values = self.definitions.get(key).expect("checked above");
-            for pointer in values {
-                let Some(definition) = self
-                    .shards
-                    .get_mut(&pointer.file_id)
-                    .and_then(|shard| shard.definitions.get_mut(pointer.ordinal))
-                else {
-                    continue;
-                };
-                definition.active = match policy {
-                    SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique => true,
-                    SymbolResolutionPolicy::ReplaceBySymbol => {
-                        Some(priorities.get(&definition.file_id).copied().unwrap_or(0))
-                            == Some(highest)
+            let updates = self
+                .definitions
+                .get(key)
+                .expect("checked above")
+                .iter()
+                .map(|pointer| {
+                    let file_id = pointer.file_id;
+                    self.shards
+                        .get(&file_id)
+                        .and_then(|shard| shard.definitions.get(pointer.ordinal))
+                        .map(|_definition| match policy {
+                            SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique => true,
+                            SymbolResolutionPolicy::ReplaceBySymbol => {
+                                Some(priorities.get(&file_id).copied().unwrap_or(0))
+                                    == Some(highest)
+                            }
+                        })
+                })
+                .collect::<Vec<_>>();
+            if let Some(values) = self.definitions.get_mut(key) {
+                for (pointer, update) in values.iter_mut().zip(updates) {
+                    if let Some(active) = update {
+                        pointer.active = active;
                     }
-                };
+                }
             }
             self.sort_definition_buckets(std::slice::from_ref(key));
         }
     }
 
     fn sort_definition_buckets(&mut self, keys: &[(String, String)]) {
-        let shards = &self.shards;
         for key in keys {
             if let Some(values) = self.definitions.get_mut(key) {
-                values.sort_by_key(|pointer| {
-                    shards
-                        .get(&pointer.file_id)
-                        .and_then(|shard| shard.definitions.get(pointer.ordinal))
-                        .map_or((true, pointer.file_id), |definition| {
-                            (!definition.active, definition.file_id)
-                        })
-                });
+                values.sort_by_key(|pointer| (!pointer.active, pointer.file_id));
             }
         }
     }
@@ -906,27 +935,20 @@ impl WorkspaceIndex {
                 cancellation.checkpoint()?;
                 self.definitions
                     .entry((
-                        definition.kind.clone(),
+                        definition.kind.to_string(),
                         self.lookup_name(&definition.kind, &definition.name),
                     ))
                     .or_default()
                     .push(DefinitionPointer {
                         file_id: *file_id,
                         ordinal,
+                        active: definition.active,
                     });
             }
         }
-        let shards = &self.shards;
         for values in self.definitions.values_mut() {
             cancellation.checkpoint()?;
-            values.sort_by_key(|pointer| {
-                shards
-                    .get(&pointer.file_id)
-                    .and_then(|shard| shard.definitions.get(pointer.ordinal))
-                    .map_or((true, pointer.file_id), |definition| {
-                        (!definition.active, definition.file_id)
-                    })
-            });
+            values.sort_by_key(|pointer| (!pointer.active, pointer.file_id));
         }
         Ok(())
     }
@@ -963,7 +985,7 @@ impl WorkspaceIndex {
 
     fn definition_key(&self, definition: &Definition) -> (String, String) {
         (
-            definition.kind.clone(),
+            definition.kind.to_string(),
             self.lookup_name(&definition.kind, &definition.name),
         )
     }

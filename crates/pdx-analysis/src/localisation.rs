@@ -85,7 +85,7 @@ fn scripted_localisation_names_cached_with_cancellation(
                 cancellation.checkpoint()?;
             }
             if definition.active && definition.kind.eq_ignore_ascii_case("defined_text") {
-                names.push(definition.name.clone());
+                names.push(definition.name.to_string());
             }
         }
     }
@@ -114,7 +114,7 @@ fn scripted_localisation_names_cached_with_cancellation(
                 cancellation.checkpoint()?;
             }
             if definition.kind.eq_ignore_ascii_case("defined_text") {
-                names.push(definition.name.clone());
+                names.push(definition.name.to_string());
             }
         }
     }
@@ -128,6 +128,7 @@ fn scripted_localisation_names_cached_with_cancellation(
     let names = Arc::new(names);
     snapshot.query_cache().insert(
         revision,
+        pdx_engine::CacheDomain::Index,
         SCRIPTED_LOCALISATION_NAMES_CACHE_KEY.to_owned(),
         Arc::clone(&names),
     );
@@ -215,6 +216,7 @@ fn static_localisation_command_names(
     let names = Arc::new(names);
     snapshot.query_cache().insert(
         revision,
+        pdx_engine::CacheDomain::Index,
         LOCALISATION_COMMANDS_CACHE_KEY.to_owned(),
         Arc::clone(&names),
     );

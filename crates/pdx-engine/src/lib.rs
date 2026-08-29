@@ -16,6 +16,7 @@ mod pipeline;
 mod query_cache;
 mod scan;
 mod snapshot;
+mod string_pool;
 
 pub use host::AnalysisHost;
 pub use index::{
@@ -35,8 +36,9 @@ pub use model::{
     WorkspaceScanToken,
 };
 pub use parse_cache::{CURRENT_PARSE_CACHE_SCHEMA_VERSION, ParseCache, ParseCacheError};
-pub use query_cache::SnapshotQueryCache;
+pub use query_cache::{CacheDomain, SnapshotQueryCache};
 pub use snapshot::AnalysisSnapshot;
+pub use string_pool::{StringPool, intern_shard_string};
 
 #[cfg(test)]
 thread_local! {

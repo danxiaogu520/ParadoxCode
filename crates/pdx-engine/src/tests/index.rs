@@ -72,8 +72,8 @@ fn bulk_index_build_retains_every_shard_and_definition() {
         FileIndexShard {
             file_id: first_file,
             definitions: vec![Definition {
-                kind: "event".to_owned(),
-                name: "shared.1".to_owned(),
+                kind: "event".into(),
+                name: "shared.1".into(),
                 file_id: first_file,
                 range,
                 active: true,
@@ -85,8 +85,8 @@ fn bulk_index_build_retains_every_shard_and_definition() {
         FileIndexShard {
             file_id: second_file,
             definitions: vec![Definition {
-                kind: "event".to_owned(),
-                name: "shared.1".to_owned(),
+                kind: "event".into(),
+                name: "shared.1".into(),
                 file_id: second_file,
                 range,
                 active: true,
@@ -191,7 +191,7 @@ fn type_per_file_definition_is_emitted_once_without_generic_pseudo_members() {
         .and_then(|hir| {
             hir.definitions()
                 .iter()
-                .find(|definition| definition.kind == "country_file" && definition.name == "AAA")
+                .find(|definition| definition.kind == "country_file" && &*definition.name == "AAA")
         })
         .expect("HIR country definition");
     assert_eq!(definitions[0].range, hir_definition.range);
@@ -221,8 +221,8 @@ fn symbol_case_policy_controls_definition_lookup_identity() {
     let mut index = WorkspaceIndex::from_shards([FileIndexShard {
         file_id,
         definitions: vec![Definition {
-            kind: "case_sensitive_kind".to_owned(),
-            name: "MixedName".to_owned(),
+            kind: "case_sensitive_kind".into(),
+            name: "MixedName".into(),
             file_id,
             range,
             active: true,
@@ -305,15 +305,15 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
     let second_file = SourceFileId::new(2);
     let range = TextRange::new(0, 3).expect("range");
     let definition = |file_id, name: &str| Definition {
-        kind: "event".to_owned(),
-        name: name.to_owned(),
+        kind: "event".into(),
+        name: name.into(),
         file_id,
         range,
         active: true,
     };
     let reference = |file_id, name: &str| Reference {
-        kind: "event".to_owned(),
-        name: name.to_owned(),
+        kind: "event".into(),
+        name: name.into(),
         file_id,
         range,
     };
@@ -345,8 +345,11 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
     assert!(index.definitions("event", "old.1").is_empty());
     assert_eq!(index.definitions("event", "new.1").len(), 1);
     assert_eq!(index.definitions("event", "untouched.1").len(), 1);
-    assert_eq!(index.references(first_file)[0].name, "new.1");
-    assert_eq!(index.references(second_file)[0].name, "untouched.1");
+    assert_eq!(index.references(first_file)[0].name.as_ref(), "new.1");
+    assert_eq!(
+        index.references(second_file)[0].name.as_ref(),
+        "untouched.1"
+    );
     assert_eq!(
         index
             .shard(first_file)
@@ -367,8 +370,8 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
     let second_file = SourceFileId::new(2);
     let range = TextRange::new(0, 3).expect("range");
     let definition = |file_id| Definition {
-        kind: "event".to_owned(),
-        name: "shared.1".to_owned(),
+        kind: "event".into(),
+        name: "shared.1".into(),
         file_id,
         range,
         active: true,
@@ -426,8 +429,8 @@ fn identical_collector_records_resolve_as_one_physical_definition() {
     let file_id = SourceFileId::new(1);
     let range = TextRange::new(4, 12).expect("range");
     let definition = Definition {
-        kind: "scripted_effect".to_owned(),
-        name: "apply".to_owned(),
+        kind: "scripted_effect".into(),
+        name: "apply".into(),
         file_id,
         range,
         active: true,
@@ -453,15 +456,15 @@ fn identical_collector_records_resolve_as_one_physical_definition() {
         file_id,
         definitions: vec![
             Definition {
-                kind: "scripted_effect".to_owned(),
-                name: "apply".to_owned(),
+                kind: "scripted_effect".into(),
+                name: "apply".into(),
                 file_id,
                 range,
                 active: true,
             },
             Definition {
-                kind: "scripted_effect".to_owned(),
-                name: "apply".to_owned(),
+                kind: "scripted_effect".into(),
+                name: "apply".into(),
                 file_id,
                 range: distinct_range,
                 active: true,
