@@ -2574,3 +2574,57 @@ fn type_per_file_rules_validate_the_document_root_once() {
         "missing file-level fields must be reported once: {results:?}"
     );
 }
+
+#[test]
+fn debug_evicted_diagnostics_reproduce() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-evict-debug-{nonce}"));
+    std::fs::create_dir_all(root.join("events")).unwrap();
+    std::fs::write(root.join("events/invalid.txt"), "scope = nowhere\n").unwrap();
+    let root = root.canonicalize().unwrap();
+    let cleanup = root.clone();
+    let mut host = crate::tests::support::eu4_host(pdx_game::eu4::first_party_rules().unwrap());
+    host.apply_change(pdx_engine::WorkspaceChange::SetSourceRoots(vec![
+        pdx_engine::SourceRoot::new(
+            pdx_engine::SourceRootId::new(0),
+            pdx_engine::SourceRootKind::CurrentMod,
+            root,
+        ),
+    ]));
+    host.refresh_source_roots().unwrap();
+    let snapshot = host.snapshot();
+    let file_id = *snapshot.source_files().keys().next().unwrap();
+    let retained = crate::source_file_diagnostics_with_cancellation(
+        &snapshot,
+        file_id,
+        &crate::CancellationToken::new(),
+    )
+    .unwrap();
+    eprintln!("retained diagnostics: {retained:?}");
+    drop(snapshot);
+    let evicted = host.evict_source_frontends(&|_| false);
+    eprintln!("evicted: {evicted}");
+    let snapshot2 = host.snapshot();
+    let state = snapshot2.file_state(file_id).unwrap();
+    eprintln!(
+        "post-evict parsed: {}, source len: {}",
+        state.parsed().is_some(),
+        state.source().len()
+    );
+    let after = crate::source_file_diagnostics_with_cancellation(
+        &snapshot2,
+        file_id,
+        &crate::CancellationToken::new(),
+    )
+    .unwrap();
+    eprintln!("evicted diagnostics: {after:?}");
+    assert_eq!(
+        retained.len(),
+        after.len(),
+        "evicted diagnostics must match"
+    );
+    std::fs::remove_dir_all(cleanup).unwrap();
+}
