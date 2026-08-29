@@ -161,29 +161,31 @@ function sampleFiles(files, count) {
   return [...new Set(picked)];
 }
 
-/** Picks stable hover/completion positions from the first `=` line. */
-function queryPositions(text) {
+/**
+ * Collects up to `limit` key-position candidates for completion probing.
+ *
+ * Completion answers at key positions; real files often start in contexts with
+ * no candidates, so the benchmark probes several and keeps the first that
+ * returns items — that latency reflects candidate-generation work.
+ */
+function completionCandidates(text, limit = 12) {
+  const lines = text.split(/\r?\n/);
+  const candidates = [];
+  for (let index = 0; index < lines.length && candidates.length < limit; index += 1) {
+    const match = lines[index].match(/^(\s*)([A-Za-z0-9_.@]+)\s*=/);
+    if (match) candidates.push({ line: index, character: match[1].length + match[2].length });
+  }
+  return candidates;
+}
+
+/** First `=` position for the hover probe. */
+function hoverPosition(text) {
   const lines = text.split(/\r?\n/);
   for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const column = line.indexOf('=');
-    if (column >= 0) {
-      // Hover sits on the key's `=`; completion sits where a value is being
-      // typed: right after `= ` when the separator exists, else line end.
-      const afterEquals = column + 1 < line.length && line[column + 1] === ' ';
-      return {
-        hover: { line: index, character: column },
-        completion: {
-          line: index,
-          character: afterEquals ? column + 2 : line.length,
-        },
-      };
-    }
+    const column = lines[index].indexOf('=');
+    if (column >= 0) return { line: index, character: column };
   }
-  return {
-    hover: { line: 0, character: 0 },
-    completion: { line: 0, character: 0 },
-  };
+  return { line: 0, character: 0 };
 }
 
 function percentile(values, fraction) {
@@ -358,7 +360,6 @@ async function runMeasurement(options) {
     for (const file of files) {
       const text = readFileSync(file, 'utf8');
       const uri = pathToFileURL(file).href;
-      const positions = queryPositions(text);
       const entry = {
         file: relative(options.workspace, file) || basename(file),
         bytes: Buffer.byteLength(text, 'utf8'),
@@ -374,21 +375,34 @@ async function runMeasurement(options) {
       const hover = await timedRequest(
         client,
         'textDocument/hover',
-        { textDocument: { uri }, position: positions.hover },
+        { textDocument: { uri }, position: hoverPosition(text) },
         REQUEST_TIMEOUT_MS,
       );
       entry.hoverMs = hover.elapsed;
 
-      const completion = await timedRequest(
-        client,
-        'textDocument/completion',
-        { textDocument: { uri }, position: positions.completion },
-        REQUEST_TIMEOUT_MS,
-      );
-      entry.completionItems = Array.isArray(completion.result)
-        ? completion.result.length
-        : completion.result?.items?.length ?? null;
-      entry.completionMs = completion.elapsed;
+      let completionItems = 0;
+      let completionElapsed = 0;
+      let completionProbes = 0;
+      for (const position of completionCandidates(text)) {
+        completionProbes += 1;
+        const completion = await timedRequest(
+          client,
+          'textDocument/completion',
+          { textDocument: { uri }, position },
+          REQUEST_TIMEOUT_MS,
+        );
+        const count = Array.isArray(completion.result)
+          ? completion.result.length
+          : completion.result?.items?.length ?? 0;
+        if (count > 0) {
+          completionItems = count;
+          completionElapsed = completion.elapsed;
+          break;
+        }
+      }
+      entry.completionItems = completionItems;
+      entry.completionMs = completionElapsed;
+      entry.completionProbes = completionProbes;
 
       const tChange = performance.now();
       client.notify('textDocument/didChange', {
@@ -408,7 +422,8 @@ async function runMeasurement(options) {
       console.log(
         `${entry.file}: open->diag ${entry.openToDiagnosticsMs.toFixed(0)} ms, ` +
           `hover ${entry.hoverMs.toFixed(0)} ms, completion ${entry.completionMs.toFixed(0)} ms ` +
-          `(${entry.completionItems ?? '?'} items), edit->diag ${entry.changeToDiagnosticsMs.toFixed(0)} ms, ` +
+          `(${entry.completionItems ?? 0} items after ${entry.completionProbes} probe(s)), ` +
+          `edit->diag ${entry.changeToDiagnosticsMs.toFixed(0)} ms, ` +
           `close cpu +${entry.closeSettleCpuSeconds?.toFixed(1) ?? 'n/a'} s`,
       );
     }
