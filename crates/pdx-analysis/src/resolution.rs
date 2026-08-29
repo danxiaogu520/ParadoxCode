@@ -734,6 +734,44 @@ pub(crate) fn all_semantics(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
 ) -> Result<SemanticWorkspace, Cancelled> {
+    all_semantics_inner(snapshot, cancellation, &mut |_file, _state| true)
+}
+
+/// Collects quoted semantics only from files whose retained source text
+/// mentions any of `names` (ASCII case-insensitively), plus every open
+/// overlay document.
+///
+/// Reference and rename results can only mention files that contain the
+/// symbol name literally — every semantic name is derived from source tokens —
+/// so a substring test is a safe superset filter. It survives syntax-tree
+/// eviction (the source text stays resident) and avoids reparsing files that
+/// cannot contribute, keeping the query bounded on large mods.
+pub(crate) fn all_semantics_for_symbol(
+    snapshot: &AnalysisSnapshot,
+    cancellation: &CancellationToken,
+    names: &[&str],
+) -> Result<SemanticWorkspace, Cancelled> {
+    #[cfg(test)]
+    ALL_SEMANTICS_CALLS.with(|calls| calls.set(calls.get().saturating_add(1)));
+    let needles = names
+        .iter()
+        .map(|name| (*name).to_ascii_lowercase())
+        .collect::<Vec<_>>();
+    all_semantics_inner(snapshot, cancellation, &mut |_file, state| {
+        let source = state.source().as_bytes();
+        needles.iter().any(|needle| {
+            source
+                .windows(needle.len().max(1))
+                .any(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
+        })
+    })
+}
+
+fn all_semantics_inner(
+    snapshot: &AnalysisSnapshot,
+    cancellation: &CancellationToken,
+    file_filter: &mut dyn FnMut(&pdx_engine::SourceFile, &pdx_engine::FileState) -> bool,
+) -> Result<SemanticWorkspace, Cancelled> {
     #[cfg(test)]
     ALL_SEMANTICS_CALLS.with(|calls| calls.set(calls.get().saturating_add(1)));
     let mut all = SemanticWorkspace::default();
@@ -750,6 +788,12 @@ pub(crate) fn all_semantics(
     for file in snapshot.source_files().values() {
         cancellation.checkpoint()?;
         if overlay_files.contains(&file.id) {
+            continue;
+        }
+        let Some(state) = snapshot.file_state(file.id) else {
+            continue;
+        };
+        if !file_filter(file, state) {
             continue;
         }
         let Some(input) = input_for_source_file(snapshot, file.id) else {

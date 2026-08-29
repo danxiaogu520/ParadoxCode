@@ -105,10 +105,19 @@ pub fn references_with_cancellation(
         );
         return Ok(result);
     }
-    let all = all_semantics(snapshot, cancellation)?;
-    let Some((kind, name)) = symbol_at(&all, document, position) else {
+    // Determine the symbol under the cursor from this document's semantics
+    // alone, then collect workspace semantics filtered to files whose shard
+    // mentions that name. This bounds the query after syntax-tree eviction:
+    // only candidate files are reparsed on demand.
+    let Some(document_input) = input_for_document(snapshot, document) else {
         return Ok(Vec::new());
     };
+    let document_all =
+        document_semantic_workspace(snapshot, document, &document_input, cancellation)?;
+    let Some((kind, name)) = symbol_at(&document_all, document, position) else {
+        return Ok(Vec::new());
+    };
+    let all = all_semantics_for_symbol(snapshot, cancellation, &[name.as_str()])?;
     let Resolution::Unique(target) = resolve_symbol(snapshot, &all, &kind, &name) else {
         return Ok(Vec::new());
     };
@@ -286,8 +295,10 @@ pub fn rename_with_cancellation(
         });
     }
     let target = rename_target(snapshot, document, position, cancellation)?;
-    let all =
-        all_semantics(snapshot, cancellation).map_err(|Cancelled| RenameFailure::Cancelled)?;
+    // Conflict checks must see both the old name (edits) and the new name
+    // (collision detection), so both drive the shard prefilter.
+    let all = all_semantics_for_symbol(snapshot, cancellation, &[target.name.as_str(), new_name])
+        .map_err(|Cancelled| RenameFailure::Cancelled)?;
     check_rename_conflict(snapshot, &all, &target, new_name, cancellation)?;
 
     let mut edits = vec![WorkspaceTextEdit {

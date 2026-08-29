@@ -24,9 +24,20 @@ fn workspace_validation_result(
                 .any(|root| root.id == file.root_id && root.kind == SourceRootKind::CurrentMod)
         })
         .filter(|file| {
-            snapshot
-                .file_state(file.id)
-                .is_some_and(|state| state.parsed().is_some())
+            // Frontends may have been evicted after an earlier validation
+            // pass; parseability is a property of the file's rule category,
+            // not of the currently retained tree. Evicted files reparse on
+            // demand inside the per-file diagnostics call.
+            snapshot.file_state(file.id).is_some()
+                && snapshot
+                    .rules()
+                    .classify(&file.logical_path)
+                    .is_some_and(|category| {
+                        matches!(
+                            category.parser,
+                            pdx_rules::ParserKind::Script | pdx_rules::ParserKind::Localisation
+                        )
+                    })
         })
         .collect::<Vec<_>>();
     files.sort_by(|left, right| {
@@ -1045,6 +1056,44 @@ impl LspServer {
                 }));
             });
         }
+    }
+
+    /// Drops CST/HIR frontends of source files once background validation
+    /// has consumed them.
+    ///
+    /// Open overlays live in the document map with their own trees, so every
+    /// file state can be evicted; later queries reparse the retained source
+    /// on demand. Shards and position ranges stay resident, keeping
+    /// definition/reference/navigation answers intact while dropping the
+    /// dominant CST/HIR memory share.
+    pub(super) fn evict_source_frontends_after_validation<W: Write>(
+        &mut self,
+        output: &mut W,
+    ) -> Result<(), LspError> {
+        let snapshot = self.host.snapshot();
+        let open_overlay_files = snapshot
+            .documents()
+            .values()
+            .filter(|document| document.source() == DocumentSource::Overlay)
+            .filter_map(|document| document.path())
+            .filter_map(|path| snapshot.source_file_id_for_path(path))
+            .collect::<HashSet<_>>();
+        drop(snapshot);
+        let evicted = self
+            .host
+            .evict_source_frontends(&|id| open_overlay_files.contains(&id));
+        if evicted > 0 {
+            write_message(
+                output,
+                &log_message_notification(
+                    MessageType::INFO,
+                    format!(
+                        "Released syntax trees for {evicted} validated file(s); they reparse on demand"
+                    ),
+                ),
+            )?;
+        }
+        Ok(())
     }
 
     /// Starts the initial background workspace scan requested by the

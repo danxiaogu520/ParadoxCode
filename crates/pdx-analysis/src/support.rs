@@ -85,17 +85,42 @@ pub(crate) fn input_for_source_file(
 ) -> Option<ParsedInput> {
     let file = snapshot.source_files().get(&id)?;
     let state = snapshot.file_state(id)?;
-    let parsed = match state.parsed()? {
-        ParsedSource::Text(parsed) => ParsedContent::Text(Arc::clone(parsed)),
+    if let Some(ParsedSource::Text(parsed)) = state.parsed() {
+        return Some(ParsedInput {
+            document: None,
+            file: Some(id),
+            path: Some(file.logical_path.clone()),
+            format: parsed.format(),
+            source: state.source_handle(),
+            parsed: ParsedContent::Text(Arc::clone(parsed)),
+            hir: state.hir_handle(),
+            profile: snapshot.game_profile_handle(),
+        });
+    }
+    // The scan may evict CST/HIR frontends after background validation to
+    // bound resident memory; the source text stays in the file state, so the
+    // tree is reparsed transiently for this one query.
+    let format = match snapshot.rules().classify(&file.logical_path)?.parser {
+        ParserKind::Script => FileFormat::Script,
+        ParserKind::Localisation => FileFormat::Localisation,
+        ParserKind::Asset | ParserKind::SyntaxOnly => return None,
     };
+    let source = state.source_handle();
+    let parsed = Arc::new(parse(format, &source));
+    let hir = Arc::new(lower_with_profile(
+        (*parsed).clone(),
+        &file.logical_path,
+        snapshot.rules(),
+        snapshot.game_profile(),
+    ));
     Some(ParsedInput {
         document: None,
         file: Some(id),
         path: Some(file.logical_path.clone()),
-        format: state.parsed()?.format(),
-        source: state.source_handle(),
-        parsed,
-        hir: state.hir_handle(),
+        format,
+        source,
+        parsed: ParsedContent::Text(parsed),
+        hir: Some(hir),
         profile: snapshot.game_profile_handle(),
     })
 }

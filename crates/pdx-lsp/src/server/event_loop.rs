@@ -1145,6 +1145,9 @@ impl LspServer {
                                                 &mut output,
                                                 &workspace,
                                             )?;
+                                            self.evict_source_frontends_after_validation(
+                                                &mut output,
+                                            )?;
                                         }
                                         Err(WorkspaceError::Cancelled) => {
                                             self.workspace_diagnostics_pending = true;

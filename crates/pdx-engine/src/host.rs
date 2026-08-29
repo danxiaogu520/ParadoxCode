@@ -955,6 +955,36 @@ impl AnalysisHost {
 
     /// Captures an immutable query view.
     #[must_use]
+    /// Evicts the retained CST/HIR frontends of source files, keeping source
+    /// text, index shards, and cached positions.
+    ///
+    /// `keep` guards files that must stay warm (for example files backing open
+    /// editor overlays are fine to evict, so callers usually keep nothing).
+    /// The workspace revision is unchanged: shards and index answers are
+    /// identical, so snapshot query caches remain valid. Returns the number of
+    /// files whose frontends were dropped.
+    pub fn evict_source_frontends(&mut self, keep: &dyn Fn(SourceFileId) -> bool) -> usize {
+        let mut evicted = Vec::new();
+        for (id, state) in self.file_states.iter() {
+            if keep(*id) {
+                continue;
+            }
+            if let Some(evicted_state) = state.evict_frontend() {
+                evicted.push((*id, Arc::new(evicted_state)));
+            }
+        }
+        if evicted.is_empty() {
+            return 0;
+        }
+        let evicted_count = evicted.len();
+        let mut file_states = BTreeMap::clone(&self.file_states);
+        for (id, state) in evicted {
+            file_states.insert(id, state);
+        }
+        self.file_states = Arc::new(file_states);
+        evicted_count
+    }
+
     pub fn snapshot(&self) -> AnalysisSnapshot {
         AnalysisSnapshot {
             revision: self.revision,

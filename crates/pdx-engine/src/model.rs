@@ -720,6 +720,29 @@ impl FileState {
             .as_deref()
             .map(Vec::as_slice)
     }
+
+    /// Drops the retained CST/HIR frontends while keeping the source text,
+    /// index shard, and any cached positions or previews.
+    ///
+    /// Used after background validation to bound resident memory: closed files
+    /// rarely need their trees again, and [`crate::pipeline`] callers can
+    /// reparse the retained source on demand. Returns `None` when no frontend
+    /// is retained. The revision is unchanged — eviction does not alter any
+    /// answer, so snapshot query caches stay valid.
+    pub(crate) fn evict_frontend(&self) -> Option<Self> {
+        if self.parsed.is_none() && self.hir.is_none() {
+            return None;
+        }
+        Some(Self {
+            revision: self.revision,
+            source: Arc::clone(&self.source),
+            parsed: None,
+            hir: None,
+            shard: Arc::clone(&self.shard),
+            cached_positions: self.cached_positions.clone(),
+            cached_localisation_previews: self.cached_localisation_previews.clone(),
+        })
+    }
 }
 /// Stable identity for an editor document during one server lifetime.
 ///
