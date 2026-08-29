@@ -9,6 +9,7 @@
 
 use std::mem::size_of;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Instant;
 
 use pdx_engine::{
@@ -160,6 +161,48 @@ fn main() {
         mib((position_ranges * 64) as f64)
     );
     println!("cached positions: {cached_positions}, previews: {cached_previews}");
+
+    // Phase timing over the same corpus: read, parse, lower. The remainder of
+    // the scan cost is shard building, line indexes, and position extraction.
+    let mut read_ns = 0u128;
+    let mut parse_ns = 0u128;
+    let mut lower_ns = 0u128;
+    let mut phase_files = 0usize;
+    for file in snapshot.source_files().values() {
+        snapshot.file_state(file.id).expect("state");
+        let logical = &file.logical_path;
+        let Some(category) = snapshot.rules().classify(logical) else {
+            continue;
+        };
+        let format = match category.parser {
+            pdx_rules::ParserKind::Script => pdx_parser::FileFormat::Script,
+            pdx_rules::ParserKind::Localisation => pdx_parser::FileFormat::Localisation,
+            _ => continue,
+        };
+        let started = std::time::Instant::now();
+        let Ok(bytes) = std::fs::read(&file.physical_path) else {
+            continue;
+        };
+        read_ns += started.elapsed().as_nanos();
+        let source: Arc<str> = Arc::from(String::from_utf8_lossy(&bytes).as_ref());
+        let started = std::time::Instant::now();
+        let parsed = Arc::new(pdx_parser::parse(format, &source));
+        parse_ns += started.elapsed().as_nanos();
+        let started = std::time::Instant::now();
+        let hir = pdx_engine::hir::lower_with_profile(
+            (*parsed).clone(),
+            logical,
+            snapshot.rules(),
+            snapshot.game_profile(),
+        );
+        lower_ns += started.elapsed().as_nanos();
+        phase_files += 1;
+        drop(hir);
+    }
+    println!("--- phase timing over {phase_files} files ---");
+    println!("read:  {:.1}s", read_ns as f64 / 1e9);
+    println!("parse: {:.1}s", parse_ns as f64 / 1e9);
+    println!("lower: {:.1}s", lower_ns as f64 / 1e9);
 }
 
 /// Placeholder sized like the non-String payload of one HIR property.

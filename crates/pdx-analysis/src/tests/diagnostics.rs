@@ -2576,7 +2576,7 @@ fn type_per_file_rules_validate_the_document_root_once() {
 }
 
 #[test]
-fn debug_evicted_diagnostics_reproduce() {
+fn evicted_frontend_diagnostics_match_retained() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()

@@ -318,6 +318,12 @@ pub struct GameProfile {
     pub value_definitions: Vec<ProfileValueDefinitionRule>,
     /// Ordered block value-definition rules; the first match wins.
     pub container_value_definitions: Vec<ProfileContainerValueDefinitionRule>,
+    /// Lazily built exact-key lookup over the rule lists above, mirroring each
+    /// list's first-match order. Populated on first per-key query because
+    /// lowering performs millions of these lookups per workspace scan and the
+    /// linear `find` over every rule dominated scan CPU.
+    #[serde(skip)]
+    pub key_index: std::sync::OnceLock<ProfileKeyIndex>,
     /// Blocks whose direct child keys declare symbols.
     pub container_definitions: Vec<ProfileContainerDefinitionRule>,
     /// Additional definitions gated by nested fields.
@@ -373,13 +379,137 @@ pub struct GameProfile {
     pub root_entry_specs: BTreeMap<String, ProfileRootEntrySpec>,
 }
 
+/// Exact-key lookup accelerator over a game profile's ordered rule lists.
+///
+/// Rules with an exact key selector are bucketed by their pattern
+/// (case-insensitive patterns are stored lowercased); every other selector
+/// mode stays in a short scan list. Both buckets keep rule order, and queries
+/// take the earliest matching index across the two, preserving each list's
+/// documented first-match semantics.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProfileKeyIndex {
+    references_exact: ExactKeyBuckets,
+    references_scan: Vec<usize>,
+    value_exact: ExactKeyBuckets,
+    value_scan: Vec<usize>,
+    container_value_exact: ExactKeyBuckets,
+    container_value_scan: Vec<usize>,
+}
+
+/// Case-split exact buckets for one rule list.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct ExactKeyBuckets {
+    /// Case-insensitive exact patterns, stored lowercased.
+    caseless: std::collections::HashMap<String, Vec<usize>>,
+    /// Case-sensitive exact patterns, stored verbatim.
+    cased: std::collections::HashMap<String, Vec<usize>>,
+}
+
+impl ExactKeyBuckets {
+    fn insert(&mut self, matcher: &ProfileTextMatcher, index: usize) -> bool {
+        if matcher.mode != ProfileMatchMode::Exact {
+            return false;
+        }
+        if matcher.case_sensitive {
+            self.cased
+                .entry(matcher.pattern.clone())
+                .or_default()
+                .push(index);
+        } else {
+            self.caseless
+                .entry(matcher.pattern.to_ascii_lowercase())
+                .or_default()
+                .push(index);
+        }
+        true
+    }
+
+    /// Bucket contents for `candidate` across both case variants.
+    fn lookup(&self, candidate: &str) -> impl Iterator<Item = usize> + '_ {
+        let cased = self.cased.get(candidate).map(Vec::as_slice).unwrap_or(&[]);
+        let caseless = normalized_ascii_query(candidate);
+        let caseless = self
+            .caseless
+            .get(caseless.as_ref())
+            .map(Vec::as_slice)
+            .unwrap_or(&[]);
+        cased
+            .iter()
+            .chain(caseless)
+            .copied()
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+}
+
+fn normalized_ascii_query(value: &str) -> std::borrow::Cow<'_, str> {
+    if value.bytes().all(|byte| byte.is_ascii_lowercase()) {
+        std::borrow::Cow::Borrowed(value)
+    } else {
+        std::borrow::Cow::Owned(value.to_ascii_lowercase())
+    }
+}
+
+impl ProfileKeyIndex {
+    fn build(profile: &GameProfile) -> Self {
+        let mut references_exact = ExactKeyBuckets::default();
+        let mut references_scan = Vec::new();
+        for (index, rule) in profile.references.iter().enumerate() {
+            if !references_exact.insert(&rule.key, index) {
+                references_scan.push(index);
+            }
+        }
+        let mut value_exact = ExactKeyBuckets::default();
+        let mut value_scan = Vec::new();
+        for (index, rule) in profile.value_definitions.iter().enumerate() {
+            if !value_exact.insert(&rule.key, index) {
+                value_scan.push(index);
+            }
+        }
+        let mut container_value_exact = ExactKeyBuckets::default();
+        let mut container_value_scan = Vec::new();
+        for (index, rule) in profile.container_value_definitions.iter().enumerate() {
+            if !container_value_exact.insert(&rule.key, index) {
+                container_value_scan.push(index);
+            }
+        }
+        Self {
+            references_exact,
+            references_scan,
+            value_exact,
+            value_scan,
+            container_value_exact,
+            container_value_scan,
+        }
+    }
+
+    /// Candidate rule indices for `candidate` in ascending rule order.
+    fn candidates<'a>(
+        exact: &'a ExactKeyBuckets,
+        scan: &'a [usize],
+        candidate: &str,
+    ) -> impl Iterator<Item = usize> + 'a {
+        let mut indices = exact.lookup(candidate).collect::<Vec<_>>();
+        indices.extend_from_slice(scan);
+        indices.sort_unstable();
+        indices.dedup();
+        indices.into_iter()
+    }
+}
+
 impl GameProfile {
+    /// Returns the shared exact-key index, building it on first use.
+    fn resolved_key_index(&self) -> &ProfileKeyIndex {
+        self.key_index.get_or_init(|| ProfileKeyIndex::build(self))
+    }
+
     /// Creates an identity-only profile with no game-specific interpretation.
     #[must_use]
     pub fn empty(game_id: impl Into<String>) -> Self {
         Self {
             game_id: game_id.into(),
             source_encoding: SourceEncoding::Utf8,
+            key_index: std::sync::OnceLock::new(),
             scan_roots: Vec::new(),
             scan_root_max_depths: BTreeMap::new(),
             scan_root_files: BTreeMap::new(),
@@ -487,9 +617,14 @@ impl GameProfile {
         &self,
         key: &str,
     ) -> Option<&ProfileContainerValueDefinitionRule> {
-        self.container_value_definitions
-            .iter()
-            .find(|rule| rule.key.matches(key))
+        let index = self.resolved_key_index();
+        ProfileKeyIndex::candidates(
+            &index.container_value_exact,
+            &index.container_value_scan,
+            key,
+        )
+        .map(|rule_index| &self.container_value_definitions[rule_index])
+        .find(|rule| rule.key.matches(key))
     }
 
     /// Returns the suffixes appended when looking up members of `kind`.
@@ -672,20 +807,24 @@ impl GameProfile {
     /// Returns the first reference rule whose key selector accepts `key`.
     #[must_use]
     pub fn reference_rule(&self, key: &str) -> Option<&ProfileReferenceRule> {
-        self.references.iter().find(|rule| {
-            rule.key.matches(key)
-                && !rule
-                    .excluded_keys
-                    .iter()
-                    .any(|excluded| excluded.eq_ignore_ascii_case(key))
-        })
+        let index = self.resolved_key_index();
+        ProfileKeyIndex::candidates(&index.references_exact, &index.references_scan, key)
+            .map(|rule_index| &self.references[rule_index])
+            .find(|rule| {
+                rule.key.matches(key)
+                    && !rule
+                        .excluded_keys
+                        .iter()
+                        .any(|excluded| excluded.eq_ignore_ascii_case(key))
+            })
     }
 
     /// Returns the declared kind for one scalar value property.
     #[must_use]
     pub fn value_definition_kind(&self, key: &str, parent_key: Option<&str>) -> Option<&str> {
-        self.value_definitions
-            .iter()
+        let index = self.resolved_key_index();
+        ProfileKeyIndex::candidates(&index.value_exact, &index.value_scan, key)
+            .map(|rule_index| &self.value_definitions[rule_index])
             .find(|rule| {
                 rule.key.matches(key)
                     && rule.parent_key.as_ref().is_none_or(|matcher| {
