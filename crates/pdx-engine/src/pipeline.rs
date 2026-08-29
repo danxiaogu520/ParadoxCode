@@ -531,8 +531,8 @@ pub(crate) fn position_ranges_for_state(state: &FileState) -> Vec<(TextRange, Po
         .filter_map(|definition| {
             let selection_range = hir_selection_ranges
                 .get(&(
-                    definition.kind.clone(),
-                    definition.name.clone(),
+                    definition.kind.to_string(),
+                    definition.name.to_string(),
                     definition.range,
                 ))
                 .copied()
@@ -726,8 +726,8 @@ fn collect_semantic_type_definition(
         return;
     }
     definitions.push(Definition {
-        kind: descriptor.name.clone(),
-        name,
+        kind: crate::string_pool::intern_shard_string(&descriptor.name),
+        name: crate::string_pool::intern_shard_string(&name),
         file_id: file.id,
         range: node.range(),
         active: true,
@@ -835,8 +835,8 @@ fn collect_hir_semantics(
 ) {
     for definition in hir.definitions() {
         definitions.push(Definition {
-            kind: definition.kind.clone(),
-            name: definition.name.clone(),
+            kind: crate::string_pool::intern_shard_string(&definition.kind),
+            name: crate::string_pool::intern_shard_string(&definition.name),
             file_id: file.id,
             range: definition.range,
             active: true,
@@ -844,8 +844,8 @@ fn collect_hir_semantics(
     }
     for reference in hir.references() {
         references.push(Reference {
-            kind: reference.kind.clone(),
-            name: reference.name.clone(),
+            kind: crate::string_pool::intern_shard_string(&reference.kind),
+            name: crate::string_pool::intern_shard_string(&reference.name),
             file_id: file.id,
             range: reference.range,
         });

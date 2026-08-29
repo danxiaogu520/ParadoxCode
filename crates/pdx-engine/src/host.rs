@@ -204,6 +204,16 @@ impl AnalysisHost {
         self.query_cache.advance_to(self.revision);
     }
 
+    /// Advances the revision for a change that only affects overlay documents.
+    ///
+    /// Document opens, edits, and closes leave the workspace index untouched,
+    /// so index-derived cache entries stay valid across keystrokes instead of
+    /// being rebuilt per edit.
+    fn advance_document_revision(&mut self) {
+        self.revision = self.revision.saturating_add(1);
+        self.query_cache.advance_documents(self.revision);
+    }
+
     /// Installs a validated persistent index cache for any configured source root.
     ///
     /// The cached root may already be configured (a dependency with an explicit index): its
@@ -512,7 +522,7 @@ impl AnalysisHost {
         cancellation.checkpoint()?;
         let mut shards = file_states
             .values()
-            .map(|state| state.shard().clone())
+            .map(|state| state.shard_handle())
             .collect::<Vec<_>>();
         if !self.installed_caches.is_empty() {
             for (id, cached) in self
@@ -730,7 +740,7 @@ impl AnalysisHost {
             paths.insert(change.path.clone(), id);
             file_states.insert(id, Arc::clone(&state));
             let priorities = source_priorities(&self.roots, &files);
-            index.replace_shard_resolved(state.shard().clone(), &priorities, self.rules.as_ref());
+            index.replace_shard_resolved(state.shard_handle(), &priorities, self.rules.as_ref());
             index.replace_position_ranges(id, position_ranges_for_state(&state));
             report.indexed_files = report.indexed_files.saturating_add(1);
             changed = true;
@@ -752,15 +762,16 @@ impl AnalysisHost {
     pub fn replace_index_shard(&mut self, shard: FileIndexShard) {
         let file_id = shard.file_id;
         let priorities = source_priorities(&self.roots, &self.source_files);
+        let shard = Arc::new(shard);
         Arc::make_mut(&mut self.index).replace_shard_resolved(
-            shard.clone(),
+            Arc::clone(&shard),
             &priorities,
             self.rules.as_ref(),
         );
         Arc::make_mut(&mut self.index).remove_position_ranges(file_id);
         if let Some(previous) = self.file_states.get(&file_id) {
             let mut replacement = previous.as_ref().clone();
-            replacement.shard = Arc::new(shard);
+            replacement.shard = Arc::clone(&shard);
             Arc::make_mut(&mut self.index)
                 .replace_position_ranges(file_id, position_ranges_for_state(&replacement));
             Arc::make_mut(&mut self.file_states).insert(file_id, Arc::new(replacement));
@@ -791,7 +802,7 @@ impl AnalysisHost {
             path,
         );
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
-        self.advance_revision();
+        self.advance_document_revision();
         Ok(())
     }
 
@@ -842,7 +853,7 @@ impl AnalysisHost {
         }
         let document = staged_overlay_document(id.clone(), version, text, current.path.clone());
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
-        self.advance_revision();
+        self.advance_document_revision();
         Ok(())
     }
 
@@ -917,7 +928,7 @@ impl AnalysisHost {
             path,
         );
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
-        self.advance_revision();
+        self.advance_document_revision();
         Ok(())
     }
 
@@ -949,7 +960,7 @@ impl AnalysisHost {
                 Arc::make_mut(&mut self.documents).insert(id.clone(), document);
             }
         }
-        self.advance_revision();
+        self.advance_document_revision();
         Ok(())
     }
 

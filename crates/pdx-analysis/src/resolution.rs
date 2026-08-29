@@ -105,9 +105,12 @@ pub(crate) fn semantic_data_with_cancellation(
         return Ok((*cached).clone());
     }
     let data = semantic_data_with_cancellation_uncached(snapshot, input, cancellation)?;
-    snapshot
-        .query_cache()
-        .insert(revision, key.to_owned(), Arc::new(data.clone()));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Documents,
+        key.to_owned(),
+        Arc::new(data.clone()),
+    );
     Ok(data)
 }
 
@@ -182,8 +185,8 @@ fn semantic_data_with_cancellation_uncached(
     {
         cancellation.checkpoint()?;
         data.references.push(ReferenceInternal {
-            kind: reference.kind.clone(),
-            name: reference.name.clone(),
+            kind: reference.kind.to_string(),
+            name: reference.name.to_string(),
             range: reference.range,
             document: input.document.clone(),
             file: input.file,
@@ -1271,8 +1274,8 @@ pub(crate) fn indexed_reference(
         .get(&reference.file_id)
         .map(|file| file.logical_path.clone());
     Some(ReferenceInternal {
-        kind: reference.kind.clone(),
-        name: reference.name.clone(),
+        kind: reference.kind.to_string(),
+        name: reference.name.to_string(),
         range: reference.range,
         document: None,
         file: Some(reference.file_id),
@@ -1296,11 +1299,11 @@ pub(crate) fn index_definition_info(
         range: definition.range,
     };
     DefinitionInfo {
-        kind: definition.kind.clone(),
-        name: definition.name.clone(),
+        kind: definition.kind.to_string(),
+        name: definition.name.to_string(),
         symbol: Symbol {
-            name: definition.name.clone(),
-            kind: definition.kind.clone(),
+            name: definition.name.to_string(),
+            kind: definition.kind.to_string(),
             range: definition.range,
             selection_range,
             location,

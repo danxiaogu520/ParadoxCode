@@ -127,7 +127,7 @@ pub fn references_with_cancellation(
     }
     let mut consider_reference = |reference: &ReferenceInternal| -> Result<(), Cancelled> {
         cancellation.checkpoint()?;
-        if reference.kind != kind || !same_name(&reference.name, &name) {
+        if &*reference.kind != kind.as_str() || !same_name(&reference.name, &name) {
             return Ok(());
         }
         if let Resolution::Unique(candidate) =
@@ -143,7 +143,7 @@ pub fn references_with_cancellation(
     }
     for reference in snapshot.index().references_iter() {
         cancellation.checkpoint()?;
-        if reference.kind != kind || !same_name(&reference.name, &name) {
+        if &*reference.kind != kind.as_str() || !same_name(&reference.name, &name) {
             continue;
         }
         if let Some(reference) = indexed_reference(snapshot, reference) {
@@ -313,7 +313,7 @@ pub fn rename_with_cancellation(
         cancellation
             .checkpoint()
             .map_err(|Cancelled| RenameFailure::Cancelled)?;
-        if reference.kind != target.kind || !same_name(&reference.name, &target.name) {
+        if &*reference.kind != target.kind.as_str() || !same_name(&reference.name, &target.name) {
             return Ok(());
         }
         // A document overlay replaces its disk candidate.  Do not return edits for the hidden
@@ -348,7 +348,7 @@ pub fn rename_with_cancellation(
         cancellation
             .checkpoint()
             .map_err(|Cancelled| RenameFailure::Cancelled)?;
-        if reference.kind != target.kind || !same_name(&reference.name, &target.name) {
+        if &*reference.kind != target.kind.as_str() || !same_name(&reference.name, &target.name) {
             continue;
         }
         if let Some(reference) = indexed_reference(snapshot, reference) {
@@ -560,7 +560,7 @@ pub(crate) fn check_rename_conflict(
         cancellation
             .checkpoint()
             .map_err(|Cancelled| RenameFailure::Cancelled)?;
-        if definition.kind != target.kind || !same_name(&definition.name, new_name) {
+        if &*definition.kind != target.kind.as_str() || !same_name(&definition.name, new_name) {
             continue;
         }
         if same_location(&definition.symbol.location, &target.definition.location) {
@@ -579,7 +579,7 @@ pub(crate) fn check_rename_conflict(
         cancellation
             .checkpoint()
             .map_err(|Cancelled| RenameFailure::Cancelled)?;
-        if definition.kind != target.kind
+        if &*definition.kind != target.kind.as_str()
             || !same_name(&definition.name, new_name)
             || (Some(definition.file_id) == target.definition.location.file
                 && definition.range == target.definition.location.range)

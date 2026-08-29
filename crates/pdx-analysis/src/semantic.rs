@@ -1118,9 +1118,12 @@ pub(crate) fn resolve_macro_definition(
         return cached.as_ref().clone();
     }
     let resolved = resolve_macro_definition_uncached(snapshot, owner_kind, owner_name);
-    snapshot
-        .query_cache()
-        .insert(revision, key, Arc::new(resolved.clone()));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Documents,
+        key,
+        Arc::new(resolved.clone()),
+    );
     resolved
 }
 
@@ -1549,9 +1552,12 @@ fn workspace_member_names_cached(snapshot: &AnalysisSnapshot, type_name: &str) -
     let names = Arc::new(effective_workspace_member_names_uncached(
         snapshot, type_name,
     ));
-    snapshot
-        .query_cache()
-        .insert(revision, key, Arc::clone(&names));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Index,
+        key,
+        Arc::clone(&names),
+    );
     names
 }
 
@@ -1572,7 +1578,7 @@ fn effective_workspace_member_names_uncached(
                         && !hidden_files.contains(&definition.file_id)
                         && completion_source_file_allowed(snapshot, definition.file_id)
                 })
-                .map(|definition| definition.name.clone()),
+                .map(|definition| definition.name.to_string()),
         );
     }
     for document in snapshot
@@ -1594,7 +1600,7 @@ fn effective_workspace_member_names_uncached(
                         .iter()
                         .any(|kind| definition.kind.eq_ignore_ascii_case(kind))
                 })
-                .map(|definition| definition.name.clone()),
+                .map(|definition| definition.name.to_string()),
         );
     }
     names.sort_by_key(|name| name.to_ascii_lowercase());
@@ -1672,9 +1678,12 @@ pub(crate) fn workspace_member_index(
     let index = Arc::new(WorkspaceMemberIndex::new(workspace_member_names_cached(
         snapshot, type_name,
     )));
-    snapshot
-        .query_cache()
-        .insert(revision, key, Arc::clone(&index));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Index,
+        key,
+        Arc::clone(&index),
+    );
     index
 }
 
@@ -1823,9 +1832,12 @@ pub(crate) fn localisation_key_index(snapshot: &AnalysisSnapshot) -> Arc<Localis
     }
     let names = workspace_member_names_cached(snapshot, "localisation");
     let index = Arc::new(LocalisationKeyIndex::new(names.as_ref()));
-    snapshot
-        .query_cache()
-        .insert(revision, key.to_owned(), Arc::clone(&index));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Index,
+        key.to_owned(),
+        Arc::clone(&index),
+    );
     index
 }
 
@@ -1854,9 +1866,12 @@ pub(crate) fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, mem
         return *cached;
     }
     let result = workspace_member_uncached(snapshot, type_name, member);
-    snapshot
-        .query_cache()
-        .insert(revision, key, Arc::new(result));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Documents,
+        key,
+        Arc::new(result),
+    );
     result
 }
 
@@ -1962,9 +1977,12 @@ pub(crate) fn overlay_members(snapshot: &AnalysisSnapshot) -> Arc<OverlayMembers
         }
     }
     let members = Arc::new(members);
-    snapshot
-        .query_cache()
-        .insert(revision, key.to_owned(), Arc::clone(&members));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Documents,
+        key.to_owned(),
+        Arc::clone(&members),
+    );
     members
 }
 
@@ -1980,9 +1998,12 @@ pub(crate) fn enum_member(snapshot: &AnalysisSnapshot, enum_name: &str, member: 
         return *cached;
     }
     let result = enum_member_uncached(snapshot, enum_name, member);
-    snapshot
-        .query_cache()
-        .insert(revision, key, Arc::new(result));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Documents,
+        key,
+        Arc::new(result),
+    );
     result
 }
 

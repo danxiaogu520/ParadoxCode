@@ -7,6 +7,7 @@
 //! ranges and legend indices.
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use pdx_engine::{AnalysisSnapshot, DocumentId};
 use pdx_parser::{CstKind, CstNode, FileFormat, ParsedFile};
@@ -76,7 +77,19 @@ pub fn semantic_tokens_in_range_with_cancellation(
 /// Builds the flat set of rule-known script keys: profile fallback keys, exact semantic-rule
 /// keys, symbol descriptor kinds, and active workspace-defined scripted macro names. Record table
 /// column names are deliberately excluded so CWT metadata never colors script text.
-fn semantic_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
+/// Rule- and profile-derived key set, rebuilt only when the rules change.
+///
+/// Tens of thousands of exact rule keys are lowercased into this set; doing
+/// that per semantic-tokens request dominated the request cost.
+fn static_semantic_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<String>> {
+    let revision = snapshot.revision();
+    const KEY: &str = "semantic-keys:static";
+    if let Some(cached) = snapshot
+        .query_cache()
+        .get::<BTreeSet<String>>(revision, KEY)
+    {
+        return cached;
+    }
     let mut keys = snapshot
         .game_profile()
         .fallback_keys
@@ -96,6 +109,18 @@ fn semantic_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
             .iter()
             .map(|descriptor| descriptor.kind_id.to_ascii_lowercase()),
     );
+    let keys = Arc::new(keys);
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Index,
+        KEY.to_owned(),
+        Arc::clone(&keys),
+    );
+    keys
+}
+
+fn semantic_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
+    let mut keys = (*static_semantic_keys(snapshot)).clone();
     // Completion classifies workspace-defined scripted macros as callable functions. Reuse the
     // same effective (overlay-aware and source-priority-aware) member view for source coloring so
     // a macro does not switch back to the generic property color after insertion.

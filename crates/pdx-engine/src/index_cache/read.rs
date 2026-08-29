@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 
 use pdx_text::{LogicalPath, PositionRange, TextRange};
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
@@ -436,13 +437,13 @@ fn load_index(
         }
         shards.insert(
             id,
-            FileIndexShard {
+            Arc::new(FileIndexShard {
                 file_id: id,
                 definitions: Vec::new(),
                 references: Vec::new(),
                 macro_definitions: Vec::new(),
                 syntax_error_count,
-            },
+            }),
         );
     }
     progress.report(source_files.len());
@@ -513,7 +514,7 @@ fn load_index(
 
 fn load_macro_definitions(
     connection: &Connection,
-    shards: &mut BTreeMap<SourceFileId, FileIndexShard>,
+    shards: &mut BTreeMap<SourceFileId, Arc<FileIndexShard>>,
 ) -> Result<usize, IndexCacheError> {
     let mut rows_loaded = 0usize;
     let mut statement = connection.prepare(
@@ -537,7 +538,7 @@ fn load_macro_definitions(
         let ordinal = usize::try_from(ordinal)
             .map_err(|_| IndexCacheError::InvalidData("negative macro ordinal".to_owned()))?;
         let definition_range = decode_range(start, end)?;
-        let shard = shards.get_mut(&file_id).ok_or_else(|| {
+        let shard = shards.get_mut(&file_id).map(Arc::make_mut).ok_or_else(|| {
             IndexCacheError::InvalidData(format!(
                 "macro definition references unknown file {}",
                 file_id.get()
@@ -613,7 +614,11 @@ fn load_macro_definitions(
         };
         let summary = shards
             .get_mut(&file_id)
-            .and_then(|shard| shard.macro_definitions.get_mut(macro_ordinal))
+            .and_then(|shard| {
+                Arc::make_mut(shard)
+                    .macro_definitions
+                    .get_mut(macro_ordinal)
+            })
             .ok_or_else(|| {
                 IndexCacheError::InvalidData("macro parameter has no owner".to_owned())
             })?;
@@ -642,7 +647,7 @@ fn load_macro_definitions(
 
 fn load_localisation_previews(
     connection: &Connection,
-    shards: &BTreeMap<SourceFileId, FileIndexShard>,
+    shards: &BTreeMap<SourceFileId, Arc<FileIndexShard>>,
     localisation_ranges: &HashSet<(SourceFileId, TextRange)>,
 ) -> Result<LocalisationPreviewMap, IndexCacheError> {
     let mut statement = connection.prepare(
@@ -699,7 +704,7 @@ fn load_localisation_previews(
 
 fn load_definitions(
     connection: &Connection,
-    shards: &mut BTreeMap<SourceFileId, FileIndexShard>,
+    shards: &mut BTreeMap<SourceFileId, Arc<FileIndexShard>>,
 ) -> Result<usize, IndexCacheError> {
     let mut rows_loaded = 0usize;
     let mut statement = connection.prepare(
@@ -736,11 +741,12 @@ fn load_definitions(
                     "definition references unknown file {}",
                     file_id.get()
                 ))
-            })?
+            })
+            .map(Arc::make_mut)?
             .definitions
             .push(Definition {
-                kind,
-                name,
+                kind: crate::string_pool::intern_shard_string(&kind),
+                name: crate::string_pool::intern_shard_string(&name),
                 file_id,
                 range,
                 active,
@@ -752,7 +758,7 @@ fn load_definitions(
 
 fn load_references(
     connection: &Connection,
-    shards: &mut BTreeMap<SourceFileId, FileIndexShard>,
+    shards: &mut BTreeMap<SourceFileId, Arc<FileIndexShard>>,
 ) -> Result<usize, IndexCacheError> {
     let mut rows_loaded = 0usize;
     let mut statement = connection.prepare(
@@ -779,11 +785,12 @@ fn load_references(
                     "reference targets unknown file {}",
                     file_id.get()
                 ))
-            })?
+            })
+            .map(Arc::make_mut)?
             .references
             .push(Reference {
-                kind,
-                name,
+                kind: crate::string_pool::intern_shard_string(&kind),
+                name: crate::string_pool::intern_shard_string(&name),
                 file_id,
                 range,
             });

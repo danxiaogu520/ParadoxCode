@@ -28,6 +28,13 @@ fn mib(bytes: f64) -> f64 {
     bytes / (1024.0 * 1024.0)
 }
 
+fn phase_rss(label: &str) {
+    // External sampler watches stdout; hold the process still briefly so the
+    // sample lands after the phase completes.
+    println!("PHASE:{label}");
+    std::thread::sleep(std::time::Duration::from_secs(4));
+}
+
 fn main() {
     let root_arg = std::env::args()
         .nth(1)
@@ -203,6 +210,28 @@ fn main() {
     println!("read:  {:.1}s", read_ns as f64 / 1e9);
     println!("parse: {:.1}s", parse_ns as f64 / 1e9);
     println!("lower: {:.1}s", lower_ns as f64 / 1e9);
+
+    // Post-scan phases: eviction and vanilla install, sampled externally.
+    drop(snapshot);
+    phase_rss("scan-retained");
+
+    // Evict all frontends and report the post-eviction resident set.
+    let evicted = host.evict_source_frontends(&|_| false);
+    println!("evicted frontends: {evicted}");
+    phase_rss("evicted");
+
+    // Install the vanilla index cache like the LSP does and report the delta.
+    let cache_path = std::env::var("LOCALAPPDATA")
+        .map(|root| std::path::PathBuf::from(root).join("ParadoxCode/cache/eu4/vanilla.pdxindex"))
+        .expect("LOCALAPPDATA");
+    match pdx_engine::IndexCache::load(&cache_path) {
+        Ok(cache) => {
+            host.install_index_cache(cache).expect("install cache");
+            phase_rss("vanilla-installed");
+        }
+        Err(error) => println!("cache load failed: {error}"),
+    }
+    phase_rss("end");
 }
 
 /// Placeholder sized like the non-String payload of one HIR property.

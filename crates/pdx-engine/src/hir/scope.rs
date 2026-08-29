@@ -22,6 +22,7 @@ pub(super) fn lower_scope_facts(
         rules,
         profile,
         facts: Vec::new(),
+        transition_candidates: std::collections::HashMap::new(),
     };
     for (property_index, property) in properties
         .iter()
@@ -106,10 +107,36 @@ pub(crate) fn property_children(properties: &[HirProperty]) -> Vec<Vec<usize>> {
 /// Collects transition rules for one property. Concrete key matches (exact/enum/any-scalar) are
 /// strong; dynamic matchers (`<mission>`, `KeyMatcher::Type`, `KeyMatcher::Dynamic`) only apply
 /// when no concrete rule selects the property, so scope facts descend into dynamic blocks.
-fn scope_transition_rules<'rule>(
+/// Rules for one (context, parent path) that pass the path/shape gates.
+///
+/// The path and shape filters do not depend on the property being visited,
+/// so they run once per distinct pair instead of once per property; effect
+/// and trigger contexts carry nearly two thousand rules each.
+fn transition_candidates<'rule>(
     rules: &'rule RuleSet,
     context: &str,
     parent_path: &[String],
+) -> Vec<&'rule SemanticRule> {
+    let root_context = context
+        .strip_prefix("type:")
+        .map(|type_name| format!("root:{type_name}"));
+    let mut candidates = Vec::new();
+    for lookup_context in std::iter::once(context).chain(root_context.as_deref()) {
+        for rule in rules.semantic_rules_for_context(lookup_context) {
+            if paths_equal(&rule.parent_path, parent_path)
+                && matches!(rule.shape, RuleShape::Node | RuleShape::ValueClause)
+            {
+                candidates.push(rule);
+            }
+        }
+    }
+    candidates
+}
+
+fn scope_transition_rules<'rule>(
+    rules: &'rule RuleSet,
+    candidates: &[&'rule SemanticRule],
+    context: &str,
     key: &str,
     profile: &GameProfile,
     state: &ScopeState,
@@ -117,14 +144,12 @@ fn scope_transition_rules<'rule>(
     let root_context = context
         .strip_prefix("type:")
         .map(|type_name| format!("root:{type_name}"));
+    let _ = root_context;
     let mut strong = Vec::new();
     let mut weak = Vec::new();
-    for lookup_context in std::iter::once(context).chain(root_context.as_deref()) {
-        for rule in rules.semantic_rules_for_context(lookup_context) {
-            if !paths_equal(&rule.parent_path, parent_path)
-                || !matches!(rule.shape, RuleShape::Node | RuleShape::ValueClause)
-                || !scope_allows(profile, state, rule)
-            {
+    {
+        for rule in candidates.iter().copied() {
+            if !scope_allows(profile, state, rule) {
                 continue;
             }
             match &rule.key {
@@ -165,9 +190,20 @@ struct ScopeFactLowering<'a> {
     rules: &'a RuleSet,
     profile: &'a GameProfile,
     facts: Vec<ScopeFact>,
+    /// Memoized path/shape-filtered rule lists per (context, parent path).
+    transition_candidates: std::collections::HashMap<(String, Vec<String>), Vec<&'a SemanticRule>>,
 }
 
-impl ScopeFactLowering<'_> {
+impl<'a> ScopeFactLowering<'a> {
+    /// Path/shape-filtered rules for one (context, parent path), memoized.
+    fn candidates_for(&mut self, context: &str, parent_path: &[String]) -> Vec<&'a SemanticRule> {
+        let key = (context.to_owned(), parent_path.to_vec());
+        self.transition_candidates
+            .entry(key)
+            .or_insert_with(|| transition_candidates(self.rules, context, parent_path))
+            .clone()
+    }
+
     fn lower_nested(
         &mut self,
         parent_index: usize,
@@ -177,10 +213,11 @@ impl ScopeFactLowering<'_> {
     ) {
         for &property_index in &self.property_children[parent_index] {
             let property = &self.properties[property_index];
+            let candidates = self.candidates_for(context, parent_path);
             let matching = scope_transition_rules(
                 self.rules,
+                &candidates,
                 context,
-                parent_path,
                 &property.key,
                 self.profile,
                 state,

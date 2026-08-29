@@ -38,7 +38,7 @@ fn vanilla_cache_preserves_scripted_macro_references_without_hir() {
             .is_some_and(|state| state.parsed().is_none() && state.hir().is_none())
     }));
     assert!(snapshot.index().references_iter().any(|reference| {
-        reference.kind == "scripted_effect" && reference.name == "cached_effect"
+        reference.kind.as_ref() == "scripted_effect" && reference.name.as_ref() == "cached_effect"
     }));
     let signature = snapshot
         .index()
@@ -67,7 +67,7 @@ fn vanilla_cache_preserves_scripted_macro_references_without_hir() {
     cache.save(&cache_path).expect("save cache");
     let loaded = IndexCache::load(&cache_path).expect("load cache");
     assert!(loaded.index().references_iter().any(|reference| {
-        reference.kind == "scripted_effect" && reference.name == "cached_effect"
+        reference.kind.as_ref() == "scripted_effect" && reference.name.as_ref() == "cached_effect"
     }));
     assert_eq!(
         loaded
@@ -204,7 +204,7 @@ fn refreshed_cache_reindexes_changed_files_and_drops_deleted_ones() {
     let definitions = reloaded
         .index()
         .definitions_iter()
-        .map(|definition| definition.name.as_str())
+        .map(|definition| &*definition.name)
         .collect::<Vec<_>>();
     assert!(
         definitions.contains(&"refresh.1b"),
@@ -649,7 +649,7 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
         "cached dependency files are never materialized"
     );
     assert!(snapshot.index().references_iter().any(|reference| {
-        reference.kind == "scripted_effect" && reference.name == "dep_cached_effect"
+        &*reference.kind == "scripted_effect" && &*reference.name == "dep_cached_effect"
     }));
     let macro_after_install = snapshot
         .index()
@@ -659,7 +659,7 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
     let kinds = snapshot
         .index()
         .references_iter()
-        .map(|reference| (reference.kind.as_str(), reference.name.as_str()))
+        .map(|reference| (&*reference.kind, &*reference.name))
         .collect::<Vec<_>>();
     assert!(
         kinds.contains(&("scripted_effect", "dep_cached_effect")),
