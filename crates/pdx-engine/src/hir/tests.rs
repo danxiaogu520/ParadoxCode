@@ -702,6 +702,30 @@ fn first_party_semantic_localisation_rules_produce_references_without_profile_sh
 }
 
 #[test]
+fn first_party_typed_values_produce_workspace_symbol_references() {
+    let rules = first_party_rules().expect("first-party rules");
+    let path = LogicalPath::parse("events/typed_reference.txt").expect("logical path");
+    let source = concat!(
+        "country_event = { id = declared.1 }\n",
+        "country_event = { id = caller.1 immediate = { ",
+        "country_event = { id = declared.1 } } }\n",
+    );
+    let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile());
+
+    let typed = hir
+        .references()
+        .iter()
+        .filter(|reference| reference.origin == HirReferenceOrigin::SemanticTyped)
+        .collect::<Vec<_>>();
+    assert_eq!(typed.len(), 1, "typed references: {typed:?}");
+    assert_eq!(typed[0].kind, "event");
+    assert_eq!(typed[0].name, "declared.1");
+    let reference_start =
+        u32::try_from(source.rfind("declared.1").expect("call id")).expect("reference offset");
+    assert_eq!(typed[0].range.start(), reference_start);
+}
+
+#[test]
 fn scope_facts_descend_through_dynamic_mission_blocks() {
     let rules = first_party_rules().expect("embedded rules");
     let path = LogicalPath::parse("missions/dynamic_scope_hir.txt").expect("logical path");

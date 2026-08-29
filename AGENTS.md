@@ -90,7 +90,7 @@ Layer responsibilities:
 | `pdx-analysis` | snapshot-oriented diagnostics/completion/hover/navigation/rename queries | direct disk reads, editor client |
 | `pdx-lsp` | lifecycle, capability negotiation, protocol conversion, cancellation, publish diagnostics, read-only `pdx/missionPreview` preview data | EU4 name tables, business queries, rule interpretation, layout semantics |
 | `editors/zed` | language metadata, queries, server fetch/verify/launch, config forwarding | symbol extraction, scope derivation, EU4 rule implementation or rule artifact distribution |
-| `editors/vscode` | language client, shared-config forwarding, mission-tree preview webview (renders server-provided geometry only) | symbol extraction, scope derivation, layout computation, EU4 rule implementation |
+| `editors/vscode` | language client, editor-local settings, mission-tree preview webview (renders server-provided geometry only) | symbol extraction, scope derivation, layout computation, EU4 rule implementation |
 
 `AnalysisHost` is the owner of mutable state; requests read immutable `AnalysisSnapshot` values and must not hold the host lock during queries. Background results must validate document version or snapshot identity before committing.
 
@@ -175,8 +175,9 @@ node scripts/diagnose-current-mod.mjs \
 The script drives the real `pdx-ls` stdio JSON-RPC server. It uses the embedded `rules/eu4` source,
 loads the supplied `.pdxindex`, and opens relevant `.txt`, `.gfx`, `.yml`, and `.yaml` files one at
 a time so the normal parser, HIR, resolution, and diagnostics pipeline is exercised. It can read
-`--project-config` and automatically use a configured `vanilla_index_cache`; external rule paths
-are not accepted. Reports are written as JSON and Markdown under the ignored `diagnostic-reports/`
+the user-level Vanilla cache configured by `pdx setup vanilla`; pass `--vanilla-cache` to override
+it. Editor settings are not read by the script, and external rule paths are not accepted. Reports
+are written as JSON and Markdown under the ignored `diagnostic-reports/`
 directory by default. The process exits `1` when the selected `--fail-on` threshold is met (`error`
 by default; `warning` or `none` are also supported). Do not commit generated reports; keep the
 diagnostic script tracked. Use `node scripts/diagnose-current-mod.mjs --help`

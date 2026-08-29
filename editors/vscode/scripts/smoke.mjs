@@ -10,7 +10,6 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { delimiter, dirname, join } from 'node:path';
-import { parse } from 'smol-toml';
 // The extension's PATH fallback must detect a missing `pdx-ls` before launch,
 // so the user gets an actionable warning instead of a bare spawn ENOENT. The
 // helper lives in the compiled `out/` tree (check runs compile first).
@@ -294,22 +293,6 @@ if (!workspaceFiles) {
   fail(`pdx/workspaceFiles failed: ${JSON.stringify(workspaceFiles.error)}`);
 } else if (!Array.isArray(workspaceFiles.result?.roots) || !Array.isArray(workspaceFiles.result?.files)) {
   fail('pdx/workspaceFiles must return roots and files arrays');
-}
-
-// The shared config TOML that both editors read must parse and yield the
-// `[server].binary`, and pdx-ls must tolerate the same file (server ignores
-// the `[server]` table it does not consume).
-const sharedConfig = `mod_directory = \"mod\"
-[[dependencies]]\nid = \"Chinese Language Mod for 1.37\"\npath = \"deps/han\"\n
-[server]\nbinary = \"C:/tools/pdx-ls.exe\"\n`;
-try {
-  const parsed = parse(sharedConfig);
-  const binary = parsed?.server?.binary;
-  if (binary !== 'C:/tools/pdx-ls.exe') {
-    fail('shared config [server].binary must parse');
-  }
-} catch (error) {
-  fail(`shared config failed to parse: ${String(error)}`);
 }
 
 const failures = process.exitCode === 1;

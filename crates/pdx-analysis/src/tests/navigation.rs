@@ -529,3 +529,77 @@ fn navigation_targets_the_name_in_an_indexed_definition() {
     );
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn navigation_targets_event_id_inside_event_call_block() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/event-call.txt");
+    let text = concat!(
+        "country_event = { id = declared.1 }\n",
+        "country_event = { id = caller.1 immediate = { ",
+        "country_event = { id = declared.1 } } }\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open event call");
+
+    let reference_start =
+        u32::try_from(text.rfind("declared.1").expect("call id")).expect("reference offset");
+    let definition_start =
+        u32::try_from(text.find("declared.1").expect("definition id")).expect("definition offset");
+    let locations = definition(&host.snapshot(), &id, reference_start + 1);
+    assert_eq!(locations.len(), 1, "event call definition: {locations:?}");
+    assert_eq!(
+        locations[0].range,
+        TextRange::new(definition_start, definition_start + 10).expect("definition range")
+    );
+}
+
+#[test]
+fn navigation_targets_event_id_in_an_indexed_definition_from_a_call_block() {
+    use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+    use std::fs;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-typed-event-index-{nonce}"));
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("create event directory");
+    let definition_text = "country_event = { id = indexed_call.1 }\n";
+    let definition_path = events.join("definitions.txt");
+    fs::write(&definition_path, definition_text).expect("write event definition");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan event definition");
+
+    let id = DocumentId::new("file:///tmp/events/use.txt");
+    let text = concat!(
+        "country_event = { id = caller.1 immediate = { ",
+        "country_event = { id = indexed_call.1 } } }\n",
+    );
+    let position = u32::try_from(text.find("indexed_call.1").expect("event call")).expect("offset");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open event call");
+
+    let location = definition(&host.snapshot(), &id, position)
+        .into_iter()
+        .next()
+        .expect("indexed event definition location");
+    let name_start = u32::try_from(
+        definition_text
+            .find("indexed_call.1")
+            .expect("definition name"),
+    )
+    .expect("offset");
+    assert_eq!(
+        location.range,
+        TextRange::new(name_start, name_start + 14).expect("definition name range")
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}

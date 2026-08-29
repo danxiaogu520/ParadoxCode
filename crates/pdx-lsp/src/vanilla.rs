@@ -7,6 +7,7 @@ use lsp_types::{
 };
 use pdx_engine::{
     AnalysisHost, IndexCache, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
+    WorkspaceScanLimits,
 };
 use pdx_game::{
     DiscoveryOptions, DiscoveryOutcome, UserConfiguration, UserPaths, discover_installations,
@@ -32,6 +33,7 @@ pub(crate) struct IndexCacheLoadRequest<'a> {
     pub(crate) auto_vanilla: Option<&'a AutoVanillaConfiguration>,
     pub(crate) log: Option<&'a (dyn Fn(&str) + Sync)>,
     pub(crate) progress: Option<&'a (dyn Fn(usize, usize) + Sync)>,
+    pub(crate) scan_limits: WorkspaceScanLimits,
     pub(crate) cancellation: &'a IndexSetupCancellation,
 }
 
@@ -42,6 +44,7 @@ struct VanillaIndexContext<'a> {
     discovery_options: &'a DiscoveryOptions,
     log: Option<&'a (dyn Fn(&str) + Sync)>,
     progress: Option<&'a (dyn Fn(usize, usize) + Sync)>,
+    scan_limits: WorkspaceScanLimits,
     cancellation: &'a IndexSetupCancellation,
 }
 
@@ -63,6 +66,7 @@ pub(crate) fn run_index_cache_load_with_options(
         auto_vanilla,
         log,
         progress,
+        scan_limits,
         cancellation,
     } = request;
     let context = VanillaIndexContext {
@@ -72,6 +76,7 @@ pub(crate) fn run_index_cache_load_with_options(
         discovery_options,
         log,
         progress,
+        scan_limits,
         cancellation,
     };
     let started = std::time::Instant::now();
@@ -268,7 +273,12 @@ fn build_cache_from_source(
     context: &VanillaIndexContext<'_>,
     activity: &str,
 ) -> Result<IndexCache, String> {
-    let mut host = cache_build_host(context.rules, context.profile, context.auto_vanilla);
+    let mut host = cache_build_host(
+        context.rules,
+        context.profile,
+        context.auto_vanilla,
+        context.scan_limits,
+    );
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(0),
         SourceRootKind::Vanilla,
@@ -338,8 +348,10 @@ fn cache_build_host(
     rules: &RuleSet,
     profile: &GameProfile,
     auto_vanilla: Option<&AutoVanillaConfiguration>,
+    scan_limits: WorkspaceScanLimits,
 ) -> AnalysisHost {
-    let host = AnalysisHost::with_profile(rules.clone(), profile.clone());
+    let mut host = AnalysisHost::with_profile(rules.clone(), profile.clone());
+    host.set_scan_limits(scan_limits);
     let Some(auto_vanilla) = auto_vanilla else {
         return host;
     };
@@ -458,25 +470,7 @@ pub(crate) fn apply_user_vanilla_configuration(
     }
 }
 
-pub(crate) fn run_auto_vanilla_setup(
-    auto_vanilla: &AutoVanillaConfiguration,
-    rules: RuleSet,
-    profile: GameProfile,
-    log: Option<&(dyn Fn(&str) + Sync)>,
-    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
-    cancellation: &IndexSetupCancellation,
-) -> Result<(IndexCache, String), String> {
-    run_auto_vanilla_setup_with_options(
-        auto_vanilla,
-        rules,
-        profile,
-        log,
-        progress,
-        cancellation,
-        &DiscoveryOptions::default(),
-    )
-}
-
+#[cfg(test)]
 pub(crate) fn run_auto_vanilla_setup_with_options(
     auto_vanilla: &AutoVanillaConfiguration,
     rules: RuleSet,
@@ -485,6 +479,32 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &IndexSetupCancellation,
     discovery_options: &DiscoveryOptions,
+) -> Result<(IndexCache, String), String> {
+    run_auto_vanilla_setup_with_options_and_limits(
+        auto_vanilla,
+        rules,
+        profile,
+        log,
+        progress,
+        cancellation,
+        discovery_options,
+        WorkspaceScanLimits::default(),
+    )
+}
+
+/// Variant used by the language-server event loop so cache builds honor the same bounded scan
+/// profile as the live workspace. The compatibility wrapper above keeps CLI/test callers on the
+/// historical default profile.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn run_auto_vanilla_setup_with_options_and_limits(
+    auto_vanilla: &AutoVanillaConfiguration,
+    rules: RuleSet,
+    profile: GameProfile,
+    log: Option<&(dyn Fn(&str) + Sync)>,
+    progress: Option<&(dyn Fn(usize, usize) + Sync)>,
+    cancellation: &IndexSetupCancellation,
+    discovery_options: &DiscoveryOptions,
+    scan_limits: WorkspaceScanLimits,
 ) -> Result<(IndexCache, String), String> {
     let started = std::time::Instant::now();
     let result = (|| {
@@ -589,7 +609,7 @@ pub(crate) fn run_auto_vanilla_setup_with_options(
             ));
         }
 
-        let mut host = cache_build_host(&rules, &profile, Some(auto_vanilla));
+        let mut host = cache_build_host(&rules, &profile, Some(auto_vanilla), scan_limits);
         host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
             SourceRootId::new(0),
             SourceRootKind::Vanilla,

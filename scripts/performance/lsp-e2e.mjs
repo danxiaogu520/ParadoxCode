@@ -41,7 +41,6 @@ Options:
   --document FILE            document to open (relative to workspace or absolute)
   --cache FILE               Vanilla cache (overrides user config)
   --no-cache                 explicitly disable Vanilla cache loading
-  --project-config FILE      optional .pdx/project.toml passed in initializationOptions
   --line N                   zero-based query line (default: fixture's id value)
   --character N              zero-based UTF-16 query character
   --timeout-ms N             request timeout (default: ${DEFAULT_TIMEOUT_MS})
@@ -50,7 +49,7 @@ Options:
   --help                      show this help
 
 Environment equivalents: PDX_PERF_SERVER, PDX_PERF_WORKSPACE, PDX_PERF_DOCUMENT,
-PDX_PERF_CACHE, PDX_PERF_PROJECT_CONFIG, PDX_PERF_LINE, PDX_PERF_CHARACTER,
+PDX_PERF_CACHE, PDX_PERF_LINE, PDX_PERF_CHARACTER,
 PDX_PERF_TIMEOUT_MS, PDX_PERF_MEMORY_INTERVAL_MS.
 `;
 
@@ -92,7 +91,6 @@ function parseArguments(argv) {
     workspace: undefined,
     document: undefined,
     cache: undefined,
-    projectConfig: undefined,
     line: undefined,
     character: undefined,
     timeoutMs: DEFAULT_TIMEOUT_MS,
@@ -126,7 +124,6 @@ function parseArguments(argv) {
         '--workspace',
         '--document',
         '--cache',
-        '--project-config',
         '--line',
         '--character',
         '--timeout-ms',
@@ -153,9 +150,6 @@ function parseArguments(argv) {
         }
         options.cache = value;
         break;
-      case '--project-config':
-        options.projectConfig = value;
-        break;
       case '--line':
         options.line = parseNonNegativeInteger(value, '--line');
         break;
@@ -181,7 +175,6 @@ function applyEnvironment(options) {
     workspace: envValue('PDX_PERF_WORKSPACE'),
     document: envValue('PDX_PERF_DOCUMENT'),
     cache: envValue('PDX_PERF_CACHE'),
-    projectConfig: envValue('PDX_PERF_PROJECT_CONFIG'),
   };
   for (const [key, value] of Object.entries(fromEnvironment)) {
     if (options[key] === undefined && value !== undefined) options[key] = value;
@@ -552,15 +545,9 @@ async function runMeasurement(options, workspace) {
     REPOSITORY_ROOT,
   );
   requireFile(serverPath, 'pdx-ls executable');
-  const projectConfig = options.projectConfig
-    ? inputPath(options.projectConfig, workspace.root)
-    : undefined;
-  if (projectConfig) requireFile(projectConfig, 'project config');
-
   const initializationOptions = {};
   if (cache) initializationOptions.vanillaIndexCache = cache;
   else initializationOptions.vanillaIndexCache = join(tmpdir(), NO_CACHE_NAME);
-  if (projectConfig) initializationOptions.projectConfig = projectConfig;
 
   const inferredPosition = defaultQueryPosition(workspace.text);
   const position = {

@@ -290,6 +290,8 @@ impl LspServer {
                                     self.ignored_diagnostic_codes = Arc::new(
                                         prepared.ignored_diagnostic_codes.iter().cloned().collect(),
                                     );
+                                    self.diagnostic_severity_overrides =
+                                        Arc::new(prepared.diagnostic_severity_overrides.clone());
                                     self.workspace_wide_diagnostics =
                                         prepared.workspace_wide_diagnostics;
                                     self.last_activity = Instant::now();
@@ -359,6 +361,7 @@ impl LspServer {
                             let worker_cancellation = cancellation.clone();
                             let rules = self.host.snapshot().rules().clone();
                             let profile = self.host.snapshot().game_profile().clone();
+                            let scan_limits = self.host.snapshot().scan_limits();
                             let current_rule_hash = rules.rule_hash().to_hex();
                             let progress_token = format!("pdx-vanilla-{}", progress_nonce());
                             let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
@@ -422,6 +425,7 @@ impl LspServer {
                                     progress: progress
                                         .as_deref()
                                         .map(|callback| callback as &(dyn Fn(usize, usize) + Sync)),
+                                    scan_limits,
                                     cancellation: &worker_cancellation,
                                 });
                                 let _ =
@@ -442,6 +446,7 @@ impl LspServer {
                             let sender = event_sender.clone();
                             let rules = self.host.snapshot().rules().clone();
                             let profile = self.host.snapshot().game_profile().clone();
+                            let scan_limits = self.host.snapshot().scan_limits();
                             let worker_cancellation = cancellation.clone();
                             let progress_token = format!("pdx-vanilla-{}", progress_nonce());
                             let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
@@ -492,16 +497,19 @@ impl LspServer {
                             };
                             scope.spawn(move || {
                                 let log_ref: &(dyn Fn(&str) + Sync) = &log;
-                                let result = run_auto_vanilla_setup(
-                                    &configuration,
-                                    rules,
-                                    profile,
-                                    Some(log_ref),
-                                    progress
-                                        .as_deref()
-                                        .map(|callback| callback as &(dyn Fn(usize, usize) + Sync)),
-                                    &worker_cancellation,
-                                );
+                                let result =
+                                    crate::vanilla::run_auto_vanilla_setup_with_options_and_limits(
+                                        &configuration,
+                                        rules,
+                                        profile,
+                                        Some(log_ref),
+                                        progress.as_deref().map(|callback| {
+                                            callback as &(dyn Fn(usize, usize) + Sync)
+                                        }),
+                                        &worker_cancellation,
+                                        &pdx_game::DiscoveryOptions::default(),
+                                        scan_limits,
+                                    );
                                 let _ =
                                     sender.send(TransportEvent::VanillaSetup(IndexSetupResult {
                                         result,
@@ -533,6 +541,7 @@ impl LspServer {
                             let worker_cancellation = cancellation.clone();
                             let rules = self.host.snapshot().rules().clone();
                             let profile = self.host.snapshot().game_profile().clone();
+                            let scan_limits = self.host.snapshot().scan_limits();
                             let current_rule_hash = rules.rule_hash().to_hex();
                             let progress_token = format!("pdx-dependency-{}", progress_nonce());
                             let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
@@ -587,6 +596,7 @@ impl LspServer {
                                     rules,
                                     profile,
                                     current_rule_hash,
+                                    scan_limits,
                                     Some(&log),
                                     progress
                                         .as_deref()

@@ -591,7 +591,7 @@ pub struct GameUserConfiguration {
     pub vanilla_cache: Option<PathBuf>,
 }
 
-/// Versioned user-level configuration shared by editors and projects.
+/// Versioned user-level configuration for local discovery and cache state.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct UserConfiguration {
@@ -654,7 +654,7 @@ impl UserConfiguration {
     }
 }
 
-/// Platform-appropriate shared configuration and cache locations.
+/// Platform-appropriate user-level configuration and cache locations.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UserPaths {
     /// User configuration file.

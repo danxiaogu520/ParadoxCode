@@ -227,9 +227,11 @@ pub(crate) fn load_source_files(
     context: &SourceLoadContext<'_>,
 ) -> Result<(), WorkspaceError> {
     let total = jobs.len();
+    let configured_workers = context.limits.max_workers.clamp(1, MAX_SOURCE_WORKERS);
     let worker_count = thread::available_parallelism()
         .map_or(1, |parallelism| parallelism.get())
         .min(MAX_SOURCE_WORKERS)
+        .min(configured_workers)
         .min(jobs.len());
     let results = if jobs.len() < PARALLEL_SOURCE_THRESHOLD || worker_count < 2 {
         let mut results = Vec::with_capacity(jobs.len());

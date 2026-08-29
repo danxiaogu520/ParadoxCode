@@ -39,7 +39,6 @@
   "activationEvents": [
     "onLanguage:eu4",
     "onLanguage:localisation",
-    "workspaceContains:.pdx/project.toml",
     "workspaceContains:**/common/achievements.txt",
     "workspaceContains:**/common/alerts.txt",
     "workspaceContains:**/common/graphicalculturetype.txt",
@@ -486,33 +485,89 @@
       {
         "language": "eu4",
         "scopes": {
-          "comment": ["comment", "comment.line.number-sign"],
-          "string": ["string", "string.unquoted"],
-          "number": ["constant.numeric"],
-          "boolean": ["constant.language.boolean"],
-          "operator": ["keyword.operator"],
-          "property": ["variable.other.property"],
-          "function": ["support.function", "entity.name.function"],
-          "keyword": ["keyword.control", "keyword"],
-          "type": ["entity.name.type"],
-          "variable": ["variable", "variable.other.definition"],
-          "parameter": ["variable.parameter", "variable"]
+          "comment": [
+            "comment",
+            "comment.line.number-sign"
+          ],
+          "string": [
+            "string",
+            "string.unquoted"
+          ],
+          "number": [
+            "constant.numeric"
+          ],
+          "boolean": [
+            "constant.language.boolean"
+          ],
+          "operator": [
+            "keyword.operator"
+          ],
+          "property": [
+            "variable.other.property"
+          ],
+          "function": [
+            "support.function",
+            "entity.name.function"
+          ],
+          "keyword": [
+            "keyword.control",
+            "keyword"
+          ],
+          "type": [
+            "entity.name.type"
+          ],
+          "variable": [
+            "variable",
+            "variable.other.definition"
+          ],
+          "parameter": [
+            "variable.parameter",
+            "variable"
+          ]
         }
       },
       {
         "language": "localisation",
         "scopes": {
-          "comment": ["comment", "comment.line.number-sign"],
-          "string": ["string", "string.quoted"],
-          "number": ["constant.numeric"],
-          "boolean": ["constant.language.boolean"],
-          "operator": ["keyword.operator"],
-          "property": ["variable.other.property"],
-          "function": ["support.function", "entity.name.function"],
-          "keyword": ["keyword.control", "keyword"],
-          "type": ["entity.name.type"],
-          "variable": ["variable", "variable.other.definition"],
-          "parameter": ["variable.parameter", "variable"]
+          "comment": [
+            "comment",
+            "comment.line.number-sign"
+          ],
+          "string": [
+            "string",
+            "string.quoted"
+          ],
+          "number": [
+            "constant.numeric"
+          ],
+          "boolean": [
+            "constant.language.boolean"
+          ],
+          "operator": [
+            "keyword.operator"
+          ],
+          "property": [
+            "variable.other.property"
+          ],
+          "function": [
+            "support.function",
+            "entity.name.function"
+          ],
+          "keyword": [
+            "keyword.control",
+            "keyword"
+          ],
+          "type": [
+            "entity.name.type"
+          ],
+          "variable": [
+            "variable",
+            "variable.other.definition"
+          ],
+          "parameter": [
+            "variable.parameter",
+            "variable"
+          ]
         }
       }
     ],
@@ -542,6 +597,21 @@
       {
         "command": "paradoxcode.selectGameDirectory",
         "title": "%commands.selectGameDirectory.title%",
+        "category": "ParadoxCode"
+      },
+      {
+        "command": "paradoxcode.addDependency",
+        "title": "%commands.addDependency.title%",
+        "category": "ParadoxCode"
+      },
+      {
+        "command": "paradoxcode.removeDependency",
+        "title": "%commands.removeDependency.title%",
+        "category": "ParadoxCode"
+      },
+      {
+        "command": "paradoxcode.openDependencySettings",
+        "title": "%commands.openDependencySettings.title%",
         "category": "ParadoxCode"
       },
       {
@@ -601,11 +671,6 @@
           "scope": "machine",
           "markdownDescription": "%configuration.serverInstallDirectory.description%"
         },
-        "paradoxcode.projectConfig": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "%configuration.projectConfig.description%"
-        },
         "paradoxcode.modDirectory": {
           "type": "string",
           "default": "",
@@ -622,11 +687,20 @@
           "markdownDescription": "%configuration.dependencies.description%",
           "items": {
             "type": "object",
-            "required": ["id", "path"],
+            "required": [
+              "id",
+              "path"
+            ],
             "properties": {
-              "id": { "type": "string" },
-              "path": { "type": "string" },
-              "index": { "type": "string" }
+              "id": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "index": {
+                "type": "string"
+              }
             }
           }
         },
@@ -635,15 +709,54 @@
           "default": "",
           "markdownDescription": "%configuration.gameDirectory.description%"
         },
+        "paradoxcode.workspaceWideDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%configuration.workspaceWideDiagnostics.description%"
+        },
+        "paradoxcode.backgroundReindexIntervalMinutes": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10080,
+          "default": 0,
+          "markdownDescription": "%configuration.backgroundReindexIntervalMinutes.description%"
+        },
+        "paradoxcode.backgroundReindexIdleSeconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 86400,
+          "default": 15,
+          "markdownDescription": "%configuration.backgroundReindexIdleSeconds.description%"
+        },
+        "paradoxcode.ignoreFilePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "%configuration.ignoreFilePatterns.description%"
+        },
+        "paradoxcode.ignoreDirectories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "%configuration.ignoreDirectories.description%"
+        },
         "paradoxcode.diagnosticIgnoreCodes": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "markdownDescription": "%configuration.diagnosticIgnoreCodes.description%"
         },
         "paradoxcode.diagnosticIgnoreFiles": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "markdownDescription": "%configuration.diagnosticIgnoreFiles.description%"
         },
@@ -651,6 +764,92 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "%configuration.diagnosticLogging.description%"
+        },
+        "paradoxcode.server.installPolicy": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "prompt",
+            "never"
+          ],
+          "enumDescriptions": [
+            "%configuration.server.installPolicy.auto.description%",
+            "%configuration.server.installPolicy.prompt.description%",
+            "%configuration.server.installPolicy.never.description%"
+          ],
+          "default": "auto",
+          "markdownDescription": "%configuration.server.installPolicy.description%"
+        },
+        "paradoxcode.vanilla.mode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "cacheOnly",
+            "disabled"
+          ],
+          "enumDescriptions": [
+            "%configuration.vanilla.mode.auto.description%",
+            "%configuration.vanilla.mode.cacheOnly.description%",
+            "%configuration.vanilla.mode.disabled.description%"
+          ],
+          "default": "auto",
+          "markdownDescription": "%configuration.vanilla.mode.description%"
+        },
+        "paradoxcode.diagnostics.severityOverrides": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "error",
+              "warning",
+              "info",
+              "hint",
+              "off"
+            ]
+          },
+          "markdownDescription": "%configuration.diagnostics.severityOverrides.description%"
+        },
+        "paradoxcode.localisation.preferredLanguages": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_]+$"
+          },
+          "default": [],
+          "markdownDescription": "%configuration.localisation.preferredLanguages.description%"
+        },
+        "paradoxcode.completion.sourceLayers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "currentMod",
+              "dependencies",
+              "vanilla"
+            ]
+          },
+          "default": [
+            "currentMod",
+            "dependencies",
+            "vanilla"
+          ],
+          "markdownDescription": "%configuration.completion.sourceLayers.description%"
+        },
+        "paradoxcode.performance.profile": {
+          "type": "string",
+          "enum": [
+            "balanced",
+            "conservative",
+            "fast"
+          ],
+          "enumDescriptions": [
+            "%configuration.performance.profile.balanced.description%",
+            "%configuration.performance.profile.conservative.description%",
+            "%configuration.performance.profile.fast.description%"
+          ],
+          "default": "balanced",
+          "markdownDescription": "%configuration.performance.profile.description%"
         },
         "paradoxcode.preview.zoomSensitivity": {
           "type": "number",
@@ -663,6 +862,41 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "%configuration.preview.showTextures.description%"
+        },
+        "paradoxcode.preview.refreshMode": {
+          "type": "string",
+          "enum": [
+            "always",
+            "onSave",
+            "manual"
+          ],
+          "enumDescriptions": [
+            "%configuration.preview.refreshMode.always.description%",
+            "%configuration.preview.refreshMode.onSave.description%",
+            "%configuration.preview.refreshMode.manual.description%"
+          ],
+          "default": "always",
+          "markdownDescription": "%configuration.preview.refreshMode.description%"
+        },
+        "paradoxcode.preview.persistViewport": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "%configuration.preview.persistViewport.description%"
+        },
+        "paradoxcode.preview.showExternalPrerequisites": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%configuration.preview.showExternalPrerequisites.description%"
+        },
+        "paradoxcode.preview.showDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%configuration.preview.showDiagnostics.description%"
+        },
+        "paradoxcode.preview.defaultExportDirectory": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "%configuration.preview.defaultExportDirectory.description%"
         }
       }
     }
@@ -679,16 +913,15 @@
     "package": "npm run compile && vsce package"
   },
   "dependencies": {
-    "smol-toml": "^1.4.0",
     "vscode-languageclient": "^10.1.0"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
     "@types/vscode": "1.134.0",
     "@vscode/test-electron": "^3.1.0",
-    "typescript": "^7.0.2",
+    "@vscode/vsce": "^3.2.2",
     "mocha": "^11.8.0",
-    "@vscode/vsce": "^3.2.2"
+    "typescript": "^7.0.2"
   },
   "files": [
     "out/**",

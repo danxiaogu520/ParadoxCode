@@ -11,7 +11,8 @@ use pdx_text::{LogicalPath, TextRange};
 use crate::index::{LocalisationPreviewMap, WorkspaceIndex};
 use crate::model::{
     DocumentId, DocumentSnapshot, DocumentSource, FileState, LocalisationPreview, PreparedDocument,
-    ResolvedCandidate, SourceFile, SourceFileId, SourceRoot, WorkspaceScanReport,
+    ResolvedCandidate, SourceFile, SourceFileId, SourceRoot, SourceRootKind, WorkspaceScanLimits,
+    WorkspaceScanReport,
 };
 use crate::pipeline::prepare_document_snapshot;
 use crate::query_cache::SnapshotQueryCache;
@@ -33,6 +34,9 @@ pub struct AnalysisSnapshot {
     pub(crate) scan_report: Arc<WorkspaceScanReport>,
     pub(crate) localisation_previews: Arc<LocalisationPreviewMap>,
     pub(crate) query_cache: Arc<SnapshotQueryCache>,
+    pub(crate) scan_limits: WorkspaceScanLimits,
+    pub(crate) preferred_localisation_languages: Arc<[String]>,
+    pub(crate) completion_source_layers: Arc<[SourceRootKind]>,
 }
 
 impl AnalysisSnapshot {
@@ -217,6 +221,31 @@ impl AnalysisSnapshot {
     #[must_use]
     pub fn query_cache(&self) -> &SnapshotQueryCache {
         &self.query_cache
+    }
+
+    /// Returns the bounded scan profile selected by the workspace configuration.
+    #[must_use]
+    pub const fn scan_limits(&self) -> WorkspaceScanLimits {
+        self.scan_limits
+    }
+
+    /// Returns the preferred localisation language order. An empty list means the analysis
+    /// default (English when available).
+    #[must_use]
+    pub fn preferred_localisation_languages(&self) -> &[String] {
+        &self.preferred_localisation_languages
+    }
+
+    /// Returns the source layers eligible to contribute workspace completion members.
+    #[must_use]
+    pub fn completion_source_layers(&self) -> &[SourceRootKind] {
+        &self.completion_source_layers
+    }
+
+    /// Returns whether one indexed source-root kind is enabled for completion members.
+    #[must_use]
+    pub fn completion_source_layer_enabled(&self, kind: SourceRootKind) -> bool {
+        self.completion_source_layers.contains(&kind)
     }
 
     /// Returns a cached localisation preview without reading the source file.

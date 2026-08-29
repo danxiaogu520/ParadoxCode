@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use lsp_types::{
@@ -33,9 +33,10 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::protocol::{
-    RpcError, cancelled_error, completion_kind, diagnostic_values_for_text_with_ignored,
-    location_range_to_lsp, location_to_lsp, range_to_lsp, range_to_lsp_for_location,
-    rename_failure, symbol_kind, typed_params, typed_value,
+    RpcError, cancelled_error, completion_kind,
+    diagnostic_values_for_text_with_ignored_and_overrides, location_range_to_lsp, location_to_lsp,
+    range_to_lsp, range_to_lsp_for_location, rename_failure, symbol_kind, typed_params,
+    typed_value,
 };
 use crate::server::SemanticTokensCache;
 use crate::text::lsp_range_to_text_range;
@@ -132,6 +133,8 @@ pub(crate) struct SnapshotRequestContext {
     textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
     /// Diagnostic categories hidden by workspace configuration.
     ignored_diagnostic_codes: Arc<HashSet<String>>,
+    /// Per-category severity remapping applied before diagnostic publication.
+    diagnostic_severity_overrides: Arc<BTreeMap<String, Option<pdx_analysis::Severity>>>,
     /// Shared bounded cache for semantic-token full/delta responses.
     semantic_tokens_cache: Arc<SemanticTokensCache>,
 }
@@ -143,6 +146,7 @@ impl SnapshotRequestContext {
         client_snippets: bool,
         textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
         ignored_diagnostic_codes: Arc<HashSet<String>>,
+        diagnostic_severity_overrides: Arc<BTreeMap<String, Option<pdx_analysis::Severity>>>,
         semantic_tokens_cache: Arc<SemanticTokensCache>,
     ) -> Self {
         Self {
@@ -151,6 +155,7 @@ impl SnapshotRequestContext {
             client_snippets,
             textures,
             ignored_diagnostic_codes,
+            diagnostic_severity_overrides,
             semantic_tokens_cache,
         }
     }
@@ -228,11 +233,12 @@ impl SnapshotRequestContext {
             let line_index = LineIndex::new(&file.text);
             results.push(serde_json::json!({
                 "path": file.path,
-                "diagnostics": diagnostic_values_for_text_with_ignored(
+                "diagnostics": diagnostic_values_for_text_with_ignored_and_overrides(
                     diagnostics,
                     &line_index,
                     &file.text,
                     &self.ignored_diagnostic_codes,
+                    &self.diagnostic_severity_overrides,
                 ),
             }));
         }
@@ -272,7 +278,7 @@ impl SnapshotRequestContext {
         let line_index = LineIndex::new(&params.text);
 
         // Resolve all `{mission_id}_title` keys in one workspace pass with the
-        // same English-preferring symbol resolution as hover; missing keys
+        // same configured language preference as hover; missing keys
         // simply fall back to the raw id in the renderer.
         // Different nodes can produce the same localisation key (and malformed
         // files may repeat ids). Deduplicating here avoids resolving the same
@@ -571,11 +577,12 @@ impl SnapshotRequestContext {
                 items.push(serde_json::json!({
                     "uri": path_to_uri(&file.physical_path),
                     "logicalPath": file.logical_path.as_str(),
-                    "diagnostics": diagnostic_values_for_text_with_ignored(
+                    "diagnostics": diagnostic_values_for_text_with_ignored_and_overrides(
                         diagnostics,
                         &line_index,
                         state.source(),
                         &self.ignored_diagnostic_codes,
+                        &self.diagnostic_severity_overrides,
                     ),
                 }));
             }

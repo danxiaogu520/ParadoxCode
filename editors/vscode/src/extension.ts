@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import {
     LanguageClient,
     LanguageClientOptions,
@@ -14,7 +15,6 @@ import {
     attachFollowupCompletionTrigger,
     FOLLOWUP_COMPLETION_TRIGGER_COMMAND,
 } from './completionMiddleware';
-import { readSharedConfig } from './sharedConfig';
 import { findExecutableOnPath } from './serverPath';
 import {
     DEFAULT_SERVER_REPOSITORY,
@@ -27,14 +27,32 @@ const EU4_LANGUAGE_ID = 'eu4';
 const LOCALISATION_LANGUAGE_ID = 'localisation';
 const SERVER_SETTING_KEYS = [
     'pdxLsPath',
-    'projectConfig',
     'modDirectory',
     'vanillaIndexCache',
     'dependencies',
     'gameDirectory',
+    'workspaceWideDiagnostics',
+    'backgroundReindexIntervalMinutes',
+    'backgroundReindexIdleSeconds',
+    'ignoreFilePatterns',
+    'ignoreDirectories',
     'diagnosticIgnoreCodes',
+    'vanilla.mode',
+    'diagnostics.severityOverrides',
+    'localisation.preferredLanguages',
+    'completion.sourceLayers',
+    'performance.profile',
+    'server.installPolicy',
     'serverInstallDirectory',
 ] as const;
+
+interface DependencySetting {
+    id: string;
+    path: string;
+    index?: string;
+}
+
+const DEPENDENCY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
 
 /** Visible diagnostic trail: activation, binary resolution, server start. */
 const log = vscode.window.createOutputChannel('ParadoxCode');
@@ -120,27 +138,319 @@ function updateVanillaContext(message: string): void {
     }
 }
 
-/** Maps `paradoxcode.*` settings onto the shared LSP initialization options contract. */
+/** Maps VS Code's `paradoxcode.*` settings onto pdx-ls initialization options. */
 function readInitializationOptions(): Record<string, unknown> {
     const config = vscode.workspace.getConfiguration('paradoxcode');
     const options: Record<string, unknown> = {};
     for (const key of [
-        'projectConfig',
         'modDirectory',
         'vanillaIndexCache',
         'dependencies',
         'gameDirectory',
     ] as const) {
         const value = config.get<unknown>(key);
-        if (value !== undefined && value !== '') {
+        if (
+            value !== undefined
+            && value !== ''
+            && (key !== 'dependencies' || isConfigurationExplicitlySet(config, key))
+        ) {
             options[key] = value;
         }
     }
     const ignoredCodes = config.get<unknown>('diagnosticIgnoreCodes');
-    if (Array.isArray(ignoredCodes) && ignoredCodes.length > 0) {
+    if (
+        Array.isArray(ignoredCodes)
+        && (ignoredCodes.length > 0 || isConfigurationExplicitlySet(config, 'diagnosticIgnoreCodes'))
+    ) {
         options.ignoredErrorCodes = ignoredCodes;
     }
+    const mappedSettings: ReadonlyArray<readonly [string, string]> = [
+        ['workspaceWideDiagnostics', 'workspaceWideDiagnostics'],
+        ['backgroundReindexIntervalMinutes', 'backgroundReindexIntervalMinutes'],
+        ['backgroundReindexIdleSeconds', 'backgroundReindexIdleSeconds'],
+        ['ignoreFilePatterns', 'ignoreFilePatterns'],
+        ['ignoreDirectories', 'ignoreDirectories'],
+        ['vanilla.mode', 'vanillaMode'],
+        ['diagnostics.severityOverrides', 'diagnosticSeverityOverrides'],
+        ['localisation.preferredLanguages', 'preferredLocalisationLanguages'],
+        ['completion.sourceLayers', 'completionSourceLayers'],
+        ['performance.profile', 'performanceProfile'],
+    ];
+    for (const [setting, wireKey] of mappedSettings) {
+        const value = config.get<unknown>(setting);
+        const inspection = config.inspect<unknown>(setting);
+        const explicitlyConfigured = inspection !== undefined && [
+            inspection.globalValue,
+            inspection.workspaceValue,
+            inspection.workspaceFolderValue,
+            inspection.globalLanguageValue,
+            inspection.workspaceLanguageValue,
+            inspection.workspaceFolderLanguageValue,
+        ].some((candidate) => candidate !== undefined);
+        if (explicitlyConfigured && value !== undefined) {
+            options[wireKey] = value;
+        }
+    }
     return options;
+}
+
+function isConfigurationExplicitlySet(
+    config: vscode.WorkspaceConfiguration,
+    key: string,
+): boolean {
+    const inspection = config.inspect<unknown>(key);
+    return inspection !== undefined && [
+        inspection.globalValue,
+        inspection.workspaceValue,
+        inspection.workspaceFolderValue,
+        inspection.globalLanguageValue,
+        inspection.workspaceLanguageValue,
+        inspection.workspaceFolderLanguageValue,
+    ].some((candidate) => candidate !== undefined);
+}
+
+function dependencySettings(): DependencySetting[] {
+    const raw = vscode.workspace
+        .getConfiguration('paradoxcode')
+        .get<unknown>('dependencies', []);
+    if (!Array.isArray(raw)) {
+        throw new Error('paradoxcode.dependencies must be an array');
+    }
+    const dependencies: DependencySetting[] = [];
+    for (const [index, value] of raw.entries()) {
+        if (
+            typeof value !== 'object'
+            || value === null
+            || typeof (value as { id?: unknown }).id !== 'string'
+            || typeof (value as { path?: unknown }).path !== 'string'
+        ) {
+            throw new Error(`paradoxcode.dependencies[${index}] must contain string id and path`);
+        }
+        const id = (value as { id: string }).id.trim();
+        const dependencyPath = (value as { path: string }).path.trim();
+        const configuredIndex = (value as { index?: unknown }).index;
+        if (!id || !dependencyPath) {
+            throw new Error(`paradoxcode.dependencies[${index}] must contain non-empty id and path`);
+        }
+        if (!DEPENDENCY_ID_PATTERN.test(id)) {
+            throw new Error(`paradoxcode.dependencies[${index}] has invalid id "${id}"`);
+        }
+        if (configuredIndex !== undefined && typeof configuredIndex !== 'string') {
+            throw new Error(`paradoxcode.dependencies[${index}].index must be a string`);
+        }
+        const entry: DependencySetting = { id, path: dependencyPath };
+        if (typeof configuredIndex === 'string' && configuredIndex.trim()) {
+            entry.index = configuredIndex.trim();
+        }
+        dependencies.push(entry);
+    }
+    return dependencies;
+}
+
+function portableWorkspacePath(workspaceRoot: string, filePath: string): string {
+    const relative = path.relative(workspaceRoot, filePath);
+    if (!relative) {
+        return '.';
+    }
+    // A different Windows drive cannot be represented as a relative path. Keep the absolute
+    // path in that case; same-drive paths remain portable across machines with the workspace.
+    return path.isAbsolute(relative) ? filePath : relative.split(path.sep).join('/');
+}
+
+function suggestedDependencyId(filePath: string): string {
+    const suggested = path.basename(filePath)
+        .replace(/[^A-Za-z0-9_.-]+/g, '-')
+        .replace(/^[.-]+|[.-]+$/g, '');
+    return suggested || 'dependency';
+}
+
+function workspaceConfigurationTarget(): vscode.WorkspaceFolder | undefined {
+    return vscode.workspace.workspaceFolders?.[0];
+}
+
+async function openDependencySettings(): Promise<void> {
+    await vscode.commands.executeCommand(
+        'workbench.action.openSettings',
+        '@id:paradoxcode.dependencies',
+    );
+}
+
+async function addDependency(): Promise<void> {
+    const workspaceFolder = workspaceConfigurationTarget();
+    if (!workspaceFolder) {
+        void vscode.window.showWarningMessage(
+            'ParadoxCode: open a workspace before adding a dependency.',
+        );
+        return;
+    }
+    const selected = await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        openLabel: 'Use Dependency Mod',
+        title: 'Choose a dependency Mod directory',
+    });
+    if (!selected?.[0]) {
+        return;
+    }
+    try {
+        const stat = await vscode.workspace.fs.stat(selected[0]);
+        if ((stat.type & vscode.FileType.Directory) === 0) {
+            void vscode.window.showErrorMessage('ParadoxCode: the dependency path must be a directory.');
+            return;
+        }
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        void vscode.window.showErrorMessage(`ParadoxCode: could not read dependency directory: ${message}`);
+        return;
+    }
+
+    let dependencies: DependencySetting[];
+    try {
+        dependencies = dependencySettings();
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        void vscode.window.showErrorMessage(`ParadoxCode: ${message}`);
+        return;
+    }
+    const id = await vscode.window.showInputBox({
+        title: 'Name the dependency',
+        prompt: 'Use a stable id; dependencies are ordered from lowest to highest priority.',
+        value: suggestedDependencyId(selected[0].fsPath),
+        validateInput: (value) => {
+            const normalized = value.trim();
+            if (!normalized) {
+                return 'Dependency id must not be empty.';
+            }
+            if (!DEPENDENCY_ID_PATTERN.test(normalized)) {
+                return 'Use letters, numbers, dots, hyphens, or underscores.';
+            }
+            if (dependencies.some((dependency) => dependency.id.toLowerCase() === normalized.toLowerCase())) {
+                return `A dependency named ${normalized} already exists.`;
+            }
+            return undefined;
+        },
+    });
+    if (!id) {
+        return;
+    }
+
+    const cacheChoice = await vscode.window.showQuickPick([
+        {
+            label: 'Live scan',
+            description: 'Scan this dependency when the language server starts.',
+            value: 'live',
+        },
+        {
+            label: 'Persistent index cache',
+            description: 'Load/build a .pdxindex instead of scanning on every launch.',
+            value: 'index',
+        },
+    ], {
+        title: 'How should ParadoxCode load this dependency?',
+        placeHolder: 'Choose a loading strategy',
+    });
+    if (!cacheChoice) {
+        return;
+    }
+
+    const workspaceRoot = workspaceFolder.uri.fsPath;
+    const entry: DependencySetting = {
+        id: id.trim(),
+        path: portableWorkspacePath(workspaceRoot, selected[0].fsPath),
+    };
+    if (cacheChoice.value === 'index') {
+        const defaultIndex = vscode.Uri.file(
+            path.join(workspaceRoot, '.pdx', 'indexes', `${entry.id}.pdxindex`),
+        );
+        const index = await vscode.window.showSaveDialog({
+            defaultUri: defaultIndex,
+            filters: { 'ParadoxCode index': ['pdxindex'] },
+            saveLabel: 'Use Index Path',
+            title: 'Choose the dependency index cache path',
+        });
+        if (!index) {
+            return;
+        }
+        entry.index = portableWorkspacePath(workspaceRoot, index.fsPath);
+    }
+
+    dependencies.push(entry);
+    try {
+        await vscode.workspace.getConfiguration('paradoxcode').update(
+            'dependencies',
+            dependencies,
+            vscode.ConfigurationTarget.Workspace,
+        );
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        void vscode.window.showErrorMessage(`ParadoxCode: could not save dependency: ${message}`);
+        return;
+    }
+    const action = await vscode.window.showInformationMessage(
+        `ParadoxCode: added dependency ${entry.id} at the end of the priority list.`,
+        'Open Dependencies Settings',
+    );
+    if (action) {
+        await openDependencySettings();
+    }
+}
+
+async function removeDependency(): Promise<void> {
+    if (!workspaceConfigurationTarget()) {
+        void vscode.window.showWarningMessage(
+            'ParadoxCode: open a workspace before removing a dependency.',
+        );
+        return;
+    }
+    let dependencies: DependencySetting[];
+    try {
+        dependencies = dependencySettings();
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        void vscode.window.showErrorMessage(`ParadoxCode: ${message}`);
+        return;
+    }
+    if (dependencies.length === 0) {
+        void vscode.window.showInformationMessage('ParadoxCode: no workspace dependencies are configured.');
+        return;
+    }
+    const selected = await vscode.window.showQuickPick(
+        dependencies.map((dependency, index) => ({
+            label: dependency.id,
+            description: dependency.path,
+            detail: dependency.index ? `index: ${dependency.index}` : 'live scan',
+            index,
+        })),
+        {
+            title: 'Remove a ParadoxCode dependency',
+            placeHolder: 'Choose a dependency',
+        },
+    );
+    if (!selected) {
+        return;
+    }
+    const confirmation = await vscode.window.showWarningMessage(
+        `Remove dependency ${selected.label}?`,
+        { modal: true },
+        'Remove',
+    );
+    if (confirmation !== 'Remove') {
+        return;
+    }
+    dependencies.splice(selected.index, 1);
+    try {
+        await vscode.workspace.getConfiguration('paradoxcode').update(
+            'dependencies',
+            dependencies,
+            vscode.ConfigurationTarget.Workspace,
+        );
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        void vscode.window.showErrorMessage(`ParadoxCode: could not save dependency: ${message}`);
+        return;
+    }
+    void vscode.window.showInformationMessage(`ParadoxCode: removed dependency ${selected.label}.`);
 }
 
 interface ServerResolution {
@@ -174,23 +484,6 @@ function resolveServerCommand(context: vscode.ExtensionContext): ServerResolutio
             source: 'setting paradoxcode.pdxLsPath',
             missingOnPath: false,
         };
-    }
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (workspaceFolder) {
-        try {
-            const shared = readSharedConfig(workspaceFolder);
-            if (shared.binary) {
-                return {
-                    command: shared.binary,
-                    source: `${workspaceFolder.uri.fsPath}/.pdx/project.toml [server].binary`,
-                    missingOnPath: false,
-                };
-            }
-        } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            log.appendLine(`WARNING: ${message}`);
-            void vscode.window.showWarningMessage(`ParadoxCode: ${message}`);
-        }
     }
     const options = installOptions(context);
     const cached = cachedServerPath(context, options);
@@ -240,6 +533,13 @@ function pathRelative(root: string, file: string): string {
     return normalizedFile.startsWith(`${normalizedRoot}/`)
         ? normalizedFile.slice(normalizedRoot.length + 1)
         : normalizedFile;
+}
+
+function previewRefreshMode(): 'always' | 'onSave' | 'manual' {
+    const value = vscode.workspace
+        .getConfiguration('paradoxcode.preview')
+        .get<string>('refreshMode', 'always');
+    return value === 'onSave' || value === 'manual' ? value : 'always';
 }
 
 function clientMiddleware(): NonNullable<LanguageClientOptions['middleware']> {
@@ -300,7 +600,7 @@ function showMissingServerActions(automaticInstallError?: string): void {
     const message = automaticInstallError
         ? `The automatic pdx-ls installation failed: ${automaticInstallError}`
         : 'pdx-ls was not found. Install it from the ParadoxCode release cache, select a binary, ' +
-          'or add [server].binary to .pdx/project.toml.';
+          'set paradoxcode.pdxLsPath, or add pdx-ls to PATH.';
     log.appendLine(`WARNING: ${message}`);
     void vscode.window.showWarningMessage(
         `ParadoxCode: ${message}`,
@@ -519,6 +819,14 @@ async function resolveOrInstallServer(context: vscode.ExtensionContext): Promise
     // server. Development/Test extension hosts keep the old explicit behavior so local tests do
     // not unexpectedly download release binaries.
     if (context.extensionMode !== vscode.ExtensionMode.Production) {
+        showMissingServerActions();
+        return undefined;
+    }
+
+    const installPolicy = vscode.workspace
+        .getConfiguration('paradoxcode')
+        .get<'auto' | 'prompt' | 'never'>('server.installPolicy', 'auto');
+    if (installPolicy !== 'auto') {
         showMissingServerActions();
         return undefined;
     }
@@ -754,7 +1062,9 @@ export function activate(context: vscode.ExtensionContext): void {
     );
 
     const refresh = debounce(() => {
-        void MissionPreviewPanel.refresh(client);
+        if (previewRefreshMode() === 'always') {
+            void MissionPreviewPanel.refresh(client);
+        }
     }, 150);
     let restartTask = Promise.resolve();
     const restart = () => {
@@ -783,6 +1093,12 @@ export function activate(context: vscode.ExtensionContext): void {
             }
         }),
         vscode.commands.registerCommand('paradoxcode.selectGameDirectory', () => chooseGameDirectory()),
+        vscode.commands.registerCommand('paradoxcode.addDependency', () => addDependency()),
+        vscode.commands.registerCommand('paradoxcode.removeDependency', () => removeDependency()),
+        vscode.commands.registerCommand(
+            'paradoxcode.openDependencySettings',
+            () => openDependencySettings(),
+        ),
         vscode.commands.registerCommand('paradoxcode.reloadServer', restart),
         vscode.commands.registerCommand('paradoxcode.exportDiagnostics', () => exportDiagnostics()),
         vscode.commands.registerCommand('paradoxcode.refreshLoadedFiles', () => loadedFilesProvider.refresh(client)),
@@ -795,6 +1111,11 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.onDidChangeActiveTextEditor((editor) => {
             updateMissionContext(editor?.document);
             refresh();
+        }),
+        vscode.workspace.onDidSaveTextDocument((document) => {
+            if (isMissionDocument(document) && previewRefreshMode() === 'onSave') {
+                void MissionPreviewPanel.refresh(client);
+            }
         }),
         vscode.workspace.onDidChangeTextDocument((event) => {
             if (isEu4Document(event.document)) {

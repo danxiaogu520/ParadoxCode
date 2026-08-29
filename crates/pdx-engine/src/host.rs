@@ -49,6 +49,9 @@ pub struct AnalysisHost {
     query_cache: Arc<SnapshotQueryCache>,
     parse_cache: Option<ParseCache>,
     scan_filters: Arc<WorkspaceScanFilters>,
+    scan_limits: WorkspaceScanLimits,
+    preferred_localisation_languages: Arc<[String]>,
+    completion_source_layers: Arc<[SourceRootKind]>,
 }
 
 impl AnalysisHost {
@@ -85,6 +88,13 @@ impl AnalysisHost {
             query_cache: Arc::new(SnapshotQueryCache::new()),
             parse_cache: None,
             scan_filters: Arc::new(WorkspaceScanFilters::default()),
+            scan_limits: WorkspaceScanLimits::default(),
+            preferred_localisation_languages: Arc::from([]),
+            completion_source_layers: Arc::from([
+                SourceRootKind::CurrentMod,
+                SourceRootKind::Dependency,
+                SourceRootKind::Vanilla,
+            ]),
         }
     }
 
@@ -124,6 +134,40 @@ impl AnalysisHost {
     #[must_use]
     pub fn scan_filters(&self) -> &WorkspaceScanFilters {
         self.scan_filters.as_ref()
+    }
+
+    /// Replaces the bounded resource profile used by subsequent workspace scans.
+    pub fn set_scan_limits(&mut self, limits: WorkspaceScanLimits) {
+        if self.scan_limits != limits {
+            self.scan_limits = limits;
+            self.advance_revision();
+        }
+    }
+
+    /// Returns the active bounded scan profile.
+    #[must_use]
+    pub const fn scan_limits(&self) -> WorkspaceScanLimits {
+        self.scan_limits
+    }
+
+    /// Replaces the preferred localisation language order used by analysis queries.
+    pub fn set_preferred_localisation_languages(&mut self, languages: Vec<String>) {
+        let languages = languages
+            .into_iter()
+            .map(|language| language.to_ascii_lowercase())
+            .collect::<Vec<_>>();
+        if self.preferred_localisation_languages.as_ref() != languages.as_slice() {
+            self.preferred_localisation_languages = Arc::from(languages);
+            self.advance_revision();
+        }
+    }
+
+    /// Replaces the source layers eligible to provide completion members.
+    pub fn set_completion_source_layers(&mut self, layers: Vec<SourceRootKind>) {
+        if self.completion_source_layers.as_ref() != layers.as_slice() {
+            self.completion_source_layers = Arc::from(layers);
+            self.advance_revision();
+        }
     }
 
     fn document_snapshot(
@@ -334,7 +378,7 @@ impl AnalysisHost {
 
     /// Scans all configured roots in stable order and atomically refreshes source files and shards.
     pub fn refresh_source_roots(&mut self) -> Result<WorkspaceScanReport, WorkspaceError> {
-        self.refresh_source_roots_with_limits(WorkspaceScanLimits::default())
+        self.refresh_source_roots_with_limits(self.scan_limits)
     }
 
     /// Scans configured roots while cooperatively observing `cancellation`.
@@ -342,11 +386,7 @@ impl AnalysisHost {
         &mut self,
         cancellation: &WorkspaceScanToken,
     ) -> Result<WorkspaceScanReport, WorkspaceError> {
-        self.refresh_source_roots_with_limits_and_cancellation(
-            WorkspaceScanLimits::default(),
-            cancellation,
-            None,
-        )
+        self.refresh_source_roots_with_limits_and_cancellation(self.scan_limits, cancellation, None)
     }
 
     /// Scans configured roots while cooperatively observing `cancellation`, invoking `progress`
@@ -357,7 +397,7 @@ impl AnalysisHost {
         progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     ) -> Result<WorkspaceScanReport, WorkspaceError> {
         self.refresh_source_roots_with_limits_and_cancellation(
-            WorkspaceScanLimits::default(),
+            self.scan_limits,
             cancellation,
             progress,
         )
@@ -554,7 +594,7 @@ impl AnalysisHost {
         cancellation: &WorkspaceScanToken,
     ) -> Result<WorkspaceScanReport, WorkspaceError> {
         cancellation.checkpoint()?;
-        let limits = WorkspaceScanLimits::default();
+        let limits = self.scan_limits;
         let mut files = self.source_files.as_ref().clone();
         let mut paths = self.source_file_paths.as_ref().clone();
         let mut file_states = self.file_states.as_ref().clone();
@@ -895,7 +935,7 @@ impl AnalysisHost {
             let mut report = WorkspaceScanReport::default();
             if let Some(text) = read_source_file(
                 &path,
-                WorkspaceScanLimits::default(),
+                self.scan_limits,
                 &mut report,
                 self.profile.source_encoding,
             ) {
@@ -930,6 +970,9 @@ impl AnalysisHost {
             scan_report: Arc::clone(&self.scan_report),
             localisation_previews: Arc::clone(&self.localisation_previews),
             query_cache: Arc::clone(&self.query_cache),
+            scan_limits: self.scan_limits,
+            preferred_localisation_languages: Arc::clone(&self.preferred_localisation_languages),
+            completion_source_layers: Arc::clone(&self.completion_source_layers),
         }
     }
 }

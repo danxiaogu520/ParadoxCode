@@ -465,6 +465,16 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
     let (language, value) = resolved.get("lang_title").expect("language preference");
     assert_eq!(value, "English Vanilla");
     assert_eq!(language.as_deref(), Some("l_english"));
+    host.set_preferred_localisation_languages(vec!["french".to_owned()]);
+    let preferred = crate::localisation_values_by_key(
+        &host.snapshot(),
+        &["lang_title"],
+        &crate::CancellationToken::new(),
+    )
+    .expect("configured language preference");
+    let (language, value) = preferred.get("lang_title").expect("French title");
+    assert_eq!(value, "French Vanilla");
+    assert_eq!(language.as_deref(), Some("l_french"));
     // Unknown keys remain absent.
     assert!(!resolved.contains_key("missing_title"));
     std::fs::remove_dir_all(root).expect("cleanup");

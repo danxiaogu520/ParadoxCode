@@ -124,6 +124,12 @@ pub struct WorkspaceScanLimits {
     pub max_file_size: u64,
     /// Maximum number of detailed issues retained in a scan report.
     pub max_reported_issues: usize,
+    /// Maximum number of source parsing workers used for a parallel scan.
+    ///
+    /// The value is clamped to the engine's hard safety cap.  Keeping this in the generic scan
+    /// limits lets an editor expose a coarse performance profile without leaking thread-pool
+    /// implementation details through the LSP layer.
+    pub max_workers: usize,
 }
 
 /// User-configurable file and directory filters applied before workspace discovery consumes
@@ -441,6 +447,7 @@ impl Default for WorkspaceScanLimits {
             max_files: 100_000,
             max_file_size: 16 * 1024 * 1024,
             max_reported_issues: 256,
+            max_workers: 12,
         }
     }
 }

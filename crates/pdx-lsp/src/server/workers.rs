@@ -10,6 +10,7 @@ fn workspace_validation_result(
     host: &AnalysisHost,
     scan_cancellation: &WorkspaceScanToken,
     ignored_diagnostic_codes: &HashSet<String>,
+    diagnostic_severity_overrides: &BTreeMap<String, Option<Severity>>,
     publish_diagnostics: bool,
 ) -> Result<WorkspaceValidationResult, WorkspaceError> {
     let snapshot = host.snapshot();
@@ -81,11 +82,12 @@ fn workspace_validation_result(
         if scan_cancellation.is_cancelled() {
             return Err(WorkspaceError::Cancelled);
         }
-        let filtered = filter_diagnostics_with_ignored(
+        let filtered = filter_diagnostics_with_ignored_and_overrides(
             diagnostics,
             &line_index,
             &source,
             ignored_diagnostic_codes,
+            diagnostic_severity_overrides,
         );
         summary.validated_files = summary.validated_files.saturating_add(1);
         let mut file_has_error = false;
@@ -112,11 +114,12 @@ fn workspace_validation_result(
         if let Some(uri) = closed_uri {
             current_uris.push(uri.clone());
             if publish_diagnostics && published_files < MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS {
-                let values = diagnostic_values_for_text_with_ignored(
+                let values = diagnostic_values_for_text_with_ignored_and_overrides(
                     filtered,
                     &line_index,
                     &source,
                     &HashSet::new(),
+                    diagnostic_severity_overrides,
                 );
                 let values = serde_json::to_value(values).map_err(|error| {
                     WorkspaceError::Io(io::Error::other(format!(
@@ -187,6 +190,7 @@ impl LspServer {
         let worker_cancellation = cancellation.clone();
         let publish_workspace_diagnostics = self.workspace_wide_diagnostics;
         let ignored_diagnostic_codes = Arc::clone(&self.ignored_diagnostic_codes);
+        let diagnostic_severity_overrides = Arc::clone(&self.diagnostic_severity_overrides);
         let mut candidate = self.host.clone();
         let sender = event_sender.clone();
         self.background_reindex_due = None;
@@ -209,6 +213,7 @@ impl LspServer {
                                     &candidate,
                                     &worker_cancellation,
                                     &ignored_diagnostic_codes,
+                                    &diagnostic_severity_overrides,
                                     publish_workspace_diagnostics,
                                 )
                             })
@@ -256,6 +261,7 @@ impl LspServer {
         let cancellation = WorkspaceScanToken::new();
         let worker_cancellation = cancellation.clone();
         let ignored_diagnostic_codes = Arc::clone(&self.ignored_diagnostic_codes);
+        let diagnostic_severity_overrides = Arc::clone(&self.diagnostic_severity_overrides);
         let candidate = self.host.clone();
         let sender = event_sender.clone();
         self.workspace_diagnostics_pending = false;
@@ -269,6 +275,7 @@ impl LspServer {
                     &candidate,
                     &worker_cancellation,
                     &ignored_diagnostic_codes,
+                    &diagnostic_severity_overrides,
                     true,
                 )
             }))
@@ -332,6 +339,7 @@ impl LspServer {
         let sender = event_sender.clone();
         let publish_workspace_diagnostics = self.workspace_wide_diagnostics;
         let ignored_diagnostic_codes = Arc::clone(&self.ignored_diagnostic_codes);
+        let diagnostic_severity_overrides = Arc::clone(&self.diagnostic_severity_overrides);
         self.background_reindex_due = None;
         *in_flight = Some(InFlightBackgroundReindex {
             base_revision,
@@ -348,6 +356,7 @@ impl LspServer {
                                     &candidate,
                                     &worker_cancellation,
                                     &ignored_diagnostic_codes,
+                                    &diagnostic_severity_overrides,
                                     true,
                                 )
                             })
@@ -444,6 +453,7 @@ impl LspServer {
             self.client_snippet_support,
             self.textures.clone(),
             Arc::clone(&self.ignored_diagnostic_codes),
+            Arc::clone(&self.diagnostic_severity_overrides),
             Arc::clone(&self.semantic_tokens_cache),
         );
         let method = method.to_owned();
@@ -672,6 +682,7 @@ impl LspServer {
         let sender = event_sender.clone();
         let publish_workspace_diagnostics = self.workspace_wide_diagnostics;
         let ignored_diagnostic_codes = Arc::clone(&self.ignored_diagnostic_codes);
+        let diagnostic_severity_overrides = Arc::clone(&self.diagnostic_severity_overrides);
         *in_flight = Some(InFlightDiskChanges {
             base_revision,
             cancellation,
@@ -688,6 +699,7 @@ impl LspServer {
                                         &candidate,
                                         &worker_cancellation,
                                         &ignored_diagnostic_codes,
+                                        &diagnostic_severity_overrides,
                                         true,
                                     )
                                 })
@@ -704,6 +716,7 @@ impl LspServer {
                                         &candidate,
                                         &worker_cancellation,
                                         &ignored_diagnostic_codes,
+                                        &diagnostic_severity_overrides,
                                         true,
                                     )
                                 })
@@ -900,6 +913,7 @@ impl LspServer {
             let sender = event_sender.clone();
             let cancellation = CancellationToken::new();
             let ignored_diagnostic_codes = Arc::clone(&self.ignored_diagnostic_codes);
+            let diagnostic_severity_overrides = Arc::clone(&self.diagnostic_severity_overrides);
             in_flight.insert(
                 id.clone(),
                 InFlightDiagnostics {
@@ -912,11 +926,12 @@ impl LspServer {
                     None
                 } else {
                     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        diagnostic_values_with_ignored(
+                        diagnostic_values_with_ignored_and_overrides(
                             &snapshot,
                             &id,
                             &cancellation,
                             &ignored_diagnostic_codes,
+                            &diagnostic_severity_overrides,
                         )
                     }))
                     .ok()

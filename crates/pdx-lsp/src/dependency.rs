@@ -4,7 +4,9 @@ use std::fs;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use pdx_engine::{AnalysisHost, IndexCache, WorkspaceChange, WorkspaceScanToken};
+use pdx_engine::{
+    AnalysisHost, IndexCache, WorkspaceChange, WorkspaceScanLimits, WorkspaceScanToken,
+};
 use pdx_rules::{GameProfile, RuleSet};
 
 use crate::workspace::DependencyIndexCache;
@@ -20,11 +22,13 @@ pub(crate) type DependencySetupOutcome =
 /// Loading and refreshing each dependency is independent. The event loop still installs the
 /// returned caches in the original order, so source priority remains deterministic even when
 /// disk work completes out of order.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_dependency_cache_loads(
     configs: Vec<DependencyIndexCache>,
     rules: RuleSet,
     profile: GameProfile,
     current_rule_hash: String,
+    scan_limits: WorkspaceScanLimits,
     log: Option<&(dyn Fn(&str) + Sync)>,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &WorkspaceScanToken,
@@ -57,6 +61,7 @@ pub(crate) fn run_dependency_cache_loads(
             let worker_rules = rules.clone();
             let worker_profile = profile.clone();
             let worker_rule_hash = current_rule_hash.clone();
+            let worker_scan_limits = scan_limits;
             scope.spawn(move || {
                 loop {
                     let index = next.fetch_add(1, Ordering::Relaxed);
@@ -68,6 +73,7 @@ pub(crate) fn run_dependency_cache_loads(
                         worker_rules.clone(),
                         worker_profile.clone(),
                         worker_rule_hash.clone(),
+                        worker_scan_limits,
                         log,
                         progress,
                         cancellation,
@@ -98,11 +104,13 @@ pub(crate) fn run_dependency_cache_loads(
 /// schema-incompatible cache is rebuilt from the configured dependency directory in place. A
 /// rules-hash mismatch triggers a regeneration attempt; if that fails the stale cache is still
 /// returned so the dependency keeps its symbols, mirroring the Vanilla cache policy.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_dependency_cache_load(
     config: &DependencyIndexCache,
     rules: RuleSet,
     profile: GameProfile,
     current_rule_hash: String,
+    scan_limits: WorkspaceScanLimits,
     log: Option<&(dyn Fn(&str) + Sync)>,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &WorkspaceScanToken,
@@ -154,6 +162,7 @@ pub(crate) fn run_dependency_cache_load(
                     config,
                     &rules,
                     &profile,
+                    scan_limits,
                     log,
                     progress,
                     cancellation,
@@ -247,6 +256,7 @@ pub(crate) fn run_dependency_cache_load(
             config,
             &rules,
             &profile,
+            scan_limits,
             log,
             progress,
             cancellation,
@@ -279,10 +289,12 @@ pub(crate) fn run_dependency_cache_load(
 }
 
 /// Scans one dependency directory and writes its cache file atomically.
+#[allow(clippy::too_many_arguments)]
 fn build_dependency_cache(
     config: &DependencyIndexCache,
     rules: &RuleSet,
     profile: &GameProfile,
+    scan_limits: WorkspaceScanLimits,
     log: Option<&(dyn Fn(&str) + Sync)>,
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
     cancellation: &WorkspaceScanToken,
@@ -298,6 +310,7 @@ fn build_dependency_cache(
         ));
     }
     let mut host = AnalysisHost::with_profile(rules.clone(), profile.clone());
+    host.set_scan_limits(scan_limits);
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![config.root.clone()]));
     let scan_started = std::time::Instant::now();
     let scan_report = host
@@ -394,6 +407,7 @@ mod tests {
             rules.clone(),
             profile(),
             rules.rule_hash().to_hex(),
+            pdx_engine::WorkspaceScanLimits::default(),
             None,
             None,
             &WorkspaceScanToken::new(),

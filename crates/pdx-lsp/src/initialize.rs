@@ -17,7 +17,7 @@ use pdx_game::{DiscoveryOptions, DiscoveryToken, GameInstallDescriptor, UserPath
 use crate::protocol::{RpcError, parse_file_uri_str, workspace_scan_error};
 use crate::server::PreparedInitialize;
 use crate::vanilla::{apply_user_vanilla_configuration, watched_files_registration};
-use crate::workspace::resolve_source_roots;
+use crate::workspace::{VanillaMode, resolve_source_roots};
 use crate::{INTERNAL_ERROR, INVALID_PARAMS, REQUEST_CANCELLED};
 
 /// Explicit process-level options passed by an editor or CLI.
@@ -32,7 +32,7 @@ pub struct InitializeOptions;
 pub struct AutoVanillaConfiguration {
     /// Data-only installation facts for the selected profile.
     pub descriptor: GameInstallDescriptor,
-    /// Shared user configuration and cache locations.
+    /// Machine-local user configuration and cache locations.
     pub user_paths: UserPaths,
     /// Optional user-selected installation root from an editor-guided setup. This takes
     /// precedence over one-time platform discovery.
@@ -121,7 +121,7 @@ pub(crate) fn prepare_initialize_candidate(
         stage("Loading workspace configuration…");
     }
     if let Some(log) = callbacks.log {
-        log("Initialization phase: resolving project configuration and source roots");
+        log("Initialization phase: resolving editor configuration and source roots");
     }
     let roots_started = std::time::Instant::now();
     let mut resolved = resolve_source_roots(
@@ -129,6 +129,12 @@ pub(crate) fn prepare_initialize_candidate(
         initialization_options,
         cancellation,
     )?;
+    // Apply query/scan preferences to the candidate host before the first refresh. Keeping these
+    // values on the engine host means every immutable snapshot and background clone observes the
+    // same user configuration without leaking editor settings into analysis code.
+    host.set_scan_limits(resolved.scan_limits);
+    host.set_preferred_localisation_languages(resolved.preferred_localisation_languages.clone());
+    host.set_completion_source_layers(resolved.completion_source_layers.clone());
     if let Some(log) = callbacks.log {
         log(&format!(
             "Source roots resolved in {:.1} ms: workspace {}, {} live source root(s), {} dependency cache(s)",
@@ -168,7 +174,7 @@ pub(crate) fn prepare_initialize_candidate(
     if let Some(log) = callbacks.log {
         match resolved.index_cache.as_ref() {
             Some(path) => log(&format!(
-                "Vanilla index candidate from project configuration: {}",
+                "Vanilla index candidate from editor configuration: {}",
                 path.display()
             )),
             None => log("Vanilla index candidate: automatic discovery or user configuration"),
@@ -186,12 +192,32 @@ pub(crate) fn prepare_initialize_candidate(
         log("Initialization phase: applying user-level Vanilla configuration");
     }
     let user_vanilla_started = std::time::Instant::now();
-    let auto_vanilla = apply_user_vanilla_configuration(
+    let mut auto_vanilla = apply_user_vanilla_configuration(
         &mut resolved,
         auto_vanilla_with_source.as_ref(),
         host.snapshot().rules().game_id(),
         &mut warnings,
     );
+    match resolved.vanilla_mode {
+        VanillaMode::Auto => {}
+        VanillaMode::CacheOnly => {
+            if auto_vanilla.is_some() {
+                warnings.push(
+                    "vanilla.mode=cacheOnly: automatic Vanilla discovery/build is disabled"
+                        .to_owned(),
+                );
+            }
+            auto_vanilla = None;
+        }
+        VanillaMode::Disabled => {
+            resolved.index_cache = None;
+            auto_vanilla = None;
+            warnings.push(
+                "vanilla.mode=disabled: Vanilla symbols and automatic cache setup are disabled"
+                    .to_owned(),
+            );
+        }
+    }
     if let Some(log) = callbacks.log {
         let selection = match (resolved.index_cache.as_ref(), auto_vanilla.is_some()) {
             (Some(path), _) => format!("cache selected at {}", path.display()),
@@ -378,6 +404,7 @@ pub(crate) fn prepare_initialize_candidate(
         background_reindex_interval_minutes: resolved.background_reindex_interval_minutes,
         background_reindex_idle_seconds: resolved.background_reindex_idle_seconds,
         ignored_diagnostic_codes: resolved.ignored_diagnostic_codes,
+        diagnostic_severity_overrides: resolved.diagnostic_severity_overrides,
         workspace_wide_diagnostics: resolved.workspace_wide_diagnostics,
     })
 }

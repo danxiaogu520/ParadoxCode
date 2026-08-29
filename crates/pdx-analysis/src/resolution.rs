@@ -124,12 +124,14 @@ fn semantic_data_with_cancellation_uncached(
         collect_quoted_semantics(snapshot, input, &mut data, cancellation)?;
         return Ok(data);
     };
-    // The inactive-range set is only consulted for Semantic-origin references; skip building it
-    // entirely when this file has none, keeping semantic_data O(references + definitions).
-    let has_semantic_references = hir
-        .references()
-        .iter()
-        .any(|reference| reference.origin == HirReferenceOrigin::Semantic);
+    // The inactive-range set is only consulted for first-party semantic references; skip building
+    // it entirely when this file has none, keeping semantic_data O(references + definitions).
+    let has_semantic_references = hir.references().iter().any(|reference| {
+        matches!(
+            reference.origin,
+            HirReferenceOrigin::Semantic | HirReferenceOrigin::SemanticTyped
+        )
+    });
     let inactive_semantic_references = if has_semantic_references {
         inactive_semantic_reference_ranges(snapshot, hir)
     } else {
@@ -153,6 +155,7 @@ fn semantic_data_with_cancellation_uncached(
                 reference.origin,
                 HirReferenceOrigin::Profile
                     | HirReferenceOrigin::Semantic
+                    | HirReferenceOrigin::SemanticTyped
                     | HirReferenceOrigin::ScriptedMacro
                     | HirReferenceOrigin::DerivedLocalisation
             )
@@ -170,6 +173,10 @@ fn semantic_data_with_cancellation_uncached(
         })
         .filter(|reference| {
             reference.origin != HirReferenceOrigin::ScriptedMacro
+                || workspace_member(snapshot, &reference.kind, &reference.name)
+        })
+        .filter(|reference| {
+            reference.origin != HirReferenceOrigin::SemanticTyped
                 || workspace_member(snapshot, &reference.kind, &reference.name)
         })
     {
@@ -684,7 +691,10 @@ pub(crate) fn semantic_reference_is_active(
     inactive_semantic_references: &BTreeSet<TextRange>,
     reference: &HirReference,
 ) -> bool {
-    if reference.origin != HirReferenceOrigin::Semantic {
+    if !matches!(
+        reference.origin,
+        HirReferenceOrigin::Semantic | HirReferenceOrigin::SemanticTyped
+    ) {
         return true;
     }
     !inactive_semantic_references.contains(&reference.range)
@@ -851,7 +861,7 @@ pub(crate) fn symbol_candidates(
         left.location == right.location && left.selection_range == right.selection_range
     });
     if kind.eq_ignore_ascii_case("localisation") {
-        candidates = prefer_localisation_language(candidates);
+        candidates = prefer_localisation_language_for_snapshot(snapshot, candidates);
     }
     candidates
 }
@@ -902,7 +912,7 @@ pub(crate) fn symbol_candidates_for_hover(
         left.location == right.location && left.selection_range == right.selection_range
     });
     if kind.eq_ignore_ascii_case("localisation") {
-        candidates = prefer_localisation_language(candidates);
+        candidates = prefer_localisation_language_for_snapshot(snapshot, candidates);
     }
     Ok(candidates)
 }
@@ -942,6 +952,10 @@ pub(crate) fn localisation_language(path: Option<&LogicalPath>) -> Option<String
             .strip_prefix("l_")
             .filter(|language| !language.is_empty())
         {
+            let language = language
+                .strip_suffix(".yml")
+                .or_else(|| language.strip_suffix(".yaml"))
+                .unwrap_or(language);
             return Some(language.to_owned());
         }
     }
@@ -964,21 +978,48 @@ pub(crate) fn localisation_language(path: Option<&LogicalPath>) -> Option<String
 pub(crate) fn prefer_localisation_language(
     candidates: Vec<ResolutionDefinition>,
 ) -> Vec<ResolutionDefinition> {
+    prefer_localisation_language_ordered(candidates, &["english"])
+}
+
+/// Selects localisation candidates using the workspace-configured language preference order.
+/// The first configured language with a candidate wins; English remains the fallback for an
+/// empty or unavailable preference list, preserving the historical behaviour.
+pub(crate) fn prefer_localisation_language_for_snapshot(
+    snapshot: &AnalysisSnapshot,
+    candidates: Vec<ResolutionDefinition>,
+) -> Vec<ResolutionDefinition> {
+    let configured = snapshot.preferred_localisation_languages();
+    if configured.is_empty() {
+        return prefer_localisation_language(candidates);
+    }
+    let mut ordered = configured.to_vec();
+    if !ordered.iter().any(|language| language == "english") {
+        ordered.push("english".to_owned());
+    }
+    prefer_localisation_language_ordered(candidates, &ordered)
+}
+
+fn prefer_localisation_language_ordered(
+    candidates: Vec<ResolutionDefinition>,
+    languages: &[impl AsRef<str>],
+) -> Vec<ResolutionDefinition> {
     if candidates.len() < 2 {
         return candidates;
     }
-    let english = candidates
-        .iter()
-        .filter(|candidate| {
-            localisation_language(candidate.location.path.as_ref()).as_deref() == Some("english")
-        })
-        .cloned()
-        .collect::<Vec<_>>();
-    if english.is_empty() {
-        candidates
-    } else {
-        english
+    for language in languages {
+        let preferred = candidates
+            .iter()
+            .filter(|candidate| {
+                localisation_language(candidate.location.path.as_ref())
+                    .is_some_and(|value| value.eq_ignore_ascii_case(language.as_ref()))
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        if !preferred.is_empty() {
+            return preferred;
+        }
     }
+    candidates
 }
 
 /// Resolves localisation keys to their displayed values in a single workspace
@@ -1073,7 +1114,7 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
                 .map(|definition| index_definition(self.snapshot, definition)),
         );
         if kind.eq_ignore_ascii_case("localisation") {
-            candidates = prefer_localisation_language(candidates);
+            candidates = prefer_localisation_language_for_snapshot(self.snapshot, candidates);
         }
         if candidates.is_empty() {
             return Resolution::Missing;

@@ -9,9 +9,9 @@ This walkthrough keeps the first run deliberately small:
 5. Open an EU4 script or Localisation file and inspect Problems, completion, hover, and navigation.
 6. Open a mission file to try the read-only mission-tree preview.
 
-No `.pdx/project.toml`, server download, rule path, or cache path is required for a normal
-Marketplace installation. The extension and the language server keep machine-local cache data;
-your Mod files are never copied into that cache.
+No manual server, rule path, or cache configuration is required for a normal Marketplace
+installation. The extension and the language server keep machine-local cache data; your Mod files
+are never copied into that cache.
 
 ## 如果你使用中文
 

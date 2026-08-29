@@ -31,11 +31,12 @@ use crate::initialize::{
 };
 use crate::protocol::{
     LspError, RequestId, RpcError, cancel_initialize_from_notification,
-    cancel_request_from_notification, diagnostic_values_for_text_with_ignored,
-    diagnostic_values_with_ignored, diagnostics_notification, document_error,
-    filter_diagnostics_with_ignored, is_execute_command_message, is_initialize_control_message,
-    is_snapshot_request, is_snapshot_request_message, log_message_notification, parse_file_uri_str,
-    request_id_from_lsp, show_info_notification, show_warning_notification, typed_params,
+    cancel_request_from_notification, diagnostic_values_for_text_with_ignored_and_overrides,
+    diagnostic_values_with_ignored_and_overrides, diagnostics_notification, document_error,
+    filter_diagnostics_with_ignored_and_overrides, is_execute_command_message,
+    is_initialize_control_message, is_snapshot_request, is_snapshot_request_message,
+    log_message_notification, parse_file_uri_str, request_id_from_lsp, show_info_notification,
+    show_warning_notification, typed_params,
 };
 use crate::requests::SnapshotRequestContext;
 use crate::text::{
@@ -43,7 +44,7 @@ use crate::text::{
 };
 use crate::transport::{read_message, write_message};
 use crate::uri::uri_to_path;
-use crate::vanilla::{IndexCacheLoadRequest, run_auto_vanilla_setup, run_index_cache_load};
+use crate::vanilla::{IndexCacheLoadRequest, run_index_cache_load};
 use crate::workspace::DependencyIndexCache;
 use crate::{
     DIAGNOSTIC_DEBOUNCE, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, JSON_RPC_VERSION,
@@ -341,12 +342,14 @@ pub(crate) struct PreparedInitialize {
     pub(crate) watcher_registration: Option<Value>,
     pub(crate) client_work_done_progress: bool,
     pub(crate) client_snippet_support: bool,
-    /// Optional quiet workspace re-scan cadence selected from initialization/project config.
+    /// Optional quiet workspace re-scan cadence selected from editor initialization options.
     pub(crate) background_reindex_interval_minutes: u64,
     /// User-idle window required before a quiet workspace re-scan.
     pub(crate) background_reindex_idle_seconds: u64,
     /// Canonical diagnostic categories omitted from LSP output.
     pub(crate) ignored_diagnostic_codes: Vec<String>,
+    /// Per-category severity remapping applied before publication and workspace aggregation.
+    pub(crate) diagnostic_severity_overrides: BTreeMap<String, Option<Severity>>,
     /// Whether automatic and explicit workspace refreshes publish diagnostics for closed Current
     /// Mod files.
     pub(crate) workspace_wide_diagnostics: bool,
@@ -537,6 +540,8 @@ pub struct LspServer {
     pub(crate) background_reindex_due: Option<Instant>,
     /// Diagnostic categories hidden from published diagnostics and diagnostic query responses.
     pub(crate) ignored_diagnostic_codes: Arc<HashSet<String>>,
+    /// Per-category severity remapping applied to all analysis diagnostics at the protocol edge.
+    pub(crate) diagnostic_severity_overrides: Arc<BTreeMap<String, Option<Severity>>>,
     /// Whether automatic and explicit workspace refreshes also publish diagnostics for closed
     /// Current Mod files. The bounded publication path is enabled by default and can be disabled
     /// by clients that only want diagnostics for open documents.
@@ -593,6 +598,7 @@ impl LspServer {
             last_activity: Instant::now(),
             background_reindex_due: None,
             ignored_diagnostic_codes: Arc::new(HashSet::new()),
+            diagnostic_severity_overrides: Arc::new(BTreeMap::new()),
             workspace_wide_diagnostics: true,
             workspace_diagnostics_pending: false,
             workspace_diagnostic_uris: BTreeSet::new(),

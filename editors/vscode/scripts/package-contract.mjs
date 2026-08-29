@@ -19,7 +19,6 @@ try {
 
 const files = new Set(listing.split(/\r?\n/).map((value) => value.trim()).filter(Boolean));
 for (const required of [
-  'node_modules/smol-toml/dist/index.cjs',
   'node_modules/vscode-languageclient/lib/node/main.js',
   'node_modules/vscode-jsonrpc/lib/node/main.js',
   'node_modules/vscode-languageserver-protocol/lib/common/api.js',

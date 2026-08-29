@@ -309,8 +309,14 @@ pub struct MacroTemplate {
 pub enum HirReferenceOrigin {
     /// A precise property matcher from the selected game profile.
     Profile,
-    /// A localisation value selected by a first-party semantic rule.
+    /// A value selected by a first-party semantic rule.
     Semantic,
+    /// A workspace-symbol value selected by a first-party semantic rule.
+    ///
+    /// These references are kept separate from ordinary semantic values because the analysis
+    /// layer can omit unresolved typed values from its navigation view while retaining the
+    /// semantic validator's more precise value diagnostic.
+    SemanticTyped,
     /// A concrete scripted-effect or scripted-trigger invocation selected by macro rules.
     ScriptedMacro,
     /// A required type-instance localisation mapping expanded from a first-party template.
