@@ -4,7 +4,7 @@ use pdx_parser::parse_quoted_script;
 use pdx_rules::{
     GameProfile, KeyMatcher, ProfileDefinitionRule, RuleSet, RuleShape, TypeDescriptor,
 };
-use pdx_text::{LogicalPath, TextRange};
+use pdx_text::{LogicalPath, TextRange, TextSize};
 
 use super::{
     HirDefinition, HirLocalisationEntry, HirProperty, HirReference, HirReferenceOrigin, HirScalar,
@@ -299,6 +299,71 @@ pub fn semantic_type_path_matches(
     true
 }
 
+/// Indexed view over one file's scope facts.
+///
+/// Facts are produced in document order; every consumer previously performed a
+/// linear `find`/`rfind` per property, which made lowering quadratic on large
+/// files. The exact lookup is a hash hit, and the nearest-preceding lookup
+/// binary-searches the document order and then walks back only across the
+/// property's preceding siblings.
+pub(super) struct ScopeFactIndex<'a> {
+    facts: &'a [ScopeFact],
+    exact: std::collections::HashMap<TextRange, usize>,
+}
+
+impl<'a> ScopeFactIndex<'a> {
+    pub(super) fn new(facts: &'a [ScopeFact]) -> Self {
+        let mut exact = std::collections::HashMap::with_capacity(facts.len());
+        for (index, fact) in facts.iter().enumerate() {
+            // `Iterator::find` semantics keep the first fact for a range.
+            exact.entry(fact.range).or_insert(index);
+        }
+        Self { facts, exact }
+    }
+
+    /// The fact recorded for exactly this key range, if any.
+    pub(super) fn exact(&self, key_range: TextRange) -> Option<&'a ScopeFact> {
+        self.exact.get(&key_range).map(|&index| &self.facts[index])
+    }
+
+    /// The nearest fact that ends at or before `offset`.
+    pub(super) fn preceding(&self, offset: TextSize) -> Option<&'a ScopeFact> {
+        // Facts whose start is at/after the offset cannot end before it.
+        let upper = self
+            .facts
+            .partition_point(|fact| fact.range.start() < offset);
+        self.facts[..upper]
+            .iter()
+            .rev()
+            .find(|fact| fact.range.end() <= offset)
+    }
+}
+
+/// Per-file cache of root-context lookups keyed by root key.
+///
+/// Most files have a handful of distinct root keys, and the lookup consults
+/// several rule indexes with case-normalized allocations on every call.
+pub(super) struct RootContextCache {
+    logical_path: Option<LogicalPath>,
+    entries: std::collections::HashMap<String, Option<String>>,
+}
+
+impl RootContextCache {
+    pub(super) fn new(logical_path: Option<&LogicalPath>) -> Self {
+        Self {
+            logical_path: logical_path.cloned(),
+            entries: std::collections::HashMap::new(),
+        }
+    }
+
+    pub(super) fn get(&mut self, rules: &RuleSet, root_key: &str) -> Option<String> {
+        self.entries
+            .entry(root_key.to_owned())
+            .or_insert_with(|| semantic_root_context(rules, self.logical_path.as_ref(), root_key))
+            .clone()
+    }
+}
+
 pub(super) fn lower_semantics(
     properties: &[HirProperty],
     localisation_entries: &[HirLocalisationEntry],
@@ -319,27 +384,30 @@ pub(super) fn lower_semantics(
         .collect::<Vec<_>>();
     let mut references = Vec::new();
     let path = logical_path.map_or("", LogicalPath::as_str);
+    let fact_index = ScopeFactIndex::new(scope_facts);
+    let mut root_contexts = RootContextCache::new(logical_path);
+    let property_children = super::scope::property_children(properties);
 
     if let Some(profile) = profile {
-        for property in properties {
+        for (property_index, property) in properties.iter().enumerate() {
             if property.top_level {
                 if let Some(rule) = profile
                     .definition(path, &property.key)
                     .filter(|rule| !rule.requires_value || property.value_range.is_some())
                 {
-                    definitions.push(definition_from_rule(properties, property, rule));
+                    definitions.push(definition_from_rule(properties, property_index, rule));
                 }
                 for rule in profile
                     .conditional_definitions
                     .iter()
                     .filter(|rule| rule.path.matches(path))
                 {
-                    if nested_property(properties, property, &rule.required_field)
+                    if nested_property(properties, property_index, &rule.required_field)
                         .and_then(|nested| nested.scalar.as_ref())
                         .is_some_and(|scalar| {
                             scalar.value.eq_ignore_ascii_case(&rule.required_value)
                         })
-                        && nested_property(properties, property, &rule.absent_field).is_none()
+                        && nested_property(properties, property_index, &rule.absent_field).is_none()
                     {
                         definitions.push(HirDefinition {
                             kind: rule.kind.clone(),
@@ -354,11 +422,10 @@ pub(super) fn lower_semantics(
                     .iter()
                     .filter(|rule| rule.path.matches(path) && rule.key.matches(&property.key))
                 {
-                    for child in properties.iter().filter(|candidate| {
-                        candidate.path.len() == property.path.len().saturating_add(1)
-                            && candidate.path.starts_with(&property.path)
-                            && range_within(candidate.range, property.range)
-                    }) {
+                    // Direct children are precomputed once per file in document
+                    // order; the previous per-property scan was quadratic.
+                    for &child_index in &property_children[property_index] {
+                        let child = &properties[child_index];
                         definitions.push(HirDefinition {
                             kind: rule.kind.clone(),
                             name: child.key.clone(),
@@ -369,7 +436,12 @@ pub(super) fn lower_semantics(
                 }
             }
             if let Some(reference) = reference_from_property(profile, property, logical_path)
-                && !semantic_rules_describe_property(property, scope_facts, logical_path, rules)
+                && !semantic_rules_describe_property(
+                    property,
+                    &fact_index,
+                    &mut root_contexts,
+                    rules,
+                )
             {
                 references.push(reference);
             }
@@ -390,11 +462,11 @@ pub(super) fn lower_semantics(
             }
         }
 
-        for property in properties {
+        for (property_index, property) in properties.iter().enumerate() {
             let Some(rule) = profile.container_value_definition(&property.key) else {
                 continue;
             };
-            let Some(named) = nested_property(properties, property, &rule.name_field) else {
+            let Some(named) = nested_property(properties, property_index, &rule.name_field) else {
                 continue;
             };
             let Some(scalar) = named.scalar.as_ref() else {
@@ -421,10 +493,10 @@ pub(super) fn lower_semantics(
     definitions.extend(semantic_type_definitions(properties, logical_path, rules));
     deduplicate_definitions(&mut definitions);
 
-    references.extend(scripted_macro_references(properties, scope_facts, rules));
+    references.extend(scripted_macro_references(properties, &fact_index, rules));
     references.extend(semantic_typed_references(
         properties,
-        scope_facts,
+        &fact_index,
         rules,
         profile,
     ));
@@ -442,8 +514,8 @@ pub(super) fn lower_semantics(
     for property in properties {
         if let Some(reference) = semantic_localisation_reference(
             property,
-            scope_facts,
-            logical_path,
+            &fact_index,
+            &mut root_contexts,
             rules,
             &enum_localisation_rules,
         ) {
@@ -464,16 +536,13 @@ pub(super) fn lower_semantics(
 
 fn semantic_rules_describe_property(
     property: &HirProperty,
-    scope_facts: &[ScopeFact],
-    logical_path: Option<&LogicalPath>,
+    fact_index: &ScopeFactIndex<'_>,
+    root_contexts: &mut RootContextCache,
     rules: &RuleSet,
 ) -> bool {
-    let fact = scope_facts
-        .iter()
-        .find(|fact| fact.range == property.key_range);
-    let root_context = semantic_root_context(
+    let fact = fact_index.exact(property.key_range);
+    let root_context = root_contexts.get(
         rules,
-        logical_path,
         property
             .path
             .first()
@@ -490,10 +559,9 @@ fn semantic_rules_describe_property(
     // Dynamic scope-link blocks (country tags, `event_target:name`, province ids) are
     // not statically selectable, so they emit no fact of their own. The nearest
     // preceding fact still names the semantic container for their children.
-    let context = fact.as_ref().map(|fact| fact.context.as_str()).or_else(|| {
-        scope_facts
-            .iter()
-            .rfind(|fact| fact.range.end() <= property.key_range.start())
+    let context = fact.map(|fact| fact.context.as_str()).or_else(|| {
+        fact_index
+            .preceding(property.key_range.start())
             .map(|fact| fact.context.as_str())
     });
     rules.exact_semantic_rules(&property.key).any(|rule| {
@@ -764,15 +832,12 @@ fn deduplicate_definitions(definitions: &mut Vec<HirDefinition>) {
 
 fn scripted_macro_references(
     properties: &[HirProperty],
-    scope_facts: &[ScopeFact],
+    fact_index: &ScopeFactIndex<'_>,
     rules: &RuleSet,
 ) -> Vec<HirReference> {
     let mut references = Vec::new();
     for property in properties {
-        let Some(fact) = scope_facts
-            .iter()
-            .find(|fact| fact.range == property.key_range)
-        else {
+        let Some(fact) = fact_index.exact(property.key_range) else {
             continue;
         };
         if property.top_level || !is_concrete_scripted_key(&property.key) {
@@ -873,8 +938,8 @@ fn property_matches_scripted_rule(
 
 fn semantic_localisation_reference(
     property: &HirProperty,
-    scope_facts: &[ScopeFact],
-    logical_path: Option<&LogicalPath>,
+    fact_index: &ScopeFactIndex<'_>,
+    root_contexts: &mut RootContextCache,
     rules: &RuleSet,
     enum_localisation_rules: &[&pdx_rules::SemanticRule],
 ) -> Option<HirReference> {
@@ -884,12 +949,9 @@ fn semantic_localisation_reference(
     if scalar.quoted || scalar.value.contains('$') {
         return None;
     }
-    let fact = scope_facts
-        .iter()
-        .find(|fact| fact.range == property.key_range);
-    let root_context = semantic_root_context(
+    let fact = fact_index.exact(property.key_range);
+    let root_context = root_contexts.get(
         rules,
-        logical_path,
         property
             .path
             .first()
@@ -905,10 +967,9 @@ fn semantic_localisation_reference(
         .map_or(property_parent_path, |fact| fact.parent_path.as_slice());
     // Dynamic scope-link blocks emit no fact of their own; the nearest preceding
     // fact still names the semantic container for their children.
-    let context = fact.as_ref().map(|fact| fact.context.as_str()).or_else(|| {
-        scope_facts
-            .iter()
-            .rfind(|fact| fact.range.end() <= property.key_range.start())
+    let context = fact.map(|fact| fact.context.as_str()).or_else(|| {
+        fact_index
+            .preceding(property.key_range.start())
             .map(|fact| fact.context.as_str())
     });
     let matches_rule = |rule: &pdx_rules::SemanticRule| {
@@ -944,7 +1005,7 @@ fn semantic_localisation_reference(
 /// overlays, so navigation does not need a game-specific special case.
 fn semantic_typed_references(
     properties: &[HirProperty],
-    scope_facts: &[ScopeFact],
+    fact_index: &ScopeFactIndex<'_>,
     rules: &RuleSet,
     profile: Option<&GameProfile>,
 ) -> Vec<HirReference> {
@@ -961,15 +1022,10 @@ fn semantic_typed_references(
         {
             continue;
         }
-        let fact = scope_facts
-            .iter()
-            .find(|fact| fact.range == property.key_range)
-            .or_else(|| {
-                scope_facts
-                    .iter()
-                    .rfind(|fact| fact.range.end() <= property.key_range.start())
-            });
-        let Some(fact) = fact else {
+        let Some(fact) = fact_index
+            .exact(property.key_range)
+            .or_else(|| fact_index.preceding(property.key_range.start()))
+        else {
             continue;
         };
         let property_parent_path = property
@@ -1216,13 +1272,14 @@ pub(super) fn derived_localisation_references(
                 let Some(field) = binding.explicit_field.as_deref() else {
                     continue;
                 };
-                let Some(instance) = properties
+                let Some(instance_index) = properties
                     .iter()
-                    .find(|property| property.range == instance_range)
+                    .position(|property| property.range == instance_range)
                 else {
                     continue;
                 };
-                let Some(field_property) = nested_property(properties, instance, field) else {
+                let Some(field_property) = nested_property(properties, instance_index, field)
+                else {
                     continue;
                 };
                 let Some(field_value) = field_property.scalar.as_ref() else {
@@ -1271,14 +1328,16 @@ fn localisation_type_instances(
     let candidates = if descriptor.skip_root_paths.is_empty() {
         properties
             .iter()
-            .filter(|property| property.top_level)
+            .enumerate()
+            .filter(|(_, property)| property.top_level)
+            .map(|(index, _)| index)
             .collect::<Vec<_>>()
     } else {
         descriptor
             .skip_root_paths
             .iter()
             .flat_map(|skip_path| {
-                properties.iter().filter(move |property| {
+                properties.iter().enumerate().filter(move |(_, property)| {
                     property.path.len() == skip_path.len().saturating_add(1)
                         && property
                             .path
@@ -1290,21 +1349,23 @@ fn localisation_type_instances(
                             })
                 })
             })
+            .map(|(index, _)| index)
             .collect::<Vec<_>>()
     };
 
     let mut instances = Vec::<(String, TextRange, TextRange)>::new();
-    for property in candidates {
+    for property_index in candidates {
         // Only container blocks declare type instances; scalar fields inside a parent
         // block (for example `can_form_personal_unions = yes` inside a religion group)
         // must not be treated as instances of the child type.
+        let property = &properties[property_index];
         if property.scalar.is_some() || !property_key_matches_type(descriptor, &property.key) {
             continue;
         }
         let (name, reference_range) = descriptor
             .name_field
             .as_deref()
-            .and_then(|field| nested_property(properties, property, field))
+            .and_then(|field| nested_property(properties, property_index, field))
             .and_then(|nested| {
                 nested
                     .scalar
@@ -1403,13 +1464,14 @@ fn localisation_subtype_applies(
 
 fn definition_from_rule(
     properties: &[HirProperty],
-    property: &HirProperty,
+    property_index: usize,
     rule: &ProfileDefinitionRule,
 ) -> HirDefinition {
+    let property = &properties[property_index];
     let named = rule
         .name_field
         .as_deref()
-        .and_then(|field| nested_property(properties, property, field))
+        .and_then(|field| nested_property(properties, property_index, field))
         .and_then(|nested| nested.scalar.as_ref());
     HirDefinition {
         kind: rule.kind.clone(),
@@ -1453,13 +1515,20 @@ fn reference_from_property(
 
 fn nested_property<'hir>(
     properties: &'hir [HirProperty],
-    parent: &HirProperty,
+    parent_index: usize,
     wanted: &str,
 ) -> Option<&'hir HirProperty> {
-    properties
+    // Properties are collected in document order, so the parent's descendants
+    // form a contiguous window that ends at the first property at or above the
+    // parent's depth. Scanning that window (instead of every property in the
+    // file) keeps conditional-definition extraction linear overall.
+    let parent = &properties[parent_index];
+    properties[parent_index + 1..]
         .iter()
-        .filter(|property| property.path.len() > parent.path.len())
-        .filter(|property| property.path.starts_with(&parent.path))
-        .filter(|property| range_within(property.range, parent.range))
+        .take_while(|property| {
+            property.path.len() > parent.path.len()
+                && property.path.starts_with(&parent.path)
+                && range_within(property.range, parent.range)
+        })
         .find(|property| property.key.eq_ignore_ascii_case(wanted))
 }
