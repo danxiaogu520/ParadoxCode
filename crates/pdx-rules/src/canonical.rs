@@ -53,7 +53,7 @@ impl fmt::Debug for RuleHash {
 }
 pub(crate) fn canonical_hash(model: &RulesModel) -> RuleHash {
     let mut bytes = Vec::new();
-    bytes.extend_from_slice(b"paradoxcode/rules/v8\0");
+    bytes.extend_from_slice(b"paradoxcode/rules/v9\0");
     put_str(&mut bytes, &model.game_id);
     // The profile is part of the logical rule identity. A cache built with different path,
     // scope, symbol, or dynamic-value interpretation must never be reused under the same hash.
@@ -231,7 +231,13 @@ pub(crate) fn canonical_hash(model: &RulesModel) -> RuleHash {
         put_len(&mut bytes, scopes.len());
         for (root, scope) in scopes {
             put_str(&mut bytes, &root);
-            put_str(&mut bytes, &scope);
+            put_str(&mut bytes, &scope.root);
+            put_str(&mut bytes, &scope.this);
+            put_str(&mut bytes, &scope.from);
+            put_len(&mut bytes, scope.documentation.len());
+            for documentation in &scope.documentation {
+                put_str(&mut bytes, documentation);
+            }
         }
     }
     let mut descriptor_names = model

@@ -121,17 +121,22 @@ pub(crate) fn semantic_initial_scope(
         return scope_context_from_hir(snapshot.game_profile_handle(), state);
     }
     let mut scope = ScopeContext::new(snapshot.game_profile_handle());
-    if let Some(type_name) = context.strip_prefix("type:")
-        && let Some(root_scope) = snapshot
+    if let Some(type_name) = context.strip_prefix("type:") {
+        if let Some(registers) = snapshot
             .rules()
-            .model()
-            .semantic
-            .type_root_scopes
-            .get(type_name)
-            .and_then(|roots| roots.get(root_key))
-    {
-        scope.root.clone_from(root_scope);
-        scope.current.clone_from(root_scope);
+            .type_root_scope_registers(type_name, root_key)
+        {
+            scope.root = initial_scope_register_value(&registers.root, None, None);
+            scope.current = initial_scope_register_value(&registers.this, Some(&scope.root), None);
+            scope.from = vec![initial_scope_register_value(
+                &registers.from,
+                Some(&scope.root),
+                Some(&scope.current),
+            )];
+            return scope;
+        }
+        // Unknown/custom type roots keep the same conservative defaults as declared roots.
+        scope.from.push("any".to_owned());
         return scope;
     }
     if let Some(root_scope) = snapshot.game_profile().root_scope(root_key) {
@@ -139,6 +144,24 @@ pub(crate) fn semantic_initial_scope(
         scope.current = root_scope.to_owned();
     }
     scope
+}
+
+fn initial_scope_register_value(
+    expression: &str,
+    root: Option<&str>,
+    current: Option<&str>,
+) -> String {
+    let expression = expression.trim();
+    if expression.is_empty() || expression.eq_ignore_ascii_case("any") {
+        return "any".to_owned();
+    }
+    if expression.eq_ignore_ascii_case("root") {
+        return root.unwrap_or("any").to_owned();
+    }
+    if expression.eq_ignore_ascii_case("this") {
+        return current.or(root).unwrap_or("any").to_owned();
+    }
+    expression.to_owned()
 }
 
 pub(crate) fn scope_context_from_hir(

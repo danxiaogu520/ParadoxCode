@@ -489,13 +489,18 @@ fn add_type_root_key_items(
         } else {
             label.clone()
         };
+        let documentation = snapshot
+            .rules()
+            .type_root_scope_registers(type_name, label)
+            .filter(|scope| !scope.documentation.is_empty())
+            .map(|scope| scope.documentation.join("\n"));
         push_completion(
             items,
             CompletionItem {
                 label: label.clone(),
                 kind: CompletionKind::Key,
                 detail: type_name.clone(),
-                documentation: None,
+                documentation,
                 replacement_range,
                 insert_text,
                 sort_score: 0,

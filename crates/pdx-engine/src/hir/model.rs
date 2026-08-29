@@ -47,6 +47,19 @@ impl ScopeState {
             previous: Vec::new(),
         }
     }
+
+    pub(crate) fn initial_registers(
+        root: ScopeValue,
+        current: ScopeValue,
+        from: ScopeValue,
+    ) -> Self {
+        Self {
+            root,
+            current: vec![current],
+            from: vec![from],
+            previous: Vec::new(),
+        }
+    }
 }
 
 /// Cached semantic root context and initial scope for one source property.

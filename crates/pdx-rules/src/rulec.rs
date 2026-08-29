@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use crate::{
     FileCategory, GameProfile, RuleRecord, RuleSet, RulesError, RulesModel, SemanticModel,
-    SymbolDescriptor,
+    SymbolDescriptor, TypeRootScope,
 };
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -89,7 +89,7 @@ struct CatalogSource {
 type ParsedTypeFragments = (
     BTreeMap<String, crate::TypeDescriptor>,
     BTreeMap<String, Vec<String>>,
-    BTreeMap<String, BTreeMap<String, String>>,
+    BTreeMap<String, BTreeMap<String, TypeRootScope>>,
 );
 
 #[derive(Debug, Deserialize)]
@@ -295,7 +295,7 @@ fn parse_semantic_fragments(
 enum ParsedTypeFragment {
     Descriptors(BTreeMap<String, crate::TypeDescriptor>),
     RootKeys(BTreeMap<String, Vec<String>>),
-    RootScopes(BTreeMap<String, BTreeMap<String, String>>),
+    RootScopes(BTreeMap<String, BTreeMap<String, TypeRootScope>>),
 }
 
 fn parse_type_fragment(
@@ -336,7 +336,7 @@ fn parse_type_fragments(
 ) -> Result<ParsedTypeFragments, CompileError> {
     let mut descriptors = BTreeMap::new();
     let mut root_keys = BTreeMap::new();
-    let mut root_scopes = BTreeMap::<String, BTreeMap<String, String>>::new();
+    let mut root_scopes = BTreeMap::<String, BTreeMap<String, TypeRootScope>>::new();
     for fragment in read_type_fragments_parallel(paths, files)? {
         match fragment {
             ParsedTypeFragment::RootKeys(fragment) => {
@@ -678,6 +678,30 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
             if scripted_macro.macro_enabled && !scripted_macro.usage.is_nonempty() {
                 return Err(CompileError::Validation(format!(
                     "type descriptor {identity} enables scripted macros without a usage capability"
+                )));
+            }
+        }
+    }
+    for (type_name, roots) in &model.semantic.type_root_scopes {
+        for (root_key, registers) in roots {
+            for (register, value) in [
+                ("root", registers.root.as_str()),
+                ("this", registers.this.as_str()),
+                ("from", registers.from.as_str()),
+            ] {
+                if value.trim().is_empty() {
+                    return Err(CompileError::Validation(format!(
+                        "type root scope {type_name}.{root_key} has an empty {register} scope"
+                    )));
+                }
+            }
+            if registers
+                .documentation
+                .iter()
+                .any(|line| line.trim().is_empty())
+            {
+                return Err(CompileError::Validation(format!(
+                    "type root scope {type_name}.{root_key} has an empty documentation line"
                 )));
             }
         }
@@ -1155,7 +1179,48 @@ mod tests {
         assert_eq!(source_model.semantic.rules.len(), 8_530);
         assert_eq!(source_model.semantic.enum_values.len(), 72);
         assert_eq!(source_model.semantic.type_root_keys.len(), 5);
-        assert_eq!(source_model.semantic.type_root_scopes.len(), 1);
+        assert_eq!(source_model.semantic.type_root_scopes.len(), 2);
+        assert_eq!(
+            source_model
+                .semantic
+                .type_root_keys
+                .get("on_action")
+                .map(Vec::len),
+            Some(256)
+        );
+        assert_eq!(
+            source_model
+                .semantic
+                .type_root_scopes
+                .get("on_action")
+                .map(std::collections::BTreeMap::len),
+            Some(256)
+        );
+        let mercenary = source_model
+            .semantic
+            .type_root_scopes
+            .get("on_action")
+            .and_then(|roots| roots.get("on_mercenary_recruited"))
+            .expect("mercenary on_action scope registers");
+        assert_eq!(mercenary.root, "mercenary_company");
+        assert_eq!(mercenary.this, "province");
+        assert_eq!(mercenary.from, "country");
+        assert_eq!(
+            mercenary.documentation,
+            [
+                "ROOT is the mercenary company; THIS is the recruiting province; FROM is the recruiting country."
+            ]
+        );
+        let startup = source_model
+            .semantic
+            .type_root_scopes
+            .get("on_action")
+            .and_then(|roots| roots.get("on_startup"))
+            .expect("startup on_action scope registers");
+        assert_eq!(startup.root, "country");
+        assert_eq!(startup.this, "country");
+        assert_eq!(startup.from, "any");
+        assert!(!startup.documentation.is_empty());
         assert_eq!(source_model.semantic.type_descriptors.len(), 148);
         assert_eq!(source_model.semantic.localisation_bindings.len(), 187);
         assert_eq!(source_model.profile.scan_roots.len(), 126);

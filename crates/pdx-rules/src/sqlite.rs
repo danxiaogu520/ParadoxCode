@@ -5,6 +5,7 @@ use crate::model::{
     FileCategory, FileResolutionPolicy, LocalisationBinding, LocalisationBindingCondition,
     ParserKind, RuleRecord, RuleShape, RulesModel, ScriptedMacroDescriptor, ScriptedMacroUsage,
     SemanticModel, SemanticRule, SymbolDescriptor, SymbolResolutionPolicy, TypeDescriptor,
+    TypeRootScope,
 };
 use crate::runtime::{RuleSet, RulesError};
 use rusqlite::{Connection, OptionalExtension, params};
@@ -72,6 +73,9 @@ fn schema(connection: &Connection) -> Result<(), RulesError> {
             type_name TEXT NOT NULL,
             root_key TEXT NOT NULL,
             scope TEXT NOT NULL,
+            this_scope TEXT,
+            from_scope TEXT,
+            documentation TEXT NOT NULL DEFAULT '',
             PRIMARY KEY (type_name, root_key)
         );
         CREATE TABLE IF NOT EXISTS type_descriptors (
@@ -111,6 +115,7 @@ fn schema(connection: &Connection) -> Result<(), RulesError> {
     )?;
     ensure_file_category_columns(connection)?;
     ensure_semantic_columns(connection)?;
+    ensure_type_root_scope_columns(connection)?;
     Ok(())
 }
 
@@ -184,6 +189,27 @@ fn ensure_semantic_columns(connection: &Connection) -> Result<(), RulesError> {
         if present == 0 {
             connection.execute(
                 &format!("ALTER TABLE type_descriptors ADD COLUMN {name} {definition}"),
+                [],
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn ensure_type_root_scope_columns(connection: &Connection) -> Result<(), RulesError> {
+    for (name, definition) in [
+        ("this_scope", "TEXT"),
+        ("from_scope", "TEXT"),
+        ("documentation", "TEXT NOT NULL DEFAULT ''"),
+    ] {
+        let present: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('type_root_scopes') WHERE name = ?1",
+            params![name],
+            |row| row.get(0),
+        )?;
+        if present == 0 {
+            connection.execute(
+                &format!("ALTER TABLE type_root_scopes ADD COLUMN {name} {definition}"),
                 [],
             )?;
         }
@@ -314,8 +340,15 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
     for (type_name, scopes) in &rules.model.semantic.type_root_scopes {
         for (root, scope) in scopes {
             transaction.execute(
-                "INSERT INTO type_root_scopes(type_name, root_key, scope) VALUES (?1, ?2, ?3)",
-                params![type_name, root, scope],
+                "INSERT INTO type_root_scopes(type_name, root_key, scope, this_scope, from_scope, documentation) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    type_name,
+                    root,
+                    scope.root,
+                    scope.this,
+                    scope.from,
+                    scope.documentation.join("\u{1f}"),
+                ],
             )?;
         }
     }
@@ -683,21 +716,37 @@ fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesEr
     }
     let mut type_root_scopes = BTreeMap::new();
     let mut statement = connection.prepare(
-        "SELECT type_name, root_key, scope FROM type_root_scopes ORDER BY type_name, root_key",
+        "SELECT type_name, root_key, scope, this_scope, from_scope, documentation FROM type_root_scopes ORDER BY type_name, root_key",
     )?;
     let rows = statement.query_map([], |row| {
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, String>(1)?,
             row.get::<_, String>(2)?,
+            row.get::<_, Option<String>>(3)?,
+            row.get::<_, Option<String>>(4)?,
+            row.get::<_, Option<String>>(5)?,
         ))
     })?;
     for row in rows {
-        let (type_name, root_key, scope) = row?;
+        let (type_name, root_key, root, this, from, documentation) = row?;
         type_root_scopes
             .entry(type_name)
             .or_insert_with(BTreeMap::new)
-            .insert(root_key, scope);
+            .insert(
+                root_key,
+                TypeRootScope {
+                    this: this.unwrap_or_else(|| root.clone()),
+                    from: from.unwrap_or_else(|| "any".to_owned()),
+                    root,
+                    documentation: documentation
+                        .unwrap_or_default()
+                        .split('\u{1f}')
+                        .filter(|line| !line.is_empty())
+                        .map(str::to_owned)
+                        .collect(),
+                },
+            );
     }
     let mut type_descriptors = BTreeMap::new();
     let scripted_macro_columns = if scripted_macro_columns_available(connection)? {
