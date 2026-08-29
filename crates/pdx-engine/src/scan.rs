@@ -493,8 +493,9 @@ fn record_scan_notice(
 /// EU4 stores some localised text in a game-specific byte encoding. After decoding with
 /// replacement characters, the surrounding script/localisation structure is still useful to
 /// the index. Quoted values are blanked as one token, comments are blanked to the end of their
-/// line, and other malformed bare tokens are blanked up to a structural delimiter. Braces and
-/// line endings are retained, so an enclosing definition and its siblings remain parseable.
+/// line, and other malformed bare tokens are blanked up to a structural delimiter. Structural
+/// braces are retained for bare tokens, while braces inside comments are blanked with the rest of
+/// the comment so commented-out script cannot become active syntax.
 fn sanitize_recovered_text(text: String) -> (String, bool) {
     let mut chars = text.chars().collect::<Vec<_>>();
     let mut bad = vec![false; chars.len()];
@@ -547,25 +548,28 @@ fn sanitize_recovered_text(text: String) -> (String, bool) {
             .iter()
             .position(|character| *character == '#')
             .map(|offset| line_start.saturating_add(offset));
-        let (start, end) = if let Some(comment_start) = comment_start {
-            (comment_start, line_end)
-        } else {
-            let start = chars[line_start..=index]
-                .iter()
-                .rposition(|character| {
-                    character.is_whitespace() || matches!(character, '=' | '{' | '}' | ':')
-                })
-                .map_or(line_start, |offset| {
-                    line_start.saturating_add(offset).saturating_add(1)
-                });
-            let end = chars[index..line_end]
-                .iter()
-                .position(|character| {
-                    character.is_whitespace() || matches!(character, '{' | '}' | '#')
-                })
-                .map_or(line_end, |offset| index.saturating_add(offset));
-            (start, end)
-        };
+        if let Some(comment_start) = comment_start {
+            for slot in comment_start..line_end {
+                if !matches!(chars[slot], '\r' | '\n') {
+                    chars[slot] = ' ';
+                }
+                masked[slot] = true;
+            }
+            continue;
+        }
+
+        let start = chars[line_start..=index]
+            .iter()
+            .rposition(|character| {
+                character.is_whitespace() || matches!(character, '=' | '{' | '}' | ':')
+            })
+            .map_or(line_start, |offset| {
+                line_start.saturating_add(offset).saturating_add(1)
+            });
+        let end = chars[index..line_end]
+            .iter()
+            .position(|character| character.is_whitespace() || matches!(character, '{' | '}' | '#'))
+            .map_or(line_end, |offset| index.saturating_add(offset));
         for slot in start..end {
             if !matches!(chars[slot], '\r' | '\n' | '{' | '}') {
                 chars[slot] = ' ';

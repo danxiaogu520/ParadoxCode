@@ -272,6 +272,60 @@ fn game_encoded_text_with_control_characters_keeps_surrounding_definitions() {
 }
 
 #[test]
+fn malformed_characters_in_comments_do_not_activate_commented_braces() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-encoded-comments-{nonce}"));
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("event directory");
+    fs::write(
+        events.join("encoded.txt"),
+        "country_event = { id = before.1 }\n\
+# disabled = { # replacement: �\n\
+# }\n\
+country_event = { id = after_open.1 }\n\
+# replacements: � � }\n\
+country_event = { id = after_close.1 }\n",
+    )
+    .expect("encoded comments");
+
+    let mut host = eu4_host();
+    host.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root.clone(),
+        ),
+    ]));
+    let report = host.refresh_source_roots().expect("encoded comment scan");
+
+    assert_eq!(report.indexed_files, 1);
+    assert_eq!(report.skipped_entries, 0);
+    assert!(report.issues.iter().any(|issue| {
+        issue.kind == super::WorkspaceScanIssueKind::EncodingRecovered
+            && issue.path.ends_with("events/encoded.txt")
+    }));
+    let snapshot = host.snapshot();
+    let source = snapshot
+        .source_files()
+        .values()
+        .next()
+        .expect("encoded source");
+    let shard = snapshot.index().shard(source.id).expect("source shard");
+    assert_eq!(shard.syntax_error_count, 0);
+    for event_id in ["before.1", "after_open.1", "after_close.1"] {
+        assert_eq!(
+            snapshot.index().definitions("event", event_id).len(),
+            1,
+            "expected {event_id} to remain indexed"
+        );
+    }
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn malformed_quoted_value_does_not_discard_the_parent_or_sibling() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
