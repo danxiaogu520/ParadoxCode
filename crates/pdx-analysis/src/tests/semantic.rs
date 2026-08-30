@@ -32,11 +32,11 @@ fn quoted_transition_beats_any_scalar_leaf_fallback() {
     fallback.shape = RuleShape::Leaf;
     fallback.child_context = None;
     let property = crate::ScriptProperty {
-        key: "embedded".to_owned(),
+        key: std::sync::Arc::from("embedded"),
         key_range: TextRange::empty(0),
         range: TextRange::empty(0),
-        operator: Some("=".to_owned()),
-        scalar: Some(("foo = yes".to_owned(), TextRange::empty(0))),
+        operator: Some(std::sync::Arc::from("=")),
+        scalar: Some((std::sync::Arc::from("foo = yes"), TextRange::empty(0))),
         quoted: true,
         quoted_source: None,
         block_range: None,
@@ -108,9 +108,12 @@ fn multiple_hir_scope_candidates_remain_conservative_in_analysis() {
     };
     let context =
         crate::scope_context_from_hir(std::sync::Arc::new(pdx_game::eu4::profile()), &state);
-    assert_eq!(context.root, "any");
-    assert_eq!(context.current, "any");
-    assert_eq!(context.from, ["country"]);
+    assert_eq!(context.root.as_ref(), "any");
+    assert_eq!(context.current.as_ref(), "any");
+    assert_eq!(
+        context.from.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+        vec!["country"]
+    );
 }
 
 #[test]
@@ -380,11 +383,11 @@ fn semantic_alternative_selection_refuses_equal_scores() {
     );
 
     let property = crate::ScriptProperty {
-        key: "left".to_owned(),
+        key: std::sync::Arc::from("left"),
         key_range: TextRange::empty(0),
         range: TextRange::empty(0),
         operator: None,
-        scalar: Some(("yes".to_owned(), TextRange::empty(0))),
+        scalar: Some((std::sync::Arc::from("yes"), TextRange::empty(0))),
         quoted: false,
         quoted_source: None,
         block_range: None,
@@ -397,7 +400,7 @@ fn semantic_alternative_selection_refuses_equal_scores() {
             &rules,
             "fixture",
             &[],
-            &[property],
+            &[&property],
             &[],
             &scope,
         )
@@ -472,20 +475,20 @@ fn workspace_type_child_key_selects_only_one_transition() {
     let snapshot = host.snapshot();
     let scope = crate::ScopeContext::new(std::sync::Arc::new(pdx_game::eu4::profile()));
     let mut property = crate::ScriptProperty {
-        key: "choose".to_owned(),
+        key: std::sync::Arc::from("choose"),
         key_range: TextRange::empty(0),
         range: TextRange::empty(0),
-        operator: Some("=".to_owned()),
+        operator: Some(std::sync::Arc::from("=")),
         scalar: None,
         quoted: false,
         quoted_source: None,
         block_range: Some(TextRange::empty(0)),
         block: vec![crate::ScriptProperty {
-            key: "FRA".to_owned(),
+            key: std::sync::Arc::from("FRA"),
             key_range: TextRange::empty(0),
             range: TextRange::empty(0),
-            operator: Some("=".to_owned()),
-            scalar: Some(("yes".to_owned(), TextRange::empty(0))),
+            operator: Some(std::sync::Arc::from("=")),
+            scalar: Some((std::sync::Arc::from("yes"), TextRange::empty(0))),
             quoted: false,
             quoted_source: None,
             block_range: None,
@@ -510,7 +513,7 @@ fn workspace_type_child_key_selects_only_one_transition() {
         Some("country-destination")
     );
 
-    property.block[0].key = "MISSING".to_owned();
+    property.block[0].key = std::sync::Arc::from("MISSING");
     assert!(
         crate::semantic_selected_transition(crate::SemanticTransitionInput {
             snapshot: &snapshot,
