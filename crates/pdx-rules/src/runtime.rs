@@ -4,7 +4,8 @@ use crate::model::{FileCategory, RulesModel, SemanticModel, SemanticRule, TypeRo
 use crate::{CURRENT_SCHEMA_VERSION, sqlite};
 use pdx_text::LogicalPath;
 
-use std::collections::{BTreeMap, HashMap};
+use rustc_hash::FxHashMap;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
 use std::path::Path;
@@ -98,12 +99,16 @@ pub struct RuleSet {
     pub(crate) schema_version: u32,
     pub(crate) rule_hash: RuleHash,
     pub(crate) model: RulesModel,
-    pub(crate) exact_semantic_rules: HashMap<String, Vec<usize>>,
-    pub(crate) semantic_rules_by_context: HashMap<String, Vec<usize>>,
+    pub(crate) exact_semantic_rules: FxHashMap<Box<str>, Vec<usize>>,
+    pub(crate) semantic_rules_by_context: FxHashMap<Box<str>, Vec<usize>>,
     /// Lowercased context -> (lowercased exact key -> rule indices).
-    pub(crate) semantic_exact_rules_by_context_key: HashMap<String, HashMap<String, Vec<usize>>>,
+    pub(crate) semantic_exact_rules_by_context_key:
+        FxHashMap<Box<str>, FxHashMap<Box<str>, Vec<usize>>>,
     /// Lowercased context -> rule indices whose key is not exact.
-    pub(crate) semantic_non_exact_rules_by_context: HashMap<String, Vec<usize>>,
+    pub(crate) semantic_non_exact_rules_by_context: FxHashMap<Box<str>, Vec<usize>>,
+    /// Whether each rule's context is `effect` or `trigger`, precomputed once so scope
+    /// link resolution stops re-lowercasing rule contexts per lookup.
+    pub(crate) effect_trigger_contexts: Vec<bool>,
 }
 
 impl RuleSet {
@@ -128,10 +133,11 @@ impl RuleSet {
                 },
                 profile: crate::GameProfile::default(),
             },
-            exact_semantic_rules: HashMap::new(),
-            semantic_rules_by_context: HashMap::new(),
-            semantic_exact_rules_by_context_key: HashMap::new(),
-            semantic_non_exact_rules_by_context: HashMap::new(),
+            exact_semantic_rules: FxHashMap::default(),
+            semantic_rules_by_context: FxHashMap::default(),
+            semantic_exact_rules_by_context_key: FxHashMap::default(),
+            semantic_non_exact_rules_by_context: FxHashMap::default(),
+            effect_trigger_contexts: Vec::new(),
         }
     }
 
@@ -178,16 +184,19 @@ impl RuleSet {
             values.dedup();
         }
         let rule_hash = canonical_hash(&model);
-        let mut exact_semantic_rules = HashMap::<String, Vec<usize>>::new();
-        let mut semantic_rules_by_context = HashMap::<String, Vec<usize>>::new();
+        let mut exact_semantic_rules = FxHashMap::<Box<str>, Vec<usize>>::default();
+        let mut semantic_rules_by_context = FxHashMap::<Box<str>, Vec<usize>>::default();
         let mut semantic_exact_rules_by_context_key =
-            HashMap::<String, HashMap<String, Vec<usize>>>::new();
-        let mut semantic_non_exact_rules_by_context = HashMap::<String, Vec<usize>>::new();
+            FxHashMap::<Box<str>, FxHashMap<Box<str>, Vec<usize>>>::default();
+        let mut semantic_non_exact_rules_by_context = FxHashMap::<Box<str>, Vec<usize>>::default();
+        let mut effect_trigger_contexts = Vec::with_capacity(model.semantic.rules.len());
         for (index, rule) in model.semantic.rules.iter().enumerate() {
-            let context_key = rule.context.to_ascii_lowercase();
+            let context_key: Box<str> = rule.context.to_ascii_lowercase().into_boxed_str();
+            effect_trigger_contexts
+                .push(context_key.as_ref() == "effect" || context_key.as_ref() == "trigger");
             match &rule.key {
                 KeyMatcher::Exact(key) => {
-                    let key = key.to_ascii_lowercase();
+                    let key: Box<str> = key.to_ascii_lowercase().into_boxed_str();
                     exact_semantic_rules
                         .entry(key.clone())
                         .or_default()
@@ -219,6 +228,7 @@ impl RuleSet {
             semantic_rules_by_context,
             semantic_exact_rules_by_context_key,
             semantic_non_exact_rules_by_context,
+            effect_trigger_contexts,
         }
     }
 
@@ -240,6 +250,79 @@ impl RuleSet {
             .into_iter()
             .flatten()
             .map(|index| &self.model.semantic.rules[*index])
+    }
+
+    /// Returns the rule indices behind [`Self::exact_semantic_rules`] without borrowing the
+    /// rules themselves, so callers can pair indices with precomputed per-rule facts.
+    #[must_use]
+    pub fn exact_semantic_rule_indices(&self, key: &str) -> &[usize] {
+        case_insensitive_indices(&self.exact_semantic_rules, key)
+            .map_or(&[], |indices| indices.as_slice())
+    }
+
+    /// Returns whether the rule at `index` is declared in the `effect` or `trigger` context.
+    ///
+    /// Precomputed at load time; scope link resolution consults it per exact-key lookup and
+    /// must not re-fold rule context strings on the hot path.
+    #[must_use]
+    pub fn semantic_rule_is_effect_or_trigger(&self, index: usize) -> bool {
+        self.effect_trigger_contexts
+            .get(index)
+            .is_some_and(|flag| *flag)
+    }
+
+    /// Returns rule indices whose key matcher is not exact for one context.
+    ///
+    /// These are the rules a key-indexed lookup must still scan; callers that
+    /// memoize them per container avoid repeating the scan per property.
+    pub fn semantic_non_exact_rules_for_context(
+        &self,
+        context: &str,
+    ) -> impl Iterator<Item = usize> + '_ {
+        let context_key = normalized_ascii_query(context);
+        self.semantic_non_exact_rules_by_context
+            .get(context_key.as_ref())
+            .into_iter()
+            .flatten()
+            .copied()
+    }
+
+    /// Returns exact-key rule indices for one (context, key) pair.
+    pub fn semantic_exact_rules_for_context_key(
+        &self,
+        context: &str,
+        key: &str,
+    ) -> impl Iterator<Item = usize> + '_ {
+        let context_key = normalized_ascii_query(context);
+        let key = normalized_ascii_query(key);
+        self.semantic_exact_rules_by_context_key
+            .get(context_key.as_ref())
+            .and_then(|by_key| by_key.get(key.as_ref()))
+            .into_iter()
+            .flatten()
+            .copied()
+    }
+
+    /// Returns rule indices for one context (both exact and non-exact keys).
+    ///
+    /// Lets callers memoize filtered index lists without recovering indices
+    /// from references.
+    pub fn semantic_rule_indices_for_context(
+        &self,
+        context: &str,
+    ) -> impl Iterator<Item = usize> + '_ {
+        let context_key = normalized_ascii_query(context);
+        self.semantic_rules_by_context
+            .get(context_key.as_ref())
+            .into_iter()
+            .flatten()
+            .copied()
+    }
+
+    /// Returns the semantic rule at one index from `semantic_rule_indices_for_context`.
+    #[must_use]
+    pub fn semantic_rule_at(&self, index: usize) -> Option<&SemanticRule> {
+        self.model.semantic.rules.get(index)
     }
 
     /// Returns semantic rules for one context without scanning unrelated contexts.
@@ -395,7 +478,7 @@ impl RuleSet {
     }
 }
 fn case_insensitive_indices<'a>(
-    index: &'a HashMap<String, Vec<usize>>,
+    index: &'a FxHashMap<Box<str>, Vec<usize>>,
     key: &str,
 ) -> Option<&'a Vec<usize>> {
     let key = normalized_ascii_query(key);
