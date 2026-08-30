@@ -243,7 +243,7 @@ struct QuotedSemanticCollector<'snapshot, 'input, 'data, 'session, 'cancel> {
 
 struct QuotedSemanticContainer<'a> {
     context: &'a str,
-    parent_path: &'a [String],
+    parent_path: &'a [std::sync::Arc<str>],
     scope: &'a ScopeContext,
     properties: &'a [ScriptProperty],
     embedded: bool,
@@ -406,7 +406,7 @@ struct EmbeddedSemanticInput<'a> {
 fn collect_embedded_property_semantics(
     source: EmbeddedSemanticInput<'_>,
     context: &str,
-    parent_path: &[String],
+    parent_path: &[std::sync::Arc<str>],
     scope: &ScopeContext,
     container_key: Option<&str>,
     property: &ScriptProperty,
@@ -434,7 +434,7 @@ fn collect_embedded_property_semantics(
             data.definitions.push(make_definition(
                 input,
                 kind,
-                value.clone(),
+                value.to_string(),
                 property.range,
                 *range,
             ));
@@ -477,7 +477,7 @@ fn collect_embedded_property_semantics(
             snapshot,
             type_name,
             &summary,
-            property.scalar.as_ref().map(|(value, _)| value.as_str()),
+            property.scalar.as_ref().map(|(value, _)| value.as_ref()),
             property.block_range.is_some(),
         ) {
             data.references.push(embedded_reference(
@@ -610,6 +610,11 @@ pub(crate) fn semantic_type_property_is_invalid<'a>(
     let Some(fact) = hir.scope_fact_at(property.key_range) else {
         return false;
     };
+    let fact_path: Vec<std::sync::Arc<str>> = fact
+        .parent_path
+        .iter()
+        .map(|segment| pdx_engine::intern_shard_string(segment))
+        .collect();
     let by_path = match cached_containers.get_mut(fact.context.as_str()) {
         Some(by_path) => by_path,
         None => cached_containers.entry(fact.context.clone()).or_default(),
@@ -618,8 +623,7 @@ pub(crate) fn semantic_type_property_is_invalid<'a>(
         // `semantic_rules_for_container` ignores its scope argument; build it once per container
         // only so the caller does not allocate a scope context for every property.
         let scope = scope_context_from_hir(snapshot.game_profile_handle(), &fact.state);
-        let rules =
-            semantic_rules_for_container(snapshot, &fact.context, &fact.parent_path, &scope);
+        let rules = semantic_rules_for_container(snapshot, &fact.context, &fact_path, &scope);
         let mut concrete_keys = HashSet::new();
         let mut any_scalar_concrete = false;
         let mut has_concrete = false;
@@ -667,7 +671,7 @@ pub(crate) fn semantic_type_property_is_invalid<'a>(
         && entry.rules.iter().any(|rule| {
             !matches!(rule.key, KeyMatcher::Type(_) | KeyMatcher::Dynamic(_))
                 && !matches!(rule.shape, RuleShape::LeafValue)
-                && semantic_rule_key_matches(snapshot, rule, &fact.parent_path, &property.key)
+                && semantic_rule_key_matches(snapshot, rule, &fact_path, &property.key)
         })
     {
         return false;

@@ -32,7 +32,7 @@ fn semantic_hover_descends_into_quoted_script_with_mapped_range() {
         context
             .property
             .as_ref()
-            .map(|property| property.key.as_str()),
+            .map(|property| property.key.as_ref()),
         Some("foo"),
         "{context:?}"
     );

@@ -55,7 +55,7 @@ struct ExpansionInput<'bindings, 'session, 'cancel> {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ExpandedContainer {
     pub(crate) properties: Vec<ScriptProperty>,
-    pub(crate) bare_values: Vec<(String, TextRange)>,
+    pub(crate) bare_values: Vec<(std::sync::Arc<str>, TextRange)>,
     omitted_optional: bool,
 }
 
@@ -194,15 +194,19 @@ impl MacroExpansionSession {
                                 expanded.properties.extend(properties);
                                 expanded.bare_values.extend(bare_values);
                             }
-                            QuotedScriptParse::Opaque => {
-                                expanded.bare_values.push((rendered.value, rendered.range))
-                            }
+                            QuotedScriptParse::Opaque => expanded.bare_values.push((
+                                pdx_engine::intern_shard_string(&rendered.value),
+                                rendered.range,
+                            )),
                             QuotedScriptParse::Limited(limit) => {
                                 return Ok(Err(ExpansionFailure::Limit(limit.message())));
                             }
                         }
                     } else {
-                        expanded.bare_values.push((rendered.value, rendered.range));
+                        expanded.bare_values.push((
+                            pdx_engine::intern_shard_string(&rendered.value),
+                            rendered.range,
+                        ));
                     }
                 }
                 MacroTemplateItem::Conditional(conditional) => {
@@ -261,7 +265,7 @@ impl MacroExpansionSession {
                 };
                 let quoted = scalar.quoted_source.is_some();
                 (
-                    Some((scalar.value, scalar.range)),
+                    Some((pdx_engine::intern_shard_string(&scalar.value), scalar.range)),
                     quoted,
                     scalar.quoted_source,
                     None,
@@ -296,10 +300,13 @@ impl MacroExpansionSession {
             }
         };
         Ok(Ok(Some(ScriptProperty {
-            key: key.value,
+            key: pdx_engine::intern_shard_string(&key.value),
             key_range: key.range,
             range: input.fallback_range,
-            operator: property.operator.clone(),
+            operator: property
+                .operator
+                .as_deref()
+                .map(pdx_engine::intern_shard_string),
             scalar,
             quoted,
             quoted_source,
@@ -453,7 +460,7 @@ fn bind_arguments(invocation: &ScriptProperty) -> BTreeMap<String, BoundValue> {
                 range: argument.block_range.unwrap_or(argument.key_range),
             },
             |(value, range)| BoundValue::Scalar {
-                value: value.clone(),
+                value: value.to_string(),
                 range: *range,
                 quoted_source: argument.quoted_source.clone(),
             },

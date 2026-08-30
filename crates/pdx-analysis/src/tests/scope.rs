@@ -50,15 +50,16 @@ fn eu4_scope_link_chains_are_resolved_segment_by_segment() {
     let host = eu4_host(rules);
     let snapshot = host.snapshot();
     let mut context = crate::ScopeContext::new(std::sync::Arc::new(pdx_game::eu4::profile()));
-    context.root = "province".to_owned();
-    context.current = "province".to_owned();
+    context.root = std::sync::Arc::from("province");
+    context.current = std::sync::Arc::from("province");
 
     assert_eq!(
-        crate::resolve_scope_expression_context(&snapshot, &context, "owner.capital_scope"),
+        crate::resolve_scope_expression_context(&snapshot, &context, "owner.capital_scope")
+            .as_ref(),
         "province"
     );
     assert_eq!(
-        crate::resolve_scope_expression_context(&snapshot, &context, "owner.missing_link"),
+        crate::resolve_scope_expression_context(&snapshot, &context, "owner.missing_link").as_ref(),
         "any"
     );
 

@@ -19,8 +19,8 @@ use crate::semantic::{
 #[derive(Clone, Debug)]
 pub(crate) struct SemanticCompletionContext {
     pub(crate) context: String,
-    pub(crate) parent_path: Vec<String>,
-    pub(crate) structural_containers: Vec<(String, Vec<String>)>,
+    pub(crate) parent_path: Vec<std::sync::Arc<str>>,
+    pub(crate) structural_containers: Vec<(String, Vec<std::sync::Arc<str>>)>,
     pub(crate) alternative_containers: Vec<SemanticCompletionContainer>,
     /// Keys already present in the active container.  Completion uses this to distinguish a
     /// missing required member from one that is already satisfied.
@@ -47,7 +47,7 @@ pub(crate) struct SemanticCompletionContext {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct SemanticCompletionContainer {
     pub(crate) context: String,
-    pub(crate) parent_path: Vec<String>,
+    pub(crate) parent_path: Vec<std::sync::Arc<str>>,
     pub(crate) scope: ScopeContext,
 }
 
@@ -213,8 +213,8 @@ pub(crate) fn semantic_root_entry_uses_bare_values(
 struct SemanticCompletionContainerInput<'a> {
     hir: Option<&'a HirFile>,
     context: String,
-    parent_path: Vec<String>,
-    structural_containers: Vec<(String, Vec<String>)>,
+    parent_path: Vec<std::sync::Arc<str>>,
+    structural_containers: Vec<(String, Vec<std::sync::Arc<str>>)>,
     alternative_containers: Vec<SemanticCompletionContainer>,
     macro_inferred: bool,
     container_property: Option<ScriptProperty>,
@@ -323,7 +323,11 @@ fn semantic_completion_container(
             };
             let next = SemanticCompletionContainer {
                 context: fact.context.clone(),
-                parent_path: fact.parent_path.clone(),
+                parent_path: fact
+                    .parent_path
+                    .iter()
+                    .map(|segment| pdx_engine::intern_shard_string(segment))
+                    .collect(),
                 scope: scope.clone(),
             };
             let structural_containers = completion_structural_containers(
@@ -338,7 +342,11 @@ fn semantic_completion_container(
                 SemanticCompletionContainerInput {
                     hir,
                     context: fact.context.clone(),
-                    parent_path: fact.parent_path.clone(),
+                    parent_path: fact
+                        .parent_path
+                        .iter()
+                        .map(|segment| pdx_engine::intern_shard_string(segment))
+                        .collect(),
                     structural_containers,
                     alternative_containers: Vec::new(),
                     macro_inferred,
@@ -365,7 +373,7 @@ fn semantic_completion_container(
                 existing_keys: property
                     .block
                     .iter()
-                    .map(|child| child.key.clone())
+                    .map(|child| child.key.to_string())
                     .collect(),
                 macro_inferred,
                 scope: scope.clone(),
@@ -540,7 +548,7 @@ fn semantic_completion_container(
     }
     let existing_keys = properties
         .iter()
-        .map(|property| property.key.clone())
+        .map(|property| property.key.to_string())
         .collect();
     let property = properties.into_iter().find(|property| {
         contains(property.range, position)
@@ -649,11 +657,11 @@ pub(crate) fn semantic_completion_containers_equal(
 pub(crate) fn property_transition_rules<'rule>(
     snapshot: &'rule AnalysisSnapshot,
     context: &str,
-    parent_path: &[String],
-    structural_containers: &[(String, Vec<String>)],
+    parent_path: &[std::sync::Arc<str>],
+    structural_containers: &[(String, Vec<std::sync::Arc<str>>)],
     scope: &ScopeContext,
     property: &ScriptProperty,
-) -> Vec<(&'rule pdx_rules::SemanticRule, Vec<String>)> {
+) -> Vec<(&'rule pdx_rules::SemanticRule, Vec<std::sync::Arc<str>>)> {
     let mut out = Vec::new();
     let mut seen = Vec::new();
     for (source_context, source_path) in structural_containers
@@ -684,10 +692,10 @@ pub(crate) fn completion_structural_containers(
     property_key: &str,
     transparent_wrapper: bool,
     next: &SemanticCompletionContainer,
-) -> Vec<(String, Vec<String>)> {
+) -> Vec<(String, Vec<std::sync::Arc<str>>)> {
     let mut structural_path = current.parent_path.clone();
     if !transparent_wrapper {
-        structural_path.push(property_key.to_owned());
+        structural_path.push(pdx_engine::intern_shard_string(property_key));
     }
     let destination_is_structural = next.context.eq_ignore_ascii_case(&current.context)
         && next.parent_path.len() == structural_path.len()
@@ -714,7 +722,7 @@ pub(crate) fn completion_structural_containers(
 pub(crate) fn semantic_rules_for_container<'a>(
     snapshot: &'a AnalysisSnapshot,
     context: &str,
-    parent_path: &[String],
+    parent_path: &[std::sync::Arc<str>],
     _scope: &ScopeContext,
 ) -> Vec<&'a pdx_rules::SemanticRule> {
     let mut candidates = snapshot

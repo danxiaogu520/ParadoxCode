@@ -20,7 +20,7 @@ use super::support::{
 
 pub(crate) struct SemanticCompletionRule<'rule, 'path> {
     pub(crate) rule: &'rule pdx_rules::SemanticRule,
-    pub(crate) parent_path: &'path [String],
+    pub(crate) parent_path: &'path [std::sync::Arc<str>],
     pub(crate) scope: &'path ScopeContext,
     pub(crate) schema_tier: CompletionSchemaTier,
 }
@@ -1224,13 +1224,13 @@ pub(crate) fn scope_expression_candidates(
     };
     for label in &profile.scope_completions {
         let resolved = if label.eq_ignore_ascii_case("root") {
-            Some(scope.root.as_str())
+            Some(scope.root.as_ref())
         } else if label.eq_ignore_ascii_case("this") {
-            Some(scope.current.as_str())
+            Some(scope.current.as_ref())
         } else if label.eq_ignore_ascii_case("from") {
-            scope.from.first().map(String::as_str)
+            scope.from.first().map(|value| value.as_ref())
         } else if label.eq_ignore_ascii_case("prev") {
-            scope.previous.first().map(String::as_str)
+            scope.previous.first().map(|value| value.as_ref())
         } else {
             None
         };

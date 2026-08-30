@@ -173,18 +173,24 @@ pub(crate) fn logical_path(snapshot: &AnalysisSnapshot, path: &Path) -> Option<L
                 .and_then(|name| LogicalPath::parse(&name.to_string_lossy()).ok())
         })
 }
+/// A script property tree built for one analysis query.
+///
+/// Keys, operators, scalars, and bare values are interned `Arc<str>` handles: the same
+/// spellings recur thousands of times per workspace, and validation clones property paths
+/// and scope registers on every transition, so shared allocations keep those clones at
+/// reference-count cost.
 #[derive(Clone, Debug)]
 pub(crate) struct ScriptProperty {
-    pub(crate) key: String,
+    pub(crate) key: std::sync::Arc<str>,
     pub(crate) key_range: TextRange,
     pub(crate) range: TextRange,
-    pub(crate) operator: Option<String>,
-    pub(crate) scalar: Option<(String, TextRange)>,
+    pub(crate) operator: Option<std::sync::Arc<str>>,
+    pub(crate) scalar: Option<(std::sync::Arc<str>, TextRange)>,
     pub(crate) quoted: bool,
     pub(crate) quoted_source: Option<QuotedScalarSource>,
     pub(crate) block_range: Option<TextRange>,
     pub(crate) block: Vec<ScriptProperty>,
-    pub(crate) bare_values: Vec<(String, TextRange)>,
+    pub(crate) bare_values: Vec<(std::sync::Arc<str>, TextRange)>,
 }
 
 #[derive(Clone, Debug)]
@@ -262,18 +268,18 @@ impl QuotedScalarSource {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ScopeContext {
     pub(crate) profile: Arc<GameProfile>,
-    pub(crate) root: String,
-    pub(crate) current: String,
-    pub(crate) from: Vec<String>,
-    pub(crate) previous: Vec<String>,
+    pub(crate) root: Arc<str>,
+    pub(crate) current: Arc<str>,
+    pub(crate) from: Vec<Arc<str>>,
+    pub(crate) previous: Vec<Arc<str>>,
 }
 
 impl ScopeContext {
     pub(crate) fn new(profile: Arc<GameProfile>) -> Self {
         Self {
             profile,
-            root: "any".to_owned(),
-            current: "any".to_owned(),
+            root: pdx_engine::intern_shard_string("any"),
+            current: pdx_engine::intern_shard_string("any"),
             from: Vec::new(),
             previous: Vec::new(),
         }
@@ -287,7 +293,7 @@ pub(crate) fn script_properties(input: &ParsedInput, parent: &CstNode) -> Vec<Sc
 pub(crate) fn script_bare_values(
     input: &ParsedInput,
     parent: &CstNode,
-) -> Vec<(String, TextRange)> {
+) -> Vec<(std::sync::Arc<str>, TextRange)> {
     let ParsedContent::Text(parsed) = &input.parsed;
     script_bare_values_mapped(parsed, parent, Some)
 }
@@ -295,7 +301,7 @@ pub(crate) fn script_bare_values(
 pub(crate) fn quoted_script_container(
     script: &QuotedScript,
     origin: &QuotedScalarSource,
-) -> (Vec<ScriptProperty>, Vec<(String, TextRange)>) {
+) -> (Vec<ScriptProperty>, Vec<(std::sync::Arc<str>, TextRange)>) {
     let parsed = script.parsed();
     let map = |offset| {
         let relative = script.source_map().decoded_offset(offset)?;
@@ -324,7 +330,7 @@ fn script_properties_mapped(
                 .children()
                 .iter()
                 .find(|child| child.kind() == CstKind::Key)?;
-            let key = parsed.text(key_node.range())?.trim().to_owned();
+            let key = pdx_engine::intern_shard_string(parsed.text(key_node.range())?.trim());
             let key_range = map_range(key_node.range())?;
             let value = node
                 .children()
@@ -347,16 +353,18 @@ fn script_properties_mapped(
                 .iter()
                 .find(|child| child.kind() == CstKind::Operator)
                 .and_then(|child| parsed.text(child.range()))
-                .map(str::to_owned);
+                .map(pdx_engine::intern_shard_string);
             let scalar_node = property_scalar_node(node);
             let scalar = scalar_node.and_then(|scalar| {
                 let raw = parsed.text(scalar.range())?.trim();
                 let value = raw
                     .strip_prefix('"')
                     .and_then(|value| value.strip_suffix('"'))
-                    .unwrap_or(raw)
-                    .to_owned();
-                Some((value, map_range(scalar.range())?))
+                    .unwrap_or(raw);
+                Some((
+                    pdx_engine::intern_shard_string(value),
+                    map_range(scalar.range())?,
+                ))
             });
             let quoted_source = scalar_node
                 .filter(|scalar| scalar.kind() == CstKind::QuotedString)
@@ -405,7 +413,7 @@ fn script_bare_values_mapped(
     parsed: &ParsedFile,
     parent: &CstNode,
     map_offset: impl Copy + Fn(TextSize) -> Option<TextSize>,
-) -> Vec<(String, TextRange)> {
+) -> Vec<(std::sync::Arc<str>, TextRange)> {
     parent
         .children()
         .iter()
@@ -415,10 +423,9 @@ fn script_bare_values_mapped(
             let value = raw
                 .strip_prefix('"')
                 .and_then(|value| value.strip_suffix('"'))
-                .unwrap_or(raw)
-                .to_owned();
+                .unwrap_or(raw);
             Some((
-                value,
+                pdx_engine::intern_shard_string(value),
                 TextRange::new(
                     map_offset(child.range().start())?,
                     map_offset(child.range().end())?,
