@@ -211,6 +211,43 @@ fn main() {
     println!("parse: {:.1}s", parse_ns as f64 / 1e9);
     println!("lower: {:.1}s", lower_ns as f64 / 1e9);
 
+    // Diagnostics pass timing (single thread) for optimization feedback.
+    {
+        let snapshot = host.snapshot();
+        let cancellation = pdx_analysis::CancellationToken::new();
+        let mut diag_ns = 0u128;
+        let mut diag_files = 0usize;
+        let mut diagnostics_count = 0usize;
+        for file in snapshot.source_files().values() {
+            if snapshot
+                .rules()
+                .classify(&file.logical_path)
+                .is_none_or(|category| {
+                    !matches!(
+                        category.parser,
+                        pdx_rules::ParserKind::Script | pdx_rules::ParserKind::Localisation
+                    )
+                })
+            {
+                continue;
+            }
+            let started = std::time::Instant::now();
+            if let Ok(diagnostics) = pdx_analysis::source_file_diagnostics_with_cancellation(
+                &snapshot,
+                file.id,
+                &cancellation,
+            ) {
+                diag_ns += started.elapsed().as_nanos();
+                diagnostics_count += diagnostics.len();
+                diag_files += 1;
+            }
+        }
+        println!(
+            "diagnostics pass: files={diag_files} count={diagnostics_count} total={:.1}s",
+            diag_ns as f64 / 1e9
+        );
+    }
+
     // Post-scan phases: eviction and vanilla install, sampled externally.
     drop(snapshot);
     phase_rss("scan-retained");
