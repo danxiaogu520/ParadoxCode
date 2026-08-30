@@ -657,6 +657,37 @@ impl WorkspaceIndex {
             .filter_map(|pointer| self.definition_at(*pointer))
     }
 
+    /// Iterates every retained definition pointer together with its resolution activity.
+    ///
+    /// Lets analysis layers build their own membership views (for example a per-revision
+    /// `(kind, name)` set) in one pass instead of one bucket probe per query.
+    #[must_use = "iterate the retained definition identities"]
+    pub fn definition_identities(&self) -> impl Iterator<Item = (&Definition, bool)> {
+        self.definitions
+            .values()
+            .flatten()
+            .filter_map(|pointer| self.definition_at(*pointer).map(|d| (d, d.active)))
+    }
+
+    /// Returns the name folding applied by definition lookups for one kind.
+    ///
+    /// Case-sensitive kinds keep their spelling; every other kind folds to lowercase. Public
+    /// so higher layers can precompute membership keys exactly as [`Self::definitions`] does.
+    #[must_use]
+    pub fn definition_name_key<'name>(
+        &self,
+        kind: &str,
+        name: &'name str,
+    ) -> std::borrow::Cow<'name, str> {
+        if self.is_case_sensitive(kind) {
+            std::borrow::Cow::Borrowed(name)
+        } else if name.bytes().any(|byte| byte.is_ascii_uppercase()) {
+            std::borrow::Cow::Owned(name.to_ascii_lowercase())
+        } else {
+            std::borrow::Cow::Borrowed(name)
+        }
+    }
+
     /// Iterates over retained definitions of one exact kind without scanning unrelated symbols.
     #[must_use = "iterate the retained definitions"]
     pub fn definitions_for_kind<'index>(
