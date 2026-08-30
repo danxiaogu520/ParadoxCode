@@ -52,6 +52,10 @@ pub(crate) const MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS: usize = 2_000;
 /// host clone after a revision race, and the persistent parse cache keeps
 /// retries cheap; the bound only stops unbounded loops under continuous edits.
 pub(crate) const MAX_BACKGROUND_SCAN_RETRIES: u8 = 10;
+/// Default threads for one whole-workspace validation pass (measured knee).
+pub(crate) const DEFAULT_WORKSPACE_VALIDATION_WORKERS: usize = 4;
+/// Upper bound on threads used by one whole-workspace validation pass.
+pub(crate) const MAX_WORKSPACE_VALIDATION_WORKERS: usize = 12;
 /// Maximum number of stale closed-file diagnostic entries cleared by one pass.
 pub(crate) const MAX_WORKSPACE_DIAGNOSTIC_CLEARS: usize = 2_000;
 pub(crate) const MAX_PUBLISHED_DIAGNOSTICS: usize = 1_000;

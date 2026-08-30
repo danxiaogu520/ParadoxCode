@@ -62,7 +62,7 @@ impl SnapshotQueryCache {
     /// Creates a cache with a conservative per-domain entry bound.
     #[must_use]
     pub fn new() -> Self {
-        Self::with_capacity(256)
+        Self::with_capacity(32_768)
     }
 
     /// Creates a cache with an explicit per-domain entry bound.
