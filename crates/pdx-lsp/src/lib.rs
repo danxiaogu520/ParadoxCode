@@ -36,7 +36,10 @@ pub(crate) const METHOD_NOT_FOUND: i64 = -32601;
 pub(crate) const INVALID_PARAMS: i64 = -32602;
 pub(crate) const SERVER_NOT_INITIALIZED: i64 = -32002;
 pub(crate) const REQUEST_CANCELLED: i64 = -32800;
-pub(crate) const DIAGNOSTIC_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(200);
+/// Delay before a document edit spawns fresh diagnostics. Zero: edits
+/// validate immediately; the pending map still coalesces rapid successive
+/// edits of one document (last version wins) without a timer.
+pub(crate) const DIAGNOSTIC_DEBOUNCE: std::time::Duration = std::time::Duration::ZERO;
 pub(crate) const MAX_LSP_HEADER_BYTES: usize = 8 * 1024;
 pub(crate) const MAX_LSP_MESSAGE_BYTES: usize = 32 * 1024 * 1024;
 pub(crate) const MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
