@@ -338,6 +338,9 @@ pub struct GameProfile {
     /// scope without appearing as ordinary `push_scope` rules. Keeping the mapping in profile
     /// data lets the generic semantic engine remain game-agnostic.
     pub scope_member_aliases: BTreeMap<String, String>,
+    /// Derived scope name/alias lookup; see [`ScopeLookup`].
+    #[serde(skip)]
+    scope_lookup: std::sync::OnceLock<ScopeLookup>,
     /// Scope spellings offered by completion.
     pub scope_completions: Vec<String>,
     /// Root-key fallbacks used when semantic type metadata has no initial scope.
@@ -394,6 +397,18 @@ pub struct ProfileKeyIndex {
     value_scan: Vec<usize>,
     container_value_exact: ExactKeyBuckets,
     container_value_scan: Vec<usize>,
+}
+
+/// Lazily built lookup for scope names and member aliases.
+///
+/// `is_scope` and `scope_member_alias` run inside per-rule value matching, so alias probing
+/// must not rebuild underscore-stripped spellings per call.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct ScopeLookup {
+    /// Lowercased known scope spellings.
+    names: rustc_hash::FxHashSet<Box<str>>,
+    /// Lowercased, underscore-stripped alias -> concrete scope spelling.
+    aliases: rustc_hash::FxHashMap<Box<str>, Box<str>>,
 }
 
 /// Case-split exact buckets for one rule list.
@@ -503,6 +518,27 @@ impl GameProfile {
         self.key_index.get_or_init(|| ProfileKeyIndex::build(self))
     }
 
+    fn resolved_scope_lookup(&self) -> &ScopeLookup {
+        self.scope_lookup.get_or_init(|| {
+            let fold = |value: &str| value.to_ascii_lowercase().replace('_', "").into_boxed_str();
+            ScopeLookup {
+                // Scope names compare case-insensitively with underscores intact.
+                names: self
+                    .scope_names
+                    .iter()
+                    .map(|name| name.to_ascii_lowercase().into_boxed_str())
+                    .collect(),
+                // Alias identity additionally ignores underscores, matching the original
+                // `alias.replace('_', "") == value.replace('_', "")` fallback.
+                aliases: self
+                    .scope_member_aliases
+                    .iter()
+                    .map(|(alias, scope)| (fold(alias), fold(scope)))
+                    .collect(),
+            }
+        })
+    }
+
     /// Creates an identity-only profile with no game-specific interpretation.
     #[must_use]
     pub fn empty(game_id: impl Into<String>) -> Self {
@@ -524,6 +560,7 @@ impl GameProfile {
             token_definitions: Vec::new(),
             scope_names: Vec::new(),
             scope_member_aliases: BTreeMap::new(),
+            scope_lookup: std::sync::OnceLock::new(),
             scope_completions: Vec::new(),
             root_scopes: Vec::new(),
             scope_compatibilities: Vec::new(),
@@ -846,23 +883,26 @@ impl GameProfile {
     /// Returns whether a scope spelling is known to this profile.
     #[must_use]
     pub fn is_scope(&self, value: &str) -> bool {
-        self.scope_names
-            .iter()
-            .any(|scope| scope.eq_ignore_ascii_case(value))
+        let lookup = self.resolved_scope_lookup();
+        if value.bytes().any(|byte| byte.is_ascii_uppercase()) {
+            lookup.names.contains(value.to_ascii_lowercase().as_str())
+        } else {
+            lookup.names.contains(value)
+        }
     }
 
     /// Returns the concrete scope selected by a profile-defined intrinsic expression.
+    ///
+    /// The alias identity is lowercase with underscores removed, matching the original
+    /// equality of `alias` and `alias.replace('_', "") == value.replace('_', "")` without
+    /// allocating stripped spellings per call.
     #[must_use]
     pub fn scope_member_alias(&self, value: &str) -> Option<&str> {
-        self.scope_member_aliases
-            .iter()
-            .find(|(alias, _)| {
-                alias.eq_ignore_ascii_case(value)
-                    || (alias
-                        .replace('_', "")
-                        .eq_ignore_ascii_case(&value.replace('_', "")))
-            })
-            .map(|(_, scope)| scope.as_str())
+        let folded = folded_scope_key(value);
+        self.resolved_scope_lookup()
+            .aliases
+            .get(folded.as_ref())
+            .map(|scope| scope.as_ref())
     }
 
     /// Tests profile scope compatibility, including the generic `any` scope.
@@ -911,5 +951,17 @@ impl GameProfile {
                     .iter()
                     .any(|value| value.eq_ignore_ascii_case(member))
         })
+    }
+}
+
+/// Lowercases and strips underscores, borrowing the input when neither is needed.
+fn folded_scope_key(value: &str) -> std::borrow::Cow<'_, str> {
+    let needs_fold = value
+        .bytes()
+        .any(|byte| byte.is_ascii_uppercase() || byte == b'_');
+    if needs_fold {
+        std::borrow::Cow::Owned(value.to_ascii_lowercase().replace('_', ""))
+    } else {
+        std::borrow::Cow::Borrowed(value)
     }
 }
