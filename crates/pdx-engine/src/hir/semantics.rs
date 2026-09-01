@@ -209,18 +209,13 @@ pub(super) fn scripted_macro_path_context(
 
 pub(super) fn scripted_macro_type_context(rules: &RuleSet, type_name: &str) -> Option<String> {
     rules
-        .model()
-        .semantic
-        .type_descriptors
-        .iter()
-        .find(|(candidate, _)| candidate.eq_ignore_ascii_case(type_name))
-        .and_then(|(_, descriptor)| descriptor.scripted_macro.as_ref())
-        .filter(|descriptor| descriptor.macro_enabled)
-        .map(|descriptor| descriptor.body_context.trim().to_owned())
+        .scripted_macro_context(type_name)
         .filter(|context| !context.is_empty())
+        .map(str::to_owned)
 }
 
 pub(super) fn is_scripted_macro_type(rules: &RuleSet, type_name: &str) -> bool {
+    // Blank body contexts keep the type non-macro for shape checks, as before.
     scripted_macro_type_context(rules, type_name).is_some()
 }
 
