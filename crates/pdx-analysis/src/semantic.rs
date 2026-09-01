@@ -2157,15 +2157,7 @@ pub(crate) fn localisation_key_index(snapshot: &AnalysisSnapshot) -> Arc<Localis
 }
 
 pub(crate) fn scripted_macro_type(snapshot: &AnalysisSnapshot, type_name: &str) -> bool {
-    snapshot
-        .rules()
-        .model()
-        .semantic
-        .type_descriptors
-        .iter()
-        .find(|(candidate, _)| candidate.eq_ignore_ascii_case(type_name))
-        .and_then(|(_, descriptor)| descriptor.scripted_macro.as_ref())
-        .is_some_and(|descriptor| descriptor.macro_enabled)
+    snapshot.rules().scripted_macro_context(type_name).is_some()
 }
 
 /// Per-revision view of every definition identity visible to membership queries.
@@ -2244,12 +2236,25 @@ impl MemberKindView {
 struct OverlayHiddenCounts(rustc_hash::FxHashMap<Box<str>, rustc_hash::FxHashMap<Box<str>, u32>>);
 
 fn overlay_hidden_counts(snapshot: &AnalysisSnapshot) -> Arc<OverlayHiddenCounts> {
+    thread_local! {
+        static SLOT: std::cell::RefCell<Option<(u64, Arc<OverlayHiddenCounts>)>> =
+            const { std::cell::RefCell::new(None) };
+    }
     let revision = snapshot.revision();
+    if let Some(cached) = SLOT.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .filter(|(seen, _)| *seen == revision)
+            .map(|(_, view)| Arc::clone(view))
+    }) {
+        return cached;
+    }
     let cache_key = "workspace-membership-hidden";
     if let Some(cached) = snapshot
         .query_cache()
         .get::<OverlayHiddenCounts>(revision, cache_key)
     {
+        SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&cached))));
         return cached;
     }
     let mut counts = OverlayHiddenCounts(rustc_hash::FxHashMap::default());
@@ -2280,6 +2285,7 @@ fn overlay_hidden_counts(snapshot: &AnalysisSnapshot) -> Arc<OverlayHiddenCounts
         cache_key.to_owned(),
         counts.clone(),
     );
+    SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&counts))));
     counts
 }
 
@@ -2433,13 +2439,31 @@ fn membership_view_type_names(rules: &pdx_rules::RuleSet) -> Vec<String> {
 }
 
 /// Returns the shared membership view for this snapshot revision.
+///
+/// Validation probes membership per (rule, property); the snapshot query cache's read
+/// lock and type-erased downcast dominated that path once 13 workers shared it. Each
+/// worker thread memoizes the `Arc` for the revision it is validating — the underlying
+/// map stays a single shared allocation, and a revision change invalidates the slot.
 fn workspace_membership(snapshot: &AnalysisSnapshot) -> Arc<WorkspaceMembership> {
+    thread_local! {
+        static SLOT: std::cell::RefCell<Option<(u64, Arc<WorkspaceMembership>)>> =
+            const { std::cell::RefCell::new(None) };
+    }
     let revision = snapshot.revision();
+    if let Some(cached) = SLOT.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .filter(|(seen, _)| *seen == revision)
+            .map(|(_, view)| Arc::clone(view))
+    }) {
+        return cached;
+    }
     let cache_key = "workspace-membership";
     if let Some(cached) = snapshot
         .query_cache()
         .get::<WorkspaceMembership>(revision, cache_key)
     {
+        SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&cached))));
         return cached;
     }
     let mut kinds: rustc_hash::FxHashMap<Box<str>, rustc_hash::FxHashMap<Box<str>, u32>> =
@@ -2485,6 +2509,7 @@ fn workspace_membership(snapshot: &AnalysisSnapshot) -> Arc<WorkspaceMembership>
         cache_key.to_owned(),
         Arc::clone(&membership),
     );
+    SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&membership))));
     membership
 }
 
@@ -2535,10 +2560,26 @@ pub(crate) struct OverlayMembers {
 }
 
 /// Returns the overlay definition view for this revision, computing it at most once.
+///
+/// Like the membership view, each worker thread memoizes the shared `Arc` for the
+/// revision it observes so membership checks skip the query-cache lock entirely.
 pub(crate) fn overlay_members(snapshot: &AnalysisSnapshot) -> Arc<OverlayMembers> {
+    thread_local! {
+        static SLOT: std::cell::RefCell<Option<(u64, Arc<OverlayMembers>)>> =
+            const { std::cell::RefCell::new(None) };
+    }
     let revision = snapshot.revision();
+    if let Some(cached) = SLOT.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .filter(|(seen, _)| *seen == revision)
+            .map(|(_, view)| Arc::clone(view))
+    }) {
+        return cached;
+    }
     let key = "overlay-members";
     if let Some(cached) = snapshot.query_cache().get::<OverlayMembers>(revision, key) {
+        SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&cached))));
         return cached;
     }
     let mut members = OverlayMembers::default();
@@ -2563,6 +2604,7 @@ pub(crate) fn overlay_members(snapshot: &AnalysisSnapshot) -> Arc<OverlayMembers
         key.to_owned(),
         Arc::clone(&members),
     );
+    SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&members))));
     members
 }
 
