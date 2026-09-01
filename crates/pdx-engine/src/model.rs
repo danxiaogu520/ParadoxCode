@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use pdx_parser::{CstKind, FileFormat, ParsedFile};
 use pdx_rules::FileResolutionPolicy;
-use pdx_text::{LineIndex, LogicalPath, PositionRange, TextRange};
+use pdx_text::{LineIndex, LogicalPath, TextRange};
 
 use crate::hir::HirFile;
 use crate::index::FileIndexShard;
@@ -617,7 +617,6 @@ pub struct FileState {
     pub(crate) parsed: Option<ParsedSource>,
     pub(crate) hir: Option<Arc<HirFile>>,
     pub(crate) shard: Arc<FileIndexShard>,
-    pub(crate) cached_positions: Option<Arc<Vec<(TextRange, PositionRange)>>>,
     pub(crate) cached_localisation_previews: Option<Arc<Vec<(TextRange, LocalisationPreview)>>>,
 }
 
@@ -672,7 +671,7 @@ impl FileState {
         &self.shard
     }
 
-    pub(crate) fn cache_only(mut self, positions: Vec<(TextRange, PositionRange)>) -> Self {
+    pub(crate) fn cache_only(mut self) -> Self {
         let cached_localisation_previews =
             self.cached_localisation_previews
                 .take()
@@ -689,15 +688,11 @@ impl FileState {
             parsed: None,
             hir: None,
             shard: self.shard,
-            cached_positions: Some(Arc::new(positions)),
             cached_localisation_previews,
         }
     }
 
-    pub(crate) fn cache_only_from_existing(
-        &self,
-        positions: Vec<(TextRange, PositionRange)>,
-    ) -> Self {
+    pub(crate) fn cache_only_from_existing(&self) -> Self {
         let cached_localisation_previews = self
             .cached_localisation_previews
             .as_ref()
@@ -715,21 +710,18 @@ impl FileState {
             parsed: None,
             hir: None,
             shard: Arc::clone(&self.shard),
-            cached_positions: Some(Arc::new(positions)),
             cached_localisation_previews,
         }
     }
 
-    pub(crate) fn cached_localisation_previews(
-        &self,
-    ) -> Option<&[(TextRange, LocalisationPreview)]> {
+    pub fn cached_localisation_previews(&self) -> Option<&[(TextRange, LocalisationPreview)]> {
         self.cached_localisation_previews
             .as_deref()
             .map(Vec::as_slice)
     }
 
     /// Drops the retained CST/HIR frontends while keeping the source text,
-    /// index shard, and any cached positions or previews.
+    /// index shard, and any cached localisation previews.
     ///
     /// Used after background validation to bound resident memory: closed files
     /// rarely need their trees again, and [`crate::pipeline`] callers can
@@ -746,7 +738,6 @@ impl FileState {
             parsed: None,
             hir: None,
             shard: Arc::clone(&self.shard),
-            cached_positions: self.cached_positions.clone(),
             cached_localisation_previews: self.cached_localisation_previews.clone(),
         })
     }

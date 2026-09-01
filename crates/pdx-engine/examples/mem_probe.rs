@@ -54,6 +54,7 @@ fn main() {
         SourceRootKind::CurrentMod,
         root,
     )]));
+    phase_rss("rules");
     let mut vanilla_installed = false;
     if let Some(appdata) = std::env::var_os("LOCALAPPDATA") {
         let cache_path =
@@ -66,6 +67,7 @@ fn main() {
             Err(error) => println!("cache load failed: {error}"),
         }
     }
+    phase_rss("vanilla");
     host.refresh_source_roots().expect("scan");
     let scan_seconds = started.elapsed().as_secs_f64();
     println!("vanilla cache installed: {vanilla_installed}");
@@ -86,8 +88,8 @@ fn main() {
     let mut hir_reference_bytes = 0usize;
     let mut shard_definitions = 0usize;
     let mut shard_references = 0usize;
-    let cached_positions = 0usize;
-    let cached_previews = 0usize;
+    let mut cached_preview_entries = 0usize;
+    let mut cached_preview_bytes = 0usize;
     let mut files = 0usize;
     let mut files_with_frontend = 0usize;
 
@@ -132,6 +134,15 @@ fn main() {
         }
         shard_definitions += state.shard().definitions.len();
         shard_references += state.shard().references.len();
+        if let Some(previews) = state.cached_localisation_previews() {
+            for (_, preview) in previews {
+                cached_preview_entries += 1;
+                cached_preview_bytes += preview.value.len() + 24;
+                if let Some(language) = &preview.language {
+                    cached_preview_bytes += language.len() + 24;
+                }
+            }
+        }
     }
     let position_ranges = snapshot.index().position_ranges().len();
 
@@ -180,7 +191,177 @@ fn main() {
         position_ranges,
         mib((position_ranges * 64) as f64)
     );
-    println!("cached positions: {cached_positions}, previews: {cached_previews}");
+    println!(
+        "state cached previews: {cached_preview_entries} = {:.0} MiB",
+        mib(cached_preview_bytes as f64)
+    );
+    {
+        let mut preview_entries = 0usize;
+        let mut preview_bytes = 0usize;
+        for (_, preview) in snapshot.localisation_previews().iter() {
+            preview_entries += 1;
+            preview_bytes += preview.value.len() + 24;
+            if let Some(language) = &preview.language {
+                preview_bytes += language.len() + 24;
+            }
+        }
+        println!(
+            "workspace preview map: {preview_entries} entries = {:.0} MiB strings (+ map nodes)",
+            mib(preview_bytes as f64)
+        );
+    }
+
+    // Whole-index accounting (mod + vanilla): shard symbol bytes with the real
+    // Arc-sharing picture, and the mod/vanilla position split. `file_state`
+    // presence distinguishes mod files (scanned, source retained) from
+    // vanilla files (cache-installed, source not retained).
+    {
+        let index = snapshot.index();
+        let mut name_pool: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        let mut kind_pool: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        let mut name_bytes = 0usize;
+        let mut kind_bytes = 0usize;
+        let mut name_uses = 0usize;
+        let mut definition_entries = 0usize;
+        for definition in index.definitions_iter() {
+            definition_entries += 1;
+            name_uses += 1;
+            if name_pool.insert(std::sync::Arc::as_ptr(&definition.name) as *const u8 as usize) {
+                name_bytes += definition.name.len() + 16;
+            }
+            if kind_pool.insert(std::sync::Arc::as_ptr(&definition.kind) as *const u8 as usize) {
+                kind_bytes += definition.kind.len() + 16;
+            }
+        }
+        let mut reference_entries = 0usize;
+        for reference in index.references_iter() {
+            reference_entries += 1;
+            name_uses += 1;
+            if name_pool.insert(std::sync::Arc::as_ptr(&reference.name) as *const u8 as usize) {
+                name_bytes += reference.name.len() + 16;
+            }
+            if kind_pool.insert(std::sync::Arc::as_ptr(&reference.kind) as *const u8 as usize) {
+                kind_bytes += reference.kind.len() + 16;
+            }
+        }
+        let entry_bytes = definition_entries * std::mem::size_of::<pdx_engine::Definition>()
+            + reference_entries * std::mem::size_of::<pdx_engine::Reference>();
+        println!(
+            "shard symbols: defs {definition_entries} + refs {reference_entries}; vec entries {:.0} MiB; distinct names {} of {name_uses} uses = {:.0} MiB; kinds {:.0} MiB",
+            mib(entry_bytes as f64),
+            name_pool.len(),
+            mib(name_bytes as f64),
+            mib(kind_bytes as f64),
+        );
+        let mut mod_positions = 0usize;
+        let mut vanilla_positions = 0usize;
+        for ((file_id, _), _) in index.position_ranges().iter() {
+            if snapshot.file_state(file_id).is_some() {
+                mod_positions += 1;
+            } else {
+                vanilla_positions += 1;
+            }
+        }
+        let entry = std::mem::size_of::<(pdx_text::TextRange, pdx_text::PositionRange)>();
+        println!(
+            "position split: mod {mod_positions} + vanilla {vanilla_positions} x {entry}B = {:.0} MiB (+vec slack)",
+            mib(((mod_positions + vanilla_positions) * entry) as f64)
+        );
+
+        // Shard vec capacity slack: capacity beyond len is dead bytes per file.
+        let mut slack_entries = 0usize;
+        for file in snapshot.source_files().values() {
+            let Some(shard) = index.shard(file.id) else {
+                continue;
+            };
+            slack_entries += shard.definitions.capacity() - shard.definitions.len();
+            slack_entries += shard.references.capacity() - shard.references.len();
+        }
+        println!(
+            "shard vec slack: {slack_entries} entries ≈ {:.0} MiB",
+            mib((slack_entries * std::mem::size_of::<pdx_engine::Reference>()) as f64)
+        );
+    }
+
+    // Rules database: SemanticRule structs plus their (un-interned) strings,
+    // and the raw normalized records that hover-only fallback keys consume.
+    {
+        let rules = snapshot.rules();
+        let mut rule_entries = 0usize;
+        let mut rule_string_bytes = 0usize;
+        let mut rule_vec_elements = 0usize;
+        fn add_str(total: &mut usize, value: &str) {
+            *total += value.len() + 16;
+        }
+        for rule in rules.semantic_rules() {
+            rule_entries += 1;
+            add_str(&mut rule_string_bytes, &rule.id);
+            add_str(&mut rule_string_bytes, &rule.context);
+            for segment in &rule.parent_path {
+                add_str(&mut rule_string_bytes, segment);
+                rule_vec_elements += 1;
+            }
+            if let pdx_rules::KeyMatcher::Exact(key) | pdx_rules::KeyMatcher::Enum(key) = &rule.key
+            {
+                add_str(&mut rule_string_bytes, key);
+            }
+            if let Some(operator) = &rule.operator {
+                add_str(&mut rule_string_bytes, operator);
+            }
+            if let Some(child) = &rule.child_context {
+                add_str(&mut rule_string_bytes, child);
+            }
+            if let Some(alternative) = &rule.alternative_id {
+                add_str(&mut rule_string_bytes, alternative);
+            }
+            for line in &rule.documentation {
+                add_str(&mut rule_string_bytes, line);
+                rule_vec_elements += 1;
+            }
+            for scope in &rule.allowed_scopes {
+                add_str(&mut rule_string_bytes, scope);
+                rule_vec_elements += 1;
+            }
+            if let Some(push) = &rule.push_scope {
+                add_str(&mut rule_string_bytes, push);
+            }
+            for (register, scope) in &rule.replace_scope {
+                add_str(&mut rule_string_bytes, register);
+                add_str(&mut rule_string_bytes, scope);
+                rule_vec_elements += 2;
+            }
+        }
+        println!(
+            "semantic rules: {rule_entries} x {}B = {:.0} MiB structs; strings {:.0} MiB; vec headers ~{:.0} MiB",
+            std::mem::size_of::<pdx_rules::SemanticRule>(),
+            mib((rule_entries * std::mem::size_of::<pdx_rules::SemanticRule>()) as f64),
+            mib(rule_string_bytes as f64),
+            mib((rule_vec_elements * std::mem::size_of::<String>()) as f64),
+        );
+        let model = rules.model();
+        let record_struct_bytes =
+            model.records.len() * std::mem::size_of::<pdx_rules::RuleRecord>();
+        let mut record_field_count = 0usize;
+        let mut record_string_bytes = 0usize;
+        for record in &model.records {
+            add_str(&mut record_string_bytes, &record.table);
+            add_str(&mut record_string_bytes, &record.logical_id);
+            for (key, value) in &record.fields {
+                record_field_count += 1;
+                add_str(&mut record_string_bytes, key);
+                add_str(&mut record_string_bytes, value);
+            }
+        }
+        println!(
+            "records: {} x {}B = {:.0} MiB structs; {} fields = {:.0} MiB nodes; strings {:.0} MiB",
+            model.records.len(),
+            std::mem::size_of::<pdx_rules::RuleRecord>(),
+            mib(record_struct_bytes as f64),
+            record_field_count,
+            mib((record_field_count * 80) as f64),
+            mib(record_string_bytes as f64),
+        );
+    }
 
     // Phase timing over the same corpus: read, parse, lower. The remainder of
     // the scan cost is shard building, line indexes, and position extraction.
@@ -314,6 +495,12 @@ fn main() {
     let evicted = host.evict_source_frontends(&|_| false);
     println!("evicted frontends: {evicted}");
     phase_rss("evicted");
+
+    // Ablation: drop the entire host (index, shards, positions, sources,
+    // rules). Anything the working set keeps afterwards is allocator
+    // retention from the scan's transient frontends, not live data.
+    drop(host);
+    phase_rss("dropped");
     phase_rss("end");
 }
 

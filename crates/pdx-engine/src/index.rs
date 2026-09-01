@@ -425,6 +425,9 @@ fn sort_position_entries(
         }
     }
     entries.truncate(write);
+    // These vectors stay resident for the session; drop the growth doubling's
+    // spare capacity so the workspace position table does not carry ~2x slack.
+    entries.shrink_to_fit();
     entries
 }
 
