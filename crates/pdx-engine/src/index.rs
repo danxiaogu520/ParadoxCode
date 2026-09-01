@@ -514,7 +514,9 @@ struct DefinitionPointer {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct WorkspaceIndex {
     pub(crate) shards: BTreeMap<SourceFileId, Arc<FileIndexShard>>,
-    definitions: BTreeMap<(String, String), Vec<DefinitionPointer>>,
+    /// Nested so lookups probe with borrowed strings: kind spellings as written, folded
+    /// names inside. Nested BTree iteration preserves the previous `(kind, name)` order.
+    definitions: BTreeMap<Box<str>, BTreeMap<Box<str>, Vec<DefinitionPointer>>>,
     case_sensitive_kinds: BTreeSet<String>,
     /// Cached UTF-16 positions for files whose source text is not retained, such as Vanilla.
     pub(crate) position_ranges: PositionMap,
@@ -610,10 +612,8 @@ impl WorkspaceIndex {
     /// priority-resolution state from the pointer buckets.
     #[must_use]
     pub fn definitions_with_state(&self, kind: &str, name: &str) -> Vec<(&Definition, bool)> {
-        self.definitions
-            .get(&(kind.to_owned(), self.lookup_name(kind, name)))
-            .into_iter()
-            .flatten()
+        self.definition_bucket(kind, name)
+            .iter()
             .filter_map(|pointer| {
                 self.definition_at(*pointer)
                     .map(|definition| (definition, pointer.active))
@@ -621,13 +621,19 @@ impl WorkspaceIndex {
             .collect()
     }
 
+    /// Returns the pointer bucket for one `(kind, name)` without allocating a key.
+    fn definition_bucket(&self, kind: &str, name: &str) -> &[DefinitionPointer] {
+        self.definitions
+            .get(kind)
+            .and_then(|by_name| by_name.get(self.lookup_name(kind, name).as_ref()))
+            .map_or(&[][..], |bucket| bucket.as_slice())
+    }
+
     /// Returns all retained definitions for a kind/name, including shadowed ones.
     #[must_use]
     pub fn definitions(&self, kind: &str, name: &str) -> Vec<&Definition> {
-        self.definitions
-            .get(&(kind.to_owned(), self.lookup_name(kind, name)))
-            .into_iter()
-            .flatten()
+        self.definition_bucket(kind, name)
+            .iter()
             .filter_map(|pointer| self.definition_at(*pointer))
             .collect()
     }
@@ -653,6 +659,7 @@ impl WorkspaceIndex {
     pub fn definitions_iter(&self) -> impl Iterator<Item = &Definition> {
         self.definitions
             .values()
+            .flat_map(|by_name| by_name.values())
             .flatten()
             .filter_map(|pointer| self.definition_at(*pointer))
     }
@@ -665,6 +672,7 @@ impl WorkspaceIndex {
     pub fn definition_identities(&self) -> impl Iterator<Item = (&Definition, bool)> {
         self.definitions
             .values()
+            .flat_map(|by_name| by_name.values())
             .flatten()
             .filter_map(|pointer| self.definition_at(*pointer).map(|d| (d, d.active)))
     }
@@ -694,12 +702,12 @@ impl WorkspaceIndex {
         &'index self,
         kind: &str,
     ) -> impl Iterator<Item = &'index Definition> {
-        let first_key = (kind.to_owned(), String::new());
-        let expected_kind = kind.to_owned();
+        let kind_bound: Box<str> = Box::from(kind);
         self.definitions
-            .range(first_key..)
-            .take_while(move |((candidate_kind, _), _)| candidate_kind == &expected_kind)
-            .flat_map(|(_, pointers)| pointers)
+            .range(kind_bound..)
+            .take_while(move |(candidate_kind, _)| candidate_kind.as_ref() == kind)
+            .flat_map(|(_, by_name)| by_name.values())
+            .flatten()
             .filter_map(|pointer| self.definition_at(*pointer))
     }
 
@@ -824,7 +832,13 @@ impl WorkspaceIndex {
         rules: &RuleSet,
         cancellation: &WorkspaceScanToken,
     ) -> Result<(), WorkspaceError> {
-        let keys = self.definitions.keys().cloned().collect::<Vec<_>>();
+        let keys = self
+            .definitions
+            .iter()
+            .flat_map(|(kind, by_name)| {
+                by_name.keys().map(move |name| (kind.clone(), name.clone()))
+            })
+            .collect::<Vec<_>>();
         let policies = symbol_policies(rules);
         for key in &keys {
             cancellation.checkpoint()?;
@@ -844,13 +858,15 @@ impl WorkspaceIndex {
         self.resolve_definition_buckets(&affected, priorities, &policies);
     }
 
-    fn replace_shard_entries(&mut self, shard: Arc<FileIndexShard>) -> Vec<(String, String)> {
+    fn replace_shard_entries(&mut self, shard: Arc<FileIndexShard>) -> Vec<(Box<str>, Box<str>)> {
         let file_id = shard.file_id;
         let mut affected = self.remove_shard_entries(file_id);
         for (ordinal, definition) in shard.definitions.iter().enumerate() {
             let key = self.definition_key(definition);
             self.definitions
-                .entry(key.clone())
+                .entry(key.0.clone())
+                .or_default()
+                .entry(key.1.clone())
                 .or_default()
                 .push(DefinitionPointer {
                     file_id,
@@ -866,7 +882,7 @@ impl WorkspaceIndex {
         affected
     }
 
-    fn remove_shard_entries(&mut self, file_id: SourceFileId) -> Vec<(String, String)> {
+    fn remove_shard_entries(&mut self, file_id: SourceFileId) -> Vec<(Box<str>, Box<str>)> {
         self.remove_position_ranges(file_id);
         let Some(previous) = self.shards.remove(&file_id) else {
             return Vec::new();
@@ -879,12 +895,19 @@ impl WorkspaceIndex {
         affected.sort();
         affected.dedup();
         for key in &affected {
-            let remove_bucket = self.definitions.get_mut(key).is_some_and(|definitions| {
-                definitions.retain(|definition| definition.file_id != file_id);
-                definitions.is_empty()
-            });
-            if remove_bucket {
-                self.definitions.remove(key);
+            let remove_bucket = self
+                .definitions
+                .get_mut(key.0.as_ref())
+                .and_then(|by_name| by_name.get_mut(key.1.as_ref()))
+                .is_some_and(|definitions| {
+                    definitions.retain(|definition| definition.file_id != file_id);
+                    definitions.is_empty()
+                });
+            if remove_bucket && let Some(by_name) = self.definitions.get_mut(key.0.as_ref()) {
+                by_name.remove(key.1.as_ref());
+                if by_name.is_empty() {
+                    self.definitions.remove(key.0.as_ref());
+                }
             }
         }
         affected
@@ -892,7 +915,7 @@ impl WorkspaceIndex {
 
     fn resolve_definition_buckets(
         &mut self,
-        keys: &[(String, String)],
+        keys: &[(Box<str>, Box<str>)],
         priorities: &BTreeMap<SourceFileId, u64>,
         policies: &BTreeMap<String, SymbolResolutionPolicy>,
     ) {
@@ -901,17 +924,23 @@ impl WorkspaceIndex {
                 .get(&key.0.to_ascii_lowercase())
                 .copied()
                 .unwrap_or(SymbolResolutionPolicy::ReplaceBySymbol);
-            let Some(highest) = self.definitions.get(key).and_then(|values| {
-                values
-                    .iter()
-                    .map(|pointer| priorities.get(&pointer.file_id).copied().unwrap_or(0))
-                    .max()
-            }) else {
+            let Some(highest) = self
+                .definitions
+                .get(key.0.as_ref())
+                .and_then(|by_name| by_name.get(key.1.as_ref()))
+                .and_then(|values| {
+                    values
+                        .iter()
+                        .map(|pointer| priorities.get(&pointer.file_id).copied().unwrap_or(0))
+                        .max()
+                })
+            else {
                 continue;
             };
             let updates = self
                 .definitions
-                .get(key)
+                .get(key.0.as_ref())
+                .and_then(|by_name| by_name.get(key.1.as_ref()))
                 .expect("checked above")
                 .iter()
                 .map(|pointer| {
@@ -928,7 +957,11 @@ impl WorkspaceIndex {
                         })
                 })
                 .collect::<Vec<_>>();
-            if let Some(values) = self.definitions.get_mut(key) {
+            if let Some(values) = self
+                .definitions
+                .get_mut(key.0.as_ref())
+                .and_then(|by_name| by_name.get_mut(key.1.as_ref()))
+            {
                 for (pointer, update) in values.iter_mut().zip(updates) {
                     if let Some(active) = update {
                         pointer.active = active;
@@ -939,9 +972,13 @@ impl WorkspaceIndex {
         }
     }
 
-    fn sort_definition_buckets(&mut self, keys: &[(String, String)]) {
+    fn sort_definition_buckets(&mut self, keys: &[(Box<str>, Box<str>)]) {
         for key in keys {
-            if let Some(values) = self.definitions.get_mut(key) {
+            if let Some(values) = self
+                .definitions
+                .get_mut(key.0.as_ref())
+                .and_then(|by_name| by_name.get_mut(key.1.as_ref()))
+            {
                 values.sort_by_key(|pointer| (!pointer.active, pointer.file_id));
             }
         }
@@ -964,11 +1001,11 @@ impl WorkspaceIndex {
             cancellation.checkpoint()?;
             for (ordinal, definition) in shard.definitions.iter().enumerate() {
                 cancellation.checkpoint()?;
+                let (kind_key, name_key) = self.definition_key(definition);
                 self.definitions
-                    .entry((
-                        definition.kind.to_string(),
-                        self.lookup_name(&definition.kind, &definition.name),
-                    ))
+                    .entry(kind_key)
+                    .or_default()
+                    .entry(name_key)
                     .or_default()
                     .push(DefinitionPointer {
                         file_id: *file_id,
@@ -977,9 +1014,11 @@ impl WorkspaceIndex {
                     });
             }
         }
-        for values in self.definitions.values_mut() {
-            cancellation.checkpoint()?;
-            values.sort_by_key(|pointer| (!pointer.active, pointer.file_id));
+        for by_name in self.definitions.values_mut() {
+            for values in by_name.values_mut() {
+                cancellation.checkpoint()?;
+                values.sort_by_key(|pointer| (!pointer.active, pointer.file_id));
+            }
         }
         Ok(())
     }
@@ -1006,18 +1045,21 @@ impl WorkspaceIndex {
             .contains(&kind.to_ascii_lowercase())
     }
 
-    fn lookup_name(&self, kind: &str, name: &str) -> String {
+    fn lookup_name<'name>(&self, kind: &str, name: &'name str) -> std::borrow::Cow<'name, str> {
         if self.is_case_sensitive(kind) {
-            name.to_owned()
+            std::borrow::Cow::Borrowed(name)
+        } else if name.bytes().any(|byte| byte.is_ascii_uppercase()) {
+            std::borrow::Cow::Owned(name.to_ascii_lowercase())
         } else {
-            name.to_ascii_lowercase()
+            std::borrow::Cow::Borrowed(name)
         }
     }
 
-    fn definition_key(&self, definition: &Definition) -> (String, String) {
+    fn definition_key(&self, definition: &Definition) -> (Box<str>, Box<str>) {
+        let folded = self.lookup_name(&definition.kind, &definition.name);
         (
-            definition.kind.to_string(),
-            self.lookup_name(&definition.kind, &definition.name),
+            Box::from(definition.kind.as_ref()),
+            Box::from(folded.as_ref()),
         )
     }
 }

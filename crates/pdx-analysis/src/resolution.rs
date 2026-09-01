@@ -1151,11 +1151,14 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
     }
 
     pub(crate) fn resolve(&self, kind: &str, name: &str) -> Resolution {
-        let mut candidates = self
-            .overlay_definitions
-            .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
-            .cloned()
-            .unwrap_or_default();
+        let mut candidates = if self.overlay_definitions.is_empty() {
+            Vec::new()
+        } else {
+            self.overlay_definitions
+                .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
+                .cloned()
+                .unwrap_or_default()
+        };
         candidates.extend(
             self.snapshot
                 .index()
