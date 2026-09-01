@@ -189,3 +189,54 @@ node performance-results/report-numbers.mjs
 - mem_probe 在末尾安装 vanilla 缓存时因根类型不匹配 panic(示例只配置了 CurrentMod 根;`install_index_cache` 期望 Vanilla 根)——发生在全部被剖析阶段之后,不影响数据;建议后续给示例补一个 Vanilla 源根。
 - 主线程 `NtWaitForSingleObject` 的 7.4%(13.7s)是睡眠/等待权重,不计入 CPU。
 - 产物(均在 gitignored 的 `performance-results/`):`samply-memprobe.json.gz`(3.4MB 原始 profile)、`samply-symbols.json`(15,012 条符号)、`samply-analysis.json`、`report-numbers.json`、`memprobe-stdout.log`,以及脚本 `analyze-samply.mjs` / `symbolicate-samply.mjs` / `report-numbers.mjs`。
+
+---
+
+## 十、2026-09-01 复采样:Wave 4 + Wave I 之后(HEAD 7d027df)
+
+方法与口径同前(同一语料、同一命令、CPU-only weight≤2、同一符号化流程),产物
+`samply-memprobe-after-waveI.json.gz`(2.6MB)、`report-numbers-after-waveI.json`、
+`report-numbers-after-waveI.mjs`(指向新 profile 的数字脚本副本)。符号化 15,065/15,089
+(99.8%)。进程内计时:诊断 pass **59.3s,157,655 条**,与逐字节一致基准完全吻合。
+(工具链备注:本版 `samply load` 不再在 stdout 打印 token;从 `http://127.0.0.1:3000/`
+根页面 HTML 的链接里抓取。)
+
+### 10.1 主线程 CPU 对比
+
+| 指标 | 8/30 基线 | 9/1 复采样 | 变化 |
+|---|---|---|---|
+| 主线程 CPU 总量 | 170.8s | **94.4s** | **-45%** |
+| 诊断 pass(进程内计时) | 137.0s | **59.3s** | **-57%** |
+| 堆分配器 | 47.2s(27.6%) | 28.6s(30.3%) | 绝对 -39% |
+| String 哈希 | 35.0s(20.5%) | **1.0s(1.1%)** | **消灭**(FxHash 替代 SipHash) |
+| memcpy/memmove | 28.6s(16.8%) | 14.3s(15.1%) | 绝对 -50% |
+
+### 10.2 关键函数包含时间对比
+
+| 函数 | 基线 | 复采样 | 说明 |
+|---|---|---|---|
+| `validate_semantic_container` | 111.8s(65.4%) | 35.4s(37.6%) | 绝对 -68% |
+| `semantic_selected_alternative` | 76.4s(44.7%) | **9.0s(9.5%)** | 本轮主攻目标,-88%,如约退出榜首 |
+| `workspace_member` | (未单列) | **18.8s(19.9%)** | **新晋第一业务查询** |
+| `lower_with_profile` | 26.2s | 25.2s(26.7%) | 未优化,符合预期 |
+| `semantic_rules_for_container` | — | 9.3s(9.9%) | |
+| `lower_semantics` | — | 10.6s(11.2%) | |
+| `semantic_selected_transition` | — | 0.8s(0.9%) | 已可忽略 |
+
+self 侧新面孔(analyze 口径,含等待权重):`semantic_parent_path_matches` 3.96%、
+`GameProfile::member_kind_alias` 2.17%、`GameProfile::scopes_compatible` 2.09%。
+
+### 10.3 结论与路线修正
+
+1. **Wave 4/I 完全兑现**:alternative 选择路径包含时间 -88%,SipHash 类开销从 20.5% 降到
+   1.1%,诊断 pass 137.0s→59.3s 且诊断输出逐字节一致。
+2. **诊断路径下一个目标是 `workspace_member`(19.9%)**——每次 `KeyMatcher::Type/Enum`
+   匹配都查询 `WorkspaceMembership`(kinds FxHashMap 嵌套查询 + 后缀扫描)。候选手段:
+   per-context 成员快照(排序 Vec + 二分或 FxHashSet 直查)、把同 (kind,name) 的重复查询
+   在单个容器验证内折叠。
+3. **分配器 + memcpy 合计 45.4% 仍是基础设施天花板**,且 profile 规则匹配类 self
+   (`member_kind_alias`/`scopes_compatible`)本质也是每次比较时的重复折叠——**A1
+   (CST arena + 词法期驻留)依旧是最大结构性杠杆**;内存侧佐证不变:CST 389+137MiB、
+   HIR 路径 String 192MiB、位置表 109MiB。
+4. `lower_with_profile` 26.7% 未动,V3(ScopeId u32)与其配套,A1 落地时一并受益。
+5. 扫描 worker 群 CPU 60.8s 基线持平,分配器占 31.8%——arena 化将同时惠及扫描路径。
