@@ -795,11 +795,13 @@ fn semantic_type_path_matches(
             .trim_matches('/')
             .strip_prefix("game/")
             .unwrap_or(prefix.trim_matches('/'));
-        let prefix = prefix.to_ascii_lowercase();
         let matches = if descriptor.path_strict {
-            directory == prefix
+            directory.eq_ignore_ascii_case(prefix)
         } else {
-            directory == prefix || directory.starts_with(&format!("{prefix}/"))
+            directory.eq_ignore_ascii_case(prefix)
+                || (crate::hir::ascii_ci_starts_with(directory, prefix)
+                    && directory.len() > prefix.len()
+                    && directory.as_bytes()[prefix.len()] == b'/')
         };
         if !matches {
             return false;

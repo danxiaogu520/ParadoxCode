@@ -44,6 +44,16 @@ fn semantic_root_context_with_confidence(
         return (Some(context), false);
     }
     let semantic = &rules.model().semantic;
+    // The descriptor loops below used to re-lowercase the path and the key per candidate
+    // and to format `root:<type>` per probe; both are hoisted so a root-context lookup
+    // allocates at most the lowered path and key once.
+    let path_lowered = logical_path.map(lowered_logical_path);
+    let type_path_ok = |descriptor: &TypeDescriptor| {
+        path_lowered
+            .as_deref()
+            .is_none_or(|path| semantic_type_path_matches_lowered(descriptor, path))
+    };
+    let key_lowered = key.to_ascii_lowercase();
     // A top-level key may name a rule context directly (`trigger`, `effect`). A
     // `root:<key>` context that belongs to a type descriptor must not be selected in
     // an unrelated directory (for example `fervor` inside common/static_modifiers).
@@ -51,14 +61,13 @@ fn semantic_root_context_with_confidence(
         semantic
             .type_descriptors
             .get(candidate)
-            .is_none_or(|descriptor| semantic_type_path_matches(descriptor, logical_path))
+            .is_none_or(&type_path_ok)
     };
     if rules.semantic_rules_for_context(key).next().is_some() {
         return (Some(key.to_owned()), false);
     }
-    let root = format!("root:{key}");
-    if rules.semantic_rules_for_context(&root).next().is_some() && key_context_matches_path(key) {
-        return (Some(root), false);
+    if rules.has_root_context_rules(key) && key_context_matches_path(key) {
+        return (Some(format!("root:{key}")), false);
     }
     if let Some(context) = semantic
         .type_root_keys
@@ -67,21 +76,18 @@ fn semantic_root_context_with_confidence(
             let descriptor = semantic.type_descriptors.get(*type_name);
             (roots.iter().any(|root| root.eq_ignore_ascii_case(key))
                 || descriptor.is_some_and(|descriptor| {
-                    descriptor.starts_with.as_deref().is_some_and(|prefix| {
-                        key.to_ascii_lowercase()
-                            .starts_with(&prefix.to_ascii_lowercase())
-                    }) || descriptor.skip_root_paths.iter().any(|path| {
-                        path.first().is_some_and(|root| {
-                            root.eq_ignore_ascii_case("any") || root.eq_ignore_ascii_case(key)
+                    descriptor
+                        .starts_with
+                        .as_deref()
+                        .is_some_and(|prefix| ascii_ci_starts_with(&key_lowered, prefix))
+                        || descriptor.skip_root_paths.iter().any(|path| {
+                            path.first().is_some_and(|root| {
+                                root.eq_ignore_ascii_case("any") || root.eq_ignore_ascii_case(key)
+                            })
                         })
-                    })
                 }))
-                && semantic.rules.iter().any(|rule| {
-                    rule.context
-                        .eq_ignore_ascii_case(&format!("root:{type_name}"))
-                })
-                && descriptor
-                    .is_none_or(|descriptor| semantic_type_path_matches(descriptor, logical_path))
+                && rules.has_root_context_rules(type_name)
+                && descriptor.is_none_or(&type_path_ok)
         })
         .map(|(type_name, _)| format!("type:{type_name}"))
         .or_else(|| {
@@ -92,10 +98,10 @@ fn semantic_root_context_with_confidence(
                 .type_descriptors
                 .iter()
                 .find(|(type_name, descriptor)| {
-                    let starts_with = descriptor.starts_with.as_deref().is_some_and(|prefix| {
-                        key.to_ascii_lowercase()
-                            .starts_with(&prefix.to_ascii_lowercase())
-                    });
+                    let starts_with = descriptor
+                        .starts_with
+                        .as_deref()
+                        .is_some_and(|prefix| ascii_ci_starts_with(&key_lowered, prefix));
                     (starts_with
                         || (!semantic.type_root_keys.contains_key(*type_name)
                             && descriptor.skip_root_paths.iter().any(|path| {
@@ -104,11 +110,8 @@ fn semantic_root_context_with_confidence(
                                         || root.eq_ignore_ascii_case(key)
                                 })
                             })))
-                        && rules
-                            .semantic_rules_for_context(&format!("root:{type_name}"))
-                            .next()
-                            .is_some()
-                        && semantic_type_path_matches(descriptor, logical_path)
+                        && rules.has_root_context_rules(type_name)
+                        && type_path_ok(descriptor)
                 })
                 .map(|(type_name, _)| format!("type:{type_name}"))
         })
@@ -118,7 +121,7 @@ fn semantic_root_context_with_confidence(
                 .iter()
                 .find(|(type_name, descriptor)| {
                     !semantic.type_root_keys.contains_key(*type_name)
-                        && semantic_type_path_matches(descriptor, logical_path)
+                        && type_path_ok(descriptor)
                         && descriptor
                             .type_key_filter
                             .as_ref()
@@ -126,10 +129,7 @@ fn semantic_root_context_with_confidence(
                                 values.iter().any(|value| value.eq_ignore_ascii_case(key))
                                     != *negate
                             })
-                        && rules
-                            .semantic_rules_for_context(&format!("root:{type_name}"))
-                            .next()
-                            .is_some()
+                        && rules.has_root_context_rules(type_name)
                 })
                 .map(|(type_name, _)| format!("type:{type_name}"))
         })
@@ -144,11 +144,8 @@ fn semantic_root_context_with_confidence(
         .find(|(type_name, descriptor)| {
             !semantic.type_root_keys.contains_key(*type_name)
                 && descriptor.type_key_filter.is_none()
-                && semantic_type_path_matches(descriptor, logical_path)
-                && rules
-                    .semantic_rules_for_context(&format!("root:{type_name}"))
-                    .next()
-                    .is_some()
+                && type_path_ok(descriptor)
+                && rules.has_root_context_rules(type_name)
         })
         .map(|(type_name, _)| format!("type:{type_name}"));
     (context.clone(), context.is_some())
@@ -169,6 +166,7 @@ pub fn semantic_file_root_context(
     if !logical_path.as_str().contains('/') {
         return None;
     }
+    let lowered = lowered_logical_path(logical_path);
     rules
         .model()
         .semantic
@@ -176,11 +174,8 @@ pub fn semantic_file_root_context(
         .iter()
         .find(|(type_name, descriptor)| {
             descriptor.type_per_file
-                && semantic_type_path_matches(descriptor, Some(logical_path))
-                && rules
-                    .semantic_rules_for_context(&format!("root:{type_name}"))
-                    .next()
-                    .is_some()
+                && semantic_type_path_matches_lowered(descriptor, &lowered)
+                && rules.has_root_context_rules(type_name)
         })
         .map(|(type_name, _)| format!("type:{type_name}"))
 }
@@ -193,6 +188,7 @@ pub(super) fn scripted_macro_path_context(
     if !logical_path.as_str().contains('/') {
         return None;
     }
+    let lowered = lowered_logical_path(logical_path);
     rules
         .model()
         .semantic
@@ -201,7 +197,7 @@ pub(super) fn scripted_macro_path_context(
         .filter_map(|descriptor| {
             let macro_descriptor = descriptor.scripted_macro.as_ref()?;
             if !macro_descriptor.macro_enabled
-                || !semantic_type_path_matches(descriptor, Some(logical_path))
+                || !semantic_type_path_matches_lowered(descriptor, &lowered)
             {
                 return None;
             }
@@ -253,11 +249,24 @@ pub fn semantic_type_path_matches(
     let Some(logical_path) = logical_path else {
         return true;
     };
-    let path = logical_path
+    semantic_type_path_matches_lowered(descriptor, &lowered_logical_path(logical_path))
+}
+
+/// Normalizes a logical path the way descriptor matching expects: forward slashes and
+/// ASCII lowercase. Callers that test many descriptors against one path lower it once.
+pub(crate) fn lowered_logical_path(logical_path: &LogicalPath) -> String {
+    logical_path
         .as_str()
         .replace('\\', "/")
-        .to_ascii_lowercase();
-    let (_directory, file_name) = path.rsplit_once('/').unwrap_or(("", path.as_str()));
+        .to_ascii_lowercase()
+}
+
+/// Allocation-free variant of [`semantic_type_path_matches`] over a pre-lowered path.
+///
+/// Descriptor-side prefixes and extensions are compared case-insensitively against the
+/// lowered path instead of being lowercased per call; selector semantics are unchanged.
+pub(crate) fn semantic_type_path_matches_lowered(descriptor: &TypeDescriptor, path: &str) -> bool {
+    let (_directory, file_name) = path.rsplit_once('/').unwrap_or(("", path));
     if !path.contains('/') {
         return true;
     }
@@ -265,22 +274,26 @@ pub fn semantic_type_path_matches(
         let prefix = prefix
             .trim_matches('/')
             .strip_prefix("game/")
-            .unwrap_or(prefix.trim_matches('/'))
-            .to_ascii_lowercase();
+            .unwrap_or(prefix.trim_matches('/'));
         // The file may sit directly under the descriptor directory, or under any
         // directory that ends with it (an absolute path or a cache layout whose
         // root prefix differs from the game-relative one).
-        let prefix_match = path == prefix
-            || path.starts_with(&format!("{prefix}/"))
-            || _directory == prefix
-            || _directory.ends_with(&format!("/{prefix}"));
+        let prefix_match = path.eq_ignore_ascii_case(prefix)
+            || (ascii_ci_starts_with(path, prefix)
+                && path.len() > prefix.len()
+                && path.as_bytes()[prefix.len()] == b'/')
+            || _directory.eq_ignore_ascii_case(prefix)
+            || (ascii_ci_ends_with(_directory, prefix)
+                && _directory.len() > prefix.len()
+                && _directory.as_bytes()[_directory.len() - prefix.len() - 1] == b'/');
         if !prefix_match {
             return false;
         }
         if descriptor.path_strict
-            && path
-                .strip_prefix(&format!("{prefix}/"))
-                .is_some_and(|rest| rest.contains('/'))
+            && ascii_ci_starts_with(path, prefix)
+            && path.len() > prefix.len()
+            && path.as_bytes()[prefix.len()] == b'/'
+            && path[prefix.len() + 1..].contains('/')
         {
             return false;
         }
@@ -291,12 +304,35 @@ pub fn semantic_type_path_matches(
         return false;
     }
     if let Some(extension) = descriptor.path_extension.as_deref() {
-        let extension = extension.trim_start_matches('.').to_ascii_lowercase();
-        if !path.ends_with(&format!(".{extension}")) {
+        let extension = extension.trim_start_matches('.');
+        if !(ascii_ci_ends_with(path, extension)
+            && path.len() > extension.len()
+            && path.as_bytes()[path.len() - extension.len() - 1] == b'.')
+        {
             return false;
         }
     }
     true
+}
+
+/// Case-insensitive ASCII prefix test that allocates nothing.
+pub(crate) fn ascii_ci_starts_with(haystack: &str, needle: &str) -> bool {
+    haystack.len() >= needle.len()
+        && haystack.is_char_boundary(needle.len())
+        && haystack.as_bytes()[..needle.len()]
+            .iter()
+            .zip(needle.as_bytes())
+            .all(|(left, right)| left.eq_ignore_ascii_case(right))
+}
+
+/// Case-insensitive ASCII suffix test that allocates nothing.
+pub(crate) fn ascii_ci_ends_with(haystack: &str, needle: &str) -> bool {
+    haystack.len() >= needle.len()
+        && haystack.is_char_boundary(haystack.len() - needle.len())
+        && haystack.as_bytes()[haystack.len() - needle.len()..]
+            .iter()
+            .zip(needle.as_bytes())
+            .all(|(left, right)| left.eq_ignore_ascii_case(right))
 }
 
 /// Indexed view over one file's scope facts.
@@ -642,8 +678,9 @@ fn semantic_type_definitions(
     if !logical_path.as_str().contains('/') {
         return definitions;
     }
+    let lowered = lowered_logical_path(logical_path);
     for descriptor in rules.model().semantic.type_descriptors.values() {
-        if !semantic_type_path_matches(descriptor, Some(logical_path)) {
+        if !semantic_type_path_matches_lowered(descriptor, &lowered) {
             continue;
         }
         if descriptor.type_per_file {

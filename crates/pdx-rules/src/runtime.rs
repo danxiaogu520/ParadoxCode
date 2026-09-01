@@ -4,7 +4,7 @@ use crate::model::{FileCategory, RulesModel, SemanticModel, SemanticRule, TypeRo
 use crate::{CURRENT_SCHEMA_VERSION, sqlite};
 use pdx_text::LogicalPath;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
@@ -106,6 +106,11 @@ pub struct RuleSet {
         FxHashMap<Box<str>, FxHashMap<Box<str>, Vec<usize>>>,
     /// Lowercased context -> rule indices whose key is not exact.
     pub(crate) semantic_non_exact_rules_by_context: FxHashMap<Box<str>, Vec<usize>>,
+    /// Lowercased type names whose `root:<name>` semantic context holds at least one rule.
+    ///
+    /// Root-context selection probes this per descriptor during lowering; building the
+    /// `root:<name>` string and scanning rules per probe dominated context resolution.
+    pub(crate) root_context_types: FxHashSet<Box<str>>,
     /// Whether each rule's context is `effect` or `trigger`, precomputed once so scope
     /// link resolution stops re-lowercasing rule contexts per lookup.
     pub(crate) effect_trigger_contexts: Vec<bool>,
@@ -137,6 +142,7 @@ impl RuleSet {
             semantic_rules_by_context: FxHashMap::default(),
             semantic_exact_rules_by_context_key: FxHashMap::default(),
             semantic_non_exact_rules_by_context: FxHashMap::default(),
+            root_context_types: FxHashSet::default(),
             effect_trigger_contexts: Vec::new(),
         }
     }
@@ -189,6 +195,7 @@ impl RuleSet {
         let mut semantic_exact_rules_by_context_key =
             FxHashMap::<Box<str>, FxHashMap<Box<str>, Vec<usize>>>::default();
         let mut semantic_non_exact_rules_by_context = FxHashMap::<Box<str>, Vec<usize>>::default();
+        let mut root_context_types = FxHashSet::<Box<str>>::default();
         let mut effect_trigger_contexts = Vec::with_capacity(model.semantic.rules.len());
         for (index, rule) in model.semantic.rules.iter().enumerate() {
             let context_key: Box<str> = rule.context.to_ascii_lowercase().into_boxed_str();
@@ -220,6 +227,11 @@ impl RuleSet {
                 .or_default()
                 .push(index);
         }
+        for context_key in semantic_rules_by_context.keys() {
+            if let Some(type_name) = context_key.strip_prefix("root:") {
+                root_context_types.insert(type_name.into());
+            }
+        }
         Self {
             schema_version: CURRENT_SCHEMA_VERSION,
             rule_hash,
@@ -228,6 +240,7 @@ impl RuleSet {
             semantic_rules_by_context,
             semantic_exact_rules_by_context_key,
             semantic_non_exact_rules_by_context,
+            root_context_types,
             effect_trigger_contexts,
         }
     }
@@ -328,6 +341,17 @@ impl RuleSet {
     /// Iterates every compiled semantic rule regardless of context.
     pub fn semantic_rules(&self) -> impl Iterator<Item = &SemanticRule> {
         self.model.semantic.rules.iter()
+    }
+
+    /// Returns whether the `root:<type_name>` semantic context holds at least one rule.
+    ///
+    /// Equivalent to `semantic_rules_for_context(&format!("root:{type_name}")).next().is_some()`
+    /// or to finding any rule whose context equals `root:<type_name>` case-insensitively, but
+    /// probes a precomputed set without building the context string.
+    #[must_use]
+    pub fn has_root_context_rules(&self, type_name: &str) -> bool {
+        let type_name = normalized_ascii_query(type_name);
+        self.root_context_types.contains(type_name.as_ref())
     }
 
     /// Returns semantic rules for one context without scanning unrelated contexts.

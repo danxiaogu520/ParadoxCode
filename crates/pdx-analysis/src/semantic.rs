@@ -58,13 +58,36 @@ struct ContextRuleView {
     non_exact: Arc<[usize]>,
 }
 
+thread_local! {
+    /// Reusable key buffer for snapshot query-cache probes.
+    ///
+    /// Validation probes the rule-view, macro-resolution, and member-name caches per
+    /// property and per rule; formatting a fresh owned key for every probe dominated
+    /// steady-state allocator traffic. The buffer is borrowed only for the duration of
+    /// the cache read, and miss paths run after the borrow ends.
+    static QUERY_CACHE_PROBE_KEY: std::cell::RefCell<String> =
+        const { std::cell::RefCell::new(String::new()) };
+}
+
+/// Probes the snapshot query cache with a key assembled from `parts` without allocating.
+fn probe_query_cache<T: Send + Sync + 'static>(
+    snapshot: &AnalysisSnapshot,
+    revision: u64,
+    parts: &[&str],
+) -> Option<Arc<T>> {
+    QUERY_CACHE_PROBE_KEY.with(|buffer| {
+        let mut key = buffer.borrow_mut();
+        key.clear();
+        for part in parts {
+            key.push_str(part);
+        }
+        snapshot.query_cache().get::<T>(revision, &key)
+    })
+}
+
 fn context_rule_view(snapshot: &AnalysisSnapshot, context: &str) -> Arc<ContextRuleView> {
     let revision = snapshot.revision();
-    let cache_key = format!("context-rule-view:{context}");
-    if let Some(cached) = snapshot
-        .query_cache()
-        .get::<ContextRuleView>(revision, &cache_key)
-    {
+    if let Some(cached) = probe_query_cache(snapshot, revision, &["context-rule-view:", context]) {
         return cached;
     }
     let rules = snapshot.rules();
@@ -219,7 +242,7 @@ fn context_rule_view(snapshot: &AnalysisSnapshot, context: &str) -> Arc<ContextR
     snapshot.query_cache().insert(
         revision,
         pdx_engine::CacheDomain::Index,
-        cache_key,
+        format!("context-rule-view:{context}"),
         view.clone(),
     );
     view
@@ -1388,18 +1411,18 @@ pub(crate) fn resolve_macro_definition(
     // (property, rule) during diagnostics, completion, and hover. Memoize per
     // (revision, kind, name) so a revision pays for the scan only once.
     let revision = snapshot.revision();
-    let key = format!("macro-definition:{owner_kind}:{owner_name}");
-    if let Some(cached) = snapshot
-        .query_cache()
-        .get::<Option<ResolvedMacroDefinition>>(revision, &key)
-    {
+    if let Some(cached) = probe_query_cache::<Option<ResolvedMacroDefinition>>(
+        snapshot,
+        revision,
+        &["macro-definition:", owner_kind, ":", owner_name],
+    ) {
         return cached.as_ref().clone();
     }
     let resolved = resolve_macro_definition_uncached(snapshot, owner_kind, owner_name);
     snapshot.query_cache().insert(
         revision,
         pdx_engine::CacheDomain::Documents,
-        key,
+        format!("macro-definition:{owner_kind}:{owner_name}"),
         Arc::new(resolved.clone()),
     );
     resolved
@@ -1823,8 +1846,12 @@ pub(crate) fn effective_workspace_member_names(
 /// completion request and gives the prefix index below one stable backing allocation.
 fn workspace_member_names_cached(snapshot: &AnalysisSnapshot, type_name: &str) -> Arc<Vec<String>> {
     let revision = snapshot.revision();
-    let key = format!("workspace-member-names:{}", type_name.to_ascii_lowercase());
-    if let Some(cached) = snapshot.query_cache().get::<Vec<String>>(revision, &key) {
+    let lowered = lowered_type_name(type_name);
+    if let Some(cached) = probe_query_cache::<Vec<String>>(
+        snapshot,
+        revision,
+        &["workspace-member-names:", lowered.as_ref()],
+    ) {
         return cached;
     }
     let names = Arc::new(effective_workspace_member_names_uncached(
@@ -1833,10 +1860,19 @@ fn workspace_member_names_cached(snapshot: &AnalysisSnapshot, type_name: &str) -
     snapshot.query_cache().insert(
         revision,
         pdx_engine::CacheDomain::Index,
-        key,
+        format!("workspace-member-names:{}", lowered.as_ref()),
         Arc::clone(&names),
     );
     names
+}
+
+/// Lowercased spelling of a type name, borrowing when it is already lowercase.
+fn lowered_type_name(type_name: &str) -> std::borrow::Cow<'_, str> {
+    if type_name.bytes().any(|byte| byte.is_ascii_uppercase()) {
+        std::borrow::Cow::Owned(type_name.to_ascii_lowercase())
+    } else {
+        std::borrow::Cow::Borrowed(type_name)
+    }
 }
 
 fn effective_workspace_member_names_uncached(
@@ -1946,11 +1982,12 @@ pub(crate) fn workspace_member_index(
     type_name: &str,
 ) -> Arc<WorkspaceMemberIndex> {
     let revision = snapshot.revision();
-    let key = format!("workspace-member-index:{}", type_name.to_ascii_lowercase());
-    if let Some(cached) = snapshot
-        .query_cache()
-        .get::<WorkspaceMemberIndex>(revision, &key)
-    {
+    let lowered = lowered_type_name(type_name);
+    if let Some(cached) = probe_query_cache::<WorkspaceMemberIndex>(
+        snapshot,
+        revision,
+        &["workspace-member-index:", lowered.as_ref()],
+    ) {
         return cached;
     }
     let index = Arc::new(WorkspaceMemberIndex::new(workspace_member_names_cached(
@@ -1959,7 +1996,7 @@ pub(crate) fn workspace_member_index(
     snapshot.query_cache().insert(
         revision,
         pdx_engine::CacheDomain::Index,
-        key,
+        format!("workspace-member-index:{}", lowered.as_ref()),
         Arc::clone(&index),
     );
     index
