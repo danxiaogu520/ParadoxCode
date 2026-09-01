@@ -76,6 +76,7 @@ fn bulk_index_build_retains_every_shard_and_definition() {
                 name: "shared.1".into(),
                 file_id: first_file,
                 range,
+                selection_range: range,
                 active: true,
             }],
             references: Vec::new(),
@@ -89,6 +90,7 @@ fn bulk_index_build_retains_every_shard_and_definition() {
                 name: "shared.1".into(),
                 file_id: second_file,
                 range,
+                selection_range: range,
                 active: true,
             }],
             references: Vec::new(),
@@ -185,16 +187,18 @@ fn type_per_file_definition_is_emitted_once_without_generic_pseudo_members() {
             .is_some()
     );
     let file_id = definitions[0].file_id;
-    let hir_definition = snapshot
-        .file_state(file_id)
-        .and_then(|state| state.hir())
-        .and_then(|hir| {
-            hir.definitions()
-                .iter()
-                .find(|definition| definition.kind == "country_file" && &*definition.name == "AAA")
-        })
-        .expect("HIR country definition");
-    assert_eq!(definitions[0].range, hir_definition.range);
+    // Frontends are evicted at scan time; the shard itself must carry the
+    // name token so navigation works without reparsing the file.
+    let state = snapshot.file_state(file_id).expect("country state");
+    assert!(state.hir().is_none());
+    let shard_definition = state
+        .shard()
+        .definitions
+        .iter()
+        .find(|definition| definition.kind.as_ref() == "country_file" && &*definition.name == "AAA")
+        .expect("shard country definition");
+    assert_eq!(definitions[0].range, shard_definition.range);
+    assert!(!shard_definition.selection_range.is_empty());
     fs::remove_dir_all(
         countries
             .parent()
@@ -225,6 +229,7 @@ fn symbol_case_policy_controls_definition_lookup_identity() {
             name: "MixedName".into(),
             file_id,
             range,
+            selection_range: range,
             active: true,
         }],
         references: Vec::new(),
@@ -309,6 +314,7 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
         name: name.into(),
         file_id,
         range,
+        selection_range: range,
         active: true,
     };
     let reference = |file_id, name: &str| Reference {
@@ -374,6 +380,7 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
         name: "shared.1".into(),
         file_id,
         range,
+        selection_range: range,
         active: true,
     };
     let mut index = WorkspaceIndex::from_shards([
@@ -433,6 +440,7 @@ fn identical_collector_records_resolve_as_one_physical_definition() {
         name: "apply".into(),
         file_id,
         range,
+        selection_range: range,
         active: true,
     };
     let index = WorkspaceIndex::from_shards([FileIndexShard {
@@ -460,6 +468,7 @@ fn identical_collector_records_resolve_as_one_physical_definition() {
                 name: "apply".into(),
                 file_id,
                 range,
+                selection_range: range,
                 active: true,
             },
             Definition {
@@ -467,6 +476,7 @@ fn identical_collector_records_resolve_as_one_physical_definition() {
                 name: "apply".into(),
                 file_id,
                 range: distinct_range,
+                selection_range: distinct_range,
                 active: true,
             },
         ],

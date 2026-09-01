@@ -271,24 +271,19 @@ fn unchanged_file_states_are_reused_and_only_changed_files_advance() {
         .find(|file| file.logical_path.as_str() == "events/b.txt")
         .expect("b file")
         .id;
-    assert!(first.file_state(a).expect("a state").parsed().is_some());
-    assert!(first.file_state(a).expect("a state").hir().is_some());
-    let Some(ParsedSource::Text(parsed)) = first.file_state(a).expect("a state").parsed() else {
-        panic!("event file should retain a text parse");
-    };
-    assert!(Arc::ptr_eq(
-        &parsed.source_handle(),
-        &first.file_state(a).expect("a state").source_handle(),
-    ));
-    assert!(std::ptr::eq(
-        parsed.as_ref(),
-        first
-            .file_state(a)
-            .expect("a state")
-            .hir()
-            .expect("a HIR")
-            .syntax()
-    ));
+    // The scan never retains closed-file frontends: shards, source text, and
+    // cached positions stay, while parse trees and HIR are rebuilt on demand.
+    let a_state = first.file_state(a).expect("a state");
+    assert!(a_state.parsed().is_none());
+    assert!(a_state.hir().is_none());
+    assert!(
+        a_state
+            .shard()
+            .definitions
+            .iter()
+            .any(|definition| { definition.kind.as_ref().eq_ignore_ascii_case("event") })
+    );
+    assert!(!a_state.source().is_empty());
 
     host.refresh_source_roots().expect("unchanged scan");
     let second = host.snapshot();

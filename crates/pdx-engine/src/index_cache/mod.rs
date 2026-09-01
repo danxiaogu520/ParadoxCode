@@ -28,7 +28,7 @@ mod write;
 /// braces from malformed comments as active syntax. Schema 8 added an optional per-file filesystem
 /// metadata fingerprint. Older caches are rebuilt once by the CLI or LSP, the same way a rules
 /// update triggers a rebuild; no legacy reader is retained.
-pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 9;
+pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 10;
 
 /// Oldest on-disk cache schema this executable can still load.
 pub const MIN_SUPPORTED_CACHE_SCHEMA_VERSION: u32 = 9;

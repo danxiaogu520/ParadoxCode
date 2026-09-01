@@ -498,7 +498,12 @@ impl AnalysisHost {
                 source_jobs.push(SourceReadJob {
                     file: source_file,
                     physical_path: physical,
-                    retain_frontend: root.kind != SourceRootKind::Vanilla,
+                    // Closed files never retain scan frontends: shards and
+                    // position ranges are extracted during the scan, and the
+                    // diagnostics pass reparses/lowerers transiently per file.
+                    // This keeps the peak resident set bounded by steady index
+                    // structures instead of every file's CST+HIR at once.
+                    retain_frontend: false,
                 });
             }
         }
@@ -727,13 +732,21 @@ impl AnalysisHost {
                 .get(&id)
                 .map_or(0, |state| state.revision().saturating_add(1));
             let state = Arc::new(match text {
-                Some(text) => build_file_state(
-                    &source_file,
-                    text,
-                    file_revision,
-                    self.rules.as_ref(),
-                    self.profile.as_ref(),
-                ),
+                Some(text) => {
+                    let state = build_file_state(
+                        &source_file,
+                        text,
+                        file_revision,
+                        self.rules.as_ref(),
+                        self.profile.as_ref(),
+                    );
+                    // Same retention policy as the scan: extract positions,
+                    // then drop the frontend so closed files never hold a
+                    // CST/HIR tree.
+                    let positions = position_ranges_for_state(&state);
+                    index.replace_position_ranges(id, positions.clone());
+                    state.cache_only(positions)
+                }
                 None => empty_file_state(&source_file, file_revision),
             });
             files.insert(id, source_file);
@@ -741,7 +754,6 @@ impl AnalysisHost {
             file_states.insert(id, Arc::clone(&state));
             let priorities = source_priorities(&self.roots, &files);
             index.replace_shard_resolved(state.shard_handle(), &priorities, self.rules.as_ref());
-            index.replace_position_ranges(id, position_ranges_for_state(&state));
             report.indexed_files = report.indexed_files.saturating_add(1);
             changed = true;
         }

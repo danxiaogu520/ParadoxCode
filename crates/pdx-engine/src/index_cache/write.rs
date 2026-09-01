@@ -111,6 +111,8 @@ fn write_cache(
              name TEXT NOT NULL,
              range_start INTEGER NOT NULL,
              range_end INTEGER NOT NULL,
+             selection_start INTEGER NOT NULL,
+             selection_end INTEGER NOT NULL,
              active INTEGER NOT NULL CHECK(active IN (0, 1)),
              PRIMARY KEY(file_id, ordinal)
          );
@@ -204,8 +206,8 @@ fn write_cache(
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )?;
     let mut insert_definition = transaction.prepare(
-        "INSERT INTO definitions(file_id, ordinal, kind, name, range_start, range_end, active)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO definitions(file_id, ordinal, kind, name, range_start, range_end, selection_start, selection_end, active)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
     )?;
     let mut insert_reference = transaction.prepare(
         "INSERT INTO symbol_references(file_id, ordinal, kind, name, range_start, range_end)
@@ -258,6 +260,8 @@ fn write_cache(
                 definition.name,
                 i64::from(definition.range.start()),
                 i64::from(definition.range.end()),
+                i64::from(definition.selection_range.start()),
+                i64::from(definition.selection_range.end()),
                 i64::from(definition.active)
             ])?;
         }

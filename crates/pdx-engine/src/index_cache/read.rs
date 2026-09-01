@@ -708,7 +708,7 @@ fn load_definitions(
 ) -> Result<usize, IndexCacheError> {
     let mut rows_loaded = 0usize;
     let mut statement = connection.prepare(
-        "SELECT file_id, kind, name, range_start, range_end, active
+        "SELECT file_id, kind, name, range_start, range_end, selection_start, selection_end, active
          FROM definitions ORDER BY file_id, ordinal",
     )?;
     let rows = statement.query_map([], |row| {
@@ -719,12 +719,15 @@ fn load_definitions(
             row.get::<_, i64>(3)?,
             row.get::<_, i64>(4)?,
             row.get::<_, i64>(5)?,
+            row.get::<_, i64>(6)?,
+            row.get::<_, i64>(7)?,
         ))
     })?;
     for row in rows {
-        let (file_id, kind, name, start, end, active) = row?;
+        let (file_id, kind, name, start, end, selection_start, selection_end, active) = row?;
         let file_id = decode_file_id(&file_id)?;
         let range = decode_range(start, end)?;
+        let selection_range = decode_range(selection_start, selection_end)?;
         let active = match active {
             0 => false,
             1 => true,
@@ -749,6 +752,7 @@ fn load_definitions(
                 name: crate::string_pool::intern_shard_string(&name),
                 file_id,
                 range,
+                selection_range,
                 active,
             });
         rows_loaded = rows_loaded.saturating_add(1);
