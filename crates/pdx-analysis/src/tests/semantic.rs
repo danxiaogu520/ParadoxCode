@@ -96,12 +96,12 @@ fn eu4_profile_supplies_known_scope_spellings() {
 #[test]
 fn multiple_hir_scope_candidates_remain_conservative_in_analysis() {
     let state = pdx_engine::hir::ScopeState {
-        root: pdx_engine::hir::ScopeValue::Known(vec!["country".to_owned(), "province".to_owned()]),
-        current: vec![pdx_engine::hir::ScopeValue::Known(vec![
+        root: pdx_engine::hir::ScopeValue::known(vec!["country".to_owned(), "province".to_owned()]),
+        current: vec![pdx_engine::hir::ScopeValue::known(vec![
             "country".to_owned(),
             "province".to_owned(),
         ])],
-        from: vec![pdx_engine::hir::ScopeValue::Known(vec![
+        from: vec![pdx_engine::hir::ScopeValue::known(vec![
             "country".to_owned(),
         ])],
         previous: Vec::new(),
