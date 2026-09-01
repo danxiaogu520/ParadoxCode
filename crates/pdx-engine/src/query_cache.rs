@@ -18,9 +18,10 @@
 //! evict the large shared indexes they share a map with.
 
 use std::any::Any;
-use std::collections::BTreeMap;
 use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
+
+use rustc_hash::FxHashMap;
 
 /// Invalidation scope of one cache entry.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -39,18 +40,21 @@ pub enum CacheDomain {
 /// observed revision are retained, because an older immutable snapshot can always recompute a
 /// miss.
 pub struct SnapshotQueryCache {
-    state: Mutex<CacheState>,
+    // Reads dominate: parallel validation workers probe shared per-revision views under the
+    // read lock, while inserts upgrade per revision. FxHashMap keeps probes allocation-free
+    // and cheap enough that sharding is unnecessary at current worker counts.
+    state: RwLock<CacheState>,
     capacity: usize,
 }
 
 struct CacheState {
     revision: Option<u64>,
-    index: BTreeMap<String, Arc<dyn Any + Send + Sync>>,
-    documents: BTreeMap<String, Arc<dyn Any + Send + Sync>>,
+    index: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
+    documents: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
 }
 
 impl CacheState {
-    fn map(&mut self, domain: CacheDomain) -> &mut BTreeMap<String, Arc<dyn Any + Send + Sync>> {
+    fn map(&mut self, domain: CacheDomain) -> &mut FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>> {
         match domain {
             CacheDomain::Index => &mut self.index,
             CacheDomain::Documents => &mut self.documents,
@@ -69,24 +73,27 @@ impl SnapshotQueryCache {
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            state: Mutex::new(CacheState {
+            state: RwLock::new(CacheState {
                 revision: None,
-                index: BTreeMap::new(),
-                documents: BTreeMap::new(),
+                index: FxHashMap::default(),
+                documents: FxHashMap::default(),
             }),
             capacity,
         }
     }
 
-    fn lock(&self) -> std::sync::MutexGuard<'_, CacheState> {
+    fn write(&self) -> std::sync::RwLockWriteGuard<'_, CacheState> {
         self.state
-            .lock()
+            .write()
             .expect("snapshot query cache lock poisoned")
     }
 
     /// Returns the cached value for `(revision, key)` when it was inserted as `T`.
     pub fn get<T: Send + Sync + 'static>(&self, revision: u64, key: &str) -> Option<Arc<T>> {
-        let state = self.lock();
+        let state = self
+            .state
+            .read()
+            .expect("snapshot query cache lock poisoned");
         if state.revision != Some(revision) {
             return None;
         }
@@ -105,7 +112,7 @@ impl SnapshotQueryCache {
         key: String,
         value: Arc<T>,
     ) {
-        let mut state = self.lock();
+        let mut state = self.write();
         match state.revision {
             Some(current) if revision < current => return,
             Some(current) if revision != current => {
@@ -117,15 +124,17 @@ impl SnapshotQueryCache {
             _ => {}
         }
         let entries = state.map(domain);
-        if entries.len() >= self.capacity && !entries.contains_key(&key) {
+        if entries.len() >= self.capacity && !entries.contains_key(key.as_str()) {
             entries.clear();
         }
-        entries.entry(key).or_insert(value);
+        entries
+            .entry(Box::from(key))
+            .or_insert_with(|| value.clone());
     }
 
     /// Advances the cache to a committed workspace revision and drops all query results.
     pub fn advance_to(&self, revision: u64) {
-        let mut state = self.lock();
+        let mut state = self.write();
         match state.revision {
             Some(current) if revision > current => {
                 state.index.clear();
@@ -142,7 +151,7 @@ impl SnapshotQueryCache {
     /// Overlay edits and closes change per-document query results but leave the workspace
     /// index untouched, so the expensive index-domain indexes stay valid across keystrokes.
     pub fn advance_documents(&self, revision: u64) {
-        let mut state = self.lock();
+        let mut state = self.write();
         match state.revision {
             Some(current) if revision > current => {
                 state.documents.clear();
@@ -156,7 +165,10 @@ impl SnapshotQueryCache {
     /// Returns the number of cached entries (for diagnostics and tests).
     #[must_use]
     pub fn len(&self) -> usize {
-        let state = self.lock();
+        let state = self
+            .state
+            .read()
+            .expect("snapshot query cache lock poisoned");
         state.index.len() + state.documents.len()
     }
 
