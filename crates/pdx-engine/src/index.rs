@@ -408,6 +408,7 @@ fn sort_preview_entries(
         }
     }
     entries.truncate(write);
+    entries.shrink_to_fit();
     entries
 }
 

@@ -151,6 +151,11 @@ impl AnalysisHost {
     }
 
     /// Replaces the preferred localisation language order used by analysis queries.
+    ///
+    /// This order also decides which localisation previews are retained when an index cache
+    /// is installed (together with the English fallback), so set preferences before
+    /// installing caches — exactly how the LSP applies them at initialize. Definitions for
+    /// every language stay indexed regardless of this order.
     pub fn set_preferred_localisation_languages(&mut self, languages: Vec<String>) {
         let languages = languages
             .into_iter()
@@ -256,7 +261,7 @@ impl AnalysisHost {
                     actual: cache.metadata().game_id.clone(),
                 });
             }
-            let (_, cached_root, cache_files, cached_index, cache_positions, cache_previews) =
+            let (_, cached_root, cache_files, cached_index, cache_positions, mut cache_previews) =
                 cache.into_parts();
             match roots.iter().find(|root| root.id == cached_root.id) {
                 Some(configured) => {
@@ -324,6 +329,13 @@ impl AnalysisHost {
                     file.logical_path.as_str()
                 )));
             }
+            // Preview retention runs before `cache_files` is moved into `files` so the filter
+            // can resolve each preview's file path.
+            Self::retain_preferred_localisation_previews(
+                &mut cache_previews,
+                &cache_files,
+                &self.preferred_localisation_languages,
+            );
             for (id, file) in cache_files {
                 let current_path = file.physical_path.clone();
                 if let Some(previous) = files.insert(id, file) {
@@ -384,6 +396,62 @@ impl AnalysisHost {
         self.installed_caches.extend(cached_root_ids);
         self.advance_revision();
         Ok(())
+    }
+
+    /// Bounds resident memory for cache-installed localisation previews to the languages
+    /// analysis can surface: the configured preference order plus the English fallback that
+    /// `prefer_localisation_language_for_snapshot` selects. Cached Vanilla locates every key
+    /// once per language, so unpreferred languages hold the bulk of preview bytes while no
+    /// query can reach them. Dropped previews stay in the persistent `.pdxindex` and return
+    /// on the next session that prefers them; diagnostics never read previews. Files without
+    /// a path language marker are always retained, as are files unknown to this cache's
+    /// source table (load-time validation guarantees the latter cannot occur).
+    fn retain_preferred_localisation_previews(
+        previews: &mut LocalisationPreviewMap,
+        files: &BTreeMap<SourceFileId, SourceFile>,
+        preferred: &[String],
+    ) {
+        previews.retain_files(|file_id| {
+            files.get(&file_id).is_none_or(|file| {
+                Self::localisation_path_language(file.logical_path.as_str()).is_none_or(
+                    |language| {
+                        language.eq_ignore_ascii_case("english")
+                            || preferred
+                                .iter()
+                                .any(|preferred| preferred.eq_ignore_ascii_case(language))
+                    },
+                )
+            })
+        });
+    }
+
+    /// Extracts the localisation language from a logical path. `localisation/l_english/…`
+    /// directories and `localisation/name_l_english.yml` file stems both yield `english`;
+    /// paths without a language marker yield `None`. Mirrors `pdx-analysis`'s
+    /// `localisation_language` so retention covers exactly the candidates analysis selects.
+    fn localisation_path_language(path: &str) -> Option<&str> {
+        for segment in path.split('/') {
+            if let Some(language) = segment
+                .strip_prefix("l_")
+                .filter(|language| !language.is_empty())
+            {
+                let language = language
+                    .strip_suffix(".yml")
+                    .or_else(|| language.strip_suffix(".yaml"))
+                    .unwrap_or(language);
+                return (!language.is_empty()).then_some(language);
+            }
+        }
+        let file = path.rsplit('/').next()?;
+        let after = file
+            .rfind("_l_")
+            .map(|index| &file[index + 3..])
+            .unwrap_or_default();
+        let language = after
+            .strip_suffix(".yml")
+            .or_else(|| after.strip_suffix(".yaml"))
+            .unwrap_or(after);
+        (!language.is_empty()).then_some(language)
     }
 
     /// Scans all configured roots in stable order and atomically refreshes source files and shards.

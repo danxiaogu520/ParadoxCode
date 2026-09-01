@@ -579,6 +579,94 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
 }
 
 #[test]
+fn vanilla_cache_previews_retain_only_preferred_languages() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-preview-retention-{nonce}"));
+    let vanilla = root.join("vanilla");
+    fs::create_dir_all(vanilla.join("localisation")).expect("fixture directory");
+    fs::write(
+        vanilla.join("localisation/test_l_english.yml"),
+        "l_english:\nenglish_key:0 \"English text\"\n",
+    )
+    .expect("English localisation");
+    fs::write(
+        vanilla.join("localisation/test_l_french.yml"),
+        "l_french:\nfrench_key:0 \"Texte francais\"\n",
+    )
+    .expect("French localisation");
+    fs::write(
+        vanilla.join("localisation/unmarked.yml"),
+        "l_english:\nplain_key:0 \"Unmarked file\"\n",
+    )
+    .expect("localisation without a language marker in its path");
+
+    let mut builder = eu4_host();
+    builder.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+        ),
+    ]));
+    builder.refresh_source_roots().expect("scan Vanilla");
+
+    let install = |preferred: Vec<String>| {
+        let mut host = eu4_host();
+        host.set_preferred_localisation_languages(preferred);
+        host.install_index_cache(IndexCache::from_snapshot(&builder.snapshot()).expect("cache"))
+            .expect("install cache");
+        host.snapshot()
+    };
+
+    let default_preferences = install(Vec::new());
+    let preview_is_present = |snapshot: &AnalysisSnapshot, key: &str| {
+        snapshot
+            .index()
+            .active_definition("localisation", key)
+            .is_some_and(|definition| {
+                snapshot
+                    .localisation_preview(definition.file_id, definition.range)
+                    .is_some()
+            })
+    };
+    assert!(
+        preview_is_present(&default_preferences, "english_key"),
+        "English stays retained as the fallback language"
+    );
+    assert!(
+        preview_is_present(&default_preferences, "plain_key"),
+        "files without a path language marker stay retained"
+    );
+    assert!(
+        !preview_is_present(&default_preferences, "french_key"),
+        "unpreferred languages are dropped at install while their definitions remain indexed"
+    );
+    assert!(
+        default_preferences
+            .index()
+            .active_definition("localisation", "french_key")
+            .is_some(),
+        "dropping a preview must not drop the indexed definition"
+    );
+
+    let french_preferences = install(vec!["french".to_owned()]);
+    assert!(
+        preview_is_present(&french_preferences, "french_key"),
+        "configured preference order is retained"
+    );
+    assert!(
+        preview_is_present(&french_preferences, "english_key"),
+        "English fallback remains retained alongside a preference"
+    );
+    assert!(preview_is_present(&french_preferences, "plain_key"));
+
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
