@@ -1122,13 +1122,15 @@ impl LspServer {
     }
 
     /// Drops CST/HIR frontends of source files once background validation
-    /// has consumed them.
+    /// has consumed them, and reports that validation finished.
     ///
     /// Open overlays live in the document map with their own trees, so every
     /// file state can be evicted; later queries reparse the retained source
     /// on demand. Shards and position ranges stay resident, keeping
     /// definition/reference/navigation answers intact while dropping the
-    /// dominant CST/HIR memory share.
+    /// dominant CST/HIR memory share. The completion notice always fires:
+    /// scan-time eviction means most runs release nothing here, but the
+    /// workspace validation endpoint is still worth telling the user about.
     pub(super) fn evict_source_frontends_after_validation<W: Write>(
         &mut self,
         output: &mut W,
@@ -1145,17 +1147,18 @@ impl LspServer {
         let evicted = self
             .host
             .evict_source_frontends(&|id| open_overlay_files.contains(&id));
-        if evicted > 0 {
-            write_message(
-                output,
-                &log_message_notification(
-                    MessageType::INFO,
-                    format!(
-                        "Released syntax trees for {evicted} validated file(s); they reparse on demand"
-                    ),
-                ),
-            )?;
-        }
+        let detail = if evicted > 0 {
+            format!("released syntax trees for {evicted} file(s); they reparse on demand")
+        } else {
+            "syntax trees stay released between queries".to_owned()
+        };
+        write_message(
+            output,
+            &log_message_notification(
+                MessageType::INFO,
+                format!("Workspace validation complete; {detail}"),
+            ),
+        )?;
         Ok(())
     }
 
