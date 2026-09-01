@@ -17,12 +17,33 @@ pub enum Scope {
 /// A conservative set of possible game scopes.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ScopeValue {
-    /// One or more statically known scope spellings.
-    Known(Vec<String>),
+    /// One or more statically known scope spellings. The list is shared
+    /// (`ScopeState` clones once per scope fact, so the spellings themselves
+    /// must not reallocate per clone).
+    Known(std::sync::Arc<[std::sync::Arc<str>]>),
     /// Lowering lacks enough information to determine the scope.
     Unknown,
     /// The rules prove that no scope is valid.
     Invalid,
+}
+
+impl ScopeValue {
+    /// A single known scope spelling.
+    #[must_use]
+    pub fn known_single(name: &str) -> Self {
+        Self::Known(std::sync::Arc::from([std::sync::Arc::from(name)]))
+    }
+
+    /// Known scope spellings from owned strings.
+    #[must_use]
+    pub fn known(names: impl IntoIterator<Item = String>) -> Self {
+        Self::Known(
+            names
+                .into_iter()
+                .map(std::sync::Arc::from)
+                .collect::<std::sync::Arc<[_]>>(),
+        )
+    }
 }
 
 /// Persistent scope registers at one semantic location.

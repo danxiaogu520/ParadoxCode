@@ -595,14 +595,20 @@ fn semantic_rules_describe_property(
             .preceding(property.key_range.start())
             .map(|fact| fact.context.as_str())
     });
+    // `root:{type}` is rule-shaped and repeats for every candidate rule; build
+    // it once instead of formatting inside the per-rule closure.
+    let root_prefixed_context = root_context.as_deref().and_then(|context| {
+        context
+            .strip_prefix("type:")
+            .map(|type_name| format!("root:{type_name}"))
+    });
     rules.exact_semantic_rules(&property.key).any(|rule| {
         (context.is_some_and(|context| rule.context.eq_ignore_ascii_case(context))
             || root_context.as_deref().is_some_and(|context| {
                 rule.context.eq_ignore_ascii_case(context)
-                    || context.strip_prefix("type:").is_some_and(|type_name| {
-                        rule.context
-                            .eq_ignore_ascii_case(&format!("root:{type_name}"))
-                    })
+                    || root_prefixed_context
+                        .as_deref()
+                        .is_some_and(|prefixed| rule.context.eq_ignore_ascii_case(prefixed))
             }))
             && localisation_parent_path_matches(rules, &rule.parent_path, actual_parent_path)
     })

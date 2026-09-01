@@ -81,5 +81,5 @@ fn concrete_scope(values: &[ScopeValue]) -> Option<String> {
     let ScopeValue::Known(scopes) = values.first()? else {
         return None;
     };
-    (scopes.len() == 1).then(|| scopes[0].clone())
+    (scopes.len() == 1).then(|| scopes[0].to_string())
 }

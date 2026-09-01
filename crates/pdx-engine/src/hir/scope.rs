@@ -22,14 +22,23 @@ pub(super) fn lower_scope_facts(
         rules,
         profile,
         facts: Vec::new(),
-        transition_candidates: std::collections::HashMap::new(),
+        transition_buckets: std::collections::HashMap::new(),
+        child_matches: std::collections::HashMap::new(),
     };
+    // Root-context resolution lowercases the whole logical path per call, and
+    // files commonly repeat one root key per definition; memoize per key.
+    let mut root_contexts: rustc_hash::FxHashMap<Box<str>, Option<String>> =
+        rustc_hash::FxHashMap::default();
     for (property_index, property) in properties
         .iter()
         .enumerate()
         .filter(|(_, property)| property.top_level)
     {
-        let Some(context) = semantic_root_context(rules, logical_path, &property.key) else {
+        let Some(context) = root_contexts
+            .entry(Box::from(property.key.to_ascii_lowercase().as_str()))
+            .or_insert_with(|| semantic_root_context(rules, logical_path, &property.key))
+            .clone()
+        else {
             continue;
         };
         lowering.facts.push(ScopeFact {
@@ -133,30 +142,45 @@ fn transition_candidates<'rule>(
     candidates
 }
 
-fn scope_transition_rules<'rule>(
-    rules: &'rule RuleSet,
-    candidates: &[&'rule SemanticRule],
-    context: &str,
-    key: &str,
-    profile: &GameProfile,
-    state: &ScopeState,
-) -> Vec<&'rule SemanticRule> {
-    let root_context = context
-        .strip_prefix("type:")
-        .map(|type_name| format!("root:{type_name}"));
-    let _ = root_context;
-    let mut strong = Vec::new();
-    let mut weak = Vec::new();
-    {
-        for rule in candidates.iter().copied() {
-            if !scope_allows(profile, state, rule) {
-                continue;
-            }
+/// Matcher-classified transition rules for one (context, parent path).
+///
+/// The path/shape-filtered candidate list is property-independent, so it is
+/// classified once per distinct pair and shared by every property under it;
+/// effect and trigger contexts carry nearly two thousand rules each, and the
+/// previous full scan per property dominated lowering. Each entry keeps its
+/// original candidate position because `equivalent_transition` returns the
+/// first matching rule: bucket probes restore candidate order before use.
+struct TransitionBuckets<'rule> {
+    candidates: Vec<&'rule SemanticRule>,
+    /// Exact-key rules by lowercased key.
+    exact: rustc_hash::FxHashMap<Box<str>, Vec<(u32, &'rule SemanticRule)>>,
+    /// Enum rules with their member lists resolved once.
+    enums: Vec<(&'rule [String], &'rule SemanticRule, u32)>,
+    any_scalar: Vec<(&'rule SemanticRule, u32)>,
+    date: Vec<(&'rule SemanticRule, u32)>,
+    weak: Vec<(&'rule SemanticRule, u32)>,
+}
+
+impl<'rule> TransitionBuckets<'rule> {
+    fn build(rules: &'rule RuleSet, candidates: Vec<&'rule SemanticRule>) -> Self {
+        let mut exact: rustc_hash::FxHashMap<Box<str>, Vec<(u32, &'rule SemanticRule)>> =
+            rustc_hash::FxHashMap::default();
+        let mut enums = Vec::new();
+        let mut any_scalar = Vec::new();
+        let mut date = Vec::new();
+        let mut weak = Vec::new();
+        for (position, rule) in candidates.iter().copied().enumerate() {
+            let position = position as u32;
             match &rule.key {
-                KeyMatcher::Exact(expected) if expected.eq_ignore_ascii_case(key) => {
-                    strong.push(rule);
+                KeyMatcher::Exact(expected) => {
+                    exact
+                        .entry(Box::from(expected.to_ascii_lowercase().as_str()))
+                        .or_default()
+                        .push((position, rule));
                 }
                 KeyMatcher::Enum(enum_name) => {
+                    // Enum rules whose enum has no values never match any key;
+                    // resolve the member list once here instead of per property.
                     let members =
                         rules
                             .model()
@@ -164,24 +188,80 @@ fn scope_transition_rules<'rule>(
                             .enum_values
                             .iter()
                             .find_map(|(name, values)| {
-                                name.eq_ignore_ascii_case(enum_name).then_some(values)
+                                name.eq_ignore_ascii_case(enum_name)
+                                    .then_some(values.as_slice())
                             });
-                    if members.is_some_and(|values| {
-                        values.iter().any(|value| value.eq_ignore_ascii_case(key))
-                    }) {
-                        strong.push(rule);
+                    if let Some(members) = members {
+                        enums.push((members, rule, position));
                     }
                 }
-                KeyMatcher::AnyScalar => strong.push(rule),
-                KeyMatcher::Date if rule.key.matches(key, |_, _| false, |_, _| false) => {
-                    strong.push(rule);
-                }
-                KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) => weak.push(rule),
-                KeyMatcher::Exact(_) | KeyMatcher::Date => {}
+                KeyMatcher::AnyScalar => any_scalar.push((rule, position)),
+                KeyMatcher::Date => date.push((rule, position)),
+                KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) => weak.push((rule, position)),
             }
         }
+        Self {
+            candidates,
+            exact,
+            enums,
+            any_scalar,
+            date,
+            weak,
+        }
     }
-    if strong.is_empty() { weak } else { strong }
+
+    /// Concrete (strong) and dynamic (weak) matches for one property key in
+    /// original candidate order, mirroring the previous per-rule scan.
+    fn matches_for(
+        &self,
+        key: &str,
+        profile: &GameProfile,
+        state: &ScopeState,
+    ) -> Vec<&'rule SemanticRule> {
+        let mut positions: Vec<u32> = Vec::new();
+        let lowered = key.to_ascii_lowercase();
+        if let Some(hits) = self.exact.get(lowered.as_str()) {
+            positions.extend(
+                hits.iter()
+                    .filter(|(_, rule)| scope_allows(profile, state, rule))
+                    .map(|(position, _)| *position),
+            );
+        }
+        for (members, rule, position) in &self.enums {
+            if members
+                .iter()
+                .any(|member| member.eq_ignore_ascii_case(key))
+                && scope_allows(profile, state, rule)
+            {
+                positions.push(*position);
+            }
+        }
+        for (rule, position) in &self.any_scalar {
+            if scope_allows(profile, state, rule) {
+                positions.push(*position);
+            }
+        }
+        for (rule, position) in &self.date {
+            if rule.key.matches(key, |_, _| false, |_, _| false)
+                && scope_allows(profile, state, rule)
+            {
+                positions.push(*position);
+            }
+        }
+        if positions.is_empty() {
+            return self
+                .weak
+                .iter()
+                .filter(|(rule, _)| scope_allows(profile, state, rule))
+                .map(|(rule, _)| *rule)
+                .collect();
+        }
+        positions.sort_unstable();
+        positions
+            .into_iter()
+            .map(|position| self.candidates[position as usize])
+            .collect()
+    }
 }
 
 struct ScopeFactLowering<'a> {
@@ -190,18 +270,37 @@ struct ScopeFactLowering<'a> {
     rules: &'a RuleSet,
     profile: &'a GameProfile,
     facts: Vec<ScopeFact>,
-    /// Memoized path/shape-filtered rule lists per (context, parent path).
-    transition_candidates: std::collections::HashMap<(String, Vec<String>), Vec<&'a SemanticRule>>,
+    /// Matcher-bucketed rule lists per (context, parent path), shared by
+    /// sibling subtrees. Effect and trigger contexts repeat heavily, so the
+    /// bucket build cost amortizes across the whole file.
+    transition_buckets:
+        std::collections::HashMap<(String, Vec<String>), std::rc::Rc<TransitionBuckets<'a>>>,
+    /// Key-acceptance buckets per transition destination (context, parent path).
+    child_matches: ChildMatchMemo<'a>,
 }
 
 impl<'a> ScopeFactLowering<'a> {
-    /// Path/shape-filtered rules for one (context, parent path), memoized.
-    fn candidates_for(&mut self, context: &str, parent_path: &[String]) -> Vec<&'a SemanticRule> {
-        let key = (context.to_owned(), parent_path.to_vec());
-        self.transition_candidates
-            .entry(key)
-            .or_insert_with(|| transition_candidates(self.rules, context, parent_path))
-            .clone()
+    /// Buckets for one (context, parent path), built on first use.
+    fn buckets_for(
+        &mut self,
+        context: &str,
+        parent_path: &[String],
+    ) -> std::rc::Rc<TransitionBuckets<'a>> {
+        if let Some(buckets) = self
+            .transition_buckets
+            .get(&(context.to_owned(), parent_path.to_vec()))
+        {
+            return std::rc::Rc::clone(buckets);
+        }
+        let buckets = std::rc::Rc::new(TransitionBuckets::build(
+            self.rules,
+            transition_candidates(self.rules, context, parent_path),
+        ));
+        self.transition_buckets.insert(
+            (context.to_owned(), parent_path.to_vec()),
+            std::rc::Rc::clone(&buckets),
+        );
+        buckets
     }
 
     fn lower_nested(
@@ -211,48 +310,171 @@ impl<'a> ScopeFactLowering<'a> {
         parent_path: &[String],
         state: &ScopeState,
     ) {
-        for &property_index in &self.property_children[parent_index] {
-            let property = &self.properties[property_index];
-            let candidates = self.candidates_for(context, parent_path);
-            let matching = scope_transition_rules(
-                self.rules,
-                &candidates,
-                context,
-                &property.key,
-                self.profile,
-                state,
-            );
-            let fact_index = self.facts.len();
-            self.facts.push(ScopeFact {
-                range: property.key_range,
-                context: context.to_owned(),
-                parent_path: parent_path.to_vec(),
-                state: state.clone(),
-                transition: None,
-            });
-            let transparent = context.eq_ignore_ascii_case("trigger")
-                && self.profile.is_transparent_scope_wrapper(&property.key);
-            let Some(rule) = statically_selected_transition(StaticTransitionInput {
-                matching: &matching,
-                properties: self.properties,
-                property_children: self.property_children,
-                property_index,
-                rules: self.rules,
-                context,
-                parent_path,
-                transparent,
-            }) else {
-                continue;
-            };
-            let (next_context, next_path) =
-                transition_destination(rule, context, parent_path, &property.key, transparent);
-            let next_state = child_scope_state(state, rule, self.rules, self.profile);
-            self.facts[fact_index].transition = Some(next_state.clone());
+        let buckets = self.buckets_for(context, parent_path);
+        // Disjoint borrows: `facts`/`child_matches` stay mutable while the
+        // immutable inputs feed the transition selection; recursion happens
+        // after the scope ends so `self` is whole again.
+        let mut recurse: Vec<(usize, String, Vec<String>, ScopeState)> = Vec::new();
+        {
+            let ScopeFactLowering {
+                properties,
+                property_children,
+                rules,
+                profile,
+                facts,
+                child_matches,
+                ..
+            } = self;
+            for &property_index in &property_children[parent_index] {
+                let property = &properties[property_index];
+                let matching = buckets.matches_for(&property.key, profile, state);
+                let fact_index = facts.len();
+                facts.push(ScopeFact {
+                    range: property.key_range,
+                    context: context.to_owned(),
+                    parent_path: parent_path.to_vec(),
+                    state: state.clone(),
+                    transition: None,
+                });
+                let transparent = context.eq_ignore_ascii_case("trigger")
+                    && profile.is_transparent_scope_wrapper(&property.key);
+                let Some(rule) = statically_selected_transition_with_memo(
+                    &matching,
+                    properties,
+                    property_children,
+                    property_index,
+                    rules,
+                    context,
+                    parent_path,
+                    transparent,
+                    child_matches,
+                ) else {
+                    continue;
+                };
+                let (next_context, next_path) =
+                    transition_destination(rule, context, parent_path, &property.key, transparent);
+                let next_state = child_scope_state(state, rule, rules, profile);
+                facts[fact_index].transition = Some(next_state.clone());
+                recurse.push((property_index, next_context, next_path, next_state));
+            }
+        }
+        for (property_index, next_context, next_path, next_state) in recurse {
             self.lower_nested(property_index, &next_context, &next_path, &next_state);
         }
     }
 }
 
+/// Key-acceptance buckets answering the old `child_key_may_match` scan for one
+/// (context, parent path) without rescanning the context's full rule list.
+/// `statically_selected_transition` probes one destination per candidate rule
+/// per child key, so the unbucketed scan volume was
+/// rules-in-context × children × properties.
+struct ChildMatchBuckets<'rule> {
+    exact: rustc_hash::FxHashSet<Box<str>>,
+    enum_members: Vec<&'rule [String]>,
+    any_scalar: bool,
+    date: Vec<&'rule SemanticRule>,
+    dynamic: bool,
+}
+
+impl<'rule> ChildMatchBuckets<'rule> {
+    fn build(rules: &'rule RuleSet, context: &str, parent_path: &[String]) -> Self {
+        let root_context = context
+            .strip_prefix("type:")
+            .map(|type_name| format!("root:{type_name}"));
+        let mut exact = rustc_hash::FxHashSet::default();
+        let mut enum_members = Vec::new();
+        let mut any_scalar = false;
+        let mut date = Vec::new();
+        let mut dynamic = false;
+        for lookup_context in std::iter::once(context).chain(root_context.as_deref()) {
+            for rule in rules
+                .semantic_rules_for_context(lookup_context)
+                .filter(|rule| {
+                    paths_equal(&rule.parent_path, parent_path)
+                        && !matches!(rule.shape, RuleShape::LeafValue)
+                })
+            {
+                match &rule.key {
+                    KeyMatcher::Exact(expected) => {
+                        exact.insert(Box::from(expected.to_ascii_lowercase().as_str()));
+                    }
+                    KeyMatcher::Enum(enum_name) => {
+                        match rules.model().semantic.enum_values.iter().find_map(
+                            |(name, values)| {
+                                name.eq_ignore_ascii_case(enum_name)
+                                    .then_some(values.as_slice())
+                            },
+                        ) {
+                            Some(members) => enum_members.push(members),
+                            None => dynamic = true,
+                        }
+                    }
+                    KeyMatcher::AnyScalar => any_scalar = true,
+                    KeyMatcher::Date => date.push(rule),
+                    KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) => dynamic = true,
+                }
+            }
+        }
+        Self {
+            exact,
+            enum_members,
+            any_scalar,
+            date,
+            dynamic,
+        }
+    }
+
+    /// Whether any bucketed rule accepts `key`; `lowered` is the caller's
+    /// lowercased key so repeated probes need not re-allocate it. An
+    /// `AnyScalar` rule decides the whole question exactly as the scan did
+    /// (non-empty key accepts, empty rejects); keys are never empty here.
+    fn may_match(&self, key: &str, lowered: &str) -> bool {
+        if self.any_scalar {
+            return !key.is_empty();
+        }
+        if self.exact.contains(lowered) {
+            return true;
+        }
+        for members in &self.enum_members {
+            if members
+                .iter()
+                .any(|member| member.eq_ignore_ascii_case(key))
+            {
+                return true;
+            }
+        }
+        for rule in &self.date {
+            if rule.key.matches(key, |_, _| false, |_, _| false) {
+                return true;
+            }
+        }
+        self.dynamic
+    }
+}
+
+/// Memoized [`ChildMatchBuckets`] per (context, parent path).
+type ChildMatchMemo<'rule> =
+    std::collections::HashMap<(String, Vec<String>), std::rc::Rc<ChildMatchBuckets<'rule>>>;
+
+fn child_match_buckets_for<'rule>(
+    memo: &mut ChildMatchMemo<'rule>,
+    rules: &'rule RuleSet,
+    context: &str,
+    parent_path: &[String],
+) -> std::rc::Rc<ChildMatchBuckets<'rule>> {
+    if let Some(buckets) = memo.get(&(context.to_owned(), parent_path.to_vec())) {
+        return std::rc::Rc::clone(buckets);
+    }
+    let buckets = std::rc::Rc::new(ChildMatchBuckets::build(rules, context, parent_path));
+    memo.insert(
+        (context.to_owned(), parent_path.to_vec()),
+        std::rc::Rc::clone(&buckets),
+    );
+    buckets
+}
+
+#[cfg(test)]
 pub(crate) struct StaticTransitionInput<'data, 'rule> {
     pub(crate) matching: &'data [&'rule SemanticRule],
     pub(crate) properties: &'data [HirProperty],
@@ -264,39 +486,62 @@ pub(crate) struct StaticTransitionInput<'data, 'rule> {
     pub(crate) transparent: bool,
 }
 
+#[cfg(test)]
 pub(crate) fn statically_selected_transition<'rule>(
-    input: StaticTransitionInput<'_, 'rule>,
+    input: StaticTransitionInput<'rule, 'rule>,
 ) -> Option<&'rule SemanticRule> {
-    if let Some(rule) = equivalent_transition(input.matching) {
+    let mut child_matches = ChildMatchMemo::new();
+    statically_selected_transition_with_memo(
+        input.matching,
+        input.properties,
+        input.property_children,
+        input.property_index,
+        input.rules,
+        input.context,
+        input.parent_path,
+        input.transparent,
+        &mut child_matches,
+    )
+}
+
+/// Memoized form of [`statically_selected_transition`]: `child_matches` is the
+/// caller's per-file memo, so repeated transition destinations stop rescanning
+/// their context's rule list. Passing the memo as a direct parameter keeps its
+/// invariant `'rule` from infecting the independent `context`/`parent_path`
+/// lifetimes (which a shared struct field would unify).
+#[allow(clippy::too_many_arguments)] // flat params instead of an input struct: see doc comment
+fn statically_selected_transition_with_memo<'rule>(
+    matching: &[&'rule SemanticRule],
+    properties: &[HirProperty],
+    property_children: &[Vec<usize>],
+    property_index: usize,
+    rules: &'rule RuleSet,
+    context: &str,
+    parent_path: &[String],
+    transparent: bool,
+    child_matches: &mut ChildMatchMemo<'rule>,
+) -> Option<&'rule SemanticRule> {
+    if let Some(rule) = equivalent_transition(matching) {
         return Some(rule);
     }
-    let children = &input.property_children[input.property_index];
+    let children = &property_children[property_index];
     if children.is_empty() {
         return None;
     }
-    let property = &input.properties[input.property_index];
-    let possible = input
-        .matching
-        .iter()
-        .copied()
-        .filter(|candidate| {
-            let (child_context, child_path) = transition_destination(
-                candidate,
-                input.context,
-                input.parent_path,
-                &property.key,
-                input.transparent,
-            );
-            children.iter().all(|child_index| {
-                child_key_may_match(
-                    input.rules,
-                    &child_context,
-                    &child_path,
-                    &input.properties[*child_index].key,
-                )
-            })
-        })
-        .collect::<Vec<_>>();
+    let property = &properties[property_index];
+    let mut possible = Vec::new();
+    'candidates: for candidate in matching.iter().copied() {
+        let (child_context, child_path) =
+            transition_destination(candidate, context, parent_path, &property.key, transparent);
+        let buckets = child_match_buckets_for(child_matches, rules, &child_context, &child_path);
+        for &child_index in children {
+            let key = &properties[child_index].key;
+            if !buckets.may_match(key, &key.to_ascii_lowercase()) {
+                continue 'candidates;
+            }
+        }
+        possible.push(candidate);
+    }
     equivalent_transition(&possible)
 }
 
@@ -319,6 +564,7 @@ fn transition_destination(
     )
 }
 
+#[cfg(test)]
 pub(crate) fn child_key_may_match(
     rules: &RuleSet,
     context: &str,
@@ -454,7 +700,7 @@ pub(crate) fn child_scope_state(
         let next = if push_scope.eq_ignore_ascii_case("any") {
             ScopeValue::Unknown
         } else {
-            ScopeValue::Known(vec![push_scope.to_owned()])
+            ScopeValue::known_single(push_scope)
         };
         child.current.insert(0, next);
     }
@@ -540,7 +786,7 @@ pub(crate) fn resolve_scope_expression(
     if expression.eq_ignore_ascii_case("any") || link_expression {
         ScopeValue::Unknown
     } else if profile.is_scope(expression) {
-        ScopeValue::Known(vec![expression.to_owned()])
+        ScopeValue::known_single(expression)
     } else {
         ScopeValue::Unknown
     }
@@ -593,7 +839,7 @@ fn resolve_scope_link(
     }
     if !targets.is_empty() {
         targets.sort_by_key(|target| target.to_ascii_lowercase());
-        return (link_expression, ScopeValue::Known(targets));
+        return (link_expression, ScopeValue::known(targets));
     }
     (link_expression, ScopeValue::Unknown)
 }
@@ -637,9 +883,7 @@ fn initial_scope_state(
     }
     let scope = profile
         .root_scope(root_key)
-        .map_or(ScopeValue::Unknown, |scope| {
-            ScopeValue::Known(vec![scope.to_owned()])
-        });
+        .map_or(ScopeValue::Unknown, ScopeValue::known_single);
     ScopeState::initial(scope)
 }
 
@@ -661,5 +905,5 @@ fn initial_scope_value(
             .or_else(|| root.cloned())
             .unwrap_or(ScopeValue::Unknown);
     }
-    ScopeValue::Known(vec![expression.to_owned()])
+    ScopeValue::known_single(expression)
 }
