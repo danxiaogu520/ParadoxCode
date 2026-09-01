@@ -14,6 +14,7 @@ mod semantics;
 mod templates;
 
 pub use model::*;
+pub(crate) use semantics::ascii_ci_starts_with;
 pub use semantics::{
     semantic_file_root_context, semantic_root_context, semantic_root_context_is_fallback,
     semantic_type_path_matches,
