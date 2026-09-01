@@ -39,8 +39,6 @@ struct ContextRuleView {
     /// Whether more than one source contributed; merged sources return rule-id order while
     /// single sources keep exact-key rules before non-exact matchers.
     merged: bool,
-    /// Every contributing rule index, rule-id ordered.
-    all: Arc<[usize]>,
     /// Indices from `all` whose rule declares no parent path; top-level containers
     /// (parent path `[]`) match exactly these, so they skip the per-rule path filter and
     /// its full-size result allocation.
@@ -56,6 +54,13 @@ struct ContextRuleView {
     exact_by_key: rustc_hash::FxHashMap<Box<str>, Arc<[usize]>>,
     /// Indices of rules whose key matcher is not exact, rule-id ordered.
     non_exact: Arc<[usize]>,
+    /// Rules with an all-literal declared parent path, keyed by the lowercased segments
+    /// joined with `\0`. A container whose path is all-literal resolves its rule list
+    /// with one probe instead of scanning every rule in the context.
+    parent_literal: rustc_hash::FxHashMap<Box<str>, Arc<[usize]>>,
+    /// Rules whose declared parent path contains a dynamic segment (`<type>`, `enum[..]`,
+    /// int/float/date), bucketed by path length; these keep the per-rule check.
+    parent_dynamic_by_len: Vec<Arc<[usize]>>,
 }
 
 thread_local! {
@@ -223,9 +228,43 @@ fn context_rule_view(snapshot: &AnalysisSnapshot, context: &str) -> Arc<ContextR
             }
         })
         .collect();
+    // Parent-path resolution buckets: all-literal declared paths answer by probe, paths
+    // with dynamic segments (`<type>`, `enum[..]`, numeric spellings) stay per-rule checks
+    // bucketed by length.
+    let mut parent_literal: rustc_hash::FxHashMap<Box<str>, Vec<usize>> =
+        rustc_hash::FxHashMap::default();
+    let mut parent_dynamic_by_len: Vec<Vec<usize>> = Vec::new();
+    for index in all.iter().copied() {
+        let Some(rule) = rules.semantic_rule_at(index) else {
+            continue;
+        };
+        if rule.parent_path.is_empty() {
+            continue;
+        }
+        if rule
+            .parent_path
+            .iter()
+            .all(|segment| semantic_parent_path_segment_is_literal(segment))
+        {
+            let mut key = String::new();
+            for segment in &rule.parent_path {
+                key.push_str(&segment.to_ascii_lowercase());
+                key.push('\0');
+            }
+            parent_literal
+                .entry(key.into_boxed_str())
+                .or_default()
+                .push(index);
+        } else {
+            let len = rule.parent_path.len();
+            if parent_dynamic_by_len.len() <= len {
+                parent_dynamic_by_len.resize(len + 1, Vec::new());
+            }
+            parent_dynamic_by_len[len].push(index);
+        }
+    }
     let view = Arc::new(ContextRuleView {
         merged,
-        all: Arc::from(all),
         all_top: Arc::from(all_top),
         alternative_groups: Arc::from(alternative_groups),
         alternative_exact_keys: alternative_exact_keys
@@ -238,6 +277,11 @@ fn context_rule_view(snapshot: &AnalysisSnapshot, context: &str) -> Arc<ContextR
             .map(|(key, bucket)| (key, Arc::from(bucket)))
             .collect(),
         non_exact: Arc::from(non_exact),
+        parent_literal: parent_literal
+            .into_iter()
+            .map(|(key, bucket)| (key, Arc::from(bucket)))
+            .collect(),
+        parent_dynamic_by_len: parent_dynamic_by_len.into_iter().map(Arc::from).collect(),
     });
     snapshot.query_cache().insert(
         revision,
@@ -264,11 +308,67 @@ pub(crate) fn semantic_rules_for_container<'a>(
             .filter_map(|index| rules.semantic_rule_at(*index))
             .collect();
     }
-    view.all
-        .iter()
-        .filter_map(|index| rules.semantic_rule_at(*index))
-        .filter(|rule| semantic_parent_path_matches(snapshot, &rule.parent_path, parent_path))
+    // Literal actual paths resolve the literal bucket by probe; rules whose declared
+    // parent path contains a dynamic segment (`<type>`, `enum[..]`, numeric spellings)
+    // keep the per-rule check. Both index lists are rule-id ordered, so the merged
+    // result preserves `all` order.
+    let literal_actual = semantic_parent_path_is_literal(parent_path);
+    let mut indices: Vec<usize> = if literal_actual {
+        let mut key = String::new();
+        for segment in parent_path {
+            key.push_str(&segment.to_ascii_lowercase());
+            key.push('\0');
+        }
+        view.parent_literal
+            .get(key.as_str())
+            .map_or_else(Vec::new, |bucket| bucket.as_ref().to_vec())
+    } else {
+        // A literal declared segment can only match by spelling equality, and a
+        // non-literal actual segment never equals a literal spelling that matters here;
+        // only dynamic-segment rules can match such paths.
+        Vec::new()
+    };
+    let dynamic = view
+        .parent_dynamic_by_len
+        .get(parent_path.len())
+        .map_or([].as_slice(), |bucket| bucket.as_ref());
+    if !dynamic.is_empty() {
+        let before = indices.len();
+        for index in dynamic {
+            if rules.semantic_rule_at(*index).is_some_and(|rule| {
+                semantic_parent_path_matches(snapshot, &rule.parent_path, parent_path)
+            }) {
+                indices.push(*index);
+            }
+        }
+        if indices.len() > before {
+            indices.sort_unstable();
+            indices.dedup();
+        }
+    }
+    indices
+        .into_iter()
+        .filter_map(|index| rules.semantic_rule_at(index))
         .collect()
+}
+
+/// Whether every segment of a concrete parent path can only satisfy the literal branch of
+/// `semantic_parent_path_matches` (no `<type>`, `enum[..]`, or numeric/date spellings).
+fn semantic_parent_path_is_literal(parent_path: &[Arc<str>]) -> bool {
+    parent_path
+        .iter()
+        .all(|segment| semantic_parent_path_segment_is_literal(segment.as_ref()))
+}
+
+/// Whether one segment can only satisfy the literal branch of `semantic_parent_path_matches`.
+fn semantic_parent_path_segment_is_literal(segment: &str) -> bool {
+    !(segment.starts_with('<')
+        || segment.ends_with('>')
+        || segment.starts_with("enum[")
+        || segment.ends_with(']')
+        || segment.eq_ignore_ascii_case("int")
+        || segment.eq_ignore_ascii_case("float")
+        || segment.eq_ignore_ascii_case("date_field"))
 }
 
 /// Returns the `LeafValue` rules of one container; used only to match bare values.
