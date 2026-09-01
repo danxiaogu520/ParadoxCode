@@ -240,3 +240,60 @@ self 侧新面孔(analyze 口径,含等待权重):`semantic_parent_path_matches`
    HIR 路径 String 192MiB、位置表 109MiB。
 4. `lower_with_profile` 26.7% 未动,V3(ScopeId u32)与其配套,A1 落地时一并受益。
 5. 扫描 worker 群 CPU 60.8s 基线持平,分配器占 31.8%——arena 化将同时惠及扫描路径。
+
+## 十一、2026-09-01 第二轮:profile 驱动的分配/锁/结构优化(五提交)
+
+语料与门槛不变(3047072888,7,907 文件,诊断 157,655 条逐字节不变)。
+本轮基于真实 LSP 流程 samply 剖析(CPU-only 聚合,pdx-ls 进程 13 个验证 worker)。
+
+### 11.1 提交与内容
+
+| 提交 | 内容 | 单线程诊断 pass |
+|---|---|---|
+| `68c9f93` | 热路径去分配:`root_context_types` 预计算集、`semantic_type_path_matches_lowered` 悬挂小写路径 + 零分配 ci 前后缀比较、query-cache 探针线程本地缓冲 | 50.2 → 34.9s |
+| `db11a1d` | membership 三视图 worker 线程本地槽(消灭 RwLock+downcast 探针)+ `scripted_macro_contexts` 预计算映射 | (并行收益,见 11.2) |
+| `91cfab2` | ContextRuleView parent-path 分桶:全字面量路径哈希桶 + 动态段按长度桶,替代每容器 1900 条规则全扫 | 34.7 → 31.3s |
+| `5efbb57` | MembershipBundle 单槽合并三视图探测 + `is_case_sensitive` 借用式探测 | 31.3 → 27.2s |
+
+### 11.2 关键测量(本轮后)
+
+| 指标 | 本轮前(本日) | 本轮后 | 本会话累计 |
+|---|---|---|---|
+| 单线程诊断 pass | 50.2s | **26.4–27.2s** | 157.3s(原始)→ **-83%** |
+| head-to-head LSP CPU | 196.4 CPU-s | **73.2–74.1 CPU-s** | **-63%** |
+| head-to-head LSP wall | 47.1s | **40.3–40.6s** | idle 窗口固定 20s 为下限 |
+| `pdx/ready` | +10.97s(cpu 52.9s) | **+6.8s(cpu 27.4s)** | |
+| idle 20s CPU | +78.7s(393%) | **+42.6s(213%)** | |
+| 峰值内存 | 2.83 GiB | **2.62 GiB** | |
+
+剖析侧:SipHash `RandomState` insert/rehash/hash_one 从 worker CPU 的 ~30% 归零;
+`SnapshotQueryCache::get`(锁+downcast)从 ~12% 归零;`semantic_type_path_matches`/
+`semantic_root_context_with_confidence` 的 format! 内联帧消失。
+
+### 11.3 与 cwtools-rs 对标(热缓存基线)
+
+| 指标 | pdx-ls(本轮后) | cwtools-rs | 差距 | 本会话前差距 |
+|---|---|---|---|---|
+| CPU | 73.2 CPU-s | 14.5 CPU-s | **5.0×** | 13.6× |
+| wall | 40.3s* | 3.0s | 13.4× | 15.7× |
+| 峰值内存 | 2.62 GiB | 0.30 GiB | **8.7×** | 9.4× |
+
+\* 脚本含固定 20s idle 观察窗与 4×(open/edit/close) 采样段,wall 下限 ≈34s,CPU 为可比口径。
+
+### 11.4 剩余差距归因(下一轮)
+
+1. **内存 8.7×(最大结构项)**:峰值窗内保留 CST arena 204MiB、HIR 路径 192MiB、
+   引用 136MiB、位置表 109MiB(mem_probe 驱逐后口径)。候选:验证期分批驱逐
+   frontend、HIR 路径段驻留复用、位置表按需化。
+2. **启动 lower 11.0s(mem_probe)** / `pdx/ready` cpu 27.4s:HIR 降低是启动 CPU 主项,
+   V3(ScopeId u32)+ lower_semantics 结构优化是正路。
+3. **wall**:测量口径下限受脚本固定窗约束;真实编辑延迟(open→diag p50 277ms)是
+   下一个体验目标,L2 指纹门属此类。
+4. 验证 worker 数自适应只影响 wall/延迟,不改变 CPU 总量(对标主口径),暂缓。
+
+### 11.5 跳过项记录
+
+- **I3(vanilla 缓存 rkyv+zstd)**:实测 `IndexCache::load_cancellable_for_install`
+  2.13s(285MB/8671 文件),占 ~47s wall 的 4.5%,重写 ROI 不足,跳过。
+- 测量工具链:samply record 服务器会随录制结束退出,重剖析用
+  `samply load --no-open --port <p> <file>` 起新实例后调 `/symbolicate/v5`。
