@@ -325,6 +325,11 @@ impl RuleSet {
         self.model.semantic.rules.get(index)
     }
 
+    /// Iterates every compiled semantic rule regardless of context.
+    pub fn semantic_rules(&self) -> impl Iterator<Item = &SemanticRule> {
+        self.model.semantic.rules.iter()
+    }
+
     /// Returns semantic rules for one context without scanning unrelated contexts.
     pub fn semantic_rules_for_context(&self, context: &str) -> impl Iterator<Item = &SemanticRule> {
         case_insensitive_indices(&self.semantic_rules_by_context, context)
