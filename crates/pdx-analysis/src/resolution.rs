@@ -1247,7 +1247,7 @@ pub(crate) fn index_definition(
             path,
             range: definition.range,
         },
-        selection_range: indexed_definition_selection_range(snapshot, definition),
+        selection_range: indexed_definition_selection_range(definition),
         priority: definition_priority_for_file(snapshot, definition.file_id),
     }
 }
@@ -1294,7 +1294,7 @@ pub(crate) fn index_definition_info(
     snapshot: &AnalysisSnapshot,
     definition: &Definition,
 ) -> DefinitionInfo {
-    let selection_range = indexed_definition_selection_range(snapshot, definition);
+    let selection_range = indexed_definition_selection_range(definition);
     let path = snapshot
         .source_files()
         .get(&definition.file_id)
@@ -1320,24 +1320,8 @@ pub(crate) fn index_definition_info(
     }
 }
 
-pub(crate) fn indexed_definition_selection_range(
-    snapshot: &AnalysisSnapshot,
-    definition: &Definition,
-) -> TextRange {
-    snapshot
-        .file_state(definition.file_id)
-        .and_then(|state| state.hir())
-        .and_then(|hir| {
-            hir.definitions()
-                .iter()
-                .find(|candidate| {
-                    candidate.kind.eq_ignore_ascii_case(&definition.kind)
-                        && candidate.name.eq_ignore_ascii_case(&definition.name)
-                        && candidate.range == definition.range
-                })
-                .map(|candidate| candidate.selection_range)
-        })
-        .unwrap_or(definition.range)
+pub(crate) fn indexed_definition_selection_range(definition: &Definition) -> TextRange {
+    definition.selection_range
 }
 
 pub(crate) fn definition_selection_location(definition: &ResolutionDefinition) -> Location {

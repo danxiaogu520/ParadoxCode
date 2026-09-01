@@ -506,39 +506,13 @@ pub(crate) fn position_ranges_for_state(state: &FileState) -> Vec<(TextRange, Po
         return cached.clone();
     }
     let line_index = LineIndex::new(state.source());
-    let hir_selection_ranges = state
-        .hir()
-        .map(|hir| {
-            hir.definitions()
-                .iter()
-                .map(|definition| {
-                    (
-                        (
-                            definition.kind.clone(),
-                            definition.name.clone(),
-                            definition.range,
-                        ),
-                        definition.selection_range,
-                    )
-                })
-                .collect::<BTreeMap<_, _>>()
-        })
-        .unwrap_or_default();
     state
         .shard()
         .definitions
         .iter()
         .filter_map(|definition| {
-            let selection_range = hir_selection_ranges
-                .get(&(
-                    definition.kind.to_string(),
-                    definition.name.to_string(),
-                    definition.range,
-                ))
-                .copied()
-                .unwrap_or(definition.range);
             line_index
-                .position_range(state.source(), selection_range)
+                .position_range(state.source(), definition.selection_range)
                 .map(|position| (definition.range, position))
         })
         .chain(state.shard().references.iter().filter_map(|reference| {
@@ -725,11 +699,16 @@ fn collect_semantic_type_definition(
     if name.is_empty() {
         return;
     }
+    let key_range = node
+        .children()
+        .find(|child| child.kind() == CstKind::Key)
+        .map(|child| child.range());
     definitions.push(Definition {
         kind: crate::string_pool::intern_shard_string(&descriptor.name),
         name: crate::string_pool::intern_shard_string(&name),
         file_id: file.id,
         range: node.range(),
+        selection_range: key_range.unwrap_or(node.range()),
         active: true,
     });
 }
@@ -836,6 +815,7 @@ fn collect_hir_semantics(
             name: crate::string_pool::intern_shard_string(&definition.name),
             file_id: file.id,
             range: definition.range,
+            selection_range: definition.selection_range,
             active: true,
         });
     }

@@ -47,13 +47,28 @@ fn main() {
     let rules = pdx_game::eu4::first_party_rules().expect("rules");
     let profile = pdx_game::eu4::profile();
     let mut host = AnalysisHost::with_profile(rules, profile);
+    // Mirrors the LSP: the Current Mod takes root id u32::MAX and the vanilla
+    // index cache installs its own root at id 0 before the first scan.
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-        SourceRootId::new(0),
+        SourceRootId::new(u32::MAX),
         SourceRootKind::CurrentMod,
         root,
     )]));
+    let mut vanilla_installed = false;
+    if let Some(appdata) = std::env::var_os("LOCALAPPDATA") {
+        let cache_path =
+            std::path::Path::new(&appdata).join("ParadoxCode/cache/eu4/vanilla.pdxindex");
+        match pdx_engine::IndexCache::load(&cache_path) {
+            Ok(cache) => {
+                host.install_index_cache(cache).expect("install cache");
+                vanilla_installed = true;
+            }
+            Err(error) => println!("cache load failed: {error}"),
+        }
+    }
     host.refresh_source_roots().expect("scan");
     let scan_seconds = started.elapsed().as_secs_f64();
+    println!("vanilla cache installed: {vanilla_installed}");
 
     let snapshot = host.snapshot();
     let mut source_bytes = 0usize;
@@ -174,7 +189,10 @@ fn main() {
     let mut lower_ns = 0u128;
     let mut phase_files = 0usize;
     for file in snapshot.source_files().values() {
-        snapshot.file_state(file.id).expect("state");
+        // Vanilla files come from the index cache without a file state.
+        if snapshot.file_state(file.id).is_none() {
+            continue;
+        }
         let logical = &file.logical_path;
         let Some(category) = snapshot.rules().classify(logical) else {
             continue;
@@ -209,26 +227,42 @@ fn main() {
     println!("parse: {:.1}s", parse_ns as f64 / 1e9);
     println!("lower: {:.1}s", lower_ns as f64 / 1e9);
 
-    // Diagnostics pass timing (single thread) for optimization feedback.
+    // Diagnostics pass timing (single thread) for optimization feedback. The
+    // digest hashes every diagnostic (code, range, severity, certainty,
+    // message, fixes) in deterministic file order so structural changes can
+    // prove they preserved output byte-for-byte.
     {
         let snapshot = host.snapshot();
         let cancellation = pdx_analysis::CancellationToken::new();
         let mut diag_ns = 0u128;
         let mut diag_files = 0usize;
         let mut diagnostics_count = 0usize;
-        for file in snapshot.source_files().values() {
-            if snapshot
-                .rules()
-                .classify(&file.logical_path)
-                .is_none_or(|category| {
-                    !matches!(
-                        category.parser,
-                        pdx_rules::ParserKind::Script | pdx_rules::ParserKind::Localisation
-                    )
-                })
-            {
-                continue;
+        let mut sorted_files = snapshot
+            .source_files()
+            .values()
+            .filter(|file| {
+                snapshot.file_state(file.id).is_some()
+                    && snapshot
+                        .rules()
+                        .classify(&file.logical_path)
+                        .is_some_and(|category| {
+                            matches!(
+                                category.parser,
+                                pdx_rules::ParserKind::Script | pdx_rules::ParserKind::Localisation
+                            )
+                        })
+            })
+            .collect::<Vec<_>>();
+        sorted_files
+            .sort_by(|left, right| left.logical_path.as_str().cmp(right.logical_path.as_str()));
+        let mut digest: u64 = 0xcbf29ce484222325;
+        let mix = |bytes: &[u8], digest: &mut u64| {
+            for &byte in bytes {
+                *digest ^= u64::from(byte);
+                *digest = digest.wrapping_mul(0x100000001b3);
             }
+        };
+        for file in &sorted_files {
             let started = std::time::Instant::now();
             if let Ok(diagnostics) = pdx_analysis::source_file_diagnostics_with_cancellation(
                 &snapshot,
@@ -238,15 +272,41 @@ fn main() {
                 diag_ns += started.elapsed().as_nanos();
                 diagnostics_count += diagnostics.len();
                 diag_files += 1;
+                for diagnostic in &diagnostics {
+                    mix(file.logical_path.as_str().as_bytes(), &mut digest);
+                    mix(&[0x1f], &mut digest);
+                    mix(diagnostic.code.as_str().as_bytes(), &mut digest);
+                    mix(&[0x1f], &mut digest);
+                    mix(&diagnostic.range.start().to_le_bytes(), &mut digest);
+                    mix(&diagnostic.range.end().to_le_bytes(), &mut digest);
+                    mix(&[0x1f], &mut digest);
+                    mix(format!("{:?}", diagnostic.severity).as_bytes(), &mut digest);
+                    mix(
+                        format!("{:?}", diagnostic.certainty).as_bytes(),
+                        &mut digest,
+                    );
+                    mix(&[0x1f], &mut digest);
+                    mix(diagnostic.message.as_bytes(), &mut digest);
+                    for fix in &diagnostic.fixes {
+                        mix(&[0x1f], &mut digest);
+                        mix(fix.title.as_bytes(), &mut digest);
+                        mix(&[0x1f], &mut digest);
+                        mix(&fix.range.start().to_le_bytes(), &mut digest);
+                        mix(&fix.range.end().to_le_bytes(), &mut digest);
+                        mix(&[0x1f], &mut digest);
+                        mix(fix.new_text.as_bytes(), &mut digest);
+                    }
+                    mix(b"\n", &mut digest);
+                }
             }
         }
         println!(
-            "diagnostics pass: files={diag_files} count={diagnostics_count} total={:.1}s",
+            "diagnostics pass: files={diag_files} count={diagnostics_count} total={:.1}s digest={digest:#018x}",
             diag_ns as f64 / 1e9
         );
     }
 
-    // Post-scan phases: eviction and vanilla install, sampled externally.
+    // Post-scan phases: eviction, sampled externally.
     drop(snapshot);
     phase_rss("scan-retained");
 
@@ -254,18 +314,6 @@ fn main() {
     let evicted = host.evict_source_frontends(&|_| false);
     println!("evicted frontends: {evicted}");
     phase_rss("evicted");
-
-    // Install the vanilla index cache like the LSP does and report the delta.
-    let cache_path = std::env::var("LOCALAPPDATA")
-        .map(|root| std::path::PathBuf::from(root).join("ParadoxCode/cache/eu4/vanilla.pdxindex"))
-        .expect("LOCALAPPDATA");
-    match pdx_engine::IndexCache::load(&cache_path) {
-        Ok(cache) => {
-            host.install_index_cache(cache).expect("install cache");
-            phase_rss("vanilla-installed");
-        }
-        Err(error) => println!("cache load failed: {error}"),
-    }
     phase_rss("end");
 }
 

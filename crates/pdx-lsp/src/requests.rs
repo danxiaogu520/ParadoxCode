@@ -546,9 +546,20 @@ impl SnapshotRequestContext {
             .values()
             .filter(|file| current_root_ids.contains(&file.root_id))
             .filter(|file| {
-                self.snapshot
-                    .file_state(file.id)
-                    .is_some_and(|state| state.parsed().is_some())
+                // Frontends are evicted at scan time; parseability is a
+                // property of the file's rule category, and evicted files
+                // reparse transiently inside the per-file diagnostics call.
+                self.snapshot.file_state(file.id).is_some()
+                    && self
+                        .snapshot
+                        .rules()
+                        .classify(&file.logical_path)
+                        .is_some_and(|category| {
+                            matches!(
+                                category.parser,
+                                ParserKind::Script | ParserKind::Localisation
+                            )
+                        })
             })
             .collect::<Vec<_>>();
         files.sort_by(|left, right| {

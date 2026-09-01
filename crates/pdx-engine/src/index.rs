@@ -468,6 +468,10 @@ pub struct Definition {
     pub file_id: SourceFileId,
     /// Source range of the definition.
     pub range: TextRange,
+    /// Range of the defining name token inside `range`, so navigation and
+    /// workspace symbols can highlight the name without reparsing the file.
+    /// Falls back to `range` when a collector cannot resolve a tighter token.
+    pub selection_range: TextRange,
     /// Whether this definition wins symbol resolution.
     pub active: bool,
 }
