@@ -1041,8 +1041,14 @@ fn symbol_policies(rules: &RuleSet) -> BTreeMap<String, SymbolResolutionPolicy> 
 
 impl WorkspaceIndex {
     fn is_case_sensitive(&self, kind: &str) -> bool {
-        self.case_sensitive_kinds
-            .contains(&kind.to_ascii_lowercase())
+        // Kinds are stored (and queried) lowercase in practice; borrowing avoids the
+        // per-probe lowercase allocation this membership hot path used to pay.
+        if kind.bytes().any(|byte| byte.is_ascii_uppercase()) {
+            self.case_sensitive_kinds
+                .contains(&kind.to_ascii_lowercase())
+        } else {
+            self.case_sensitive_kinds.contains(kind)
+        }
     }
 
     fn lookup_name<'name>(&self, kind: &str, name: &'name str) -> std::borrow::Cow<'name, str> {

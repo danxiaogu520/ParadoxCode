@@ -2385,7 +2385,6 @@ fn overlay_hidden_counts(snapshot: &AnalysisSnapshot) -> Arc<OverlayHiddenCounts
         cache_key.to_owned(),
         counts.clone(),
     );
-    SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&counts))));
     counts
 }
 
@@ -2408,17 +2407,23 @@ impl WorkspaceMembership {
         *total > hidden_count
     }
 
-    fn contains(&self, snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
+    fn contains(
+        &self,
+        snapshot: &AnalysisSnapshot,
+        hidden: &OverlayHiddenCounts,
+        members: &OverlayMembers,
+        type_name: &str,
+        member: &str,
+    ) -> bool {
         // Rule-derived type names resolve through prebuilt views; arbitrary kinds from
         // resolution queries fall back to the derivation below.
         let Some(view) = self.views.get::<str>(type_name) else {
-            return self.contains_slow(snapshot, type_name, member);
+            return self.contains_slow(snapshot, hidden, members, type_name, member);
         };
-        let hidden = overlay_hidden_counts(snapshot);
         let index = snapshot.index();
         for kind in view.kinds.iter() {
             let folded = index.definition_name_key(kind, member);
-            if self.indexed(&hidden, kind, folded.as_ref()) {
+            if self.indexed(hidden, kind, folded.as_ref()) {
                 return true;
             }
         }
@@ -2426,7 +2431,7 @@ impl WorkspaceMembership {
             let candidate = format!("{member}{suffix}");
             for kind in view.kinds.iter() {
                 let folded = index.definition_name_key(kind, &candidate);
-                if self.indexed(&hidden, kind, folded.as_ref()) {
+                if self.indexed(hidden, kind, folded.as_ref()) {
                     return true;
                 }
             }
@@ -2434,7 +2439,6 @@ impl WorkspaceMembership {
         if !completion_overlay_allowed(snapshot) {
             return false;
         }
-        let members = overlay_members(snapshot);
         if members.names.is_empty() {
             return false;
         }
@@ -2451,7 +2455,14 @@ impl WorkspaceMembership {
         })
     }
 
-    fn contains_slow(&self, snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
+    fn contains_slow(
+        &self,
+        snapshot: &AnalysisSnapshot,
+        hidden: &OverlayHiddenCounts,
+        members: &OverlayMembers,
+        type_name: &str,
+        member: &str,
+    ) -> bool {
         let profile = snapshot.game_profile();
         let base = type_name
             .split_once('.')
@@ -2476,11 +2487,10 @@ impl WorkspaceMembership {
                 }
             }
         }
-        let hidden = overlay_hidden_counts(snapshot);
         if names.iter().any(|name| {
             kinds.iter().any(|kind| {
                 let folded = snapshot.index().definition_name_key(kind, name);
-                self.indexed(&hidden, kind, folded.as_ref())
+                self.indexed(hidden, kind, folded.as_ref())
             })
         }) {
             return true;
@@ -2488,7 +2498,6 @@ impl WorkspaceMembership {
         if !completion_overlay_allowed(snapshot) {
             return false;
         }
-        let members = overlay_members(snapshot);
         if members.names.is_empty() {
             return false;
         }
@@ -2563,7 +2572,6 @@ fn workspace_membership(snapshot: &AnalysisSnapshot) -> Arc<WorkspaceMembership>
         .query_cache()
         .get::<WorkspaceMembership>(revision, cache_key)
     {
-        SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&cached))));
         return cached;
     }
     let mut kinds: rustc_hash::FxHashMap<Box<str>, rustc_hash::FxHashMap<Box<str>, u32>> =
@@ -2609,12 +2617,49 @@ fn workspace_membership(snapshot: &AnalysisSnapshot) -> Arc<WorkspaceMembership>
         cache_key.to_owned(),
         Arc::clone(&membership),
     );
-    SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&membership))));
     membership
 }
 
+/// The three membership views one `workspace_member` check needs, fetched together.
+///
+/// Validation calls `workspace_member` per (rule, property); fetching all views through
+/// one revision-keyed thread-local slot keeps the check to a single borrow plus `Arc`
+/// clones, with no query-cache lock on the steady-state path. The underlying views stay
+/// single shared allocations stored in the snapshot query cache.
+struct MembershipBundle {
+    membership: Arc<WorkspaceMembership>,
+    hidden: Arc<OverlayHiddenCounts>,
+    members: Arc<OverlayMembers>,
+}
+
+fn membership_bundle(snapshot: &AnalysisSnapshot) -> Arc<MembershipBundle> {
+    thread_local! {
+        static SLOT: std::cell::RefCell<Option<(u64, Arc<MembershipBundle>)>> =
+            const { std::cell::RefCell::new(None) };
+    }
+    let revision = snapshot.revision();
+    if let Some(cached) = SLOT.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .filter(|(seen, _)| *seen == revision)
+            .map(|(_, bundle)| Arc::clone(bundle))
+    }) {
+        return cached;
+    }
+    let bundle = Arc::new(MembershipBundle {
+        membership: workspace_membership(snapshot),
+        hidden: overlay_hidden_counts(snapshot),
+        members: overlay_members(snapshot),
+    });
+    SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&bundle))));
+    bundle
+}
+
 pub(crate) fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
-    workspace_membership(snapshot).contains(snapshot, type_name, member)
+    let bundle = membership_bundle(snapshot);
+    bundle
+        .membership
+        .contains(snapshot, &bundle.hidden, &bundle.members, type_name, member)
 }
 
 /// Returns whether an indexed definition's source layer is enabled for completion members.
@@ -2704,7 +2749,6 @@ pub(crate) fn overlay_members(snapshot: &AnalysisSnapshot) -> Arc<OverlayMembers
         key.to_owned(),
         Arc::clone(&members),
     );
-    SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&members))));
     members
 }
 
