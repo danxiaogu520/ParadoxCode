@@ -541,9 +541,9 @@ impl HirFile {
     /// condition before it can choose the branch.
     fn parameter_reference_is_runtime_guarded(&self, reference: &HirParameterReference) -> bool {
         fn containing_properties<'a>(
-            node: &'a CstNode,
+            node: CstNode<'a>,
             range: TextRange,
-            ancestors: &mut Vec<&'a CstNode>,
+            ancestors: &mut Vec<CstNode<'a>>,
         ) -> bool {
             if range.start() < node.range().start() || range.end() > node.range().end() {
                 return false;
@@ -554,7 +554,6 @@ impl HirFile {
             }
             if node
                 .children()
-                .iter()
                 .any(|child| containing_properties(child, range, ancestors))
             {
                 return true;
@@ -572,7 +571,6 @@ impl HirFile {
         for (index, ancestor) in ancestors.iter().enumerate() {
             let key = ancestor
                 .children()
-                .iter()
                 .find(|child| child.kind() == CstKind::Key)
                 .and_then(|child| self.syntax.text(child.range()))
                 .map(str::trim);
@@ -584,12 +582,7 @@ impl HirFile {
             }
             let in_limit = ancestors
                 .get(index.saturating_add(1))
-                .and_then(|child| {
-                    child
-                        .children()
-                        .iter()
-                        .find(|node| node.kind() == CstKind::Key)
-                })
+                .and_then(|child| child.children().find(|node| node.kind() == CstKind::Key))
                 .and_then(|child| self.syntax.text(child.range()))
                 .is_some_and(|child| child.trim().eq_ignore_ascii_case("limit"));
             if !in_limit {
@@ -601,14 +594,13 @@ impl HirFile {
 
     fn parameter_reference_occupies_token(&self, reference: &HirParameterReference) -> bool {
         fn containing_token(
-            node: &pdx_parser::CstNode,
+            node: pdx_parser::CstNode<'_>,
             range: TextRange,
-        ) -> Option<&pdx_parser::CstNode> {
+        ) -> Option<pdx_parser::CstNode<'_>> {
             if range.start() < node.range().start() || range.end() > node.range().end() {
                 return None;
             }
             node.children()
-                .iter()
                 .find_map(|child| containing_token(child, range))
                 .or_else(|| {
                     matches!(
@@ -636,14 +628,13 @@ impl HirFile {
 
     fn parameter_reference_is_same_named_value(&self, reference: &HirParameterReference) -> bool {
         fn containing_property(
-            node: &pdx_parser::CstNode,
+            node: pdx_parser::CstNode<'_>,
             range: TextRange,
-        ) -> Option<&pdx_parser::CstNode> {
+        ) -> Option<pdx_parser::CstNode<'_>> {
             if range.start() < node.range().start() || range.end() > node.range().end() {
                 return None;
             }
             node.children()
-                .iter()
                 .find_map(|child| containing_property(child, range))
                 .or_else(|| (node.kind() == pdx_parser::CstKind::Property).then_some(node))
         }
@@ -652,7 +643,6 @@ impl HirFile {
             .and_then(|property| {
                 property
                     .children()
-                    .iter()
                     .find(|child| child.kind() == pdx_parser::CstKind::Key)
             })
             .and_then(|key| self.syntax.text(key.range()))

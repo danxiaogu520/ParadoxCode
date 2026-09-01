@@ -246,14 +246,14 @@ pub(crate) fn localisation_command_diagnostics(
     }
     let ParsedContent::Text(parsed) = &input.parsed;
     let mut diagnostics = Vec::new();
-    for (index, entry) in parsed.root().children().iter().enumerate() {
+    for (index, entry) in parsed.root().children().enumerate() {
         if index & 31 == 0 {
             cancellation.checkpoint()?;
         }
         if entry.kind() != CstKind::LocalisationEntry {
             continue;
         }
-        let Some(value) = entry.children().iter().find(|child| {
+        let Some(value) = entry.children().find(|child| {
             matches!(
                 child.kind(),
                 CstKind::LocalisationString | CstKind::UnquotedValue

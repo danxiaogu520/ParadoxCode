@@ -14,7 +14,10 @@ mod localisation;
 mod quoted_script;
 mod script;
 
-pub use cst::{CstKind, CstNode, SyntaxError, SyntaxErrorKind, SyntaxToken, TokenKind};
+pub(crate) use cst::SyntaxTreeBuilder;
+pub use cst::{
+    CstChildren, CstKind, CstNode, SyntaxError, SyntaxErrorKind, SyntaxToken, SyntaxTree, TokenKind,
+};
 pub use quoted_script::{
     QuotedScript, QuotedScriptSourceMap, encode_quoted_script_text, parse_quoted_script,
 };
@@ -82,7 +85,7 @@ impl std::fmt::Display for EditError {
 impl std::error::Error for EditError {}
 
 pub(crate) struct ParseParts {
-    root: CstNode,
+    tree: SyntaxTree,
     tokens: Vec<SyntaxToken>,
     errors: Vec<SyntaxError>,
 }
@@ -96,8 +99,8 @@ pub(crate) struct ParseParts {
 pub struct ParsedFileCache {
     /// Frontend used to construct the syntax tree.
     pub format: FileFormat,
-    /// Typed CST root with source-relative ranges.
-    pub root: CstNode,
+    /// Flat CST arena with source-relative ranges.
+    pub tree: SyntaxTree,
     /// Lexical tokens in source order.
     pub tokens: Vec<SyntaxToken>,
     /// Recoverable syntax diagnostics.
@@ -111,7 +114,7 @@ pub struct ParsedFileCache {
 pub struct ParsedFile {
     format: FileFormat,
     source: Arc<str>,
-    root: CstNode,
+    tree: SyntaxTree,
     tokens: Vec<SyntaxToken>,
     errors: Vec<SyntaxError>,
     revision: u64,
@@ -121,7 +124,7 @@ impl PartialEq for ParsedFile {
     fn eq(&self, other: &Self) -> bool {
         self.format == other.format
             && self.source == other.source
-            && self.root == other.root
+            && self.tree == other.tree
             && self.tokens == other.tokens
             && self.errors == other.errors
             && self.revision == other.revision
@@ -135,7 +138,7 @@ impl ParsedFile {
         Self {
             format,
             source,
-            root: parts.root,
+            tree: parts.tree,
             tokens: parts.tokens,
             errors: parts.errors,
             revision,
@@ -160,10 +163,16 @@ impl ParsedFile {
         Arc::clone(&self.source)
     }
 
-    /// Returns the typed CST root.
+    /// Returns the flat CST arena retained by this parse.
     #[must_use]
-    pub const fn root(&self) -> &CstNode {
-        &self.root
+    pub const fn tree(&self) -> &SyntaxTree {
+        &self.tree
+    }
+
+    /// Returns the typed CST root as a borrowed handle.
+    #[must_use]
+    pub fn root(&self) -> CstNode<'_> {
+        self.tree.root()
     }
 
     /// Returns lexical tokens in source order.
@@ -197,7 +206,7 @@ impl ParsedFile {
     pub fn cache_data(&self) -> ParsedFileCache {
         ParsedFileCache {
             format: self.format,
-            root: self.root.clone(),
+            tree: self.tree.clone(),
             tokens: self.tokens.clone(),
             errors: self.errors.clone(),
             revision: self.revision,
@@ -210,7 +219,7 @@ impl ParsedFile {
         Self {
             format: data.format,
             source: Arc::from(source),
-            root: data.root,
+            tree: data.tree,
             tokens: data.tokens,
             errors: data.errors,
             revision: data.revision,
@@ -227,11 +236,11 @@ impl ParsedFile {
         self.format == format
             && self.source.as_ref() == source
             && matches!(
-                (format, self.root.kind()),
+                (format, self.root().kind()),
                 (FileFormat::Script, CstKind::Document)
                     | (FileFormat::Localisation, CstKind::LocalisationDocument)
             )
-            && valid_node(&self.root, None, source)
+            && valid_node(self.root(), None, source)
             && self
                 .tokens
                 .iter()
@@ -288,14 +297,13 @@ fn parse_with_revision(format: FileFormat, source: &str, revision: u64) -> Parse
     ParsedFile::from_parts(format, source, parts, revision)
 }
 
-fn valid_node(node: &CstNode, parent: Option<TextRange>, source: &str) -> bool {
+fn valid_node(node: CstNode<'_>, parent: Option<TextRange>, source: &str) -> bool {
     valid_range(node.range(), source)
         && parent.is_none_or(|parent| {
             parent.start() <= node.range().start() && node.range().end() <= parent.end()
         })
         && node
             .children()
-            .iter()
             .all(|child| valid_node(child, Some(node.range()), source))
 }
 
@@ -336,12 +344,21 @@ mod tests {
             "# note\nname = one\nname = two\nrgb { 1 2 3 }\n[[!country] value = yes]",
         );
         assert!(parsed.errors().is_empty(), "errors: {:?}", parsed.errors());
-        assert_eq!(parsed.root().children().len(), 5);
-        assert_eq!(parsed.root().children()[1].kind(), CstKind::Property);
-        assert_eq!(parsed.root().children()[3].kind(), CstKind::HeaderBlock);
-        assert_eq!(parsed.root().children()[4].kind(), CstKind::ParameterBlock);
+        assert_eq!(parsed.root().child_count(), 5);
         assert_eq!(
-            parsed.text(parsed.root().children()[0].range()),
+            parsed.root().child(1).expect("child").kind(),
+            CstKind::Property
+        );
+        assert_eq!(
+            parsed.root().child(3).expect("child").kind(),
+            CstKind::HeaderBlock
+        );
+        assert_eq!(
+            parsed.root().child(4).expect("child").kind(),
+            CstKind::ParameterBlock
+        );
+        assert_eq!(
+            parsed.text(parsed.root().child(0).expect("child").range()),
             Some("# note")
         );
     }
@@ -353,23 +370,22 @@ mod tests {
             "monarch_names = { \"Friedrich #0\" = 100 }\n",
         );
         assert!(parsed.errors().is_empty(), "errors: {:?}", parsed.errors());
-        let monarch_names = &parsed.root().children()[0];
+        let monarch_names = parsed.root().child(0).expect("child");
         let block = monarch_names
             .children()
-            .iter()
             .find(|child| child.kind() == CstKind::Value)
             .and_then(|value| {
                 value
                     .children()
-                    .iter()
                     .find(|child| child.kind() == CstKind::Block)
             })
             .expect("monarch names block");
-        assert_eq!(block.children().len(), 1);
-        assert_eq!(block.children()[0].kind(), CstKind::Property);
-        let key = block.children()[0]
+        assert_eq!(block.child_count(), 1);
+        assert_eq!(block.child(0).expect("child").kind(), CstKind::Property);
+        let key = block
+            .child(0)
+            .expect("child")
             .children()
-            .iter()
             .find(|child| child.kind() == CstKind::Key)
             .expect("quoted key");
         assert_eq!(parsed.text(key.range()), Some("\"Friedrich #0\""));
@@ -382,20 +398,20 @@ mod tests {
             "position = { { 0.0 -5.0 0.0 } { 0.0 -6.5 0.0 } }\n",
         );
         assert!(parsed.errors().is_empty(), "errors: {:?}", parsed.errors());
-        let value = parsed.root().children()[0]
+        let value = parsed
+            .root()
+            .child(0)
+            .expect("child")
             .children()
-            .iter()
             .find(|child| child.kind() == CstKind::Value)
             .expect("position value");
         let outer = value
             .children()
-            .iter()
             .find(|child| child.kind() == CstKind::Block)
             .expect("outer block");
         assert_eq!(
             outer
                 .children()
-                .iter()
                 .filter(|child| child.kind() == CstKind::Block)
                 .count(),
             2
@@ -435,9 +451,9 @@ mod tests {
             "errors: {:?}",
             localisation.errors()
         );
-        assert_eq!(localisation.root().children().len(), 3);
+        assert_eq!(localisation.root().child_count(), 3);
         assert_eq!(
-            localisation.root().children()[1].kind(),
+            localisation.root().child(1).expect("child").kind(),
             CstKind::LocalisationEntry
         );
     }
@@ -456,10 +472,9 @@ mod tests {
         let entries = localisation
             .root()
             .children()
-            .iter()
             .filter(|child| child.kind() == CstKind::LocalisationEntry)
-            .collect::<Vec<_>>();
-        assert_eq!(entries.len(), 3);
+            .count();
+        assert_eq!(entries, 3);
     }
 
     #[test]

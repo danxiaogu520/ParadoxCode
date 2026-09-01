@@ -20,10 +20,13 @@ use sha2::{Digest, Sha256};
 use crate::SourceFile;
 
 /// Current on-disk syntax-tree cache schema.
-pub const CURRENT_PARSE_CACHE_SCHEMA_VERSION: u32 = 5;
+///
+/// v6: the CST moved from a nested node tree to the flat `SyntaxTree` arena, changing the
+/// postcard wire format of `ParsedFileCache`; older entries are ordinary misses.
+pub const CURRENT_PARSE_CACHE_SCHEMA_VERSION: u32 = 6;
 
 const MAX_PARSE_CACHE_BYTES: u64 = 64 * 1024 * 1024;
-const CACHE_NAMESPACE: &[u8] = b"paradoxcode/parse-cache/v5\0";
+const CACHE_NAMESPACE: &[u8] = b"paradoxcode/parse-cache/v6\0";
 static WRITE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 /// A user-local directory containing independent syntax-tree cache entries.

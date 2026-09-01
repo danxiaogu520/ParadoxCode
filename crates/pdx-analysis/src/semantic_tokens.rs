@@ -151,7 +151,7 @@ fn semantic_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
 /// Recursively classifies one CST node in source order.
 fn collect_tokens(
     parsed: &ParsedFile,
-    node: &CstNode,
+    node: CstNode<'_>,
     keys: &BTreeSet<String>,
     profile: &pdx_rules::GameProfile,
     tokens: &mut Vec<SemanticToken>,
@@ -187,7 +187,7 @@ fn collect_tokens(
         ),
         CstKind::HeaderBlock => {
             // The header is the leading scalar child; its block content follows.
-            if let Some(header) = node.children().first() {
+            if let Some(header) = node.children().next() {
                 if header.kind() == CstKind::BareValue {
                     push_token_if_visible(
                         tokens,
@@ -200,7 +200,7 @@ fn collect_tokens(
                     collect_tokens(parsed, header, keys, profile, tokens, cancellation, range)?;
                 }
             }
-            for child in node.children().iter().skip(1) {
+            for child in node.children().skip(1) {
                 collect_tokens(parsed, child, keys, profile, tokens, cancellation, range)?;
             }
         }

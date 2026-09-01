@@ -74,9 +74,9 @@ fn normalize_texture_path(path: &str) -> String {
 
 /// Returns every `spriteType` property node, including those wrapped in a
 /// top-level `spriteTypes = { ... }` container (the common EU4 layout).
-fn sprite_type_nodes(parsed: &ParsedFile) -> Vec<&pdx_parser::CstNode> {
+fn sprite_type_nodes(parsed: &ParsedFile) -> Vec<pdx_parser::CstNode<'_>> {
     let mut nodes = Vec::new();
-    for prop in parsed.root().children().iter().filter(is_property) {
+    for prop in parsed.root().children().filter(is_property) {
         match scalar_key(parsed, prop).as_deref() {
             Some("spriteType") if property_block(prop).is_some() => nodes.push(prop),
             Some("spriteTypes") => {
@@ -96,39 +96,35 @@ fn sprite_type_nodes(parsed: &ParsedFile) -> Vec<&pdx_parser::CstNode> {
     nodes
 }
 
-fn is_property(node: &&pdx_parser::CstNode) -> bool {
+fn is_property(node: &pdx_parser::CstNode<'_>) -> bool {
     node.kind() == CstKind::Property
 }
 
-fn block_properties(node: &pdx_parser::CstNode) -> Vec<&pdx_parser::CstNode> {
+fn block_properties(node: pdx_parser::CstNode<'_>) -> Vec<pdx_parser::CstNode<'_>> {
     node.children()
-        .iter()
         .filter(|child| child.kind() == CstKind::Property)
         .collect()
 }
 
-fn property_block(prop: &pdx_parser::CstNode) -> Option<&pdx_parser::CstNode> {
-    prop.children().iter().find_map(|child| match child.kind() {
+fn property_block(prop: pdx_parser::CstNode<'_>) -> Option<pdx_parser::CstNode<'_>> {
+    prop.children().find_map(|child| match child.kind() {
         CstKind::Block | CstKind::HeaderBlock => Some(child),
         CstKind::Value => child
             .children()
-            .iter()
             .find(|c| matches!(c.kind(), CstKind::Block | CstKind::HeaderBlock)),
         _ => None,
     })
 }
 
-fn scalar_key(parsed: &ParsedFile, prop: &pdx_parser::CstNode) -> Option<String> {
+fn scalar_key(parsed: &ParsedFile, prop: pdx_parser::CstNode<'_>) -> Option<String> {
     prop.children()
-        .iter()
         .find(|c| c.kind() == CstKind::Key)
         .map(|key| unquote(parsed.text(key.range()).unwrap_or_default().trim()))
         .filter(|value| !value.is_empty())
 }
 
-fn scalar_value(parsed: &ParsedFile, prop: &pdx_parser::CstNode) -> Option<String> {
+fn scalar_value(parsed: &ParsedFile, prop: pdx_parser::CstNode<'_>) -> Option<String> {
     prop.children()
-        .iter()
         .find(|c| c.kind() == CstKind::Value)
         .map(|value| unquote(parsed.text(value.range()).unwrap_or_default().trim()))
         .filter(|value| !value.is_empty())

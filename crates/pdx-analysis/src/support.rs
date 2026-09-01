@@ -285,14 +285,14 @@ impl ScopeContext {
         }
     }
 }
-pub(crate) fn script_properties(input: &ParsedInput, parent: &CstNode) -> Vec<ScriptProperty> {
+pub(crate) fn script_properties(input: &ParsedInput, parent: CstNode<'_>) -> Vec<ScriptProperty> {
     let ParsedContent::Text(parsed) = &input.parsed;
     script_properties_mapped(parsed, parent, Some, true)
 }
 
 pub(crate) fn script_bare_values(
     input: &ParsedInput,
-    parent: &CstNode,
+    parent: CstNode<'_>,
 ) -> Vec<(std::sync::Arc<str>, TextRange)> {
     let ParsedContent::Text(parsed) = &input.parsed;
     script_bare_values_mapped(parsed, parent, Some)
@@ -315,7 +315,7 @@ pub(crate) fn quoted_script_container(
 
 fn script_properties_mapped(
     parsed: &ParsedFile,
-    parent: &CstNode,
+    parent: CstNode<'_>,
     map_offset: impl Copy + Fn(TextSize) -> Option<TextSize>,
     direct_offsets: bool,
 ) -> Vec<ScriptProperty> {
@@ -323,23 +323,15 @@ fn script_properties_mapped(
         |range: TextRange| TextRange::new(map_offset(range.start())?, map_offset(range.end())?);
     parent
         .children()
-        .iter()
         .filter(|node| node.kind() == CstKind::Property)
         .filter_map(|node| {
-            let key_node = node
-                .children()
-                .iter()
-                .find(|child| child.kind() == CstKind::Key)?;
+            let key_node = node.children().find(|child| child.kind() == CstKind::Key)?;
             let key = pdx_engine::intern_shard_string(parsed.text(key_node.range())?.trim());
             let key_range = map_range(key_node.range())?;
-            let value = node
-                .children()
-                .iter()
-                .find(|child| child.kind() == CstKind::Value);
+            let value = node.children().find(|child| child.kind() == CstKind::Value);
             let block_node = value.and_then(|value| {
                 value
                     .children()
-                    .iter()
                     .find(|child| child.kind() == CstKind::Block)
             });
             let block = block_node.map_or_else(Vec::new, |block| {
@@ -350,7 +342,6 @@ fn script_properties_mapped(
             });
             let operator = node
                 .children()
-                .iter()
                 .find(|child| child.kind() == CstKind::Operator)
                 .and_then(|child| parsed.text(child.range()))
                 .map(pdx_engine::intern_shard_string);
@@ -411,12 +402,11 @@ fn script_properties_mapped(
 
 fn script_bare_values_mapped(
     parsed: &ParsedFile,
-    parent: &CstNode,
+    parent: CstNode<'_>,
     map_offset: impl Copy + Fn(TextSize) -> Option<TextSize>,
 ) -> Vec<(std::sync::Arc<str>, TextRange)> {
     parent
         .children()
-        .iter()
         .filter(|child| matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString))
         .filter_map(|child| {
             let raw = parsed.text(child.range())?.trim();
@@ -434,12 +424,10 @@ fn script_bare_values_mapped(
         })
         .collect()
 }
-fn property_scalar_node(node: &CstNode) -> Option<&CstNode> {
+fn property_scalar_node(node: CstNode<'_>) -> Option<CstNode<'_>> {
     node.children()
-        .iter()
         .find(|child| child.kind() == CstKind::Value)?
         .children()
-        .iter()
         .find(|child| matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString))
 }
 

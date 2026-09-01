@@ -3,7 +3,7 @@
 use libfuzzer_sys::fuzz_target;
 use pdx_parser::{CstNode, FileFormat, parse};
 
-fn walk(node: &CstNode, source_len: u32) {
+fn walk(node: CstNode<'_>, source_len: u32) {
     assert!(node.range().end() <= source_len);
     for child in node.children() {
         walk(child, source_len);

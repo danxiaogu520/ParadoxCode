@@ -60,11 +60,15 @@ impl<'file> PdxFormatter<'file> {
     }
 
     fn document_lines(&self) -> Vec<String> {
-        let children = self.file.root().children();
+        let children: Vec<_> = self.file.root().children().collect();
         let has_bom = children
             .first()
             .is_some_and(|node| node.kind() == CstKind::Bom);
-        let children = if has_bom { &children[1..] } else { children };
+        let children = if has_bom {
+            &children[1..]
+        } else {
+            &children[..]
+        };
         let mut lines = self.sequence(children, 0);
         if has_bom {
             if let Some(first) = lines.first_mut() {
@@ -76,11 +80,11 @@ impl<'file> PdxFormatter<'file> {
         lines
     }
 
-    fn sequence(&self, children: &[CstNode], depth: usize) -> Vec<String> {
+    fn sequence(&self, children: &[CstNode<'_>], depth: usize) -> Vec<String> {
         let mut lines = Vec::new();
         let mut index = 0;
         while index < children.len() {
-            let node = &children[index];
+            let node = children[index];
             if node.kind() == CstKind::Bom {
                 index += 1;
                 continue;
@@ -94,11 +98,11 @@ impl<'file> PdxFormatter<'file> {
             let mut item = self.item(node, depth);
             if let Some(comment) = children.get(index + 1)
                 && comment.kind() == CstKind::Comment
-                && self.same_source_line(node, comment)
+                && self.same_source_line(node, *comment)
             {
                 if let Some(last) = item.last_mut() {
                     last.push(' ');
-                    last.push_str(self.text(comment));
+                    last.push_str(self.text(*comment));
                 }
                 index += 1;
             }
@@ -108,7 +112,7 @@ impl<'file> PdxFormatter<'file> {
         lines
     }
 
-    fn item(&self, node: &CstNode, depth: usize) -> Vec<String> {
+    fn item(&self, node: CstNode<'_>, depth: usize) -> Vec<String> {
         match node.kind() {
             CstKind::Property => self.property(node, depth),
             CstKind::HeaderBlock => self.header_item(node, depth),
@@ -131,13 +135,13 @@ impl<'file> PdxFormatter<'file> {
             CstKind::Comment => vec![format!("{}{}", indent(depth), self.text(node))],
             CstKind::Value => node
                 .children()
-                .first()
+                .next()
                 .map_or_else(Vec::new, |child| self.item(child, depth)),
             _ => vec![format!("{}{}", indent(depth), self.text(node).trim())],
         }
     }
 
-    fn property(&self, node: &CstNode, depth: usize) -> Vec<String> {
+    fn property(&self, node: CstNode<'_>, depth: usize) -> Vec<String> {
         let Some((key, operator, value)) = property_parts(node) else {
             return vec![format!("{}{}", indent(depth), self.text(node).trim())];
         };
@@ -159,7 +163,7 @@ impl<'file> PdxFormatter<'file> {
         compose(prefix, layout)
     }
 
-    fn header_item(&self, node: &CstNode, depth: usize) -> Vec<String> {
+    fn header_item(&self, node: CstNode<'_>, depth: usize) -> Vec<String> {
         let Some((header, block)) = header_parts(node) else {
             return vec![format!("{}{}", indent(depth), self.text(node).trim())];
         };
@@ -176,7 +180,7 @@ impl<'file> PdxFormatter<'file> {
         compose(prefix, layout)
     }
 
-    fn parameter_item(&self, node: &CstNode, depth: usize) -> Vec<String> {
+    fn parameter_item(&self, node: CstNode<'_>, depth: usize) -> Vec<String> {
         match self.parameter(node, depth, false) {
             ValueLayout::Inline { text, .. } => vec![format!("{}{}", indent(depth), text)],
             ValueLayout::Expanded {
@@ -194,13 +198,13 @@ impl<'file> PdxFormatter<'file> {
 
     fn value(
         &self,
-        node: &CstNode,
+        node: CstNode<'_>,
         depth: usize,
         compact: bool,
         force_expand: bool,
     ) -> ValueLayout {
         let node = if node.kind() == CstKind::Value {
-            node.children().first().unwrap_or(node)
+            node.children().next().unwrap_or(node)
         } else {
             node
         };
@@ -216,7 +220,7 @@ impl<'file> PdxFormatter<'file> {
 
     fn header_value(
         &self,
-        node: &CstNode,
+        node: CstNode<'_>,
         depth: usize,
         compact: bool,
         force_expand: bool,
@@ -247,17 +251,17 @@ impl<'file> PdxFormatter<'file> {
 
     fn block(
         &self,
-        node: &CstNode,
+        node: CstNode<'_>,
         depth: usize,
         compact: bool,
         force_expand: bool,
     ) -> ValueLayout {
-        let children = node.children();
+        let children: Vec<_> = node.children().collect();
         if compact {
             let items = children
                 .iter()
                 .filter(|child| child.kind() != CstKind::Bom)
-                .map(|child| self.compact_item(child, depth))
+                .map(|child| self.compact_item(*child, depth))
                 .collect::<Option<Vec<_>>>();
             if let Some(items) = items {
                 return if items.is_empty() {
@@ -275,17 +279,17 @@ impl<'file> PdxFormatter<'file> {
             if children.is_empty() {
                 return ValueLayout::inline("{ }");
             }
-            if children.iter().all(is_scalar_node)
+            if children.iter().all(|child| is_scalar_node(*child))
                 && let Some(items) = children
                     .iter()
-                    .map(|child| self.inline_item(child, depth))
+                    .map(|child| self.inline_item(*child, depth))
                     .collect::<Option<Vec<_>>>()
             {
                 return ValueLayout::inline(format!("{{ {} }}", items.join(" ")));
             }
             if children.len() == 1
                 && children[0].kind() == CstKind::Property
-                && let Some(property) = self.inline_property(&children[0], depth)
+                && let Some(property) = self.inline_property(children[0], depth)
             {
                 return ValueLayout::width_sensitive(format!("{{ {property} }}"));
             }
@@ -297,11 +301,11 @@ impl<'file> PdxFormatter<'file> {
         let body_children = if header_comment.is_some() {
             &children[1..]
         } else {
-            children
+            &children[..]
         };
         let opener = header_comment.map_or_else(
             || "{".to_owned(),
-            |comment| format!("{{ {}", self.text(comment)),
+            |comment| format!("{{ {}", self.text(*comment)),
         );
         ValueLayout::Expanded {
             opener,
@@ -310,7 +314,7 @@ impl<'file> PdxFormatter<'file> {
         }
     }
 
-    fn inline_item(&self, node: &CstNode, depth: usize) -> Option<String> {
+    fn inline_item(&self, node: CstNode<'_>, depth: usize) -> Option<String> {
         match node.kind() {
             CstKind::BareValue => Some(canonical_keyword(self.text(node)).to_owned()),
             CstKind::QuotedString => match self.quoted(node, depth, false, false) {
@@ -339,7 +343,7 @@ impl<'file> PdxFormatter<'file> {
         }
     }
 
-    fn inline_property(&self, node: &CstNode, depth: usize) -> Option<String> {
+    fn inline_property(&self, node: CstNode<'_>, depth: usize) -> Option<String> {
         let (key, operator, value) = property_parts(node)?;
         let value = match self.value(value, depth, false, false) {
             ValueLayout::Inline { text, .. } if !contains_line_break(&text) => text,
@@ -353,7 +357,7 @@ impl<'file> PdxFormatter<'file> {
         fits_line(&property).then_some(property)
     }
 
-    fn compact_item(&self, node: &CstNode, depth: usize) -> Option<String> {
+    fn compact_item(&self, node: CstNode<'_>, depth: usize) -> Option<String> {
         match node.kind() {
             CstKind::Comment | CstKind::Bom => None,
             CstKind::BareValue => Some(canonical_keyword(self.text(node)).to_owned()),
@@ -393,21 +397,21 @@ impl<'file> PdxFormatter<'file> {
         }
     }
 
-    fn parameter(&self, node: &CstNode, depth: usize, compact: bool) -> ValueLayout {
-        let Some(condition) = node
-            .children()
+    fn parameter(&self, node: CstNode<'_>, depth: usize, compact: bool) -> ValueLayout {
+        let children: Vec<_> = node.children().collect();
+        let Some(condition) = children
             .first()
             .filter(|node| node.kind() == CstKind::ParameterCondition)
         else {
             return ValueLayout::inline(self.text(node).trim());
         };
-        let body = &node.children()[1..];
-        let condition = self.text(condition);
+        let body = &children[1..];
+        let condition = self.text(*condition);
         let has_comment = node_has_comment(node);
         if compact || !has_comment {
             let items = body
                 .iter()
-                .map(|child| self.compact_item(child, depth))
+                .map(|child| self.compact_item(*child, depth))
                 .collect::<Option<Vec<_>>>()
                 .unwrap_or_default();
             return ValueLayout::inline(format!("[[{condition}]{}]", items.join(" ")));
@@ -421,7 +425,7 @@ impl<'file> PdxFormatter<'file> {
 
     fn quoted(
         &self,
-        node: &CstNode,
+        node: CstNode<'_>,
         depth: usize,
         compact: bool,
         force_expand: bool,
@@ -457,11 +461,11 @@ impl<'file> PdxFormatter<'file> {
         }
     }
 
-    fn text(&self, node: &CstNode) -> &str {
+    fn text(&self, node: CstNode<'_>) -> &str {
         self.file.text(node.range()).unwrap_or("")
     }
 
-    fn same_source_line(&self, left: &CstNode, right: &CstNode) -> bool {
+    fn same_source_line(&self, left: CstNode<'_>, right: CstNode<'_>) -> bool {
         let Some(gap) = self.file.text(
             TextRange::new(left.range().end(), right.range().start())
                 .unwrap_or_else(|| TextRange::empty(left.range().end())),
@@ -512,33 +516,31 @@ pub(super) fn canonical_keyword(text: &str) -> &str {
     }
 }
 
-fn property_parts(node: &CstNode) -> Option<(&CstNode, &CstNode, &CstNode)> {
-    let children = node.children();
-    let key = children.iter().find(|child| child.kind() == CstKind::Key)?;
-    let operator = children
-        .iter()
+fn property_parts(node: CstNode<'_>) -> Option<(CstNode<'_>, CstNode<'_>, CstNode<'_>)> {
+    let key = node.children().find(|child| child.kind() == CstKind::Key)?;
+    let operator = node
+        .children()
         .find(|child| child.kind() == CstKind::Operator)?;
-    let value = children
-        .iter()
+    let value = node
+        .children()
         .find(|child| child.kind() == CstKind::Value)?;
     Some((key, operator, value))
 }
 
-fn header_parts(node: &CstNode) -> Option<(&CstNode, &CstNode)> {
-    let children = node.children();
-    let header = children.first()?;
-    let block = children
-        .iter()
+fn header_parts(node: CstNode<'_>) -> Option<(CstNode<'_>, CstNode<'_>)> {
+    let header = node.children().next()?;
+    let block = node
+        .children()
         .find(|child| child.kind() == CstKind::Block)?;
     Some((header, block))
 }
 
-fn is_scalar_node(node: &CstNode) -> bool {
+fn is_scalar_node(node: CstNode<'_>) -> bool {
     matches!(node.kind(), CstKind::BareValue | CstKind::QuotedString)
 }
 
-fn node_has_comment(node: &CstNode) -> bool {
-    node.kind() == CstKind::Comment || node.children().iter().any(node_has_comment)
+fn node_has_comment(node: CstNode<'_>) -> bool {
+    node.kind() == CstKind::Comment || node.children().any(node_has_comment)
 }
 
 pub(super) struct QuotedScript {
@@ -556,8 +558,8 @@ pub(super) fn quoted_script(source: &str, depth: usize) -> Option<QuotedScript> 
     Some(QuotedScript { parsed })
 }
 
-fn has_semantic_item(root: &CstNode) -> bool {
-    root.children().iter().any(|node| {
+fn has_semantic_item(root: CstNode<'_>) -> bool {
+    root.children().any(|node| {
         matches!(
             node.kind(),
             CstKind::Property | CstKind::HeaderBlock | CstKind::ParameterBlock

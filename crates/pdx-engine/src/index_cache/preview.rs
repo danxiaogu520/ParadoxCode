@@ -46,14 +46,13 @@ pub(super) fn collect_localisation_previews(
                 CstKind::LanguageHeader => {
                     language = node
                         .children()
-                        .iter()
                         .find(|child| child.kind() == CstKind::LocalisationKey)
                         .and_then(|child| parsed.text(child.range()))
                         .map(|value| value.trim().to_owned())
                         .filter(|value| !value.is_empty());
                 }
                 CstKind::LocalisationEntry => {
-                    let Some(value_node) = node.children().iter().find(|child| {
+                    let Some(value_node) = node.children().find(|child| {
                         matches!(
                             child.kind(),
                             CstKind::LocalisationString | CstKind::UnquotedValue
