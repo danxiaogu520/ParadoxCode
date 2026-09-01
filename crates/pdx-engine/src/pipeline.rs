@@ -668,7 +668,7 @@ fn collect_semantic_skip_root_path(
     file: &SourceFile,
     parsed: &ParsedFile,
     descriptor: &pdx_rules::TypeDescriptor,
-    node: &CstNode,
+    node: CstNode<'_>,
     path: &[String],
     definitions: &mut Vec<Definition>,
 ) {
@@ -693,7 +693,7 @@ fn collect_semantic_block_children(
     file: &SourceFile,
     parsed: &ParsedFile,
     descriptor: &pdx_rules::TypeDescriptor,
-    node: &CstNode,
+    node: CstNode<'_>,
     definitions: &mut Vec<Definition>,
 ) {
     for child in semantic_block_properties(node) {
@@ -705,7 +705,7 @@ fn collect_semantic_type_definition(
     file: &SourceFile,
     parsed: &ParsedFile,
     descriptor: &pdx_rules::TypeDescriptor,
-    node: &CstNode,
+    node: CstNode<'_>,
     definitions: &mut Vec<Definition>,
 ) {
     let Some(key) = semantic_property_key(node, parsed) else {
@@ -758,28 +758,23 @@ fn semantic_type_root_key_allowed(
     roots.iter().any(|root| root.eq_ignore_ascii_case(key))
 }
 
-fn semantic_block_properties(node: &CstNode) -> impl Iterator<Item = &CstNode> {
-    node.children().iter().flat_map(|child| {
-        if child.kind() != CstKind::Value {
-            return Vec::new();
-        }
-        child
-            .children()
-            .iter()
-            .filter(|block| block.kind() == CstKind::Block)
-            .flat_map(|block| {
-                block
-                    .children()
-                    .iter()
-                    .filter(|child| child.kind() == CstKind::Property)
-            })
-            .collect::<Vec<_>>()
-    })
+fn semantic_block_properties(node: CstNode<'_>) -> impl Iterator<Item = CstNode<'_>> {
+    node.children()
+        .filter(|child| child.kind() == CstKind::Value)
+        .flat_map(|value| {
+            value
+                .children()
+                .filter(|block| block.kind() == CstKind::Block)
+        })
+        .flat_map(|block| {
+            block
+                .children()
+                .filter(|child| child.kind() == CstKind::Property)
+        })
 }
 
-fn semantic_property_key(node: &CstNode, parsed: &ParsedFile) -> Option<String> {
+fn semantic_property_key(node: CstNode<'_>, parsed: &ParsedFile) -> Option<String> {
     node.children()
-        .iter()
         .find(|child| child.kind() == CstKind::Key)
         .and_then(|child| parsed.text(child.range()))
         .map(|key| key.trim().to_owned())
@@ -852,11 +847,10 @@ fn collect_hir_semantics(
     }
 }
 
-fn find_property(node: &CstNode, wanted: &str, parsed: &ParsedFile) -> Option<String> {
+fn find_property(node: CstNode<'_>, wanted: &str, parsed: &ParsedFile) -> Option<String> {
     if node.kind() == CstKind::Property {
         let key = node
             .children()
-            .iter()
             .find(|child| child.kind() == CstKind::Key)
             .and_then(|child| parsed.text(child.range()))
             .map(str::trim);
@@ -868,7 +862,7 @@ fn find_property(node: &CstNode, wanted: &str, parsed: &ParsedFile) -> Option<St
                         .map(|value| value.trim_matches('"').trim().to_owned());
                 }
                 if child.kind() == CstKind::Value
-                    && let Some(value) = child.children().iter().find(|value| {
+                    && let Some(value) = child.children().find(|value| {
                         matches!(value.kind(), CstKind::BareValue | CstKind::QuotedString)
                     })
                 {
@@ -880,7 +874,6 @@ fn find_property(node: &CstNode, wanted: &str, parsed: &ParsedFile) -> Option<St
         }
     }
     node.children()
-        .iter()
         .find_map(|child| find_property(child, wanted, parsed))
 }
 

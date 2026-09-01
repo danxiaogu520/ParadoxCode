@@ -16,9 +16,9 @@ use pdx_engine::{
     AnalysisHost, ParsedSource, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
 };
 
-fn walk_cst(node: &pdx_parser::CstNode, stats: &mut (usize, usize)) {
+fn walk_cst(node: pdx_parser::CstNode<'_>, stats: &mut (usize, usize)) {
     stats.0 += 1;
-    stats.1 += node.children().len();
+    stats.1 += node.child_count();
     for child in node.children() {
         walk_cst(child, stats);
     }
@@ -120,10 +120,8 @@ fn main() {
     }
     let position_ranges = snapshot.index().position_ranges().len();
 
-    let node_header = size_of::<pdx_parser::CstNode>();
-    // Every non-leaf node owns one heap Vec: buffer (cap*8B, rounded by the
-    // allocator to at least 16B) plus allocator overhead (~16B).
-    let cst_vec_bytes = cst_child_slots * 8 + (cst_nodes - token_count.min(cst_nodes)) * 16;
+    // Arena layout: 1B kind + 16B (range + child span) per node, 4B per child edge.
+    let cst_arena_bytes = cst_nodes * 17 + cst_child_slots * 4;
     let hir_property_header =
         hir_properties * (size_of::<HirPropertyHeaderProxy>() + size_of::<Vec<String>>());
 
@@ -132,10 +130,10 @@ fn main() {
     println!("--- retained bytes (approximate) ---");
     println!("source text: {:.0} MiB", mib(source_bytes as f64));
     println!(
-        "cst: {} nodes x {node_header}B = {:.0} MiB headers + ~{:.0} MiB vec buffers; tokens {} x 8B = {:.0} MiB",
+        "cst: {} nodes x 17B + {} edges x 4B = {:.0} MiB arena; tokens {} x 8B = {:.0} MiB",
         cst_nodes,
-        mib((cst_nodes * node_header) as f64),
-        mib(cst_vec_bytes as f64),
+        cst_child_slots,
+        mib(cst_arena_bytes as f64),
         token_count,
         mib((token_count * 8) as f64),
     );

@@ -56,8 +56,8 @@ fn extract_trees(parsed: &ParsedFile, warnings: &mut Vec<String>) -> Vec<Mission
 
 fn parse_tree(
     parsed: &ParsedFile,
-    key: &CstNode,
-    value: &CstNode,
+    key: CstNode<'_>,
+    value: CstNode<'_>,
     span: pdx_text::TextRange,
     warnings: &mut Vec<String>,
 ) -> MissionTree {
@@ -123,8 +123,8 @@ fn parse_tree(
 
 fn parse_mission(
     parsed: &ParsedFile,
-    key: &CstNode,
-    value: &CstNode,
+    key: CstNode<'_>,
+    value: CstNode<'_>,
     span: pdx_text::TextRange,
     warnings: &mut Vec<String>,
 ) -> Mission {
@@ -200,18 +200,17 @@ fn push_unknown(
 // --- CST helpers -----------------------------------------------------------
 
 /// Returns the block node of a property value, unwrapping the `Value` wrapper.
-fn as_block(node: &CstNode) -> Option<&CstNode> {
+fn as_block(node: CstNode<'_>) -> Option<CstNode<'_>> {
     match node.kind() {
         CstKind::Block | CstKind::HeaderBlock => Some(node),
         CstKind::Value => node
             .children()
-            .iter()
             .find(|c| matches!(c.kind(), CstKind::Block | CstKind::HeaderBlock)),
         _ => None,
     }
 }
 
-fn prop_parts<'a>(_parsed: &ParsedFile, prop: &'a CstNode) -> Option<(&'a CstNode, &'a CstNode)> {
+fn prop_parts<'t>(_parsed: &ParsedFile, prop: CstNode<'t>) -> Option<(CstNode<'t>, CstNode<'t>)> {
     let mut key = None;
     let mut value = None;
     for child in prop.children() {
@@ -225,21 +224,20 @@ fn prop_parts<'a>(_parsed: &ParsedFile, prop: &'a CstNode) -> Option<(&'a CstNod
 }
 
 /// Properties directly inside a block, in source order.
-fn block_props(block: &CstNode) -> Vec<&CstNode> {
+fn block_props(block: CstNode<'_>) -> Vec<CstNode<'_>> {
     block
         .children()
-        .iter()
         .filter(|c| c.kind() == CstKind::Property)
         .collect()
 }
 
 /// Unquoted scalar text of a node.
-fn scalar(parsed: &ParsedFile, node: &CstNode) -> String {
+fn scalar(parsed: &ParsedFile, node: CstNode<'_>) -> String {
     unquote(parsed.text(node.range()).unwrap_or_default().trim())
 }
 
 /// Full raw value text (scalar or block, braces included).
-fn value_text(parsed: &ParsedFile, node: &CstNode) -> String {
+fn value_text(parsed: &ParsedFile, node: CstNode<'_>) -> String {
     parsed
         .text(node.range())
         .unwrap_or_default()
@@ -254,26 +252,25 @@ fn unquote(text: &str) -> String {
         .to_owned()
 }
 
-fn block(parsed: &ParsedFile, node: &CstNode) -> Block {
+fn block(parsed: &ParsedFile, node: CstNode<'_>) -> Block {
     Block::new(value_text(parsed, node))
 }
 
 /// Scalars inside a block, in source order.
-fn block_scalars(parsed: &ParsedFile, block: &CstNode) -> Vec<String> {
+fn block_scalars(parsed: &ParsedFile, block: CstNode<'_>) -> Vec<String> {
     block
         .children()
-        .iter()
         .filter(|c| matches!(c.kind(), CstKind::BareValue | CstKind::QuotedString))
         .map(|c| scalar(parsed, c))
         .filter(|s| !s.is_empty())
         .collect()
 }
 
-fn parse_u32(parsed: &ParsedFile, node: &CstNode) -> Option<u32> {
+fn parse_u32(parsed: &ParsedFile, node: CstNode<'_>) -> Option<u32> {
     scalar(parsed, node).parse().ok()
 }
 
-fn parse_bool(parsed: &ParsedFile, node: &CstNode) -> Option<bool> {
+fn parse_bool(parsed: &ParsedFile, node: CstNode<'_>) -> Option<bool> {
     match scalar(parsed, node).as_str() {
         "yes" => Some(true),
         "no" => Some(false),
