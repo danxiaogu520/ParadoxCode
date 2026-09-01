@@ -2655,11 +2655,66 @@ fn membership_bundle(snapshot: &AnalysisSnapshot) -> Arc<MembershipBundle> {
     bundle
 }
 
+/// Upper bound on memoized workspace-membership probes per thread. The memo
+/// only trades memory for repeat-probe speed, so clearing it when full loses
+/// no correctness — the next probe of a cleared pair recomputes.
+const WORKSPACE_MEMBER_MEMO_CAP: usize = 1 << 16;
+
+/// type-name -> (lowercase member -> membership answer) for the memo below.
+type WorkspaceMemberMemo = rustc_hash::FxHashMap<Box<str>, rustc_hash::FxHashMap<Box<str>, bool>>;
+
+thread_local! {
+    /// Repeat-probe memo for [`workspace_member`], keyed by snapshot revision.
+    /// Rule matching probes the same `(type, member)` pairs for every property
+    /// (dynamic keys, scope fields, variable names), and answers depend only on
+    /// the immutable snapshot, so one computation per distinct pair per revision
+    /// is enough. Nested maps keep every probe allocation-free for
+    /// already-lowercase members.
+    static WORKSPACE_MEMBER_MEMO: std::cell::RefCell<Option<(u64, WorkspaceMemberMemo)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 pub(crate) fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
+    let revision = snapshot.revision();
+    let lowered = if member.bytes().any(|byte| byte.is_ascii_uppercase()) {
+        std::borrow::Cow::Owned(member.to_ascii_lowercase())
+    } else {
+        std::borrow::Cow::Borrowed(member)
+    };
+    let memoized = WORKSPACE_MEMBER_MEMO.with(|memo| {
+        let mut slot = memo.borrow_mut();
+        let entry = slot.get_or_insert((revision, rustc_hash::FxHashMap::default()));
+        if entry.0 != revision {
+            *entry = (revision, rustc_hash::FxHashMap::default());
+        }
+        if let Some(answer) = entry
+            .1
+            .get::<str>(type_name)
+            .and_then(|members| members.get::<str>(lowered.as_ref()))
+        {
+            return Some(*answer);
+        }
+        None
+    });
+    if let Some(answer) = memoized {
+        return answer;
+    }
     let bundle = membership_bundle(snapshot);
-    bundle
-        .membership
-        .contains(snapshot, &bundle.hidden, &bundle.members, type_name, member)
+    let answer =
+        bundle
+            .membership
+            .contains(snapshot, &bundle.hidden, &bundle.members, type_name, member);
+    WORKSPACE_MEMBER_MEMO.with(|memo| {
+        let mut slot = memo.borrow_mut();
+        let Some(entry) = slot.as_mut() else {
+            return;
+        };
+        let members = entry.1.entry(Box::from(type_name)).or_default();
+        if members.len() < WORKSPACE_MEMBER_MEMO_CAP {
+            members.insert(Box::from(lowered.as_ref()), answer);
+        }
+    });
+    answer
 }
 
 /// Returns whether an indexed definition's source layer is enabled for completion members.
