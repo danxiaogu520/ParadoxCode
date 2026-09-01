@@ -494,6 +494,15 @@ fn load_index(
     }
     drop(known_ranges);
     progress.report(positions.len());
+    // The loaded shard vectors stay resident for the session; exact-fit them
+    // so row-push growth doubling does not leave ~2x slack per file.
+    for shard in shards.values_mut() {
+        if let Some(shard) = std::sync::Arc::get_mut(shard) {
+            shard.definitions.shrink_to_fit();
+            shard.references.shrink_to_fit();
+            shard.macro_definitions.shrink_to_fit();
+        }
+    }
     Ok((
         source_files,
         if build_lookup_maps {

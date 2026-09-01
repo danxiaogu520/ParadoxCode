@@ -133,6 +133,13 @@ impl AnalysisSnapshot {
         &self.index
     }
 
+    /// Returns the workspace-wide localisation preview table (mostly Vanilla
+    /// entries installed from the index cache).
+    #[must_use]
+    pub fn localisation_previews(&self) -> &LocalisationPreviewMap {
+        &self.localisation_previews
+    }
+
     /// Returns the bounded report from the latest successful source-root scan.
     #[must_use]
     pub fn scan_report(&self) -> &WorkspaceScanReport {

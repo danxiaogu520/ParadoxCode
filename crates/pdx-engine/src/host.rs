@@ -742,10 +742,9 @@ impl AnalysisHost {
                     );
                     // Same retention policy as the scan: extract positions,
                     // then drop the frontend so closed files never hold a
-                    // CST/HIR tree.
-                    let positions = position_ranges_for_state(&state);
-                    index.replace_position_ranges(id, positions.clone());
-                    state.cache_only(positions)
+                    // CST/HIR tree. The index map keeps the only copy.
+                    index.replace_position_ranges(id, position_ranges_for_state(&state));
+                    state.cache_only()
                 }
                 None => empty_file_state(&source_file, file_revision),
             });

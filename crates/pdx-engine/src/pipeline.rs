@@ -349,9 +349,7 @@ fn load_source_file_job(
             if job.retain_frontend || previous.parsed().is_none() {
                 return Arc::clone(previous);
             }
-            return Arc::new(
-                previous.cache_only_from_existing(position_ranges_for_state(previous)),
-            );
+            return Arc::new(previous.cache_only_from_existing());
         }
         let file_revision = previous.map_or(0, |state| state.revision().saturating_add(1));
         let state = build_file_state_with_cache(
@@ -365,8 +363,7 @@ fn load_source_file_job(
         if job.retain_frontend {
             Arc::new(state)
         } else {
-            let positions = position_ranges_for_state(&state);
-            Arc::new(state.cache_only(positions))
+            Arc::new(state.cache_only())
         }
     });
     Ok(SourceReadResult {
@@ -428,7 +425,6 @@ pub(crate) fn build_file_state_with_cache(
                 macro_definitions: Vec::new(),
                 syntax_error_count: 0,
             }),
-            cached_positions: None,
             cached_localisation_previews: None,
         };
     };
@@ -478,7 +474,6 @@ pub(crate) fn build_file_state_with_cache(
         parsed,
         hir,
         shard: Arc::new(shard),
-        cached_positions: None,
         cached_localisation_previews: None,
     }
 }
@@ -496,15 +491,11 @@ pub(crate) fn empty_file_state(file: &SourceFile, revision: u64) -> FileState {
             macro_definitions: Vec::new(),
             syntax_error_count: 0,
         }),
-        cached_positions: None,
         cached_localisation_previews: None,
     }
 }
 
 pub(crate) fn position_ranges_for_state(state: &FileState) -> Vec<(TextRange, PositionRange)> {
-    if let Some(cached) = state.cached_positions.as_deref() {
-        return cached.clone();
-    }
     let line_index = LineIndex::new(state.source());
     state
         .shard()
@@ -533,6 +524,10 @@ fn shard_from_parsed(
     let mut references = Vec::new();
     collect_hir_semantics(file, hir, &mut definitions, &mut references);
     collect_semantic_type_members(file, parsed, rules, &mut definitions);
+    // Shards stay resident in the workspace index; exact-fit the vectors so
+    // growth doubling does not leave ~2x slack per file.
+    definitions.shrink_to_fit();
+    references.shrink_to_fit();
     let macro_definitions = collect_macro_definitions(hir, rules);
     FileIndexShard {
         file_id: file.id,
