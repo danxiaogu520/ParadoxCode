@@ -2144,6 +2144,63 @@ pub(crate) struct WorkspaceMembership {
     kinds: rustc_hash::FxHashMap<Box<str>, rustc_hash::FxHashMap<Box<str>, u32>>,
     /// Lowercased kind -> name suffixes probed in addition to the raw member spelling.
     suffixes: rustc_hash::FxHashMap<Box<str>, Vec<Box<str>>>,
+    /// Prebuilt per-type-name views for every name the rule set can query.
+    views: rustc_hash::FxHashMap<Box<str>, Arc<MemberKindView>>,
+}
+
+/// Per-type-name resolution of the kind spellings and name suffixes probed by
+/// [`WorkspaceMembership::contains`].
+///
+/// Hot-path type names come from the rule set (key/value matchers and `<name>`
+/// parent-path entries) plus a handful of literals, so every membership check
+/// resolves through a prebuilt view instead of re-running the kind-alias scan,
+/// case folding, and suffix formatting per property. Resolution inputs are
+/// profile-static, so views are exact per revision and only need rebuilding
+/// with the rule set.
+struct MemberKindView {
+    /// Kind spellings exactly as `WorkspaceMembership::kinds` keys store them.
+    kinds: Arc<[Box<str>]>,
+    /// The same kinds lowercased, for the overlay-positive check.
+    kinds_lower: Arc<[Box<str>]>,
+    /// Name suffixes probed as `{member}{suffix}` against every kind.
+    suffixes: Arc<[Box<str>]>,
+}
+
+impl MemberKindView {
+    fn resolve(
+        profile: &GameProfile,
+        suffixes: &rustc_hash::FxHashMap<Box<str>, Vec<Box<str>>>,
+        type_name: &str,
+    ) -> Self {
+        let base = type_name
+            .split_once('.')
+            .map_or(type_name, |(kind, _)| kind);
+        let mut kinds: Vec<Box<str>> = vec![Box::from(type_name)];
+        if base != type_name {
+            kinds.push(Box::from(base));
+        }
+        if let Some(alias) = profile.member_kind_alias(base)
+            && !kinds.iter().any(|kind| kind.eq_ignore_ascii_case(alias))
+        {
+            kinds.push(Box::from(alias));
+        }
+        let mut resolved_suffixes: Vec<Box<str>> = Vec::new();
+        for kind in &kinds {
+            let kind_lower = kind.to_ascii_lowercase();
+            if let Some(list) = suffixes.get(kind_lower.as_str()) {
+                resolved_suffixes.extend(list.iter().cloned());
+            }
+        }
+        let kinds_lower = kinds
+            .iter()
+            .map(|kind| Box::from(kind.to_ascii_lowercase().as_str()))
+            .collect();
+        Self {
+            kinds: kinds.into(),
+            kinds_lower,
+            suffixes: resolved_suffixes.into(),
+        }
+    }
 }
 
 /// `(kind, folded name)` definition counts hidden by open overlays, per document revision.
@@ -2209,6 +2266,49 @@ impl WorkspaceMembership {
     }
 
     fn contains(&self, snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
+        // Rule-derived type names resolve through prebuilt views; arbitrary kinds from
+        // resolution queries fall back to the derivation below.
+        let Some(view) = self.views.get::<str>(type_name) else {
+            return self.contains_slow(snapshot, type_name, member);
+        };
+        let hidden = overlay_hidden_counts(snapshot);
+        let index = snapshot.index();
+        for kind in view.kinds.iter() {
+            let folded = index.definition_name_key(kind, member);
+            if self.indexed(&hidden, kind, folded.as_ref()) {
+                return true;
+            }
+        }
+        for suffix in view.suffixes.iter() {
+            let candidate = format!("{member}{suffix}");
+            for kind in view.kinds.iter() {
+                let folded = index.definition_name_key(kind, &candidate);
+                if self.indexed(&hidden, kind, folded.as_ref()) {
+                    return true;
+                }
+            }
+        }
+        if !completion_overlay_allowed(snapshot) {
+            return false;
+        }
+        let members = overlay_members(snapshot);
+        if members.names.is_empty() {
+            return false;
+        }
+        let mut candidates = vec![member.to_ascii_lowercase()];
+        candidates.extend(
+            view.suffixes
+                .iter()
+                .map(|suffix| format!("{member}{suffix}").to_ascii_lowercase()),
+        );
+        candidates.iter().any(|name| {
+            view.kinds_lower
+                .iter()
+                .any(|kind| members.names.contains(&(kind.to_string(), name.clone())))
+        })
+    }
+
+    fn contains_slow(&self, snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
         let profile = snapshot.game_profile();
         let base = type_name
             .split_once('.')
@@ -2259,6 +2359,42 @@ impl WorkspaceMembership {
     }
 }
 
+/// Collects every type name the diagnostics hot path can pass to `workspace_member`.
+///
+/// Key/value matchers and `<name>` parent-path entries pass their rule spelling through
+/// verbatim; `ValueMatcher::Dynamic` names reach membership only after lowercasing in
+/// `semantic_dynamic_value_matches`, so they are harvested pre-lowered. Arbitrary kinds
+/// from resolution queries are not enumerable here and use the slow path.
+fn membership_view_type_names(rules: &pdx_rules::RuleSet) -> Vec<String> {
+    let mut names = vec![
+        "variable".to_owned(),
+        "variable_name".to_owned(),
+        "scripted_effect".to_owned(),
+        "scripted_trigger".to_owned(),
+    ];
+    for rule in rules.semantic_rules() {
+        if let KeyMatcher::Type(type_name) = &rule.key {
+            names.push(type_name.clone());
+        }
+        match &rule.value {
+            ValueMatcher::Type(type_name) => names.push(type_name.clone()),
+            ValueMatcher::Dynamic(kind) => names.push(kind.to_ascii_lowercase()),
+            _ => {}
+        }
+        for segment in &rule.parent_path {
+            if let Some(type_name) = segment
+                .strip_prefix('<')
+                .and_then(|name| name.strip_suffix('>'))
+            {
+                names.push(type_name.to_owned());
+            }
+        }
+    }
+    names.sort_unstable();
+    names.dedup();
+    names
+}
+
 /// Returns the shared membership view for this snapshot revision.
 fn workspace_membership(snapshot: &AnalysisSnapshot) -> Arc<WorkspaceMembership> {
     let revision = snapshot.revision();
@@ -2294,7 +2430,18 @@ fn workspace_membership(snapshot: &AnalysisSnapshot) -> Arc<WorkspaceMembership>
                 .push(Box::from(rule.suffix.as_str()));
         }
     }
-    let membership = Arc::new(WorkspaceMembership { kinds, suffixes });
+    let views = membership_view_type_names(snapshot.rules())
+        .into_iter()
+        .map(|type_name| {
+            let view = MemberKindView::resolve(snapshot.game_profile(), &suffixes, &type_name);
+            (Box::from(type_name.as_str()), Arc::new(view))
+        })
+        .collect();
+    let membership = Arc::new(WorkspaceMembership {
+        kinds,
+        suffixes,
+        views,
+    });
     snapshot.query_cache().insert(
         revision,
         pdx_engine::CacheDomain::Index,
