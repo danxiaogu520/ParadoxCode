@@ -1288,7 +1288,7 @@ fn semantic_rules_drive_value_completion_and_hover() {
     assert!(
         property_hover
             .contents
-            .contains("- value: `bool (`yes` / `no`)`")
+            .contains("- value: bool (`yes` / `no`)")
     );
 
     assert!(!property_hover.contents.contains("context: `trigger`"));
