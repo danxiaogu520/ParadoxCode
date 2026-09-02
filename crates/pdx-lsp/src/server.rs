@@ -556,6 +556,11 @@ enum TransportEvent {
     Progress(Progress),
     DiskChanges(DiskChangesResult),
     WorkspaceDiagnostics(WorkspaceDiagnosticsResult),
+    /// Loop heartbeat synthesized when `recv_timeout` expires. Carries no
+    /// payload: its only job is to route control flow through the end-of-loop
+    /// shutdown-drain/reader-arm block, which `continue` on timeout would
+    /// otherwise starve when no worker or timer will ever fire again.
+    Tick,
 }
 
 /// An LSP server with a single event-loop-owned workspace host.
@@ -770,9 +775,16 @@ impl LspServer {
 
     /// Queues an automatic closed-file validation pass. The event loop starts it once no
     /// foreground scan is active; explicit `validateWorkspace` remains synchronous with its own
-    /// response and does not use this flag.
+    /// response and does not use this flag. The pass may also be queued during shutdown: the
+    /// shutdown drain deliberately waits for an in-flight scan to publish, so suppressing it
+    /// after `shutdown` would drop that publication entirely.
     pub(crate) fn request_workspace_diagnostics(&mut self) {
-        if self.workspace_wide_diagnostics && self.state == ServerState::Initialized {
+        if self.workspace_wide_diagnostics
+            && matches!(
+                self.state,
+                ServerState::Initialized | ServerState::ShuttingDown
+            )
+        {
             self.workspace_diagnostics_pending = true;
         }
     }
