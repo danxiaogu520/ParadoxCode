@@ -3,8 +3,8 @@ use std::fs;
 use std::sync::Arc;
 
 pub(crate) use super::{
-    AnalysisHost, Definition, DiskFileChange, DiskFileChangeKind, DocumentError, DocumentId,
-    DocumentSource, FileIndexShard, IndexCache, IndexCacheError, LocalisationPreview,
+    AnalysisHost, AnalysisSnapshot, Definition, DiskFileChange, DiskFileChangeKind, DocumentError,
+    DocumentId, DocumentSource, FileIndexShard, IndexCache, IndexCacheError, LocalisationPreview,
     LocalisationPreviewMap, MacroParameterSignature, ParsedSource, PositionMap, Reference,
     SourceFileId, SourceRoot, SourceRootId, SourceRootKind, TextChange, WorkspaceChange,
     WorkspaceError, WorkspaceIndex, WorkspaceScanFilters, WorkspaceScanIssueKind,

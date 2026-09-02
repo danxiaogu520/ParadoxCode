@@ -521,7 +521,6 @@ fn initialize_defers_an_existing_vanilla_cache() {
         &InitializeCallbacks {
             stage: None,
             log: None,
-            progress: None,
         },
     )
     .expect("prepare initialize candidate");

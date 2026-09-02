@@ -37,7 +37,7 @@ pub(crate) fn completion_definitions_for_kinds(
             if completion_source_file_allowed(snapshot, definition.file_id)
                 && completion_matches(&definition.name, prefix)
             {
-                definitions.push((definition.kind.clone(), definition.name.clone()));
+                definitions.push((definition.kind.to_string(), definition.name.to_string()));
             }
         }
     }
@@ -57,7 +57,7 @@ pub(crate) fn completion_definitions_for_kinds(
                             .any(|kind| definition.kind.eq_ignore_ascii_case(kind))
                             && completion_matches(&definition.name, prefix)
                     })
-                    .map(|definition| (definition.kind, definition.name)),
+                    .map(|definition| (definition.kind.to_string(), definition.name.to_string())),
             );
         }
     }

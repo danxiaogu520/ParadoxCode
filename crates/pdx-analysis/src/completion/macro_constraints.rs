@@ -30,7 +30,7 @@ pub(crate) struct MacroValueConstraintSite {
 #[derive(Clone, Debug)]
 pub(crate) struct MacroQuotedScriptConstraintSite {
     pub(crate) context: String,
-    pub(crate) parent_path: Vec<String>,
+    pub(crate) parent_path: Vec<std::sync::Arc<str>>,
     pub(crate) scope: ScopeContext,
 }
 
@@ -165,7 +165,7 @@ fn macro_parameter_owner(
             }
             Some((
                 owner_kind.to_owned(),
-                owner_name.clone(),
+                owner_name.to_string(),
                 candidate.scope.clone(),
             ))
         })
@@ -180,7 +180,7 @@ fn invocation_bindings(
         let value = if target.is_some_and(|target| target.range == argument.range) {
             SymbolicToken::Target
         } else if let Some((value, _)) = &argument.scalar {
-            SymbolicToken::Concrete(value.clone())
+            SymbolicToken::Concrete(value.to_string())
         } else {
             SymbolicToken::Unknown
         };
@@ -310,7 +310,7 @@ impl<'a> ConstraintCollector<'a> {
         &mut self,
         container: &SymbolicContainer,
         context: &str,
-        parent_path: &[String],
+        parent_path: &[std::sync::Arc<str>],
         scope: &ScopeContext,
     ) -> Result<(), Cancelled> {
         if self.exhausted {
@@ -397,11 +397,11 @@ impl<'a> ConstraintCollector<'a> {
                         let next_scope = semantic_child_scope(self.snapshot, scope, rule);
                         if !destinations.iter().any(
                             |(known_context, known_path, known_scope): &(
-                                String,
-                                Vec<String>,
+                                std::sync::Arc<str>,
+                                Vec<std::sync::Arc<str>>,
                                 ScopeContext,
                             )| {
-                                known_context.eq_ignore_ascii_case(&next_context)
+                                known_context.eq_ignore_ascii_case(next_context.as_ref())
                                     && known_path == &next_path
                                     && known_scope == &next_scope
                             },
@@ -412,7 +412,7 @@ impl<'a> ConstraintCollector<'a> {
                     if destinations.is_empty() {
                         let mut structural_path = parent_path.to_vec();
                         if !transparent_wrapper {
-                            structural_path.push(key.clone());
+                            structural_path.push(pdx_engine::intern_shard_string(key));
                         }
                         self.collect_container(children, context, &structural_path, scope)?;
                     } else {

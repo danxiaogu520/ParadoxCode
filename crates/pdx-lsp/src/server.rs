@@ -18,7 +18,7 @@ use pdx_analysis::{
 use pdx_engine::{
     AnalysisHost, AnalysisSnapshot, DiskFileChange, DiskFileChangeKind, DocumentId, DocumentSource,
     IndexCache, PreparedDocument, SourceRootKind, WorkspaceError, WorkspaceScanFilters,
-    WorkspaceScanToken,
+    WorkspaceScanReport, WorkspaceScanToken,
 };
 use pdx_game::DiscoveryToken;
 use pdx_rules::{GameProfile, RuleSet};
@@ -34,9 +34,9 @@ use crate::protocol::{
     cancel_request_from_notification, diagnostic_values_for_text_with_ignored_and_overrides,
     diagnostic_values_with_ignored_and_overrides, diagnostics_notification, document_error,
     filter_diagnostics_with_ignored_and_overrides, is_execute_command_message,
-    is_initialize_control_message, is_snapshot_request, is_snapshot_request_message,
-    log_message_notification, parse_file_uri_str, request_id_from_lsp, show_info_notification,
-    show_warning_notification, typed_params,
+    is_exit_notification, is_initialize_control_message, is_snapshot_request,
+    is_snapshot_request_message, log_message_notification, parse_file_uri_str, request_id_from_lsp,
+    show_info_notification, show_warning_notification, typed_params,
 };
 use crate::requests::SnapshotRequestContext;
 use crate::text::{
@@ -113,9 +113,10 @@ fn work_done_progress_end(token: &str, message: &str) -> Value {
 
 /// Announces that the initial workspace/index setup has completed.
 ///
-/// `LanguageClient` reaching `Running` only means that the LSP handshake finished.  Vanilla and
-/// dependency indexes may still be loading in the background, so editors need a separate,
-/// protocol-level signal before presenting the server as fully ready.
+/// `LanguageClient` reaching `Running` only means that the LSP handshake finished — the
+/// initialize response returns before the workspace scan, and Vanilla/dependency indexes may
+/// still be loading in the background, so editors need a separate, protocol-level signal before
+/// presenting the server as fully ready.
 fn ready_notification(revision: u64, source_files: usize) -> Value {
     json!({
         "jsonrpc": JSON_RPC_VERSION,
@@ -333,12 +334,15 @@ pub(crate) struct PreparedInitialize {
     pub(crate) warnings: Vec<String>,
     pub(crate) auto_vanilla: Option<AutoVanillaConfiguration>,
     pub(crate) index_cache: Option<PathBuf>,
-    /// Mission-preview texture store (game sprites), when a game installation
-    /// was configured or discovered.
-    pub(crate) textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
+    /// Mission-preview textures, resolved lazily from the captured discovery
+    /// inputs on the first preview request.
+    pub(crate) textures: Arc<crate::initialize::TextureStore>,
     /// Dependencies configured with persistent index caches, loaded in the background after
     /// the initialize response is sent.
     pub(crate) dependency_caches: Vec<DependencyIndexCache>,
+    /// Whether the initial workspace scan still needs to run as a background
+    /// worker after the initialize response is sent.
+    pub(crate) scan_pending: bool,
     pub(crate) watcher_registration: Option<Value>,
     pub(crate) client_work_done_progress: bool,
     pub(crate) client_snippet_support: bool,
@@ -416,6 +420,70 @@ pub(crate) struct InFlightWorkspaceDiagnostics {
 }
 
 #[derive(Debug)]
+/// In-flight Vanilla cache worker slot. `is_load` distinguishes the bounded
+/// cache-load flavor (snapshot requests wait for complete answers) from an
+/// unbounded background rebuild (requests are served from partial state).
+pub(crate) struct InFlightIndexSlot {
+    pub(crate) cancellation: IndexSetupCancellation,
+    pub(crate) is_load: bool,
+}
+
+/// In-flight dependency cache worker slot. Dependency installs always load or
+/// build bounded caches before installing in place.
+pub(crate) struct InFlightDependencySlot {
+    pub(crate) cancellation: WorkspaceScanToken,
+}
+
+/// Cache workers started by one `spawn_background_cache_workers` call.
+pub(crate) struct CacheWorkersSpawned {
+    pub(crate) index: Option<InFlightIndexSlot>,
+    pub(crate) index_progress_token: Option<String>,
+    pub(crate) dependency: Option<InFlightDependencySlot>,
+    pub(crate) dependency_progress_token: Option<String>,
+}
+
+/// Inputs for background cache workers, stashed while the initial workspace
+/// scan runs so cache installs never race the scan's host commit.
+#[derive(Debug, Default)]
+pub(crate) struct PendingCacheSetup {
+    pub(crate) index_cache: Option<PathBuf>,
+    pub(crate) dependency_caches: Vec<DependencyIndexCache>,
+    /// User-level automatic Vanilla configuration captured by the initialize
+    /// handshake, replayed when the deferred workers finally start.
+    pub(crate) auto_vanilla: Option<AutoVanillaConfiguration>,
+}
+
+/// In-flight initial background workspace scan.
+pub(crate) struct InFlightScan {
+    pub(crate) base_revision: u64,
+    pub(crate) cancellation: WorkspaceScanToken,
+    /// Progress token created for this scan, when the client supports
+    /// `window.workDoneProgress`; the event loop ends it on completion.
+    pub(crate) progress_token: Option<String>,
+}
+
+/// Test-only seam invoked by a background scan worker once its scan has fully
+/// completed but before the completion is reported to the event loop. In-crate
+/// shutdown-race regression tests use it to pin exact interleavings — events
+/// processed while the scan is verifiably still in flight — deterministically
+/// instead of racing wall-clock time. Production servers never configure a
+/// gate, and a configured gate must be guaranteed to release.
+#[derive(Clone)]
+pub(crate) struct ScanGate(Arc<dyn Fn() + Send + Sync>);
+
+impl ScanGate {
+    /// Parks the calling scan worker until the gate releases it.
+    pub(crate) fn hold(&self) {
+        (self.0)();
+    }
+}
+
+impl std::fmt::Debug for ScanGate {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("ScanGate")
+    }
+}
+
 pub(crate) struct InFlightReindexCommand {
     pub(crate) request_id: RequestId,
     pub(crate) base_revision: u64,
@@ -456,6 +524,10 @@ pub(crate) struct WorkspaceValidationResult {
     /// can be retained rather than flooding the client with clears.
     pub(crate) publications: Vec<WorkspaceDiagnosticPublication>,
     pub(crate) current_uris: Vec<String>,
+    /// Whether this validation walked the whole Current Mod. A full walk
+    /// answers the queued post-ready pass; an incremental watched-file batch
+    /// covers only the files it touched and must leave that pass queued.
+    pub(crate) full_workspace: bool,
 }
 
 #[derive(Debug)]
@@ -486,6 +558,14 @@ pub(crate) struct WorkspaceDiagnosticsResult {
     pub(crate) result: Result<WorkspaceValidationResult, WorkspaceError>,
 }
 
+/// Background initial workspace scan completion. The worker refreshes a host
+/// clone; the event loop commits it only when the live revision still matches.
+#[derive(Debug)]
+pub(crate) struct ScanSetupResult {
+    pub(crate) base_revision: u64,
+    pub(crate) result: Result<(AnalysisHost, WorkspaceScanReport), WorkspaceError>,
+}
+
 enum TransportEvent {
     Input(Result<Option<Value>, LspError>),
     Initialize(Box<InitializeTaskResult>),
@@ -494,6 +574,7 @@ enum TransportEvent {
     Request(SnapshotRequestResult),
     VanillaSetup(IndexSetupResult),
     DependencySetup(DependencySetupResult),
+    ScanSetup(ScanSetupResult),
     BackgroundReindex(BackgroundReindexResult),
     ReindexCommand(ReindexCommandResult),
     /// A server-side `window/logMessage` notification produced by a worker.
@@ -501,6 +582,11 @@ enum TransportEvent {
     Progress(Progress),
     DiskChanges(DiskChangesResult),
     WorkspaceDiagnostics(WorkspaceDiagnosticsResult),
+    /// Loop heartbeat synthesized when `recv_timeout` expires. Carries no
+    /// payload: its only job is to route control flow through the end-of-loop
+    /// shutdown-drain/reader-arm block, which `continue` on timeout would
+    /// otherwise starve when no worker or timer will ever fire again.
+    Tick,
 }
 
 /// An LSP server with a single event-loop-owned workspace host.
@@ -518,8 +604,8 @@ pub struct LspServer {
     pending_disk_changes_rescan: bool,
     watcher_registration: Option<Value>,
     auto_vanilla: Option<AutoVanillaConfiguration>,
-    /// Mission-preview texture store shared with snapshot requests.
-    textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
+    /// Mission-preview textures, resolved lazily on first preview use.
+    textures: Arc<crate::initialize::TextureStore>,
     /// Whether the client advertises `window.workDoneProgress`, so server-initiated background
     /// work can be surfaced as a progress bar instead of only start/end messages.
     client_work_done_progress: bool,
@@ -548,12 +634,27 @@ pub struct LspServer {
     pub(crate) workspace_wide_diagnostics: bool,
     /// Whether an automatic closed-file validation pass is waiting for a quiet worker slot.
     pub(crate) workspace_diagnostics_pending: bool,
+    /// Whether the initial background workspace scan still needs to start. Set
+    /// during the initialize handshake when live roots exist; the scan worker
+    /// commits while the live revision is unchanged and retries otherwise.
+    pub(crate) scan_pending: bool,
+    /// Cache worker inputs deferred until the initial background scan commits.
+    pub(crate) pending_cache_setup: PendingCacheSetup,
+    /// Consecutive background-scan attempts that lost the revision race. After
+    /// a bounded number of retries the scan is abandoned with an explicit
+    /// warning instead of looping forever under continuous edits.
+    pub(crate) scan_retries: u8,
+    /// Retry ceiling for the initial scan. Production uses the repository bound; tests may lower
+    /// it to exercise the terminal race path without forcing ten full scans.
+    scan_retry_limit: u8,
     /// URIs for which the last workspace pass published closed-file diagnostics. This lets a
     /// subsequent pass clear deleted or ignored files without retaining diagnostic payloads.
     pub(crate) workspace_diagnostic_uris: BTreeSet<String>,
     /// Notifications queued by a live setting change; drained by the transport loop so the
     /// configuration handler remains a pure state transition.
     pub(crate) workspace_diagnostic_clear_queue: Vec<String>,
+    /// Test-only scan-completion gate; see [`ScanGate`]. `None` in production.
+    scan_gate: Option<ScanGate>,
     /// Process-start messages collected before an LSP client can receive
     /// `window/logMessage`. They are replayed at the beginning of the first
     /// initialize worker so the editor's log has no unexplained pre-initialize gap.
@@ -589,7 +690,7 @@ impl LspServer {
             pending_disk_changes_rescan: false,
             watcher_registration: None,
             auto_vanilla: None,
-            textures: None,
+            textures: Arc::new(crate::initialize::TextureStore::new(None, None)),
             client_work_done_progress: false,
             client_snippet_support: false,
             semantic_tokens_cache: Arc::new(SemanticTokensCache::new()),
@@ -601,8 +702,13 @@ impl LspServer {
             diagnostic_severity_overrides: Arc::new(BTreeMap::new()),
             workspace_wide_diagnostics: true,
             workspace_diagnostics_pending: false,
+            scan_pending: false,
+            pending_cache_setup: PendingCacheSetup::default(),
+            scan_retries: 0,
+            scan_retry_limit: crate::MAX_BACKGROUND_SCAN_RETRIES,
             workspace_diagnostic_uris: BTreeSet::new(),
             workspace_diagnostic_clear_queue: Vec::new(),
+            scan_gate: None,
             startup_log: Vec::new(),
             clean_exit: false,
         })
@@ -621,6 +727,24 @@ impl LspServer {
     #[must_use]
     pub fn with_auto_vanilla(mut self, configuration: AutoVanillaConfiguration) -> Self {
         self.auto_vanilla = Some(configuration);
+        self
+    }
+
+    /// Attaches a gate each background scan worker invokes just before it
+    /// reports completion. In-crate test seam only: production servers never
+    /// set it, and the gate blocks the worker until it returns, so the
+    /// closure must be guaranteed to release.
+    #[cfg(test)]
+    pub(crate) fn with_scan_gate(mut self, gate: Arc<dyn Fn() + Send + Sync>) -> Self {
+        self.scan_gate = Some(ScanGate(gate));
+        self
+    }
+
+    /// Lowers the initial-scan retry ceiling for deterministic lifecycle tests.
+    #[cfg(test)]
+    pub(crate) fn with_scan_retry_limit(mut self, limit: u8) -> Self {
+        assert!(limit > 0, "scan retry limit must be positive");
+        self.scan_retry_limit = limit;
         self
     }
 
@@ -653,6 +777,16 @@ impl LspServer {
         if current.is_some_and(|document| {
             document.source() == DocumentSource::Overlay && document.version() == Some(version)
         }) {
+            // The overlay re-run after a scan commit legitimately recomputes the
+            // same version against the completed index; republishing a byte-identical
+            // batch would only churn the client, so only changed results go out.
+            if self
+                .diagnostics
+                .get(&id)
+                .is_some_and(|published| *published == diagnostics)
+            {
+                return false;
+            }
             self.diagnostics.insert(id, diagnostics);
             true
         } else {
@@ -675,36 +809,58 @@ impl LspServer {
         output: &mut W,
         result: &WorkspaceValidationResult,
     ) -> Result<(), LspError> {
-        self.workspace_diagnostics_pending = false;
-        let current = result.current_uris.iter().cloned().collect::<BTreeSet<_>>();
-        let stale = self
-            .workspace_diagnostic_uris
-            .difference(&current)
-            .cloned()
-            .collect::<Vec<_>>();
-        for uri in stale
-            .into_iter()
-            .take(crate::MAX_WORKSPACE_DIAGNOSTIC_CLEARS)
-        {
-            write_message(output, &diagnostics_notification(&uri, json!([])))?;
-            self.workspace_diagnostic_uris.remove(&uri);
+        if result.full_workspace {
+            // A whole-workspace validation answers the queued post-ready pass. An
+            // incremental watched-file batch covers only the files it touched;
+            // clearing the flag there would drop the initial closed-file
+            // publication whenever a watched change lands between `ready` and
+            // the pass spawn.
+            self.workspace_diagnostics_pending = false;
+            let current = result.current_uris.iter().cloned().collect::<BTreeSet<_>>();
+            let stale = self
+                .workspace_diagnostic_uris
+                .difference(&current)
+                .cloned()
+                .collect::<Vec<_>>();
+            for uri in stale
+                .into_iter()
+                .take(crate::MAX_WORKSPACE_DIAGNOSTIC_CLEARS)
+            {
+                write_message(output, &diagnostics_notification(&uri, json!([])))?;
+                self.workspace_diagnostic_uris.remove(&uri);
+            }
         }
         for publication in &result.publications {
             write_message(
                 output,
                 &diagnostics_notification(&publication.uri, publication.values.clone()),
             )?;
-            self.workspace_diagnostic_uris
-                .insert(publication.uri.clone());
+            if publication
+                .values
+                .as_array()
+                .is_some_and(|diagnostics| diagnostics.is_empty())
+            {
+                self.workspace_diagnostic_uris.remove(&publication.uri);
+            } else {
+                self.workspace_diagnostic_uris
+                    .insert(publication.uri.clone());
+            }
         }
         Ok(())
     }
 
     /// Queues an automatic closed-file validation pass. The event loop starts it once no
     /// foreground scan is active; explicit `validateWorkspace` remains synchronous with its own
-    /// response and does not use this flag.
+    /// response and does not use this flag. The pass may also be queued during shutdown: the
+    /// shutdown drain deliberately waits for an in-flight scan to publish, so suppressing it
+    /// after `shutdown` would drop that publication entirely.
     pub(crate) fn request_workspace_diagnostics(&mut self) {
-        if self.workspace_wide_diagnostics && self.state == ServerState::Initialized {
+        if self.workspace_wide_diagnostics
+            && matches!(
+                self.state,
+                ServerState::Initialized | ServerState::ShuttingDown
+            )
+        {
             self.workspace_diagnostics_pending = true;
         }
     }

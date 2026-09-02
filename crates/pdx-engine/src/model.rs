@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use pdx_parser::{CstKind, FileFormat, ParsedFile};
 use pdx_rules::FileResolutionPolicy;
-use pdx_text::{LineIndex, LogicalPath, PositionRange, TextRange};
+use pdx_text::{LineIndex, LogicalPath, TextRange};
 
 use crate::hir::HirFile;
 use crate::index::FileIndexShard;
@@ -547,14 +547,13 @@ fn localisation_previews_from_parsed(parsed: &ParsedFile) -> Vec<(TextRange, Loc
             CstKind::LanguageHeader => {
                 language = node
                     .children()
-                    .iter()
                     .find(|child| child.kind() == CstKind::LocalisationKey)
                     .and_then(|child| parsed.text(child.range()))
                     .map(|value| value.trim().to_owned())
                     .filter(|value| !value.is_empty());
             }
             CstKind::LocalisationEntry => {
-                let Some(value_node) = node.children().iter().find(|child| {
+                let Some(value_node) = node.children().find(|child| {
                     matches!(
                         child.kind(),
                         CstKind::LocalisationString | CstKind::UnquotedValue
@@ -618,7 +617,6 @@ pub struct FileState {
     pub(crate) parsed: Option<ParsedSource>,
     pub(crate) hir: Option<Arc<HirFile>>,
     pub(crate) shard: Arc<FileIndexShard>,
-    pub(crate) cached_positions: Option<Arc<Vec<(TextRange, PositionRange)>>>,
     pub(crate) cached_localisation_previews: Option<Arc<Vec<(TextRange, LocalisationPreview)>>>,
 }
 
@@ -659,13 +657,21 @@ impl FileState {
         self.hir.as_ref().map(Arc::clone)
     }
 
-    /// Returns the index shard produced atomically with this parse/HIR state.
+    /// Returns the index shard shared with the workspace index.
+    ///
+    /// The shard lives behind an `Arc` that the workspace index shares, so
+    /// installing or merging indexes never deep-copies every definition and
+    /// reference string in the workspace.
     #[must_use]
+    pub fn shard_handle(&self) -> Arc<FileIndexShard> {
+        Arc::clone(&self.shard)
+    }
+
     pub fn shard(&self) -> &FileIndexShard {
         &self.shard
     }
 
-    pub(crate) fn cache_only(mut self, positions: Vec<(TextRange, PositionRange)>) -> Self {
+    pub(crate) fn cache_only(mut self) -> Self {
         let cached_localisation_previews =
             self.cached_localisation_previews
                 .take()
@@ -682,15 +688,11 @@ impl FileState {
             parsed: None,
             hir: None,
             shard: self.shard,
-            cached_positions: Some(Arc::new(positions)),
             cached_localisation_previews,
         }
     }
 
-    pub(crate) fn cache_only_from_existing(
-        &self,
-        positions: Vec<(TextRange, PositionRange)>,
-    ) -> Self {
+    pub(crate) fn cache_only_from_existing(&self) -> Self {
         let cached_localisation_previews = self
             .cached_localisation_previews
             .as_ref()
@@ -708,17 +710,36 @@ impl FileState {
             parsed: None,
             hir: None,
             shard: Arc::clone(&self.shard),
-            cached_positions: Some(Arc::new(positions)),
             cached_localisation_previews,
         }
     }
 
-    pub(crate) fn cached_localisation_previews(
-        &self,
-    ) -> Option<&[(TextRange, LocalisationPreview)]> {
+    pub fn cached_localisation_previews(&self) -> Option<&[(TextRange, LocalisationPreview)]> {
         self.cached_localisation_previews
             .as_deref()
             .map(Vec::as_slice)
+    }
+
+    /// Drops the retained CST/HIR frontends while keeping the source text,
+    /// index shard, and any cached localisation previews.
+    ///
+    /// Used after background validation to bound resident memory: closed files
+    /// rarely need their trees again, and [`crate::pipeline`] callers can
+    /// reparse the retained source on demand. Returns `None` when no frontend
+    /// is retained. The revision is unchanged — eviction does not alter any
+    /// answer, so snapshot query caches stay valid.
+    pub(crate) fn evict_frontend(&self) -> Option<Self> {
+        if self.parsed.is_none() && self.hir.is_none() {
+            return None;
+        }
+        Some(Self {
+            revision: self.revision,
+            source: Arc::clone(&self.source),
+            parsed: None,
+            hir: None,
+            shard: Arc::clone(&self.shard),
+            cached_localisation_previews: self.cached_localisation_previews.clone(),
+        })
     }
 }
 /// Stable identity for an editor document during one server lifetime.

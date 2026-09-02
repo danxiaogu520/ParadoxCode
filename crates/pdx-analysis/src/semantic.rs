@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use pdx_engine::hir::{HirFile, ScopeState, ScopeValue};
@@ -7,6 +7,7 @@ use pdx_engine::hir::{
     semantic_root_context as hir_semantic_root_context,
     semantic_root_context_is_fallback as hir_semantic_root_context_is_fallback,
 };
+use pdx_engine::intern_shard_string;
 use pdx_engine::{
     AnalysisSnapshot, DocumentId, DocumentSource, MacroDefinitionSummary, MacroParameterSignature,
     SourceFileId, SourceRootKind,
@@ -17,46 +18,364 @@ use pdx_text::{LogicalPath, TextRange};
 use crate::support::*;
 use crate::types::*;
 
-pub(crate) fn semantic_rules_for_container<'a>(
-    snapshot: &'a AnalysisSnapshot,
-    context: &str,
-    parent_path: &[String],
-    _scope: &ScopeContext,
-) -> Vec<&'a pdx_rules::SemanticRule> {
-    let mut candidates = snapshot
-        .rules()
-        .semantic_rules_for_context(context)
-        .collect::<Vec<_>>();
+/// Per-context rule lookup view shared by every container of one semantic context.
+///
+/// The merge (own context + inherited profile contexts + the `root:{type}` expansion) is a
+/// pure function of the immutable snapshot, so the exact-key buckets and the non-exact list
+/// are computed once per revision: per-key lookups become one hash probe plus a small
+/// iteration instead of re-merging, sorting, and deduplicating per call.
+/// One precomputed alternative group of one semantic context.
+struct AlternativeGroup {
+    /// Shared alternative identity.
+    id: Arc<str>,
+    /// Rule indices belonging to the group, rule-id ordered.
+    rule_indices: Arc<[usize]>,
+    /// Members of `rule_indices` that also declare no parent path; containers with an
+    /// empty parent path match exactly these.
+    top_rule_indices: Arc<[usize]>,
+}
+
+struct ContextRuleView {
+    /// Whether more than one source contributed; merged sources return rule-id order while
+    /// single sources keep exact-key rules before non-exact matchers.
+    merged: bool,
+    /// Indices from `all` whose rule declares no parent path; top-level containers
+    /// (parent path `[]`) match exactly these, so they skip the per-rule path filter and
+    /// its full-size result allocation.
+    all_top: Arc<[usize]>,
+    /// Alternative groups in first-occurrence order: one entry per distinct alternative id
+    /// among the contributing rules, each listing its rule indices in rule-id order.
+    alternative_groups: Arc<[AlternativeGroup]>,
+    /// Lowercased exact key -> `(rule index, group index)` pairs of alternative rules.
+    alternative_exact_keys: rustc_hash::FxHashMap<Box<str>, Arc<[(usize, usize)]>>,
+    /// `(rule index, group index)` pairs of alternative rules with non-exact key matchers.
+    alternative_non_exact: Arc<[(usize, usize)]>,
+    /// Lowercased exact key -> contributing rule indices, rule-id ordered per bucket.
+    exact_by_key: rustc_hash::FxHashMap<Box<str>, Arc<[usize]>>,
+    /// Indices of rules whose key matcher is not exact, rule-id ordered.
+    non_exact: Arc<[usize]>,
+    /// Rules with an all-literal declared parent path, keyed by the lowercased segments
+    /// joined with `\0`. A container whose path is all-literal resolves its rule list
+    /// with one probe instead of scanning every rule in the context.
+    parent_literal: rustc_hash::FxHashMap<Box<str>, Arc<[usize]>>,
+    /// Rules whose declared parent path contains a dynamic segment (`<type>`, `enum[..]`,
+    /// int/float/date), bucketed by path length; these keep the per-rule check.
+    parent_dynamic_by_len: Vec<Arc<[usize]>>,
+}
+
+thread_local! {
+    /// Reusable key buffer for snapshot query-cache probes.
+    ///
+    /// Validation probes the rule-view, macro-resolution, and member-name caches per
+    /// property and per rule; formatting a fresh owned key for every probe dominated
+    /// steady-state allocator traffic. The buffer is borrowed only for the duration of
+    /// the cache read, and miss paths run after the borrow ends.
+    static QUERY_CACHE_PROBE_KEY: std::cell::RefCell<String> =
+        const { std::cell::RefCell::new(String::new()) };
+}
+
+/// Probes the snapshot query cache with a key assembled from `parts` without allocating.
+fn probe_query_cache<T: Send + Sync + 'static>(
+    snapshot: &AnalysisSnapshot,
+    revision: u64,
+    parts: &[&str],
+) -> Option<Arc<T>> {
+    QUERY_CACHE_PROBE_KEY.with(|buffer| {
+        let mut key = buffer.borrow_mut();
+        key.clear();
+        for part in parts {
+            key.push_str(part);
+        }
+        snapshot.query_cache().get::<T>(revision, &key)
+    })
+}
+
+fn context_rule_view(snapshot: &AnalysisSnapshot, context: &str) -> Arc<ContextRuleView> {
+    let revision = snapshot.revision();
+    if let Some(cached) = probe_query_cache(snapshot, revision, &["context-rule-view:", context]) {
+        return cached;
+    }
+    let rules = snapshot.rules();
     let mut merged = false;
+    let mut all: Vec<usize> = Vec::new();
+    let mut exact: rustc_hash::FxHashMap<Box<str>, Vec<usize>> = rustc_hash::FxHashMap::default();
+    let mut non_exact: Vec<usize> = Vec::new();
+    let mut push_source = |source: &str| {
+        for index in rules.semantic_rule_indices_for_context(source) {
+            let Some(rule) = rules.semantic_rule_at(index) else {
+                continue;
+            };
+            all.push(index);
+            match &rule.key {
+                KeyMatcher::Exact(expected) => {
+                    let key: Box<str> = expected.to_ascii_lowercase().into_boxed_str();
+                    exact.entry(key).or_default().push(index);
+                }
+                _ => non_exact.push(index),
+            }
+        }
+    };
+    push_source(context);
     for inherited in snapshot.game_profile().inherited_semantic_contexts(context) {
-        candidates.extend(snapshot.rules().semantic_rules_for_context(inherited));
+        push_source(inherited);
         merged = true;
     }
     if let Some(type_name) = context.strip_prefix("type:") {
-        candidates.extend(
-            snapshot
-                .rules()
-                .semantic_rules_for_context(&format!("root:{type_name}")),
-        );
+        let root_context = format!("root:{type_name}");
+        push_source(&root_context);
         merged = true;
     }
-    // A single source is already ordered by rule id; only merged sources need sorting so the
-    // dedup and deterministic selection stay stable.
+    let dedup = |indices: &mut Vec<usize>| {
+        // Rule indices ascend in rule-id order, so adjacent near-duplicate ids collapse here.
+        let mut write = 0;
+        for read in 0..indices.len() {
+            let same = read > 0
+                && rules
+                    .semantic_rule_at(indices[write - 1])
+                    .zip(rules.semantic_rule_at(indices[read]))
+                    .is_some_and(|(left, right)| left.id.eq_ignore_ascii_case(&right.id));
+            if same {
+                continue;
+            }
+            indices[write] = indices[read];
+            write += 1;
+        }
+        indices.truncate(write);
+    };
     if merged {
-        candidates.sort_by(|left, right| left.id.cmp(&right.id));
-        candidates.dedup_by(|left, right| left.id.eq_ignore_ascii_case(&right.id));
+        all.sort_unstable();
+        dedup(&mut all);
+        for bucket in exact.values_mut() {
+            bucket.sort_unstable();
+            dedup(bucket);
+        }
+        non_exact.sort_unstable();
+        dedup(&mut non_exact);
     }
-    candidates
+    let all_top: Vec<usize> = all
+        .iter()
+        .copied()
+        .filter(|index| {
+            rules
+                .semantic_rule_at(*index)
+                .is_some_and(|rule| rule.parent_path.is_empty())
+        })
+        .collect();
+    let mut group_ids: Vec<Arc<str>> = Vec::new();
+    let mut group_index_by_id = rustc_hash::FxHashMap::<Box<str>, usize>::default();
+    let mut group_rules: Vec<Vec<usize>> = Vec::new();
+    for index in all.iter().copied() {
+        let Some(rule) = rules.semantic_rule_at(index) else {
+            continue;
+        };
+        let Some(alternative) = rule.alternative_id.as_deref() else {
+            continue;
+        };
+        // Group identity is the exact alternative spelling, mirroring the previous
+        // case-sensitive `by_id` equality.
+        let exact: Box<str> = Box::from(alternative);
+        let group = match group_index_by_id.get(exact.as_ref()) {
+            Some(group) => *group,
+            None => {
+                let group = group_ids.len();
+                group_index_by_id.insert(exact, group);
+                group_ids.push(intern_shard_string(alternative));
+                group_rules.push(Vec::new());
+                group
+            }
+        };
+        group_rules[group].push(index);
+    }
+    // Discovery buckets over the alternative rules: exact-key rules hash straight to their
+    // groups, non-exact matchers stay a small ordered scan.
+    let mut alternative_exact_keys: rustc_hash::FxHashMap<Box<str>, Vec<(usize, usize)>> =
+        rustc_hash::FxHashMap::default();
+    let mut alternative_non_exact: Vec<(usize, usize)> = Vec::new();
+    for (group_index, group) in group_rules.iter().enumerate() {
+        for &rule_index in group {
+            let Some(rule) = rules.semantic_rule_at(rule_index) else {
+                continue;
+            };
+            match &rule.key {
+                KeyMatcher::Exact(expected) => {
+                    let key: Box<str> = expected.to_ascii_lowercase().into_boxed_str();
+                    alternative_exact_keys
+                        .entry(key)
+                        .or_default()
+                        .push((rule_index, group_index));
+                }
+                _ => alternative_non_exact.push((rule_index, group_index)),
+            }
+        }
+    }
+    let alternative_groups: Vec<AlternativeGroup> = group_ids
         .into_iter()
-        .filter(|rule| semantic_parent_path_matches(snapshot, &rule.parent_path, parent_path))
+        .zip(group_rules)
+        .map(|(id, rule_indices)| {
+            let top_rule_indices = rule_indices
+                .iter()
+                .copied()
+                .filter(|index| {
+                    rules
+                        .semantic_rule_at(*index)
+                        .is_some_and(|rule| rule.parent_path.is_empty())
+                })
+                .collect::<Vec<_>>();
+            AlternativeGroup {
+                id,
+                rule_indices: Arc::from(rule_indices),
+                top_rule_indices: Arc::from(top_rule_indices),
+            }
+        })
+        .collect();
+    // Parent-path resolution buckets: all-literal declared paths answer by probe, paths
+    // with dynamic segments (`<type>`, `enum[..]`, numeric spellings) stay per-rule checks
+    // bucketed by length.
+    let mut parent_literal: rustc_hash::FxHashMap<Box<str>, Vec<usize>> =
+        rustc_hash::FxHashMap::default();
+    let mut parent_dynamic_by_len: Vec<Vec<usize>> = Vec::new();
+    for index in all.iter().copied() {
+        let Some(rule) = rules.semantic_rule_at(index) else {
+            continue;
+        };
+        if rule.parent_path.is_empty() {
+            continue;
+        }
+        if rule
+            .parent_path
+            .iter()
+            .all(|segment| semantic_parent_path_segment_is_literal(segment))
+        {
+            let mut key = String::new();
+            for segment in &rule.parent_path {
+                key.push_str(&segment.to_ascii_lowercase());
+                key.push('\0');
+            }
+            parent_literal
+                .entry(key.into_boxed_str())
+                .or_default()
+                .push(index);
+        } else {
+            let len = rule.parent_path.len();
+            if parent_dynamic_by_len.len() <= len {
+                parent_dynamic_by_len.resize(len + 1, Vec::new());
+            }
+            parent_dynamic_by_len[len].push(index);
+        }
+    }
+    let view = Arc::new(ContextRuleView {
+        merged,
+        all_top: Arc::from(all_top),
+        alternative_groups: Arc::from(alternative_groups),
+        alternative_exact_keys: alternative_exact_keys
+            .into_iter()
+            .map(|(key, pairs)| (key, Arc::from(pairs)))
+            .collect(),
+        alternative_non_exact: Arc::from(alternative_non_exact),
+        exact_by_key: exact
+            .into_iter()
+            .map(|(key, bucket)| (key, Arc::from(bucket)))
+            .collect(),
+        non_exact: Arc::from(non_exact),
+        parent_literal: parent_literal
+            .into_iter()
+            .map(|(key, bucket)| (key, Arc::from(bucket)))
+            .collect(),
+        parent_dynamic_by_len: parent_dynamic_by_len.into_iter().map(Arc::from).collect(),
+    });
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Index,
+        format!("context-rule-view:{context}"),
+        view.clone(),
+    );
+    view
+}
+
+pub(crate) fn semantic_rules_for_container<'a>(
+    snapshot: &'a AnalysisSnapshot,
+    context: &str,
+    parent_path: &[Arc<str>],
+    _scope: &ScopeContext,
+) -> Vec<&'a pdx_rules::SemanticRule> {
+    let view = context_rule_view(snapshot, context);
+    let rules = snapshot.rules();
+    if parent_path.is_empty() {
+        // Top-level containers match exactly the rules with no declared parent path.
+        return view
+            .all_top
+            .iter()
+            .filter_map(|index| rules.semantic_rule_at(*index))
+            .collect();
+    }
+    // Literal actual paths resolve the literal bucket by probe; rules whose declared
+    // parent path contains a dynamic segment (`<type>`, `enum[..]`, numeric spellings)
+    // keep the per-rule check. Both index lists are rule-id ordered, so the merged
+    // result preserves `all` order.
+    let literal_actual = semantic_parent_path_is_literal(parent_path);
+    let mut indices: Vec<usize> = if literal_actual {
+        let mut key = String::new();
+        for segment in parent_path {
+            key.push_str(&segment.to_ascii_lowercase());
+            key.push('\0');
+        }
+        view.parent_literal
+            .get(key.as_str())
+            .map_or_else(Vec::new, |bucket| bucket.as_ref().to_vec())
+    } else {
+        // A literal declared segment can only match by spelling equality, and a
+        // non-literal actual segment never equals a literal spelling that matters here;
+        // only dynamic-segment rules can match such paths.
+        Vec::new()
+    };
+    let dynamic = view
+        .parent_dynamic_by_len
+        .get(parent_path.len())
+        .map_or([].as_slice(), |bucket| bucket.as_ref());
+    if !dynamic.is_empty() {
+        let before = indices.len();
+        for index in dynamic {
+            if rules.semantic_rule_at(*index).is_some_and(|rule| {
+                semantic_parent_path_matches(snapshot, &rule.parent_path, parent_path)
+            }) {
+                indices.push(*index);
+            }
+        }
+        if indices.len() > before {
+            indices.sort_unstable();
+            indices.dedup();
+        }
+    }
+    indices
+        .into_iter()
+        .filter_map(|index| rules.semantic_rule_at(index))
         .collect()
+}
+
+/// Whether every segment of a concrete parent path can only satisfy the literal branch of
+/// `semantic_parent_path_matches` (no `<type>`, `enum[..]`, or numeric/date spellings).
+fn semantic_parent_path_is_literal(parent_path: &[Arc<str>]) -> bool {
+    parent_path
+        .iter()
+        .all(|segment| semantic_parent_path_segment_is_literal(segment.as_ref()))
+}
+
+/// Whether one segment can only satisfy the literal branch of `semantic_parent_path_matches`.
+fn semantic_parent_path_segment_is_literal(segment: &str) -> bool {
+    !(segment.starts_with('<')
+        || segment.ends_with('>')
+        || segment.starts_with("enum[")
+        || segment.ends_with(']')
+        || segment.eq_ignore_ascii_case("int")
+        || segment.eq_ignore_ascii_case("float")
+        || segment.eq_ignore_ascii_case("date_field"))
 }
 
 /// Returns the `LeafValue` rules of one container; used only to match bare values.
 pub(crate) fn semantic_leaf_rules_for_container<'a>(
     snapshot: &'a AnalysisSnapshot,
     context: &str,
-    parent_path: &[String],
+    parent_path: &[Arc<str>],
     scope: &ScopeContext,
 ) -> Vec<&'a pdx_rules::SemanticRule> {
     semantic_rules_for_container(snapshot, context, parent_path, scope)
@@ -71,36 +390,54 @@ pub(crate) fn semantic_leaf_rules_for_container<'a>(
 pub(crate) fn semantic_rules_for_container_key<'a>(
     snapshot: &'a AnalysisSnapshot,
     context: &str,
-    parent_path: &[String],
+    parent_path: &[Arc<str>],
     key: &str,
 ) -> Vec<&'a pdx_rules::SemanticRule> {
-    let mut candidates = snapshot
-        .rules()
-        .semantic_rules_for_context_key(context, key)
-        .collect::<Vec<_>>();
-    let mut merged = false;
-    for inherited in snapshot.game_profile().inherited_semantic_contexts(context) {
-        candidates.extend(
-            snapshot
-                .rules()
-                .semantic_rules_for_context_key(inherited, key),
-        );
-        merged = true;
-    }
-    if let Some(type_name) = context.strip_prefix("type:") {
-        candidates.extend(
-            snapshot
-                .rules()
-                .semantic_rules_for_context_key(&format!("root:{type_name}"), key),
-        );
-        merged = true;
-    }
-    if merged {
-        candidates.sort_by(|left, right| left.id.cmp(&right.id));
-        candidates.dedup_by(|left, right| left.id.eq_ignore_ascii_case(&right.id));
+    let view = context_rule_view(snapshot, context);
+    let rules = snapshot.rules();
+    let folded: std::borrow::Cow<'_, str> = if key.bytes().any(|byte| byte.is_ascii_uppercase()) {
+        std::borrow::Cow::Owned(key.to_ascii_lowercase())
+    } else {
+        std::borrow::Cow::Borrowed(key)
+    };
+    let exact = view
+        .exact_by_key
+        .get(folded.as_ref())
+        .map_or([].as_slice(), |bucket| bucket.as_ref());
+    let mut candidates: Vec<usize> = Vec::with_capacity(exact.len() + view.non_exact.len());
+    if view.merged {
+        // Merged sources answer in rule-id order: merge the two id-ordered lists and drop
+        // near-duplicate ids, exactly as the per-call merge used to after sorting.
+        let (mut left, mut right) = (0, 0);
+        while left < exact.len() || right < view.non_exact.len() {
+            let take_left = right >= view.non_exact.len()
+                || (left < exact.len() && exact[left] <= view.non_exact[right]);
+            let index = if take_left {
+                let index = exact[left];
+                left += 1;
+                index
+            } else {
+                let index = view.non_exact[right];
+                right += 1;
+                index
+            };
+            let same = candidates
+                .last()
+                .and_then(|previous| rules.semantic_rule_at(*previous))
+                .zip(rules.semantic_rule_at(index))
+                .is_some_and(|(previous, current)| previous.id.eq_ignore_ascii_case(&current.id));
+            if !same {
+                candidates.push(index);
+            }
+        }
+    } else {
+        // Single-source contexts keep exact-key rules ahead of the non-exact matchers.
+        candidates.extend_from_slice(exact);
+        candidates.extend_from_slice(&view.non_exact);
     }
     candidates
         .into_iter()
+        .filter_map(|index| rules.semantic_rule_at(index))
         .filter(|rule| semantic_parent_path_matches(snapshot, &rule.parent_path, parent_path))
         .collect()
 }
@@ -136,12 +473,12 @@ pub(crate) fn semantic_initial_scope(
             return scope;
         }
         // Unknown/custom type roots keep the same conservative defaults as declared roots.
-        scope.from.push("any".to_owned());
+        scope.from.push(scope.root.clone());
         return scope;
     }
     if let Some(root_scope) = snapshot.game_profile().root_scope(root_key) {
-        scope.root = root_scope.to_owned();
-        scope.current = root_scope.to_owned();
+        scope.root = intern_shard_string(root_scope);
+        scope.current = scope.root.clone();
     }
     scope
 }
@@ -150,30 +487,31 @@ fn initial_scope_register_value(
     expression: &str,
     root: Option<&str>,
     current: Option<&str>,
-) -> String {
+) -> Arc<str> {
     let expression = expression.trim();
     if expression.is_empty() || expression.eq_ignore_ascii_case("any") {
-        return "any".to_owned();
+        return intern_shard_string("any");
     }
     if expression.eq_ignore_ascii_case("root") {
-        return root.unwrap_or("any").to_owned();
+        return root.map_or_else(|| intern_shard_string("any"), intern_shard_string);
     }
     if expression.eq_ignore_ascii_case("this") {
-        return current.or(root).unwrap_or("any").to_owned();
+        return current
+            .or(root)
+            .map_or_else(|| intern_shard_string("any"), intern_shard_string);
     }
-    expression.to_owned()
+    intern_shard_string(expression)
 }
 
 pub(crate) fn scope_context_from_hir(
     profile: Arc<GameProfile>,
     state: &ScopeState,
 ) -> ScopeContext {
-    fn spelling(value: &ScopeValue) -> String {
+    fn spelling(value: &ScopeValue) -> Arc<str> {
         match value {
-            ScopeValue::Known(scopes) if scopes.len() == 1 => scopes[0].clone(),
-            ScopeValue::Known(_) => "any".to_owned(),
-            ScopeValue::Unknown => "any".to_owned(),
-            ScopeValue::Invalid => "invalid".to_owned(),
+            ScopeValue::Known(scopes) if scopes.len() == 1 => intern_shard_string(&scopes[0]),
+            ScopeValue::Known(_) | ScopeValue::Unknown => intern_shard_string("any"),
+            ScopeValue::Invalid => intern_shard_string("invalid"),
         }
     }
     ScopeContext {
@@ -182,7 +520,7 @@ pub(crate) fn scope_context_from_hir(
         current: state
             .current
             .first()
-            .map_or_else(|| "any".to_owned(), spelling),
+            .map_or_else(|| intern_shard_string("any"), spelling),
         from: state.from.iter().map(spelling).collect(),
         previous: state.previous.iter().map(spelling).collect(),
     }
@@ -213,7 +551,7 @@ pub(crate) struct CachedScopeFactInput<'data, 'hir> {
     pub(crate) snapshot: &'data AnalysisSnapshot,
     pub(crate) hir: Option<&'hir HirFile>,
     pub(crate) context: &'data str,
-    pub(crate) parent_path: &'data [String],
+    pub(crate) parent_path: &'data [Arc<str>],
     pub(crate) property: &'data ScriptProperty,
     pub(crate) matching: &'data [&'hir pdx_rules::SemanticRule],
     pub(crate) selected_alternative: Option<&'data str>,
@@ -316,7 +654,7 @@ pub(crate) struct SemanticTransitionInput<'data, 'rule> {
     pub(crate) matching: &'data [&'rule pdx_rules::SemanticRule],
     pub(crate) selected_alternative: Option<&'data str>,
     pub(crate) context: &'data str,
-    pub(crate) parent_path: &'data [String],
+    pub(crate) parent_path: &'data [Arc<str>],
     pub(crate) property: &'data ScriptProperty,
     pub(crate) scope: &'data ScopeContext,
     pub(crate) transparent_wrapper: bool,
@@ -484,19 +822,19 @@ pub(crate) fn semantic_transition_candidates<'rule>(
 pub(crate) fn semantic_transition_destination(
     rule: &pdx_rules::SemanticRule,
     context: &str,
-    parent_path: &[String],
+    parent_path: &[Arc<str>],
     property_key: &str,
     transparent_wrapper: bool,
-) -> (String, Vec<String>) {
+) -> (Arc<str>, Vec<Arc<str>>) {
     rule.child_context.as_deref().map_or_else(
         || {
             let mut child_path = parent_path.to_vec();
             if !transparent_wrapper {
-                child_path.push(property_key.to_owned());
+                child_path.push(intern_shard_string(property_key));
             }
-            (context.to_owned(), child_path)
+            (intern_shard_string(context), child_path)
         },
-        |child_context| (child_context.to_owned(), Vec::new()),
+        |child_context| (intern_shard_string(child_context), Vec::new()),
     )
 }
 
@@ -549,42 +887,80 @@ pub(crate) fn semantic_selected_alternative(
     snapshot: &AnalysisSnapshot,
     rules: &[&pdx_rules::SemanticRule],
     context: &str,
-    parent_path: &[String],
-    properties: &[ScriptProperty],
-    bare_values: &[(String, TextRange)],
+    parent_path: &[Arc<str>],
+    properties: &[&ScriptProperty],
+    bare_values: &[&(Arc<str>, TextRange)],
     scope: &ScopeContext,
 ) -> Option<String> {
     // Alternatives are grouped in first-occurrence order; groups are small (one to three
-    // rules), while the container holds hundreds of rules and alternatives. Discover which
-    // alternatives the container content can actually reach with keyed per-property lookups,
-    // then score only those groups instead of every alternative against every property.
-    let mut alternatives = Vec::<(String, Vec<&pdx_rules::SemanticRule>)>::new();
-    let mut by_id = HashMap::<&str, usize>::new();
-    for rule in rules {
-        if let Some(alternative) = rule.alternative_id.as_deref()
-            && let Some(index) = by_id.get(alternative).copied()
-        {
-            alternatives[index].1.push(rule);
-        } else if let Some(alternative) = rule.alternative_id.as_deref() {
-            by_id.insert(alternative, alternatives.len());
-            alternatives.push((alternative.to_owned(), vec![rule]));
+    // rules), while the container holds hundreds of rules and alternatives. The context
+    // view precomputes the grouping, so per-container work reduces to a parent-path
+    // filter plus key matching against the handful of alternative rules.
+    let view = context_rule_view(snapshot, context);
+    let engine_rules = snapshot.rules();
+    // Parent-path filter shared by grouping, discovery, and scoring: a rule participates
+    // exactly when the container's merged rule list (`rules`) would have contained it.
+    let parent_ok = |rule: &pdx_rules::SemanticRule| {
+        semantic_parent_path_matches(snapshot, &rule.parent_path, parent_path)
+    };
+    // Group members that survive the container's parent-path filter, in group order; a
+    // group with no surviving member stays empty, matching the previous inline grouping
+    // that would never have created it.
+    // For containers with an empty parent path the surviving members are exactly the
+    // group's top-level rules; deeper paths check parent paths on demand.
+    let top_level = parent_path.is_empty();
+    let mut non_empty_groups: Vec<usize> = Vec::new();
+    for (index, group) in view.alternative_groups.iter().enumerate() {
+        let has_member = if top_level {
+            !group.top_rule_indices.is_empty()
+        } else {
+            group.rule_indices.iter().any(|rule_index| {
+                engine_rules
+                    .semantic_rule_at(*rule_index)
+                    .is_some_and(&parent_ok)
+            })
+        };
+        if has_member {
+            non_empty_groups.push(index);
         }
     }
+
+    // Discover reachable groups by matching alternative rules against property keys. This
+    // is the same membership predicate as a per-property key lookup (`rules` already
+    // carries the container's parent-path filter), but it visits only the alternative
+    // rules instead of scanning the context's non-exact matchers for every property.
     let mut relevant = Vec::<usize>::new();
     let mut seen = std::collections::BTreeSet::<usize>::new();
+    fn folded_key(key: &str) -> std::borrow::Cow<'_, str> {
+        if key.bytes().any(|byte| byte.is_ascii_uppercase()) {
+            std::borrow::Cow::Owned(key.to_ascii_lowercase())
+        } else {
+            std::borrow::Cow::Borrowed(key)
+        }
+    }
     for property in properties {
-        for rule in semantic_rules_for_container_key(snapshot, context, parent_path, &property.key)
-            .into_iter()
-            .filter(|rule| {
-                !matches!(rule.shape, RuleShape::LeafValue)
-                    && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
-            })
+        // Exact-key alternative rules resolve through the bucket; non-exact alternative
+        // matchers stay a small ordered scan. Top-level containers consult only rules the
+        // precomputed top membership retains.
+        let exact = view
+            .alternative_exact_keys
+            .get(folded_key(&property.key).as_ref());
+        for (rule_index, group_index) in exact
+            .map_or(&[][..], |pairs| pairs.as_ref())
+            .iter()
+            .copied()
+            .chain(view.alternative_non_exact.iter().copied())
         {
-            if let Some(alternative) = rule.alternative_id.as_deref()
-                && let Some(index) = by_id.get(alternative).copied()
-                && seen.insert(index)
+            let Some(rule) = engine_rules.semantic_rule_at(rule_index) else {
+                continue;
+            };
+            if matches!(rule.shape, RuleShape::LeafValue) || !parent_ok(rule) {
+                continue;
+            }
+            if semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
+                && seen.insert(group_index)
             {
-                relevant.push(index);
+                relevant.push(group_index);
             }
         }
     }
@@ -594,38 +970,62 @@ pub(crate) fn semantic_selected_alternative(
                 && semantic_leaf_value_matches(snapshot, rule, value, scope)
         }) {
             if let Some(alternative) = rule.alternative_id.as_deref()
-                && let Some(index) = by_id.get(alternative).copied()
-                && seen.insert(index)
+                && let Some(group) = view
+                    .alternative_groups
+                    .iter()
+                    .position(|group| group.id.as_ref() == alternative)
+                // A group whose members were all removed by the parent-path filter would
+                // not have existed in the previous inline grouping.
+                && non_empty_groups.contains(&group)
+                && seen.insert(group)
             {
-                relevant.push(index);
+                relevant.push(group);
             }
         }
     }
-    let mut best: Option<((usize, usize), String)> = None;
+    let mut best: Option<((usize, usize), usize)> = None;
     let mut tied = false;
     for index in relevant {
-        let (alternative, group) = &alternatives[index];
+        let group = &view.alternative_groups[index];
+        let group_member = |rule_index: &usize| {
+            engine_rules
+                .semantic_rule_at(*rule_index)
+                .filter(|rule| parent_ok(rule))
+        };
+        let member_indices: &[usize] = if top_level {
+            group.top_rule_indices.as_ref()
+        } else {
+            group.rule_indices.as_ref()
+        };
+        let members = member_indices.iter().filter_map(group_member);
         let mut present = 0_usize;
         let mut valid = 0_usize;
         for property in properties {
-            let matching = group.iter().filter(|rule| {
+            let mut any_match = false;
+            let mut any_valid = false;
+            for rule in members.clone().filter(|rule| {
                 !matches!(rule.shape, RuleShape::LeafValue)
                     && semantic_rule_key_matches(snapshot, rule, parent_path, &property.key)
-            });
-            if matching.clone().next().is_some() {
+            }) {
+                any_match = true;
+                if semantic_scope_allows(rule, scope)
+                    && semantic_property_matches(snapshot, rule, property, scope)
+                {
+                    any_valid = true;
+                    break;
+                }
+            }
+            if any_match {
                 present += 1;
             }
-            if matching
-                .filter(|rule| semantic_scope_allows(rule, scope))
-                .any(|rule| semantic_property_matches(snapshot, rule, property, scope))
-            {
+            if any_valid {
                 valid += 1;
             }
         }
         valid += bare_values
             .iter()
             .filter(|(value, _)| {
-                group.iter().any(|rule| {
+                members.clone().any(|rule| {
                     matches!(rule.shape, RuleShape::LeafValue)
                         && semantic_leaf_value_matches(snapshot, rule, value, scope)
                 })
@@ -634,11 +1034,11 @@ pub(crate) fn semantic_selected_alternative(
         let score = (valid, present);
         match best.as_ref() {
             None => {
-                best = Some((score, alternative.clone()));
+                best = Some((score, index));
                 tied = false;
             }
             Some((current, _)) if score > *current => {
-                best = Some((score, alternative.clone()));
+                best = Some((score, index));
                 tied = false;
             }
             Some((current, _)) if score == *current => tied = true,
@@ -647,12 +1047,12 @@ pub(crate) fn semantic_selected_alternative(
     }
     if tied {
         None
-    } else if let Some((_, alternative)) = best {
-        Some(alternative)
-    } else if alternatives.len() == 1 {
+    } else if let Some((_, index)) = best {
+        Some(view.alternative_groups[index].id.to_string())
+    } else if non_empty_groups.len() == 1 {
         // With no matching content the single alternative is selected by default, matching the
         // previous full-scan behavior where one all-zero alternative still won.
-        Some(alternatives[0].0.clone())
+        Some(view.alternative_groups[non_empty_groups[0]].id.to_string())
     } else {
         None
     }
@@ -715,7 +1115,7 @@ pub(crate) fn semantic_matcher_label(matcher: &KeyMatcher) -> String {
 pub(crate) fn semantic_parent_path_matches(
     snapshot: &AnalysisSnapshot,
     expected: &[String],
-    actual: &[String],
+    actual: &[Arc<str>],
 ) -> bool {
     expected.len() == actual.len()
         && expected.iter().zip(actual).all(|(expected, actual)| {
@@ -855,9 +1255,9 @@ pub(crate) fn semantic_child_scope(
     if let Some(push_scope) = &rule.push_scope {
         child.previous.insert(0, child.current.clone());
         if push_scope.eq_ignore_ascii_case("any") {
-            child.current = "any".to_owned();
+            child.current = intern_shard_string("any");
         } else {
-            child.current.clone_from(push_scope);
+            child.current = intern_shard_string(push_scope);
         }
     }
     for (register, value) in &rule.replace_scope {
@@ -887,16 +1287,16 @@ pub(crate) fn resolve_scope_expression_context(
     snapshot: &AnalysisSnapshot,
     context: &ScopeContext,
     expression: &str,
-) -> String {
+) -> Arc<str> {
     if expression.contains('.') {
         let mut segments = expression.split('.');
         let Some(first) = segments.next() else {
-            return "any".to_owned();
+            return intern_shard_string("any");
         };
         let mut value = resolve_scope_expression_context(snapshot, context, first);
         for segment in segments {
             value = resolve_scope_link_context(snapshot, context, &value, segment)
-                .unwrap_or_else(|| "any".to_owned());
+                .unwrap_or_else(|| intern_shard_string("any"));
             if value.eq_ignore_ascii_case("any") {
                 break;
             }
@@ -916,7 +1316,7 @@ pub(crate) fn resolve_scope_expression_context(
             .from
             .get(depth)
             .cloned()
-            .unwrap_or_else(|| "any".to_owned());
+            .unwrap_or_else(|| intern_shard_string("any"));
     }
     if let Some(depth) = repeated_scope_register_depth(&lowered, "previous")
         .or_else(|| repeated_scope_register_depth(&lowered, "prev"))
@@ -925,17 +1325,18 @@ pub(crate) fn resolve_scope_expression_context(
             .previous
             .get(depth)
             .cloned()
-            .unwrap_or_else(|| "any".to_owned());
+            .unwrap_or_else(|| intern_shard_string("any"));
     }
 
-    let link_expression = snapshot
-        .rules()
-        .exact_semantic_rules(expression)
-        .any(|rule| {
-            matches!(
-                rule.context.to_ascii_lowercase().as_str(),
-                "effect" | "trigger"
-            ) && rule.push_scope.is_some()
+    let rules = snapshot.rules();
+    let link_expression = rules
+        .exact_semantic_rule_indices(expression)
+        .iter()
+        .any(|index| {
+            rules.semantic_rule_is_effect_or_trigger(*index)
+                && rules
+                    .semantic_rule_at(*index)
+                    .is_some_and(|rule| rule.push_scope.is_some())
         });
     if let Some(target) =
         resolve_scope_link_context(snapshot, context, &context.current, expression)
@@ -943,11 +1344,11 @@ pub(crate) fn resolve_scope_expression_context(
         return target;
     }
     if expression.eq_ignore_ascii_case("any") || link_expression {
-        "any".to_owned()
+        intern_shard_string("any")
     } else if context.profile.is_scope(expression) {
-        expression.to_owned()
+        intern_shard_string(expression)
     } else {
-        "any".to_owned()
+        intern_shard_string("any")
     }
 }
 
@@ -956,26 +1357,26 @@ pub(crate) fn resolve_scope_link_context(
     context: &ScopeContext,
     current: &str,
     expression: &str,
-) -> Option<String> {
-    let mut targets = snapshot
-        .rules()
-        .exact_semantic_rules(expression)
-        .filter_map(|rule| {
-            if !matches!(
-                rule.context.to_ascii_lowercase().as_str(),
-                "effect" | "trigger"
-            ) || !rule.allowed_scopes.is_empty()
-                && !rule
-                    .allowed_scopes
-                    .iter()
-                    .any(|expected| context.profile.scopes_compatible(current, expected))
+) -> Option<Arc<str>> {
+    let rules = snapshot.rules();
+    let mut targets = rules
+        .exact_semantic_rule_indices(expression)
+        .iter()
+        .filter_map(|index| {
+            let rule = rules.semantic_rule_at(*index)?;
+            if !rules.semantic_rule_is_effect_or_trigger(*index)
+                || !rule.allowed_scopes.is_empty()
+                    && !rule
+                        .allowed_scopes
+                        .iter()
+                        .any(|expected| context.profile.scopes_compatible(current, expected))
             {
                 return None;
             }
             rule.push_scope
                 .as_deref()
                 .filter(|target| !target.eq_ignore_ascii_case("any"))
-                .map(str::to_owned)
+                .map(intern_shard_string)
         })
         .collect::<Vec<_>>();
     targets.sort_by_key(|target| target.to_ascii_lowercase());
@@ -987,11 +1388,11 @@ pub(crate) fn resolve_scope_link_context(
     }
 }
 
-pub(crate) fn set_scope_register(registers: &mut Vec<String>, depth: usize, value: &str) {
+pub(crate) fn set_scope_register(registers: &mut Vec<Arc<str>>, depth: usize, value: &Arc<str>) {
     if registers.len() <= depth {
-        registers.resize(depth + 1, "any".to_owned());
+        registers.resize(depth + 1, intern_shard_string("any"));
     }
-    registers[depth] = value.to_owned();
+    registers[depth] = value.clone();
 }
 
 pub(crate) fn repeated_scope_register_depth(value: &str, token: &str) -> Option<usize> {
@@ -1006,7 +1407,7 @@ pub(crate) fn repeated_scope_register_depth(value: &str, token: &str) -> Option<
 pub(crate) fn semantic_rule_key_matches(
     snapshot: &AnalysisSnapshot,
     rule: &pdx_rules::SemanticRule,
-    parent_path: &[String],
+    parent_path: &[Arc<str>],
     key: &str,
 ) -> bool {
     match qualified_parameter_domain(snapshot, rule, parent_path) {
@@ -1027,7 +1428,7 @@ pub(crate) enum QualifiedParameterDomain {
 pub(crate) fn qualified_parameter_domain(
     snapshot: &AnalysisSnapshot,
     rule: &pdx_rules::SemanticRule,
-    parent_path: &[String],
+    parent_path: &[Arc<str>],
 ) -> QualifiedParameterDomain {
     let KeyMatcher::Enum(enum_name) = &rule.key else {
         return QualifiedParameterDomain::NotApplicable;
@@ -1110,17 +1511,20 @@ pub(crate) fn resolve_macro_definition(
     // (property, rule) during diagnostics, completion, and hover. Memoize per
     // (revision, kind, name) so a revision pays for the scan only once.
     let revision = snapshot.revision();
-    let key = format!("macro-definition:{owner_kind}:{owner_name}");
-    if let Some(cached) = snapshot
-        .query_cache()
-        .get::<Option<ResolvedMacroDefinition>>(revision, &key)
-    {
+    if let Some(cached) = probe_query_cache::<Option<ResolvedMacroDefinition>>(
+        snapshot,
+        revision,
+        &["macro-definition:", owner_kind, ":", owner_name],
+    ) {
         return cached.as_ref().clone();
     }
     let resolved = resolve_macro_definition_uncached(snapshot, owner_kind, owner_name);
-    snapshot
-        .query_cache()
-        .insert(revision, key, Arc::new(resolved.clone()));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Documents,
+        format!("macro-definition:{owner_kind}:{owner_name}"),
+        Arc::new(resolved.clone()),
+    );
     resolved
 }
 
@@ -1358,7 +1762,7 @@ pub(crate) fn semantic_property_matches(
 pub(crate) enum ScopeValueMatch {
     NotScopeRule,
     Known {
-        actual: String,
+        actual: Arc<str>,
         expected: Option<String>,
         compatible: bool,
     },
@@ -1436,7 +1840,7 @@ fn scripted_macro_call_shape_matches(
         snapshot,
         type_name,
         &summary,
-        property.scalar.as_ref().map(|(value, _)| value.as_str()),
+        property.scalar.as_ref().map(|(value, _)| value.as_ref()),
         property.block_range.is_some(),
     ))
 }
@@ -1542,17 +1946,33 @@ pub(crate) fn effective_workspace_member_names(
 /// completion request and gives the prefix index below one stable backing allocation.
 fn workspace_member_names_cached(snapshot: &AnalysisSnapshot, type_name: &str) -> Arc<Vec<String>> {
     let revision = snapshot.revision();
-    let key = format!("workspace-member-names:{}", type_name.to_ascii_lowercase());
-    if let Some(cached) = snapshot.query_cache().get::<Vec<String>>(revision, &key) {
+    let lowered = lowered_type_name(type_name);
+    if let Some(cached) = probe_query_cache::<Vec<String>>(
+        snapshot,
+        revision,
+        &["workspace-member-names:", lowered.as_ref()],
+    ) {
         return cached;
     }
     let names = Arc::new(effective_workspace_member_names_uncached(
         snapshot, type_name,
     ));
-    snapshot
-        .query_cache()
-        .insert(revision, key, Arc::clone(&names));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Documents,
+        format!("workspace-member-names:{}", lowered.as_ref()),
+        Arc::clone(&names),
+    );
     names
+}
+
+/// Lowercased spelling of a type name, borrowing when it is already lowercase.
+fn lowered_type_name(type_name: &str) -> std::borrow::Cow<'_, str> {
+    if type_name.bytes().any(|byte| byte.is_ascii_uppercase()) {
+        std::borrow::Cow::Owned(type_name.to_ascii_lowercase())
+    } else {
+        std::borrow::Cow::Borrowed(type_name)
+    }
 }
 
 fn effective_workspace_member_names_uncached(
@@ -1566,13 +1986,13 @@ fn effective_workspace_member_names_uncached(
         names.extend(
             snapshot
                 .index()
-                .definitions_for_kind(kind)
-                .filter(|definition| {
-                    definition.active
+                .definitions_for_kind_with_state(kind)
+                .filter(|(definition, active)| {
+                    *active
                         && !hidden_files.contains(&definition.file_id)
                         && completion_source_file_allowed(snapshot, definition.file_id)
                 })
-                .map(|definition| definition.name.clone()),
+                .map(|(definition, _active)| definition.name.to_string()),
         );
     }
     for document in snapshot
@@ -1594,7 +2014,7 @@ fn effective_workspace_member_names_uncached(
                         .iter()
                         .any(|kind| definition.kind.eq_ignore_ascii_case(kind))
                 })
-                .map(|definition| definition.name.clone()),
+                .map(|definition| definition.name.to_string()),
         );
     }
     names.sort_by_key(|name| name.to_ascii_lowercase());
@@ -1662,19 +2082,23 @@ pub(crate) fn workspace_member_index(
     type_name: &str,
 ) -> Arc<WorkspaceMemberIndex> {
     let revision = snapshot.revision();
-    let key = format!("workspace-member-index:{}", type_name.to_ascii_lowercase());
-    if let Some(cached) = snapshot
-        .query_cache()
-        .get::<WorkspaceMemberIndex>(revision, &key)
-    {
+    let lowered = lowered_type_name(type_name);
+    if let Some(cached) = probe_query_cache::<WorkspaceMemberIndex>(
+        snapshot,
+        revision,
+        &["workspace-member-index:", lowered.as_ref()],
+    ) {
         return cached;
     }
     let index = Arc::new(WorkspaceMemberIndex::new(workspace_member_names_cached(
         snapshot, type_name,
     )));
-    snapshot
-        .query_cache()
-        .insert(revision, key, Arc::clone(&index));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Documents,
+        format!("workspace-member-index:{}", lowered.as_ref()),
+        Arc::clone(&index),
+    );
     index
 }
 
@@ -1823,78 +2247,471 @@ pub(crate) fn localisation_key_index(snapshot: &AnalysisSnapshot) -> Arc<Localis
     }
     let names = workspace_member_names_cached(snapshot, "localisation");
     let index = Arc::new(LocalisationKeyIndex::new(names.as_ref()));
-    snapshot
-        .query_cache()
-        .insert(revision, key.to_owned(), Arc::clone(&index));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Documents,
+        key.to_owned(),
+        Arc::clone(&index),
+    );
     index
 }
 
 pub(crate) fn scripted_macro_type(snapshot: &AnalysisSnapshot, type_name: &str) -> bool {
-    snapshot
-        .rules()
-        .model()
-        .semantic
-        .type_descriptors
-        .iter()
-        .find(|(candidate, _)| candidate.eq_ignore_ascii_case(type_name))
-        .and_then(|(_, descriptor)| descriptor.scripted_macro.as_ref())
-        .is_some_and(|descriptor| descriptor.macro_enabled)
+    snapshot.rules().scripted_macro_context(type_name).is_some()
+}
+
+/// Per-revision view of every definition identity visible to membership queries.
+///
+/// `workspace_member` is called once per (rule, property) pair — hundreds of times per
+/// document. The previous per-call memo key (`format!` + two lowercase strings + a global
+/// cache probe per query) cost more than the membership check itself. The index-derived
+/// name counts live in the Index cache domain; definitions hidden by open overlays are
+/// tracked separately in the Documents domain so overlay edits stay correct without
+/// rebuilding the workspace-wide set on every keystroke.
+pub(crate) struct WorkspaceMembership {
+    /// Definition kind spelling as stored by the workspace index.
+    kinds: rustc_hash::FxHashMap<Box<str>, rustc_hash::FxHashMap<Box<str>, u32>>,
+    /// Lowercased kind -> name suffixes probed in addition to the raw member spelling.
+    suffixes: rustc_hash::FxHashMap<Box<str>, Vec<Box<str>>>,
+    /// Prebuilt per-type-name views for every name the rule set can query.
+    views: rustc_hash::FxHashMap<Box<str>, Arc<MemberKindView>>,
+}
+
+/// Per-type-name resolution of the kind spellings and name suffixes probed by
+/// [`WorkspaceMembership::contains`].
+///
+/// Hot-path type names come from the rule set (key/value matchers and `<name>`
+/// parent-path entries) plus a handful of literals, so every membership check
+/// resolves through a prebuilt view instead of re-running the kind-alias scan,
+/// case folding, and suffix formatting per property. Resolution inputs are
+/// profile-static, so views are exact per revision and only need rebuilding
+/// with the rule set.
+struct MemberKindView {
+    /// Kind spellings exactly as `WorkspaceMembership::kinds` keys store them.
+    kinds: Arc<[Box<str>]>,
+    /// The same kinds lowercased, for the overlay-positive check.
+    kinds_lower: Arc<[Box<str>]>,
+    /// Name suffixes probed as `{member}{suffix}` against every kind.
+    suffixes: Arc<[Box<str>]>,
+}
+
+impl MemberKindView {
+    fn resolve(
+        profile: &GameProfile,
+        suffixes: &rustc_hash::FxHashMap<Box<str>, Vec<Box<str>>>,
+        type_name: &str,
+    ) -> Self {
+        let base = type_name
+            .split_once('.')
+            .map_or(type_name, |(kind, _)| kind);
+        let mut kinds: Vec<Box<str>> = vec![Box::from(type_name)];
+        if base != type_name {
+            kinds.push(Box::from(base));
+        }
+        if let Some(alias) = profile.member_kind_alias(base)
+            && !kinds.iter().any(|kind| kind.eq_ignore_ascii_case(alias))
+        {
+            kinds.push(Box::from(alias));
+        }
+        let mut resolved_suffixes: Vec<Box<str>> = Vec::new();
+        for kind in &kinds {
+            let kind_lower = kind.to_ascii_lowercase();
+            if let Some(list) = suffixes.get(kind_lower.as_str()) {
+                resolved_suffixes.extend(list.iter().cloned());
+            }
+        }
+        let kinds_lower = kinds
+            .iter()
+            .map(|kind| Box::from(kind.to_ascii_lowercase().as_str()))
+            .collect();
+        Self {
+            kinds: kinds.into(),
+            kinds_lower,
+            suffixes: resolved_suffixes.into(),
+        }
+    }
+}
+
+/// `(kind, folded name)` definition counts hidden by open overlays, per document revision.
+struct OverlayHiddenCounts(rustc_hash::FxHashMap<Box<str>, rustc_hash::FxHashMap<Box<str>, u32>>);
+
+fn overlay_hidden_counts(snapshot: &AnalysisSnapshot) -> Arc<OverlayHiddenCounts> {
+    thread_local! {
+        static SLOT: std::cell::RefCell<Option<(u64, Arc<OverlayHiddenCounts>)>> =
+            const { std::cell::RefCell::new(None) };
+    }
+    let revision = snapshot.revision();
+    if let Some(cached) = SLOT.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .filter(|(seen, _)| *seen == revision)
+            .map(|(_, view)| Arc::clone(view))
+    }) {
+        return cached;
+    }
+    let cache_key = "workspace-membership-hidden";
+    if let Some(cached) = snapshot
+        .query_cache()
+        .get::<OverlayHiddenCounts>(revision, cache_key)
+    {
+        SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&cached))));
+        return cached;
+    }
+    let mut counts = OverlayHiddenCounts(rustc_hash::FxHashMap::default());
+    for file_id in overlay_file_ids(snapshot) {
+        for (definition, active) in snapshot.index().definitions_for_file_with_state(file_id) {
+            if !active || !completion_source_file_allowed(snapshot, file_id) {
+                continue;
+            }
+            let folded = snapshot
+                .index()
+                .definition_name_key(&definition.kind, &definition.name);
+            counts
+                .0
+                .entry(Box::from(definition.kind.as_ref()))
+                .or_default()
+                .entry(Box::from(folded.as_ref()))
+                .and_modify(|count| *count += 1)
+                .or_insert(1);
+        }
+    }
+    let counts = Arc::new(counts);
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Documents,
+        cache_key.to_owned(),
+        counts.clone(),
+    );
+    counts
+}
+
+impl WorkspaceMembership {
+    /// Whether one `(kind, name)` pair has a definition not hidden by an overlay.
+    fn indexed(&self, hidden: &OverlayHiddenCounts, kind: &str, folded: &str) -> bool {
+        let Some(total) = self
+            .kinds
+            .get::<str>(kind)
+            .and_then(|names| names.get::<str>(folded))
+        else {
+            return false;
+        };
+        let hidden_count = hidden
+            .0
+            .get::<str>(kind)
+            .and_then(|names| names.get::<str>(folded))
+            .copied()
+            .unwrap_or(0);
+        *total > hidden_count
+    }
+
+    fn contains(
+        &self,
+        snapshot: &AnalysisSnapshot,
+        hidden: &OverlayHiddenCounts,
+        members: &OverlayMembers,
+        type_name: &str,
+        member: &str,
+    ) -> bool {
+        // Rule-derived type names resolve through prebuilt views; arbitrary kinds from
+        // resolution queries fall back to the derivation below.
+        let Some(view) = self.views.get::<str>(type_name) else {
+            return self.contains_slow(snapshot, hidden, members, type_name, member);
+        };
+        let index = snapshot.index();
+        for kind in view.kinds.iter() {
+            let folded = index.definition_name_key(kind, member);
+            if self.indexed(hidden, kind, folded.as_ref()) {
+                return true;
+            }
+        }
+        for suffix in view.suffixes.iter() {
+            let candidate = format!("{member}{suffix}");
+            for kind in view.kinds.iter() {
+                let folded = index.definition_name_key(kind, &candidate);
+                if self.indexed(hidden, kind, folded.as_ref()) {
+                    return true;
+                }
+            }
+        }
+        if !completion_overlay_allowed(snapshot) {
+            return false;
+        }
+        if members.names.is_empty() {
+            return false;
+        }
+        let mut candidates = vec![member.to_ascii_lowercase()];
+        candidates.extend(
+            view.suffixes
+                .iter()
+                .map(|suffix| format!("{member}{suffix}").to_ascii_lowercase()),
+        );
+        candidates.iter().any(|name| {
+            view.kinds_lower
+                .iter()
+                .any(|kind| members.names.contains(&(kind.to_string(), name.clone())))
+        })
+    }
+
+    fn contains_slow(
+        &self,
+        snapshot: &AnalysisSnapshot,
+        hidden: &OverlayHiddenCounts,
+        members: &OverlayMembers,
+        type_name: &str,
+        member: &str,
+    ) -> bool {
+        let profile = snapshot.game_profile();
+        let base = type_name
+            .split_once('.')
+            .map_or(type_name, |(kind, _)| kind);
+        // The kind set matches `workspace_member_kinds` up to case-insensitive dedup; the
+        // boolean result is order-insensitive, so no sorted materialisation is needed.
+        let mut kinds: Vec<&str> = vec![type_name];
+        if base != type_name {
+            kinds.push(base);
+        }
+        if let Some(alias) = profile.member_kind_alias(base)
+            && !kinds.iter().any(|kind| kind.eq_ignore_ascii_case(alias))
+        {
+            kinds.push(alias);
+        }
+        let mut names = vec![member.to_owned()];
+        for kind in &kinds {
+            let kind_lower = kind.to_ascii_lowercase();
+            if let Some(suffixes) = self.suffixes.get(kind_lower.as_str()) {
+                for suffix in suffixes {
+                    names.push(format!("{member}{suffix}"));
+                }
+            }
+        }
+        if names.iter().any(|name| {
+            kinds.iter().any(|kind| {
+                let folded = snapshot.index().definition_name_key(kind, name);
+                self.indexed(hidden, kind, folded.as_ref())
+            })
+        }) {
+            return true;
+        }
+        if !completion_overlay_allowed(snapshot) {
+            return false;
+        }
+        if members.names.is_empty() {
+            return false;
+        }
+        names.iter().any(|name| {
+            kinds.iter().any(|kind| {
+                members
+                    .names
+                    .contains(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
+            })
+        })
+    }
+}
+
+/// Collects every type name the diagnostics hot path can pass to `workspace_member`.
+///
+/// Key/value matchers and `<name>` parent-path entries pass their rule spelling through
+/// verbatim; `ValueMatcher::Dynamic` names reach membership only after lowercasing in
+/// `semantic_dynamic_value_matches`, so they are harvested pre-lowered. Arbitrary kinds
+/// from resolution queries are not enumerable here and use the slow path.
+fn membership_view_type_names(rules: &pdx_rules::RuleSet) -> Vec<String> {
+    let mut names = vec![
+        "variable".to_owned(),
+        "variable_name".to_owned(),
+        "scripted_effect".to_owned(),
+        "scripted_trigger".to_owned(),
+    ];
+    for rule in rules.semantic_rules() {
+        if let KeyMatcher::Type(type_name) = &rule.key {
+            names.push(type_name.clone());
+        }
+        match &rule.value {
+            ValueMatcher::Type(type_name) => names.push(type_name.clone()),
+            ValueMatcher::Dynamic(kind) => names.push(kind.to_ascii_lowercase()),
+            _ => {}
+        }
+        for segment in &rule.parent_path {
+            if let Some(type_name) = segment
+                .strip_prefix('<')
+                .and_then(|name| name.strip_suffix('>'))
+            {
+                names.push(type_name.to_owned());
+            }
+        }
+    }
+    names.sort_unstable();
+    names.dedup();
+    names
+}
+
+/// Returns the shared membership view for this snapshot revision.
+///
+/// Validation probes membership per (rule, property); the snapshot query cache's read
+/// lock and type-erased downcast dominated that path once 13 workers shared it. Each
+/// worker thread memoizes the `Arc` for the revision it is validating — the underlying
+/// map stays a single shared allocation, and a revision change invalidates the slot.
+fn workspace_membership(snapshot: &AnalysisSnapshot) -> Arc<WorkspaceMembership> {
+    thread_local! {
+        static SLOT: std::cell::RefCell<Option<(u64, Arc<WorkspaceMembership>)>> =
+            const { std::cell::RefCell::new(None) };
+    }
+    let revision = snapshot.revision();
+    if let Some(cached) = SLOT.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .filter(|(seen, _)| *seen == revision)
+            .map(|(_, view)| Arc::clone(view))
+    }) {
+        return cached;
+    }
+    let cache_key = "workspace-membership";
+    if let Some(cached) = snapshot
+        .query_cache()
+        .get::<WorkspaceMembership>(revision, cache_key)
+    {
+        return cached;
+    }
+    let mut kinds: rustc_hash::FxHashMap<Box<str>, rustc_hash::FxHashMap<Box<str>, u32>> =
+        rustc_hash::FxHashMap::default();
+    for (definition, active) in snapshot.index().definition_identities() {
+        if !active || !completion_source_file_allowed(snapshot, definition.file_id) {
+            continue;
+        }
+        let folded = snapshot
+            .index()
+            .definition_name_key(&definition.kind, &definition.name);
+        *kinds
+            .entry(Box::from(definition.kind.as_ref()))
+            .or_default()
+            .entry(Box::from(folded.as_ref()))
+            .or_insert(0) += 1;
+    }
+    let mut suffixes: rustc_hash::FxHashMap<Box<str>, Vec<Box<str>>> =
+        rustc_hash::FxHashMap::default();
+    for rule in &snapshot.game_profile().member_name_suffixes {
+        for kind in &rule.kinds {
+            suffixes
+                .entry(Box::from(kind.to_ascii_lowercase().as_str()))
+                .or_default()
+                .push(Box::from(rule.suffix.as_str()));
+        }
+    }
+    let views = membership_view_type_names(snapshot.rules())
+        .into_iter()
+        .map(|type_name| {
+            let view = MemberKindView::resolve(snapshot.game_profile(), &suffixes, &type_name);
+            (Box::from(type_name.as_str()), Arc::new(view))
+        })
+        .collect();
+    let membership = Arc::new(WorkspaceMembership {
+        kinds,
+        suffixes,
+        views,
+    });
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Index,
+        cache_key.to_owned(),
+        Arc::clone(&membership),
+    );
+    membership
+}
+
+/// The three membership views one `workspace_member` check needs, fetched together.
+///
+/// Validation calls `workspace_member` per (rule, property); fetching all views through
+/// one revision-keyed thread-local slot keeps the check to a single borrow plus `Arc`
+/// clones, with no query-cache lock on the steady-state path. The underlying views stay
+/// single shared allocations stored in the snapshot query cache.
+struct MembershipBundle {
+    membership: Arc<WorkspaceMembership>,
+    hidden: Arc<OverlayHiddenCounts>,
+    members: Arc<OverlayMembers>,
+}
+
+fn membership_bundle(snapshot: &AnalysisSnapshot) -> Arc<MembershipBundle> {
+    thread_local! {
+        static SLOT: std::cell::RefCell<Option<(u64, Arc<MembershipBundle>)>> =
+            const { std::cell::RefCell::new(None) };
+    }
+    let revision = snapshot.revision();
+    if let Some(cached) = SLOT.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .filter(|(seen, _)| *seen == revision)
+            .map(|(_, bundle)| Arc::clone(bundle))
+    }) {
+        return cached;
+    }
+    let bundle = Arc::new(MembershipBundle {
+        membership: workspace_membership(snapshot),
+        hidden: overlay_hidden_counts(snapshot),
+        members: overlay_members(snapshot),
+    });
+    SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&bundle))));
+    bundle
+}
+
+/// Upper bound on memoized workspace-membership probes per thread. The memo
+/// only trades memory for repeat-probe speed, so clearing it when full loses
+/// no correctness — the next probe of a cleared pair recomputes.
+const WORKSPACE_MEMBER_MEMO_CAP: usize = 1 << 16;
+
+/// type-name -> (lowercase member -> membership answer) for the memo below.
+type WorkspaceMemberMemo = rustc_hash::FxHashMap<Box<str>, rustc_hash::FxHashMap<Box<str>, bool>>;
+
+thread_local! {
+    /// Repeat-probe memo for [`workspace_member`], keyed by snapshot revision.
+    /// Rule matching probes the same `(type, member)` pairs for every property
+    /// (dynamic keys, scope fields, variable names), and answers depend only on
+    /// the immutable snapshot, so one computation per distinct pair per revision
+    /// is enough. Nested maps keep every probe allocation-free for
+    /// already-lowercase members.
+    static WORKSPACE_MEMBER_MEMO: std::cell::RefCell<Option<(u64, WorkspaceMemberMemo)>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 pub(crate) fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
-    // Membership is a pure function of the immutable snapshot, and the matching pipeline calls
-    // it once per (rule, property) — hundreds of times per document. Memoize per revision.
     let revision = snapshot.revision();
-    let key = format!(
-        "workspace-member:{}:{}",
-        type_name.to_ascii_lowercase(),
-        member.to_ascii_lowercase()
-    );
-    if let Some(cached) = snapshot.query_cache().get::<bool>(revision, &key) {
-        return *cached;
-    }
-    let result = workspace_member_uncached(snapshot, type_name, member);
-    snapshot
-        .query_cache()
-        .insert(revision, key, Arc::new(result));
-    result
-}
-
-fn workspace_member_uncached(snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
-    let hidden_files = overlay_file_ids(snapshot);
-    let kinds = workspace_member_kinds(snapshot, type_name);
-    let mut names = vec![member.to_owned()];
-    for kind in &kinds {
-        for suffix in snapshot.game_profile().member_name_suffixes_for(kind) {
-            names.push(format!("{member}{suffix}"));
+    let lowered = if member.bytes().any(|byte| byte.is_ascii_uppercase()) {
+        std::borrow::Cow::Owned(member.to_ascii_lowercase())
+    } else {
+        std::borrow::Cow::Borrowed(member)
+    };
+    let memoized = WORKSPACE_MEMBER_MEMO.with(|memo| {
+        let mut slot = memo.borrow_mut();
+        let entry = slot.get_or_insert((revision, rustc_hash::FxHashMap::default()));
+        if entry.0 != revision {
+            *entry = (revision, rustc_hash::FxHashMap::default());
         }
+        if let Some(answer) = entry
+            .1
+            .get::<str>(type_name)
+            .and_then(|members| members.get::<str>(lowered.as_ref()))
+        {
+            return Some(*answer);
+        }
+        None
+    });
+    if let Some(answer) = memoized {
+        return answer;
     }
-    if names.iter().any(|name| {
-        kinds.iter().any(|kind| {
-            snapshot
-                .index()
-                .definitions(kind, name)
-                .into_iter()
-                .any(|definition| {
-                    definition.active
-                        && !hidden_files.contains(&definition.file_id)
-                        && completion_source_file_allowed(snapshot, definition.file_id)
-                })
-        })
-    }) {
-        return true;
-    }
-    if !completion_overlay_allowed(snapshot) {
-        return false;
-    }
-    let members = overlay_members(snapshot);
-    names.iter().any(|name| {
-        kinds.iter().any(|kind| {
-            members
-                .names
-                .contains(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
-        })
-    })
+    let bundle = membership_bundle(snapshot);
+    let answer =
+        bundle
+            .membership
+            .contains(snapshot, &bundle.hidden, &bundle.members, type_name, member);
+    WORKSPACE_MEMBER_MEMO.with(|memo| {
+        let mut slot = memo.borrow_mut();
+        let Some(entry) = slot.as_mut() else {
+            return;
+        };
+        let members = entry.1.entry(Box::from(type_name)).or_default();
+        if members.len() < WORKSPACE_MEMBER_MEMO_CAP {
+            members.insert(Box::from(lowered.as_ref()), answer);
+        }
+    });
+    answer
 }
 
 /// Returns whether an indexed definition's source layer is enabled for completion members.
@@ -1940,10 +2757,26 @@ pub(crate) struct OverlayMembers {
 }
 
 /// Returns the overlay definition view for this revision, computing it at most once.
+///
+/// Like the membership view, each worker thread memoizes the shared `Arc` for the
+/// revision it observes so membership checks skip the query-cache lock entirely.
 pub(crate) fn overlay_members(snapshot: &AnalysisSnapshot) -> Arc<OverlayMembers> {
+    thread_local! {
+        static SLOT: std::cell::RefCell<Option<(u64, Arc<OverlayMembers>)>> =
+            const { std::cell::RefCell::new(None) };
+    }
     let revision = snapshot.revision();
+    if let Some(cached) = SLOT.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .filter(|(seen, _)| *seen == revision)
+            .map(|(_, view)| Arc::clone(view))
+    }) {
+        return cached;
+    }
     let key = "overlay-members";
     if let Some(cached) = snapshot.query_cache().get::<OverlayMembers>(revision, key) {
+        SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&cached))));
         return cached;
     }
     let mut members = OverlayMembers::default();
@@ -1962,28 +2795,20 @@ pub(crate) fn overlay_members(snapshot: &AnalysisSnapshot) -> Arc<OverlayMembers
         }
     }
     let members = Arc::new(members);
-    snapshot
-        .query_cache()
-        .insert(revision, key.to_owned(), Arc::clone(&members));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Documents,
+        key.to_owned(),
+        Arc::clone(&members),
+    );
     members
 }
 
 pub(crate) fn enum_member(snapshot: &AnalysisSnapshot, enum_name: &str, member: &str) -> bool {
-    // Same memoization rationale as `workspace_member`; static enum lookups repeat per rule.
-    let revision = snapshot.revision();
-    let key = format!(
-        "enum-member:{}:{}",
-        enum_name.to_ascii_lowercase(),
-        member.to_ascii_lowercase()
-    );
-    if let Some(cached) = snapshot.query_cache().get::<bool>(revision, &key) {
-        return *cached;
-    }
-    let result = enum_member_uncached(snapshot, enum_name, member);
-    snapshot
-        .query_cache()
-        .insert(revision, key, Arc::new(result));
-    result
+    // Static enum membership is a BTreeMap probe plus small scans; the previous per-call
+    // memo key (format! + two lowercase strings + a global cache probe) cost more than the
+    // check itself now that `workspace_member` consults a per-revision membership set.
+    enum_member_uncached(snapshot, enum_name, member)
 }
 
 fn enum_member_uncached(snapshot: &AnalysisSnapshot, enum_name: &str, member: &str) -> bool {
@@ -2014,7 +2839,7 @@ fn enum_member_uncached(snapshot: &AnalysisSnapshot, enum_name: &str, member: &s
 /// reporting a misspelled static scope as an error.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ScopeResolution {
-    Known { scope: String },
+    Known { scope: Arc<str> },
     Dynamic,
     Unresolved,
     Unknown,
@@ -2033,7 +2858,7 @@ pub(crate) fn resolve_scope_member(
     }
     if let Some(scope) = context.profile.scope_member_alias(member) {
         return ScopeResolution::Known {
-            scope: scope.to_owned(),
+            scope: intern_shard_string(scope),
         };
     }
     let lowered = member.to_ascii_lowercase().replace('_', "");
@@ -2047,19 +2872,19 @@ pub(crate) fn resolve_scope_member(
         })
     {
         return ScopeResolution::Known {
-            scope: destination.to_owned(),
+            scope: intern_shard_string(destination),
         };
     }
     let resolved = if lowered == "root" {
-        Some(context.root.as_str())
+        Some(context.root.as_ref())
     } else if lowered == "this" {
-        Some(context.current.as_str())
+        Some(context.current.as_ref())
     } else if let Some(depth) = repeated_scope_register_depth(&lowered, "from") {
-        context.from.get(depth).map(String::as_str)
+        context.from.get(depth).map(|value| value.as_ref())
     } else if let Some(depth) = repeated_scope_register_depth(&lowered, "previous")
         .or_else(|| repeated_scope_register_depth(&lowered, "prev"))
     {
-        context.previous.get(depth).map(String::as_str)
+        context.previous.get(depth).map(|value| value.as_ref())
     } else {
         Some(member)
     };
@@ -2074,14 +2899,14 @@ pub(crate) fn resolve_scope_member(
             || workspace_member(snapshot, "country_tag", member)
         {
             ScopeResolution::Known {
-                scope: "country".to_owned(),
+                scope: intern_shard_string("country"),
             }
         } else {
             ScopeResolution::Unknown
         };
     }
     ScopeResolution::Known {
-        scope: resolved.to_owned(),
+        scope: intern_shard_string(resolved),
     }
 }
 

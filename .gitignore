@@ -57,3 +57,6 @@ Desktop.ini
 
 # External CWTools reference material
 /reference/
+
+# Local performance benchmark results
+/performance-results/

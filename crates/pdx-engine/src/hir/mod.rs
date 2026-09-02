@@ -14,6 +14,7 @@ mod semantics;
 mod templates;
 
 pub use model::*;
+pub(crate) use semantics::ascii_ci_starts_with;
 pub use semantics::{
     semantic_file_root_context, semantic_root_context, semantic_root_context_is_fallback,
     semantic_type_path_matches,
@@ -92,14 +93,26 @@ fn lower_shared_impl(
         rules,
         false,
     ));
-    let mut seen_references = std::collections::BTreeSet::new();
-    references.retain(|reference| {
-        seen_references.insert((
-            reference.kind.to_ascii_lowercase(),
-            reference.name.clone(),
-            reference.range,
-        ))
+    // Deduplicate (case-insensitive kind, name, range) without a BTreeSet:
+    // sorting the moved tuples once avoids cloning every reference name and
+    // lowercasing every kind on every insert.
+    let mut seen_references = references
+        .drain(..)
+        .map(|reference| (reference.kind.to_ascii_lowercase(), reference))
+        .collect::<Vec<_>>();
+    seen_references.sort_by(|left, right| {
+        left.0
+            .cmp(&right.0)
+            .then_with(|| left.1.name.cmp(&right.1.name))
+            .then_with(|| left.1.range.cmp(&right.1.range))
     });
+    seen_references.dedup_by(|left, right| {
+        left.0 == right.0 && left.1.name == right.1.name && left.1.range == right.1.range
+    });
+    let references = seen_references
+        .into_iter()
+        .map(|(_, reference)| reference)
+        .collect::<Vec<_>>();
     let (parameter_definitions, parameter_references) = parameters::lower_parameters(
         &syntax,
         &properties,

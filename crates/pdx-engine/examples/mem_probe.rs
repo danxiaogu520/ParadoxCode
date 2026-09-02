@@ -1,0 +1,517 @@
+//! Memory-attribution probe for a full Current-Mod scan.
+//!
+//! Loads the embedded EU4 rules, scans one workspace root, and prints the
+//! retained size of every per-file component (source text, CST nodes and
+//! tokens, HIR collections, index shards, cached positions and previews) so
+//! memory work targets the real hot spot. Not part of any test gate.
+//!
+//! Usage: `cargo run --release -p pdx-engine --example mem_probe -- <mod root>`
+
+use std::mem::size_of;
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Instant;
+
+use pdx_engine::{
+    AnalysisHost, ParsedSource, SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange,
+};
+
+fn walk_cst(node: pdx_parser::CstNode<'_>, stats: &mut (usize, usize)) {
+    stats.0 += 1;
+    stats.1 += node.child_count();
+    for child in node.children() {
+        walk_cst(child, stats);
+    }
+}
+
+fn mib(bytes: f64) -> f64 {
+    bytes / (1024.0 * 1024.0)
+}
+
+fn phase_rss(label: &str) {
+    // External sampler watches stdout; hold the process still briefly so the
+    // sample lands after the phase completes.
+    println!("PHASE:{label}");
+    std::thread::sleep(std::time::Duration::from_secs(4));
+}
+
+fn main() {
+    let root_arg = std::env::args()
+        .nth(1)
+        .expect("usage: mem_probe <mod root>");
+    let root = Path::new(&root_arg)
+        .canonicalize()
+        .expect("canonicalize root");
+    let started = Instant::now();
+
+    let rules = pdx_game::eu4::first_party_rules().expect("rules");
+    let profile = pdx_game::eu4::profile();
+    let mut host = AnalysisHost::with_profile(rules, profile);
+    // Mirrors the LSP: the Current Mod takes root id u32::MAX and the vanilla
+    // index cache installs its own root at id 0 before the first scan.
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(u32::MAX),
+        SourceRootKind::CurrentMod,
+        root,
+    )]));
+    phase_rss("rules");
+    let mut vanilla_installed = false;
+    if let Some(appdata) = std::env::var_os("LOCALAPPDATA") {
+        let cache_path =
+            std::path::Path::new(&appdata).join("ParadoxCode/cache/eu4/vanilla.pdxindex");
+        match pdx_engine::IndexCache::load(&cache_path) {
+            Ok(cache) => {
+                host.install_index_cache(cache).expect("install cache");
+                vanilla_installed = true;
+            }
+            Err(error) => println!("cache load failed: {error}"),
+        }
+    }
+    phase_rss("vanilla");
+    host.refresh_source_roots().expect("scan");
+    let scan_seconds = started.elapsed().as_secs_f64();
+    println!("vanilla cache installed: {vanilla_installed}");
+
+    let snapshot = host.snapshot();
+    let mut source_bytes = 0usize;
+    let mut cst_nodes = 0usize;
+    let mut cst_child_slots = 0usize;
+    let mut token_count = 0usize;
+    let mut hir_properties = 0usize;
+    let mut hir_path_strings = 0usize;
+    let mut hir_path_string_bytes = 0usize;
+    let mut hir_key_bytes = 0usize;
+    let mut hir_scalar_bytes = 0usize;
+    let mut hir_definitions = 0usize;
+    let mut hir_references = 0usize;
+    let mut hir_definition_bytes = 0usize;
+    let mut hir_reference_bytes = 0usize;
+    let mut shard_definitions = 0usize;
+    let mut shard_references = 0usize;
+    let mut cached_preview_entries = 0usize;
+    let mut cached_preview_bytes = 0usize;
+    let mut files = 0usize;
+    let mut files_with_frontend = 0usize;
+
+    for file in snapshot.source_files().values() {
+        let Some(state) = snapshot.file_state(file.id) else {
+            continue;
+        };
+        files += 1;
+        source_bytes += state.source().len();
+        if let Some(ParsedSource::Text(parsed)) = state.parsed() {
+            files_with_frontend += 1;
+            let mut stats = (0usize, 0usize);
+            walk_cst(parsed.root(), &mut stats);
+            cst_nodes += stats.0;
+            cst_child_slots += stats.1;
+            token_count += parsed.tokens().len();
+        }
+        if let Some(hir) = state.hir() {
+            for property in hir.properties() {
+                hir_properties += 1;
+                hir_path_strings += property.path.len();
+                hir_path_string_bytes += property
+                    .path
+                    .iter()
+                    .map(|segment| segment.len() + 1 + size_of::<String>())
+                    .sum::<usize>();
+                hir_key_bytes += property.key.len() + 1 + size_of::<String>();
+                if let Some(scalar) = &property.scalar {
+                    hir_scalar_bytes += scalar.value.len() + 1 + size_of::<String>();
+                }
+            }
+            for definition in hir.definitions() {
+                hir_definitions += 1;
+                hir_definition_bytes +=
+                    definition.kind.len() + definition.name.len() + 2 + 2 * size_of::<String>();
+            }
+            for reference in hir.references() {
+                hir_references += 1;
+                hir_reference_bytes +=
+                    reference.kind.len() + reference.name.len() + 2 + 2 * size_of::<String>();
+            }
+        }
+        shard_definitions += state.shard().definitions.len();
+        shard_references += state.shard().references.len();
+        if let Some(previews) = state.cached_localisation_previews() {
+            for (_, preview) in previews {
+                cached_preview_entries += 1;
+                cached_preview_bytes += preview.value.len() + 24;
+                if let Some(language) = &preview.language {
+                    cached_preview_bytes += language.len() + 24;
+                }
+            }
+        }
+    }
+    let position_ranges = snapshot.index().position_ranges().len();
+
+    // Arena layout: 1B kind + 16B (range + child span) per node, 4B per child edge.
+    let cst_arena_bytes = cst_nodes * 17 + cst_child_slots * 4;
+    let hir_property_header =
+        hir_properties * (size_of::<HirPropertyHeaderProxy>() + size_of::<Vec<String>>());
+
+    println!("files: {files} (frontend retained: {files_with_frontend})");
+    println!("scan wall: {scan_seconds:.1}s");
+    println!("--- retained bytes (approximate) ---");
+    println!("source text: {:.0} MiB", mib(source_bytes as f64));
+    println!(
+        "cst: {} nodes x 17B + {} edges x 4B = {:.0} MiB arena; tokens {} x 8B = {:.0} MiB",
+        cst_nodes,
+        cst_child_slots,
+        mib(cst_arena_bytes as f64),
+        token_count,
+        mib((token_count * 8) as f64),
+    );
+    println!(
+        "hir properties: {} headers ~{:.0} MiB; keys {:.0} MiB; scalars {:.0} MiB",
+        hir_properties,
+        mib(hir_property_header as f64),
+        mib(hir_key_bytes as f64),
+        mib(hir_scalar_bytes as f64),
+    );
+    println!(
+        "hir paths: {} strings = {:.0} MiB (strings+headers)",
+        hir_path_strings,
+        mib(hir_path_string_bytes as f64)
+    );
+    println!(
+        "hir definitions: {} = {:.0} MiB; references: {} = {:.0} MiB",
+        hir_definitions,
+        mib(hir_definition_bytes as f64),
+        hir_references,
+        mib(hir_reference_bytes as f64),
+    );
+    println!(
+        "shard definitions: {}, references: {}",
+        shard_definitions, shard_references
+    );
+    println!(
+        "index position ranges: {} x ~64B = {:.0} MiB",
+        position_ranges,
+        mib((position_ranges * 64) as f64)
+    );
+    println!(
+        "state cached previews: {cached_preview_entries} = {:.0} MiB",
+        mib(cached_preview_bytes as f64)
+    );
+    {
+        let mut preview_entries = 0usize;
+        let mut preview_bytes = 0usize;
+        for (_, preview) in snapshot.localisation_previews().iter() {
+            preview_entries += 1;
+            preview_bytes += preview.value.len() + 24;
+            if let Some(language) = &preview.language {
+                preview_bytes += language.len() + 24;
+            }
+        }
+        println!(
+            "workspace preview map: {preview_entries} entries = {:.0} MiB strings (+ map nodes)",
+            mib(preview_bytes as f64)
+        );
+    }
+
+    // Whole-index accounting (mod + vanilla): shard symbol bytes with the real
+    // Arc-sharing picture, and the mod/vanilla position split. `file_state`
+    // presence distinguishes mod files (scanned, source retained) from
+    // vanilla files (cache-installed, source not retained).
+    {
+        let index = snapshot.index();
+        let mut name_pool: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        let mut kind_pool: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        let mut name_bytes = 0usize;
+        let mut kind_bytes = 0usize;
+        let mut name_uses = 0usize;
+        let mut definition_entries = 0usize;
+        for definition in index.definitions_iter() {
+            definition_entries += 1;
+            name_uses += 1;
+            if name_pool.insert(std::sync::Arc::as_ptr(&definition.name) as *const u8 as usize) {
+                name_bytes += definition.name.len() + 16;
+            }
+            if kind_pool.insert(std::sync::Arc::as_ptr(&definition.kind) as *const u8 as usize) {
+                kind_bytes += definition.kind.len() + 16;
+            }
+        }
+        let mut reference_entries = 0usize;
+        for reference in index.references_iter() {
+            reference_entries += 1;
+            name_uses += 1;
+            if name_pool.insert(std::sync::Arc::as_ptr(&reference.name) as *const u8 as usize) {
+                name_bytes += reference.name.len() + 16;
+            }
+            if kind_pool.insert(std::sync::Arc::as_ptr(&reference.kind) as *const u8 as usize) {
+                kind_bytes += reference.kind.len() + 16;
+            }
+        }
+        let entry_bytes = definition_entries * std::mem::size_of::<pdx_engine::Definition>()
+            + reference_entries * std::mem::size_of::<pdx_engine::Reference>();
+        println!(
+            "shard symbols: defs {definition_entries} + refs {reference_entries}; vec entries {:.0} MiB; distinct names {} of {name_uses} uses = {:.0} MiB; kinds {:.0} MiB",
+            mib(entry_bytes as f64),
+            name_pool.len(),
+            mib(name_bytes as f64),
+            mib(kind_bytes as f64),
+        );
+        let mut mod_positions = 0usize;
+        let mut vanilla_positions = 0usize;
+        for ((file_id, _), _) in index.position_ranges().iter() {
+            if snapshot.file_state(file_id).is_some() {
+                mod_positions += 1;
+            } else {
+                vanilla_positions += 1;
+            }
+        }
+        let entry = std::mem::size_of::<(pdx_text::TextRange, pdx_text::PositionRange)>();
+        println!(
+            "position split: mod {mod_positions} + vanilla {vanilla_positions} x {entry}B = {:.0} MiB (+vec slack)",
+            mib(((mod_positions + vanilla_positions) * entry) as f64)
+        );
+
+        // Shard vec capacity slack: capacity beyond len is dead bytes per file.
+        let mut slack_entries = 0usize;
+        for file in snapshot.source_files().values() {
+            let Some(shard) = index.shard(file.id) else {
+                continue;
+            };
+            slack_entries += shard.definitions.capacity() - shard.definitions.len();
+            slack_entries += shard.references.capacity() - shard.references.len();
+        }
+        println!(
+            "shard vec slack: {slack_entries} entries ≈ {:.0} MiB",
+            mib((slack_entries * std::mem::size_of::<pdx_engine::Reference>()) as f64)
+        );
+    }
+
+    // Rules database: SemanticRule structs plus their (un-interned) strings,
+    // and the raw normalized records that hover-only fallback keys consume.
+    {
+        let rules = snapshot.rules();
+        let mut rule_entries = 0usize;
+        let mut rule_string_bytes = 0usize;
+        let mut rule_vec_elements = 0usize;
+        fn add_str(total: &mut usize, value: &str) {
+            *total += value.len() + 16;
+        }
+        for rule in rules.semantic_rules() {
+            rule_entries += 1;
+            add_str(&mut rule_string_bytes, &rule.id);
+            add_str(&mut rule_string_bytes, &rule.context);
+            for segment in &rule.parent_path {
+                add_str(&mut rule_string_bytes, segment);
+                rule_vec_elements += 1;
+            }
+            if let pdx_rules::KeyMatcher::Exact(key) | pdx_rules::KeyMatcher::Enum(key) = &rule.key
+            {
+                add_str(&mut rule_string_bytes, key);
+            }
+            if let Some(operator) = &rule.operator {
+                add_str(&mut rule_string_bytes, operator);
+            }
+            if let Some(child) = &rule.child_context {
+                add_str(&mut rule_string_bytes, child);
+            }
+            if let Some(alternative) = &rule.alternative_id {
+                add_str(&mut rule_string_bytes, alternative);
+            }
+            for line in &rule.documentation {
+                add_str(&mut rule_string_bytes, line);
+                rule_vec_elements += 1;
+            }
+            for scope in &rule.allowed_scopes {
+                add_str(&mut rule_string_bytes, scope);
+                rule_vec_elements += 1;
+            }
+            if let Some(push) = &rule.push_scope {
+                add_str(&mut rule_string_bytes, push);
+            }
+            for (register, scope) in &rule.replace_scope {
+                add_str(&mut rule_string_bytes, register);
+                add_str(&mut rule_string_bytes, scope);
+                rule_vec_elements += 2;
+            }
+        }
+        println!(
+            "semantic rules: {rule_entries} x {}B = {:.0} MiB structs; strings {:.0} MiB; vec headers ~{:.0} MiB",
+            std::mem::size_of::<pdx_rules::SemanticRule>(),
+            mib((rule_entries * std::mem::size_of::<pdx_rules::SemanticRule>()) as f64),
+            mib(rule_string_bytes as f64),
+            mib((rule_vec_elements * std::mem::size_of::<String>()) as f64),
+        );
+        let model = rules.model();
+        let record_struct_bytes =
+            model.records.len() * std::mem::size_of::<pdx_rules::RuleRecord>();
+        let mut record_field_count = 0usize;
+        let mut record_string_bytes = 0usize;
+        for record in &model.records {
+            add_str(&mut record_string_bytes, &record.table);
+            add_str(&mut record_string_bytes, &record.logical_id);
+            for (key, value) in &record.fields {
+                record_field_count += 1;
+                add_str(&mut record_string_bytes, key);
+                add_str(&mut record_string_bytes, value);
+            }
+        }
+        println!(
+            "records: {} x {}B = {:.0} MiB structs; {} fields = {:.0} MiB nodes; strings {:.0} MiB",
+            model.records.len(),
+            std::mem::size_of::<pdx_rules::RuleRecord>(),
+            mib(record_struct_bytes as f64),
+            record_field_count,
+            mib((record_field_count * 80) as f64),
+            mib(record_string_bytes as f64),
+        );
+    }
+
+    // Phase timing over the same corpus: read, parse, lower. The remainder of
+    // the scan cost is shard building, line indexes, and position extraction.
+    let mut read_ns = 0u128;
+    let mut parse_ns = 0u128;
+    let mut lower_ns = 0u128;
+    let mut phase_files = 0usize;
+    for file in snapshot.source_files().values() {
+        // Vanilla files come from the index cache without a file state.
+        if snapshot.file_state(file.id).is_none() {
+            continue;
+        }
+        let logical = &file.logical_path;
+        let Some(category) = snapshot.rules().classify(logical) else {
+            continue;
+        };
+        let format = match category.parser {
+            pdx_rules::ParserKind::Script => pdx_parser::FileFormat::Script,
+            pdx_rules::ParserKind::Localisation => pdx_parser::FileFormat::Localisation,
+            _ => continue,
+        };
+        let started = std::time::Instant::now();
+        let Ok(bytes) = std::fs::read(&file.physical_path) else {
+            continue;
+        };
+        read_ns += started.elapsed().as_nanos();
+        let source: Arc<str> = Arc::from(String::from_utf8_lossy(&bytes).as_ref());
+        let started = std::time::Instant::now();
+        let parsed = Arc::new(pdx_parser::parse(format, &source));
+        parse_ns += started.elapsed().as_nanos();
+        let started = std::time::Instant::now();
+        let hir = pdx_engine::hir::lower_with_profile(
+            (*parsed).clone(),
+            logical,
+            snapshot.rules(),
+            snapshot.game_profile(),
+        );
+        lower_ns += started.elapsed().as_nanos();
+        phase_files += 1;
+        drop(hir);
+    }
+    println!("--- phase timing over {phase_files} files ---");
+    println!("read:  {:.1}s", read_ns as f64 / 1e9);
+    println!("parse: {:.1}s", parse_ns as f64 / 1e9);
+    println!("lower: {:.1}s", lower_ns as f64 / 1e9);
+
+    // Diagnostics pass timing (single thread) for optimization feedback. The
+    // digest hashes every diagnostic (code, range, severity, certainty,
+    // message, fixes) in deterministic file order so structural changes can
+    // prove they preserved output byte-for-byte.
+    {
+        let snapshot = host.snapshot();
+        let cancellation = pdx_analysis::CancellationToken::new();
+        let mut diag_ns = 0u128;
+        let mut diag_files = 0usize;
+        let mut diagnostics_count = 0usize;
+        let mut sorted_files = snapshot
+            .source_files()
+            .values()
+            .filter(|file| {
+                snapshot.file_state(file.id).is_some()
+                    && snapshot
+                        .rules()
+                        .classify(&file.logical_path)
+                        .is_some_and(|category| {
+                            matches!(
+                                category.parser,
+                                pdx_rules::ParserKind::Script | pdx_rules::ParserKind::Localisation
+                            )
+                        })
+            })
+            .collect::<Vec<_>>();
+        sorted_files
+            .sort_by(|left, right| left.logical_path.as_str().cmp(right.logical_path.as_str()));
+        let mut digest: u64 = 0xcbf29ce484222325;
+        let mix = |bytes: &[u8], digest: &mut u64| {
+            for &byte in bytes {
+                *digest ^= u64::from(byte);
+                *digest = digest.wrapping_mul(0x100000001b3);
+            }
+        };
+        for file in &sorted_files {
+            let started = std::time::Instant::now();
+            if let Ok(diagnostics) = pdx_analysis::source_file_diagnostics_with_cancellation(
+                &snapshot,
+                file.id,
+                &cancellation,
+            ) {
+                diag_ns += started.elapsed().as_nanos();
+                diagnostics_count += diagnostics.len();
+                diag_files += 1;
+                for diagnostic in &diagnostics {
+                    mix(file.logical_path.as_str().as_bytes(), &mut digest);
+                    mix(&[0x1f], &mut digest);
+                    mix(diagnostic.code.as_str().as_bytes(), &mut digest);
+                    mix(&[0x1f], &mut digest);
+                    mix(&diagnostic.range.start().to_le_bytes(), &mut digest);
+                    mix(&diagnostic.range.end().to_le_bytes(), &mut digest);
+                    mix(&[0x1f], &mut digest);
+                    mix(format!("{:?}", diagnostic.severity).as_bytes(), &mut digest);
+                    mix(
+                        format!("{:?}", diagnostic.certainty).as_bytes(),
+                        &mut digest,
+                    );
+                    mix(&[0x1f], &mut digest);
+                    mix(diagnostic.message.as_bytes(), &mut digest);
+                    for fix in &diagnostic.fixes {
+                        mix(&[0x1f], &mut digest);
+                        mix(fix.title.as_bytes(), &mut digest);
+                        mix(&[0x1f], &mut digest);
+                        mix(&fix.range.start().to_le_bytes(), &mut digest);
+                        mix(&fix.range.end().to_le_bytes(), &mut digest);
+                        mix(&[0x1f], &mut digest);
+                        mix(fix.new_text.as_bytes(), &mut digest);
+                    }
+                    mix(b"\n", &mut digest);
+                }
+            }
+        }
+        println!(
+            "diagnostics pass: files={diag_files} count={diagnostics_count} total={:.1}s digest={digest:#018x}",
+            diag_ns as f64 / 1e9
+        );
+    }
+
+    // Post-scan phases: eviction, sampled externally.
+    drop(snapshot);
+    phase_rss("scan-retained");
+
+    // Evict all frontends and report the post-eviction resident set.
+    let evicted = host.evict_source_frontends(&|_| false);
+    println!("evicted frontends: {evicted}");
+    phase_rss("evicted");
+
+    // Ablation: drop the entire host (index, shards, positions, sources,
+    // rules). Anything the working set keeps afterwards is allocator
+    // retention from the scan's transient frontends, not live data.
+    drop(host);
+    phase_rss("dropped");
+    phase_rss("end");
+}
+
+/// Placeholder sized like the non-String payload of one HIR property.
+#[repr(C)]
+struct HirPropertyHeaderProxy {
+    a: u64,
+    b: u64,
+    c: u64,
+    d: u32,
+    e: u32,
+    f: u64,
+    g: u64,
+}

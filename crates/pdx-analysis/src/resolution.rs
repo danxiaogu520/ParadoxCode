@@ -105,9 +105,12 @@ pub(crate) fn semantic_data_with_cancellation(
         return Ok((*cached).clone());
     }
     let data = semantic_data_with_cancellation_uncached(snapshot, input, cancellation)?;
-    snapshot
-        .query_cache()
-        .insert(revision, key.to_owned(), Arc::new(data.clone()));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Documents,
+        key.to_owned(),
+        Arc::new(data.clone()),
+    );
     Ok(data)
 }
 
@@ -182,8 +185,8 @@ fn semantic_data_with_cancellation_uncached(
     {
         cancellation.checkpoint()?;
         data.references.push(ReferenceInternal {
-            kind: reference.kind.clone(),
-            name: reference.name.clone(),
+            kind: reference.kind.to_string(),
+            name: reference.name.to_string(),
             range: reference.range,
             document: input.document.clone(),
             file: input.file,
@@ -240,7 +243,7 @@ struct QuotedSemanticCollector<'snapshot, 'input, 'data, 'session, 'cancel> {
 
 struct QuotedSemanticContainer<'a> {
     context: &'a str,
-    parent_path: &'a [String],
+    parent_path: &'a [std::sync::Arc<str>],
     scope: &'a ScopeContext,
     properties: &'a [ScriptProperty],
     embedded: bool,
@@ -403,7 +406,7 @@ struct EmbeddedSemanticInput<'a> {
 fn collect_embedded_property_semantics(
     source: EmbeddedSemanticInput<'_>,
     context: &str,
-    parent_path: &[String],
+    parent_path: &[std::sync::Arc<str>],
     scope: &ScopeContext,
     container_key: Option<&str>,
     property: &ScriptProperty,
@@ -431,7 +434,7 @@ fn collect_embedded_property_semantics(
             data.definitions.push(make_definition(
                 input,
                 kind,
-                value.clone(),
+                value.to_string(),
                 property.range,
                 *range,
             ));
@@ -474,7 +477,7 @@ fn collect_embedded_property_semantics(
             snapshot,
             type_name,
             &summary,
-            property.scalar.as_ref().map(|(value, _)| value.as_str()),
+            property.scalar.as_ref().map(|(value, _)| value.as_ref()),
             property.block_range.is_some(),
         ) {
             data.references.push(embedded_reference(
@@ -607,6 +610,11 @@ pub(crate) fn semantic_type_property_is_invalid<'a>(
     let Some(fact) = hir.scope_fact_at(property.key_range) else {
         return false;
     };
+    let fact_path: Vec<std::sync::Arc<str>> = fact
+        .parent_path
+        .iter()
+        .map(|segment| pdx_engine::intern_shard_string(segment))
+        .collect();
     let by_path = match cached_containers.get_mut(fact.context.as_str()) {
         Some(by_path) => by_path,
         None => cached_containers.entry(fact.context.clone()).or_default(),
@@ -615,8 +623,7 @@ pub(crate) fn semantic_type_property_is_invalid<'a>(
         // `semantic_rules_for_container` ignores its scope argument; build it once per container
         // only so the caller does not allocate a scope context for every property.
         let scope = scope_context_from_hir(snapshot.game_profile_handle(), &fact.state);
-        let rules =
-            semantic_rules_for_container(snapshot, &fact.context, &fact.parent_path, &scope);
+        let rules = semantic_rules_for_container(snapshot, &fact.context, &fact_path, &scope);
         let mut concrete_keys = HashSet::new();
         let mut any_scalar_concrete = false;
         let mut has_concrete = false;
@@ -664,7 +671,7 @@ pub(crate) fn semantic_type_property_is_invalid<'a>(
         && entry.rules.iter().any(|rule| {
             !matches!(rule.key, KeyMatcher::Type(_) | KeyMatcher::Dynamic(_))
                 && !matches!(rule.shape, RuleShape::LeafValue)
-                && semantic_rule_key_matches(snapshot, rule, &fact.parent_path, &property.key)
+                && semantic_rule_key_matches(snapshot, rule, &fact_path, &property.key)
         })
     {
         return false;
@@ -734,6 +741,44 @@ pub(crate) fn all_semantics(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
 ) -> Result<SemanticWorkspace, Cancelled> {
+    all_semantics_inner(snapshot, cancellation, &mut |_file, _state| true)
+}
+
+/// Collects quoted semantics only from files whose retained source text
+/// mentions any of `names` (ASCII case-insensitively), plus every open
+/// overlay document.
+///
+/// Reference and rename results can only mention files that contain the
+/// symbol name literally — every semantic name is derived from source tokens —
+/// so a substring test is a safe superset filter. It survives syntax-tree
+/// eviction (the source text stays resident) and avoids reparsing files that
+/// cannot contribute, keeping the query bounded on large mods.
+pub(crate) fn all_semantics_for_symbol(
+    snapshot: &AnalysisSnapshot,
+    cancellation: &CancellationToken,
+    names: &[&str],
+) -> Result<SemanticWorkspace, Cancelled> {
+    #[cfg(test)]
+    ALL_SEMANTICS_CALLS.with(|calls| calls.set(calls.get().saturating_add(1)));
+    let needles = names
+        .iter()
+        .map(|name| (*name).to_ascii_lowercase())
+        .collect::<Vec<_>>();
+    all_semantics_inner(snapshot, cancellation, &mut |_file, state| {
+        let source = state.source().as_bytes();
+        needles.iter().any(|needle| {
+            source
+                .windows(needle.len().max(1))
+                .any(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
+        })
+    })
+}
+
+fn all_semantics_inner(
+    snapshot: &AnalysisSnapshot,
+    cancellation: &CancellationToken,
+    file_filter: &mut dyn FnMut(&pdx_engine::SourceFile, &pdx_engine::FileState) -> bool,
+) -> Result<SemanticWorkspace, Cancelled> {
     #[cfg(test)]
     ALL_SEMANTICS_CALLS.with(|calls| calls.set(calls.get().saturating_add(1)));
     let mut all = SemanticWorkspace::default();
@@ -750,6 +795,12 @@ pub(crate) fn all_semantics(
     for file in snapshot.source_files().values() {
         cancellation.checkpoint()?;
         if overlay_files.contains(&file.id) {
+            continue;
+        }
+        let Some(state) = snapshot.file_state(file.id) else {
+            continue;
+        };
+        if !file_filter(file, state) {
             continue;
         }
         let Some(input) = input_for_source_file(snapshot, file.id) else {
@@ -1100,11 +1151,14 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
     }
 
     pub(crate) fn resolve(&self, kind: &str, name: &str) -> Resolution {
-        let mut candidates = self
-            .overlay_definitions
-            .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
-            .cloned()
-            .unwrap_or_default();
+        let mut candidates = if self.overlay_definitions.is_empty() {
+            Vec::new()
+        } else {
+            self.overlay_definitions
+                .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
+                .cloned()
+                .unwrap_or_default()
+        };
         candidates.extend(
             self.snapshot
                 .index()
@@ -1193,7 +1247,7 @@ pub(crate) fn index_definition(
             path,
             range: definition.range,
         },
-        selection_range: indexed_definition_selection_range(snapshot, definition),
+        selection_range: indexed_definition_selection_range(definition),
         priority: definition_priority_for_file(snapshot, definition.file_id),
     }
 }
@@ -1227,8 +1281,8 @@ pub(crate) fn indexed_reference(
         .get(&reference.file_id)
         .map(|file| file.logical_path.clone());
     Some(ReferenceInternal {
-        kind: reference.kind.clone(),
-        name: reference.name.clone(),
+        kind: reference.kind.to_string(),
+        name: reference.name.to_string(),
         range: reference.range,
         document: None,
         file: Some(reference.file_id),
@@ -1240,7 +1294,7 @@ pub(crate) fn index_definition_info(
     snapshot: &AnalysisSnapshot,
     definition: &Definition,
 ) -> DefinitionInfo {
-    let selection_range = indexed_definition_selection_range(snapshot, definition);
+    let selection_range = indexed_definition_selection_range(definition);
     let path = snapshot
         .source_files()
         .get(&definition.file_id)
@@ -1252,11 +1306,11 @@ pub(crate) fn index_definition_info(
         range: definition.range,
     };
     DefinitionInfo {
-        kind: definition.kind.clone(),
-        name: definition.name.clone(),
+        kind: definition.kind.to_string(),
+        name: definition.name.to_string(),
         symbol: Symbol {
-            name: definition.name.clone(),
-            kind: definition.kind.clone(),
+            name: definition.name.to_string(),
+            kind: definition.kind.to_string(),
             range: definition.range,
             selection_range,
             location,
@@ -1266,24 +1320,8 @@ pub(crate) fn index_definition_info(
     }
 }
 
-pub(crate) fn indexed_definition_selection_range(
-    snapshot: &AnalysisSnapshot,
-    definition: &Definition,
-) -> TextRange {
-    snapshot
-        .file_state(definition.file_id)
-        .and_then(|state| state.hir())
-        .and_then(|hir| {
-            hir.definitions()
-                .iter()
-                .find(|candidate| {
-                    candidate.kind.eq_ignore_ascii_case(&definition.kind)
-                        && candidate.name.eq_ignore_ascii_case(&definition.name)
-                        && candidate.range == definition.range
-                })
-                .map(|candidate| candidate.selection_range)
-        })
-        .unwrap_or(definition.range)
+pub(crate) fn indexed_definition_selection_range(definition: &Definition) -> TextRange {
+    definition.selection_range
 }
 
 pub(crate) fn definition_selection_location(definition: &ResolutionDefinition) -> Location {

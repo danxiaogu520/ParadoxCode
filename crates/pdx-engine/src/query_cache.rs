@@ -4,98 +4,157 @@
 //! analysis layer recomputes per-document semantic extraction on every request. This module
 //! provides a bounded, revision-keyed cache that is owned by the snapshot infrastructure and
 //! shared by all clones, so results are computed once per (revision, key) and reused by every
-//! query worker observing the same revision.
+//! query worker observing that same revision.
 //!
 //! The engine intentionally stores opaque values (`Arc<dyn Any>`): the cache is a mechanism
 //! only. Contents belong to higher layers (currently `pdx-analysis`). Entries from older
 //! revisions are discarded as soon as a newer revision is observed; an old worker that finishes
 //! later cannot repopulate the cache with stale data.
+//!
+//! Entries live in one of two invalidation domains. Document edits used to clear the whole
+//! cache, so every keystroke discarded workspace-scale indexes (member-name lists, the
+//! localisation key index) and rebuilt them from scratch. Index-domain entries now survive
+//! document revisions; each domain overflows independently, so cheap boolean probes no longer
+//! evict the large shared indexes they share a map with.
 
 use std::any::Any;
-use std::collections::BTreeMap;
 use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
-/// Bounded snapshot-scoped cache keyed by `(revision, key)`.
+use rustc_hash::FxHashMap;
+
+/// Invalidation scope of one cache entry.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CacheDomain {
+    /// Derived from workspace index state; invalidated when shards or rules change.
+    Index,
+    /// Derived from open overlay documents; invalidated by every document edit.
+    Documents,
+}
+
+/// Bounded snapshot-scoped cache keyed by `(revision, domain, key)`.
 ///
 /// Entries are immutable: a key is only ever inserted once per revision, and the owning
-/// snapshot guarantees that all callers observing that revision see the same inputs. When the
-/// capacity is exceeded the cache is cleared wholesale. Only entries for the newest observed
-/// revision are retained, because an older immutable snapshot can always recompute a miss.
+/// snapshot guarantees that all callers observing that revision see the same inputs. When a
+/// domain exceeds its capacity that domain is cleared wholesale. Only entries for the newest
+/// observed revision are retained, because an older immutable snapshot can always recompute a
+/// miss.
 pub struct SnapshotQueryCache {
-    state: Mutex<CacheState>,
+    // Reads dominate: parallel validation workers probe shared per-revision views under the
+    // read lock, while inserts upgrade per revision. FxHashMap keeps probes allocation-free
+    // and cheap enough that sharding is unnecessary at current worker counts.
+    state: RwLock<CacheState>,
     capacity: usize,
 }
 
 struct CacheState {
     revision: Option<u64>,
-    entries: BTreeMap<String, Arc<dyn Any + Send + Sync>>,
+    index: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
+    documents: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
+}
+
+impl CacheState {
+    fn map(&mut self, domain: CacheDomain) -> &mut FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>> {
+        match domain {
+            CacheDomain::Index => &mut self.index,
+            CacheDomain::Documents => &mut self.documents,
+        }
+    }
 }
 
 impl SnapshotQueryCache {
-    /// Creates a cache with a conservative entry bound.
+    /// Creates a cache with a conservative per-domain entry bound.
     #[must_use]
     pub fn new() -> Self {
-        Self::with_capacity(256)
+        Self::with_capacity(32_768)
     }
 
-    /// Creates a cache with an explicit entry bound.
+    /// Creates a cache with an explicit per-domain entry bound.
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            state: Mutex::new(CacheState {
+            state: RwLock::new(CacheState {
                 revision: None,
-                entries: BTreeMap::new(),
+                index: FxHashMap::default(),
+                documents: FxHashMap::default(),
             }),
             capacity,
         }
+    }
+
+    fn write(&self) -> std::sync::RwLockWriteGuard<'_, CacheState> {
+        self.state
+            .write()
+            .expect("snapshot query cache lock poisoned")
     }
 
     /// Returns the cached value for `(revision, key)` when it was inserted as `T`.
     pub fn get<T: Send + Sync + 'static>(&self, revision: u64, key: &str) -> Option<Arc<T>> {
         let state = self
             .state
-            .lock()
+            .read()
             .expect("snapshot query cache lock poisoned");
         if state.revision != Some(revision) {
             return None;
         }
         state
-            .entries
+            .documents
             .get(key)
+            .or_else(|| state.index.get(key))
             .and_then(|value| Arc::clone(value).downcast::<T>().ok())
     }
 
-    /// Stores `value` under `(revision, key)`; a key that already exists is never replaced.
-    pub fn insert<T: Send + Sync + 'static>(&self, revision: u64, key: String, value: Arc<T>) {
-        let mut state = self
-            .state
-            .lock()
-            .expect("snapshot query cache lock poisoned");
+    /// Stores `value` under `(revision, domain, key)`; an existing key is never replaced.
+    pub fn insert<T: Send + Sync + 'static>(
+        &self,
+        revision: u64,
+        domain: CacheDomain,
+        key: String,
+        value: Arc<T>,
+    ) {
+        let mut state = self.write();
         match state.revision {
             Some(current) if revision < current => return,
             Some(current) if revision != current => {
-                state.entries.clear();
+                state.index.clear();
+                state.documents.clear();
                 state.revision = Some(revision);
             }
             None => state.revision = Some(revision),
             _ => {}
         }
-        if state.entries.len() >= self.capacity && !state.entries.contains_key(&key) {
-            state.entries.clear();
+        let entries = state.map(domain);
+        if entries.len() >= self.capacity && !entries.contains_key(key.as_str()) {
+            entries.clear();
         }
-        state.entries.entry(key).or_insert(value);
+        entries
+            .entry(Box::from(key))
+            .or_insert_with(|| value.clone());
     }
 
-    /// Advances the cache to a committed workspace revision and drops older query results.
+    /// Advances the cache to a committed workspace revision and drops all query results.
     pub fn advance_to(&self, revision: u64) {
-        let mut state = self
-            .state
-            .lock()
-            .expect("snapshot query cache lock poisoned");
+        let mut state = self.write();
         match state.revision {
             Some(current) if revision > current => {
-                state.entries.clear();
+                state.index.clear();
+                state.documents.clear();
+                state.revision = Some(revision);
+            }
+            None => state.revision = Some(revision),
+            _ => {}
+        }
+    }
+
+    /// Advances to a document-only revision, keeping index-derived entries.
+    ///
+    /// Overlay edits and closes change per-document query results but leave the workspace
+    /// index untouched, so the expensive index-domain indexes stay valid across keystrokes.
+    pub fn advance_documents(&self, revision: u64) {
+        let mut state = self.write();
+        match state.revision {
+            Some(current) if revision > current => {
+                state.documents.clear();
                 state.revision = Some(revision);
             }
             None => state.revision = Some(revision),
@@ -106,11 +165,11 @@ impl SnapshotQueryCache {
     /// Returns the number of cached entries (for diagnostics and tests).
     #[must_use]
     pub fn len(&self) -> usize {
-        self.state
-            .lock()
-            .expect("snapshot query cache lock poisoned")
-            .entries
-            .len()
+        let state = self
+            .state
+            .read()
+            .expect("snapshot query cache lock poisoned");
+        state.index.len() + state.documents.len()
     }
 
     /// Returns whether the cache holds no entries.
@@ -144,25 +203,62 @@ mod tests {
     fn entries_are_immutable_and_capacity_is_bounded() {
         let cache = SnapshotQueryCache::with_capacity(2);
         assert!(cache.get::<u32>(1, "key").is_none());
-        cache.insert(1, "key".to_owned(), Arc::new(7_u32));
+        cache.insert(1, CacheDomain::Index, "key".to_owned(), Arc::new(7_u32));
         assert_eq!(*cache.get::<u32>(1, "key").expect("cached"), 7);
         // Inserting a different type under the same key must not collide or replace.
-        cache.insert(1, "key".to_owned(), Arc::new("replacement"));
+        cache.insert(
+            1,
+            CacheDomain::Index,
+            "key".to_owned(),
+            Arc::new("replacement"),
+        );
         assert_eq!(*cache.get::<u32>(1, "key").expect("cached"), 7);
         // Moving to a newer revision drops the old snapshot's entries.
         assert!(cache.get::<u32>(2, "key").is_none());
-        cache.insert(2, "other".to_owned(), Arc::new(9_u32));
+        cache.insert(2, CacheDomain::Index, "other".to_owned(), Arc::new(9_u32));
         assert_eq!(cache.len(), 1);
         assert!(cache.get::<u32>(1, "key").is_none());
         // A stale worker cannot repopulate the cache after the revision advanced.
-        cache.insert(1, "stale".to_owned(), Arc::new(11_u32));
+        cache.insert(1, CacheDomain::Index, "stale".to_owned(), Arc::new(11_u32));
         assert_eq!(cache.len(), 1);
         assert!(cache.get::<u32>(1, "stale").is_none());
-        cache.insert(2, "third".to_owned(), Arc::new(11_u32));
+        cache.insert(2, CacheDomain::Index, "third".to_owned(), Arc::new(11_u32));
         assert_eq!(cache.len(), 2);
-        // Overflow clears wholesale and the newest entry survives.
-        cache.insert(2, "fourth".to_owned(), Arc::new(13_u32));
+        // Overflow clears that domain wholesale and the newest entry survives.
+        cache.insert(2, CacheDomain::Index, "fourth".to_owned(), Arc::new(13_u32));
         assert_eq!(cache.len(), 1);
         assert_eq!(*cache.get::<u32>(2, "fourth").expect("newest entry"), 13);
+    }
+
+    #[test]
+    fn document_revisions_keep_index_entries() {
+        let cache = SnapshotQueryCache::with_capacity(8);
+        cache.insert(
+            1,
+            CacheDomain::Index,
+            "workspace-member-names:event".to_owned(),
+            Arc::new(Vec::<String>::new()),
+        );
+        cache.insert(
+            1,
+            CacheDomain::Documents,
+            "file:///events/a.txt".to_owned(),
+            Arc::new(1_u32),
+        );
+        cache.advance_documents(2);
+        assert!(
+            cache
+                .get::<Vec<String>>(2, "workspace-member-names:event")
+                .is_some(),
+            "index entries survive document revisions"
+        );
+        assert!(cache.get::<u32>(2, "file:///events/a.txt").is_none());
+        // A full advance drops both domains.
+        cache.advance_to(3);
+        assert!(
+            cache
+                .get::<Vec<String>>(3, "workspace-member-names:event")
+                .is_none()
+        );
     }
 }

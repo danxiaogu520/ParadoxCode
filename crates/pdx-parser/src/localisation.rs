@@ -1,11 +1,15 @@
-use super::{CstKind, CstNode, ParseParts, SyntaxError, SyntaxErrorKind, SyntaxToken, TokenKind};
+use super::{
+    CstKind, ParseParts, SyntaxError, SyntaxErrorKind, SyntaxToken, SyntaxTreeBuilder, TokenKind,
+};
 
 pub(crate) fn parse(source: &str) -> ParseParts {
     let mut parser = Parser::new(source);
-    let children = parser.parse_lines();
-    let root = parser.node(CstKind::LocalisationDocument, 0, source.len(), children);
+    let mark = parser.tree.child_mark();
+    parser.parse_lines();
+    let children = parser.tree.children_since(mark);
+    parser.node(CstKind::LocalisationDocument, 0, source.len(), children);
     ParseParts {
-        root,
+        tree: parser.tree.finish(),
         tokens: parser.tokens,
         errors: parser.errors,
     }
@@ -15,6 +19,7 @@ struct Parser<'source> {
     source: &'source str,
     tokens: Vec<SyntaxToken>,
     errors: Vec<SyntaxError>,
+    tree: SyntaxTreeBuilder,
 }
 
 impl<'source> Parser<'source> {
@@ -23,11 +28,27 @@ impl<'source> Parser<'source> {
             source,
             tokens: Vec::new(),
             errors: Vec::new(),
+            tree: SyntaxTreeBuilder::default(),
         }
     }
 
-    fn parse_lines(&mut self) -> Vec<CstNode> {
-        let mut children = Vec::new();
+    fn node(&mut self, kind: CstKind, start: usize, end: usize, child_count: usize) -> u32 {
+        self.tree.node(kind, super::range(start, end), child_count)
+    }
+
+    fn push(&mut self, index: u32) {
+        self.tree.push_child(index);
+    }
+
+    fn children_mark(&self) -> usize {
+        self.tree.child_mark()
+    }
+
+    fn children_since(&self, mark: usize) -> usize {
+        self.tree.children_since(mark)
+    }
+
+    fn parse_lines(&mut self) {
         let mut line_start = 0;
         let bytes = self.source.as_bytes();
         let mut first_line = true;
@@ -45,7 +66,8 @@ impl<'source> Parser<'source> {
             if first_line && line.starts_with('\u{feff}') {
                 let range = super::range(line_start, line_start + '\u{feff}'.len_utf8());
                 self.tokens.push(SyntaxToken::new(TokenKind::Bom, range));
-                children.push(self.node(CstKind::Bom, line_start, line_start + 3, Vec::new()));
+                let bom = self.node(CstKind::Bom, line_start, line_start + 3, 0);
+                self.push(bom);
             }
             let offset = if first_line && line.starts_with('\u{feff}') {
                 3
@@ -62,9 +84,10 @@ impl<'source> Parser<'source> {
                         TokenKind::Comment,
                         super::range(start, content_end),
                     ));
-                    children.push(self.node(CstKind::Comment, start, content_end, Vec::new()));
+                    let comment = self.node(CstKind::Comment, start, content_end, 0);
+                    self.push(comment);
                 } else if let Some(node) = self.parse_line(start, content_end, trimmed) {
-                    children.push(node);
+                    self.push(node);
                 }
             }
             if line_end == bytes.len() {
@@ -73,10 +96,10 @@ impl<'source> Parser<'source> {
             line_start = line_end + 1;
             first_line = false;
         }
-        children
     }
 
-    fn parse_line(&mut self, start: usize, line_end: usize, line: &str) -> Option<CstNode> {
+    fn parse_line(&mut self, start: usize, line_end: usize, line: &str) -> Option<u32> {
+        let mark = self.children_mark();
         let key_len = line
             .bytes()
             .take_while(|byte| matches!(byte, b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b'$' | b'.' | b'-'))
@@ -88,14 +111,15 @@ impl<'source> Parser<'source> {
                 line_end,
                 "localisation line is missing a key",
             );
-            return Some(self.node(CstKind::Error, start, line_end, Vec::new()));
+            return Some(self.node(CstKind::Error, start, line_end, 0));
         }
         let key_end = start + key_len;
         self.tokens.push(SyntaxToken::new(
             TokenKind::Bare,
             super::range(start, key_end),
         ));
-        let key = self.node(CstKind::LocalisationKey, start, key_end, Vec::new());
+        let key = self.node(CstKind::LocalisationKey, start, key_end, 0);
+        self.push(key);
         let mut position = key_len;
         while line
             .as_bytes()
@@ -104,7 +128,6 @@ impl<'source> Parser<'source> {
         {
             position += 1;
         }
-        let mut children = vec![key];
         if line.as_bytes().get(position) == Some(&b':') {
             let colon_start = start + position;
             position += 1;
@@ -115,7 +138,12 @@ impl<'source> Parser<'source> {
                     TokenKind::Colon,
                     super::range(colon_start, colon_start + 1),
                 ));
-                return Some(self.node(CstKind::LanguageHeader, start, line_end, children));
+                return Some(self.node(
+                    CstKind::LanguageHeader,
+                    start,
+                    line_end,
+                    self.children_since(mark),
+                ));
             }
             self.tokens.push(SyntaxToken::new(
                 TokenKind::Colon,
@@ -148,12 +176,8 @@ impl<'source> Parser<'source> {
                     TokenKind::Bare,
                     super::range(start + version_start, version_end),
                 ));
-                children.push(self.node(
-                    CstKind::Version,
-                    start + version_start,
-                    version_end,
-                    Vec::new(),
-                ));
+                let version = self.node(CstKind::Version, start + version_start, version_end, 0);
+                self.push(version);
                 while line
                     .as_bytes()
                     .get(position)
@@ -176,10 +200,17 @@ impl<'source> Parser<'source> {
                     TokenKind::Comment,
                     super::range(comment_start, line_end),
                 ));
-                children.push(self.node(CstKind::Comment, comment_start, line_end, Vec::new()));
+                let comment = self.node(CstKind::Comment, comment_start, line_end, 0);
+                self.push(comment);
             }
-            children.push(self.node(CstKind::Error, line_end, line_end, Vec::new()));
-            return Some(self.node(CstKind::LocalisationEntry, start, line_end, children));
+            let recovery = self.node(CstKind::Error, line_end, line_end, 0);
+            self.push(recovery);
+            return Some(self.node(
+                CstKind::LocalisationEntry,
+                start,
+                line_end,
+                self.children_since(mark),
+            ));
         }
 
         let value_start = start + position;
@@ -188,14 +219,19 @@ impl<'source> Parser<'source> {
         } else {
             self.parse_unquoted(value_start, line_end)
         };
-        children.push(value);
+        self.push(value);
         if let Some(comment) = comment {
-            children.push(comment);
+            self.push(comment);
         }
-        Some(self.node(CstKind::LocalisationEntry, start, line_end, children))
+        Some(self.node(
+            CstKind::LocalisationEntry,
+            start,
+            line_end,
+            self.children_since(mark),
+        ))
     }
 
-    fn parse_quoted(&mut self, start: usize, line_end: usize) -> (CstNode, Option<CstNode>) {
+    fn parse_quoted(&mut self, start: usize, line_end: usize) -> (u32, Option<u32>) {
         let mut position = start + 1;
         let mut closed = false;
         while position < line_end {
@@ -235,12 +271,12 @@ impl<'source> Parser<'source> {
         }
         let comment = closed.then(|| self.inline_comment(end, line_end)).flatten();
         (
-            self.node(CstKind::LocalisationString, start, end, Vec::new()),
+            self.node(CstKind::LocalisationString, start, end, 0),
             comment,
         )
     }
 
-    fn parse_unquoted(&mut self, start: usize, line_end: usize) -> (CstNode, Option<CstNode>) {
+    fn parse_unquoted(&mut self, start: usize, line_end: usize) -> (u32, Option<u32>) {
         let mut end = line_end;
         let mut comment_node = None;
         if let Some(comment) = self.source[start..line_end].find('#') {
@@ -253,7 +289,7 @@ impl<'source> Parser<'source> {
                 TokenKind::Comment,
                 super::range(comment_start, line_end),
             ));
-            comment_node = Some(self.node(CstKind::Comment, comment_start, line_end, Vec::new()));
+            comment_node = Some(self.node(CstKind::Comment, comment_start, line_end, 0));
         }
         while end > start && self.source.as_bytes()[end - 1].is_ascii_whitespace() {
             end -= 1;
@@ -261,23 +297,19 @@ impl<'source> Parser<'source> {
         self.tokens
             .push(SyntaxToken::new(TokenKind::Bare, super::range(start, end)));
         (
-            self.node(CstKind::UnquotedValue, start, end, Vec::new()),
+            self.node(CstKind::UnquotedValue, start, end, 0),
             comment_node,
         )
     }
 
-    fn inline_comment(&mut self, start: usize, line_end: usize) -> Option<CstNode> {
+    fn inline_comment(&mut self, start: usize, line_end: usize) -> Option<u32> {
         let relative = self.source[start..line_end].find('#')?;
         let comment_start = start + relative;
         self.tokens.push(SyntaxToken::new(
             TokenKind::Comment,
             super::range(comment_start, line_end),
         ));
-        Some(self.node(CstKind::Comment, comment_start, line_end, Vec::new()))
-    }
-
-    fn node(&self, kind: CstKind, start: usize, end: usize, children: Vec<CstNode>) -> CstNode {
-        CstNode::new(kind, super::range(start, end), children)
+        Some(self.node(CstKind::Comment, comment_start, line_end, 0))
     }
 
     fn error(&mut self, kind: SyntaxErrorKind, start: usize, end: usize, message: &'static str) {

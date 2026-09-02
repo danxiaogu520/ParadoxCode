@@ -105,10 +105,19 @@ pub fn references_with_cancellation(
         );
         return Ok(result);
     }
-    let all = all_semantics(snapshot, cancellation)?;
-    let Some((kind, name)) = symbol_at(&all, document, position) else {
+    // Determine the symbol under the cursor from this document's semantics
+    // alone, then collect workspace semantics filtered to files whose shard
+    // mentions that name. This bounds the query after syntax-tree eviction:
+    // only candidate files are reparsed on demand.
+    let Some(document_input) = input_for_document(snapshot, document) else {
         return Ok(Vec::new());
     };
+    let document_all =
+        document_semantic_workspace(snapshot, document, &document_input, cancellation)?;
+    let Some((kind, name)) = symbol_at(&document_all, document, position) else {
+        return Ok(Vec::new());
+    };
+    let all = all_semantics_for_symbol(snapshot, cancellation, &[name.as_str()])?;
     let Resolution::Unique(target) = resolve_symbol(snapshot, &all, &kind, &name) else {
         return Ok(Vec::new());
     };
@@ -118,7 +127,7 @@ pub fn references_with_cancellation(
     }
     let mut consider_reference = |reference: &ReferenceInternal| -> Result<(), Cancelled> {
         cancellation.checkpoint()?;
-        if reference.kind != kind || !same_name(&reference.name, &name) {
+        if &*reference.kind != kind.as_str() || !same_name(&reference.name, &name) {
             return Ok(());
         }
         if let Resolution::Unique(candidate) =
@@ -134,7 +143,7 @@ pub fn references_with_cancellation(
     }
     for reference in snapshot.index().references_iter() {
         cancellation.checkpoint()?;
-        if reference.kind != kind || !same_name(&reference.name, &name) {
+        if &*reference.kind != kind.as_str() || !same_name(&reference.name, &name) {
             continue;
         }
         if let Some(reference) = indexed_reference(snapshot, reference) {
@@ -286,8 +295,10 @@ pub fn rename_with_cancellation(
         });
     }
     let target = rename_target(snapshot, document, position, cancellation)?;
-    let all =
-        all_semantics(snapshot, cancellation).map_err(|Cancelled| RenameFailure::Cancelled)?;
+    // Conflict checks must see both the old name (edits) and the new name
+    // (collision detection), so both drive the shard prefilter.
+    let all = all_semantics_for_symbol(snapshot, cancellation, &[target.name.as_str(), new_name])
+        .map_err(|Cancelled| RenameFailure::Cancelled)?;
     check_rename_conflict(snapshot, &all, &target, new_name, cancellation)?;
 
     let mut edits = vec![WorkspaceTextEdit {
@@ -302,7 +313,7 @@ pub fn rename_with_cancellation(
         cancellation
             .checkpoint()
             .map_err(|Cancelled| RenameFailure::Cancelled)?;
-        if reference.kind != target.kind || !same_name(&reference.name, &target.name) {
+        if &*reference.kind != target.kind.as_str() || !same_name(&reference.name, &target.name) {
             return Ok(());
         }
         // A document overlay replaces its disk candidate.  Do not return edits for the hidden
@@ -337,7 +348,7 @@ pub fn rename_with_cancellation(
         cancellation
             .checkpoint()
             .map_err(|Cancelled| RenameFailure::Cancelled)?;
-        if reference.kind != target.kind || !same_name(&reference.name, &target.name) {
+        if &*reference.kind != target.kind.as_str() || !same_name(&reference.name, &target.name) {
             continue;
         }
         if let Some(reference) = indexed_reference(snapshot, reference) {
@@ -549,7 +560,7 @@ pub(crate) fn check_rename_conflict(
         cancellation
             .checkpoint()
             .map_err(|Cancelled| RenameFailure::Cancelled)?;
-        if definition.kind != target.kind || !same_name(&definition.name, new_name) {
+        if &*definition.kind != target.kind.as_str() || !same_name(&definition.name, new_name) {
             continue;
         }
         if same_location(&definition.symbol.location, &target.definition.location) {
@@ -568,7 +579,7 @@ pub(crate) fn check_rename_conflict(
         cancellation
             .checkpoint()
             .map_err(|Cancelled| RenameFailure::Cancelled)?;
-        if definition.kind != target.kind
+        if &*definition.kind != target.kind.as_str()
             || !same_name(&definition.name, new_name)
             || (Some(definition.file_id) == target.definition.location.file
                 && definition.range == target.definition.location.range)

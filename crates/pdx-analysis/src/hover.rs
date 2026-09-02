@@ -795,7 +795,7 @@ pub(crate) fn localisation_preview(
         CstKind::LocalisationEntry,
         definition.location.range,
     )?;
-    let value_node = entry.children().iter().find(|child| {
+    let value_node = entry.children().find(|child| {
         matches!(
             child.kind(),
             CstKind::LocalisationString | CstKind::UnquotedValue
@@ -818,7 +818,6 @@ pub(crate) fn localisation_preview(
         if node.kind() == CstKind::LanguageHeader
             && let Some(value) = node
                 .children()
-                .iter()
                 .find(|child| child.kind() == CstKind::LocalisationKey)
                 .and_then(|child| parsed.text(child.range()))
         {
@@ -887,7 +886,7 @@ fn symbol_localisation_preview(
                     .references(file)
                     .iter()
                     .filter(|reference| reference.kind.eq_ignore_ascii_case("localisation"))
-                    .map(|reference| (reference.name.clone(), reference.range)),
+                    .map(|reference| (reference.name.to_string(), reference.range)),
             );
         }
     }
@@ -970,7 +969,11 @@ fn localisation_references_for_hover(
     Ok(references)
 }
 
-pub(crate) fn find_cst_node(node: &CstNode, kind: CstKind, range: TextRange) -> Option<&CstNode> {
+pub(crate) fn find_cst_node(
+    node: CstNode<'_>,
+    kind: CstKind,
+    range: TextRange,
+) -> Option<CstNode<'_>> {
     find_cst_node_bounded(node, kind, range, MAX_CST_SEARCH_DEPTH)
 }
 
@@ -979,11 +982,11 @@ pub(crate) fn find_cst_node(node: &CstNode, kind: CstKind, range: TextRange) -> 
 const MAX_CST_SEARCH_DEPTH: usize = 64;
 
 fn find_cst_node_bounded(
-    node: &CstNode,
+    node: CstNode<'_>,
     kind: CstKind,
     range: TextRange,
     depth: usize,
-) -> Option<&CstNode> {
+) -> Option<CstNode<'_>> {
     if node.kind() == kind && node.range() == range {
         return Some(node);
     }
@@ -991,7 +994,6 @@ fn find_cst_node_bounded(
         return None;
     }
     node.children()
-        .iter()
         .find_map(|child| find_cst_node_bounded(child, kind, range, depth - 1))
 }
 
@@ -1082,9 +1084,12 @@ pub(crate) fn known_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<String>> {
             .map(|descriptor| descriptor.kind_id.to_ascii_lowercase()),
     );
     let keys = Arc::new(keys);
-    snapshot
-        .query_cache()
-        .insert(revision, key.to_owned(), Arc::clone(&keys));
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Index,
+        key.to_owned(),
+        Arc::clone(&keys),
+    );
     keys
 }
 

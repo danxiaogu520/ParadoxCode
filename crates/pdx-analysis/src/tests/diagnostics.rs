@@ -62,6 +62,28 @@ fn scripted_localisation_names_feed_indexed_diagnostics_and_completion() {
     let names = scripted_localisation_names(&snapshot);
     assert_eq!(names, ["Scripted.One", "Scripted.Two"]);
 
+    let definitions_path = definitions.join("00_defs.txt");
+    let definitions_id = DocumentId::new("file:///tmp/scripted-localisation-definitions.txt");
+    host.open_document(
+        definitions_id.clone(),
+        1,
+        "defined_text = { name = Overlay.Only text = yes }\n".to_owned(),
+        Some(definitions_path),
+    )
+    .expect("open scripted localisation overlay");
+    assert_eq!(
+        scripted_localisation_names(&host.snapshot()),
+        ["Overlay.Only"],
+        "an overlay must replace its backing scripted-localisation shard"
+    );
+    host.close_document(&definitions_id)
+        .expect("close scripted localisation overlay");
+    assert_eq!(
+        scripted_localisation_names(&host.snapshot()),
+        ["Scripted.One", "Scripted.Two"],
+        "closing an overlay must invalidate its derived name cache"
+    );
+
     let id = DocumentId::new("file:///tmp/scripted-localisation-use.yml");
     let text = "l_english:\nentry: \"[ROOT.Scripted.One] [ROOT.MissingScripted]\"\n";
     host.open_document(
@@ -2573,4 +2595,58 @@ fn type_per_file_rules_validate_the_document_root_once() {
         missing_monarch_names, 1,
         "missing file-level fields must be reported once: {results:?}"
     );
+}
+
+#[test]
+fn evicted_frontend_diagnostics_match_retained() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-evict-debug-{nonce}"));
+    std::fs::create_dir_all(root.join("events")).unwrap();
+    std::fs::write(root.join("events/invalid.txt"), "scope = nowhere\n").unwrap();
+    let root = root.canonicalize().unwrap();
+    let cleanup = root.clone();
+    let mut host = crate::tests::support::eu4_host(pdx_game::eu4::first_party_rules().unwrap());
+    host.apply_change(pdx_engine::WorkspaceChange::SetSourceRoots(vec![
+        pdx_engine::SourceRoot::new(
+            pdx_engine::SourceRootId::new(0),
+            pdx_engine::SourceRootKind::CurrentMod,
+            root,
+        ),
+    ]));
+    host.refresh_source_roots().unwrap();
+    let snapshot = host.snapshot();
+    let file_id = *snapshot.source_files().keys().next().unwrap();
+    let retained = crate::source_file_diagnostics_with_cancellation(
+        &snapshot,
+        file_id,
+        &crate::CancellationToken::new(),
+    )
+    .unwrap();
+    eprintln!("retained diagnostics: {retained:?}");
+    drop(snapshot);
+    let evicted = host.evict_source_frontends(&|_| false);
+    eprintln!("evicted: {evicted}");
+    let snapshot2 = host.snapshot();
+    let state = snapshot2.file_state(file_id).unwrap();
+    eprintln!(
+        "post-evict parsed: {}, source len: {}",
+        state.parsed().is_some(),
+        state.source().len()
+    );
+    let after = crate::source_file_diagnostics_with_cancellation(
+        &snapshot2,
+        file_id,
+        &crate::CancellationToken::new(),
+    )
+    .unwrap();
+    eprintln!("evicted diagnostics: {after:?}");
+    assert_eq!(
+        retained.len(),
+        after.len(),
+        "evicted diagnostics must match"
+    );
+    std::fs::remove_dir_all(cleanup).unwrap();
 }

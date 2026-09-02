@@ -327,6 +327,7 @@ dependencies = [
  "pdx-text",
  "postcard",
  "rusqlite",
+ "rustc-hash",
  "serde",
  "serde_json",
  "sha2",
@@ -374,6 +375,7 @@ dependencies = [
  "pdx-text",
  "rayon",
  "rusqlite",
+ "rustc-hash",
  "serde",
  "serde_json",
  "sha2",
@@ -472,6 +474,12 @@ dependencies = [
  "smallvec",
  "sqlite-wasm-rs",
 ]
+
+[[package]]
+name = "rustc-hash"
+version = "2.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b1e7f9a428571be2dc5bc0505c13fb6bf936822b894ec87abf8a08a4e51742d"
 
 [[package]]
 name = "rustix"

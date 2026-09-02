@@ -12,6 +12,7 @@ readme.workspace = true
 publish = false
 
 [dependencies]
+rustc-hash = "2"
 pdx-text = { path = "../pdx-text" }
 rusqlite = { version = "0.40", features = ["bundled"] }
 rayon = "1.11"

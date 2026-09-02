@@ -1,6 +1,53 @@
 use super::support::*;
 
 #[test]
+fn workspace_member_index_tracks_overlay_open_and_close() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-member-overlay-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&definitions).expect("scripted effects directory");
+    let source = definitions.join("effects.txt");
+    std::fs::write(&source, "disk_effect = { }\n").expect("disk definition");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan scripted effects");
+    assert_eq!(
+        crate::semantic::workspace_member_index(&host.snapshot(), "scripted_effect").select(""),
+        ["disk_effect"]
+    );
+
+    let id = DocumentId::new("file:///tmp/scripted-effects-overlay.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "overlay_effect = { }\n".to_owned(),
+        Some(source),
+    )
+    .expect("open scripted-effect overlay");
+    assert_eq!(
+        crate::semantic::workspace_member_index(&host.snapshot(), "scripted_effect").select(""),
+        ["overlay_effect"]
+    );
+
+    host.close_document(&id)
+        .expect("close scripted-effect overlay");
+    assert_eq!(
+        crate::semantic::workspace_member_index(&host.snapshot(), "scripted_effect").select(""),
+        ["disk_effect"],
+        "closing the overlay must restore the disk-derived member index"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn event_file_root_offers_all_entries_with_correct_shapes() {
     use std::path::PathBuf;
 
@@ -362,9 +409,26 @@ fn on_action_entries_seed_documented_initial_scopes() {
         let context = semantic_completion_context(&snapshot, &input, position)
             .expect("on_action semantic context");
         assert_eq!(context.context, "type:on_action");
-        assert_eq!(context.scope.root, expected_root, "{action} root scope");
-        assert_eq!(context.scope.current, expected_this, "{action} THIS scope");
-        assert_eq!(context.scope.from, [expected_from], "{action} FROM scope");
+        assert_eq!(
+            context.scope.root.as_ref(),
+            expected_root,
+            "{action} root scope"
+        );
+        assert_eq!(
+            context.scope.current.as_ref(),
+            expected_this,
+            "{action} THIS scope"
+        );
+        assert_eq!(
+            context
+                .scope
+                .from
+                .iter()
+                .map(|scope| scope.as_ref())
+                .collect::<Vec<_>>(),
+            vec![expected_from],
+            "{action} FROM scope"
+        );
     }
 }
 
@@ -882,10 +946,21 @@ fn completion_traversal_uses_hir_to_disambiguate_nested_rule_contexts() {
     assert_eq!(context.context, "trigger");
     assert!(context.parent_path.is_empty());
     assert_eq!(
-        context.structural_containers,
+        context
+            .structural_containers
+            .iter()
+            .map(|(context, path)| {
+                (
+                    context.clone(),
+                    path.iter()
+                        .map(|segment| segment.to_string())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<Vec<_>>(),
         [("modifier_rule".to_owned(), vec!["modifier".to_owned()])]
     );
-    assert_eq!(context.scope.current, "country");
+    assert_eq!(context.scope.current.as_ref(), "country");
     let mut all_key_items = Vec::new();
     let mut member_cache = crate::CompletionMemberCache::default();
     crate::add_semantic_key_items(
@@ -2038,8 +2113,8 @@ fn scope_value_completion_offers_intrinsics_links_and_chains() {
         macro_inferred: false,
         scope: crate::ScopeContext {
             profile: snapshot.game_profile_handle(),
-            root: "province".to_owned(),
-            current: "province".to_owned(),
+            root: std::sync::Arc::from("province"),
+            current: std::sync::Arc::from("province"),
             from: Vec::new(),
             previous: Vec::new(),
         },
@@ -2936,8 +3011,15 @@ fn mission_probe(
     let position =
         u32::try_from(text.find(needle).expect("needle") + needle.len()).expect("position");
     let input = input_for_document(&snapshot, &id).expect("analysis input");
-    let ctx = semantic_completion_context(&snapshot, &input, position)
-        .map(|c| (c.context, c.parent_path.to_vec()));
+    let ctx = semantic_completion_context(&snapshot, &input, position).map(|c| {
+        (
+            c.context,
+            c.parent_path
+                .iter()
+                .map(|segment| segment.to_string())
+                .collect::<Vec<_>>(),
+        )
+    });
     let result = complete(&snapshot, &id, position);
     let labels = result
         .items

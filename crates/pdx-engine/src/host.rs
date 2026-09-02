@@ -151,6 +151,11 @@ impl AnalysisHost {
     }
 
     /// Replaces the preferred localisation language order used by analysis queries.
+    ///
+    /// This order also decides which localisation previews are retained when an index cache
+    /// is installed (together with the English fallback), so set preferences before
+    /// installing caches — exactly how the LSP applies them at initialize. Definitions for
+    /// every language stay indexed regardless of this order.
     pub fn set_preferred_localisation_languages(&mut self, languages: Vec<String>) {
         let languages = languages
             .into_iter()
@@ -204,6 +209,16 @@ impl AnalysisHost {
         self.query_cache.advance_to(self.revision);
     }
 
+    /// Advances the revision for a change that only affects overlay documents.
+    ///
+    /// Document opens, edits, and closes leave the workspace index untouched,
+    /// so index-derived cache entries stay valid across keystrokes instead of
+    /// being rebuilt per edit.
+    fn advance_document_revision(&mut self) {
+        self.revision = self.revision.saturating_add(1);
+        self.query_cache.advance_documents(self.revision);
+    }
+
     /// Installs a validated persistent index cache for any configured source root.
     ///
     /// The cached root may already be configured (a dependency with an explicit index): its
@@ -246,7 +261,7 @@ impl AnalysisHost {
                     actual: cache.metadata().game_id.clone(),
                 });
             }
-            let (_, cached_root, cache_files, cached_index, cache_positions, cache_previews) =
+            let (_, cached_root, cache_files, cached_index, cache_positions, mut cache_previews) =
                 cache.into_parts();
             match roots.iter().find(|root| root.id == cached_root.id) {
                 Some(configured) => {
@@ -314,6 +329,13 @@ impl AnalysisHost {
                     file.logical_path.as_str()
                 )));
             }
+            // Preview retention runs before `cache_files` is moved into `files` so the filter
+            // can resolve each preview's file path.
+            Self::retain_preferred_localisation_previews(
+                &mut cache_previews,
+                &cache_files,
+                &self.preferred_localisation_languages,
+            );
             for (id, file) in cache_files {
                 let current_path = file.physical_path.clone();
                 if let Some(previous) = files.insert(id, file) {
@@ -374,6 +396,62 @@ impl AnalysisHost {
         self.installed_caches.extend(cached_root_ids);
         self.advance_revision();
         Ok(())
+    }
+
+    /// Bounds resident memory for cache-installed localisation previews to the languages
+    /// analysis can surface: the configured preference order plus the English fallback that
+    /// `prefer_localisation_language_for_snapshot` selects. Cached Vanilla locates every key
+    /// once per language, so unpreferred languages hold the bulk of preview bytes while no
+    /// query can reach them. Dropped previews stay in the persistent `.pdxindex` and return
+    /// on the next session that prefers them; diagnostics never read previews. Files without
+    /// a path language marker are always retained, as are files unknown to this cache's
+    /// source table (load-time validation guarantees the latter cannot occur).
+    fn retain_preferred_localisation_previews(
+        previews: &mut LocalisationPreviewMap,
+        files: &BTreeMap<SourceFileId, SourceFile>,
+        preferred: &[String],
+    ) {
+        previews.retain_files(|file_id| {
+            files.get(&file_id).is_none_or(|file| {
+                Self::localisation_path_language(file.logical_path.as_str()).is_none_or(
+                    |language| {
+                        language.eq_ignore_ascii_case("english")
+                            || preferred
+                                .iter()
+                                .any(|preferred| preferred.eq_ignore_ascii_case(language))
+                    },
+                )
+            })
+        });
+    }
+
+    /// Extracts the localisation language from a logical path. `localisation/l_english/…`
+    /// directories and `localisation/name_l_english.yml` file stems both yield `english`;
+    /// paths without a language marker yield `None`. Mirrors `pdx-analysis`'s
+    /// `localisation_language` so retention covers exactly the candidates analysis selects.
+    fn localisation_path_language(path: &str) -> Option<&str> {
+        for segment in path.split('/') {
+            if let Some(language) = segment
+                .strip_prefix("l_")
+                .filter(|language| !language.is_empty())
+            {
+                let language = language
+                    .strip_suffix(".yml")
+                    .or_else(|| language.strip_suffix(".yaml"))
+                    .unwrap_or(language);
+                return (!language.is_empty()).then_some(language);
+            }
+        }
+        let file = path.rsplit('/').next()?;
+        let after = file
+            .rfind("_l_")
+            .map(|index| &file[index + 3..])
+            .unwrap_or_default();
+        let language = after
+            .strip_suffix(".yml")
+            .or_else(|| after.strip_suffix(".yaml"))
+            .unwrap_or(after);
+        (!language.is_empty()).then_some(language)
     }
 
     /// Scans all configured roots in stable order and atomically refreshes source files and shards.
@@ -488,7 +566,12 @@ impl AnalysisHost {
                 source_jobs.push(SourceReadJob {
                     file: source_file,
                     physical_path: physical,
-                    retain_frontend: root.kind != SourceRootKind::Vanilla,
+                    // Closed files never retain scan frontends: shards and
+                    // position ranges are extracted during the scan, and the
+                    // diagnostics pass reparses/lowerers transiently per file.
+                    // This keeps the peak resident set bounded by steady index
+                    // structures instead of every file's CST+HIR at once.
+                    retain_frontend: false,
                 });
             }
         }
@@ -512,7 +595,7 @@ impl AnalysisHost {
         cancellation.checkpoint()?;
         let mut shards = file_states
             .values()
-            .map(|state| state.shard().clone())
+            .map(|state| state.shard_handle())
             .collect::<Vec<_>>();
         if !self.installed_caches.is_empty() {
             for (id, cached) in self
@@ -717,21 +800,27 @@ impl AnalysisHost {
                 .get(&id)
                 .map_or(0, |state| state.revision().saturating_add(1));
             let state = Arc::new(match text {
-                Some(text) => build_file_state(
-                    &source_file,
-                    text,
-                    file_revision,
-                    self.rules.as_ref(),
-                    self.profile.as_ref(),
-                ),
+                Some(text) => {
+                    let state = build_file_state(
+                        &source_file,
+                        text,
+                        file_revision,
+                        self.rules.as_ref(),
+                        self.profile.as_ref(),
+                    );
+                    // Same retention policy as the scan: extract positions,
+                    // then drop the frontend so closed files never hold a
+                    // CST/HIR tree. The index map keeps the only copy.
+                    index.replace_position_ranges(id, position_ranges_for_state(&state));
+                    state.cache_only()
+                }
                 None => empty_file_state(&source_file, file_revision),
             });
             files.insert(id, source_file);
             paths.insert(change.path.clone(), id);
             file_states.insert(id, Arc::clone(&state));
             let priorities = source_priorities(&self.roots, &files);
-            index.replace_shard_resolved(state.shard().clone(), &priorities, self.rules.as_ref());
-            index.replace_position_ranges(id, position_ranges_for_state(&state));
+            index.replace_shard_resolved(state.shard_handle(), &priorities, self.rules.as_ref());
             report.indexed_files = report.indexed_files.saturating_add(1);
             changed = true;
         }
@@ -752,15 +841,16 @@ impl AnalysisHost {
     pub fn replace_index_shard(&mut self, shard: FileIndexShard) {
         let file_id = shard.file_id;
         let priorities = source_priorities(&self.roots, &self.source_files);
+        let shard = Arc::new(shard);
         Arc::make_mut(&mut self.index).replace_shard_resolved(
-            shard.clone(),
+            Arc::clone(&shard),
             &priorities,
             self.rules.as_ref(),
         );
         Arc::make_mut(&mut self.index).remove_position_ranges(file_id);
         if let Some(previous) = self.file_states.get(&file_id) {
             let mut replacement = previous.as_ref().clone();
-            replacement.shard = Arc::new(shard);
+            replacement.shard = Arc::clone(&shard);
             Arc::make_mut(&mut self.index)
                 .replace_position_ranges(file_id, position_ranges_for_state(&replacement));
             Arc::make_mut(&mut self.file_states).insert(file_id, Arc::new(replacement));
@@ -791,7 +881,7 @@ impl AnalysisHost {
             path,
         );
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
-        self.advance_revision();
+        self.advance_document_revision();
         Ok(())
     }
 
@@ -842,7 +932,7 @@ impl AnalysisHost {
         }
         let document = staged_overlay_document(id.clone(), version, text, current.path.clone());
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
-        self.advance_revision();
+        self.advance_document_revision();
         Ok(())
     }
 
@@ -917,7 +1007,7 @@ impl AnalysisHost {
             path,
         );
         Arc::make_mut(&mut self.documents).insert(id.clone(), document);
-        self.advance_revision();
+        self.advance_document_revision();
         Ok(())
     }
 
@@ -949,12 +1039,42 @@ impl AnalysisHost {
                 Arc::make_mut(&mut self.documents).insert(id.clone(), document);
             }
         }
-        self.advance_revision();
+        self.advance_document_revision();
         Ok(())
     }
 
     /// Captures an immutable query view.
     #[must_use]
+    /// Evicts the retained CST/HIR frontends of source files, keeping source
+    /// text, index shards, and cached positions.
+    ///
+    /// `keep` guards files that must stay warm (for example files backing open
+    /// editor overlays are fine to evict, so callers usually keep nothing).
+    /// The workspace revision is unchanged: shards and index answers are
+    /// identical, so snapshot query caches remain valid. Returns the number of
+    /// files whose frontends were dropped.
+    pub fn evict_source_frontends(&mut self, keep: &dyn Fn(SourceFileId) -> bool) -> usize {
+        let mut evicted = Vec::new();
+        for (id, state) in self.file_states.iter() {
+            if keep(*id) {
+                continue;
+            }
+            if let Some(evicted_state) = state.evict_frontend() {
+                evicted.push((*id, Arc::new(evicted_state)));
+            }
+        }
+        if evicted.is_empty() {
+            return 0;
+        }
+        let evicted_count = evicted.len();
+        let mut file_states = BTreeMap::clone(&self.file_states);
+        for (id, state) in evicted {
+            file_states.insert(id, state);
+        }
+        self.file_states = Arc::new(file_states);
+        evicted_count
+    }
+
     pub fn snapshot(&self) -> AnalysisSnapshot {
         AnalysisSnapshot {
             revision: self.revision,

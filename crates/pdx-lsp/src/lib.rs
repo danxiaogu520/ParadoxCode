@@ -36,7 +36,10 @@ pub(crate) const METHOD_NOT_FOUND: i64 = -32601;
 pub(crate) const INVALID_PARAMS: i64 = -32602;
 pub(crate) const SERVER_NOT_INITIALIZED: i64 = -32002;
 pub(crate) const REQUEST_CANCELLED: i64 = -32800;
-pub(crate) const DIAGNOSTIC_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(200);
+/// Delay before a document edit spawns fresh diagnostics. Zero: edits
+/// validate immediately; the pending map still coalesces rapid successive
+/// edits of one document (last version wins) without a timer.
+pub(crate) const DIAGNOSTIC_DEBOUNCE: std::time::Duration = std::time::Duration::ZERO;
 pub(crate) const MAX_LSP_HEADER_BYTES: usize = 8 * 1024;
 pub(crate) const MAX_LSP_MESSAGE_BYTES: usize = 32 * 1024 * 1024;
 pub(crate) const MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
@@ -47,6 +50,15 @@ pub(crate) const MAX_WORKSPACE_DIAGNOSTIC_FILES: usize = 128;
 /// Explicit validation still counts every file; the cap only protects the JSON-RPC client from
 /// a notification storm on very large mods.
 pub(crate) const MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS: usize = 2_000;
+/// Maximum attempts for the initial background workspace scan before deferring
+/// to an explicit `pdx/reindexWorkspace`. Each attempt restarts from a fresh
+/// host clone after a revision race, and the persistent parse cache keeps
+/// retries cheap; the bound only stops unbounded loops under continuous edits.
+pub(crate) const MAX_BACKGROUND_SCAN_RETRIES: u8 = 10;
+/// Default threads for one whole-workspace validation pass (measured knee).
+pub(crate) const DEFAULT_WORKSPACE_VALIDATION_WORKERS: usize = 4;
+/// Upper bound on threads used by one whole-workspace validation pass.
+pub(crate) const MAX_WORKSPACE_VALIDATION_WORKERS: usize = 12;
 /// Maximum number of stale closed-file diagnostic entries cleared by one pass.
 pub(crate) const MAX_WORKSPACE_DIAGNOSTIC_CLEARS: usize = 2_000;
 pub(crate) const MAX_PUBLISHED_DIAGNOSTICS: usize = 1_000;

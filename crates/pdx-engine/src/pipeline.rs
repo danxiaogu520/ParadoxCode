@@ -349,9 +349,7 @@ fn load_source_file_job(
             if job.retain_frontend || previous.parsed().is_none() {
                 return Arc::clone(previous);
             }
-            return Arc::new(
-                previous.cache_only_from_existing(position_ranges_for_state(previous)),
-            );
+            return Arc::new(previous.cache_only_from_existing());
         }
         let file_revision = previous.map_or(0, |state| state.revision().saturating_add(1));
         let state = build_file_state_with_cache(
@@ -365,8 +363,7 @@ fn load_source_file_job(
         if job.retain_frontend {
             Arc::new(state)
         } else {
-            let positions = position_ranges_for_state(&state);
-            Arc::new(state.cache_only(positions))
+            Arc::new(state.cache_only())
         }
     });
     Ok(SourceReadResult {
@@ -428,7 +425,6 @@ pub(crate) fn build_file_state_with_cache(
                 macro_definitions: Vec::new(),
                 syntax_error_count: 0,
             }),
-            cached_positions: None,
             cached_localisation_previews: None,
         };
     };
@@ -478,7 +474,6 @@ pub(crate) fn build_file_state_with_cache(
         parsed,
         hir,
         shard: Arc::new(shard),
-        cached_positions: None,
         cached_localisation_previews: None,
     }
 }
@@ -496,49 +491,19 @@ pub(crate) fn empty_file_state(file: &SourceFile, revision: u64) -> FileState {
             macro_definitions: Vec::new(),
             syntax_error_count: 0,
         }),
-        cached_positions: None,
         cached_localisation_previews: None,
     }
 }
 
 pub(crate) fn position_ranges_for_state(state: &FileState) -> Vec<(TextRange, PositionRange)> {
-    if let Some(cached) = state.cached_positions.as_deref() {
-        return cached.clone();
-    }
     let line_index = LineIndex::new(state.source());
-    let hir_selection_ranges = state
-        .hir()
-        .map(|hir| {
-            hir.definitions()
-                .iter()
-                .map(|definition| {
-                    (
-                        (
-                            definition.kind.clone(),
-                            definition.name.clone(),
-                            definition.range,
-                        ),
-                        definition.selection_range,
-                    )
-                })
-                .collect::<BTreeMap<_, _>>()
-        })
-        .unwrap_or_default();
     state
         .shard()
         .definitions
         .iter()
         .filter_map(|definition| {
-            let selection_range = hir_selection_ranges
-                .get(&(
-                    definition.kind.clone(),
-                    definition.name.clone(),
-                    definition.range,
-                ))
-                .copied()
-                .unwrap_or(definition.range);
             line_index
-                .position_range(state.source(), selection_range)
+                .position_range(state.source(), definition.selection_range)
                 .map(|position| (definition.range, position))
         })
         .chain(state.shard().references.iter().filter_map(|reference| {
@@ -559,6 +524,10 @@ fn shard_from_parsed(
     let mut references = Vec::new();
     collect_hir_semantics(file, hir, &mut definitions, &mut references);
     collect_semantic_type_members(file, parsed, rules, &mut definitions);
+    // Shards stay resident in the workspace index; exact-fit the vectors so
+    // growth doubling does not leave ~2x slack per file.
+    definitions.shrink_to_fit();
+    references.shrink_to_fit();
     let macro_definitions = collect_macro_definitions(hir, rules);
     FileIndexShard {
         file_id: file.id,
@@ -668,7 +637,7 @@ fn collect_semantic_skip_root_path(
     file: &SourceFile,
     parsed: &ParsedFile,
     descriptor: &pdx_rules::TypeDescriptor,
-    node: &CstNode,
+    node: CstNode<'_>,
     path: &[String],
     definitions: &mut Vec<Definition>,
 ) {
@@ -693,7 +662,7 @@ fn collect_semantic_block_children(
     file: &SourceFile,
     parsed: &ParsedFile,
     descriptor: &pdx_rules::TypeDescriptor,
-    node: &CstNode,
+    node: CstNode<'_>,
     definitions: &mut Vec<Definition>,
 ) {
     for child in semantic_block_properties(node) {
@@ -705,7 +674,7 @@ fn collect_semantic_type_definition(
     file: &SourceFile,
     parsed: &ParsedFile,
     descriptor: &pdx_rules::TypeDescriptor,
-    node: &CstNode,
+    node: CstNode<'_>,
     definitions: &mut Vec<Definition>,
 ) {
     let Some(key) = semantic_property_key(node, parsed) else {
@@ -725,11 +694,16 @@ fn collect_semantic_type_definition(
     if name.is_empty() {
         return;
     }
+    let key_range = node
+        .children()
+        .find(|child| child.kind() == CstKind::Key)
+        .map(|child| child.range());
     definitions.push(Definition {
-        kind: descriptor.name.clone(),
-        name,
+        kind: crate::string_pool::intern_shard_string(&descriptor.name),
+        name: crate::string_pool::intern_shard_string(&name),
         file_id: file.id,
         range: node.range(),
+        selection_range: key_range.unwrap_or(node.range()),
         active: true,
     });
 }
@@ -758,28 +732,23 @@ fn semantic_type_root_key_allowed(
     roots.iter().any(|root| root.eq_ignore_ascii_case(key))
 }
 
-fn semantic_block_properties(node: &CstNode) -> impl Iterator<Item = &CstNode> {
-    node.children().iter().flat_map(|child| {
-        if child.kind() != CstKind::Value {
-            return Vec::new();
-        }
-        child
-            .children()
-            .iter()
-            .filter(|block| block.kind() == CstKind::Block)
-            .flat_map(|block| {
-                block
-                    .children()
-                    .iter()
-                    .filter(|child| child.kind() == CstKind::Property)
-            })
-            .collect::<Vec<_>>()
-    })
+fn semantic_block_properties(node: CstNode<'_>) -> impl Iterator<Item = CstNode<'_>> {
+    node.children()
+        .filter(|child| child.kind() == CstKind::Value)
+        .flat_map(|value| {
+            value
+                .children()
+                .filter(|block| block.kind() == CstKind::Block)
+        })
+        .flat_map(|block| {
+            block
+                .children()
+                .filter(|child| child.kind() == CstKind::Property)
+        })
 }
 
-fn semantic_property_key(node: &CstNode, parsed: &ParsedFile) -> Option<String> {
+fn semantic_property_key(node: CstNode<'_>, parsed: &ParsedFile) -> Option<String> {
     node.children()
-        .iter()
         .find(|child| child.kind() == CstKind::Key)
         .and_then(|child| parsed.text(child.range()))
         .map(|key| key.trim().to_owned())
@@ -800,11 +769,13 @@ fn semantic_type_path_matches(
             .trim_matches('/')
             .strip_prefix("game/")
             .unwrap_or(prefix.trim_matches('/'));
-        let prefix = prefix.to_ascii_lowercase();
         let matches = if descriptor.path_strict {
-            directory == prefix
+            directory.eq_ignore_ascii_case(prefix)
         } else {
-            directory == prefix || directory.starts_with(&format!("{prefix}/"))
+            directory.eq_ignore_ascii_case(prefix)
+                || (crate::hir::ascii_ci_starts_with(directory, prefix)
+                    && directory.len() > prefix.len()
+                    && directory.as_bytes()[prefix.len()] == b'/')
         };
         if !matches {
             return false;
@@ -835,28 +806,28 @@ fn collect_hir_semantics(
 ) {
     for definition in hir.definitions() {
         definitions.push(Definition {
-            kind: definition.kind.clone(),
-            name: definition.name.clone(),
+            kind: crate::string_pool::intern_shard_string(&definition.kind),
+            name: crate::string_pool::intern_shard_string(&definition.name),
             file_id: file.id,
             range: definition.range,
+            selection_range: definition.selection_range,
             active: true,
         });
     }
     for reference in hir.references() {
         references.push(Reference {
-            kind: reference.kind.clone(),
-            name: reference.name.clone(),
+            kind: crate::string_pool::intern_shard_string(&reference.kind),
+            name: crate::string_pool::intern_shard_string(&reference.name),
             file_id: file.id,
             range: reference.range,
         });
     }
 }
 
-fn find_property(node: &CstNode, wanted: &str, parsed: &ParsedFile) -> Option<String> {
+fn find_property(node: CstNode<'_>, wanted: &str, parsed: &ParsedFile) -> Option<String> {
     if node.kind() == CstKind::Property {
         let key = node
             .children()
-            .iter()
             .find(|child| child.kind() == CstKind::Key)
             .and_then(|child| parsed.text(child.range()))
             .map(str::trim);
@@ -868,7 +839,7 @@ fn find_property(node: &CstNode, wanted: &str, parsed: &ParsedFile) -> Option<St
                         .map(|value| value.trim_matches('"').trim().to_owned());
                 }
                 if child.kind() == CstKind::Value
-                    && let Some(value) = child.children().iter().find(|value| {
+                    && let Some(value) = child.children().find(|value| {
                         matches!(value.kind(), CstKind::BareValue | CstKind::QuotedString)
                     })
                 {
@@ -880,7 +851,6 @@ fn find_property(node: &CstNode, wanted: &str, parsed: &ParsedFile) -> Option<St
         }
     }
     node.children()
-        .iter()
         .find_map(|child| find_property(child, wanted, parsed))
 }
 

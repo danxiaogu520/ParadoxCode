@@ -77,15 +77,16 @@ fn scripted_localisation_names_cached_with_cancellation(
         {
             continue;
         }
-        let Some(shard) = snapshot.index().shard(file.id) else {
-            continue;
-        };
-        for (definition_index, definition) in shard.definitions.iter().enumerate() {
+        for (definition_index, (definition, active)) in snapshot
+            .index()
+            .definitions_for_file_with_state(file.id)
+            .enumerate()
+        {
             if definition_index & 255 == 0 {
                 cancellation.checkpoint()?;
             }
-            if definition.active && definition.kind.eq_ignore_ascii_case("defined_text") {
-                names.push(definition.name.clone());
+            if active && definition.kind.eq_ignore_ascii_case("defined_text") {
+                names.push(definition.name.to_string());
             }
         }
     }
@@ -114,7 +115,7 @@ fn scripted_localisation_names_cached_with_cancellation(
                 cancellation.checkpoint()?;
             }
             if definition.kind.eq_ignore_ascii_case("defined_text") {
-                names.push(definition.name.clone());
+                names.push(definition.name.to_string());
             }
         }
     }
@@ -128,6 +129,7 @@ fn scripted_localisation_names_cached_with_cancellation(
     let names = Arc::new(names);
     snapshot.query_cache().insert(
         revision,
+        pdx_engine::CacheDomain::Documents,
         SCRIPTED_LOCALISATION_NAMES_CACHE_KEY.to_owned(),
         Arc::clone(&names),
     );
@@ -215,6 +217,7 @@ fn static_localisation_command_names(
     let names = Arc::new(names);
     snapshot.query_cache().insert(
         revision,
+        pdx_engine::CacheDomain::Index,
         LOCALISATION_COMMANDS_CACHE_KEY.to_owned(),
         Arc::clone(&names),
     );
@@ -244,14 +247,14 @@ pub(crate) fn localisation_command_diagnostics(
     }
     let ParsedContent::Text(parsed) = &input.parsed;
     let mut diagnostics = Vec::new();
-    for (index, entry) in parsed.root().children().iter().enumerate() {
+    for (index, entry) in parsed.root().children().enumerate() {
         if index & 31 == 0 {
             cancellation.checkpoint()?;
         }
         if entry.kind() != CstKind::LocalisationEntry {
             continue;
         }
-        let Some(value) = entry.children().iter().find(|child| {
+        let Some(value) = entry.children().find(|child| {
             matches!(
                 child.kind(),
                 CstKind::LocalisationString | CstKind::UnquotedValue

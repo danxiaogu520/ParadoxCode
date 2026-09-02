@@ -17,12 +17,33 @@ pub enum Scope {
 /// A conservative set of possible game scopes.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ScopeValue {
-    /// One or more statically known scope spellings.
-    Known(Vec<String>),
+    /// One or more statically known scope spellings. The list is shared
+    /// (`ScopeState` clones once per scope fact, so the spellings themselves
+    /// must not reallocate per clone).
+    Known(std::sync::Arc<[std::sync::Arc<str>]>),
     /// Lowering lacks enough information to determine the scope.
     Unknown,
     /// The rules prove that no scope is valid.
     Invalid,
+}
+
+impl ScopeValue {
+    /// A single known scope spelling.
+    #[must_use]
+    pub fn known_single(name: &str) -> Self {
+        Self::Known(std::sync::Arc::from([std::sync::Arc::from(name)]))
+    }
+
+    /// Known scope spellings from owned strings.
+    #[must_use]
+    pub fn known(names: impl IntoIterator<Item = String>) -> Self {
+        Self::Known(
+            names
+                .into_iter()
+                .map(std::sync::Arc::from)
+                .collect::<std::sync::Arc<[_]>>(),
+        )
+    }
 }
 
 /// Persistent scope registers at one semantic location.
@@ -541,9 +562,9 @@ impl HirFile {
     /// condition before it can choose the branch.
     fn parameter_reference_is_runtime_guarded(&self, reference: &HirParameterReference) -> bool {
         fn containing_properties<'a>(
-            node: &'a CstNode,
+            node: CstNode<'a>,
             range: TextRange,
-            ancestors: &mut Vec<&'a CstNode>,
+            ancestors: &mut Vec<CstNode<'a>>,
         ) -> bool {
             if range.start() < node.range().start() || range.end() > node.range().end() {
                 return false;
@@ -554,7 +575,6 @@ impl HirFile {
             }
             if node
                 .children()
-                .iter()
                 .any(|child| containing_properties(child, range, ancestors))
             {
                 return true;
@@ -572,7 +592,6 @@ impl HirFile {
         for (index, ancestor) in ancestors.iter().enumerate() {
             let key = ancestor
                 .children()
-                .iter()
                 .find(|child| child.kind() == CstKind::Key)
                 .and_then(|child| self.syntax.text(child.range()))
                 .map(str::trim);
@@ -584,12 +603,7 @@ impl HirFile {
             }
             let in_limit = ancestors
                 .get(index.saturating_add(1))
-                .and_then(|child| {
-                    child
-                        .children()
-                        .iter()
-                        .find(|node| node.kind() == CstKind::Key)
-                })
+                .and_then(|child| child.children().find(|node| node.kind() == CstKind::Key))
                 .and_then(|child| self.syntax.text(child.range()))
                 .is_some_and(|child| child.trim().eq_ignore_ascii_case("limit"));
             if !in_limit {
@@ -601,14 +615,13 @@ impl HirFile {
 
     fn parameter_reference_occupies_token(&self, reference: &HirParameterReference) -> bool {
         fn containing_token(
-            node: &pdx_parser::CstNode,
+            node: pdx_parser::CstNode<'_>,
             range: TextRange,
-        ) -> Option<&pdx_parser::CstNode> {
+        ) -> Option<pdx_parser::CstNode<'_>> {
             if range.start() < node.range().start() || range.end() > node.range().end() {
                 return None;
             }
             node.children()
-                .iter()
                 .find_map(|child| containing_token(child, range))
                 .or_else(|| {
                     matches!(
@@ -636,14 +649,13 @@ impl HirFile {
 
     fn parameter_reference_is_same_named_value(&self, reference: &HirParameterReference) -> bool {
         fn containing_property(
-            node: &pdx_parser::CstNode,
+            node: pdx_parser::CstNode<'_>,
             range: TextRange,
-        ) -> Option<&pdx_parser::CstNode> {
+        ) -> Option<pdx_parser::CstNode<'_>> {
             if range.start() < node.range().start() || range.end() > node.range().end() {
                 return None;
             }
             node.children()
-                .iter()
                 .find_map(|child| containing_property(child, range))
                 .or_else(|| (node.kind() == pdx_parser::CstKind::Property).then_some(node))
         }
@@ -652,7 +664,6 @@ impl HirFile {
             .and_then(|property| {
                 property
                     .children()
-                    .iter()
                     .find(|child| child.kind() == pdx_parser::CstKind::Key)
             })
             .and_then(|key| self.syntax.text(key.range()))
