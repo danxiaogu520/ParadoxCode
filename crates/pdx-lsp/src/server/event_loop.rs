@@ -119,6 +119,31 @@ impl LspServer {
                 // rebuilds serve partial state instead of freezing the editor.
                 let vanilla_load_busy = in_flight_index.as_ref().is_some_and(|task| task.is_load);
                 let dependency_load_busy = in_flight_dependency.is_some();
+                // A deferred `exit` may only run once every queued publication
+                // and commit has landed — the same set the shutdown drain at
+                // the bottom of this loop waits on; keep the two in sync.
+                // Without the queued-pass and rescan terms, an exit deferred
+                // behind a disk change replayed the moment that worker
+                // finished, before the workspace pass its completion had
+                // queued could spawn and publish.
+                let front_deferred_exit =
+                    deferred_messages.front().is_some_and(is_exit_notification);
+                let shutdown_owes_work = !self.pending_parses.is_empty()
+                    || !in_flight_parses.is_empty()
+                    || !self.pending_diagnostics.is_empty()
+                    || !in_flight.is_empty()
+                    || !in_flight_requests.is_empty()
+                    || in_flight_initialize.is_some()
+                    || in_flight_index.is_some()
+                    || in_flight_dependency.is_some()
+                    || in_flight_scan.is_some()
+                    || self.scan_pending
+                    || self.workspace_diagnostics_pending
+                    || self.has_pending_disk_changes()
+                    || in_flight_disk_changes.is_some()
+                    || in_flight_background_reindex.is_some()
+                    || in_flight_workspace_diagnostics.is_some()
+                    || in_flight_reindex_command.is_some();
                 let deferred_ready = !parse_busy
                     && !initialize_busy
                     && !disk_changes_busy
@@ -129,7 +154,8 @@ impl LspServer {
                         && deferred_messages
                             .front()
                             .is_some_and(is_execute_command_message))
-                    && !deferred_messages.is_empty();
+                    && !deferred_messages.is_empty()
+                    && (!front_deferred_exit || !shutdown_owes_work);
                 let (event, from_reader) = if deferred_ready {
                     let message = deferred_messages.pop_front().expect("checked non-empty");
                     (TransportEvent::Input(Ok(Some(message))), false)
