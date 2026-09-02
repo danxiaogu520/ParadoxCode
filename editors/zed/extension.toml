@@ -1,6 +1,6 @@
 id = "paradoxcode"
 name = "ParadoxCode - EU4 Language Tools"
-version = "0.2.0"
+version = "0.3.0"
 schema_version = 1
 authors = ["ParadoxCode contributors"]
 description = "Independent, unofficial EU4 language tooling backed by pdx-ls."
