@@ -253,10 +253,12 @@ fn ready_pass_publishes_when_scan_completes_after_shutdown() {
     fs::create_dir_all(&events).expect("events directory");
     let source = events.join("post-shutdown-invalid.txt");
     fs::write(&source, "scope = nowhere\n").expect("invalid source");
-    for index in 0..400 {
+    for index in 0..800 {
         // Sizing the bulk corpus so the initial scan reliably outlasts the
-        // message flow is what forces the interleaving under test; small files
-        // let the scan win the race on fast machines.
+        // message flow is what forces the interleaving under test. A fast
+        // Windows runner scanned 400 files in under the 150 ms `initialized`
+        // delay, letting the scan win the race; 800 files restore a ~2x
+        // margin there while the corpus stays cheap to create.
         let bulk = "a = 1\n".repeat(400);
         fs::write(events.join(format!("bulk-{index:03}.txt")), &bulk).expect("bulk source");
     }
@@ -344,7 +346,7 @@ fn scan_reschedule_during_shutdown_still_exits_cleanly() {
     fs::create_dir_all(&events).expect("events directory");
     let source = events.join("rescheduled-scan-overlay.txt");
     fs::write(&source, "scope = nowhere\n").expect("invalid source");
-    for index in 0..400 {
+    for index in 0..800 {
         // Sizing the bulk corpus so the initial scan reliably outlasts the
         // message flow is what forces the interleaving under test; small files
         // let the scan win the race on fast machines.
@@ -433,7 +435,7 @@ fn identical_overlay_revalidation_is_not_republished_after_scan_commit() {
     let (root, root_uri) = temp_workspace_dir();
     let events = root.join("events");
     fs::create_dir_all(&events).expect("events directory");
-    for index in 0..400 {
+    for index in 0..800 {
         let bulk = "a = 1\n".repeat(400);
         fs::write(events.join(format!("bulk-{index:03}.txt")), &bulk).expect("bulk source");
     }
@@ -608,7 +610,7 @@ fn deferred_exit_waits_for_the_ready_pass_queued_behind_a_disk_change() {
     fs::write(&source, "scope = nowhere\n").expect("invalid source");
     let changed_source = source.clone();
     let source_uri = canonical_uri(&source);
-    for index in 0..400 {
+    for index in 0..800 {
         // The bulk corpus keeps the initial scan in flight past
         // `shutdown`, which is what queues the ready pass behind the
         // pending watched-file change in the first place.
