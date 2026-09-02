@@ -34,9 +34,9 @@ use crate::protocol::{
     cancel_request_from_notification, diagnostic_values_for_text_with_ignored_and_overrides,
     diagnostic_values_with_ignored_and_overrides, diagnostics_notification, document_error,
     filter_diagnostics_with_ignored_and_overrides, is_execute_command_message,
-    is_initialize_control_message, is_snapshot_request, is_snapshot_request_message,
-    log_message_notification, parse_file_uri_str, request_id_from_lsp, show_info_notification,
-    show_warning_notification, typed_params,
+    is_exit_notification, is_initialize_control_message, is_snapshot_request,
+    is_snapshot_request_message, log_message_notification, parse_file_uri_str, request_id_from_lsp,
+    show_info_notification, show_warning_notification, typed_params,
 };
 use crate::requests::SnapshotRequestContext;
 use crate::text::{

@@ -169,6 +169,13 @@ impl LspServer {
                             reader_active = false;
                         }
                         let Some(message) = result? else {
+                            if !deferred_messages.is_empty() {
+                                // The reader is finished, but deferred messages — such as a
+                                // trailing `exit` held back behind in-flight publication work —
+                                // still have to run. Keep pumping worker events until the
+                                // queue drains; a deferred exit then ends the loop cleanly.
+                                continue;
+                            }
                             return if self.state == ServerState::Exited && self.clean_exit {
                                 Ok(())
                             } else {
@@ -192,13 +199,17 @@ impl LspServer {
                         let dependency_load_busy = in_flight_dependency.is_some();
                         let execute_command_busy =
                             background_busy && is_execute_command_message(&message);
+                        // `exit` terminates the loop immediately and cancels every in-flight
+                        // task, so it must wait while a watched-file refresh (or document
+                        // parse) is about to republish diagnostics; otherwise the client's
+                        // last valid state could be dropped by a race between the exit
+                        // notification and the refresh completion event.
                         if from_reader
-                            && (((parse_busy
-                                || disk_changes_busy
-                                || scan_busy
-                                || vanilla_load_busy
-                                || dependency_load_busy)
-                                && is_snapshot_request_message(&message))
+                            && (((parse_busy || disk_changes_busy)
+                                && (is_snapshot_request_message(&message)
+                                    || is_exit_notification(&message)))
+                                || ((scan_busy || vanilla_load_busy || dependency_load_busy)
+                                    && is_snapshot_request_message(&message))
                                 || execute_command_busy
                                 || (initialize_busy && !is_initialize_control_message(&message)))
                         {
