@@ -1112,3 +1112,38 @@ fn replace_scope_resolves_static_links_into_register_values() {
     assert!(unchanged.from.is_empty());
     assert!(unchanged.previous.is_empty());
 }
+
+#[test]
+fn mission_trigger_boolean_containers_still_extract_scripted_references() {
+    let rules = first_party_rules().expect("embedded rules");
+    let path = LogicalPath::parse("missions/probe_scratch.txt").expect("logical path");
+    // Real-world shape from a mod missions file: the scripted trigger sits under
+    // trigger > OR > num_of_owned_provinces_with. Boolean containers (AND/OR/NOT)
+    // must keep the trigger-context descent alive so the reference is extracted.
+    let source = "series = { mission_one = { trigger = { OR = { num_of_owned_provinces_with = { value = 3 has_fort_building_trigger = yes } } } } }\n";
+    let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile());
+    assert!(
+        hir.references()
+            .iter()
+            .any(|reference| reference.kind == "scripted_trigger"
+                && reference.name == "has_fort_building_trigger"),
+        "scripted trigger reference must be extracted from mission trigger blocks"
+    );
+
+    let and_not = "series = { mission_one = { trigger = { AND = { has_fort_building_trigger = yes } NOT = { has_fort_building_trigger = yes } } } } }\n";
+    let hir = lower_with_profile(
+        parse(FileFormat::Script, and_not),
+        &path,
+        &rules,
+        &profile(),
+    );
+    assert_eq!(
+        hir.references()
+            .iter()
+            .filter(|reference| reference.kind == "scripted_trigger"
+                && reference.name == "has_fort_building_trigger")
+            .count(),
+        2,
+        "AND and NOT containers must keep extracting scripted trigger references"
+    );
+}

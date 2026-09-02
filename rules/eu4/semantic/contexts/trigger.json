@@ -3017,6 +3017,84 @@
     "line": 6691
   },
   {
+    "id": "boolean-containers:1:alias:trigger:AND",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "AND"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Evaluates to true when every trigger inside the block is true."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic/contexts/trigger.json",
+    "line": 3019
+  },
+  {
+    "id": "boolean-containers:2:alias:trigger:OR",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "OR"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Evaluates to true when at least one trigger inside the block is true."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic/contexts/trigger.json",
+    "line": 3046
+  },
+  {
+    "id": "boolean-containers:3:alias:trigger:NOT",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "NOT"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "trigger",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Evaluates to true when the trigger inside the block is false."
+    ],
+    "allowed_scopes": [],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": null,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "semantic/contexts/trigger.json",
+    "line": 3073
+  },
+  {
     "id": "scope_links:460:rule:trigger:limit",
     "context": "trigger",
     "parent_path": [
@@ -8916,8 +8994,7 @@
       "Returns true if the country is the specified country."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -8947,8 +9024,7 @@
       "Returns true if the country is the specified country."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -17576,8 +17652,7 @@
       "Checks number of times a country has used transfer development"
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -17640,8 +17715,7 @@
       "Checks number of times a country used pillage capital"
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -33502,8 +33576,7 @@
       "Returns true if the flag X is set for the country."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -54231,8 +54304,7 @@
       "Returns true if the country's primary culture is X."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],

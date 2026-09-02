@@ -41628,8 +41628,7 @@
       "Adds Imperial Influence for the current scope. No effect if not emperor."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -42488,8 +42487,7 @@
       "Adds modifier to the current scope as a country modifier."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -42804,8 +42802,7 @@
       "Removes an already assigned country modifier from the current scope."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -43069,8 +43066,7 @@
       "Adds an event modifier to the current province scope as a province modifier. Modifiers added with this effect are cleared automatically when the province changes ownership."
     ],
     "allowed_scopes": [
-      "province",
-      "country"
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -43449,8 +43445,7 @@
       "A unique string to identify the country flag with. Flags can be appended with scopes or event targets: set_country_flag = my_flag@ROOT"
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -43480,8 +43475,7 @@
       "Removes an already assigned province modifier from the current province scope."
     ],
     "allowed_scopes": [
-      "province",
-      "country"
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -43511,8 +43505,7 @@
       "Removes an already assigned province modifier from the current province scope."
     ],
     "allowed_scopes": [
-      "province",
-      "country"
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -43542,8 +43535,7 @@
       "Removes an already assigned province modifier from the current province scope."
     ],
     "allowed_scopes": [
-      "province",
-      "country"
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -43788,8 +43780,7 @@
       "Clears a defined country flag for the current scope."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
