@@ -462,6 +462,28 @@ pub(crate) struct InFlightScan {
     pub(crate) progress_token: Option<String>,
 }
 
+/// Test-only seam invoked by a background scan worker once its scan has fully
+/// completed but before the completion is reported to the event loop. In-crate
+/// shutdown-race regression tests use it to pin exact interleavings — events
+/// processed while the scan is verifiably still in flight — deterministically
+/// instead of racing wall-clock time. Production servers never configure a
+/// gate, and a configured gate must be guaranteed to release.
+#[derive(Clone)]
+pub(crate) struct ScanGate(Arc<dyn Fn() + Send + Sync>);
+
+impl ScanGate {
+    /// Parks the calling scan worker until the gate releases it.
+    pub(crate) fn hold(&self) {
+        (self.0)();
+    }
+}
+
+impl std::fmt::Debug for ScanGate {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("ScanGate")
+    }
+}
+
 pub(crate) struct InFlightReindexCommand {
     pub(crate) request_id: RequestId,
     pub(crate) base_revision: u64,
@@ -628,6 +650,8 @@ pub struct LspServer {
     /// Notifications queued by a live setting change; drained by the transport loop so the
     /// configuration handler remains a pure state transition.
     pub(crate) workspace_diagnostic_clear_queue: Vec<String>,
+    /// Test-only scan-completion gate; see [`ScanGate`]. `None` in production.
+    scan_gate: Option<ScanGate>,
     /// Process-start messages collected before an LSP client can receive
     /// `window/logMessage`. They are replayed at the beginning of the first
     /// initialize worker so the editor's log has no unexplained pre-initialize gap.
@@ -680,6 +704,7 @@ impl LspServer {
             scan_retries: 0,
             workspace_diagnostic_uris: BTreeSet::new(),
             workspace_diagnostic_clear_queue: Vec::new(),
+            scan_gate: None,
             startup_log: Vec::new(),
             clean_exit: false,
         })
@@ -698,6 +723,16 @@ impl LspServer {
     #[must_use]
     pub fn with_auto_vanilla(mut self, configuration: AutoVanillaConfiguration) -> Self {
         self.auto_vanilla = Some(configuration);
+        self
+    }
+
+    /// Attaches a gate each background scan worker invokes just before it
+    /// reports completion. In-crate test seam only: production servers never
+    /// set it, and the gate blocks the worker until it returns, so the
+    /// closure must be guaranteed to release.
+    #[cfg(test)]
+    pub(crate) fn with_scan_gate(mut self, gate: Arc<dyn Fn() + Send + Sync>) -> Self {
+        self.scan_gate = Some(ScanGate(gate));
         self
     }
 

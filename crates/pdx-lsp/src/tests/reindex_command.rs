@@ -242,10 +242,10 @@ fn initial_ready_pass_publishes_closed_current_mod_diagnostics() {
 /// the server entered `ShuttingDown`, dropping the very publication the shutdown
 /// drain had just waited for.
 ///
-/// The `initialized` read is delayed past the initialize worker on purpose:
-/// without the delay the message arrives while the server is still initializing,
-/// gets deferred behind the handshake, and serializes the whole shutdown after
-/// every publication — which never exercises the race this test pins down.
+/// The interleaving is forced deterministically: a test gate parks the finished
+/// scan worker until the shutdown response has been written, and the reader
+/// holds `initialized` back until the worker is parked. Machine speed cannot
+/// flip the ordering, so no bulk corpus or timing guess is needed.
 #[test]
 fn ready_pass_publishes_when_scan_completes_after_shutdown() {
     let (root, root_uri) = temp_workspace_dir();
@@ -253,18 +253,9 @@ fn ready_pass_publishes_when_scan_completes_after_shutdown() {
     fs::create_dir_all(&events).expect("events directory");
     let source = events.join("post-shutdown-invalid.txt");
     fs::write(&source, "scope = nowhere\n").expect("invalid source");
-    for index in 0..800 {
-        // Sizing the bulk corpus so the initial scan reliably outlasts the
-        // message flow is what forces the interleaving under test. A fast
-        // Windows runner scanned 400 files in under the 150 ms `initialized`
-        // delay, letting the scan win the race; 800 files restore a ~2x
-        // margin there while the corpus stays cheap to create.
-        let bulk = "a = 1\n".repeat(400);
-        fs::write(events.join(format!("bulk-{index:03}.txt")), &bulk).expect("bulk source");
-    }
-    let wait_for_initialize: ReadAction = Some(Box::new(|| {
-        std::thread::sleep(std::time::Duration::from_millis(150));
-    }));
+    let output = SharedOutput::new();
+    let (gate, parked) = scan_completion_gate(&output, response_written(2));
+    let wait_for_scan_parked: ReadAction = Some(Box::new(move || parked.wait()));
     let input = ScriptedReader::new([
         (
             json!({
@@ -280,7 +271,7 @@ fn ready_pass_publishes_when_scan_completes_after_shutdown() {
         ),
         (
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            wait_for_initialize,
+            wait_for_scan_parked,
         ),
         (
             json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
@@ -288,16 +279,18 @@ fn ready_pass_publishes_when_scan_completes_after_shutdown() {
         ),
         (json!({"jsonrpc":"2.0","method":"exit"}), None),
     ]);
-    let mut output = Vec::new();
-    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-    server.run_transport(input, &mut output).expect("transport");
+    let mut server = eu4_server(InitializeOptions)
+        .expect("embedded rules")
+        .with_scan_gate(gate);
+    server
+        .run_transport(input, output.clone())
+        .expect("transport");
     let uri = canonical_uri(&source);
-    let responses = decode_frames(&output);
-    // Vacuity guard: the pass under test only runs when `shutdown` was
-    // processed while the initial scan was still in flight. If a faster
-    // machine finishes the scan before the shutdown response is written, the
-    // publication below would be produced by the ordinary Initialized path
-    // and prove nothing — fail loudly so the corpus or delay gets retuned.
+    let responses = decode_frames(&output.bytes());
+    // Structural check, guaranteed by the gate and kept as a guard against
+    // seam regressions: `shutdown` was answered while the scan was still in
+    // flight, so the publication below can only come from the drain-held
+    // ready pass.
     let shutdown_at = responses
         .iter()
         .position(|value| value["id"] == 2 && value.get("result").is_some())
@@ -308,7 +301,7 @@ fn ready_pass_publishes_when_scan_completes_after_shutdown() {
         .expect("pdx/ready notification after the initial scan");
     assert!(
         shutdown_at < ready_at,
-        "initial scan completed before `shutdown` was processed; enlarge the bulk corpus or the `initialized` delay"
+        "the scan gate must keep the initial scan in flight until `shutdown` is answered"
     );
     let published = responses
         .iter()
@@ -331,14 +324,16 @@ fn ready_pass_publishes_when_scan_completes_after_shutdown() {
 /// forever, wedging the event loop; the retry must now respawn during the
 /// drain and still exit cleanly, with the overlay's diagnostics published.
 ///
-/// Like the ready-pass test above, the `initialized` read is delayed past the
-/// initialize worker so `didOpen`/`shutdown` are processed while the (bulk-slow)
-/// initial scan is still in flight — the exact interleaving that wedged CI.
+/// The interleaving is forced deterministically: the scan gate parks the
+/// finished scan until the shutdown response has been written, and `didOpen`
+/// is only delivered once the worker is parked — so the overlay verifiably
+/// lands while the scan is in flight and the completion verifiably loses the
+/// revision race after `shutdown`.
 ///
 /// The client advertises `window.workDoneProgress` so the scan reports its
-/// completion as a `$/progress` end frame; that frame is the only observable
-/// the reschedule path still writes, and the ordering guard below uses it to
-/// fail loudly if a faster machine lets the scan win the race.
+/// completion as a `$/progress` end frame; that frame is written before the
+/// reschedule branch runs, so its position pins the scan's completion
+/// relative to the shutdown response.
 #[test]
 fn scan_reschedule_during_shutdown_still_exits_cleanly() {
     let (root, root_uri) = temp_workspace_dir();
@@ -346,17 +341,10 @@ fn scan_reschedule_during_shutdown_still_exits_cleanly() {
     fs::create_dir_all(&events).expect("events directory");
     let source = events.join("rescheduled-scan-overlay.txt");
     fs::write(&source, "scope = nowhere\n").expect("invalid source");
-    for index in 0..800 {
-        // Sizing the bulk corpus so the initial scan reliably outlasts the
-        // message flow is what forces the interleaving under test; small files
-        // let the scan win the race on fast machines.
-        let bulk = "a = 1\n".repeat(400);
-        fs::write(events.join(format!("bulk-{index:03}.txt")), &bulk).expect("bulk source");
-    }
     let uri = canonical_uri(&source);
-    let wait_for_initialize: ReadAction = Some(Box::new(|| {
-        std::thread::sleep(std::time::Duration::from_millis(150));
-    }));
+    let output = SharedOutput::new();
+    let (gate, parked) = scan_completion_gate(&output, response_written(2));
+    let wait_for_scan_parked: ReadAction = Some(Box::new(move || parked.wait()));
     let input = ScriptedReader::new([
         (
             json!({
@@ -372,7 +360,7 @@ fn scan_reschedule_during_shutdown_still_exits_cleanly() {
         ),
         (
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            wait_for_initialize,
+            wait_for_scan_parked,
         ),
         (
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
@@ -386,14 +374,18 @@ fn scan_reschedule_during_shutdown_still_exits_cleanly() {
         ),
         (json!({"jsonrpc":"2.0","method":"exit"}), None),
     ]);
-    let mut output = Vec::new();
-    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-    server.run_transport(input, &mut output).expect("transport");
-    let responses = decode_frames(&output);
-    // Vacuity guard: the wedge only reproduced when `shutdown` was processed
-    // before the initial scan finished; the scan's `$/progress` end frame is
-    // written before the reschedule branch runs, so its position pins the
-    // scan's completion relative to the shutdown response.
+    let mut server = eu4_server(InitializeOptions)
+        .expect("embedded rules")
+        .with_scan_gate(gate);
+    server
+        .run_transport(input, output.clone())
+        .expect("transport");
+    let responses = decode_frames(&output.bytes());
+    // Structural check, guaranteed by the gate: the wedge only reproduced
+    // when `shutdown` was processed before the initial scan finished, and the
+    // scan's `$/progress` end frame is written before the reschedule branch
+    // runs, so its position pins the scan's completion relative to the
+    // shutdown response.
     let shutdown_at = responses
         .iter()
         .position(|value| value["id"] == 2 && value.get("result").is_some())
@@ -410,7 +402,7 @@ fn scan_reschedule_during_shutdown_still_exits_cleanly() {
         .expect("scan completion progress frame");
     assert!(
         shutdown_at < scan_end_at,
-        "initial scan completed before `shutdown` was processed; enlarge the bulk corpus or the `initialized` delay"
+        "the scan gate must keep the initial scan in flight until `shutdown` is answered"
     );
     assert!(
         responses.iter().any(|value| {
@@ -427,24 +419,21 @@ fn scan_reschedule_during_shutdown_still_exits_cleanly() {
 /// index" — publishing a byte-identical batch a second time. Identical
 /// revalidation results must not be republished; only changed batches are.
 ///
-/// The setup mirrors the other shutdown-race tests: a bulk corpus keeps the
-/// scan in flight past `shutdown`, and the ordering guard fails loudly on a
-/// machine fast enough to let the scan win.
+/// The setup mirrors the other shutdown-race tests: the scan gate parks the
+/// finished scan until the shutdown response has been written, so the overlay
+/// lifecycle and its drain-time publication verifiably precede the scan
+/// commit whose revalidation must deduplicate.
 #[test]
 fn identical_overlay_revalidation_is_not_republished_after_scan_commit() {
     let (root, root_uri) = temp_workspace_dir();
     let events = root.join("events");
     fs::create_dir_all(&events).expect("events directory");
-    for index in 0..800 {
-        let bulk = "a = 1\n".repeat(400);
-        fs::write(events.join(format!("bulk-{index:03}.txt")), &bulk).expect("bulk source");
-    }
     let source = events.join("overlay-fresh.txt");
     fs::write(&source, "scope = country\n").expect("overlay base source");
     let uri = canonical_uri(&source);
-    let wait_for_initialize: ReadAction = Some(Box::new(|| {
-        std::thread::sleep(std::time::Duration::from_millis(150));
-    }));
+    let output = SharedOutput::new();
+    let (gate, parked) = scan_completion_gate(&output, response_written(2));
+    let wait_for_scan_parked: ReadAction = Some(Box::new(move || parked.wait()));
     let input = ScriptedReader::new([
         (
             json!({
@@ -460,7 +449,7 @@ fn identical_overlay_revalidation_is_not_republished_after_scan_commit() {
         ),
         (
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            wait_for_initialize,
+            wait_for_scan_parked,
         ),
         (
             json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
@@ -481,10 +470,13 @@ fn identical_overlay_revalidation_is_not_republished_after_scan_commit() {
         ),
         (json!({"jsonrpc":"2.0","method":"exit"}), None),
     ]);
-    let mut output = Vec::new();
-    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-    server.run_transport(input, &mut output).expect("transport");
-    let responses = decode_frames(&output);
+    let mut server = eu4_server(InitializeOptions)
+        .expect("embedded rules")
+        .with_scan_gate(gate);
+    server
+        .run_transport(input, output.clone())
+        .expect("transport");
+    let responses = decode_frames(&output.bytes());
     let shutdown_at = responses
         .iter()
         .position(|value| value["id"] == 2 && value.get("result").is_some())
@@ -501,7 +493,7 @@ fn identical_overlay_revalidation_is_not_republished_after_scan_commit() {
         .expect("scan completion progress frame");
     assert!(
         shutdown_at < scan_end_at,
-        "initial scan completed before `shutdown` was processed; enlarge the bulk corpus or the `initialized` delay"
+        "the scan gate must keep the initial scan in flight until `shutdown` is answered"
     );
     let batches = responses
         .iter()
@@ -536,6 +528,26 @@ fn watched_refresh_republishes_closed_file_diagnostics() {
     fs::write(&source, "scope = nowhere\n").expect("invalid source");
     let changed_source = source.clone();
     let source_uri = canonical_uri(&source);
+    // The watched change must land strictly after the initial (non-empty)
+    // publication so the republication below is proven to come from the
+    // refresh and not from a scan that raced the disk rewrite. Waiting for
+    // the publication frame in the shared output makes the ordering causal
+    // instead of timing-dependent.
+    let output = SharedOutput::new();
+    let wait_for_initial_publication = {
+        let output = output.clone();
+        let watched_uri = source_uri.clone();
+        move || {
+            output.wait_for(|value| {
+                value["method"] == "textDocument/publishDiagnostics"
+                    && value["params"]["uri"] == watched_uri
+                    && value["params"]["diagnostics"]
+                        .as_array()
+                        .is_some_and(|items| !items.is_empty())
+            });
+            fs::write(changed_source, "").expect("write fixed source");
+        }
+    };
     let input = ScriptedReader::new([
         (
             json!({
@@ -559,9 +571,7 @@ fn watched_refresh_republishes_closed_file_diagnostics() {
                 "method":"workspace/didChangeWatchedFiles",
                 "params":{"changes":[{"uri":source_uri,"type":2}]}
             }),
-            Some(Box::new(move || {
-                fs::write(changed_source, "").expect("write fixed source");
-            }) as Box<dyn FnOnce() + Send>),
+            Some(Box::new(wait_for_initial_publication) as Box<dyn FnOnce() + Send>),
         ),
         (
             json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
@@ -569,10 +579,11 @@ fn watched_refresh_republishes_closed_file_diagnostics() {
         ),
         (json!({"jsonrpc":"2.0","method":"exit"}), None),
     ]);
-    let mut output = Vec::new();
     let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-    server.run_transport(input, &mut output).expect("transport");
-    let responses = decode_frames(&output);
+    server
+        .run_transport(input, output.clone())
+        .expect("transport");
+    let responses = decode_frames(&output.bytes());
     let publications = responses
         .iter()
         .filter(|value| {
@@ -601,6 +612,12 @@ fn watched_refresh_republishes_closed_file_diagnostics() {
 /// it touched. A deferred `exit` must wait for every worker the shutdown
 /// drain waits on, and only a whole-workspace validation may consume the
 /// queued pass.
+///
+/// The interleaving is forced deterministically: the scan gate parks the
+/// finished scan until the shutdown response has been written, and the
+/// watched-file notification is only delivered once the worker is parked —
+/// so the disk change verifiably pends while the scan is in flight, which is
+/// what queues the ready pass behind the disk batch.
 #[test]
 fn deferred_exit_waits_for_the_ready_pass_queued_behind_a_disk_change() {
     let (root, root_uri) = temp_workspace_dir();
@@ -610,16 +627,9 @@ fn deferred_exit_waits_for_the_ready_pass_queued_behind_a_disk_change() {
     fs::write(&source, "scope = nowhere\n").expect("invalid source");
     let changed_source = source.clone();
     let source_uri = canonical_uri(&source);
-    for index in 0..800 {
-        // The bulk corpus keeps the initial scan in flight past
-        // `shutdown`, which is what queues the ready pass behind the
-        // pending watched-file change in the first place.
-        let bulk = "a = 1\n".repeat(400);
-        fs::write(events.join(format!("bulk-{index:03}.txt")), &bulk).expect("bulk source");
-    }
-    let wait_for_initialize: ReadAction = Some(Box::new(|| {
-        std::thread::sleep(std::time::Duration::from_millis(150));
-    }));
+    let output = SharedOutput::new();
+    let (gate, parked) = scan_completion_gate(&output, response_written(2));
+    let wait_for_scan_parked: ReadAction = Some(Box::new(move || parked.wait()));
     let input = ScriptedReader::new([
         (
             json!({
@@ -635,7 +645,7 @@ fn deferred_exit_waits_for_the_ready_pass_queued_behind_a_disk_change() {
         ),
         (
             json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
-            wait_for_initialize,
+            wait_for_scan_parked,
         ),
         (
             json!({
@@ -653,10 +663,13 @@ fn deferred_exit_waits_for_the_ready_pass_queued_behind_a_disk_change() {
         ),
         (json!({"jsonrpc":"2.0","method":"exit"}), None),
     ]);
-    let mut output = Vec::new();
-    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
-    server.run_transport(input, &mut output).expect("transport");
-    let responses = decode_frames(&output);
+    let mut server = eu4_server(InitializeOptions)
+        .expect("embedded rules")
+        .with_scan_gate(gate);
+    server
+        .run_transport(input, output.clone())
+        .expect("transport");
+    let responses = decode_frames(&output.bytes());
     let shutdown_at = responses
         .iter()
         .position(|value| value["id"] == 2 && value.get("result").is_some())
@@ -673,7 +686,7 @@ fn deferred_exit_waits_for_the_ready_pass_queued_behind_a_disk_change() {
         .expect("scan completion progress frame");
     assert!(
         shutdown_at < scan_end_at,
-        "initial scan completed before `shutdown` was processed; enlarge the bulk corpus or the `initialized` delay"
+        "the scan gate must keep the initial scan in flight until `shutdown` is answered"
     );
     let publications = responses
         .iter()
