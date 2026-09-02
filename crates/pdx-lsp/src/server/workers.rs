@@ -434,8 +434,13 @@ impl LspServer {
         in_flight: &mut Option<InFlightWorkspaceDiagnostics>,
         busy: bool,
     ) {
-        if self.state != ServerState::Initialized
-            || !self.workspace_wide_diagnostics
+        // ShuttingDown is accepted: the shutdown drain waits for this pass to
+        // publish closed-file diagnostics queued by an in-flight scan's
+        // completion, so refusing to spawn it would drop the publication.
+        if !matches!(
+            self.state,
+            ServerState::Initialized | ServerState::ShuttingDown
+        ) || !self.workspace_wide_diagnostics
             || !self.workspace_diagnostics_pending
             || in_flight.is_some()
             || busy
@@ -1173,7 +1178,16 @@ impl LspServer {
         in_flight: &mut Option<InFlightScan>,
         output: &mut W,
     ) -> Result<(), LspError> {
-        if self.state != ServerState::Initialized || in_flight.is_some() || !self.scan_pending {
+        // ShuttingDown is accepted: the shutdown drain waits on `scan_pending`,
+        // so a rescheduled scan that raced an edit must be able to respawn or
+        // the drain would hold `exit` forever while dropping the scanned
+        // workspace data. The retry counter still bounds the races.
+        if !matches!(
+            self.state,
+            ServerState::Initialized | ServerState::ShuttingDown
+        ) || in_flight.is_some()
+            || !self.scan_pending
+        {
             return Ok(());
         }
         self.scan_pending = false;

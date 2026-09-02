@@ -143,11 +143,26 @@ impl LspServer {
                             background_busy,
                         ))
                         .chain(self.pending_disk_change_wait(in_flight_disk_changes.as_ref()))
-                        .min();
+                        .min()
+                        .or_else(|| {
+                            // Never block indefinitely while the loop still owes the
+                            // client work (a shutdown drain or replaying deferred
+                            // messages): a state no worker or timer will satisfy must
+                            // keep cycling the spawn/retry logic instead of wedging on
+                            // a channel whose loop-owned sender keeps it permanently
+                            // connected.
+                            (self.state == ServerState::ShuttingDown
+                                || !deferred_messages.is_empty())
+                            .then(|| Duration::from_millis(200))
+                        });
                     let event = match timeout {
                         Some(timeout) => match event_receiver.recv_timeout(timeout) {
                             Ok(event) => event,
-                            Err(RecvTimeoutError::Timeout) => continue,
+                            // Not `continue`: that would skip the loop-bottom
+                            // shutdown-drain/reader-arm block, and a shutdown
+                            // with no outstanding worker would never re-arm
+                            // the reader to receive `exit`.
+                            Err(RecvTimeoutError::Timeout) => TransportEvent::Tick,
                             Err(RecvTimeoutError::Disconnected) => {
                                 return Err(LspError::Protocol(
                                     "LSP transport workers stopped unexpectedly".to_owned(),
@@ -497,6 +512,7 @@ impl LspServer {
                     TransportEvent::Log(value) => {
                         write_message(&mut output, &value)?;
                     }
+                    TransportEvent::Tick => {}
                     TransportEvent::ScanSetup(result) => {
                         let current = in_flight_scan
                             .as_ref()
@@ -524,7 +540,10 @@ impl LspServer {
                             // state. The attempt counter is bumped by each
                             // spawn, so a bounded number of races defers to an
                             // explicit `pdx/reindexWorkspace` instead of
-                            // looping forever.
+                            // looping forever. The retry respawns even during
+                            // the shutdown drain: dropping it here would also
+                            // drop the scanned workspace data the client (and
+                            // the drain) still expects.
                             if self.scan_retries < crate::MAX_BACKGROUND_SCAN_RETRIES {
                                 self.scan_pending = true;
                             } else {
@@ -1186,8 +1205,18 @@ impl LspServer {
                         || !in_flight_requests.is_empty()
                         || in_flight_initialize.is_some()
                         || in_flight_index.is_some()
+                        // The dependency build owes the client its completion
+                        // notification; every other worker slot drains, and
+                        // the heartbeat would otherwise let `exit` cancel the
+                        // build a fraction of the way in.
+                        || in_flight_dependency.is_some()
                         || in_flight_scan.is_some()
                         || self.scan_pending
+                        // A queued-but-unspawned pass must hold the drain too:
+                        // the spawn happens at the next iteration's loop top,
+                        // and arming the reader inside that one-iteration gap
+                        // let `exit` cancel the worker before it published.
+                        || self.workspace_diagnostics_pending
                         || self.has_pending_disk_changes()
                         || in_flight_disk_changes.is_some()
                         || in_flight_background_reindex.is_some()

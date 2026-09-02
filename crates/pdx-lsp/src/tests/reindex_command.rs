@@ -236,6 +236,189 @@ fn initial_ready_pass_publishes_closed_current_mod_diagnostics() {
     fs::remove_dir_all(root).expect("cleanup");
 }
 
+/// Forces the initial scan to outlast the message flow so it completes after
+/// `shutdown` was processed, then asserts the ready pass still publishes
+/// closed-file diagnostics. Regression test: the pass used to be suppressed once
+/// the server entered `ShuttingDown`, dropping the very publication the shutdown
+/// drain had just waited for.
+///
+/// The `initialized` read is delayed past the initialize worker on purpose:
+/// without the delay the message arrives while the server is still initializing,
+/// gets deferred behind the handshake, and serializes the whole shutdown after
+/// every publication — which never exercises the race this test pins down.
+#[test]
+fn ready_pass_publishes_when_scan_completes_after_shutdown() {
+    let (root, root_uri) = temp_workspace_dir();
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("events directory");
+    let source = events.join("post-shutdown-invalid.txt");
+    fs::write(&source, "scope = nowhere\n").expect("invalid source");
+    for index in 0..400 {
+        // Sizing the bulk corpus so the initial scan reliably outlasts the
+        // message flow is what forces the interleaving under test; small files
+        // let the scan win the race on fast machines.
+        let bulk = "a = 1\n".repeat(400);
+        fs::write(events.join(format!("bulk-{index:03}.txt")), &bulk).expect("bulk source");
+    }
+    let wait_for_initialize: ReadAction = Some(Box::new(|| {
+        std::thread::sleep(std::time::Duration::from_millis(150));
+    }));
+    let input = ScriptedReader::new([
+        (
+            json!({
+                "jsonrpc":"2.0",
+                "id":1,
+                "method":"initialize",
+                "params":{
+                    "workspaceFolders":[{"uri":root_uri,"name":"test"}],
+                    "capabilities":{}
+                }
+            }),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            wait_for_initialize,
+        ),
+        (
+            json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+            None,
+        ),
+        (json!({"jsonrpc":"2.0","method":"exit"}), None),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server.run_transport(input, &mut output).expect("transport");
+    let uri = canonical_uri(&source);
+    let responses = decode_frames(&output);
+    // Vacuity guard: the pass under test only runs when `shutdown` was
+    // processed while the initial scan was still in flight. If a faster
+    // machine finishes the scan before the shutdown response is written, the
+    // publication below would be produced by the ordinary Initialized path
+    // and prove nothing — fail loudly so the corpus or delay gets retuned.
+    let shutdown_at = responses
+        .iter()
+        .position(|value| value["id"] == 2 && value.get("result").is_some())
+        .expect("shutdown response");
+    let ready_at = responses
+        .iter()
+        .position(|value| value["method"] == "pdx/ready")
+        .expect("pdx/ready notification after the initial scan");
+    assert!(
+        shutdown_at < ready_at,
+        "initial scan completed before `shutdown` was processed; enlarge the bulk corpus or the `initialized` delay"
+    );
+    let published = responses
+        .iter()
+        .find(|value| {
+            value["method"] == "textDocument/publishDiagnostics" && value["params"]["uri"] == uri
+        })
+        .expect("ready-pass publication after shutdown");
+    assert!(
+        published["params"]["diagnostics"]
+            .as_array()
+            .is_some_and(|items| !items.is_empty())
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+/// Regression test for the Linux CI deadlock: an overlay edit bumps the
+/// workspace revision while the initial scan runs, and the scan reschedules
+/// itself after `shutdown` was processed. The pending retry used to be
+/// unspawnable during `ShuttingDown` while the shutdown drain waited on it
+/// forever, wedging the event loop; the retry must now respawn during the
+/// drain and still exit cleanly, with the overlay's diagnostics published.
+///
+/// Like the ready-pass test above, the `initialized` read is delayed past the
+/// initialize worker so `didOpen`/`shutdown` are processed while the (bulk-slow)
+/// initial scan is still in flight — the exact interleaving that wedged CI.
+///
+/// The client advertises `window.workDoneProgress` so the scan reports its
+/// completion as a `$/progress` end frame; that frame is the only observable
+/// the reschedule path still writes, and the ordering guard below uses it to
+/// fail loudly if a faster machine lets the scan win the race.
+#[test]
+fn scan_reschedule_during_shutdown_still_exits_cleanly() {
+    let (root, root_uri) = temp_workspace_dir();
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("events directory");
+    let source = events.join("rescheduled-scan-overlay.txt");
+    fs::write(&source, "scope = nowhere\n").expect("invalid source");
+    for index in 0..400 {
+        // Sizing the bulk corpus so the initial scan reliably outlasts the
+        // message flow is what forces the interleaving under test; small files
+        // let the scan win the race on fast machines.
+        let bulk = "a = 1\n".repeat(400);
+        fs::write(events.join(format!("bulk-{index:03}.txt")), &bulk).expect("bulk source");
+    }
+    let uri = canonical_uri(&source);
+    let wait_for_initialize: ReadAction = Some(Box::new(|| {
+        std::thread::sleep(std::time::Duration::from_millis(150));
+    }));
+    let input = ScriptedReader::new([
+        (
+            json!({
+                "jsonrpc":"2.0",
+                "id":1,
+                "method":"initialize",
+                "params":{
+                    "workspaceFolders":[{"uri":root_uri,"name":"test"}],
+                    "capabilities":{"window":{"workDoneProgress":true}}
+                }
+            }),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            wait_for_initialize,
+        ),
+        (
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
+                "textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":"scope = nowhere\n"}
+            }}),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+            None,
+        ),
+        (json!({"jsonrpc":"2.0","method":"exit"}), None),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server.run_transport(input, &mut output).expect("transport");
+    let responses = decode_frames(&output);
+    // Vacuity guard: the wedge only reproduced when `shutdown` was processed
+    // before the initial scan finished; the scan's `$/progress` end frame is
+    // written before the reschedule branch runs, so its position pins the
+    // scan's completion relative to the shutdown response.
+    let shutdown_at = responses
+        .iter()
+        .position(|value| value["id"] == 2 && value.get("result").is_some())
+        .expect("shutdown response");
+    let scan_end_at = responses
+        .iter()
+        .position(|value| {
+            value["method"] == "$/progress"
+                && value["params"]["token"]
+                    .as_str()
+                    .is_some_and(|token| token.starts_with("pdx-scan-"))
+                && value["params"]["value"]["kind"] == "end"
+        })
+        .expect("scan completion progress frame");
+    assert!(
+        shutdown_at < scan_end_at,
+        "initial scan completed before `shutdown` was processed; enlarge the bulk corpus or the `initialized` delay"
+    );
+    assert!(
+        responses.iter().any(|value| {
+            value["method"] == "textDocument/publishDiagnostics" && value["params"]["uri"] == uri
+        }),
+        "overlay diagnostics were never published"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
 #[test]
 fn watched_refresh_republishes_closed_file_diagnostics() {
     let (root, root_uri) = temp_workspace_dir();
