@@ -10,8 +10,8 @@ use pdx_engine::{
     WorkspaceScanLimits,
 };
 use pdx_game::{
-    DiscoveryOptions, DiscoveryOutcome, UserConfiguration, UserPaths, discover_installations,
-    validate_installation_for_source,
+    CandidateSource, DiscoveredInstallation, DiscoveryOptions, DiscoveryOutcome, UserConfiguration,
+    UserPaths, discover_installations, select_installation, validate_installation_for_source,
 };
 use pdx_rules::{GameProfile, RuleSet};
 use serde_json::{Value, json};
@@ -182,10 +182,11 @@ pub(crate) fn run_index_cache_load_with_options(
 /// Rebuilds an explicit cache path when the cache file itself cannot be loaded.
 ///
 /// Returns `Ok(None)` when automatic discovery is unavailable or declines to
-/// participate; `Ok(Some(cache))` after a successful rebuild. Discovery failures
-/// are reported but never recorded in the user configuration, because an explicit
-/// cache path is a caller-owned location and must not mark the user-level
-/// automatic setup as attempted.
+/// participate; `Ok(Some(cache))` after a successful rebuild. Discovery outcomes and
+/// the one-time attempt flag are never recorded here, because an explicit cache path
+/// is a caller-owned location and must not mark the user-level automatic setup as
+/// attempted. When the rebuilt path is the user-level cache location, the resolved
+/// source is recorded so a later rebuild reuses it without searching again.
 fn rebuild_unavailable_cache(
     path: &Path,
     context: &VanillaIndexContext<'_>,
@@ -220,22 +221,26 @@ fn rebuild_unavailable_cache(
             if report.cancelled {
                 return Err("Vanilla cache rebuild discovery was cancelled".to_owned());
             }
-            match report.installations.as_slice() {
-                [source] => source.clone(),
-                [] => return Ok(None),
-                candidates => {
-                    return Err(format!(
-                        "multiple {} installations were found; run `pdx setup vanilla --game {} --source <directory>` to choose one: {}",
-                        auto_vanilla.descriptor.display_name,
-                        auto_vanilla.descriptor.game_id,
-                        candidates
-                            .iter()
-                            .map(|path| path.display().to_string())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    ));
-                }
+            let Some(selection) = select_installation(&report.installations) else {
+                return Ok(None);
+            };
+            if !selection.alternatives.is_empty()
+                && let Some(log) = context.log
+            {
+                let listed = selection
+                    .alternatives
+                    .iter()
+                    .map(|candidate| candidate.path.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                log(&format!(
+                    "Vanilla cache rebuild found {} installation(s); selected {} ({}) over: {listed}",
+                    report.installations.len(),
+                    selection.selected.path.display(),
+                    selection.selected.source.label(),
+                ));
             }
+            selection.selected.path.clone()
         }
     };
     if let Some(log) = context.log {
@@ -264,7 +269,35 @@ fn rebuild_unavailable_cache(
             path.display()
         ));
     }
-    build_cache_from_source(&source, path, context, "Vanilla cache rebuild").map(Some)
+    let cache = build_cache_from_source(&source, path, context, "Vanilla cache rebuild")?;
+    // A rebuild of the user-level cache records the resolved source so the recovery
+    // path never needs to search twice; explicit caller-owned paths stay untouched.
+    if path
+        == auto_vanilla
+            .user_paths
+            .vanilla_cache(auto_vanilla.descriptor.game_id)
+    {
+        let recorded = UserConfiguration::load(&auto_vanilla.user_paths.config_file).and_then(
+            |mut configuration| {
+                let game = configuration
+                    .games
+                    .entry(auto_vanilla.descriptor.game_id.to_owned())
+                    .or_default();
+                game.vanilla_source = Some(source.clone());
+                game.vanilla_cache = Some(path.to_owned());
+                configuration.save(&auto_vanilla.user_paths.config_file)
+            },
+        );
+        if let Err(error) = recorded
+            && let Some(log) = context.log
+        {
+            log(&format!(
+                "Vanilla cache rebuild could not record the resolved source in {}: {error}",
+                auto_vanilla.user_paths.config_file.display()
+            ));
+        }
+    }
+    Ok(Some(cache))
 }
 
 fn build_cache_from_source(
@@ -461,7 +494,7 @@ pub(crate) fn apply_user_vanilla_configuration(
     }
     if game.auto_discovery_attempted && auto_vanilla.source_override.is_none() {
         warnings.push(format!(
-            "Automatic {} discovery was already attempted without a usable cache; run `pdx setup vanilla --game {active_game_id} --deep` to search again",
+            "Automatic {} discovery was already attempted without a usable cache; run `pdx setup vanilla --game {active_game_id} --source <directory>` to select an installation",
             auto_vanilla.descriptor.display_name
         ));
         None
@@ -530,7 +563,8 @@ pub(crate) fn run_auto_vanilla_setup_with_options_and_limits(
                 descriptor.display_name
             ));
         }
-        let source = if let Some(source) = auto_vanilla.source_override.as_ref() {
+        let mut alternatives: Vec<std::path::PathBuf> = Vec::new();
+        let selected = if let Some(source) = auto_vanilla.source_override.as_ref() {
             if let Some(log) = log {
                 log(&format!(
                     "Vanilla setup phase: validating explicitly selected installation {}",
@@ -544,7 +578,12 @@ pub(crate) fn run_auto_vanilla_setup_with_options_and_limits(
                     source.display()
                 ));
             }
-            source.clone()
+            DiscoveredInstallation {
+                path: source.clone(),
+                source: CandidateSource::Explicit,
+                game_build: None,
+                marker_modified: None,
+            }
         } else {
             if let Some(log) = log {
                 log(&format!(
@@ -568,9 +607,9 @@ pub(crate) fn run_auto_vanilla_setup_with_options_and_limits(
                     descriptor.display_name
                 ));
             }
-            match report.installations.as_slice() {
-                [source] => source.clone(),
-                [] => {
+            let selection = match select_installation(&report.installations) {
+                Some(selection) => selection,
+                None => {
                     record_discovery_outcome(
                         &mut configuration,
                         descriptor.game_id,
@@ -578,34 +617,40 @@ pub(crate) fn run_auto_vanilla_setup_with_options_and_limits(
                         &auto_vanilla.user_paths,
                     )?;
                     return Err(format!(
-                        "{} was not found in common installation locations; run `pdx setup vanilla --game {} --deep` to search local disks",
+                        "{} was not found in known installation locations; run `pdx setup vanilla --game {} --source <directory>` to select it manually",
                         descriptor.display_name, descriptor.game_id
                     ));
                 }
-                candidates => {
-                    record_discovery_outcome(
-                        &mut configuration,
-                        descriptor.game_id,
-                        DiscoveryOutcome::MultipleCandidates,
-                        &auto_vanilla.user_paths,
-                    )?;
-                    return Err(format!(
-                        "multiple {} installations were found:\n{}\nrun `pdx setup vanilla --game {} --source <directory>` to choose one",
-                        descriptor.display_name,
-                        candidates
-                            .iter()
-                            .map(|path| format!("  {}", path.display()))
-                            .collect::<Vec<_>>()
-                            .join("\n"),
-                        descriptor.game_id
+            };
+            if !selection.alternatives.is_empty() {
+                let listed = selection
+                    .alternatives
+                    .iter()
+                    .map(|candidate| candidate.path.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                if let Some(log) = log {
+                    log(&format!(
+                        "Vanilla discovery found {} installation(s); selected {} ({}) over: {listed}",
+                        report.installations.len(),
+                        selection.selected.path.display(),
+                        selection.selected.source.label(),
                     ));
                 }
+                alternatives = selection
+                    .alternatives
+                    .iter()
+                    .map(|candidate| candidate.path.clone())
+                    .collect();
             }
+            selection.selected.clone()
         };
+        let source = selected.path.clone();
         if let Some(log) = log {
             log(&format!(
-                "Vanilla setup phase: selected source {}",
-                source.display()
+                "Vanilla setup phase: selected source {} ({})",
+                source.display(),
+                selected.source.label()
             ));
         }
 
@@ -683,6 +728,8 @@ pub(crate) fn run_auto_vanilla_setup_with_options_and_limits(
                 game.discovery_outcome = Some(DiscoveryOutcome::Configured);
                 game.vanilla_source = Some(source.clone());
                 game.vanilla_cache = Some(cache_path.clone());
+                game.resolved_via = Some(selected.source.label().to_owned());
+                game.game_build = selected.game_build.clone();
                 configuration
                     .save(&auto_vanilla.user_paths.config_file)
                     .map_err(|error| {
@@ -696,14 +743,23 @@ pub(crate) fn run_auto_vanilla_setup_with_options_and_limits(
                         auto_vanilla.user_paths.config_file.display()
                     ));
                 }
-                Ok((
-                    cache,
-                    format!(
-                        "{} Vanilla symbols are now enabled from {}",
-                        descriptor.display_name,
-                        source.display()
-                    ),
-                ))
+                let mut message = format!(
+                    "{} Vanilla symbols are now enabled from {} ({})",
+                    descriptor.display_name,
+                    source.display(),
+                    selected.source.label()
+                );
+                if !alternatives.is_empty() {
+                    message.push_str(&format!(
+                        "; other candidates: {} (override with `pdx setup vanilla --source <directory>`)",
+                        alternatives
+                            .iter()
+                            .map(|path| path.display().to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ));
+                }
+                Ok((cache, message))
             }
             Err(error) => {
                 if cancellation.discovery.is_cancelled() || cancellation.workspace.is_cancelled() {

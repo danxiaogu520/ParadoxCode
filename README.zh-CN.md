@@ -150,7 +150,7 @@ Zed 使用 `.zed/settings.json` 中的 `lsp.pdx-ls.initialization_options`。两
 pdx setup vanilla
 ```
 
-首次 `pdx-ls` 启动时，若没有显式缓存或之前的尝试记录，也会执行一次非阻塞的快速探测。如果常见位置没有产生唯一候选，请运行 `pdx setup vanilla --deep` 或用 `--source` 指定目录。正常启动时不会重复搜索。
+首次 `pdx-ls` 启动时，若没有显式缓存或之前的尝试记录，也会执行一次非阻塞的快速探测。探测会读取启动器元数据（Steam 库清单、Epic 清单、GOG 注册表）和常见位置，只执行一次；若未产生候选，请用 `--source` 显式指定目录（或用 `--root` 探测指定文件夹）。正常启动时不会重复搜索。
 
 使用底层命令在显式位置构建或手动刷新缓存：
 

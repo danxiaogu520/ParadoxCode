@@ -871,7 +871,6 @@ fn unavailable_explicit_cache_is_rebuilt_from_discovered_source() {
     let discovery_options = DiscoveryOptions {
         roots: vec![root.join("library")],
         include_platform_locations: false,
-        ..DiscoveryOptions::default()
     };
     let (cache, message) = run_index_cache_load_with_options(
         IndexCacheLoadRequest {
@@ -980,6 +979,167 @@ fn unavailable_configured_cache_is_rebuilt_from_configured_source() {
 }
 
 #[test]
+fn unavailable_user_level_cache_rebuild_records_the_resolved_source() {
+    let (root, _) = temp_workspace_dir();
+    fixture_vanilla_source(&root);
+    let automatic = AutoVanillaConfiguration {
+        descriptor: pdx_game::eu4::INSTALL_DESCRIPTOR,
+        user_paths: UserPaths {
+            config_file: root.join("user/config.toml"),
+            cache_root: root.join("user/cache"),
+        },
+        source_override: None,
+    };
+    // The cache path is the user-level location, so the recovery rebuild must record
+    // the resolved source and never need to search a second time.
+    let cache_path = automatic.user_paths.vanilla_cache("eu4");
+    fs::create_dir_all(cache_path.parent().expect("cache parent")).expect("cache directory");
+    fs::write(&cache_path, b"not a vanilla cache").expect("corrupt cache fixture");
+    let cancellation = IndexSetupCancellation::new();
+    let discovery_options = DiscoveryOptions {
+        roots: vec![root.join("library")],
+        include_platform_locations: false,
+    };
+    let rules = pdx_game::eu4::first_party_rules().expect("rules");
+    let (cache, message) = run_index_cache_load_with_options(
+        IndexCacheLoadRequest {
+            path: &cache_path,
+            rules: rules.clone(),
+            profile: pdx_game::eu4::profile(),
+            current_rule_hash: rules.rule_hash().to_hex(),
+            auto_vanilla: Some(&automatic),
+            log: None,
+            progress: None,
+            scan_limits: pdx_engine::WorkspaceScanLimits::default(),
+            cancellation: &cancellation,
+        },
+        &discovery_options,
+    )
+    .expect("user-level rebuild succeeds");
+    assert!(
+        message.contains("rebuilt from the discovered installation"),
+        "{message}"
+    );
+    assert_eq!(cache.metadata().game_id, "eu4");
+    let configuration =
+        UserConfiguration::load(&automatic.user_paths.config_file).expect("configuration");
+    let game = configuration.games.get("eu4").expect("EU4 configuration");
+    let expected = pdx_game::portable_path(
+        fs::canonicalize(root.join("library/Europa Universalis IV")).expect("canonical source"),
+    );
+    assert_eq!(game.vanilla_source.as_deref(), Some(expected.as_path()));
+    assert_eq!(game.vanilla_cache.as_deref(), Some(cache_path.as_path()));
+    // A caller-driven rebuild never marks the one-time automatic attempt as done.
+    assert!(!game.auto_discovery_attempted);
+    assert!(game.discovery_outcome.is_none());
+
+    // With the source recorded, a second unavailable-cache recovery reads the
+    // configuration instead of searching.
+    fs::write(&cache_path, b"not a vanilla cache").expect("corrupt cache again");
+    let (_, second) = run_index_cache_load_with_options(
+        IndexCacheLoadRequest {
+            path: &cache_path,
+            rules: rules.clone(),
+            profile: pdx_game::eu4::profile(),
+            current_rule_hash: rules.rule_hash().to_hex(),
+            auto_vanilla: Some(&automatic),
+            log: None,
+            progress: None,
+            scan_limits: pdx_engine::WorkspaceScanLimits::default(),
+            cancellation: &cancellation,
+        },
+        // No roots this time: only the recorded configuration may resolve the source.
+        &DiscoveryOptions {
+            roots: Vec::new(),
+            include_platform_locations: false,
+        },
+    )
+    .expect("recorded source rebuilds without searching");
+    assert!(
+        second.contains("rebuilt from the discovered installation"),
+        "{second}"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn automatic_discovery_resolves_multiple_candidates_deterministically() {
+    let (root, _) = temp_workspace_dir();
+    let older = fixture_vanilla_source(&root);
+    let newer = {
+        let source = root.join("library2/Europa Universalis IV");
+        for directory in pdx_game::eu4::INSTALL_DESCRIPTOR.validation_directories {
+            fs::create_dir_all(source.join(directory)).expect("validation directory");
+        }
+        #[cfg(target_os = "windows")]
+        let executable = source.join("eu4.exe");
+        #[cfg(target_os = "linux")]
+        let executable = source.join("eu4");
+        #[cfg(target_os = "macos")]
+        let executable = source.join("Europa Universalis IV.app/Contents/MacOS/eu4");
+        fs::create_dir_all(executable.parent().expect("executable parent"))
+            .expect("executable parent directory");
+        let file = fs::File::options()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(&executable)
+            .expect("executable marker");
+        file.set_modified(
+            std::time::SystemTime::now() + std::time::Duration::from_secs(60 * 60 * 24),
+        )
+        .expect("newer marker mtime");
+        drop(file);
+        fs::create_dir_all(source.join("events")).expect("indexed directory");
+        fs::write(
+            source.join("events/definitions.txt"),
+            "country_event = { id = vanilla.1 }\n",
+        )
+        .expect("fixture source");
+        source
+    };
+    let automatic = AutoVanillaConfiguration {
+        descriptor: pdx_game::eu4::INSTALL_DESCRIPTOR,
+        user_paths: UserPaths {
+            config_file: root.join("user/config.toml"),
+            cache_root: root.join("user/cache"),
+        },
+        source_override: None,
+    };
+    let options = DiscoveryOptions {
+        roots: vec![root.join("library"), root.join("library2")],
+        include_platform_locations: false,
+    };
+    let (_, message) = run_auto_vanilla_setup_with_options(
+        &automatic,
+        pdx_game::eu4::first_party_rules().expect("rules"),
+        pdx_game::eu4::profile(),
+        None,
+        None,
+        &IndexSetupCancellation::new(),
+        &options,
+    )
+    .expect("multiple candidates must resolve instead of failing");
+    let expected = pdx_game::portable_path(fs::canonicalize(&newer).expect("canonical"));
+    assert!(
+        message.contains("Vanilla symbols are now enabled")
+            && message.contains(expected.to_str().expect("utf-8 path"))
+            && message.contains("other candidates"),
+        "the newest installation wins and alternatives are reported: {message}"
+    );
+    let configuration =
+        UserConfiguration::load(&automatic.user_paths.config_file).expect("configuration");
+    let game = configuration.games.get("eu4").expect("EU4 configuration");
+    assert_eq!(game.discovery_outcome, Some(DiscoveryOutcome::Configured));
+    assert_eq!(
+        game.vanilla_source.as_deref(),
+        Some(expected.as_path()),
+        "the {older:?} candidate must not be selected"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn automatic_vanilla_setup_builds_cache_and_records_single_attempt() {
     let (root, _) = temp_workspace_dir();
     let source = root.join("library/Europa Universalis IV");
@@ -1012,7 +1172,6 @@ fn automatic_vanilla_setup_builds_cache_and_records_single_attempt() {
     let options = DiscoveryOptions {
         roots: vec![root.join("library")],
         include_platform_locations: false,
-        ..DiscoveryOptions::default()
     };
     let (cache, message) = run_auto_vanilla_setup_with_options(
         &automatic,
@@ -1069,7 +1228,6 @@ fn selected_game_directory_retries_after_failed_automatic_discovery() {
     let options = DiscoveryOptions {
         roots: Vec::new(),
         include_platform_locations: false,
-        ..DiscoveryOptions::default()
     };
     let (_, message) = run_auto_vanilla_setup_with_options(
         &automatic,
@@ -1210,7 +1368,6 @@ fn unsuccessful_automatic_discovery_is_recorded_and_not_repeated() {
     let options = DiscoveryOptions {
         roots: Vec::new(),
         include_platform_locations: false,
-        ..DiscoveryOptions::default()
     };
     let first = run_auto_vanilla_setup_with_options(
         &automatic,
