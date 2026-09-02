@@ -95,10 +95,12 @@ that send only the deprecated `rootUri` field are intentionally unsupported and 
 
 ## Project status
 
-**Latest release: v0.2.0** (28 Aug 2026). The CWTools-inspired EU4 analysis and indexing features
-are implemented, tested, and released through the tag-driven release pipeline (see
-[Releases](#releases)). Early adopters should expect rough edges while 0.2.x matures; please
-report problems through the issue templates so they can be fixed in the next release.
+**Latest release: v0.3.0** (2 Sep 2026). The EU4 analysis and indexing features are implemented,
+tested, and released through the tag-driven release pipeline (see [Releases](#releases)). This
+release cuts whole-workspace validation CPU by 68% and peak memory by 66% with unchanged
+diagnostics output, hardens language-server shutdown, and reworks vanilla installation discovery.
+Early adopters should still expect rough edges while 0.x matures; please report problems through
+the issue templates so they can be fixed in the next release.
 
 Known limitations of the current scope:
 

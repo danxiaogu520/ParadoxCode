@@ -7,8 +7,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-02
+
+This release ships a profile-driven performance round (whole-workspace validation CPU -68%, peak
+memory -66%, diagnostics output unchanged), hardens language-server shutdown and watched-file
+handling, and reworks EU4 vanilla installation discovery around launcher metadata.
+
 ### Added
 
+- A profile-driven optimization round across the parser, HIR, rules, index, analysis, and LSP:
+  whole-workspace validation CPU drops 68% and peak memory drops 66% on the head-to-head
+  benchmark harness, and the single-threaded validation pass drops 78% (157.3s to 35.0s on a
+  7,907-file workshop mod) while diagnostics output stays byte-identical.
+- The workspace scan no longer blocks `initialize`; whole-workspace validation runs in parallel
+  and document edits are validated immediately.
+- Closed-file syntax trees are evicted after validation and reparsed on demand, index vectors
+  shrink to their exact size, and localisation cache previews are retained only for preferred
+  languages.
+- Completion covers the remaining EU4 root entries, including `on_action`, and the first-party
+  rules ship `on_action` scope documentation.
+- VS Code gains dependency-management commands: **ParadoxCode: Add Dependency** opens a
+  folder-and-cache wizard that appends the ordered `paradoxcode.dependencies` entry, with
+  matching Remove and Open Dependency Settings commands.
 - Installation discovery now resolves launcher metadata first: Steam library roots from the
   Windows registry plus per-library `appmanifest` install directories (with build ids), Epic
   Games manifest install locations, and GOG registry entries. WSL setups additionally probe
@@ -23,8 +43,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Editor configuration is intentionally separate: VS Code uses its `paradoxcode.*` settings
+  while Zed uses `lsp.pdx-ls.initialization_options`; the two editors no longer read a shared
+  project file.
+- VS Code's whole-workspace diagnostics default to off; opened documents are always validated
+  either way, and the resolved setting is forwarded unconditionally so untouched
+  configurations no longer fall back to the server-side default.
 - An unavailable user-level Vanilla cache rebuild now records the resolved source so the
   recovery path never searches twice.
+
+### Fixed
+
+- Language-server shutdown drains every queued workspace worker and in-flight watched-file
+  republication before exiting, eliminating shutdown-race interleavings; the queued ready pass
+  survives partial watched-file batches, and identical overlay diagnostics are no longer
+  republished after a scan commit.
+- Comments are preserved during encoding recovery.
 
 ### Removed
 
@@ -176,7 +210,8 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.2...v0.1.3
