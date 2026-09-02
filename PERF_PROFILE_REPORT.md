@@ -189,6 +189,7 @@ node performance-results/report-numbers.mjs
 - mem_probe 在末尾安装 vanilla 缓存时因根类型不匹配 panic(示例只配置了 CurrentMod 根;`install_index_cache` 期望 Vanilla 根)——发生在全部被剖析阶段之后,不影响数据;建议后续给示例补一个 Vanilla 源根。
 - 主线程 `NtWaitForSingleObject` 的 7.4%(13.7s)是睡眠/等待权重,不计入 CPU。
 - 产物(均在 gitignored 的 `performance-results/`):`samply-memprobe.json.gz`(3.4MB 原始 profile)、`samply-symbols.json`(15,012 条符号)、`samply-analysis.json`、`report-numbers.json`、`memprobe-stdout.log`,以及脚本 `analyze-samply.mjs` / `symbolicate-samply.mjs` / `report-numbers.mjs`。
+- 本轮收尾时已清理全部一次性原始 profile 与日志(约 108MB);`performance-results/` 仅保留复现用脚本(`run-triple.mjs` / `sample-proc.mjs` / `symbolicate-samply.mjs` / `analyze-samply.mjs` / `report-numbers.mjs`),原始数据可按第八节流程重新采集。
 
 ---
 
