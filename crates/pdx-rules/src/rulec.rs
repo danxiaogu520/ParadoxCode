@@ -1176,7 +1176,7 @@ mod tests {
         assert_eq!(source_model.file_categories.len(), 124);
         assert_eq!(source_model.symbol_descriptors.len(), 2667);
         assert_eq!(source_model.records.len(), 13_719);
-        assert_eq!(source_model.semantic.rules.len(), 8_530);
+        assert_eq!(source_model.semantic.rules.len(), 8_533);
         assert_eq!(source_model.semantic.enum_values.len(), 72);
         assert_eq!(source_model.semantic.type_root_keys.len(), 7);
         assert_eq!(source_model.semantic.type_root_scopes.len(), 2);
