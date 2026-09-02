@@ -34,7 +34,7 @@
   "configuration.vanillaIndexCache.description": "Path to a persistent Vanilla index cache (.pdxindex).",
   "configuration.dependencies.description": "Dependency Mods from lowest to highest priority. Each item is { id, path, index? }.",
   "configuration.gameDirectory.description": "EU4 installation root containing eu4.exe. Used for mission textures and as the explicit Vanilla source during guided setup.",
-  "configuration.workspaceWideDiagnostics.description": "Publish diagnostics for closed files in the current Mod during workspace validation and refreshes.",
+  "configuration.workspaceWideDiagnostics.description": "Publish diagnostics for closed files in the current Mod during workspace validation and refreshes. Disabled by default; files opened in the editor are always validated.",
   "configuration.backgroundReindexIntervalMinutes.description": "Quiet full workspace re-scan interval in minutes. Zero disables automatic re-scans.",
   "configuration.backgroundReindexIdleSeconds.description": "Minimum editor-idle time before a quiet workspace re-scan can begin.",
   "configuration.ignoreFilePatterns.description": "Glob patterns for files excluded from workspace discovery.",

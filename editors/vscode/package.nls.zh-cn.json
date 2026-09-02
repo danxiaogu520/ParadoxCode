@@ -34,7 +34,7 @@
   "configuration.vanillaIndexCache.description": "持久化 Vanilla 索引缓存（`.pdxindex`）路径。",
   "configuration.dependencies.description": "按从低到高优先级排列的依赖 Mod，每项为 `{ id, path, index? }`。",
   "configuration.gameDirectory.description": "包含 `eu4.exe` 的 EU4 安装目录，用于任务树纹理，并在新手引导中作为明确的 Vanilla 数据来源。",
-  "configuration.workspaceWideDiagnostics.description": "在工作区校验和刷新期间，为当前 Mod 中未打开的文件发布诊断。",
+  "configuration.workspaceWideDiagnostics.description": "在工作区校验和刷新期间，为当前 Mod 中未打开的文件发布诊断。默认关闭；编辑器中打开的文件始终会校验。",
   "configuration.backgroundReindexIntervalMinutes.description": "安静时完整扫描工作区的间隔（分钟）。设为 0 可禁用自动扫描。",
   "configuration.backgroundReindexIdleSeconds.description": "启动安静扫描前要求编辑器保持空闲的最短时间。",
   "configuration.ignoreFilePatterns.description": "从工作区发现中排除文件的 glob 模式。",
