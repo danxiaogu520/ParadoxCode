@@ -80,18 +80,22 @@ impl PlatformExecutablePaths {
 
 impl GameInstallDescriptor {
     /// Whether a launcher-reported executable (a registry value or manifest entry) names
-    /// one of this game's marker executables. Comparison uses only the file name.
+    /// one of this game's marker executables. Comparison uses only the file name; launcher
+    /// metadata reports Windows-formatted paths, so both separators must split on every
+    /// platform (`Path::file_name` rejects `\` outside Windows).
+    #[cfg(any(target_os = "windows", target_os = "macos", test))]
     #[must_use]
     fn matches_executable_file(&self, reported: &str) -> bool {
-        let Some(name) = Path::new(reported).file_name().and_then(OsStr::to_str) else {
+        fn file_name(path: &str) -> &str {
+            path.rsplit(['/', '\\']).next().unwrap_or_default()
+        }
+        let name = file_name(reported);
+        if name.is_empty() {
             return false;
-        };
-        self.executable_paths.any_platform().any(|marker| {
-            Path::new(marker)
-                .file_name()
-                .and_then(OsStr::to_str)
-                .is_some_and(|marker| marker.eq_ignore_ascii_case(name))
-        })
+        }
+        self.executable_paths
+            .any_platform()
+            .any(|marker| file_name(marker).eq_ignore_ascii_case(name))
     }
 }
 
