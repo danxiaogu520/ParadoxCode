@@ -588,6 +588,105 @@ fn watched_refresh_republishes_closed_file_diagnostics() {
     fs::remove_dir_all(root).expect("cleanup");
 }
 
+/// Regression test for a Linux CI flake in the same family as the ready-pass
+/// one. A watched-file change pending while the initial scan ran meant the
+/// post-ready workspace pass stayed queued behind the disk batch; two
+/// independent holes then dropped it before `exit` ran. First, the
+/// deferred-replay gate waited for the disk worker and the scan but not for
+/// the pass their completions had queued, so the replayed `exit` skipped its
+/// publication. Second, publishing the incremental watched-file batch
+/// cleared the queued-pass flag even though that batch covers only the files
+/// it touched. A deferred `exit` must wait for every worker the shutdown
+/// drain waits on, and only a whole-workspace validation may consume the
+/// queued pass.
+#[test]
+fn deferred_exit_waits_for_the_ready_pass_queued_behind_a_disk_change() {
+    let (root, root_uri) = temp_workspace_dir();
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("events directory");
+    let source = events.join("deferred-exit-refresh.txt");
+    fs::write(&source, "scope = nowhere\n").expect("invalid source");
+    let changed_source = source.clone();
+    let source_uri = canonical_uri(&source);
+    for index in 0..400 {
+        // The bulk corpus keeps the initial scan in flight past
+        // `shutdown`, which is what queues the ready pass behind the
+        // pending watched-file change in the first place.
+        let bulk = "a = 1\n".repeat(400);
+        fs::write(events.join(format!("bulk-{index:03}.txt")), &bulk).expect("bulk source");
+    }
+    let wait_for_initialize: ReadAction = Some(Box::new(|| {
+        std::thread::sleep(std::time::Duration::from_millis(150));
+    }));
+    let input = ScriptedReader::new([
+        (
+            json!({
+                "jsonrpc":"2.0",
+                "id":1,
+                "method":"initialize",
+                "params":{
+                    "workspaceFolders":[{"uri":root_uri,"name":"test"}],
+                    "capabilities":{"window":{"workDoneProgress":true}}
+                }
+            }),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            wait_for_initialize,
+        ),
+        (
+            json!({
+                "jsonrpc":"2.0",
+                "method":"workspace/didChangeWatchedFiles",
+                "params":{"changes":[{"uri":source_uri,"type":2}]}
+            }),
+            Some(Box::new(move || {
+                fs::write(changed_source, "").expect("write fixed source");
+            }) as Box<dyn FnOnce() + Send>),
+        ),
+        (
+            json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+            None,
+        ),
+        (json!({"jsonrpc":"2.0","method":"exit"}), None),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server.run_transport(input, &mut output).expect("transport");
+    let responses = decode_frames(&output);
+    let shutdown_at = responses
+        .iter()
+        .position(|value| value["id"] == 2 && value.get("result").is_some())
+        .expect("shutdown response");
+    let scan_end_at = responses
+        .iter()
+        .position(|value| {
+            value["method"] == "$/progress"
+                && value["params"]["token"]
+                    .as_str()
+                    .is_some_and(|token| token.starts_with("pdx-scan-"))
+                && value["params"]["value"]["kind"] == "end"
+        })
+        .expect("scan completion progress frame");
+    assert!(
+        shutdown_at < scan_end_at,
+        "initial scan completed before `shutdown` was processed; enlarge the bulk corpus or the `initialized` delay"
+    );
+    let publications = responses
+        .iter()
+        .filter(|value| {
+            value["method"] == "textDocument/publishDiagnostics"
+                && value["params"]["uri"] == source_uri
+        })
+        .count();
+    assert!(
+        publications >= 2,
+        "the watched-file republication or the queued ready pass was skipped before `exit` ran"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
 #[test]
 fn initialize_ignore_filters_are_applied_before_workspace_scan() {
     let (root, root_uri) = temp_workspace_dir();

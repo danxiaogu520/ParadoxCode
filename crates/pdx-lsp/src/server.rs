@@ -502,6 +502,10 @@ pub(crate) struct WorkspaceValidationResult {
     /// can be retained rather than flooding the client with clears.
     pub(crate) publications: Vec<WorkspaceDiagnosticPublication>,
     pub(crate) current_uris: Vec<String>,
+    /// Whether this validation walked the whole Current Mod. A full walk
+    /// answers the queued post-ready pass; an incremental watched-file batch
+    /// covers only the files it touched and must leave that pass queued.
+    pub(crate) full_workspace: bool,
 }
 
 #[derive(Debug)]
@@ -758,7 +762,14 @@ impl LspServer {
         output: &mut W,
         result: &WorkspaceValidationResult,
     ) -> Result<(), LspError> {
-        self.workspace_diagnostics_pending = false;
+        if result.full_workspace {
+            // A whole-workspace validation answers the queued post-ready pass. An
+            // incremental watched-file batch covers only the files it touched;
+            // clearing the flag there would drop the initial closed-file
+            // publication whenever a watched change lands between `ready` and
+            // the pass spawn.
+            self.workspace_diagnostics_pending = false;
+        }
         let current = result.current_uris.iter().cloned().collect::<BTreeSet<_>>();
         let stale = self
             .workspace_diagnostic_uris

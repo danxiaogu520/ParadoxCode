@@ -209,6 +209,7 @@ fn workspace_validation_result(
         summary,
         publications,
         current_uris,
+        full_workspace: true,
     })
 }
 
@@ -320,6 +321,7 @@ fn changed_files_validation_result(
         summary,
         publications,
         current_uris,
+        full_workspace: false,
     })
 }
 
@@ -425,8 +427,9 @@ impl LspServer {
     /// Starts an automatic closed-file diagnostic pass once all foreground work has drained.
     ///
     /// This worker deliberately validates the current immutable snapshot without refreshing the
-    /// source roots. Refresh workers attach their own validation result so a watched-file burst or
-    /// quiet re-scan never pays for a second full diagnostics walk.
+    /// source roots. Full refresh workers attach their own validation result so a whole-workspace
+    /// re-scan never pays for a second full diagnostics walk; incremental watched-file batches
+    /// cover only the files they touched and do not supersede this pass.
     pub(super) fn spawn_pending_workspace_diagnostics<'scope, 'environment>(
         &mut self,
         scope: &'scope std::thread::Scope<'scope, 'environment>,
