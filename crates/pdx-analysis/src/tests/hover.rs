@@ -221,8 +221,8 @@ fn semantic_hover_keeps_multiple_matching_rule_meanings() {
     let hover = hover(&host.snapshot(), &id, position).expect("ambiguous rule hover");
     assert!(hover.contents.contains("#### Possible meanings (2)"));
     assert!(!hover.contents.contains("##### Candidate 1"));
-    assert!(hover.contents.contains("value: `bool (`yes` / `no`)`"));
-    assert!(hover.contents.contains("value: `integer in [1, 3]`"));
+    assert!(hover.contents.contains("value: bool (`yes` / `no`)"));
+    assert!(hover.contents.contains("value: integer in [1, 3]"));
 }
 
 #[test]

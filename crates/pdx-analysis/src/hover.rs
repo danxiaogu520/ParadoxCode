@@ -353,7 +353,7 @@ fn semantic_hover_candidate_details(
 ) -> Vec<String> {
     let rule = candidate.rule;
     let mut details = vec![format!(
-        "- value: `{}`",
+        "- value: {}",
         semantic_rule_hover_value_label(rule)
     )];
     if !rule.allowed_scopes.is_empty() {
@@ -451,6 +451,10 @@ fn semantic_hover_candidate_equivalent(
         && left.rule.max_occurs == right.rule.max_occurs
 }
 
+/// Renders a value-matcher description. Some labels embed their own inline code
+/// spans (for example ``dynamic value set `country_flag` ``), so callers must
+/// not wrap the result in another code span — the nested backticks would break
+/// apart in the rendered Markdown.
 pub(crate) fn semantic_value_hover_label(matcher: &ValueMatcher) -> String {
     match matcher {
         ValueMatcher::AnyScalar => "any scalar".to_owned(),
