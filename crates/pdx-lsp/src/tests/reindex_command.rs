@@ -419,6 +419,112 @@ fn scan_reschedule_during_shutdown_still_exits_cleanly() {
     fs::remove_dir_all(root).expect("cleanup");
 }
 
+/// Regression test for a Linux CI flake: while the initial scan was still
+/// running, the shutdown-time force spawn published the overlay's diagnostics
+/// and the scan commit then re-ran the same version "against the now-complete
+/// index" — publishing a byte-identical batch a second time. Identical
+/// revalidation results must not be republished; only changed batches are.
+///
+/// The setup mirrors the other shutdown-race tests: a bulk corpus keeps the
+/// scan in flight past `shutdown`, and the ordering guard fails loudly on a
+/// machine fast enough to let the scan win.
+#[test]
+fn identical_overlay_revalidation_is_not_republished_after_scan_commit() {
+    let (root, root_uri) = temp_workspace_dir();
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("events directory");
+    for index in 0..400 {
+        let bulk = "a = 1\n".repeat(400);
+        fs::write(events.join(format!("bulk-{index:03}.txt")), &bulk).expect("bulk source");
+    }
+    let source = events.join("overlay-fresh.txt");
+    fs::write(&source, "scope = country\n").expect("overlay base source");
+    let uri = canonical_uri(&source);
+    let wait_for_initialize: ReadAction = Some(Box::new(|| {
+        std::thread::sleep(std::time::Duration::from_millis(150));
+    }));
+    let input = ScriptedReader::new([
+        (
+            json!({
+                "jsonrpc":"2.0",
+                "id":1,
+                "method":"initialize",
+                "params":{
+                    "workspaceFolders":[{"uri":root_uri,"name":"test"}],
+                    "capabilities":{"window":{"workDoneProgress":true}}
+                }
+            }),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            wait_for_initialize,
+        ),
+        (
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
+                "textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":"scope = nowhere\n"}
+            }}),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","method":"textDocument/didChange","params":{
+                "textDocument":{"uri":uri,"version":2},
+                "contentChanges":[{"text":"scope = country\n"}]
+            }}),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+            None,
+        ),
+        (json!({"jsonrpc":"2.0","method":"exit"}), None),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server.run_transport(input, &mut output).expect("transport");
+    let responses = decode_frames(&output);
+    let shutdown_at = responses
+        .iter()
+        .position(|value| value["id"] == 2 && value.get("result").is_some())
+        .expect("shutdown response");
+    let scan_end_at = responses
+        .iter()
+        .position(|value| {
+            value["method"] == "$/progress"
+                && value["params"]["token"]
+                    .as_str()
+                    .is_some_and(|token| token.starts_with("pdx-scan-"))
+                && value["params"]["value"]["kind"] == "end"
+        })
+        .expect("scan completion progress frame");
+    assert!(
+        shutdown_at < scan_end_at,
+        "initial scan completed before `shutdown` was processed; enlarge the bulk corpus or the `initialized` delay"
+    );
+    let batches = responses
+        .iter()
+        .filter(|value| {
+            value["method"] == "textDocument/publishDiagnostics" && value["params"]["uri"] == uri
+        })
+        .map(|value| value["params"]["diagnostics"].clone())
+        .collect::<Vec<_>>();
+    assert!(
+        !batches.is_empty(),
+        "overlay diagnostics were never published"
+    );
+    assert!(
+        batches.windows(2).all(|pair| pair[0] != pair[1]),
+        "an identical diagnostics batch was republished: {batches:?}"
+    );
+    assert!(
+        batches.last().is_some_and(|latest| latest
+            .as_array()
+            .is_some_and(|items| { items.iter().all(|item| item["code"] != "UnknownScope") })),
+        "the latest overlay text was not the published one: {batches:?}"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
 #[test]
 fn watched_refresh_republishes_closed_file_diagnostics() {
     let (root, root_uri) = temp_workspace_dir();
