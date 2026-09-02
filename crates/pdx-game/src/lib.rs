@@ -8,6 +8,7 @@ pub mod eu4;
 
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 use std::ffi::OsStr;
 use std::fmt;
 use std::fs;
