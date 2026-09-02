@@ -726,6 +726,16 @@ impl LspServer {
         if current.is_some_and(|document| {
             document.source() == DocumentSource::Overlay && document.version() == Some(version)
         }) {
+            // The overlay re-run after a scan commit legitimately recomputes the
+            // same version against the completed index; republishing a byte-identical
+            // batch would only churn the client, so only changed results go out.
+            if self
+                .diagnostics
+                .get(&id)
+                .is_some_and(|published| *published == diagnostics)
+            {
+                return false;
+            }
             self.diagnostics.insert(id, diagnostics);
             true
         } else {
