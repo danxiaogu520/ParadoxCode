@@ -108,12 +108,21 @@ fn workspace_validation_result(
                             cancelled.store(true, std::sync::atomic::Ordering::Relaxed);
                             return;
                         };
+                        let source = document.text_handle();
+                        let line_index = document.line_index().clone();
+                        let filtered = filter_diagnostics_with_ignored_and_overrides(
+                            diagnostics,
+                            &line_index,
+                            &source,
+                            ignored_diagnostic_codes,
+                            diagnostic_severity_overrides,
+                        );
                         write_outcome(
                             index,
                             FileOutcome {
-                                filtered: diagnostics,
-                                source: document.text_handle(),
-                                line_index: document.line_index().clone(),
+                                filtered,
+                                source,
+                                line_index,
                                 closed_uri: None,
                             },
                         );

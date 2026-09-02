@@ -77,14 +77,15 @@ fn scripted_localisation_names_cached_with_cancellation(
         {
             continue;
         }
-        let Some(shard) = snapshot.index().shard(file.id) else {
-            continue;
-        };
-        for (definition_index, definition) in shard.definitions.iter().enumerate() {
+        for (definition_index, (definition, active)) in snapshot
+            .index()
+            .definitions_for_file_with_state(file.id)
+            .enumerate()
+        {
             if definition_index & 255 == 0 {
                 cancellation.checkpoint()?;
             }
-            if definition.active && definition.kind.eq_ignore_ascii_case("defined_text") {
+            if active && definition.kind.eq_ignore_ascii_case("defined_text") {
                 names.push(definition.name.to_string());
             }
         }
@@ -128,7 +129,7 @@ fn scripted_localisation_names_cached_with_cancellation(
     let names = Arc::new(names);
     snapshot.query_cache().insert(
         revision,
-        pdx_engine::CacheDomain::Index,
+        pdx_engine::CacheDomain::Documents,
         SCRIPTED_LOCALISATION_NAMES_CACHE_KEY.to_owned(),
         Arc::clone(&names),
     );

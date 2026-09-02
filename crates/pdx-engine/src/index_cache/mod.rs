@@ -24,14 +24,14 @@ mod write;
 
 /// Current on-disk cache schema.
 ///
-/// Schema 9 invalidates indexes built by the old encoding-recovery sanitizer, which could expose
-/// braces from malformed comments as active syntax. Schema 8 added an optional per-file filesystem
-/// metadata fingerprint. Older caches are rebuilt once by the CLI or LSP, the same way a rules
-/// update triggers a rebuild; no legacy reader is retained.
+/// Schema 10 persists the exact selection range of definitions. Schema 9 invalidated indexes built
+/// by the old encoding-recovery sanitizer, which could expose braces from malformed comments as
+/// active syntax. Older caches are rebuilt once by the CLI or LSP, the same way a rules update
+/// triggers a rebuild; no legacy reader is retained.
 pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 10;
 
 /// Oldest on-disk cache schema this executable can still load.
-pub const MIN_SUPPORTED_CACHE_SCHEMA_VERSION: u32 = 9;
+pub const MIN_SUPPORTED_CACHE_SCHEMA_VERSION: u32 = CURRENT_CACHE_SCHEMA_VERSION;
 
 const APPLICATION_ID: i32 = 0x5044_5856;
 const MAX_CACHE_BYTES: u64 = 1024 * 1024 * 1024;

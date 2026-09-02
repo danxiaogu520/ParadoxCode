@@ -1,6 +1,53 @@
 use super::support::*;
 
 #[test]
+fn workspace_member_index_tracks_overlay_open_and_close() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-member-overlay-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&definitions).expect("scripted effects directory");
+    let source = definitions.join("effects.txt");
+    std::fs::write(&source, "disk_effect = { }\n").expect("disk definition");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan scripted effects");
+    assert_eq!(
+        crate::semantic::workspace_member_index(&host.snapshot(), "scripted_effect").select(""),
+        ["disk_effect"]
+    );
+
+    let id = DocumentId::new("file:///tmp/scripted-effects-overlay.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "overlay_effect = { }\n".to_owned(),
+        Some(source),
+    )
+    .expect("open scripted-effect overlay");
+    assert_eq!(
+        crate::semantic::workspace_member_index(&host.snapshot(), "scripted_effect").select(""),
+        ["overlay_effect"]
+    );
+
+    host.close_document(&id)
+        .expect("close scripted-effect overlay");
+    assert_eq!(
+        crate::semantic::workspace_member_index(&host.snapshot(), "scripted_effect").select(""),
+        ["disk_effect"],
+        "closing the overlay must restore the disk-derived member index"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn event_file_root_offers_all_entries_with_correct_shapes() {
     use std::path::PathBuf;
 

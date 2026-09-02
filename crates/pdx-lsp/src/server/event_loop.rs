@@ -560,7 +560,9 @@ impl LspServer {
                         if task.cancellation.is_cancelled() {
                             continue;
                         }
-                        if self.host.snapshot().revision() != result.base_revision {
+                        let scan_is_current =
+                            self.host.snapshot().revision() == result.base_revision;
+                        if !scan_is_current {
                             // Document edits raced the scan; restart from a
                             // fresh clone so the commit never drops overlay
                             // state. The attempt counter is bumped by each
@@ -570,8 +572,9 @@ impl LspServer {
                             // the shutdown drain: dropping it here would also
                             // drop the scanned workspace data the client (and
                             // the drain) still expects.
-                            if self.scan_retries < crate::MAX_BACKGROUND_SCAN_RETRIES {
+                            if self.scan_retries < self.scan_retry_limit {
                                 self.scan_pending = true;
+                                continue;
                             } else {
                                 self.scan_retries = 0;
                                 write_message(
@@ -582,59 +585,60 @@ impl LspServer {
                                     ),
                                 )?;
                             }
-                            continue;
                         }
-                        match result.result {
-                            Ok((host, report)) => {
-                                self.host = host;
-                                self.invalidate_all_semantic_tokens();
-                                write_message(
-                                    &mut output,
-                                    &log_message_notification(
-                                        MessageType::INFO,
-                                        format!(
-                                            "Workspace scan finished: discovered={}, indexed={}, legacy-encoded={}, skipped={}, issues={}, source file(s) active={}",
-                                            report.discovered_files,
-                                            report.indexed_files,
-                                            report.legacy_encoded_files,
-                                            report.skipped_entries,
-                                            report.issues.len() + report.omitted_issues,
-                                            self.host.snapshot().source_files().len(),
+                        if scan_is_current {
+                            match result.result {
+                                Ok((host, report)) => {
+                                    self.host = host;
+                                    self.invalidate_all_semantic_tokens();
+                                    write_message(
+                                        &mut output,
+                                        &log_message_notification(
+                                            MessageType::INFO,
+                                            format!(
+                                                "Workspace scan finished: discovered={}, indexed={}, legacy-encoded={}, skipped={}, issues={}, source file(s) active={}",
+                                                report.discovered_files,
+                                                report.indexed_files,
+                                                report.legacy_encoded_files,
+                                                report.skipped_entries,
+                                                report.issues.len() + report.omitted_issues,
+                                                self.host.snapshot().source_files().len(),
+                                            ),
                                         ),
-                                    ),
-                                )?;
-                                // Open overlays existed before the scan only
-                                // when documents raced it; re-run their
-                                // diagnostics against the now-complete index.
-                                let open = self
-                                    .host
-                                    .snapshot()
-                                    .documents()
-                                    .iter()
-                                    .filter_map(|(id, document)| {
-                                        document.version().map(|version| (id.clone(), version))
-                                    })
-                                    .collect::<Vec<_>>();
-                                for (id, version) in open {
-                                    self.schedule_diagnostics_for_document(
-                                        id,
-                                        version,
-                                        DIAGNOSTIC_DEBOUNCE,
-                                    );
+                                    )?;
+                                    // Open overlays existed before the scan only
+                                    // when documents raced it; re-run their
+                                    // diagnostics against the now-complete index.
+                                    let open = self
+                                        .host
+                                        .snapshot()
+                                        .documents()
+                                        .iter()
+                                        .filter_map(|(id, document)| {
+                                            document.version().map(|version| (id.clone(), version))
+                                        })
+                                        .collect::<Vec<_>>();
+                                    for (id, version) in open {
+                                        self.schedule_diagnostics_for_document(
+                                            id,
+                                            version,
+                                            DIAGNOSTIC_DEBOUNCE,
+                                        );
+                                    }
+                                }
+                                Err(WorkspaceError::Cancelled) => {}
+                                Err(error) => {
+                                    write_message(
+                                        &mut output,
+                                        &show_warning_notification(format!(
+                                            "Initial workspace scan failed: {error}"
+                                        )),
+                                    )?;
                                 }
                             }
-                            Err(WorkspaceError::Cancelled) => {}
-                            Err(error) => {
-                                write_message(
-                                    &mut output,
-                                    &show_warning_notification(format!(
-                                        "Initial workspace scan failed: {error}"
-                                    )),
-                                )?;
-                            }
                         }
-                        // Cache installs deferred behind the scan start now
-                        // that the host commit landed.
+                        // Cache installs deferred behind the scan start can proceed once the scan
+                        // reaches a terminal outcome, including bounded retry exhaustion.
                         let pending = std::mem::take(&mut self.pending_cache_setup);
                         if pending.index_cache.is_some()
                             || !pending.dependency_caches.is_empty()

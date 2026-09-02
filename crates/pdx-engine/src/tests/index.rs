@@ -416,6 +416,28 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
     index.resolve_priorities(&ordered, &rules);
     assert_eq!(
         index
+            .definition_identities()
+            .filter_map(|(definition, active)| active.then_some(definition.file_id))
+            .collect::<Vec<_>>(),
+        vec![second_file],
+        "bulk identity iteration must expose pointer-owned resolution state"
+    );
+    assert_eq!(
+        index
+            .definitions_for_kind_with_state("event")
+            .filter_map(|(definition, active)| active.then_some(definition.file_id))
+            .collect::<Vec<_>>(),
+        vec![second_file]
+    );
+    assert_eq!(
+        index
+            .definitions_for_file_with_state(first_file)
+            .map(|(_definition, active)| active)
+            .collect::<Vec<_>>(),
+        vec![false]
+    );
+    assert_eq!(
+        index
             .active_definition("event", "shared.1")
             .expect("higher priority definition")
             .file_id,
