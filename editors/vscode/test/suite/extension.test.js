@@ -94,7 +94,7 @@ suite('ParadoxCode VS Code extension host', () => {
       const config = vscode.workspace.getConfiguration('paradoxcode');
       assert.equal(typeof config.get('diagnosticIgnoreCodes'), 'object');
       assert.equal(typeof config.get('preview.zoomSensitivity'), 'number');
-      assert.equal(config.get('workspaceWideDiagnostics'), true);
+      assert.equal(config.get('workspaceWideDiagnostics'), false);
       assert.equal(config.get('backgroundReindexIntervalMinutes'), 0);
       assert.equal(config.get('backgroundReindexIdleSeconds'), 15);
       assert.deepEqual(config.get('ignoreFilePatterns'), []);
