@@ -158,6 +158,14 @@ pub(crate) fn is_initialize_control_message(message: &Value) -> bool {
         .is_some_and(|method| matches!(method, "$/cancelRequest" | "exit"))
 }
 
+pub(crate) fn is_exit_notification(message: &Value) -> bool {
+    message
+        .as_object()
+        .and_then(|object| object.get("method"))
+        .and_then(Value::as_str)
+        == Some("exit")
+}
+
 pub(crate) fn cancel_request_from_notification(
     message: &Value,
     in_flight: &HashMap<RequestId, InFlightRequest>,
