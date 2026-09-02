@@ -199,8 +199,9 @@ pdx setup vanilla
 ```
 
 The first `pdx-ls` launch also performs one non-blocking quick attempt when no explicit cache or
-previous attempt exists. If common locations do not produce exactly one candidate, run
-`pdx setup vanilla --deep` or select a directory with `--source`. Searches are not repeated on
+previous attempt exists. Launcher metadata (Steam libraries, Epic manifests, GOG registry entries)
+and common locations are probed once; if that produces no candidate, select the directory
+explicitly with `--source` (or `--root` to probe a specific folder). Searches are not repeated on
 normal startup.
 
 Build or manually refresh a cache at an explicit location with the lower-level command:

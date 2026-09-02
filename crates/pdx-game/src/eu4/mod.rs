@@ -238,6 +238,7 @@ pub const INSTALL_DESCRIPTOR: GameInstallDescriptor = GameInstallDescriptor {
     },
     validation_directories: &["common", "events", "missions", "decisions", "localisation"],
     installation_directory_names: &["Europa Universalis IV"],
+    steam_app_id: Some(236_850),
 };
 
 /// Loads and validates the first-party EU4 rules from the embedded JSON source bundle.

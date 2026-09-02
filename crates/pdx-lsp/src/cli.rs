@@ -2,7 +2,6 @@
 
 use std::fmt;
 use std::fs;
-use std::io::{self, IsTerminal, Write};
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -11,14 +10,14 @@ use pdx_engine::{
     WorkspaceChange, WorkspaceError, WorkspaceScanToken,
 };
 use pdx_game::{
-    DiscoveryDepth, DiscoveryOptions, DiscoveryOutcome, DiscoveryToken, GameInstallDescriptor,
-    UserConfigError, UserConfiguration, UserPaths, discover_installations, validate_installation,
-    validate_installation_for_source,
+    CandidateSource, DiscoveredInstallation, DiscoveryOptions, DiscoveryOutcome, DiscoveryToken,
+    GameInstallDescriptor, UserConfigError, UserConfiguration, UserPaths, discover_installations,
+    portable_path, select_installation, validate_installation_for_source,
 };
 
 use crate::workspace::stable_dependency_root_id;
 
-const USAGE: &str = "usage:\n  pdx --version\n  pdx index [vanilla] --source <EU4 directory> --output <cache.pdxindex>\n  pdx index dependency --id <id> --source <directory> --output <cache.pdxindex>\n  pdx setup vanilla [--game eu4] [--deep] [--root <directory>]... [--source <game directory>]\n  pdx check policy|zed|release|grammar-fuzz|all [--root <repository root>]\n  pdx release package --version <semver> --target <target> --binary <path> --output-dir <path> [--root <repository root>]\n  pdx release verify --version <semver> --directory <path> [--root <repository root>]\n  pdx dev prepare-manifest [--root <repository root>]";
+const USAGE: &str = "usage:\n  pdx --version\n  pdx index [vanilla] --source <EU4 directory> --output <cache.pdxindex>\n  pdx index dependency --id <id> --source <directory> --output <cache.pdxindex>\n  pdx setup vanilla [--game eu4] [--root <directory>]... [--source <game directory>]\n  pdx check policy|zed|release|grammar-fuzz|all [--root <repository root>]\n  pdx release package --version <semver> --target <target> --binary <path> --output-dir <path> [--root <repository root>]\n  pdx release verify --version <semver> --directory <path> [--root <repository root>]\n  pdx dev prepare-manifest [--root <repository root>]";
 const SUPPORTED_GAME_INSTALLATIONS: &[GameInstallDescriptor] = &[pdx_game::eu4::INSTALL_DESCRIPTOR];
 
 /// Executes one `pdx` command and returns text intended for stdout.
@@ -58,19 +57,9 @@ fn setup_vanilla(args: &[String], paths: &UserPaths) -> Result<String, CliError>
     let mut game = None::<String>;
     let mut source = None::<PathBuf>;
     let mut roots = Vec::<PathBuf>::new();
-    let mut deep = false;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
-            "--deep" => {
-                if deep {
-                    return Err(CliError::Usage(
-                        "option supplied more than once: --deep".to_owned(),
-                    ));
-                }
-                deep = true;
-                index += 1;
-            }
             flag @ ("--game" | "--root" | "--source") => {
                 let value = args.get(index + 1).ok_or_else(|| {
                     CliError::Usage(format!("missing value for {flag}\n\n{USAGE}"))
@@ -131,7 +120,6 @@ fn setup_vanilla(args: &[String], paths: &UserPaths) -> Result<String, CliError>
             *descriptor,
             source.clone(),
             roots.clone(),
-            deep,
             paths,
         )?);
     }
@@ -142,7 +130,6 @@ fn setup_game(
     descriptor: GameInstallDescriptor,
     source: Option<PathBuf>,
     roots: Vec<PathBuf>,
-    deep: bool,
     paths: &UserPaths,
 ) -> Result<String, CliError> {
     let mut configuration = UserConfiguration::load(&paths.config_file)?;
@@ -151,13 +138,14 @@ fn setup_game(
         .get(descriptor.game_id)
         .cloned()
         .unwrap_or_default();
-    let explicit_search = source.is_some() || deep || !roots.is_empty();
+    let explicit_search = source.is_some() || !roots.is_empty();
     let candidates = if let Some(source) = source {
         let source = std::fs::canonicalize(&source).map_err(|error| CliError::Path {
             field: "--source",
             path: source,
             error,
         })?;
+        let source = portable_path(source);
         if !validate_installation_for_source(&source, &descriptor) {
             return Err(CliError::Discovery(format!(
                 "{} is not a valid {} installation; expected an executable and common, events, missions, decisions, and localisation directories",
@@ -165,22 +153,19 @@ fn setup_game(
                 descriptor.display_name
             )));
         }
-        vec![source]
+        vec![explicit_installation(source)]
     } else {
-        match previous
-            .vanilla_source
-            .filter(|source| !explicit_search && validate_installation(source, &descriptor))
-        {
-            Some(source) => vec![source],
+        match previous.vanilla_source.filter(|source| {
+            !explicit_search && validate_installation_for_source(source, &descriptor)
+        }) {
+            Some(source) => vec![DiscoveredInstallation {
+                game_build: previous.game_build,
+                ..explicit_installation(source)
+            }],
             None => {
                 let report = discover_installations(
                     &descriptor,
                     &DiscoveryOptions {
-                        depth: if deep {
-                            DiscoveryDepth::Deep
-                        } else {
-                            DiscoveryDepth::Quick
-                        },
                         roots,
                         include_platform_locations: true,
                     },
@@ -196,8 +181,9 @@ fn setup_game(
         }
     };
 
-    let selected = match candidates.as_slice() {
-        [] => {
+    let selection = match select_installation(&candidates) {
+        Some(selection) => selection,
+        None => {
             let game = configuration
                 .games
                 .entry(descriptor.game_id.to_owned())
@@ -206,20 +192,19 @@ fn setup_game(
             game.discovery_outcome = Some(DiscoveryOutcome::NotFound);
             configuration.save(&paths.config_file)?;
             return Err(CliError::Discovery(format!(
-                "no valid {} installation was found; retry with --deep, --root, or --source",
+                "no valid {} installation was found; retry with --source <directory> or --root <directory>",
                 descriptor.display_name
             )));
         }
-        [only] => only.clone(),
-        many => select_candidate(descriptor.display_name, many)?,
     };
+    let selected = selection.selected.clone();
 
     let cache_path = paths.vanilla_cache(descriptor.game_id);
     let summary = match build_cache(
         SourceRoot::new(
             SourceRootId::new(0),
             SourceRootKind::Vanilla,
-            selected.clone(),
+            selected.path.clone(),
         ),
         &cache_path,
         "Vanilla",
@@ -232,7 +217,7 @@ fn setup_game(
                 .or_default();
             game.auto_discovery_attempted = true;
             game.discovery_outcome = Some(DiscoveryOutcome::Failed);
-            game.vanilla_source = Some(selected);
+            game.vanilla_source = Some(selected.path);
             configuration.save(&paths.config_file)?;
             return Err(error);
         }
@@ -243,45 +228,41 @@ fn setup_game(
         .or_default();
     game.auto_discovery_attempted = true;
     game.discovery_outcome = Some(DiscoveryOutcome::Configured);
-    game.vanilla_source = Some(selected.clone());
+    game.vanilla_source = Some(selected.path.clone());
     game.vanilla_cache = Some(cache_path.clone());
+    game.resolved_via = Some(selected.source.label().to_owned());
+    game.game_build = selected.game_build;
     configuration.save(&paths.config_file)?;
-    Ok(format!(
-        "{} configured\nsource: {}\ncache: {}\n{summary}",
+    let mut output = format!(
+        "{} configured\nsource: {} ({})\ncache: {}",
         descriptor.display_name,
-        selected.display(),
+        selected.path.display(),
+        selected.source.label(),
         cache_path.display()
-    ))
+    );
+    if !selection.alternatives.is_empty() {
+        output.push_str(&format!(
+            "\nalternatives: {} (rerun with --source <directory> to choose another)",
+            selection
+                .alternatives
+                .iter()
+                .map(|candidate| candidate.path.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+    output.push_str(&format!("\n{summary}"));
+    Ok(output)
 }
 
-fn select_candidate(display_name: &str, candidates: &[PathBuf]) -> Result<PathBuf, CliError> {
-    if !io::stdin().is_terminal() || !io::stderr().is_terminal() {
-        return Err(CliError::Discovery(format!(
-            "multiple valid {display_name} installations were found:\n{}\nrerun with --source <directory>",
-            candidates
-                .iter()
-                .map(|path| format!("  {}", path.display()))
-                .collect::<Vec<_>>()
-                .join("\n")
-        )));
+/// Wraps an explicitly chosen or previously configured directory as a candidate.
+fn explicit_installation(path: PathBuf) -> DiscoveredInstallation {
+    DiscoveredInstallation {
+        path,
+        source: CandidateSource::Explicit,
+        game_build: None,
+        marker_modified: None,
     }
-    eprintln!("Multiple valid {display_name} installations were found:");
-    for (index, candidate) in candidates.iter().enumerate() {
-        eprintln!("  {}) {}", index + 1, candidate.display());
-    }
-    eprint!("Select an installation [1-{}]: ", candidates.len());
-    io::stderr().flush().map_err(CliError::Interactive)?;
-    let mut answer = String::new();
-    io::stdin()
-        .read_line(&mut answer)
-        .map_err(CliError::Interactive)?;
-    let selected = answer
-        .trim()
-        .parse::<usize>()
-        .ok()
-        .filter(|selected| (1..=candidates.len()).contains(selected))
-        .ok_or_else(|| CliError::Discovery("invalid installation selection".to_owned()))?;
-    Ok(candidates[selected - 1].clone())
 }
 
 fn index_vanilla(args: &[String]) -> Result<String, CliError> {
@@ -470,8 +451,6 @@ pub enum CliError {
     Discovery(String),
     /// User-local discovery configuration failed.
     UserConfig(UserConfigError),
-    /// Interactive candidate selection failed.
-    Interactive(std::io::Error),
     /// Quality-gate checks found failures.
     CheckFailed,
 }
@@ -488,7 +467,6 @@ impl CliError {
             | Self::Cache(_)
             | Self::Discovery(_)
             | Self::UserConfig(_)
-            | Self::Interactive(_)
             | Self::CheckFailed => 1,
         }
     }
@@ -510,7 +488,6 @@ impl fmt::Display for CliError {
             Self::Cache(error) => write!(formatter, "{error}"),
             Self::Discovery(message) => formatter.write_str(message),
             Self::UserConfig(error) => write!(formatter, "{error}"),
-            Self::Interactive(error) => write!(formatter, "interactive selection failed: {error}"),
             Self::CheckFailed => formatter.write_str("one or more checks failed"),
         }
     }
@@ -524,7 +501,6 @@ impl std::error::Error for CliError {
             Self::Workspace(error) => Some(error),
             Self::Cache(error) => Some(error),
             Self::UserConfig(error) => Some(error),
-            Self::Interactive(error) => Some(error),
             Self::Usage(_) | Self::Discovery(_) | Self::CheckFailed => None,
         }
     }
@@ -938,11 +914,11 @@ mod tests {
         assert_eq!(
             game.vanilla_source.as_deref(),
             Some(
-                fs::canonicalize(&source)
-                    .expect("canonical source")
+                pdx_game::portable_path(fs::canonicalize(&source).expect("canonical source"))
                     .as_path()
             )
         );
+        assert_eq!(game.resolved_via.as_deref(), Some("explicit"));
         let cache_path = game.vanilla_cache.as_ref().expect("cache path");
         let cache = IndexCache::load(cache_path).expect("load generated cache");
         assert_eq!(cache.metadata().game_id, "eu4");
@@ -1014,8 +990,7 @@ mod tests {
         assert_eq!(
             game.vanilla_source.as_deref(),
             Some(
-                fs::canonicalize(source)
-                    .expect("canonical source")
+                pdx_game::portable_path(fs::canonicalize(source).expect("canonical source"))
                     .as_path()
             )
         );

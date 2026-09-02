@@ -7,6 +7,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Installation discovery now resolves launcher metadata first: Steam library roots from the
+  Windows registry plus per-library `appmanifest` install directories (with build ids), Epic
+  Games manifest install locations, and GOG registry entries. WSL setups additionally probe
+  Windows Steam libraries under `/mnt`, accepting foreign-platform executable markers there
+  only.
+- Multiple validated installations are resolved deterministically (explicit root > launcher
+  metadata > common-location guess, then newest marker executable) instead of aborting setup;
+  alternatives are reported and can be overridden with `--source`.
+- The user configuration records how an installation was resolved (`resolved_via`) and the
+  launcher-reported `game_build`, and discovered paths no longer carry Windows verbatim
+  (`\\?\`) prefixes.
+
+### Changed
+
+- An unavailable user-level Vanilla cache rebuild now records the resolved source so the
+  recovery path never searches twice.
+
+### Removed
+
+- Deep full-disk installation search and the `pdx setup vanilla --deep` flag. Unfound
+  installations are selected explicitly with `--source` (or probed under `--root`).
+
 ## [0.2.0] - 2026-08-28
 
 This release brings the CWTools-inspired analysis and workspace infrastructure into the

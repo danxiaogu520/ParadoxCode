@@ -436,9 +436,15 @@ fn resolve_texture_assets(
             &DiscoveryOptions::default(),
             &DiscoveryToken::new(),
         );
-        report.installations.into_iter().next()
+        pdx_game::select_installation(&report.installations)
+            .map(|selection| resolution_path(selection.selected))
     } else {
         None
     };
     root.as_deref().and_then(TextureAssets::load).map(Arc::new)
+}
+
+/// The installation root to load textures from.
+fn resolution_path(installation: &pdx_game::DiscoveredInstallation) -> PathBuf {
+    installation.path.clone()
 }
