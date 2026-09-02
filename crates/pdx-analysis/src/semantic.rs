@@ -1959,7 +1959,7 @@ fn workspace_member_names_cached(snapshot: &AnalysisSnapshot, type_name: &str) -
     ));
     snapshot.query_cache().insert(
         revision,
-        pdx_engine::CacheDomain::Index,
+        pdx_engine::CacheDomain::Documents,
         format!("workspace-member-names:{}", lowered.as_ref()),
         Arc::clone(&names),
     );
@@ -1986,13 +1986,13 @@ fn effective_workspace_member_names_uncached(
         names.extend(
             snapshot
                 .index()
-                .definitions_for_kind(kind)
-                .filter(|definition| {
-                    definition.active
+                .definitions_for_kind_with_state(kind)
+                .filter(|(definition, active)| {
+                    *active
                         && !hidden_files.contains(&definition.file_id)
                         && completion_source_file_allowed(snapshot, definition.file_id)
                 })
-                .map(|definition| definition.name.to_string()),
+                .map(|(definition, _active)| definition.name.to_string()),
         );
     }
     for document in snapshot
@@ -2095,7 +2095,7 @@ pub(crate) fn workspace_member_index(
     )));
     snapshot.query_cache().insert(
         revision,
-        pdx_engine::CacheDomain::Index,
+        pdx_engine::CacheDomain::Documents,
         format!("workspace-member-index:{}", lowered.as_ref()),
         Arc::clone(&index),
     );
@@ -2249,7 +2249,7 @@ pub(crate) fn localisation_key_index(snapshot: &AnalysisSnapshot) -> Arc<Localis
     let index = Arc::new(LocalisationKeyIndex::new(names.as_ref()));
     snapshot.query_cache().insert(
         revision,
-        pdx_engine::CacheDomain::Index,
+        pdx_engine::CacheDomain::Documents,
         key.to_owned(),
         Arc::clone(&index),
     );
@@ -2359,11 +2359,8 @@ fn overlay_hidden_counts(snapshot: &AnalysisSnapshot) -> Arc<OverlayHiddenCounts
     }
     let mut counts = OverlayHiddenCounts(rustc_hash::FxHashMap::default());
     for file_id in overlay_file_ids(snapshot) {
-        let Some(shard) = snapshot.index().shard(file_id) else {
-            continue;
-        };
-        for definition in &shard.definitions {
-            if !definition.active || !completion_source_file_allowed(snapshot, file_id) {
+        for (definition, active) in snapshot.index().definitions_for_file_with_state(file_id) {
+            if !active || !completion_source_file_allowed(snapshot, file_id) {
                 continue;
             }
             let folded = snapshot

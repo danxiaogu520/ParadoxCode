@@ -62,6 +62,28 @@ fn scripted_localisation_names_feed_indexed_diagnostics_and_completion() {
     let names = scripted_localisation_names(&snapshot);
     assert_eq!(names, ["Scripted.One", "Scripted.Two"]);
 
+    let definitions_path = definitions.join("00_defs.txt");
+    let definitions_id = DocumentId::new("file:///tmp/scripted-localisation-definitions.txt");
+    host.open_document(
+        definitions_id.clone(),
+        1,
+        "defined_text = { name = Overlay.Only text = yes }\n".to_owned(),
+        Some(definitions_path),
+    )
+    .expect("open scripted localisation overlay");
+    assert_eq!(
+        scripted_localisation_names(&host.snapshot()),
+        ["Overlay.Only"],
+        "an overlay must replace its backing scripted-localisation shard"
+    );
+    host.close_document(&definitions_id)
+        .expect("close scripted localisation overlay");
+    assert_eq!(
+        scripted_localisation_names(&host.snapshot()),
+        ["Scripted.One", "Scripted.Two"],
+        "closing an overlay must invalidate its derived name cache"
+    );
+
     let id = DocumentId::new("file:///tmp/scripted-localisation-use.yml");
     let text = "l_english:\nentry: \"[ROOT.Scripted.One] [ROOT.MissingScripted]\"\n";
     host.open_document(

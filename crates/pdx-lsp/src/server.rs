@@ -644,6 +644,9 @@ pub struct LspServer {
     /// a bounded number of retries the scan is abandoned with an explicit
     /// warning instead of looping forever under continuous edits.
     pub(crate) scan_retries: u8,
+    /// Retry ceiling for the initial scan. Production uses the repository bound; tests may lower
+    /// it to exercise the terminal race path without forcing ten full scans.
+    scan_retry_limit: u8,
     /// URIs for which the last workspace pass published closed-file diagnostics. This lets a
     /// subsequent pass clear deleted or ignored files without retaining diagnostic payloads.
     pub(crate) workspace_diagnostic_uris: BTreeSet<String>,
@@ -702,6 +705,7 @@ impl LspServer {
             scan_pending: false,
             pending_cache_setup: PendingCacheSetup::default(),
             scan_retries: 0,
+            scan_retry_limit: crate::MAX_BACKGROUND_SCAN_RETRIES,
             workspace_diagnostic_uris: BTreeSet::new(),
             workspace_diagnostic_clear_queue: Vec::new(),
             scan_gate: None,
@@ -733,6 +737,14 @@ impl LspServer {
     #[cfg(test)]
     pub(crate) fn with_scan_gate(mut self, gate: Arc<dyn Fn() + Send + Sync>) -> Self {
         self.scan_gate = Some(ScanGate(gate));
+        self
+    }
+
+    /// Lowers the initial-scan retry ceiling for deterministic lifecycle tests.
+    #[cfg(test)]
+    pub(crate) fn with_scan_retry_limit(mut self, limit: u8) -> Self {
+        assert!(limit > 0, "scan retry limit must be positive");
+        self.scan_retry_limit = limit;
         self
     }
 
@@ -804,27 +816,35 @@ impl LspServer {
             // publication whenever a watched change lands between `ready` and
             // the pass spawn.
             self.workspace_diagnostics_pending = false;
-        }
-        let current = result.current_uris.iter().cloned().collect::<BTreeSet<_>>();
-        let stale = self
-            .workspace_diagnostic_uris
-            .difference(&current)
-            .cloned()
-            .collect::<Vec<_>>();
-        for uri in stale
-            .into_iter()
-            .take(crate::MAX_WORKSPACE_DIAGNOSTIC_CLEARS)
-        {
-            write_message(output, &diagnostics_notification(&uri, json!([])))?;
-            self.workspace_diagnostic_uris.remove(&uri);
+            let current = result.current_uris.iter().cloned().collect::<BTreeSet<_>>();
+            let stale = self
+                .workspace_diagnostic_uris
+                .difference(&current)
+                .cloned()
+                .collect::<Vec<_>>();
+            for uri in stale
+                .into_iter()
+                .take(crate::MAX_WORKSPACE_DIAGNOSTIC_CLEARS)
+            {
+                write_message(output, &diagnostics_notification(&uri, json!([])))?;
+                self.workspace_diagnostic_uris.remove(&uri);
+            }
         }
         for publication in &result.publications {
             write_message(
                 output,
                 &diagnostics_notification(&publication.uri, publication.values.clone()),
             )?;
-            self.workspace_diagnostic_uris
-                .insert(publication.uri.clone());
+            if publication
+                .values
+                .as_array()
+                .is_some_and(|diagnostics| diagnostics.is_empty())
+            {
+                self.workspace_diagnostic_uris.remove(&publication.uri);
+            } else {
+                self.workspace_diagnostic_uris
+                    .insert(publication.uri.clone());
+            }
         }
         Ok(())
     }

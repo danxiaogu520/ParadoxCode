@@ -147,6 +147,63 @@ fn validate_workspace_returns_a_bounded_diagnostic_summary() {
 }
 
 #[test]
+fn validate_workspace_filters_open_document_severity_overrides() {
+    let (root, root_uri) = temp_workspace_dir();
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("events directory");
+    let source = events.join("open-invalid.txt");
+    fs::write(&source, "scope = nowhere\n").expect("invalid source");
+    let uri = canonical_uri(&source);
+    let input = frames([
+        json!({
+            "jsonrpc":"2.0",
+            "id":1,
+            "method":"initialize",
+            "params":{
+                "workspaceFolders":[{"uri":root_uri,"name":"test"}],
+                "capabilities":{},
+                "initializationOptions":{
+                    "diagnosticSeverityOverrides":{"UnknownScope":"warning"}
+                }
+            }
+        }),
+        json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
+            "textDocument":{
+                "uri":uri,
+                "languageId":"eu4",
+                "version":1,
+                "text":"scope = nowhere\n"
+            }
+        }}),
+        json!({
+            "jsonrpc":"2.0",
+            "id":2,
+            "method":"workspace/executeCommand",
+            "params":{"command":"validateWorkspace","arguments":[]}
+        }),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"exit"}),
+    ]);
+    let mut output = Vec::new();
+    let mut server = eu4_server(InitializeOptions).expect("embedded rules");
+    server
+        .run_transport(Cursor::new(input), &mut output)
+        .expect("transport");
+    let responses = decode_frames(&output);
+    let validation = responses
+        .iter()
+        .find(|value| value["id"] == 2)
+        .expect("validateWorkspace response");
+    assert_eq!(validation["result"]["totalFiles"], 1);
+    assert_eq!(validation["result"]["validatedFiles"], 1);
+    assert_eq!(validation["result"]["filesWithErrors"], 0);
+    assert_eq!(validation["result"]["totalErrors"], 0);
+    assert!(validation["result"]["totalWarnings"].as_u64().unwrap_or(0) > 0);
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn workspace_wide_diagnostics_can_be_disabled_without_changing_validation() {
     let (root, root_uri) = temp_workspace_dir();
     let events = root.join("events");
@@ -413,6 +470,72 @@ fn scan_reschedule_during_shutdown_still_exits_cleanly() {
     fs::remove_dir_all(root).expect("cleanup");
 }
 
+#[test]
+fn exhausted_initial_scan_retries_still_reach_ready() {
+    let (root, root_uri) = temp_workspace_dir();
+    let events = root.join("events");
+    fs::create_dir_all(&events).expect("events directory");
+    let source = events.join("exhausted-scan-overlay.txt");
+    fs::write(&source, "scope = nowhere\n").expect("invalid source");
+    let uri = canonical_uri(&source);
+    let output = SharedOutput::new();
+    let (gate, parked) = scan_completion_gate(&output, response_written(2));
+    let wait_for_scan_parked: ReadAction = Some(Box::new(move || parked.wait()));
+    let input = ScriptedReader::new([
+        (
+            json!({
+                "jsonrpc":"2.0",
+                "id":1,
+                "method":"initialize",
+                "params":{
+                    "workspaceFolders":[{"uri":root_uri,"name":"test"}],
+                    "capabilities":{}
+                }
+            }),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
+            wait_for_scan_parked,
+        ),
+        (
+            json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
+                "textDocument":{
+                    "uri":uri,
+                    "languageId":"eu4",
+                    "version":1,
+                    "text":"scope = nowhere\n"
+                }
+            }}),
+            None,
+        ),
+        (
+            json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
+            None,
+        ),
+        (json!({"jsonrpc":"2.0","method":"exit"}), None),
+    ]);
+    let mut server = eu4_server(InitializeOptions)
+        .expect("embedded rules")
+        .with_scan_gate(gate)
+        .with_scan_retry_limit(1);
+    server
+        .run_transport(input, output.clone())
+        .expect("transport");
+    let responses = decode_frames(&output.bytes());
+    assert!(responses.iter().any(|value| {
+        value["method"] == "window/showMessage"
+            && value["params"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("workspace kept changing"))
+    }));
+    assert!(
+        responses.iter().any(|value| value["method"] == "pdx/ready"),
+        "retry exhaustion skipped the terminal ready path: {responses:?}"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
 /// Regression test for a Linux CI flake: while the initial scan was still
 /// running, the shutdown-time force spawn published the overlay's diagnostics
 /// and the scan commit then re-ran the same version "against the now-complete
@@ -526,8 +649,11 @@ fn watched_refresh_republishes_closed_file_diagnostics() {
     fs::create_dir_all(&events).expect("events directory");
     let source = events.join("watched-diagnostics.txt");
     fs::write(&source, "scope = nowhere\n").expect("invalid source");
+    let untouched_source = events.join("untouched-diagnostics.txt");
+    fs::write(&untouched_source, "scope = nowhere\n").expect("untouched invalid source");
     let changed_source = source.clone();
     let source_uri = canonical_uri(&source);
+    let untouched_uri = canonical_uri(&untouched_source);
     // The watched change must land strictly after the initial (non-empty)
     // publication so the republication below is proven to come from the
     // refresh and not from a scan that raced the disk rewrite. Waiting for
@@ -537,10 +663,18 @@ fn watched_refresh_republishes_closed_file_diagnostics() {
     let wait_for_initial_publication = {
         let output = output.clone();
         let watched_uri = source_uri.clone();
+        let unchanged_uri = untouched_uri.clone();
         move || {
             output.wait_for(|value| {
                 value["method"] == "textDocument/publishDiagnostics"
                     && value["params"]["uri"] == watched_uri
+                    && value["params"]["diagnostics"]
+                        .as_array()
+                        .is_some_and(|items| !items.is_empty())
+            });
+            output.wait_for(|value| {
+                value["method"] == "textDocument/publishDiagnostics"
+                    && value["params"]["uri"] == unchanged_uri
                     && value["params"]["diagnostics"]
                         .as_array()
                         .is_some_and(|items| !items.is_empty())
@@ -597,6 +731,21 @@ fn watched_refresh_republishes_closed_file_diagnostics() {
             .last()
             .and_then(|value| value["params"]["diagnostics"].as_array())
             .is_some_and(Vec::is_empty)
+    );
+    let untouched_publications = responses
+        .iter()
+        .filter(|value| {
+            value["method"] == "textDocument/publishDiagnostics"
+                && value["params"]["uri"] == untouched_uri
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        untouched_publications
+            .iter()
+            .all(|value| value["params"]["diagnostics"]
+                .as_array()
+                .is_some_and(|items| !items.is_empty())),
+        "an incremental batch cleared an untouched file: {untouched_publications:?}"
     );
     fs::remove_dir_all(root).expect("cleanup");
 }

@@ -682,7 +682,10 @@ impl WorkspaceIndex {
             .values()
             .flat_map(|by_name| by_name.values())
             .flatten()
-            .filter_map(|pointer| self.definition_at(*pointer).map(|d| (d, d.active)))
+            .filter_map(|pointer| {
+                self.definition_at(*pointer)
+                    .map(|definition| (definition, pointer.active))
+            })
     }
 
     /// Returns the name folding applied by definition lookups for one kind.
@@ -717,6 +720,53 @@ impl WorkspaceIndex {
             .flat_map(|(_, by_name)| by_name.values())
             .flatten()
             .filter_map(|pointer| self.definition_at(*pointer))
+    }
+
+    /// Iterates over retained definitions of one exact kind together with their live
+    /// priority-resolution state.
+    #[must_use = "iterate the retained definitions"]
+    pub fn definitions_for_kind_with_state<'index>(
+        &'index self,
+        kind: &str,
+    ) -> impl Iterator<Item = (&'index Definition, bool)> {
+        let kind_bound: Box<str> = Box::from(kind);
+        self.definitions
+            .range(kind_bound..)
+            .take_while(move |(candidate_kind, _)| candidate_kind.as_ref() == kind)
+            .flat_map(|(_, by_name)| by_name.values())
+            .flatten()
+            .filter_map(|pointer| {
+                self.definition_at(*pointer)
+                    .map(|definition| (definition, pointer.active))
+            })
+    }
+
+    /// Iterates over one file's shard definitions in source order together with their live
+    /// priority-resolution state.
+    #[must_use = "iterate the retained definitions"]
+    pub fn definitions_for_file_with_state(
+        &self,
+        file_id: SourceFileId,
+    ) -> impl Iterator<Item = (&Definition, bool)> {
+        self.shards
+            .get(&file_id)
+            .into_iter()
+            .flat_map(move |shard| {
+                shard
+                    .definitions
+                    .iter()
+                    .enumerate()
+                    .map(move |(ordinal, definition)| {
+                        let active = self
+                            .definition_bucket(&definition.kind, &definition.name)
+                            .iter()
+                            .find(|pointer| {
+                                pointer.file_id == file_id && pointer.ordinal == ordinal
+                            })
+                            .is_some_and(|pointer| pointer.active);
+                        (definition, active)
+                    })
+            })
     }
 
     /// Returns the shard for a file.
