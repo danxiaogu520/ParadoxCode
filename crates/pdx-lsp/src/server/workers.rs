@@ -1200,6 +1200,7 @@ impl LspServer {
         let worker_cancellation = cancellation.clone();
         let mut candidate = self.host.clone();
         let sender = event_sender.clone();
+        let scan_gate = self.scan_gate.clone();
         let progress_token = format!("pdx-scan-{}", progress_nonce());
         let progress: Option<Box<dyn Fn(usize, usize) + Send + Sync>> =
             if self.client_work_done_progress {
@@ -1249,6 +1250,12 @@ impl LspServer {
                     "workspace scan worker failed unexpectedly",
                 )))
             });
+            // Test seam (never configured in production): park the finished
+            // scan before its completion is reported so shutdown-race tests
+            // can pin the interleaving deterministically.
+            if let Some(gate) = scan_gate {
+                gate.hold();
+            }
             let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
             let _ = sender.send(TransportEvent::Log(log_message_notification(
                 MessageType::INFO,
