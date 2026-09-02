@@ -4,7 +4,7 @@ use pdx_parser::parse_quoted_script;
 use pdx_rules::{
     GameProfile, KeyMatcher, ProfileDefinitionRule, RuleSet, RuleShape, TypeDescriptor,
 };
-use pdx_text::{LogicalPath, TextRange};
+use pdx_text::{LogicalPath, TextRange, TextSize};
 
 use super::{
     HirDefinition, HirLocalisationEntry, HirProperty, HirReference, HirReferenceOrigin, HirScalar,
@@ -44,6 +44,16 @@ fn semantic_root_context_with_confidence(
         return (Some(context), false);
     }
     let semantic = &rules.model().semantic;
+    // The descriptor loops below used to re-lowercase the path and the key per candidate
+    // and to format `root:<type>` per probe; both are hoisted so a root-context lookup
+    // allocates at most the lowered path and key once.
+    let path_lowered = logical_path.map(lowered_logical_path);
+    let type_path_ok = |descriptor: &TypeDescriptor| {
+        path_lowered
+            .as_deref()
+            .is_none_or(|path| semantic_type_path_matches_lowered(descriptor, path))
+    };
+    let key_lowered = key.to_ascii_lowercase();
     // A top-level key may name a rule context directly (`trigger`, `effect`). A
     // `root:<key>` context that belongs to a type descriptor must not be selected in
     // an unrelated directory (for example `fervor` inside common/static_modifiers).
@@ -51,14 +61,13 @@ fn semantic_root_context_with_confidence(
         semantic
             .type_descriptors
             .get(candidate)
-            .is_none_or(|descriptor| semantic_type_path_matches(descriptor, logical_path))
+            .is_none_or(&type_path_ok)
     };
     if rules.semantic_rules_for_context(key).next().is_some() {
         return (Some(key.to_owned()), false);
     }
-    let root = format!("root:{key}");
-    if rules.semantic_rules_for_context(&root).next().is_some() && key_context_matches_path(key) {
-        return (Some(root), false);
+    if rules.has_root_context_rules(key) && key_context_matches_path(key) {
+        return (Some(format!("root:{key}")), false);
     }
     if let Some(context) = semantic
         .type_root_keys
@@ -67,21 +76,18 @@ fn semantic_root_context_with_confidence(
             let descriptor = semantic.type_descriptors.get(*type_name);
             (roots.iter().any(|root| root.eq_ignore_ascii_case(key))
                 || descriptor.is_some_and(|descriptor| {
-                    descriptor.starts_with.as_deref().is_some_and(|prefix| {
-                        key.to_ascii_lowercase()
-                            .starts_with(&prefix.to_ascii_lowercase())
-                    }) || descriptor.skip_root_paths.iter().any(|path| {
-                        path.first().is_some_and(|root| {
-                            root.eq_ignore_ascii_case("any") || root.eq_ignore_ascii_case(key)
+                    descriptor
+                        .starts_with
+                        .as_deref()
+                        .is_some_and(|prefix| ascii_ci_starts_with(&key_lowered, prefix))
+                        || descriptor.skip_root_paths.iter().any(|path| {
+                            path.first().is_some_and(|root| {
+                                root.eq_ignore_ascii_case("any") || root.eq_ignore_ascii_case(key)
+                            })
                         })
-                    })
                 }))
-                && semantic.rules.iter().any(|rule| {
-                    rule.context
-                        .eq_ignore_ascii_case(&format!("root:{type_name}"))
-                })
-                && descriptor
-                    .is_none_or(|descriptor| semantic_type_path_matches(descriptor, logical_path))
+                && rules.has_root_context_rules(type_name)
+                && descriptor.is_none_or(&type_path_ok)
         })
         .map(|(type_name, _)| format!("type:{type_name}"))
         .or_else(|| {
@@ -92,10 +98,10 @@ fn semantic_root_context_with_confidence(
                 .type_descriptors
                 .iter()
                 .find(|(type_name, descriptor)| {
-                    let starts_with = descriptor.starts_with.as_deref().is_some_and(|prefix| {
-                        key.to_ascii_lowercase()
-                            .starts_with(&prefix.to_ascii_lowercase())
-                    });
+                    let starts_with = descriptor
+                        .starts_with
+                        .as_deref()
+                        .is_some_and(|prefix| ascii_ci_starts_with(&key_lowered, prefix));
                     (starts_with
                         || (!semantic.type_root_keys.contains_key(*type_name)
                             && descriptor.skip_root_paths.iter().any(|path| {
@@ -104,11 +110,8 @@ fn semantic_root_context_with_confidence(
                                         || root.eq_ignore_ascii_case(key)
                                 })
                             })))
-                        && rules
-                            .semantic_rules_for_context(&format!("root:{type_name}"))
-                            .next()
-                            .is_some()
-                        && semantic_type_path_matches(descriptor, logical_path)
+                        && rules.has_root_context_rules(type_name)
+                        && type_path_ok(descriptor)
                 })
                 .map(|(type_name, _)| format!("type:{type_name}"))
         })
@@ -118,7 +121,7 @@ fn semantic_root_context_with_confidence(
                 .iter()
                 .find(|(type_name, descriptor)| {
                     !semantic.type_root_keys.contains_key(*type_name)
-                        && semantic_type_path_matches(descriptor, logical_path)
+                        && type_path_ok(descriptor)
                         && descriptor
                             .type_key_filter
                             .as_ref()
@@ -126,10 +129,7 @@ fn semantic_root_context_with_confidence(
                                 values.iter().any(|value| value.eq_ignore_ascii_case(key))
                                     != *negate
                             })
-                        && rules
-                            .semantic_rules_for_context(&format!("root:{type_name}"))
-                            .next()
-                            .is_some()
+                        && rules.has_root_context_rules(type_name)
                 })
                 .map(|(type_name, _)| format!("type:{type_name}"))
         })
@@ -144,11 +144,8 @@ fn semantic_root_context_with_confidence(
         .find(|(type_name, descriptor)| {
             !semantic.type_root_keys.contains_key(*type_name)
                 && descriptor.type_key_filter.is_none()
-                && semantic_type_path_matches(descriptor, logical_path)
-                && rules
-                    .semantic_rules_for_context(&format!("root:{type_name}"))
-                    .next()
-                    .is_some()
+                && type_path_ok(descriptor)
+                && rules.has_root_context_rules(type_name)
         })
         .map(|(type_name, _)| format!("type:{type_name}"));
     (context.clone(), context.is_some())
@@ -169,6 +166,7 @@ pub fn semantic_file_root_context(
     if !logical_path.as_str().contains('/') {
         return None;
     }
+    let lowered = lowered_logical_path(logical_path);
     rules
         .model()
         .semantic
@@ -176,11 +174,8 @@ pub fn semantic_file_root_context(
         .iter()
         .find(|(type_name, descriptor)| {
             descriptor.type_per_file
-                && semantic_type_path_matches(descriptor, Some(logical_path))
-                && rules
-                    .semantic_rules_for_context(&format!("root:{type_name}"))
-                    .next()
-                    .is_some()
+                && semantic_type_path_matches_lowered(descriptor, &lowered)
+                && rules.has_root_context_rules(type_name)
         })
         .map(|(type_name, _)| format!("type:{type_name}"))
 }
@@ -193,6 +188,7 @@ pub(super) fn scripted_macro_path_context(
     if !logical_path.as_str().contains('/') {
         return None;
     }
+    let lowered = lowered_logical_path(logical_path);
     rules
         .model()
         .semantic
@@ -201,7 +197,7 @@ pub(super) fn scripted_macro_path_context(
         .filter_map(|descriptor| {
             let macro_descriptor = descriptor.scripted_macro.as_ref()?;
             if !macro_descriptor.macro_enabled
-                || !semantic_type_path_matches(descriptor, Some(logical_path))
+                || !semantic_type_path_matches_lowered(descriptor, &lowered)
             {
                 return None;
             }
@@ -213,18 +209,13 @@ pub(super) fn scripted_macro_path_context(
 
 pub(super) fn scripted_macro_type_context(rules: &RuleSet, type_name: &str) -> Option<String> {
     rules
-        .model()
-        .semantic
-        .type_descriptors
-        .iter()
-        .find(|(candidate, _)| candidate.eq_ignore_ascii_case(type_name))
-        .and_then(|(_, descriptor)| descriptor.scripted_macro.as_ref())
-        .filter(|descriptor| descriptor.macro_enabled)
-        .map(|descriptor| descriptor.body_context.trim().to_owned())
+        .scripted_macro_context(type_name)
         .filter(|context| !context.is_empty())
+        .map(str::to_owned)
 }
 
 pub(super) fn is_scripted_macro_type(rules: &RuleSet, type_name: &str) -> bool {
+    // Blank body contexts keep the type non-macro for shape checks, as before.
     scripted_macro_type_context(rules, type_name).is_some()
 }
 
@@ -253,11 +244,24 @@ pub fn semantic_type_path_matches(
     let Some(logical_path) = logical_path else {
         return true;
     };
-    let path = logical_path
+    semantic_type_path_matches_lowered(descriptor, &lowered_logical_path(logical_path))
+}
+
+/// Normalizes a logical path the way descriptor matching expects: forward slashes and
+/// ASCII lowercase. Callers that test many descriptors against one path lower it once.
+pub(crate) fn lowered_logical_path(logical_path: &LogicalPath) -> String {
+    logical_path
         .as_str()
         .replace('\\', "/")
-        .to_ascii_lowercase();
-    let (_directory, file_name) = path.rsplit_once('/').unwrap_or(("", path.as_str()));
+        .to_ascii_lowercase()
+}
+
+/// Allocation-free variant of [`semantic_type_path_matches`] over a pre-lowered path.
+///
+/// Descriptor-side prefixes and extensions are compared case-insensitively against the
+/// lowered path instead of being lowercased per call; selector semantics are unchanged.
+pub(crate) fn semantic_type_path_matches_lowered(descriptor: &TypeDescriptor, path: &str) -> bool {
+    let (_directory, file_name) = path.rsplit_once('/').unwrap_or(("", path));
     if !path.contains('/') {
         return true;
     }
@@ -265,22 +269,26 @@ pub fn semantic_type_path_matches(
         let prefix = prefix
             .trim_matches('/')
             .strip_prefix("game/")
-            .unwrap_or(prefix.trim_matches('/'))
-            .to_ascii_lowercase();
+            .unwrap_or(prefix.trim_matches('/'));
         // The file may sit directly under the descriptor directory, or under any
         // directory that ends with it (an absolute path or a cache layout whose
         // root prefix differs from the game-relative one).
-        let prefix_match = path == prefix
-            || path.starts_with(&format!("{prefix}/"))
-            || _directory == prefix
-            || _directory.ends_with(&format!("/{prefix}"));
+        let prefix_match = path.eq_ignore_ascii_case(prefix)
+            || (ascii_ci_starts_with(path, prefix)
+                && path.len() > prefix.len()
+                && path.as_bytes()[prefix.len()] == b'/')
+            || _directory.eq_ignore_ascii_case(prefix)
+            || (ascii_ci_ends_with(_directory, prefix)
+                && _directory.len() > prefix.len()
+                && _directory.as_bytes()[_directory.len() - prefix.len() - 1] == b'/');
         if !prefix_match {
             return false;
         }
         if descriptor.path_strict
-            && path
-                .strip_prefix(&format!("{prefix}/"))
-                .is_some_and(|rest| rest.contains('/'))
+            && ascii_ci_starts_with(path, prefix)
+            && path.len() > prefix.len()
+            && path.as_bytes()[prefix.len()] == b'/'
+            && path[prefix.len() + 1..].contains('/')
         {
             return false;
         }
@@ -291,12 +299,100 @@ pub fn semantic_type_path_matches(
         return false;
     }
     if let Some(extension) = descriptor.path_extension.as_deref() {
-        let extension = extension.trim_start_matches('.').to_ascii_lowercase();
-        if !path.ends_with(&format!(".{extension}")) {
+        let extension = extension.trim_start_matches('.');
+        if !(ascii_ci_ends_with(path, extension)
+            && path.len() > extension.len()
+            && path.as_bytes()[path.len() - extension.len() - 1] == b'.')
+        {
             return false;
         }
     }
     true
+}
+
+/// Case-insensitive ASCII prefix test that allocates nothing.
+pub(crate) fn ascii_ci_starts_with(haystack: &str, needle: &str) -> bool {
+    haystack.len() >= needle.len()
+        && haystack.is_char_boundary(needle.len())
+        && haystack.as_bytes()[..needle.len()]
+            .iter()
+            .zip(needle.as_bytes())
+            .all(|(left, right)| left.eq_ignore_ascii_case(right))
+}
+
+/// Case-insensitive ASCII suffix test that allocates nothing.
+pub(crate) fn ascii_ci_ends_with(haystack: &str, needle: &str) -> bool {
+    haystack.len() >= needle.len()
+        && haystack.is_char_boundary(haystack.len() - needle.len())
+        && haystack.as_bytes()[haystack.len() - needle.len()..]
+            .iter()
+            .zip(needle.as_bytes())
+            .all(|(left, right)| left.eq_ignore_ascii_case(right))
+}
+
+/// Indexed view over one file's scope facts.
+///
+/// Facts are produced in document order; every consumer previously performed a
+/// linear `find`/`rfind` per property, which made lowering quadratic on large
+/// files. The exact lookup is a hash hit, and the nearest-preceding lookup
+/// binary-searches the document order and then walks back only across the
+/// property's preceding siblings.
+pub(super) struct ScopeFactIndex<'a> {
+    facts: &'a [ScopeFact],
+    exact: std::collections::HashMap<TextRange, usize>,
+}
+
+impl<'a> ScopeFactIndex<'a> {
+    pub(super) fn new(facts: &'a [ScopeFact]) -> Self {
+        let mut exact = std::collections::HashMap::with_capacity(facts.len());
+        for (index, fact) in facts.iter().enumerate() {
+            // `Iterator::find` semantics keep the first fact for a range.
+            exact.entry(fact.range).or_insert(index);
+        }
+        Self { facts, exact }
+    }
+
+    /// The fact recorded for exactly this key range, if any.
+    pub(super) fn exact(&self, key_range: TextRange) -> Option<&'a ScopeFact> {
+        self.exact.get(&key_range).map(|&index| &self.facts[index])
+    }
+
+    /// The nearest fact that ends at or before `offset`.
+    pub(super) fn preceding(&self, offset: TextSize) -> Option<&'a ScopeFact> {
+        // Facts whose start is at/after the offset cannot end before it.
+        let upper = self
+            .facts
+            .partition_point(|fact| fact.range.start() < offset);
+        self.facts[..upper]
+            .iter()
+            .rev()
+            .find(|fact| fact.range.end() <= offset)
+    }
+}
+
+/// Per-file cache of root-context lookups keyed by root key.
+///
+/// Most files have a handful of distinct root keys, and the lookup consults
+/// several rule indexes with case-normalized allocations on every call.
+pub(super) struct RootContextCache {
+    logical_path: Option<LogicalPath>,
+    entries: std::collections::HashMap<String, Option<String>>,
+}
+
+impl RootContextCache {
+    pub(super) fn new(logical_path: Option<&LogicalPath>) -> Self {
+        Self {
+            logical_path: logical_path.cloned(),
+            entries: std::collections::HashMap::new(),
+        }
+    }
+
+    pub(super) fn get(&mut self, rules: &RuleSet, root_key: &str) -> Option<String> {
+        self.entries
+            .entry(root_key.to_owned())
+            .or_insert_with(|| semantic_root_context(rules, self.logical_path.as_ref(), root_key))
+            .clone()
+    }
 }
 
 pub(super) fn lower_semantics(
@@ -319,27 +415,30 @@ pub(super) fn lower_semantics(
         .collect::<Vec<_>>();
     let mut references = Vec::new();
     let path = logical_path.map_or("", LogicalPath::as_str);
+    let fact_index = ScopeFactIndex::new(scope_facts);
+    let mut root_contexts = RootContextCache::new(logical_path);
+    let property_children = super::scope::property_children(properties);
 
     if let Some(profile) = profile {
-        for property in properties {
+        for (property_index, property) in properties.iter().enumerate() {
             if property.top_level {
                 if let Some(rule) = profile
                     .definition(path, &property.key)
                     .filter(|rule| !rule.requires_value || property.value_range.is_some())
                 {
-                    definitions.push(definition_from_rule(properties, property, rule));
+                    definitions.push(definition_from_rule(properties, property_index, rule));
                 }
                 for rule in profile
                     .conditional_definitions
                     .iter()
                     .filter(|rule| rule.path.matches(path))
                 {
-                    if nested_property(properties, property, &rule.required_field)
+                    if nested_property(properties, property_index, &rule.required_field)
                         .and_then(|nested| nested.scalar.as_ref())
                         .is_some_and(|scalar| {
                             scalar.value.eq_ignore_ascii_case(&rule.required_value)
                         })
-                        && nested_property(properties, property, &rule.absent_field).is_none()
+                        && nested_property(properties, property_index, &rule.absent_field).is_none()
                     {
                         definitions.push(HirDefinition {
                             kind: rule.kind.clone(),
@@ -354,11 +453,10 @@ pub(super) fn lower_semantics(
                     .iter()
                     .filter(|rule| rule.path.matches(path) && rule.key.matches(&property.key))
                 {
-                    for child in properties.iter().filter(|candidate| {
-                        candidate.path.len() == property.path.len().saturating_add(1)
-                            && candidate.path.starts_with(&property.path)
-                            && range_within(candidate.range, property.range)
-                    }) {
+                    // Direct children are precomputed once per file in document
+                    // order; the previous per-property scan was quadratic.
+                    for &child_index in &property_children[property_index] {
+                        let child = &properties[child_index];
                         definitions.push(HirDefinition {
                             kind: rule.kind.clone(),
                             name: child.key.clone(),
@@ -369,7 +467,12 @@ pub(super) fn lower_semantics(
                 }
             }
             if let Some(reference) = reference_from_property(profile, property, logical_path)
-                && !semantic_rules_describe_property(property, scope_facts, logical_path, rules)
+                && !semantic_rules_describe_property(
+                    property,
+                    &fact_index,
+                    &mut root_contexts,
+                    rules,
+                )
             {
                 references.push(reference);
             }
@@ -390,11 +493,11 @@ pub(super) fn lower_semantics(
             }
         }
 
-        for property in properties {
+        for (property_index, property) in properties.iter().enumerate() {
             let Some(rule) = profile.container_value_definition(&property.key) else {
                 continue;
             };
-            let Some(named) = nested_property(properties, property, &rule.name_field) else {
+            let Some(named) = nested_property(properties, property_index, &rule.name_field) else {
                 continue;
             };
             let Some(scalar) = named.scalar.as_ref() else {
@@ -421,10 +524,10 @@ pub(super) fn lower_semantics(
     definitions.extend(semantic_type_definitions(properties, logical_path, rules));
     deduplicate_definitions(&mut definitions);
 
-    references.extend(scripted_macro_references(properties, scope_facts, rules));
+    references.extend(scripted_macro_references(properties, &fact_index, rules));
     references.extend(semantic_typed_references(
         properties,
-        scope_facts,
+        &fact_index,
         rules,
         profile,
     ));
@@ -442,8 +545,8 @@ pub(super) fn lower_semantics(
     for property in properties {
         if let Some(reference) = semantic_localisation_reference(
             property,
-            scope_facts,
-            logical_path,
+            &fact_index,
+            &mut root_contexts,
             rules,
             &enum_localisation_rules,
         ) {
@@ -464,16 +567,13 @@ pub(super) fn lower_semantics(
 
 fn semantic_rules_describe_property(
     property: &HirProperty,
-    scope_facts: &[ScopeFact],
-    logical_path: Option<&LogicalPath>,
+    fact_index: &ScopeFactIndex<'_>,
+    root_contexts: &mut RootContextCache,
     rules: &RuleSet,
 ) -> bool {
-    let fact = scope_facts
-        .iter()
-        .find(|fact| fact.range == property.key_range);
-    let root_context = semantic_root_context(
+    let fact = fact_index.exact(property.key_range);
+    let root_context = root_contexts.get(
         rules,
-        logical_path,
         property
             .path
             .first()
@@ -490,20 +590,25 @@ fn semantic_rules_describe_property(
     // Dynamic scope-link blocks (country tags, `event_target:name`, province ids) are
     // not statically selectable, so they emit no fact of their own. The nearest
     // preceding fact still names the semantic container for their children.
-    let context = fact.as_ref().map(|fact| fact.context.as_str()).or_else(|| {
-        scope_facts
-            .iter()
-            .rfind(|fact| fact.range.end() <= property.key_range.start())
+    let context = fact.map(|fact| fact.context.as_str()).or_else(|| {
+        fact_index
+            .preceding(property.key_range.start())
             .map(|fact| fact.context.as_str())
+    });
+    // `root:{type}` is rule-shaped and repeats for every candidate rule; build
+    // it once instead of formatting inside the per-rule closure.
+    let root_prefixed_context = root_context.as_deref().and_then(|context| {
+        context
+            .strip_prefix("type:")
+            .map(|type_name| format!("root:{type_name}"))
     });
     rules.exact_semantic_rules(&property.key).any(|rule| {
         (context.is_some_and(|context| rule.context.eq_ignore_ascii_case(context))
             || root_context.as_deref().is_some_and(|context| {
                 rule.context.eq_ignore_ascii_case(context)
-                    || context.strip_prefix("type:").is_some_and(|type_name| {
-                        rule.context
-                            .eq_ignore_ascii_case(&format!("root:{type_name}"))
-                    })
+                    || root_prefixed_context
+                        .as_deref()
+                        .is_some_and(|prefixed| rule.context.eq_ignore_ascii_case(prefixed))
             }))
             && localisation_parent_path_matches(rules, &rule.parent_path, actual_parent_path)
     })
@@ -574,8 +679,9 @@ fn semantic_type_definitions(
     if !logical_path.as_str().contains('/') {
         return definitions;
     }
+    let lowered = lowered_logical_path(logical_path);
     for descriptor in rules.model().semantic.type_descriptors.values() {
-        if !semantic_type_path_matches(descriptor, Some(logical_path)) {
+        if !semantic_type_path_matches_lowered(descriptor, &lowered) {
             continue;
         }
         if descriptor.type_per_file {
@@ -764,15 +870,12 @@ fn deduplicate_definitions(definitions: &mut Vec<HirDefinition>) {
 
 fn scripted_macro_references(
     properties: &[HirProperty],
-    scope_facts: &[ScopeFact],
+    fact_index: &ScopeFactIndex<'_>,
     rules: &RuleSet,
 ) -> Vec<HirReference> {
     let mut references = Vec::new();
     for property in properties {
-        let Some(fact) = scope_facts
-            .iter()
-            .find(|fact| fact.range == property.key_range)
-        else {
+        let Some(fact) = fact_index.exact(property.key_range) else {
             continue;
         };
         if property.top_level || !is_concrete_scripted_key(&property.key) {
@@ -873,8 +976,8 @@ fn property_matches_scripted_rule(
 
 fn semantic_localisation_reference(
     property: &HirProperty,
-    scope_facts: &[ScopeFact],
-    logical_path: Option<&LogicalPath>,
+    fact_index: &ScopeFactIndex<'_>,
+    root_contexts: &mut RootContextCache,
     rules: &RuleSet,
     enum_localisation_rules: &[&pdx_rules::SemanticRule],
 ) -> Option<HirReference> {
@@ -884,12 +987,9 @@ fn semantic_localisation_reference(
     if scalar.quoted || scalar.value.contains('$') {
         return None;
     }
-    let fact = scope_facts
-        .iter()
-        .find(|fact| fact.range == property.key_range);
-    let root_context = semantic_root_context(
+    let fact = fact_index.exact(property.key_range);
+    let root_context = root_contexts.get(
         rules,
-        logical_path,
         property
             .path
             .first()
@@ -905,10 +1005,9 @@ fn semantic_localisation_reference(
         .map_or(property_parent_path, |fact| fact.parent_path.as_slice());
     // Dynamic scope-link blocks emit no fact of their own; the nearest preceding
     // fact still names the semantic container for their children.
-    let context = fact.as_ref().map(|fact| fact.context.as_str()).or_else(|| {
-        scope_facts
-            .iter()
-            .rfind(|fact| fact.range.end() <= property.key_range.start())
+    let context = fact.map(|fact| fact.context.as_str()).or_else(|| {
+        fact_index
+            .preceding(property.key_range.start())
             .map(|fact| fact.context.as_str())
     });
     let matches_rule = |rule: &pdx_rules::SemanticRule| {
@@ -944,7 +1043,7 @@ fn semantic_localisation_reference(
 /// overlays, so navigation does not need a game-specific special case.
 fn semantic_typed_references(
     properties: &[HirProperty],
-    scope_facts: &[ScopeFact],
+    fact_index: &ScopeFactIndex<'_>,
     rules: &RuleSet,
     profile: Option<&GameProfile>,
 ) -> Vec<HirReference> {
@@ -961,15 +1060,10 @@ fn semantic_typed_references(
         {
             continue;
         }
-        let fact = scope_facts
-            .iter()
-            .find(|fact| fact.range == property.key_range)
-            .or_else(|| {
-                scope_facts
-                    .iter()
-                    .rfind(|fact| fact.range.end() <= property.key_range.start())
-            });
-        let Some(fact) = fact else {
+        let Some(fact) = fact_index
+            .exact(property.key_range)
+            .or_else(|| fact_index.preceding(property.key_range.start()))
+        else {
             continue;
         };
         let property_parent_path = property
@@ -1216,13 +1310,14 @@ pub(super) fn derived_localisation_references(
                 let Some(field) = binding.explicit_field.as_deref() else {
                     continue;
                 };
-                let Some(instance) = properties
+                let Some(instance_index) = properties
                     .iter()
-                    .find(|property| property.range == instance_range)
+                    .position(|property| property.range == instance_range)
                 else {
                     continue;
                 };
-                let Some(field_property) = nested_property(properties, instance, field) else {
+                let Some(field_property) = nested_property(properties, instance_index, field)
+                else {
                     continue;
                 };
                 let Some(field_value) = field_property.scalar.as_ref() else {
@@ -1271,14 +1366,16 @@ fn localisation_type_instances(
     let candidates = if descriptor.skip_root_paths.is_empty() {
         properties
             .iter()
-            .filter(|property| property.top_level)
+            .enumerate()
+            .filter(|(_, property)| property.top_level)
+            .map(|(index, _)| index)
             .collect::<Vec<_>>()
     } else {
         descriptor
             .skip_root_paths
             .iter()
             .flat_map(|skip_path| {
-                properties.iter().filter(move |property| {
+                properties.iter().enumerate().filter(move |(_, property)| {
                     property.path.len() == skip_path.len().saturating_add(1)
                         && property
                             .path
@@ -1290,21 +1387,23 @@ fn localisation_type_instances(
                             })
                 })
             })
+            .map(|(index, _)| index)
             .collect::<Vec<_>>()
     };
 
     let mut instances = Vec::<(String, TextRange, TextRange)>::new();
-    for property in candidates {
+    for property_index in candidates {
         // Only container blocks declare type instances; scalar fields inside a parent
         // block (for example `can_form_personal_unions = yes` inside a religion group)
         // must not be treated as instances of the child type.
+        let property = &properties[property_index];
         if property.scalar.is_some() || !property_key_matches_type(descriptor, &property.key) {
             continue;
         }
         let (name, reference_range) = descriptor
             .name_field
             .as_deref()
-            .and_then(|field| nested_property(properties, property, field))
+            .and_then(|field| nested_property(properties, property_index, field))
             .and_then(|nested| {
                 nested
                     .scalar
@@ -1403,13 +1502,14 @@ fn localisation_subtype_applies(
 
 fn definition_from_rule(
     properties: &[HirProperty],
-    property: &HirProperty,
+    property_index: usize,
     rule: &ProfileDefinitionRule,
 ) -> HirDefinition {
+    let property = &properties[property_index];
     let named = rule
         .name_field
         .as_deref()
-        .and_then(|field| nested_property(properties, property, field))
+        .and_then(|field| nested_property(properties, property_index, field))
         .and_then(|nested| nested.scalar.as_ref());
     HirDefinition {
         kind: rule.kind.clone(),
@@ -1453,13 +1553,20 @@ fn reference_from_property(
 
 fn nested_property<'hir>(
     properties: &'hir [HirProperty],
-    parent: &HirProperty,
+    parent_index: usize,
     wanted: &str,
 ) -> Option<&'hir HirProperty> {
-    properties
+    // Properties are collected in document order, so the parent's descendants
+    // form a contiguous window that ends at the first property at or above the
+    // parent's depth. Scanning that window (instead of every property in the
+    // file) keeps conditional-definition extraction linear overall.
+    let parent = &properties[parent_index];
+    properties[parent_index + 1..]
         .iter()
-        .filter(|property| property.path.len() > parent.path.len())
-        .filter(|property| property.path.starts_with(&parent.path))
-        .filter(|property| range_within(property.range, parent.range))
+        .take_while(|property| {
+            property.path.len() > parent.path.len()
+                && property.path.starts_with(&parent.path)
+                && range_within(property.range, parent.range)
+        })
         .find(|property| property.key.eq_ignore_ascii_case(wanted))
 }

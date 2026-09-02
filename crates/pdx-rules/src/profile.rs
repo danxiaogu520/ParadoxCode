@@ -318,6 +318,12 @@ pub struct GameProfile {
     pub value_definitions: Vec<ProfileValueDefinitionRule>,
     /// Ordered block value-definition rules; the first match wins.
     pub container_value_definitions: Vec<ProfileContainerValueDefinitionRule>,
+    /// Lazily built exact-key lookup over the rule lists above, mirroring each
+    /// list's first-match order. Populated on first per-key query because
+    /// lowering performs millions of these lookups per workspace scan and the
+    /// linear `find` over every rule dominated scan CPU.
+    #[serde(skip)]
+    pub key_index: std::sync::OnceLock<ProfileKeyIndex>,
     /// Blocks whose direct child keys declare symbols.
     pub container_definitions: Vec<ProfileContainerDefinitionRule>,
     /// Additional definitions gated by nested fields.
@@ -332,6 +338,9 @@ pub struct GameProfile {
     /// scope without appearing as ordinary `push_scope` rules. Keeping the mapping in profile
     /// data lets the generic semantic engine remain game-agnostic.
     pub scope_member_aliases: BTreeMap<String, String>,
+    /// Derived scope name/alias lookup; see [`ScopeLookup`].
+    #[serde(skip)]
+    scope_lookup: std::sync::OnceLock<ScopeLookup>,
     /// Scope spellings offered by completion.
     pub scope_completions: Vec<String>,
     /// Root-key fallbacks used when semantic type metadata has no initial scope.
@@ -373,13 +382,170 @@ pub struct GameProfile {
     pub root_entry_specs: BTreeMap<String, ProfileRootEntrySpec>,
 }
 
+/// Exact-key lookup accelerator over a game profile's ordered rule lists.
+///
+/// Rules with an exact key selector are bucketed by their pattern
+/// (case-insensitive patterns are stored lowercased); every other selector
+/// mode stays in a short scan list. Both buckets keep rule order, and queries
+/// take the earliest matching index across the two, preserving each list's
+/// documented first-match semantics.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProfileKeyIndex {
+    references_exact: ExactKeyBuckets,
+    references_scan: Vec<usize>,
+    value_exact: ExactKeyBuckets,
+    value_scan: Vec<usize>,
+    container_value_exact: ExactKeyBuckets,
+    container_value_scan: Vec<usize>,
+}
+
+/// Lazily built lookup for scope names and member aliases.
+///
+/// `is_scope` and `scope_member_alias` run inside per-rule value matching, so alias probing
+/// must not rebuild underscore-stripped spellings per call.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct ScopeLookup {
+    /// Lowercased known scope spellings.
+    names: rustc_hash::FxHashSet<Box<str>>,
+    /// Lowercased, underscore-stripped alias -> concrete scope spelling.
+    aliases: rustc_hash::FxHashMap<Box<str>, Box<str>>,
+}
+
+/// Case-split exact buckets for one rule list.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct ExactKeyBuckets {
+    /// Case-insensitive exact patterns, stored lowercased.
+    caseless: std::collections::HashMap<String, Vec<usize>>,
+    /// Case-sensitive exact patterns, stored verbatim.
+    cased: std::collections::HashMap<String, Vec<usize>>,
+}
+
+impl ExactKeyBuckets {
+    fn insert(&mut self, matcher: &ProfileTextMatcher, index: usize) -> bool {
+        if matcher.mode != ProfileMatchMode::Exact {
+            return false;
+        }
+        if matcher.case_sensitive {
+            self.cased
+                .entry(matcher.pattern.clone())
+                .or_default()
+                .push(index);
+        } else {
+            self.caseless
+                .entry(matcher.pattern.to_ascii_lowercase())
+                .or_default()
+                .push(index);
+        }
+        true
+    }
+
+    /// Bucket contents for `candidate` across both case variants.
+    fn lookup(&self, candidate: &str) -> impl Iterator<Item = usize> + '_ {
+        let cased = self.cased.get(candidate).map(Vec::as_slice).unwrap_or(&[]);
+        let caseless = normalized_ascii_query(candidate);
+        let caseless = self
+            .caseless
+            .get(caseless.as_ref())
+            .map(Vec::as_slice)
+            .unwrap_or(&[]);
+        cased
+            .iter()
+            .chain(caseless)
+            .copied()
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+}
+
+fn normalized_ascii_query(value: &str) -> std::borrow::Cow<'_, str> {
+    if value.bytes().all(|byte| byte.is_ascii_lowercase()) {
+        std::borrow::Cow::Borrowed(value)
+    } else {
+        std::borrow::Cow::Owned(value.to_ascii_lowercase())
+    }
+}
+
+impl ProfileKeyIndex {
+    fn build(profile: &GameProfile) -> Self {
+        let mut references_exact = ExactKeyBuckets::default();
+        let mut references_scan = Vec::new();
+        for (index, rule) in profile.references.iter().enumerate() {
+            if !references_exact.insert(&rule.key, index) {
+                references_scan.push(index);
+            }
+        }
+        let mut value_exact = ExactKeyBuckets::default();
+        let mut value_scan = Vec::new();
+        for (index, rule) in profile.value_definitions.iter().enumerate() {
+            if !value_exact.insert(&rule.key, index) {
+                value_scan.push(index);
+            }
+        }
+        let mut container_value_exact = ExactKeyBuckets::default();
+        let mut container_value_scan = Vec::new();
+        for (index, rule) in profile.container_value_definitions.iter().enumerate() {
+            if !container_value_exact.insert(&rule.key, index) {
+                container_value_scan.push(index);
+            }
+        }
+        Self {
+            references_exact,
+            references_scan,
+            value_exact,
+            value_scan,
+            container_value_exact,
+            container_value_scan,
+        }
+    }
+
+    /// Candidate rule indices for `candidate` in ascending rule order.
+    fn candidates<'a>(
+        exact: &'a ExactKeyBuckets,
+        scan: &'a [usize],
+        candidate: &str,
+    ) -> impl Iterator<Item = usize> + 'a {
+        let mut indices = exact.lookup(candidate).collect::<Vec<_>>();
+        indices.extend_from_slice(scan);
+        indices.sort_unstable();
+        indices.dedup();
+        indices.into_iter()
+    }
+}
+
 impl GameProfile {
+    /// Returns the shared exact-key index, building it on first use.
+    fn resolved_key_index(&self) -> &ProfileKeyIndex {
+        self.key_index.get_or_init(|| ProfileKeyIndex::build(self))
+    }
+
+    fn resolved_scope_lookup(&self) -> &ScopeLookup {
+        self.scope_lookup.get_or_init(|| {
+            let fold = |value: &str| value.to_ascii_lowercase().replace('_', "").into_boxed_str();
+            ScopeLookup {
+                // Scope names compare case-insensitively with underscores intact.
+                names: self
+                    .scope_names
+                    .iter()
+                    .map(|name| name.to_ascii_lowercase().into_boxed_str())
+                    .collect(),
+                // Alias identity additionally ignores underscores, matching the original
+                // `alias.replace('_', "") == value.replace('_', "")` fallback.
+                aliases: self
+                    .scope_member_aliases
+                    .iter()
+                    .map(|(alias, scope)| (fold(alias), fold(scope)))
+                    .collect(),
+            }
+        })
+    }
+
     /// Creates an identity-only profile with no game-specific interpretation.
     #[must_use]
     pub fn empty(game_id: impl Into<String>) -> Self {
         Self {
             game_id: game_id.into(),
             source_encoding: SourceEncoding::Utf8,
+            key_index: std::sync::OnceLock::new(),
             scan_roots: Vec::new(),
             scan_root_max_depths: BTreeMap::new(),
             scan_root_files: BTreeMap::new(),
@@ -394,6 +560,7 @@ impl GameProfile {
             token_definitions: Vec::new(),
             scope_names: Vec::new(),
             scope_member_aliases: BTreeMap::new(),
+            scope_lookup: std::sync::OnceLock::new(),
             scope_completions: Vec::new(),
             root_scopes: Vec::new(),
             scope_compatibilities: Vec::new(),
@@ -487,9 +654,14 @@ impl GameProfile {
         &self,
         key: &str,
     ) -> Option<&ProfileContainerValueDefinitionRule> {
-        self.container_value_definitions
-            .iter()
-            .find(|rule| rule.key.matches(key))
+        let index = self.resolved_key_index();
+        ProfileKeyIndex::candidates(
+            &index.container_value_exact,
+            &index.container_value_scan,
+            key,
+        )
+        .map(|rule_index| &self.container_value_definitions[rule_index])
+        .find(|rule| rule.key.matches(key))
     }
 
     /// Returns the suffixes appended when looking up members of `kind`.
@@ -672,20 +844,24 @@ impl GameProfile {
     /// Returns the first reference rule whose key selector accepts `key`.
     #[must_use]
     pub fn reference_rule(&self, key: &str) -> Option<&ProfileReferenceRule> {
-        self.references.iter().find(|rule| {
-            rule.key.matches(key)
-                && !rule
-                    .excluded_keys
-                    .iter()
-                    .any(|excluded| excluded.eq_ignore_ascii_case(key))
-        })
+        let index = self.resolved_key_index();
+        ProfileKeyIndex::candidates(&index.references_exact, &index.references_scan, key)
+            .map(|rule_index| &self.references[rule_index])
+            .find(|rule| {
+                rule.key.matches(key)
+                    && !rule
+                        .excluded_keys
+                        .iter()
+                        .any(|excluded| excluded.eq_ignore_ascii_case(key))
+            })
     }
 
     /// Returns the declared kind for one scalar value property.
     #[must_use]
     pub fn value_definition_kind(&self, key: &str, parent_key: Option<&str>) -> Option<&str> {
-        self.value_definitions
-            .iter()
+        let index = self.resolved_key_index();
+        ProfileKeyIndex::candidates(&index.value_exact, &index.value_scan, key)
+            .map(|rule_index| &self.value_definitions[rule_index])
             .find(|rule| {
                 rule.key.matches(key)
                     && rule.parent_key.as_ref().is_none_or(|matcher| {
@@ -707,23 +883,26 @@ impl GameProfile {
     /// Returns whether a scope spelling is known to this profile.
     #[must_use]
     pub fn is_scope(&self, value: &str) -> bool {
-        self.scope_names
-            .iter()
-            .any(|scope| scope.eq_ignore_ascii_case(value))
+        let lookup = self.resolved_scope_lookup();
+        if value.bytes().any(|byte| byte.is_ascii_uppercase()) {
+            lookup.names.contains(value.to_ascii_lowercase().as_str())
+        } else {
+            lookup.names.contains(value)
+        }
     }
 
     /// Returns the concrete scope selected by a profile-defined intrinsic expression.
+    ///
+    /// The alias identity is lowercase with underscores removed, matching the original
+    /// equality of `alias` and `alias.replace('_', "") == value.replace('_', "")` without
+    /// allocating stripped spellings per call.
     #[must_use]
     pub fn scope_member_alias(&self, value: &str) -> Option<&str> {
-        self.scope_member_aliases
-            .iter()
-            .find(|(alias, _)| {
-                alias.eq_ignore_ascii_case(value)
-                    || (alias
-                        .replace('_', "")
-                        .eq_ignore_ascii_case(&value.replace('_', "")))
-            })
-            .map(|(_, scope)| scope.as_str())
+        let folded = folded_scope_key(value);
+        self.resolved_scope_lookup()
+            .aliases
+            .get(folded.as_ref())
+            .map(|scope| scope.as_ref())
     }
 
     /// Tests profile scope compatibility, including the generic `any` scope.
@@ -772,5 +951,17 @@ impl GameProfile {
                     .iter()
                     .any(|value| value.eq_ignore_ascii_case(member))
         })
+    }
+}
+
+/// Lowercases and strips underscores, borrowing the input when neither is needed.
+fn folded_scope_key(value: &str) -> std::borrow::Cow<'_, str> {
+    let needs_fold = value
+        .bytes()
+        .any(|byte| byte.is_ascii_uppercase() || byte == b'_');
+    if needs_fold {
+        std::borrow::Cow::Owned(value.to_ascii_lowercase().replace('_', ""))
+    } else {
+        std::borrow::Cow::Borrowed(value)
     }
 }

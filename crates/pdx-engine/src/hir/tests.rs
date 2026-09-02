@@ -791,11 +791,11 @@ fn profile_lowering_caches_semantic_root_context_and_initial_scope() {
     assert_eq!(fact.context, "type:event");
     assert_eq!(
         fact.state.root,
-        ScopeValue::Known(vec!["country".to_owned()])
+        ScopeValue::known(vec!["country".to_owned()])
     );
     assert_eq!(
         fact.state.current,
-        vec![ScopeValue::Known(vec!["country".to_owned()])]
+        vec![ScopeValue::known(vec!["country".to_owned()])]
     );
     assert_eq!(fact.state.from, vec![ScopeValue::Unknown]);
     assert_eq!(hir.scope_fact(fact.range, "TYPE:EVENT"), Some(fact));
@@ -811,7 +811,7 @@ fn profile_lowering_caches_semantic_root_context_and_initial_scope() {
         .expect("nested transition fact");
     assert_eq!(
         tax_scope.state.current.first(),
-        Some(&ScopeValue::Known(vec!["province".to_owned()]))
+        Some(&ScopeValue::known(vec!["province".to_owned()]))
     );
     assert!(
         tax_scope.parent_path.is_empty(),
@@ -832,7 +832,7 @@ fn profile_lowering_caches_semantic_root_context_and_initial_scope() {
             .transition
             .as_ref()
             .and_then(|state| state.current.first()),
-        Some(&ScopeValue::Known(vec!["province".to_owned()]))
+        Some(&ScopeValue::known(vec!["province".to_owned()]))
     );
 }
 
@@ -854,15 +854,15 @@ fn on_action_lowering_seeds_distinct_root_this_and_from_registers() {
     assert_eq!(fact.context, "type:on_action");
     assert_eq!(
         fact.state.root,
-        ScopeValue::Known(vec!["mercenary_company".to_owned()])
+        ScopeValue::known(vec!["mercenary_company".to_owned()])
     );
     assert_eq!(
         fact.state.current,
-        vec![ScopeValue::Known(vec!["province".to_owned()])]
+        vec![ScopeValue::known(vec!["province".to_owned()])]
     );
     assert_eq!(
         fact.state.from,
-        vec![ScopeValue::Known(vec!["country".to_owned()])]
+        vec![ScopeValue::known(vec!["country".to_owned()])]
     );
 }
 
@@ -896,7 +896,7 @@ fn equivalent_rule_alternatives_share_one_cached_transition() {
         .expect("equivalent alternatives should continue lowering");
     assert_eq!(
         fact.state.current.first(),
-        Some(&ScopeValue::Known(vec!["country".to_owned()]))
+        Some(&ScopeValue::known(vec!["country".to_owned()]))
     );
 
     let conflicting = lower_with_profile(
@@ -1084,14 +1084,14 @@ fn replace_scope_resolves_static_links_into_register_values() {
         .expect("effect scope fact");
     assert_eq!(
         fact.state.current.first(),
-        Some(&ScopeValue::Known(vec!["province".to_owned()]))
+        Some(&ScopeValue::known(vec!["province".to_owned()]))
     );
     assert_eq!(
         fact.state.from.first(),
-        Some(&ScopeValue::Known(vec!["country".to_owned()]))
+        Some(&ScopeValue::known(vec!["country".to_owned()]))
     );
 
-    let province = ScopeValue::Known(vec!["province".to_owned()]);
+    let province = ScopeValue::known(vec!["province".to_owned()]);
     let state = ScopeState::initial(province.clone());
     assert_eq!(
         resolve_scope_expression(&state, "OwNeR.CAPITAL_SCOPE", &rules, &profile()),

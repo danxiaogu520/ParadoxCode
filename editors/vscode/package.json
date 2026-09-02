@@ -711,7 +711,7 @@
         },
         "paradoxcode.workspaceWideDiagnostics": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "markdownDescription": "%configuration.workspaceWideDiagnostics.description%"
         },
         "paradoxcode.backgroundReindexIntervalMinutes": {

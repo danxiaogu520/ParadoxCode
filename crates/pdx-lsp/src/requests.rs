@@ -128,9 +128,9 @@ pub(crate) struct SnapshotRequestContext {
     cancellation: CancellationToken,
     /// Whether the client advertises snippet support for completion items.
     client_snippets: bool,
-    /// Game sprite textures for the mission preview, when a game installation
-    /// is available. `None` renders a texture-less preview.
-    textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
+    /// Mission-preview textures, resolved lazily from the captured discovery
+    /// inputs when a preview is first requested.
+    textures: Arc<crate::initialize::TextureStore>,
     /// Diagnostic categories hidden by workspace configuration.
     ignored_diagnostic_codes: Arc<HashSet<String>>,
     /// Per-category severity remapping applied before diagnostic publication.
@@ -144,7 +144,7 @@ impl SnapshotRequestContext {
         snapshot: AnalysisSnapshot,
         cancellation: CancellationToken,
         client_snippets: bool,
-        textures: Option<Arc<pdx_game::eu4::mission::TextureAssets>>,
+        textures: Arc<crate::initialize::TextureStore>,
         ignored_diagnostic_codes: Arc<HashSet<String>>,
         diagnostic_severity_overrides: Arc<BTreeMap<String, Option<pdx_analysis::Severity>>>,
         semantic_tokens_cache: Arc<SemanticTokensCache>,
@@ -399,7 +399,7 @@ impl SnapshotRequestContext {
         wanted.sort_unstable();
         wanted.dedup();
         let mut textures = serde_json::Map::new();
-        if let Some(assets) = &self.textures {
+        if let Some(assets) = self.textures.get() {
             for name in wanted {
                 if let Some(url) = assets.data_url(name) {
                     textures.insert(name.to_owned(), Value::String(url));
@@ -546,9 +546,20 @@ impl SnapshotRequestContext {
             .values()
             .filter(|file| current_root_ids.contains(&file.root_id))
             .filter(|file| {
-                self.snapshot
-                    .file_state(file.id)
-                    .is_some_and(|state| state.parsed().is_some())
+                // Frontends are evicted at scan time; parseability is a
+                // property of the file's rule category, and evicted files
+                // reparse transiently inside the per-file diagnostics call.
+                self.snapshot.file_state(file.id).is_some()
+                    && self
+                        .snapshot
+                        .rules()
+                        .classify(&file.logical_path)
+                        .is_some_and(|category| {
+                            matches!(
+                                category.parser,
+                                ParserKind::Script | ParserKind::Localisation
+                            )
+                        })
             })
             .collect::<Vec<_>>();
         files.sort_by(|left, right| {

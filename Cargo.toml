@@ -25,6 +25,12 @@ opt-level = 0
 [profile.bench]
 opt-level = 3
 
+# Line tables only: full optimization with enough symbol information for
+# release-build sampling profilers (samply/VTune) to attribute frames,
+# without the size and build-time cost of full debug info.
+[profile.release]
+debug = "line-tables-only"
+
 [workspace.package]
 version = "0.2.0"
 edition = "2024"

@@ -164,8 +164,11 @@ function readInitializationOptions(): Record<string, unknown> {
     ) {
         options.ignoredErrorCodes = ignoredCodes;
     }
+    // Forwarded unconditionally: the setting's declared default (false) must reach the
+    // server even when the user never touched it, otherwise the server-side default
+    // (workspace-wide diagnostics on) would silently win.
+    options.workspaceWideDiagnostics = config.get<boolean>('workspaceWideDiagnostics', false);
     const mappedSettings: ReadonlyArray<readonly [string, string]> = [
-        ['workspaceWideDiagnostics', 'workspaceWideDiagnostics'],
         ['backgroundReindexIntervalMinutes', 'backgroundReindexIntervalMinutes'],
         ['backgroundReindexIdleSeconds', 'backgroundReindexIdleSeconds'],
         ['ignoreFilePatterns', 'ignoreFilePatterns'],

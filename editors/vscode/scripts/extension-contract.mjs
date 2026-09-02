@@ -373,6 +373,17 @@ for (const setting of requiredSettings) {
     fail(`English and Chinese NLS entries are required for ${setting}`);
   }
 }
+// Whole-workspace diagnostics is opt-in from the editor: the manifest default
+// must be false and the resolved value must be forwarded unconditionally, or
+// users who never touch the setting would fall back to the server default.
+if (manifest.contributes.configuration?.properties?.['paradoxcode.workspaceWideDiagnostics']?.default !== false) {
+  fail('paradoxcode.workspaceWideDiagnostics must default to false');
+}
+if (!extensionSource.includes(
+  "options.workspaceWideDiagnostics = config.get<boolean>('workspaceWideDiagnostics', false)",
+)) {
+  fail('workspace-wide diagnostics must forward its resolved value unconditionally');
+}
 for (const command of [
   'paradoxcode.addDependency',
   'paradoxcode.removeDependency',

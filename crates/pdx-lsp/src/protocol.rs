@@ -12,7 +12,7 @@ use pdx_analysis::{
     CancellationToken, Cancelled, CompletionKind, Diagnostic, DiagnosticCode, Location,
     RenameError, RenameFailure, Severity, diagnostics_with_cancellation,
 };
-use pdx_engine::{AnalysisSnapshot, DocumentError, DocumentId, WorkspaceError};
+use pdx_engine::{AnalysisSnapshot, DocumentError, DocumentId};
 use pdx_rules::RulesError;
 use pdx_text::{LineIndex, PositionRange, TextRange};
 use serde::Serialize;
@@ -156,6 +156,14 @@ pub(crate) fn is_initialize_control_message(message: &Value) -> bool {
         .and_then(|object| object.get("method"))
         .and_then(Value::as_str)
         .is_some_and(|method| matches!(method, "$/cancelRequest" | "exit"))
+}
+
+pub(crate) fn is_exit_notification(message: &Value) -> bool {
+    message
+        .as_object()
+        .and_then(|object| object.get("method"))
+        .and_then(Value::as_str)
+        == Some("exit")
 }
 
 pub(crate) fn cancel_request_from_notification(
@@ -616,18 +624,6 @@ pub(crate) fn location_to_lsp(
 pub(crate) fn document_error(error: DocumentError) -> RpcError {
     RpcError {
         code: INVALID_PARAMS,
-        message: error.to_string(),
-    }
-}
-
-pub(crate) fn workspace_scan_error(error: WorkspaceError) -> RpcError {
-    let code = if matches!(error, WorkspaceError::Cancelled) {
-        REQUEST_CANCELLED
-    } else {
-        INVALID_PARAMS
-    };
-    RpcError {
-        code,
         message: error.to_string(),
     }
 }

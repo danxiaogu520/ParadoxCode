@@ -157,21 +157,19 @@ pub(super) fn refresh_cancellable(
             category_id: Some(category.id.clone()),
             resolution: category.resolution,
         };
-        // Revision is irrelevant for cached states; only the shard, positions, and previews
-        // are retained after `cache_only`.
+        // Revision is irrelevant for cached states; only the shard and previews
+        // are retained after `cache_only`; positions recompute from the source.
         let state = build_file_state(&source_file, source, 0, rules, profile);
         let positions_for_file = position_ranges_for_state(&state);
-        let state = state.cache_only(positions_for_file);
-        let shard = (*state.shard).clone();
+        let state = state.cache_only();
+        let shard = state.shard_handle();
         shards.insert(*id, shard);
         positions.remove_file(*id);
-        if let Some(cached) = state.cached_positions.as_deref() {
-            positions.extend(
-                cached
-                    .iter()
-                    .map(|(range, position)| ((*id, *range), *position)),
-            );
-        }
+        positions.extend(
+            positions_for_file
+                .into_iter()
+                .map(|(range, position)| ((*id, range), position)),
+        );
         previews.remove_file(*id);
         if let Some(cached) = state.cached_localisation_previews() {
             previews.replace_file(

@@ -343,17 +343,20 @@ pub(crate) fn semantic_rule_diagnostics(
     let mut expansion = MacroExpansionSession::default();
     let mut quoted_scripts = QuotedScriptSession::new(cancellation);
     if let Some(context) = semantic_file_root_context(snapshot, input.path.as_ref()) {
+        let root_refs: Vec<&ScriptProperty> = roots.iter().collect();
+        let root_value_refs: Vec<&(std::sync::Arc<str>, TextRange)> =
+            root_bare_values.iter().collect();
         let (root_key, key_range) = roots.first().map_or_else(
             || ("", parsed.root().range()),
-            |property| (property.key.as_str(), property.key_range),
+            |property| (property.key.as_ref(), property.key_range),
         );
         let scope = semantic_initial_scope(snapshot, input, &context, root_key, key_range);
         validate_semantic_container(SemanticValidationInput {
             snapshot,
             context: &context,
             parent_path: &[],
-            properties: &roots,
-            bare_values: &root_bare_values,
+            properties: &root_refs,
+            bare_values: &root_value_refs,
             scope: &scope,
             hir: input.hir.as_deref(),
             diagnostics: &mut diagnostics,
@@ -411,12 +414,15 @@ pub(crate) fn semantic_rule_diagnostics(
                 }
                 let child_scope =
                     semantic_initial_scope(snapshot, input, &context, &child.key, child.key_range);
+                let child_properties: Vec<&ScriptProperty> = child.block.iter().collect();
+                let child_values: Vec<&(std::sync::Arc<str>, TextRange)> =
+                    child.bare_values.iter().collect();
                 validate_semantic_container(SemanticValidationInput {
                     snapshot,
                     context: &context,
                     parent_path: &[],
-                    properties: &child.block,
-                    bare_values: &child.bare_values,
+                    properties: &child_properties,
+                    bare_values: &child_values,
                     scope: &child_scope,
                     hir: input.hir.as_deref(),
                     diagnostics: &mut container_diagnostics,
@@ -429,12 +435,15 @@ pub(crate) fn semantic_rule_diagnostics(
                 })?;
             }
         } else {
+            let root_properties: Vec<&ScriptProperty> = property.block.iter().collect();
+            let root_values: Vec<&(std::sync::Arc<str>, TextRange)> =
+                property.bare_values.iter().collect();
             validate_semantic_container(SemanticValidationInput {
                 snapshot,
                 context: &context,
                 parent_path: &[],
-                properties: &property.block,
-                bare_values: &property.bare_values,
+                properties: &root_properties,
+                bare_values: &root_values,
                 scope: &scope,
                 hir: input.hir.as_deref(),
                 diagnostics: &mut container_diagnostics,
@@ -481,9 +490,9 @@ fn semantic_diagnostic(
 struct SemanticValidationInput<'data, 'hir, 'session, 'cancel> {
     snapshot: &'data AnalysisSnapshot,
     context: &'data str,
-    parent_path: &'data [String],
-    properties: &'data [ScriptProperty],
-    bare_values: &'data [(String, TextRange)],
+    parent_path: &'data [std::sync::Arc<str>],
+    properties: &'data [&'data ScriptProperty],
+    bare_values: &'data [&'data (std::sync::Arc<str>, TextRange)],
     scope: &'data ScopeContext,
     hir: Option<&'hir HirFile>,
     diagnostics: &'data mut Vec<Diagnostic>,
@@ -528,21 +537,33 @@ fn validate_semantic_container(
         bare_values,
         scope,
     );
-    let mut counts = std::collections::BTreeMap::<String, u32>::new();
+    let profile = snapshot.game_profile();
+    let trigger_like = context.eq_ignore_ascii_case("trigger")
+        || profile.semantic_context_inherits(context, "trigger");
+    let effect_like = context.eq_ignore_ascii_case("effect")
+        || profile.semantic_context_inherits(context, "effect");
+    // Case-folded occurrence counting with a linear scan: containers repeat a handful of
+    // distinct keys, and the scan avoids lowercasing and cloning a String per property.
+    let mut counts: Vec<(&str, u32)> = Vec::new();
     for property in properties {
         cancellation.checkpoint()?;
         let fact_scope = hir
             .and_then(|hir| hir.scope_fact(property.key_range, context))
             .map(|fact| scope_context_from_hir(snapshot.game_profile_handle(), &fact.state));
         let scope = fact_scope.as_ref().unwrap_or(scope);
-        let key = property.key.to_ascii_lowercase();
-        let count = counts.entry(key.clone()).or_default();
-        *count = count.saturating_add(1);
-        let profile = snapshot.game_profile();
-        let trigger_like = context.eq_ignore_ascii_case("trigger")
-            || profile.semantic_context_inherits(context, "trigger");
-        let effect_like = context.eq_ignore_ascii_case("effect")
-            || profile.semantic_context_inherits(context, "effect");
+        let count = match counts
+            .iter_mut()
+            .find(|(seen, _)| seen.eq_ignore_ascii_case(&property.key))
+        {
+            Some(entry) => {
+                entry.1 = entry.1.saturating_add(1);
+                entry.1
+            }
+            None => {
+                counts.push((property.key.as_ref(), 1));
+                1
+            }
+        };
         let transparent_wrapper = (trigger_like
             && profile.is_transparent_scope_wrapper(&property.key))
             || ((trigger_like || effect_like)
@@ -758,7 +779,7 @@ fn validate_semantic_container(
                     .max()
             };
             if let Some(max_occurs) = max_occurs
-                && *count > max_occurs
+                && count > max_occurs
             {
                 diagnostics.push(semantic_diagnostic(
                     DiagnosticCode::Cardinality,
@@ -786,10 +807,17 @@ fn validate_semantic_container(
             scope,
             transparent_wrapper,
         });
+        // The structural-path fallback and the quoted-script probe below need the same
+        // selected transition; compute it once and reuse the rule for both consumers.
+        let mut transition_rule: Option<&pdx_rules::SemanticRule> = None;
+        let mut transition_resolved = false;
         let destination = if let Some(fact) = cached_child_fact {
             Some((
-                fact.context.clone(),
-                fact.parent_path.clone(),
+                pdx_engine::intern_shard_string(&fact.context),
+                fact.parent_path
+                    .iter()
+                    .map(|segment| pdx_engine::intern_shard_string(segment))
+                    .collect::<Vec<_>>(),
                 scope_context_from_hir(snapshot.game_profile_handle(), &fact.state),
             ))
         } else if transparent_wrapper
@@ -799,10 +827,15 @@ fn validate_semantic_container(
         {
             let mut next_scope = scope.clone();
             next_scope.previous.insert(0, next_scope.current.clone());
-            next_scope.current = "any".to_owned();
-            Some((context.to_owned(), parent_path.to_vec(), next_scope))
+            next_scope.current = pdx_engine::intern_shard_string("any");
+            Some((
+                pdx_engine::intern_shard_string(context),
+                parent_path.to_vec(),
+                next_scope,
+            ))
         } else {
-            semantic_selected_transition(SemanticTransitionInput {
+            transition_resolved = true;
+            let selected = semantic_selected_transition(SemanticTransitionInput {
                 snapshot,
                 matching: &matching,
                 selected_alternative: selected_alternative.as_deref(),
@@ -811,8 +844,9 @@ fn validate_semantic_container(
                 property,
                 scope,
                 transparent_wrapper,
-            })
-            .map(|rule| {
+            });
+            transition_rule = selected;
+            selected.map(|rule| {
                 let (next_context, child_path) = semantic_transition_destination(
                     rule,
                     context,
@@ -832,12 +866,15 @@ fn validate_semantic_container(
             let structural_rules =
                 semantic_rules_for_container(snapshot, context, &structural_path, scope);
             if !structural_rules.is_empty() {
+                let child_properties: Vec<&ScriptProperty> = property.block.iter().collect();
+                let child_values: Vec<&(std::sync::Arc<str>, TextRange)> =
+                    property.bare_values.iter().collect();
                 validate_semantic_container(SemanticValidationInput {
                     snapshot,
                     context,
                     parent_path: &structural_path,
-                    properties: &property.block,
-                    bare_values: &property.bare_values,
+                    properties: &child_properties,
+                    bare_values: &child_values,
                     scope,
                     hir,
                     diagnostics,
@@ -851,16 +888,20 @@ fn validate_semantic_container(
             }
             continue;
         };
-        let quoted_transition = semantic_selected_transition(SemanticTransitionInput {
-            snapshot,
-            matching: &matching,
-            selected_alternative: selected_alternative.as_deref(),
-            context,
-            parent_path,
-            property,
-            scope,
-            transparent_wrapper,
-        })
+        let quoted_transition = if transition_resolved {
+            transition_rule
+        } else {
+            semantic_selected_transition(SemanticTransitionInput {
+                snapshot,
+                matching: &matching,
+                selected_alternative: selected_alternative.as_deref(),
+                context,
+                parent_path,
+                property,
+                scope,
+                transparent_wrapper,
+            })
+        }
         .filter(|rule| matches!(rule.shape, RuleShape::QuotedScript));
         if quoted_transition.is_some() {
             validate_quoted_script(
@@ -891,35 +932,46 @@ fn validate_semantic_container(
             if !structural_rules.is_empty() {
                 // Clauses such as `limit` are evaluated after the enclosing scope link has
                 // moved to its target, so structural and transitioned children share next_scope.
-                let (structural_properties, transition_properties): (Vec<_>, Vec<_>) =
-                    property.block.iter().cloned().partition(|child| {
-                        semantic_rules_for_container_key(
-                            snapshot,
-                            context,
-                            &structural_path,
-                            &child.key,
-                        )
-                        .iter()
-                        .any(|rule| {
-                            !matches!(rule.shape, RuleShape::LeafValue)
-                                && semantic_rule_key_matches(
-                                    snapshot,
-                                    rule,
-                                    &structural_path,
-                                    &child.key,
-                                )
-                        })
-                    });
-                let (structural_values, transition_values): (Vec<_>, Vec<_>) = property
-                    .bare_values
+                // Children are partitioned by reference: cloning whole property subtrees here
+                // dominated allocation traffic for deeply nested files.
+                let mut structural_properties = Vec::new();
+                let mut transition_properties = Vec::new();
+                for child in &property.block {
+                    let structural = semantic_rules_for_container_key(
+                        snapshot,
+                        context,
+                        &structural_path,
+                        &child.key,
+                    )
                     .iter()
-                    .cloned()
-                    .partition(|(value, _)| {
-                        structural_rules.iter().any(|rule| {
-                            matches!(rule.shape, RuleShape::LeafValue)
-                                && semantic_leaf_value_matches(snapshot, rule, value, &next_scope)
-                        })
+                    .any(|rule| {
+                        !matches!(rule.shape, RuleShape::LeafValue)
+                            && semantic_rule_key_matches(
+                                snapshot,
+                                rule,
+                                &structural_path,
+                                &child.key,
+                            )
                     });
+                    if structural {
+                        structural_properties.push(child);
+                    } else {
+                        transition_properties.push(child);
+                    }
+                }
+                let mut structural_values = Vec::new();
+                let mut transition_values = Vec::new();
+                for value in &property.bare_values {
+                    let structural = structural_rules.iter().any(|rule| {
+                        matches!(rule.shape, RuleShape::LeafValue)
+                            && semantic_leaf_value_matches(snapshot, rule, &value.0, &next_scope)
+                    });
+                    if structural {
+                        structural_values.push(value);
+                    } else {
+                        transition_values.push(value);
+                    }
+                }
                 validate_semantic_container(SemanticValidationInput {
                     snapshot,
                     context,
@@ -955,12 +1007,15 @@ fn validate_semantic_container(
                 continue;
             }
         }
+        let child_properties: Vec<&ScriptProperty> = property.block.iter().collect();
+        let child_values: Vec<&(std::sync::Arc<str>, TextRange)> =
+            property.bare_values.iter().collect();
         validate_semantic_container(SemanticValidationInput {
             snapshot,
             context: &next_context,
             parent_path: &child_path,
-            properties: &property.block,
-            bare_values: &property.bare_values,
+            properties: &child_properties,
+            bare_values: &child_values,
             scope: &next_scope,
             hir,
             diagnostics,
@@ -1151,7 +1206,7 @@ struct ValidationState<'data, 'session, 'cancel> {
 fn validate_quoted_script(
     state: ValidationState<'_, '_, '_>,
     context: &str,
-    parent_path: &[String],
+    parent_path: &[std::sync::Arc<str>],
     scope: &ScopeContext,
     property: &ScriptProperty,
     depth: usize,
@@ -1204,13 +1259,15 @@ fn validate_quoted_script(
             error.message.clone(),
         ));
     }
-    let (properties, bare_values) = quoted_script_container(&script, origin);
+    let (expanded_properties, expanded_values) = quoted_script_container(&script, origin);
+    let property_refs: Vec<&ScriptProperty> = expanded_properties.iter().collect();
+    let value_refs: Vec<&(std::sync::Arc<str>, TextRange)> = expanded_values.iter().collect();
     validate_semantic_container(SemanticValidationInput {
         snapshot,
         context,
         parent_path,
-        properties: &properties,
-        bare_values: &bare_values,
+        properties: &property_refs,
+        bare_values: &value_refs,
         scope,
         hir: None,
         diagnostics,
@@ -1334,12 +1391,15 @@ fn validate_scripted_macro_expansion(
         }
     };
     let first_expanded_diagnostic = diagnostics.len();
+    let expanded_property_refs: Vec<&ScriptProperty> = expanded.properties.iter().collect();
+    let expanded_value_refs: Vec<&(std::sync::Arc<str>, TextRange)> =
+        expanded.bare_values.iter().collect();
     let validation = validate_semantic_container(SemanticValidationInput {
         snapshot,
         context: &resolved.body_context,
         parent_path: &[],
-        properties: &expanded.properties,
-        bare_values: &expanded.bare_values,
+        properties: &expanded_property_refs,
+        bare_values: &expanded_value_refs,
         scope,
         hir: None,
         diagnostics,

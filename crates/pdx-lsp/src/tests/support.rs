@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
 use std::fs;
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Write};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
 
 use super::*;
 use pdx_engine::{
@@ -81,6 +83,115 @@ impl Read for ScriptedReader {
         }
         self.current.read(buffer)
     }
+}
+
+/// Write handle mirroring transport output into a shared buffer so test code
+/// can observe frames while `run_transport` is still running. The event loop
+/// is the only writer, so frames always land whole; readers consider only
+/// complete frames.
+#[derive(Clone, Default)]
+pub(crate) struct SharedOutput(Arc<Mutex<Vec<u8>>>);
+
+impl SharedOutput {
+    pub(crate) fn new() -> Self {
+        Self::default()
+    }
+
+    /// Returns every complete frame written so far; a trailing partially
+    /// written frame is ignored until its bytes have landed.
+    pub(crate) fn frames(&self) -> Vec<Value> {
+        let bytes = self.0.lock().expect("shared output lock").clone();
+        let mut cursor = Cursor::new(&bytes[..]);
+        let mut decoded = Vec::new();
+        while let Some(value) = read_message(&mut cursor).ok().flatten() {
+            decoded.push(value);
+        }
+        decoded
+    }
+
+    /// Blocks until a complete frame matching `predicate` has been written.
+    /// The short poll interval is efficiency only: release is caused by the
+    /// frame being written, never by timing, so the resulting interleaving
+    /// does not depend on machine speed.
+    pub(crate) fn wait_for(&self, predicate: impl Fn(&Value) -> bool) {
+        while !self.frames().iter().any(&predicate) {
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+    }
+
+    /// Returns the raw bytes written so far.
+    pub(crate) fn bytes(&self) -> Vec<u8> {
+        self.0.lock().expect("shared output lock").clone()
+    }
+}
+
+impl Write for SharedOutput {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.0
+            .lock()
+            .expect("shared output lock")
+            .extend_from_slice(buffer);
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// One-shot latch used by scan-gate tests: the gate sets it once the scan
+/// worker is parked, and a `ScriptedReader` action waits on it so the messages
+/// that must race the scan are only delivered after the scan is verifiably in
+/// flight.
+#[derive(Clone, Default)]
+pub(crate) struct Latch(Arc<(Mutex<bool>, Condvar)>);
+
+impl Latch {
+    pub(crate) fn set(&self) {
+        let mut set = self.0.0.lock().expect("latch lock");
+        *set = true;
+        self.0.1.notify_all();
+    }
+
+    pub(crate) fn wait(&self) {
+        let mut set = self.0.0.lock().expect("latch lock");
+        while !*set {
+            set = self.0.1.wait(set).expect("latch lock");
+        }
+    }
+}
+
+/// Matches the successful response to request `id` — the release condition the
+/// shutdown-race tests gate the initial scan on.
+pub(crate) fn response_written(id: i64) -> impl Fn(&Value) -> bool {
+    move |value| value["id"] == id && value.get("result").is_some()
+}
+
+/// Builds the deterministic scan-completion gate used by the shutdown-race
+/// regression tests. The first background scan worker to finish parks after
+/// its scan completed but before the completion is reported to the event
+/// loop, and resumes once `release_after` matches a frame the transport has
+/// already written (typically the `shutdown` response) — so the scan
+/// verifiably completes after that frame and verifiably overlaps every
+/// message delivered before it. Revision-race retry scans pass through
+/// freely so shutdown drains still converge. The returned latch fires when
+/// the worker parks.
+pub(crate) fn scan_completion_gate(
+    output: &SharedOutput,
+    release_after: impl Fn(&Value) -> bool + Send + Sync + 'static,
+) -> (Arc<dyn Fn() + Send + Sync>, Latch) {
+    let parked = Latch::default();
+    let gate_parked = parked.clone();
+    let output = output.clone();
+    let spent = Arc::new(AtomicBool::new(false));
+    let gate = Arc::new(move || {
+        if spent.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        gate_parked.set();
+        output.wait_for(&release_after);
+    });
+    (gate, parked)
 }
 
 pub(crate) fn decode_frames(bytes: &[u8]) -> Vec<Value> {

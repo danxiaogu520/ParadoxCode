@@ -38,7 +38,7 @@ impl<'syntax> FactCollector<'syntax> {
 
     fn collect(
         &mut self,
-        node: &CstNode,
+        node: CstNode<'_>,
         top_level: bool,
         inside_key: bool,
         parent_path: &[String],
@@ -51,7 +51,6 @@ impl<'syntax> FactCollector<'syntax> {
         if node.kind() == CstKind::ParameterBlock
             && let Some(condition) = node
                 .children()
-                .iter()
                 .find(|child| child.kind() == CstKind::ParameterCondition)
             && let Some(raw) = self.syntax.text(condition.range()).map(str::trim)
         {
@@ -78,7 +77,6 @@ impl<'syntax> FactCollector<'syntax> {
         if node.kind() == CstKind::LocalisationEntry
             && let Some(key) = node
                 .children()
-                .iter()
                 .find(|child| child.kind() == CstKind::LocalisationKey)
             && let Some(name) = self.syntax.text(key.range())
         {
@@ -103,10 +101,7 @@ impl<'syntax> FactCollector<'syntax> {
             });
         }
         if node.kind() == CstKind::Property
-            && let Some(key_node) = node
-                .children()
-                .iter()
-                .find(|child| child.kind() == CstKind::Key)
+            && let Some(key_node) = node.children().find(|child| child.kind() == CstKind::Key)
             && let Some(key) = self
                 .syntax
                 .text(key_node.range())
@@ -121,7 +116,6 @@ impl<'syntax> FactCollector<'syntax> {
                 range: node.range(),
                 operator: node
                     .children()
-                    .iter()
                     .find(|child| child.kind() == CstKind::Operator)
                     .and_then(|operator| self.syntax.text(operator.range()))
                     .map(str::trim)
@@ -131,9 +125,8 @@ impl<'syntax> FactCollector<'syntax> {
                 top_level,
                 value_range: node
                     .children()
-                    .iter()
                     .find(|child| child.kind() == CstKind::Value)
-                    .map(CstNode::range),
+                    .map(|child| child.range()),
                 scalar: direct_scalar(self.syntax, node),
             });
             for child in node.children() {
@@ -157,14 +150,12 @@ impl<'syntax> FactCollector<'syntax> {
     }
 }
 
-fn direct_scalar(syntax: &ParsedFile, node: &CstNode) -> Option<HirScalar> {
+fn direct_scalar(syntax: &ParsedFile, node: CstNode<'_>) -> Option<HirScalar> {
     let value = node
         .children()
-        .iter()
         .find(|child| child.kind() == CstKind::Value)?;
     let scalar = value
         .children()
-        .iter()
         .find(|child| matches!(child.kind(), CstKind::BareValue | CstKind::QuotedString))?;
     let raw = syntax.text(scalar.range())?.trim();
     let value = raw

@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 
 use pdx_text::{LogicalPath, PositionRange, TextRange};
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
@@ -436,13 +437,13 @@ fn load_index(
         }
         shards.insert(
             id,
-            FileIndexShard {
+            Arc::new(FileIndexShard {
                 file_id: id,
                 definitions: Vec::new(),
                 references: Vec::new(),
                 macro_definitions: Vec::new(),
                 syntax_error_count,
-            },
+            }),
         );
     }
     progress.report(source_files.len());
@@ -493,6 +494,15 @@ fn load_index(
     }
     drop(known_ranges);
     progress.report(positions.len());
+    // The loaded shard vectors stay resident for the session; exact-fit them
+    // so row-push growth doubling does not leave ~2x slack per file.
+    for shard in shards.values_mut() {
+        if let Some(shard) = std::sync::Arc::get_mut(shard) {
+            shard.definitions.shrink_to_fit();
+            shard.references.shrink_to_fit();
+            shard.macro_definitions.shrink_to_fit();
+        }
+    }
     Ok((
         source_files,
         if build_lookup_maps {
@@ -513,7 +523,7 @@ fn load_index(
 
 fn load_macro_definitions(
     connection: &Connection,
-    shards: &mut BTreeMap<SourceFileId, FileIndexShard>,
+    shards: &mut BTreeMap<SourceFileId, Arc<FileIndexShard>>,
 ) -> Result<usize, IndexCacheError> {
     let mut rows_loaded = 0usize;
     let mut statement = connection.prepare(
@@ -537,7 +547,7 @@ fn load_macro_definitions(
         let ordinal = usize::try_from(ordinal)
             .map_err(|_| IndexCacheError::InvalidData("negative macro ordinal".to_owned()))?;
         let definition_range = decode_range(start, end)?;
-        let shard = shards.get_mut(&file_id).ok_or_else(|| {
+        let shard = shards.get_mut(&file_id).map(Arc::make_mut).ok_or_else(|| {
             IndexCacheError::InvalidData(format!(
                 "macro definition references unknown file {}",
                 file_id.get()
@@ -613,7 +623,11 @@ fn load_macro_definitions(
         };
         let summary = shards
             .get_mut(&file_id)
-            .and_then(|shard| shard.macro_definitions.get_mut(macro_ordinal))
+            .and_then(|shard| {
+                Arc::make_mut(shard)
+                    .macro_definitions
+                    .get_mut(macro_ordinal)
+            })
             .ok_or_else(|| {
                 IndexCacheError::InvalidData("macro parameter has no owner".to_owned())
             })?;
@@ -642,7 +656,7 @@ fn load_macro_definitions(
 
 fn load_localisation_previews(
     connection: &Connection,
-    shards: &BTreeMap<SourceFileId, FileIndexShard>,
+    shards: &BTreeMap<SourceFileId, Arc<FileIndexShard>>,
     localisation_ranges: &HashSet<(SourceFileId, TextRange)>,
 ) -> Result<LocalisationPreviewMap, IndexCacheError> {
     let mut statement = connection.prepare(
@@ -699,11 +713,11 @@ fn load_localisation_previews(
 
 fn load_definitions(
     connection: &Connection,
-    shards: &mut BTreeMap<SourceFileId, FileIndexShard>,
+    shards: &mut BTreeMap<SourceFileId, Arc<FileIndexShard>>,
 ) -> Result<usize, IndexCacheError> {
     let mut rows_loaded = 0usize;
     let mut statement = connection.prepare(
-        "SELECT file_id, kind, name, range_start, range_end, active
+        "SELECT file_id, kind, name, range_start, range_end, selection_start, selection_end, active
          FROM definitions ORDER BY file_id, ordinal",
     )?;
     let rows = statement.query_map([], |row| {
@@ -714,12 +728,15 @@ fn load_definitions(
             row.get::<_, i64>(3)?,
             row.get::<_, i64>(4)?,
             row.get::<_, i64>(5)?,
+            row.get::<_, i64>(6)?,
+            row.get::<_, i64>(7)?,
         ))
     })?;
     for row in rows {
-        let (file_id, kind, name, start, end, active) = row?;
+        let (file_id, kind, name, start, end, selection_start, selection_end, active) = row?;
         let file_id = decode_file_id(&file_id)?;
         let range = decode_range(start, end)?;
+        let selection_range = decode_range(selection_start, selection_end)?;
         let active = match active {
             0 => false,
             1 => true,
@@ -736,13 +753,15 @@ fn load_definitions(
                     "definition references unknown file {}",
                     file_id.get()
                 ))
-            })?
+            })
+            .map(Arc::make_mut)?
             .definitions
             .push(Definition {
-                kind,
-                name,
+                kind: crate::string_pool::intern_shard_string(&kind),
+                name: crate::string_pool::intern_shard_string(&name),
                 file_id,
                 range,
+                selection_range,
                 active,
             });
         rows_loaded = rows_loaded.saturating_add(1);
@@ -752,7 +771,7 @@ fn load_definitions(
 
 fn load_references(
     connection: &Connection,
-    shards: &mut BTreeMap<SourceFileId, FileIndexShard>,
+    shards: &mut BTreeMap<SourceFileId, Arc<FileIndexShard>>,
 ) -> Result<usize, IndexCacheError> {
     let mut rows_loaded = 0usize;
     let mut statement = connection.prepare(
@@ -779,11 +798,12 @@ fn load_references(
                     "reference targets unknown file {}",
                     file_id.get()
                 ))
-            })?
+            })
+            .map(Arc::make_mut)?
             .references
             .push(Reference {
-                kind,
-                name,
+                kind: crate::string_pool::intern_shard_string(&kind),
+                name: crate::string_pool::intern_shard_string(&name),
                 file_id,
                 range,
             });

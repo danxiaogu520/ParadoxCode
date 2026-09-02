@@ -84,7 +84,7 @@ impl<'cancel> QuotedScriptSession<'cancel> {
     }
 }
 
-fn cst_node_count(node: &CstNode) -> usize {
+fn cst_node_count(node: CstNode<'_>) -> usize {
     let mut count = 0usize;
     let mut pending = vec![node];
     while let Some(current) = pending.pop() {

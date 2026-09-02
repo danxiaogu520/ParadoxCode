@@ -42,12 +42,11 @@ pub(super) fn equivalent(original: &ParsedFile, formatted: &ParsedFile, depth: u
         })
 }
 
-fn same_tree_shape(left: &CstNode, right: &CstNode) -> bool {
+fn same_tree_shape(left: CstNode<'_>, right: CstNode<'_>) -> bool {
     left.kind() == right.kind()
-        && left.children().len() == right.children().len()
+        && left.child_count() == right.child_count()
         && left
             .children()
-            .iter()
             .zip(right.children())
             .all(|(left, right)| same_tree_shape(left, right))
 }

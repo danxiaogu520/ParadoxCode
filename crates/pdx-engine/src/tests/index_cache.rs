@@ -1,6 +1,50 @@
 use super::*;
 
 #[test]
+fn previous_cache_schema_is_rejected_before_table_loading() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-old-schema-cache-{nonce}"));
+    let vanilla = root.join("vanilla");
+    fs::create_dir_all(vanilla.join("events")).expect("event directory");
+    fs::write(
+        vanilla.join("events/schema.txt"),
+        "country_event = { id = schema.1 }\n",
+    )
+    .expect("schema fixture");
+
+    let mut host = AnalysisHost::with_profile(
+        pdx_game::eu4::first_party_rules().expect("first-party rules"),
+        pdx_game::eu4::profile(),
+    );
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+    )]));
+    host.refresh_source_roots().expect("scan Vanilla");
+    let cache = IndexCache::from_snapshot(&host.snapshot()).expect("build cache");
+    let cache_path = root.join("cache/vanilla.pdxindex");
+    cache.save(&cache_path).expect("save cache");
+
+    let connection = rusqlite::Connection::open(&cache_path).expect("open cache metadata");
+    connection
+        .execute(
+            "UPDATE metadata SET value = ?1 WHERE key = 'schema_version'",
+            rusqlite::params![b"9".as_slice()],
+        )
+        .expect("mark cache as previous schema");
+    drop(connection);
+    assert!(matches!(
+        IndexCache::load(&cache_path),
+        Err(IndexCacheError::UnsupportedSchema(9))
+    ));
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn vanilla_cache_preserves_scripted_macro_references_without_hir() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -38,7 +82,7 @@ fn vanilla_cache_preserves_scripted_macro_references_without_hir() {
             .is_some_and(|state| state.parsed().is_none() && state.hir().is_none())
     }));
     assert!(snapshot.index().references_iter().any(|reference| {
-        reference.kind == "scripted_effect" && reference.name == "cached_effect"
+        reference.kind.as_ref() == "scripted_effect" && reference.name.as_ref() == "cached_effect"
     }));
     let signature = snapshot
         .index()
@@ -67,7 +111,7 @@ fn vanilla_cache_preserves_scripted_macro_references_without_hir() {
     cache.save(&cache_path).expect("save cache");
     let loaded = IndexCache::load(&cache_path).expect("load cache");
     assert!(loaded.index().references_iter().any(|reference| {
-        reference.kind == "scripted_effect" && reference.name == "cached_effect"
+        reference.kind.as_ref() == "scripted_effect" && reference.name.as_ref() == "cached_effect"
     }));
     assert_eq!(
         loaded
@@ -204,7 +248,7 @@ fn refreshed_cache_reindexes_changed_files_and_drops_deleted_ones() {
     let definitions = reloaded
         .index()
         .definitions_iter()
-        .map(|definition| definition.name.as_str())
+        .map(|definition| &*definition.name)
         .collect::<Vec<_>>();
     assert!(
         definitions.contains(&"refresh.1b"),
@@ -579,6 +623,94 @@ fn persistent_vanilla_cache_round_trips_and_is_never_rescanned() {
 }
 
 #[test]
+fn vanilla_cache_previews_retain_only_preferred_languages() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-preview-retention-{nonce}"));
+    let vanilla = root.join("vanilla");
+    fs::create_dir_all(vanilla.join("localisation")).expect("fixture directory");
+    fs::write(
+        vanilla.join("localisation/test_l_english.yml"),
+        "l_english:\nenglish_key:0 \"English text\"\n",
+    )
+    .expect("English localisation");
+    fs::write(
+        vanilla.join("localisation/test_l_french.yml"),
+        "l_french:\nfrench_key:0 \"Texte francais\"\n",
+    )
+    .expect("French localisation");
+    fs::write(
+        vanilla.join("localisation/unmarked.yml"),
+        "l_english:\nplain_key:0 \"Unmarked file\"\n",
+    )
+    .expect("localisation without a language marker in its path");
+
+    let mut builder = eu4_host();
+    builder.apply_change(super::WorkspaceChange::SetSourceRoots(vec![
+        SourceRoot::new(
+            SourceRootId::new(0),
+            SourceRootKind::Vanilla,
+            fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+        ),
+    ]));
+    builder.refresh_source_roots().expect("scan Vanilla");
+
+    let install = |preferred: Vec<String>| {
+        let mut host = eu4_host();
+        host.set_preferred_localisation_languages(preferred);
+        host.install_index_cache(IndexCache::from_snapshot(&builder.snapshot()).expect("cache"))
+            .expect("install cache");
+        host.snapshot()
+    };
+
+    let default_preferences = install(Vec::new());
+    let preview_is_present = |snapshot: &AnalysisSnapshot, key: &str| {
+        snapshot
+            .index()
+            .active_definition("localisation", key)
+            .is_some_and(|definition| {
+                snapshot
+                    .localisation_preview(definition.file_id, definition.range)
+                    .is_some()
+            })
+    };
+    assert!(
+        preview_is_present(&default_preferences, "english_key"),
+        "English stays retained as the fallback language"
+    );
+    assert!(
+        preview_is_present(&default_preferences, "plain_key"),
+        "files without a path language marker stay retained"
+    );
+    assert!(
+        !preview_is_present(&default_preferences, "french_key"),
+        "unpreferred languages are dropped at install while their definitions remain indexed"
+    );
+    assert!(
+        default_preferences
+            .index()
+            .active_definition("localisation", "french_key")
+            .is_some(),
+        "dropping a preview must not drop the indexed definition"
+    );
+
+    let french_preferences = install(vec!["french".to_owned()]);
+    assert!(
+        preview_is_present(&french_preferences, "french_key"),
+        "configured preference order is retained"
+    );
+    assert!(
+        preview_is_present(&french_preferences, "english_key"),
+        "English fallback remains retained alongside a preference"
+    );
+    assert!(preview_is_present(&french_preferences, "plain_key"));
+
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -649,7 +781,7 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
         "cached dependency files are never materialized"
     );
     assert!(snapshot.index().references_iter().any(|reference| {
-        reference.kind == "scripted_effect" && reference.name == "dep_cached_effect"
+        &*reference.kind == "scripted_effect" && &*reference.name == "dep_cached_effect"
     }));
     let macro_after_install = snapshot
         .index()
@@ -659,7 +791,7 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
     let kinds = snapshot
         .index()
         .references_iter()
-        .map(|reference| (reference.kind.as_str(), reference.name.as_str()))
+        .map(|reference| (&*reference.kind, &*reference.name))
         .collect::<Vec<_>>();
     assert!(
         kinds.contains(&("scripted_effect", "dep_cached_effect")),

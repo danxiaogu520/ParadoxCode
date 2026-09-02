@@ -1,11 +1,17 @@
-use super::{CstKind, CstNode, ParseParts, SyntaxError, SyntaxErrorKind, SyntaxToken, TokenKind};
+use pdx_text::TextRange;
+
+use super::{
+    CstKind, ParseParts, SyntaxError, SyntaxErrorKind, SyntaxToken, SyntaxTreeBuilder, TokenKind,
+};
 
 pub(crate) fn parse(source: &str) -> ParseParts {
     let mut parser = Parser::new(source);
-    let children = parser.parse_container(None);
-    let root = parser.node(CstKind::Document, 0, source.len(), children);
+    let mark = parser.tree.child_mark();
+    parser.parse_container(None);
+    let children = parser.tree.children_since(mark);
+    parser.node(CstKind::Document, 0, source.len(), children);
     ParseParts {
-        root,
+        tree: parser.tree.finish(),
         tokens: parser.tokens,
         errors: parser.errors,
     }
@@ -16,6 +22,7 @@ struct Parser<'source> {
     position: usize,
     tokens: Vec<SyntaxToken>,
     errors: Vec<SyntaxError>,
+    tree: SyntaxTreeBuilder,
 }
 
 impl<'source> Parser<'source> {
@@ -25,25 +32,44 @@ impl<'source> Parser<'source> {
             position: 0,
             tokens: Vec::new(),
             errors: Vec::new(),
+            tree: SyntaxTreeBuilder::default(),
         }
     }
 
-    fn node(&self, kind: CstKind, start: usize, end: usize, children: Vec<CstNode>) -> CstNode {
-        CstNode::new(kind, super::range(start, end), children)
+    /// Emits one node whose children are the most recently pushed `child_count` indices.
+    fn node(&mut self, kind: CstKind, start: usize, end: usize, child_count: usize) -> u32 {
+        self.tree.node(kind, super::range(start, end), child_count)
     }
 
-    fn parse_container(&mut self, terminator: Option<u8>) -> Vec<CstNode> {
-        let mut children = Vec::new();
+    /// Queues one emitted node as a child of the parent under construction.
+    fn push(&mut self, index: u32) {
+        self.tree.push_child(index);
+    }
+
+    fn children_mark(&self) -> usize {
+        self.tree.child_mark()
+    }
+
+    fn children_since(&self, mark: usize) -> usize {
+        self.tree.children_since(mark)
+    }
+
+    fn node_range(&self, index: u32) -> TextRange {
+        self.tree.node_range(index)
+    }
+
+    fn parse_container(&mut self, terminator: Option<u8>) {
         loop {
             self.skip_whitespace();
-            if self.position >= self.source.len() {
+            if self.position >= self.source.len() || self.tree.is_saturated() {
                 break;
             }
             if terminator.is_some_and(|value| self.peek() == Some(value)) {
                 break;
             }
             if self.peek() == Some(b'#') {
-                children.push(self.parse_comment());
+                let comment = self.parse_comment();
+                self.push(comment);
                 continue;
             }
             if matches!(self.peek(), Some(b'}' | b']')) {
@@ -55,7 +81,8 @@ impl<'source> Parser<'source> {
                     self.position,
                     "unexpected closing delimiter",
                 );
-                children.push(self.node(CstKind::Error, start, self.position, Vec::new()));
+                let recovery = self.node(CstKind::Error, start, self.position, 0);
+                self.push(recovery);
                 continue;
             }
 
@@ -64,34 +91,35 @@ impl<'source> Parser<'source> {
                 if self.peek() == Some(b'{') {
                     // Clausewitz data occasionally uses anonymous nested vectors, for example
                     // `position = { { 0 0 0 } { 1 1 1 } }` in GFX configuration.
-                    children.push(self.parse_block());
+                    let block = self.parse_block();
+                    self.push(block);
                 } else if self.peek() == Some(b'"') {
                     let quoted = self.parse_quoted(CstKind::QuotedString);
                     self.skip_whitespace();
                     if self.operator_starts_here() {
-                        children.push(self.parse_property(start, quoted));
+                        let property = self.parse_property(start, quoted);
+                        self.push(property);
                     } else if self.peek() == Some(b'{') {
                         let block = self.parse_block();
-                        let end = block.range().end() as usize;
-                        children.push(self.node(
-                            CstKind::HeaderBlock,
-                            start,
-                            end,
-                            vec![quoted, block],
-                        ));
+                        let end = self.node_range(block).end() as usize;
+                        self.push(quoted);
+                        self.push(block);
+                        let header = self.node(CstKind::HeaderBlock, start, end, 2);
+                        self.push(header);
                     } else {
                         if terminator.is_none() {
                             self.error(
                                 SyntaxErrorKind::UnexpectedToken,
                                 start,
-                                quoted.range().end() as usize,
+                                self.node_range(quoted).end() as usize,
                                 "a top-level script value must be assigned to a key",
                             );
                         }
-                        children.push(quoted);
+                        self.push(quoted);
                     }
                 } else if self.starts_parameter_block() {
-                    children.push(self.parse_parameter_block());
+                    let parameter = self.parse_parameter_block();
+                    self.push(parameter);
                 } else {
                     let end = self.position.saturating_add(1).min(self.source.len());
                     self.position = end;
@@ -101,30 +129,32 @@ impl<'source> Parser<'source> {
                         end,
                         "unexpected token in script document",
                     );
-                    children.push(self.node(CstKind::Error, start, end, Vec::new()));
+                    let recovery = self.node(CstKind::Error, start, end, 0);
+                    self.push(recovery);
                 }
                 continue;
             };
 
-            let after_first = self.position;
             self.skip_whitespace();
             if self.operator_starts_here() {
-                children.push(self.parse_property(start, first));
+                let property = self.parse_property(start, first);
+                self.push(property);
             } else if self.peek() == Some(b'{') {
                 let block = self.parse_block();
-                let end = block.range().end() as usize;
-                children.push(self.node(CstKind::HeaderBlock, start, end, vec![first, block]));
+                let end = self.node_range(block).end() as usize;
+                self.push(first);
+                self.push(block);
+                let header = self.node(CstKind::HeaderBlock, start, end, 2);
+                self.push(header);
             } else {
                 // Whitespace after a scalar belongs to the container, not to the scalar node.
                 // Keeping the cursor after it is what lets a mixed block continue parsing.
-                let _ = after_first;
-                children.push(first);
+                self.push(first);
             }
         }
-        children
     }
 
-    fn parse_property(&mut self, start: usize, key: CstNode) -> CstNode {
+    fn parse_property(&mut self, start: usize, key: u32) -> u32 {
         let operator_start = self.position;
         let operator = if let Some((_end, token)) = self.parse_operator() {
             token
@@ -137,7 +167,7 @@ impl<'source> Parser<'source> {
                 end,
                 "invalid script operator",
             );
-            self.node(CstKind::Error, operator_start, end, Vec::new())
+            self.node(CstKind::Error, operator_start, end, 0)
         };
 
         self.skip_whitespace();
@@ -151,34 +181,29 @@ impl<'source> Parser<'source> {
                 at,
                 "property operator is missing a value",
             );
-            self.node(CstKind::Error, at, at, Vec::new())
+            self.node(CstKind::Error, at, at, 0)
         } else {
             self.parse_value()
         };
-        let end = value.range().end() as usize;
-        self.node(
-            CstKind::Property,
-            start,
-            end,
-            vec![
-                self.node(
-                    CstKind::Key,
-                    key.range().start() as usize,
-                    key.range().end() as usize,
-                    vec![key],
-                ),
-                operator,
-                self.node(
-                    CstKind::Value,
-                    value.range().start() as usize,
-                    end,
-                    vec![value],
-                ),
-            ],
-        )
+        let key_range = self.node_range(key);
+        self.push(key);
+        let key_node = self.node(
+            CstKind::Key,
+            key_range.start() as usize,
+            key_range.end() as usize,
+            1,
+        );
+        let value_range = self.node_range(value);
+        let end = value_range.end() as usize;
+        self.push(value);
+        let value_node = self.node(CstKind::Value, value_range.start() as usize, end, 1);
+        self.push(key_node);
+        self.push(operator);
+        self.push(value_node);
+        self.node(CstKind::Property, start, end, 3)
     }
 
-    fn parse_value(&mut self) -> CstNode {
+    fn parse_value(&mut self) -> u32 {
         let start = self.position;
         if self.peek() == Some(b'"') {
             return self.parse_quoted(CstKind::QuotedString);
@@ -198,22 +223,26 @@ impl<'source> Parser<'source> {
                 end,
                 "expected a script value",
             );
-            return self.node(CstKind::Error, start, end, Vec::new());
+            return self.node(CstKind::Error, start, end, 0);
         };
         self.skip_whitespace();
         if self.peek() == Some(b'{') {
             let block = self.parse_block();
-            let end = block.range().end() as usize;
-            self.node(CstKind::HeaderBlock, start, end, vec![value, block])
+            let end = self.node_range(block).end() as usize;
+            self.push(value);
+            self.push(block);
+            self.node(CstKind::HeaderBlock, start, end, 2)
         } else {
             value
         }
     }
 
-    fn parse_block(&mut self) -> CstNode {
+    fn parse_block(&mut self) -> u32 {
         let start = self.position;
         self.consume_expected(b'{');
-        let children = self.parse_container(Some(b'}'));
+        let mark = self.children_mark();
+        self.parse_container(Some(b'}'));
+        let children = self.children_since(mark);
         if self.peek() == Some(b'}') {
             self.consume_delimiter(TokenKind::CloseDelimiter);
         } else {
@@ -227,7 +256,7 @@ impl<'source> Parser<'source> {
         self.node(CstKind::Block, start, self.position.max(start), children)
     }
 
-    fn parse_parameter_block(&mut self) -> CstNode {
+    fn parse_parameter_block(&mut self) -> u32 {
         let start = self.position;
         self.consume_delimiter(TokenKind::OpenDelimiter);
         self.consume_delimiter(TokenKind::OpenDelimiter);
@@ -244,7 +273,7 @@ impl<'source> Parser<'source> {
                 condition_end,
                 "parameter block is missing a condition",
             );
-            self.node(CstKind::Error, condition_start, condition_end, Vec::new())
+            self.node(CstKind::Error, condition_start, condition_end, 0)
         });
         self.skip_whitespace();
         if self.peek() == Some(b']') {
@@ -258,14 +287,17 @@ impl<'source> Parser<'source> {
                 "parameter condition is missing `]`",
             );
         }
+        self.push(condition);
         let condition_node = self.node(
             CstKind::ParameterCondition,
             condition_start,
             condition_end,
-            vec![condition],
+            1,
         );
-        let mut children = vec![condition_node];
-        children.extend(self.parse_container(Some(b']')));
+        self.push(condition_node);
+        let mark = self.children_mark();
+        self.parse_container(Some(b']'));
+        let children = self.children_since(mark) + 1;
         if self.peek() == Some(b']') {
             self.consume_delimiter(TokenKind::CloseDelimiter);
         } else {
@@ -284,7 +316,7 @@ impl<'source> Parser<'source> {
         )
     }
 
-    fn parse_comment(&mut self) -> CstNode {
+    fn parse_comment(&mut self) -> u32 {
         let start = self.position;
         while self.position < self.source.len()
             && !matches!(self.source.as_bytes()[self.position], b'\r' | b'\n')
@@ -294,10 +326,10 @@ impl<'source> Parser<'source> {
         let range = super::range(start, self.position);
         self.tokens
             .push(SyntaxToken::new(TokenKind::Comment, range));
-        self.node(CstKind::Comment, start, self.position, Vec::new())
+        self.node(CstKind::Comment, start, self.position, 0)
     }
 
-    fn parse_quoted(&mut self, kind: CstKind) -> CstNode {
+    fn parse_quoted(&mut self, kind: CstKind) -> u32 {
         let start = self.position;
         self.position += 1;
         let mut closed = false;
@@ -334,10 +366,10 @@ impl<'source> Parser<'source> {
                 "quoted string is missing `\"`",
             );
         }
-        self.node(kind, start, end, Vec::new())
+        self.node(kind, start, end, 0)
     }
 
-    fn parse_bare(&mut self) -> Option<CstNode> {
+    fn parse_bare(&mut self) -> Option<u32> {
         let start = self.position;
         while self.position < self.source.len() {
             let byte = self.source.as_bytes()[self.position];
@@ -356,10 +388,10 @@ impl<'source> Parser<'source> {
         }
         let range = super::range(start, self.position);
         self.tokens.push(SyntaxToken::new(TokenKind::Bare, range));
-        Some(self.node(CstKind::BareValue, start, self.position, Vec::new()))
+        Some(self.node(CstKind::BareValue, start, self.position, 0))
     }
 
-    fn parse_operator(&mut self) -> Option<(usize, CstNode)> {
+    fn parse_operator(&mut self) -> Option<(usize, u32)> {
         let start = self.position;
         let rest = &self.source.as_bytes()[start..];
         let length = if rest.starts_with(b">=")
@@ -380,7 +412,7 @@ impl<'source> Parser<'source> {
             .push(SyntaxToken::new(TokenKind::Operator, range));
         Some((
             self.position,
-            self.node(CstKind::Operator, start, self.position, Vec::new()),
+            self.node(CstKind::Operator, start, self.position, 0),
         ))
     }
 

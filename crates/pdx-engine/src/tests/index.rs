@@ -72,10 +72,11 @@ fn bulk_index_build_retains_every_shard_and_definition() {
         FileIndexShard {
             file_id: first_file,
             definitions: vec![Definition {
-                kind: "event".to_owned(),
-                name: "shared.1".to_owned(),
+                kind: "event".into(),
+                name: "shared.1".into(),
                 file_id: first_file,
                 range,
+                selection_range: range,
                 active: true,
             }],
             references: Vec::new(),
@@ -85,10 +86,11 @@ fn bulk_index_build_retains_every_shard_and_definition() {
         FileIndexShard {
             file_id: second_file,
             definitions: vec![Definition {
-                kind: "event".to_owned(),
-                name: "shared.1".to_owned(),
+                kind: "event".into(),
+                name: "shared.1".into(),
                 file_id: second_file,
                 range,
+                selection_range: range,
                 active: true,
             }],
             references: Vec::new(),
@@ -185,16 +187,18 @@ fn type_per_file_definition_is_emitted_once_without_generic_pseudo_members() {
             .is_some()
     );
     let file_id = definitions[0].file_id;
-    let hir_definition = snapshot
-        .file_state(file_id)
-        .and_then(|state| state.hir())
-        .and_then(|hir| {
-            hir.definitions()
-                .iter()
-                .find(|definition| definition.kind == "country_file" && definition.name == "AAA")
-        })
-        .expect("HIR country definition");
-    assert_eq!(definitions[0].range, hir_definition.range);
+    // Frontends are evicted at scan time; the shard itself must carry the
+    // name token so navigation works without reparsing the file.
+    let state = snapshot.file_state(file_id).expect("country state");
+    assert!(state.hir().is_none());
+    let shard_definition = state
+        .shard()
+        .definitions
+        .iter()
+        .find(|definition| definition.kind.as_ref() == "country_file" && &*definition.name == "AAA")
+        .expect("shard country definition");
+    assert_eq!(definitions[0].range, shard_definition.range);
+    assert!(!shard_definition.selection_range.is_empty());
     fs::remove_dir_all(
         countries
             .parent()
@@ -221,10 +225,11 @@ fn symbol_case_policy_controls_definition_lookup_identity() {
     let mut index = WorkspaceIndex::from_shards([FileIndexShard {
         file_id,
         definitions: vec![Definition {
-            kind: "case_sensitive_kind".to_owned(),
-            name: "MixedName".to_owned(),
+            kind: "case_sensitive_kind".into(),
+            name: "MixedName".into(),
             file_id,
             range,
+            selection_range: range,
             active: true,
         }],
         references: Vec::new(),
@@ -305,15 +310,16 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
     let second_file = SourceFileId::new(2);
     let range = TextRange::new(0, 3).expect("range");
     let definition = |file_id, name: &str| Definition {
-        kind: "event".to_owned(),
-        name: name.to_owned(),
+        kind: "event".into(),
+        name: name.into(),
         file_id,
         range,
+        selection_range: range,
         active: true,
     };
     let reference = |file_id, name: &str| Reference {
-        kind: "event".to_owned(),
-        name: name.to_owned(),
+        kind: "event".into(),
+        name: name.into(),
         file_id,
         range,
     };
@@ -345,8 +351,11 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
     assert!(index.definitions("event", "old.1").is_empty());
     assert_eq!(index.definitions("event", "new.1").len(), 1);
     assert_eq!(index.definitions("event", "untouched.1").len(), 1);
-    assert_eq!(index.references(first_file)[0].name, "new.1");
-    assert_eq!(index.references(second_file)[0].name, "untouched.1");
+    assert_eq!(index.references(first_file)[0].name.as_ref(), "new.1");
+    assert_eq!(
+        index.references(second_file)[0].name.as_ref(),
+        "untouched.1"
+    );
     assert_eq!(
         index
             .shard(first_file)
@@ -367,10 +376,11 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
     let second_file = SourceFileId::new(2);
     let range = TextRange::new(0, 3).expect("range");
     let definition = |file_id| Definition {
-        kind: "event".to_owned(),
-        name: "shared.1".to_owned(),
+        kind: "event".into(),
+        name: "shared.1".into(),
         file_id,
         range,
+        selection_range: range,
         active: true,
     };
     let mut index = WorkspaceIndex::from_shards([
@@ -406,6 +416,28 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
     index.resolve_priorities(&ordered, &rules);
     assert_eq!(
         index
+            .definition_identities()
+            .filter_map(|(definition, active)| active.then_some(definition.file_id))
+            .collect::<Vec<_>>(),
+        vec![second_file],
+        "bulk identity iteration must expose pointer-owned resolution state"
+    );
+    assert_eq!(
+        index
+            .definitions_for_kind_with_state("event")
+            .filter_map(|(definition, active)| active.then_some(definition.file_id))
+            .collect::<Vec<_>>(),
+        vec![second_file]
+    );
+    assert_eq!(
+        index
+            .definitions_for_file_with_state(first_file)
+            .map(|(_definition, active)| active)
+            .collect::<Vec<_>>(),
+        vec![false]
+    );
+    assert_eq!(
+        index
             .active_definition("event", "shared.1")
             .expect("higher priority definition")
             .file_id,
@@ -426,10 +458,11 @@ fn identical_collector_records_resolve_as_one_physical_definition() {
     let file_id = SourceFileId::new(1);
     let range = TextRange::new(4, 12).expect("range");
     let definition = Definition {
-        kind: "scripted_effect".to_owned(),
-        name: "apply".to_owned(),
+        kind: "scripted_effect".into(),
+        name: "apply".into(),
         file_id,
         range,
+        selection_range: range,
         active: true,
     };
     let index = WorkspaceIndex::from_shards([FileIndexShard {
@@ -453,17 +486,19 @@ fn identical_collector_records_resolve_as_one_physical_definition() {
         file_id,
         definitions: vec![
             Definition {
-                kind: "scripted_effect".to_owned(),
-                name: "apply".to_owned(),
+                kind: "scripted_effect".into(),
+                name: "apply".into(),
                 file_id,
                 range,
+                selection_range: range,
                 active: true,
             },
             Definition {
-                kind: "scripted_effect".to_owned(),
-                name: "apply".to_owned(),
+                kind: "scripted_effect".into(),
+                name: "apply".into(),
                 file_id,
                 range: distinct_range,
+                selection_range: distinct_range,
                 active: true,
             },
         ],

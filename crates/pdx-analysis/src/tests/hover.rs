@@ -32,7 +32,7 @@ fn semantic_hover_descends_into_quoted_script_with_mapped_range() {
         context
             .property
             .as_ref()
-            .map(|property| property.key.as_str()),
+            .map(|property| property.key.as_ref()),
         Some("foo"),
         "{context:?}"
     );
@@ -421,7 +421,7 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
-        current,
+        current.clone(),
     )]));
     host.install_index_cache(cache)
         .expect("install Vanilla cache");
@@ -465,9 +465,27 @@ fn localisation_values_by_key_uses_index_priority_and_english_preference() {
     let (language, value) = resolved.get("lang_title").expect("language preference");
     assert_eq!(value, "English Vanilla");
     assert_eq!(language.as_deref(), Some("l_english"));
-    host.set_preferred_localisation_languages(vec!["french".to_owned()]);
+    // Preview retention is decided when a cache is installed, from the host's preference
+    // order at that moment — mirroring the LSP, which fixes preferences at initialize
+    // before the Vanilla cache install. The French pass therefore installs a second cache
+    // into a host that already prefers French.
+    let mut french_host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    french_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        current,
+    )]));
+    french_host.set_preferred_localisation_languages(vec!["french".to_owned()]);
+    french_host
+        .install_index_cache(
+            IndexCache::from_snapshot(&vanilla_host.snapshot()).expect("rebuild Vanilla cache"),
+        )
+        .expect("install Vanilla cache with French preference");
+    french_host
+        .refresh_source_roots()
+        .expect("scan Current Mod");
     let preferred = crate::localisation_values_by_key(
-        &host.snapshot(),
+        &french_host.snapshot(),
         &["lang_title"],
         &crate::CancellationToken::new(),
     )

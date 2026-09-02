@@ -61,9 +61,9 @@ pub(super) fn lower_macro_templates(
     templates
 }
 
-fn template_items(
+fn template_items<'t>(
     syntax: &ParsedFile,
-    nodes: &[CstNode],
+    nodes: impl Iterator<Item = CstNode<'t>>,
     conditionals: &[HirParameterConditional],
     references: &[&HirParameterReference],
 ) -> Option<Vec<MacroTemplateItem>> {
@@ -87,15 +87,13 @@ fn template_items(
                     .find(|conditional| conditional.range == node.range())?;
                 let body = node
                     .children()
-                    .iter()
                     .filter(|child| child.kind() != CstKind::ParameterCondition)
-                    .cloned()
                     .collect::<Vec<_>>();
                 items.push(MacroTemplateItem::Conditional(MacroTemplateConditional {
                     name: conditional.name.clone(),
                     negated: conditional.negated,
                     range: conditional.range,
-                    items: template_items(syntax, &body, conditionals, references)?,
+                    items: template_items(syntax, body.iter().copied(), conditionals, references)?,
                 }));
             }
             CstKind::Comment | CstKind::Bom => {}
@@ -121,17 +119,13 @@ fn template_items(
 
 fn template_property(
     syntax: &ParsedFile,
-    node: &CstNode,
+    node: CstNode<'_>,
     conditionals: &[HirParameterConditional],
     references: &[&HirParameterReference],
 ) -> Option<MacroTemplateProperty> {
-    let key = node
-        .children()
-        .iter()
-        .find(|child| child.kind() == CstKind::Key)?;
+    let key = node.children().find(|child| child.kind() == CstKind::Key)?;
     let operator = node
         .children()
-        .iter()
         .find(|child| child.kind() == CstKind::Operator)
         .and_then(|operator| syntax.text(operator.range()))
         .map(str::trim)
@@ -139,10 +133,9 @@ fn template_property(
         .map(str::to_owned);
     let value = node
         .children()
-        .iter()
         .find(|child| child.kind() == CstKind::Value)?
         .children()
-        .first()?;
+        .next()?;
     let value = match value.kind() {
         CstKind::BareValue | CstKind::QuotedString => {
             MacroTemplateValue::Scalar(template_token(syntax, value, references)?)
@@ -163,7 +156,7 @@ fn template_property(
 
 fn template_token(
     syntax: &ParsedFile,
-    node: &CstNode,
+    node: CstNode<'_>,
     references: &[&HirParameterReference],
 ) -> Option<MacroTemplateToken> {
     let raw = syntax.text(node.range())?;
@@ -220,20 +213,17 @@ fn template_token(
     })
 }
 
-fn property_value_child(node: &CstNode, kind: CstKind) -> Option<&CstNode> {
+fn property_value_child(node: CstNode<'_>, kind: CstKind) -> Option<CstNode<'_>> {
     node.children()
-        .iter()
         .find(|child| child.kind() == CstKind::Value)?
         .children()
-        .iter()
         .find(|child| child.kind() == kind)
 }
 
-fn find_node(node: &CstNode, kind: CstKind, range: TextRange) -> Option<&CstNode> {
+fn find_node(node: CstNode<'_>, kind: CstKind, range: TextRange) -> Option<CstNode<'_>> {
     if node.kind() == kind && node.range() == range {
         return Some(node);
     }
     node.children()
-        .iter()
         .find_map(|child| find_node(child, kind, range))
 }

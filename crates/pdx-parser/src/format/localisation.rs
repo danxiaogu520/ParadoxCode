@@ -10,7 +10,7 @@ pub(super) fn format_localisation(file: &ParsedFile) -> String {
             CstKind::LanguageHeader => {
                 let key = node
                     .children()
-                    .first()
+                    .next()
                     .and_then(|child| file.text(child.range()));
                 if let Some(key) = key {
                     lines.push(format!("{key}:"));
@@ -36,18 +36,17 @@ pub(super) fn format_localisation(file: &ParsedFile) -> String {
     }
 }
 
-fn format_localisation_entry(file: &ParsedFile, node: &CstNode) -> String {
-    let children = node.children();
-    let key = children
-        .iter()
+fn format_localisation_entry(file: &ParsedFile, node: CstNode<'_>) -> String {
+    let key = node
+        .children()
         .find(|child| child.kind() == CstKind::LocalisationKey)
         .and_then(|child| file.text(child.range()))
         .unwrap_or("");
-    let version = children
-        .iter()
+    let version = node
+        .children()
         .find(|child| child.kind() == CstKind::Version)
         .and_then(|child| file.text(child.range()));
-    let value_node = children.iter().find(|child| {
+    let value_node = node.children().find(|child| {
         matches!(
             child.kind(),
             CstKind::LocalisationString | CstKind::UnquotedValue
@@ -58,8 +57,7 @@ fn format_localisation_entry(file: &ParsedFile, node: &CstNode) -> String {
         .unwrap_or("");
     let has_colon = value_node.is_some_and(|value_node| {
         let range = TextRange::new(
-            children
-                .iter()
+            node.children()
                 .find(|child| child.kind() == CstKind::LocalisationKey)
                 .map_or(node.range().start(), |child| child.range().end()),
             value_node.range().start(),
@@ -72,8 +70,8 @@ fn format_localisation_entry(file: &ParsedFile, node: &CstNode) -> String {
     } else {
         format!("{key} {value}")
     };
-    if let Some(comment) = children
-        .iter()
+    if let Some(comment) = node
+        .children()
         .find(|child| child.kind() == CstKind::Comment)
     {
         line.push(' ');

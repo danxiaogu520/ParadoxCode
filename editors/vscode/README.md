@@ -74,7 +74,7 @@ on the next server restart; preview settings take effect immediately.
 | `paradoxcode.gameDirectory` | `""` | EU4 installation root for textures and guided Vanilla setup. |
 | `paradoxcode.vanillaIndexCache` | `""` | Persistent `.pdxindex` cache path. |
 | `paradoxcode.vanilla.mode` | `"auto"` | Vanilla policy: `auto`, `cacheOnly`, or `disabled`. |
-| `paradoxcode.workspaceWideDiagnostics` | `true` | Publish diagnostics for closed Current Mod files. |
+| `paradoxcode.workspaceWideDiagnostics` | `false` | Publish diagnostics for closed Current Mod files. Off by default; opened files are always validated. |
 | `paradoxcode.backgroundReindexIntervalMinutes` | `0` | Quiet full re-scan interval; `0` disables it. |
 | `paradoxcode.backgroundReindexIdleSeconds` | `15` | Required editor-idle window before a quiet re-scan. |
 | `paradoxcode.ignoreFilePatterns` | `[]` | File globs excluded from workspace discovery. |
