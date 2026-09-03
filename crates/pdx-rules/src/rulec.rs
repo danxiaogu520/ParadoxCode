@@ -1286,9 +1286,9 @@ mod tests {
             read_json(&root.join("rules/manifest.json")).expect("committed manifest");
         let (_, source_model) = load_source(&root.join("rules/eu4")).expect("source model");
         assert_eq!(source_model.file_categories.len(), 124);
-        assert_eq!(source_model.symbol_descriptors.len(), 2667);
-        assert_eq!(source_model.records.len(), 13_719);
-        assert_eq!(source_model.semantic.rules.len(), 8_553);
+        assert_eq!(source_model.symbol_descriptors.len(), 2665);
+        assert_eq!(source_model.records.len(), 12_973);
+        assert_eq!(source_model.semantic.rules.len(), 8_309);
         assert_eq!(source_model.semantic.enum_values.len(), 72);
         assert_eq!(source_model.semantic.type_root_keys.len(), 7);
         assert_eq!(source_model.semantic.type_root_scopes.len(), 2);

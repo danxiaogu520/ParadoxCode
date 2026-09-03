@@ -629,45 +629,6 @@
     },
     {
       "table": "triggers",
-      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:78:0",
-      "source_order": 5865,
-      "fields": {
-        "key": "trigger",
-        "line": "2266",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "scalar"
-      }
-    },
-    {
-      "table": "triggers",
-      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:80:0",
-      "source_order": 5871,
-      "fields": {
-        "key": "trigger",
-        "line": "2281",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "scalar"
-      }
-    },
-    {
-      "table": "triggers",
-      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:81:0",
-      "source_order": 5874,
-      "fields": {
-        "key": "trigger",
-        "line": "2289",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "scalar"
-      }
-    },
-    {
-      "table": "triggers",
       "logical_id": "common/subject_types:common/subject_types:common/subject_types:root:1:133:2",
       "source_order": 6060,
       "fields": {
