@@ -1,5 +1,6 @@
 mod completion;
 mod diagnostics;
+mod dynamic_rules;
 mod hover;
 mod hover_improvements;
 mod inlay;
