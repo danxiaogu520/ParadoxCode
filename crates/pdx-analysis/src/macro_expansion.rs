@@ -14,9 +14,42 @@ use crate::semantic::{MacroDefinitionIdentity, ResolvedMacroDefinition};
 use crate::support::{QuotedScalarSource, ScriptProperty, quoted_script_container};
 use crate::types::{CancellationToken, Cancelled};
 
-const MAX_EXPANSION_DEPTH: usize = 32;
-const MAX_EXPANDED_NODES: usize = 50_000;
-const MAX_EXPANDED_TOKEN_BYTES: usize = 1024 * 1024;
+/// Expansion budgets bound runaway acyclic expansions (deep DAG fan-out);
+/// genuine recursion is rejected earlier by definition-site cycle analysis.
+/// Each budget can be raised or lowered through an environment variable so a
+/// pathological workspace can be diagnosed without a new build.
+fn max_expansion_depth() -> usize {
+    static VALUE: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *VALUE.get_or_init(|| env_budget("PDX_MACRO_EXPANSION_DEPTH", 32, 1, 1024))
+}
+
+fn max_expanded_nodes() -> usize {
+    static VALUE: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *VALUE.get_or_init(|| env_budget("PDX_MACRO_EXPANDED_NODES", 200_000, 1, 100_000_000))
+}
+
+fn max_expanded_token_bytes() -> usize {
+    static VALUE: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *VALUE.get_or_init(|| {
+        env_budget(
+            "PDX_MACRO_EXPANDED_TOKEN_BYTES",
+            4 * 1024 * 1024,
+            1,
+            u64::MAX as usize,
+        )
+    })
+}
+
+/// Reads one budget override; unparseable values fall back to the default so a
+/// typo can never silently disable the safety net.
+fn env_budget(name: &str, default: usize, min: usize, max: usize) -> usize {
+    let Some(raw) = std::env::var(name).ok() else {
+        return default;
+    };
+    raw.trim()
+        .parse::<usize>()
+        .map_or(default, |parsed| parsed.clamp(min, max))
+}
 
 #[derive(Clone, Debug)]
 struct ExpansionFrame {
@@ -98,7 +131,7 @@ impl MacroExpansionSession {
             chain.push(resolved.summary.name.clone());
             return Err(ExpansionEnterFailure::Cycle(chain));
         }
-        if self.stack.len() >= MAX_EXPANSION_DEPTH {
+        if self.stack.len() >= max_expansion_depth() {
             return Err(ExpansionEnterFailure::Limit("expansion depth"));
         }
         self.stack.push(ExpansionFrame {
@@ -110,6 +143,12 @@ impl MacroExpansionSession {
 
     pub(crate) fn leave(&mut self) {
         let _ = self.stack.pop();
+    }
+
+    /// True while no scripted-macro definition is being expanded, i.e. the
+    /// current container is authored content rather than expansion output.
+    pub(crate) fn authoring(&self) -> bool {
+        self.stack.is_empty()
     }
 
     pub(crate) fn expand(
@@ -375,7 +414,7 @@ impl MacroExpansionSession {
 
     pub(crate) fn charge_node(&mut self) -> Result<(), ExpansionFailure> {
         self.expanded_nodes = self.expanded_nodes.saturating_add(1);
-        if self.expanded_nodes > MAX_EXPANDED_NODES {
+        if self.expanded_nodes > max_expanded_nodes() {
             Err(ExpansionFailure::Limit("expanded nodes"))
         } else {
             Ok(())
@@ -384,7 +423,7 @@ impl MacroExpansionSession {
 
     pub(crate) fn charge_token_bytes(&mut self, bytes: usize) -> Result<(), ExpansionFailure> {
         self.expanded_token_bytes = self.expanded_token_bytes.saturating_add(bytes);
-        if self.expanded_token_bytes > MAX_EXPANDED_TOKEN_BYTES {
+        if self.expanded_token_bytes > max_expanded_token_bytes() {
             Err(ExpansionFailure::Limit("expanded token bytes"))
         } else {
             Ok(())
@@ -468,4 +507,17 @@ fn bind_arguments(invocation: &ScriptProperty) -> BTreeMap<String, BoundValue> {
         bindings.insert(argument.key.to_ascii_lowercase(), value);
     }
     bindings
+}
+
+/// Scalar argument bindings of one macro invocation, keyed by lowercased
+/// parameter name. Only scalar arguments can name another scripted macro, so
+/// block arguments are omitted; callers treat them as unresolvable.
+pub(crate) fn scalar_argument_bindings(invocation: &ScriptProperty) -> BTreeMap<String, String> {
+    bind_arguments(invocation)
+        .into_iter()
+        .filter_map(|(name, value)| match value {
+            BoundValue::Scalar { value, .. } => Some((name, value)),
+            BoundValue::Invalid { .. } => None,
+        })
+        .collect()
 }

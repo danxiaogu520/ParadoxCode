@@ -18,7 +18,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -46,7 +48,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -74,7 +78,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -102,7 +108,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -206,7 +214,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": "country",
     "replace_scope": [],
     "min_occurs": null,
@@ -336,7 +346,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -362,7 +374,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -388,7 +402,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -414,7 +430,9 @@
     "documentation": [
       "Forced scripted trigger to work"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [
       [
@@ -451,7 +469,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -477,7 +497,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -503,7 +525,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -529,7 +553,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -560,7 +586,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -612,7 +640,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -638,7 +668,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -664,7 +696,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -777,7 +811,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -803,7 +839,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -855,7 +893,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -909,7 +949,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -935,7 +977,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -989,7 +1033,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -1015,7 +1061,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1069,7 +1117,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -1095,7 +1145,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1151,7 +1203,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1178,7 +1232,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -1207,7 +1263,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -1233,7 +1291,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1285,7 +1345,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -1340,8 +1402,7 @@
       "Refers to the country (if it exists) that is currently the Holy Roman Emperor."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "country",
     "replace_scope": [],
@@ -1369,8 +1430,7 @@
       "Refers to the country (if it exists) that is the current revolution target."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "country",
     "replace_scope": [],
@@ -1398,8 +1458,7 @@
       "Refers to the country (if it exists) that is the current crusade target."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "country",
     "replace_scope": [],
@@ -1483,8 +1542,7 @@
       "Refers to the capital province of the current country scope."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": "province",
     "replace_scope": [],
@@ -1708,8 +1766,7 @@
       "Scopes to all countries in the world. Avoid this if you can use something more specific."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "country",
     "replace_scope": [],
@@ -2045,8 +2102,7 @@
       "Scopes to all provinces in the world. Avoid this if you can use something more specific."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "province",
     "replace_scope": [],
@@ -2242,8 +2298,7 @@
       "Scopes to one country among all countries in the world. Avoid this if you can use something more specific."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "country",
     "replace_scope": [],
@@ -2327,8 +2382,7 @@
       "Scopes to one country that has been discovered by the current scope."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "country",
     "replace_scope": [],
@@ -2553,8 +2607,7 @@
       "Scopes to one province from among all provinces in the world. Avoid this if you can use something more specific."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "province",
     "replace_scope": [],
@@ -2750,8 +2803,7 @@
       "Scopes to one province that shares a border (or sea zone?) with the current scope."
     ],
     "allowed_scopes": [
-      "province",
-      "country"
+      "province"
     ],
     "push_scope": "province",
     "replace_scope": [],
@@ -2919,7 +2971,6 @@
       "Scopes to one country that owns a province in the current trade node."
     ],
     "allowed_scopes": [
-      "trade_node",
       "province"
     ],
     "push_scope": "country",
@@ -2948,7 +2999,6 @@
       "Scopes to all provinces in the current trade node."
     ],
     "allowed_scopes": [
-      "trade_node",
       "province"
     ],
     "push_scope": "province",
@@ -3005,8 +3055,7 @@
       "Scopes to the province, which is also a trade node (defined in common/tradenodes)"
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "trade_node",
     "replace_scope": [],
@@ -3033,7 +3082,9 @@
     "documentation": [
       "Evaluates to true when every trigger inside the block is true."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -3059,7 +3110,9 @@
     "documentation": [
       "Evaluates to true when at least one trigger inside the block is true."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -3085,7 +3138,9 @@
     "documentation": [
       "Evaluates to true when the trigger inside the block is false."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -3111,7 +3166,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -3135,7 +3192,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -3161,7 +3220,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -3185,7 +3246,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -3209,7 +3272,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -3262,8 +3327,7 @@
       "Refers to the province ids listed /Europa Universalis IV/map/definition.csv"
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "province",
     "replace_scope": [],
@@ -3346,7 +3410,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3400,7 +3466,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3428,7 +3496,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3487,7 +3557,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -3546,7 +3618,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -3603,7 +3677,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -3662,7 +3738,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -3719,7 +3797,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -3801,7 +3881,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3828,8 +3910,7 @@
       "Refers to the areas listed /Europa Universalis IV/map/areas.txt"
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "province",
     "replace_scope": [],
@@ -3857,7 +3938,6 @@
       "Refers to the colonial regions listed /Europa Universalis IV/common/colonial_regions/00_colonial_regions.txt"
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": "province",
@@ -3943,7 +4023,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3970,8 +4052,7 @@
       "Scopes to any tribal land province"
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": "province",
     "replace_scope": [],
@@ -4054,7 +4135,9 @@
     "documentation": [
       "Excludes the triggers inside for the trigger counter in the UI, used in Age Objeciives."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -4136,7 +4219,9 @@
     "documentation": [
       "Apply effect to random provinces in the province group, use combined with amount"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4187,7 +4272,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": "country",
     "replace_scope": [],
     "min_occurs": 1,
@@ -4246,7 +4333,9 @@
     "documentation": [
       "How many provinces to apply the effect, implies 'type = random' unless explicitly set"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4270,7 +4359,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": "province",
     "replace_scope": [],
     "min_occurs": 1,
@@ -4294,7 +4385,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": "province",
     "replace_scope": [],
     "min_occurs": 1,
@@ -4321,8 +4414,7 @@
       "Refers to the province_group listed /Europa Universalis IV/map/provincegroup.txt"
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "province",
     "replace_scope": [],
@@ -4347,7 +4439,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": "province",
     "replace_scope": [],
     "min_occurs": 1,
@@ -4371,7 +4465,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": "province",
     "replace_scope": [],
     "min_occurs": 1,
@@ -4395,7 +4491,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": "province",
     "replace_scope": [],
     "min_occurs": 1,
@@ -4423,7 +4521,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4447,7 +4547,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": "province",
     "replace_scope": [],
     "min_occurs": 1,
@@ -4471,7 +4573,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": "province",
     "replace_scope": [],
     "min_occurs": 1,
@@ -4495,7 +4599,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": "province",
     "replace_scope": [],
     "min_occurs": 1,
@@ -4522,8 +4628,7 @@
       "Scopes to all capital provinces."
     ],
     "allowed_scopes": [
-      "province",
-      "country"
+      "any"
     ],
     "push_scope": "province",
     "replace_scope": [],
@@ -4551,8 +4656,7 @@
       "Scopes to any capital province."
     ],
     "allowed_scopes": [
-      "province",
-      "country"
+      "any"
     ],
     "push_scope": "province",
     "replace_scope": [],
@@ -4580,8 +4684,7 @@
       "Refers to any region found in /Europa Universalis IV/map/region.txt"
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "province",
     "replace_scope": [],
@@ -4638,7 +4741,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4748,7 +4853,9 @@
     "documentation": [
       "Refers to any superregion found in /Europa Universalis IV/map/superregion.txt"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": "province",
     "replace_scope": [],
     "min_occurs": 1,
@@ -4776,7 +4883,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4803,8 +4912,7 @@
       "Refers to any continent found in /Europa Universalis IV/map/continent.txt"
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "province",
     "replace_scope": [],
@@ -4833,7 +4941,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4860,8 +4970,7 @@
       "Refers to any colonial region found in /Europa Universalis IV/common/colonial_regions/"
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "province",
     "replace_scope": [],
@@ -4890,7 +4999,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4917,8 +5028,7 @@
       "Refers to any trade company found in /Europa Universalis IV/common/trade_companies//"
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "province",
     "replace_scope": [],
@@ -4946,8 +5056,7 @@
       "Refers to the country tags listed /Europa Universalis IV/common/country_tags"
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": "country",
     "replace_scope": [],
@@ -4972,7 +5081,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -5033,7 +5144,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -5059,7 +5172,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5115,7 +5230,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -5146,7 +5263,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -5202,7 +5321,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -5233,7 +5354,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -5257,7 +5380,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -5313,7 +5438,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -5344,7 +5471,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -5368,7 +5497,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -5678,7 +5809,9 @@
     "documentation": [
       "Returns true if today is X. Refers to the actual real day (probably takes system time)."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -5709,7 +5842,9 @@
     "documentation": [
       "Returns true if the month of the year in reality is at least X (January = 0)"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -5740,7 +5875,9 @@
     "documentation": [
       "Returns true if the reform desire is at least X%."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -6837,7 +6974,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -6863,7 +7002,9 @@
     "documentation": [
       "Returns true if the specified religion is enabled for at least X years."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -6891,7 +7032,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -6919,7 +7062,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -6947,7 +7092,9 @@
     "severity": 2,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7102,7 +7249,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -7130,7 +7279,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -7161,7 +7312,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -7217,7 +7370,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -7245,7 +7400,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -7273,7 +7430,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7301,7 +7460,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -7332,7 +7493,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7419,7 +7582,9 @@
     "documentation": [
       "Returns true if there is a revolutionary target in the world."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -7606,7 +7771,9 @@
     "severity": 2,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7935,7 +8102,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8093,7 +8262,8 @@
       "In country scope, returns true if the countries' capitals are on the same continent. In province scope, returns true if the specified provinces are on the same continent."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -8123,7 +8293,8 @@
       "In country scope, returns true if the countries' capitals are on the same continent. In province scope, returns true if the specified provinces are on the same continent."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -8153,6 +8324,7 @@
       "In country scope, returns true if the countries' capitals are on the same continent. In province scope, returns true if the specified provinces are on the same continent."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -8183,6 +8355,7 @@
       "In country scope, returns true if the countries' capitals are on the same continent. In province scope, returns true if the specified provinces are on the same continent."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -8192,36 +8365,6 @@
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 6970
-  },
-  {
-    "id": "triggers:1098:alias:trigger:same_continent",
-    "context": "trigger",
-    "parent_path": [],
-    "key": {
-      "exact": "same_continent"
-    },
-    "operator": "=",
-    "value": {
-      "scope": "capital_scope"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": "triggers:1098:alias:trigger:same_continent",
-    "severity": null,
-    "required": false,
-    "documentation": [
-      "In country scope, returns true if the countries' capitals are on the same continent. In province scope, returns true if the specified provinces are on the same continent."
-    ],
-    "allowed_scopes": [
-      "capital_scope"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 6971
   },
   {
     "id": "triggers:1099:alias:trigger:secondary_religion",
@@ -8271,8 +8414,8 @@
       "Returns true if the specified variable is at least X."
     ],
     "allowed_scopes": [
-      "province",
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -8671,7 +8814,9 @@
     "documentation": [
       "Returns true if the start date of the campaign is X."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -8697,7 +8842,9 @@
     "documentation": [
       "Returns true if the current date in the campaign is X."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -8723,7 +8870,9 @@
     "documentation": [
       "Returns true if the start date of the campaign is X or after."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -8787,7 +8936,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -9246,8 +9397,8 @@
       "Returns true if the country has a tolerance of at least X towards the religion of the country or scoped province."
     ],
     "allowed_scopes": [
-      "province",
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -9495,7 +9646,9 @@
     "documentation": [
       "Returns true if the total number of cardinals is at least X."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -10046,7 +10199,6 @@
       "Returns true if the trade node is within the trade range of the specified country."
     ],
     "allowed_scopes": [
-      "trade_node",
       "province"
     ],
     "push_scope": null,
@@ -10077,8 +10229,7 @@
       "Returns true if the trade node is within the trade range of the specified country."
     ],
     "allowed_scopes": [
-      "trade_node",
-      "capital_scope"
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -10107,7 +10258,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -10135,7 +10288,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -10166,7 +10321,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -10222,7 +10379,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -10248,7 +10407,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -10334,7 +10495,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -10365,7 +10528,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -10421,7 +10586,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -10449,7 +10616,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -10477,7 +10646,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -10505,7 +10676,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -11083,8 +11256,8 @@
       "Returns true if the unrest in the province is at least X."
     ],
     "allowed_scopes": [
-      "province",
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -11624,7 +11797,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11653,7 +11828,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -11682,7 +11859,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -11711,7 +11890,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11740,7 +11921,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11769,7 +11952,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11798,7 +11983,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11824,7 +12011,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11853,7 +12042,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -11885,7 +12076,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11944,7 +12137,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11973,7 +12168,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 2,
@@ -11999,7 +12196,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -12028,7 +12227,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -12060,7 +12261,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -12086,7 +12289,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -12115,7 +12320,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -12147,7 +12354,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -12173,7 +12382,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -12202,7 +12413,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -12267,7 +12480,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -12293,7 +12508,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -12322,7 +12539,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -12354,7 +12573,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -12380,7 +12601,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -12409,7 +12632,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 2,
@@ -12435,7 +12660,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -12461,7 +12688,9 @@
     "documentation": [
       "Can use variable effects and triggers to compare or change and compare modifier and trigger values. \"variable_arithmetic_trigger\" sections can include more \"variable_arithmetic_trigger\" sections. This has to be done for effects such as \"change_variable\" or effects of \"if\" sections inside the \"variable_arithmetic_trigger\", since the game may crash otherwise."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -12550,8 +12779,8 @@
       "Returns true if the scoped country has a claim on a colony owned by the target country, or if the scoped colony province is claimed by the target country."
     ],
     "allowed_scopes": [
-      "province",
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -12706,7 +12935,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -12734,7 +12965,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -12765,7 +12998,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -12882,8 +13117,8 @@
       "Returns true if the scoped country has a claim on a colony owned by the target country, or if the scoped colony province is claimed by the target country."
     ],
     "allowed_scopes": [
-      "province",
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -13001,7 +13236,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -13029,7 +13266,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -13060,7 +13299,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -13116,7 +13357,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -13144,7 +13387,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -13175,7 +13420,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -13238,7 +13485,9 @@
     "documentation": [
       "Do not limit by subject type"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -13603,7 +13852,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -13739,7 +13990,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -13767,7 +14020,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -13795,7 +14050,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -13882,7 +14139,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -13910,7 +14169,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -13938,7 +14199,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -13966,7 +14229,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -13997,7 +14262,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14447,7 +14714,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14768,7 +15037,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14796,7 +15067,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14887,7 +15160,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14941,7 +15216,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14969,7 +15246,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14997,7 +15276,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15054,7 +15335,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15196,7 +15479,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15227,7 +15512,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15311,7 +15598,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15339,7 +15628,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15369,7 +15660,9 @@
     "documentation": [
       "0 = 0 or more; 1 = 1 or less"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15399,7 +15692,9 @@
     "documentation": [
       "0 = 0 or more; 1 = 1 or less"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15485,7 +15780,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15513,7 +15810,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15544,7 +15843,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15636,7 +15937,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15664,7 +15967,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15690,7 +15995,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15716,7 +16023,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15744,7 +16053,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -16150,7 +16461,7 @@
     "required": false,
     "documentation": [],
     "allowed_scopes": [
-      "country"
+      "any"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -16386,7 +16697,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -16447,7 +16760,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -16472,8 +16787,7 @@
     "required": false,
     "documentation": [],
     "allowed_scopes": [
-      "province",
-      "country"
+      "any"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -16530,7 +16844,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -16561,7 +16877,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -17009,7 +17327,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -17276,7 +17596,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -17503,7 +17825,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -17531,7 +17855,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -17559,7 +17885,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -17592,7 +17920,9 @@
     "documentation": [
       "Returns true if this great project is tier X or higher"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -17832,7 +18162,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -17863,7 +18195,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -17919,7 +18253,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -17950,7 +18286,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -18132,7 +18470,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -18160,7 +18500,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -18216,7 +18558,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -18244,7 +18588,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -18300,7 +18646,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -18386,7 +18734,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -18442,7 +18792,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -18498,7 +18850,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -18767,8 +19121,8 @@
       "Returns true if the tribal development of the scope tribe is at least X, if used in the province scope it returns true if the tribal development of the province is at least X."
     ],
     "allowed_scopes": [
-      "province",
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -19254,7 +19608,7 @@
       "Returns true if the province culture is X, or the same as the specified scope."
     ],
     "allowed_scopes": [
-      "country"
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -19343,7 +19697,7 @@
       "If council of trent is enabled"
     ],
     "allowed_scopes": [
-      "country"
+      "any"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -19862,7 +20216,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -19890,7 +20246,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -19918,7 +20276,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -19948,7 +20308,9 @@
     "documentation": [
       "This, as of 1.34.3.0, doesn't work, use 'soldiers' instead"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -20008,7 +20370,9 @@
     "documentation": [
       "Land Units"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -20036,7 +20400,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -20064,7 +20430,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -20092,7 +20460,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -20120,7 +20490,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -20148,7 +20520,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -20179,7 +20553,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -20328,7 +20704,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -20356,7 +20734,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -20384,7 +20764,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -20412,7 +20794,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -20440,7 +20824,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -21116,7 +21502,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -21147,7 +21535,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -21599,8 +21989,7 @@
       "Checks what the current amount of ducats in the Curia Treasury is."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -21663,8 +22052,7 @@
       "Checks what the Curia Treasury's current monthly income is."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "any"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -21754,7 +22142,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -21785,7 +22175,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -21841,7 +22233,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -21872,7 +22266,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -22021,7 +22417,9 @@
     "documentation": [
       "Returns true if the specified imperial reform has been enacted."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -22049,7 +22447,9 @@
     "documentation": [
       "Returns true if the specified Chinese imperial reform has been enacted."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -22077,7 +22477,9 @@
     "documentation": [
       "Checks whether a given (or any) imperial incident is currently active."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -22105,7 +22507,9 @@
     "documentation": [
       "Checks whether a given (or any) imperial incident is currently active."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -22569,7 +22973,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -22597,7 +23003,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -22663,7 +23071,9 @@
     "documentation": [
       "Default = infinity"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -23593,7 +24003,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -23651,7 +24063,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -23682,7 +24096,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -23861,7 +24277,9 @@
     "documentation": [
       "DO NOT USE THIS. This key is used by Paradox Internally to test things but it has made into the released files of 1.34, so we are adding it here to avoid confusing errors."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -23889,7 +24307,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -23917,7 +24337,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -23978,7 +24400,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -24005,8 +24429,7 @@
       "Returns true if country has at least X trade power in a trade node via privateering actions."
     ],
     "allowed_scopes": [
-      "province",
-      "trade_node"
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -24039,8 +24462,7 @@
       "Returns true if the trade node has a value of at least X"
     ],
     "allowed_scopes": [
-      "province",
-      "trade_node"
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -24160,7 +24582,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -24216,7 +24640,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -24244,7 +24670,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -24305,7 +24733,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -24361,7 +24791,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -24389,7 +24821,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -24445,7 +24879,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -24476,7 +24912,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -24507,7 +24945,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -24654,7 +25094,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -24682,7 +25124,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -24713,7 +25157,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -25462,7 +25908,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -25490,7 +25938,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -25515,7 +25965,7 @@
     "required": false,
     "documentation": [],
     "allowed_scopes": [
-      "trade_node"
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -25547,7 +25997,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -25572,7 +26024,7 @@
     "required": false,
     "documentation": [],
     "allowed_scopes": [
-      "trade_node"
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -26159,7 +26611,7 @@
     "required": false,
     "documentation": [],
     "allowed_scopes": [
-      "country"
+      "any"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -26187,7 +26639,7 @@
     "required": false,
     "documentation": [],
     "allowed_scopes": [
-      "country"
+      "any"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -26213,7 +26665,7 @@
     "required": false,
     "documentation": [],
     "allowed_scopes": [
-      "country"
+      "any"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -27144,7 +27596,8 @@
       "Returns true if the country is a neighbor of the specified province."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -27171,7 +27624,9 @@
     "documentation": [
       "Returns true if the given name matches the Name field of the descriptor.mod of any enabled mods, e.g. \"Example Mod\" will return true if a mod is enabled that contains Name=\"Example Mod\" in its descriptor.mod"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -27295,7 +27750,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -27324,7 +27781,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -27348,7 +27807,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -27528,7 +27989,9 @@
     "documentation": [
       "Returns true if the current age is X."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -27681,7 +28144,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -27707,7 +28172,9 @@
     "documentation": [
       "Hides the enclosed condition so that it is still required but cannot be seen by human players and displays the specified tooltip in its place."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -28450,7 +28917,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -29263,7 +29732,9 @@
     "documentation": [
       "Returns true if at least X Empire of China reforms are enacted. Works similar to hre_reform_level"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -29289,7 +29760,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29315,7 +29788,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29343,7 +29818,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29371,7 +29848,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29399,7 +29878,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29457,7 +29938,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29485,7 +29968,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29513,7 +29998,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29541,7 +30028,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29569,7 +30058,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29597,7 +30088,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29625,7 +30118,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29653,7 +30148,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29681,7 +30178,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29709,7 +30208,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29767,7 +30268,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29795,7 +30298,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29823,7 +30328,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29854,7 +30361,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29882,7 +30391,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29908,7 +30419,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -29964,7 +30477,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -29992,7 +30507,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30020,7 +30537,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -30084,7 +30603,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30140,7 +30661,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30171,7 +30694,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30227,7 +30752,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30258,7 +30785,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30282,7 +30811,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30310,7 +30841,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30336,7 +30869,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30390,7 +30925,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30418,7 +30955,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30444,7 +30983,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30468,7 +31009,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30496,7 +31039,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30527,7 +31072,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30583,7 +31130,9 @@
     "documentation": [
       "Returns true if country X or the scoped country exists."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30611,7 +31160,9 @@
     "documentation": [
       "Returns true if country X or the scoped country exists."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30637,7 +31188,9 @@
     "documentation": [
       "Returns true if country X or the scoped country exists."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30725,7 +31278,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -30756,7 +31311,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -31323,8 +31880,7 @@
       "Returns true if the country's or province's total development has grown by the specified amount"
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -31536,7 +32092,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -31567,7 +32125,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -31623,7 +32183,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -31654,7 +32216,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -31710,7 +32274,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -31766,7 +32332,9 @@
     "severity": 2,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -31797,7 +32365,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -31853,7 +32423,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -31884,7 +32456,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -31910,7 +32484,9 @@
     "documentation": [
       "Returns true if the global flag X was last set at least Y days ago."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -31938,7 +32514,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -31969,7 +32547,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -32025,7 +32605,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -32053,7 +32635,9 @@
     "severity": 2,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -32084,7 +32668,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -32173,7 +32759,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -32204,7 +32792,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -32260,7 +32850,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -32291,7 +32883,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -32347,7 +32941,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -32375,7 +32971,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -32406,7 +33004,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -32674,7 +33274,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -32909,7 +33511,6 @@
       "Returns true if the province or country has a cardinal in the curia."
     ],
     "allowed_scopes": [
-      "country",
       "province"
     ],
     "push_scope": null,
@@ -32939,7 +33540,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -32967,7 +33570,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -33023,7 +33628,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -33137,7 +33744,9 @@
     "documentation": [
       "Returns true if playing as a released vassal."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -33783,7 +34392,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -33814,7 +34425,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -33871,7 +34484,8 @@
       "In country scope, returns true if the country has discovered the province with the ID X. In province scope, returns true if the country X has discovered the province."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -33901,7 +34515,8 @@
       "In country scope, returns true if the country has discovered the province with the ID X. In province scope, returns true if the country X has discovered the province."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -33931,7 +34546,8 @@
       "In country scope, returns true if the country has discovered the province with the ID X. In province scope, returns true if the country X has discovered the province."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -33958,7 +34574,9 @@
     "documentation": [
       "Returns true if females can become emperor."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -33987,7 +34605,8 @@
       "In country scope, returns true if the country has discovered the province with the ID X. In province scope, returns true if the country X has discovered the province."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -34006,7 +34625,7 @@
     },
     "operator": "=",
     "value": {
-      "scope": "any"
+      "scope": "country"
     },
     "shape": "leaf",
     "child_context": null,
@@ -34017,6 +34636,7 @@
       "In country scope, returns true if the country has discovered the province with the ID X. In province scope, returns true if the country X has discovered the province."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -34047,6 +34667,7 @@
       "In country scope, returns true if the country has discovered the province with the ID X. In province scope, returns true if the country X has discovered the province."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -34075,6 +34696,7 @@
       "In country scope, returns true if the country has discovered the province with the ID X. In province scope, returns true if the country X has discovered the province."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -34104,7 +34726,9 @@
     "documentation": [
       "Returns true if the DLC X is enabled."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -34276,7 +34900,9 @@
     "documentation": [
       "Returns true under all circumstances if set to yes, returns false under all circumstances if set to no."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -34304,7 +34930,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -34330,7 +34958,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -34363,7 +34993,9 @@
     "documentation": [
       "Specify the value of influence the modifier has to contribute."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -34419,7 +35051,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -34445,7 +35079,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -34478,7 +35114,9 @@
     "documentation": [
       "Specify the value of loyalty the modifier has to contribute."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -34676,7 +35314,9 @@
     "documentation": [
       "Returns true if a revolution has happened in the world."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -34786,7 +35426,9 @@
     "documentation": [
       "Returns true if the game has started."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -34930,7 +35572,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -34988,7 +35632,9 @@
     "documentation": [
       "Returns true if the specified global flag is set."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -35014,7 +35660,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -35045,7 +35693,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -35071,7 +35721,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -35540,8 +36192,7 @@
       "Returns true if the country has a hostile center of reformation."
     ],
     "allowed_scopes": [
-      "country",
-      "province"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -35747,7 +36398,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -35778,7 +36431,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -35809,7 +36464,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -35840,7 +36497,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -35871,7 +36530,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -35932,7 +36593,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -35960,7 +36623,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -36014,7 +36679,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -36045,7 +36712,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -36252,7 +36921,6 @@
       "Returns true if the scoped country has an active merchant in the trade node."
     ],
     "allowed_scopes": [
-      "trade_node",
       "province"
     ],
     "push_scope": null,
@@ -36283,7 +36951,6 @@
       "Returns true if the scoped country has an active merchant in the trade node."
     ],
     "allowed_scopes": [
-      "trade_node",
       "province"
     ],
     "push_scope": null,
@@ -36429,7 +37096,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -36457,7 +37126,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -36488,7 +37159,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -36610,7 +37283,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -36638,7 +37313,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -36666,7 +37343,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -36697,7 +37376,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -37548,7 +38229,9 @@
     "documentation": [
       "Returns true if the specified event target has been saved."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -37576,7 +38259,9 @@
     "documentation": [
       "Returns true if the specified event target has been saved."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -37834,7 +38519,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -37862,7 +38549,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -37890,7 +38579,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -37921,7 +38612,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -37977,7 +38670,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -38005,7 +38700,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -38036,7 +38733,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -38148,7 +38847,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -38202,7 +38903,9 @@
     "documentation": [
       "Returns true if the player has changed nation by playing as a released vassal."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -38260,7 +38963,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -38288,7 +38993,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -38314,7 +39021,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -38461,7 +39170,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -39131,7 +39842,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -39458,7 +40171,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -39574,7 +40289,9 @@
     "documentation": [
       "Hides the enclosed conditions so that they are still required but cannot be seen by human players."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -39753,7 +40470,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -39874,7 +40593,9 @@
     "documentation": [
       "Returns true if the specified religion is the opposition religion of the HRE. Note: No localisation for the negation."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -39902,7 +40623,9 @@
     "documentation": [
       "Returns true if the specified religion is the opposition religion of the HRE. Note: No localisation for the negation."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -39930,7 +40653,9 @@
     "documentation": [
       "Returns true if the specified religion is the opposition religion of the HRE. Note: No localisation for the negation."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -39958,7 +40683,9 @@
     "documentation": [
       "Returns true if the specified religion is the opposition religion of the HRE. Note: No localisation for the negation."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -39986,7 +40713,9 @@
     "documentation": [
       "Returns true if the specified religion is the opposition religion of the HRE. Note: No localisation for the negation."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40014,7 +40743,9 @@
     "documentation": [
       "Returns true if the specified religion is the opposition religion of the HRE. Note: No localisation for the negation."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40040,7 +40771,9 @@
     "documentation": [
       "Returns true if religious leagues are enabled."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40096,7 +40829,9 @@
     "documentation": [
       "Returns true if the specified religion is the dominant faith of the HRE."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40124,7 +40859,9 @@
     "documentation": [
       "Returns true if the specified religion is the dominant faith of the HRE."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40152,7 +40889,9 @@
     "documentation": [
       "Returns true if the specified religion is the dominant faith of the HRE."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40180,7 +40919,9 @@
     "documentation": [
       "Returns true if the specified religion is the dominant faith of the HRE."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40208,7 +40949,9 @@
     "documentation": [
       "Returns true if the specified religion is the dominant faith of the HRE."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40236,7 +40979,9 @@
     "documentation": [
       "Returns true if the specified religion is the dominant faith of the HRE."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40262,7 +41007,9 @@
     "documentation": [
       "Returns true if an official faith of the HRE has been permanently established."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40288,7 +41035,9 @@
     "documentation": [
       "Returns true if the treaty of religious peace in the HRE has been signed."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40319,7 +41068,9 @@
     "documentation": [
       "Returns true if the HRE contains at least X members."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40350,7 +41101,9 @@
     "documentation": [
       "Returns true if the emperor of the HRE has an imperial authority of at least X."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40414,7 +41167,9 @@
     "documentation": [
       "Returns true if the emperor of China has at least X mandate."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40689,7 +41444,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40750,7 +41507,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40806,7 +41565,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40834,7 +41595,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40865,7 +41628,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -40982,7 +41747,9 @@
     "documentation": [
       "Returns true if the ironman mode is enabled"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -41239,7 +42006,8 @@
       "In country scope, returns true if the country has a claim on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -41269,7 +42037,8 @@
       "In country scope, returns true if the country has a claim on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -41288,7 +42057,7 @@
     },
     "operator": "=",
     "value": {
-      "scope": "any"
+      "scope": "country"
     },
     "shape": "leaf",
     "child_context": null,
@@ -41299,6 +42068,7 @@
       "In country scope, returns true if the country has a claim on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -41329,6 +42099,7 @@
       "In country scope, returns true if the country has a claim on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -41387,7 +42158,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -41620,7 +42393,8 @@
       "In country scope, returns true if the country has a core on the province with the ID X. In province scope, returns true if the country X has a core on the province."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -41650,7 +42424,8 @@
       "In country scope, returns true if the country has a core on the province with the ID X. In province scope, returns true if the country X has a core on the province."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -41669,7 +42444,7 @@
     },
     "operator": "=",
     "value": {
-      "scope": "any"
+      "scope": "country"
     },
     "shape": "leaf",
     "child_context": null,
@@ -41680,6 +42455,7 @@
       "In country scope, returns true if the country has a core on the province with the ID X. In province scope, returns true if the country X has a core on the province."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -41743,6 +42519,7 @@
       "In country scope, returns true if the country has a core on the province with the ID X. In province scope, returns true if the country X has a core on the province."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -42372,7 +43149,9 @@
     "documentation": [
       "Returns true if the emperor has a casus belli on occupiers of the Empire. Note: Enabled/Disabled with Call for Reichsreform."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -42608,7 +43387,9 @@
     "documentation": [
       "Returns true if the specified institution has been discovered."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -42922,7 +43703,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -42950,7 +43733,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -43011,7 +43796,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -43039,7 +43826,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -43070,7 +43859,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -43098,7 +43889,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -43131,7 +43924,9 @@
     "documentation": [
       "Using negative war_score is currently bugged, it will always return false"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -43157,7 +43952,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -43185,7 +43982,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -43213,7 +44012,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -43241,7 +44042,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -43269,7 +44072,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -43327,7 +44132,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -43355,7 +44162,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -43383,7 +44192,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -43732,7 +44543,9 @@
     "documentation": [
       "Returns true if the current month is at least X (zero based i.e. 0 = January)."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -44158,7 +44971,7 @@
     },
     "operator": "=",
     "value": {
-      "scope": "any"
+      "scope": "country"
     },
     "shape": "leaf",
     "child_context": null,
@@ -44169,6 +44982,7 @@
       "Returns true if the province is a permanent claim of X, or if country has a permanent claim on X."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -44199,6 +45013,7 @@
       "Returns true if the province is a permanent claim of X, or if country has a permanent claim on X."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -44229,7 +45044,8 @@
       "Returns true if the province is a permanent claim of X, or if country has a permanent claim on X."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -44292,7 +45108,8 @@
       "Returns true if the province is a permanent claim of X, or if country has a permanent claim on X."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -44551,7 +45368,9 @@
     "documentation": [
       "Returns true if playing with a random New World."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -44643,7 +45462,9 @@
     "documentation": [
       "Returns true if the province is a reformation center."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -44759,7 +45580,9 @@
     "documentation": [
       "Returns true if the specified religion is enabled."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -44993,7 +45816,8 @@
       "In country scope, returns true if the country has a state core on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -45023,7 +45847,8 @@
       "In country scope, returns true if the country has a state core on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -45042,7 +45867,7 @@
     },
     "operator": "=",
     "value": {
-      "scope": "any"
+      "scope": "country"
     },
     "shape": "leaf",
     "child_context": null,
@@ -45053,6 +45878,7 @@
       "In country scope, returns true if the country has a state core on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -45083,6 +45909,7 @@
       "In country scope, returns true if the country has a state core on the province with the ID X. In province scope, returns true if the specified country has a claim on the province."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -45352,7 +46179,8 @@
       "In country scope, returns true if the country has a territorial core on the province with the ID X. In province scope, returns true if the country X has a territorial core on the province."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -45382,7 +46210,8 @@
       "In country scope, returns true if the country has a territorial core on the province with the ID X. In province scope, returns true if the country X has a territorial core on the province."
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -45412,6 +46241,7 @@
       "In country scope, returns true if the country has a territorial core on the province with the ID X. In province scope, returns true if the country X has a territorial core on the province."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -45442,6 +46272,7 @@
       "In country scope, returns true if the country has a territorial core on the province with the ID X. In province scope, returns true if the country X has a territorial core on the province."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -45676,7 +46507,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 2,
@@ -45702,7 +46535,9 @@
     "documentation": [
       "Returns true if the specified variable is equal to X."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -45730,7 +46565,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -45761,7 +46598,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -45787,7 +46626,9 @@
     "documentation": [
       "Returns true if the specified variable is equal to X."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -45846,7 +46687,9 @@
     "documentation": [
       "Returns true if the current year is at least X."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -47874,7 +48717,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -47902,7 +48747,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -47933,7 +48780,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -47961,7 +48810,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -48338,7 +49189,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -48618,7 +49471,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -48646,7 +49501,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -48677,7 +49534,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -48708,7 +49567,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -48764,7 +49625,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -48792,7 +49655,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -48823,7 +49688,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -48910,7 +49777,9 @@
     "documentation": [
       "Returns true if game is set to use normal or historical nations."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -48936,7 +49805,9 @@
     "documentation": [
       "Returns true if game is set to use normal province values."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -49341,7 +50212,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -49999,7 +50872,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -50225,7 +51100,9 @@
     "documentation": [
       "Returns true if there are at least X electors of the HRE."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -50662,7 +51539,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": "province",
     "replace_scope": [],
     "min_occurs": 0,
@@ -50997,7 +51876,9 @@
     "documentation": [
       "Returns true if at least amount number of targets within the specified scope match the specified conditions. Use \"all_x\" scopes."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -51844,7 +52725,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -51875,7 +52758,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -51906,7 +52791,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -51934,7 +52821,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -52783,7 +53672,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -52811,7 +53702,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -52839,7 +53732,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -52867,7 +53762,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -53722,7 +54619,9 @@
     "documentation": [
       "Returns true if the papacy is active."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -54092,7 +54991,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -54423,7 +55324,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -54539,7 +55442,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -54567,7 +55472,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -54598,7 +55505,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -54750,7 +55659,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -54809,7 +55720,9 @@
     "documentation": [
       "Switches the block's scope to the FROM register; block contents are triggers."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [
       [
@@ -54840,7 +55753,9 @@
     "documentation": [
       "Switches the block's scope to the ROOT register; block contents are triggers."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [
       [
@@ -54871,7 +55786,9 @@
     "documentation": [
       "Switches the block's scope to the previous scope; block contents are triggers."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [
       [
@@ -54902,7 +55819,9 @@
     "documentation": [
       "Switches the block's scope to the previous scope; block contents are triggers."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [
       [
@@ -54933,7 +55852,9 @@
     "documentation": [
       "Switches the block's scope to the second-previous scope; block contents are triggers."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [
       [
@@ -54964,7 +55885,9 @@
     "documentation": [
       "Switches the block's scope to the current scope; block contents are triggers."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -54998,7 +55921,9 @@
     "documentation": [
       "Direct variable-name shorthand accepted by check_variable."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -55006,5 +55931,380 @@
     "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 6973
+  },
+  {
+    "id": "eu4:trigger:has_administration_efficiency_value",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "has_administration_efficiency_value"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": "0",
+        "max": "1"
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Returns true if the country has at least as high administration efficiency value."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 8538
+  },
+  {
+    "id": "eu4:trigger:has_center_of_trade_of_level",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "has_center_of_trade_of_level"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Returns true if the country has a center of trade of at least the given level."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 8539
+  },
+  {
+    "id": "eu4:trigger:has_num_flagships",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "has_num_flagships"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Returns true if the country has at least X flagships."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 8540
+  },
+  {
+    "id": "eu4:trigger:is_any_heresy_enabled",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "is_any_heresy_enabled"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Returns true if the religion of the current scope has a heresy enabled."
+    ],
+    "allowed_scopes": [
+      "country",
+      "province"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 8541
+  },
+  {
+    "id": "eu4:trigger:is_most_powerful_estate",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "is_most_powerful_estate"
+    },
+    "operator": "=",
+    "value": {
+      "type": "estate"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Returns true if the most powerful estate in the country is the given one."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 8542
+  },
+  {
+    "id": "eu4:trigger:is_or_was_tag",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "is_or_was_tag"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Returns true if the current scope is or has been the specified tag."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 8543
+  },
+  {
+    "id": "eu4:trigger:last_mission",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "last_mission"
+    },
+    "operator": "=",
+    "value": {
+      "type": "mission"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Returns true if the last mission of the country was the specified one."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 8544
+  },
+  {
+    "id": "eu4:trigger:militarised_society",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "militarised_society"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": "0",
+        "max": "100"
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Returns true if the country has a militarisation of society of at least X."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 8545
+  },
+  {
+    "id": "eu4:trigger:num_of_marches",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "num_of_marches"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Returns true if the country has at least X marches."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 8546
+  },
+  {
+    "id": "eu4:trigger:province_size",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "province_size"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Returns true if the province, in provinces.bmp, contains at least X pixels."
+    ],
+    "allowed_scopes": [
+      "province"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 8547
+  },
+  {
+    "id": "eu4:trigger:provinces_on_continent",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "provinces_on_continent"
+    },
+    "operator": "=",
+    "value": {
+      "type": "continent"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Returns true if the current scope has provinces on the specified continent."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 8548
+  },
+  {
+    "id": "eu4:trigger:will_back_next_reform",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "will_back_next_reform"
+    },
+    "operator": "=",
+    "value": "bool",
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Returns true if the member of the HRE is backing the next imperial reform."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 8549
   }
 ]

@@ -1,4 +1,10 @@
+use crate::lints::{
+    is_boolean_container_key, is_conditional_key, lint_boolean_container, lint_conditional_block,
+    lint_conditional_siblings,
+};
 use crate::localisation::localisation_command_diagnostics;
+use crate::macro_contracts;
+use crate::macro_cycles;
 use crate::macro_expansion::{ExpansionEnterFailure, ExpansionFailure, MacroExpansionSession};
 use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
 use crate::resolution::*;
@@ -14,7 +20,7 @@ use pdx_engine::{
     AnalysisSnapshot, DocumentId, DocumentSource, MacroDefinitionSummary, SourceFileId,
 };
 use pdx_parser::{FileFormat, SyntaxError};
-use pdx_rules::RuleShape;
+use pdx_rules::{KeyMatcher, RuleShape};
 use pdx_text::TextRange;
 
 const MAX_EXPANDED_DIAGNOSTICS_PER_INVOCATION: usize = 32;
@@ -184,6 +190,36 @@ pub(crate) fn analyze_input_with_cancellation(
     cancellation.checkpoint()?;
     let resolution = DirectResolutionContext::new(snapshot);
     let mut diagnostics = DiagnosticCollector::new(syntax_diagnostics(input));
+    // Definition-site macro analyses run first: they warm the per-revision
+    // caches the expansion guard and call-site checks consult.
+    diagnostics
+        .values
+        .extend(macro_cycles::macro_cycle_diagnostics(
+            snapshot,
+            input,
+            cancellation,
+        )?);
+    diagnostics
+        .values
+        .extend(macro_contracts::macro_contract_diagnostics(
+            snapshot,
+            input,
+            cancellation,
+        )?);
+    diagnostics
+        .values
+        .extend(macro_contracts::macro_call_site_diagnostics(
+            snapshot,
+            input,
+            cancellation,
+        )?);
+    diagnostics
+        .values
+        .extend(crate::modifier_scope::modifier_scope_diagnostics(
+            snapshot,
+            input,
+            cancellation,
+        )?);
     diagnostics
         .values
         .extend(semantic_rule_diagnostics(snapshot, input, cancellation)?);
@@ -366,6 +402,8 @@ pub(crate) fn semantic_rule_diagnostics(
             expansion: &mut expansion,
             quoted_scripts: &mut quoted_scripts,
             quoted_script_depth: 0,
+            scope_diagnostics_deferred: false,
+            enclosing_key: None,
         })?;
         return Ok(diagnostics);
     }
@@ -432,19 +470,64 @@ pub(crate) fn semantic_rule_diagnostics(
                     expansion: &mut expansion,
                     quoted_scripts: &mut quoted_scripts,
                     quoted_script_depth: 0,
+                    scope_diagnostics_deferred: false,
+                    enclosing_key: None,
                 })?;
             }
         } else {
             let root_properties: Vec<&ScriptProperty> = property.block.iter().collect();
             let root_values: Vec<&(std::sync::Arc<str>, TextRange)> =
                 property.bare_values.iter().collect();
+            // Definition-style type contexts may declare a wrapper rule for the entry
+            // key itself whose child_context describes the entry body (e.g. `root:luck`'s
+            // any_scalar country blocks validating as trigger clauses). The wrapper only
+            // speaks for the entry when the context offers nothing but wildcard matchers:
+            // a context that also names keys (`root:imperial_incident`'s `event`,
+            // `can_stop`, ...) describes the entry body itself, and its wildcard rules
+            // target entry children. Structural wrapper rules without a child-context
+            // switch keep the file context, matching the engine descent.
+            let context_is_wildcard_only =
+                semantic_rules_for_container(snapshot, &context, &[], &scope)
+                    .iter()
+                    .all(|rule| !matches!(rule.key, KeyMatcher::Exact(_) | KeyMatcher::Enum(_)));
+            let wrapper_matching =
+                semantic_rules_for_container_key(snapshot, &context, &[], &property.key)
+                    .into_iter()
+                    .filter(|rule| {
+                        !matches!(rule.shape, RuleShape::LeafValue)
+                            && semantic_rule_key_matches(snapshot, rule, &[], &property.key)
+                    })
+                    .collect::<Vec<_>>();
+            let wrapper_transition = semantic_selected_transition(SemanticTransitionInput {
+                snapshot,
+                matching: &wrapper_matching,
+                selected_alternative: None,
+                context: &context,
+                parent_path: &[],
+                property: &property,
+                scope: &scope,
+                transparent_wrapper: false,
+            });
+            let mut body_context = context;
+            let mut body_scope = scope;
+            if let Some(rule) = wrapper_transition
+                && context_is_wildcard_only
+                && matches!(rule.key, KeyMatcher::AnyScalar | KeyMatcher::Date)
+                && rule
+                    .child_context
+                    .as_deref()
+                    .is_some_and(|child| !child.eq_ignore_ascii_case(&body_context))
+            {
+                body_scope = semantic_child_scope(snapshot, &body_scope, rule);
+                body_context = rule.child_context.clone().unwrap_or(body_context);
+            }
             validate_semantic_container(SemanticValidationInput {
                 snapshot,
-                context: &context,
+                context: &body_context,
                 parent_path: &[],
                 properties: &root_properties,
                 bare_values: &root_values,
-                scope: &scope,
+                scope: &body_scope,
                 hir: input.hir.as_deref(),
                 diagnostics: &mut container_diagnostics,
                 cancellation,
@@ -453,6 +536,8 @@ pub(crate) fn semantic_rule_diagnostics(
                 expansion: &mut expansion,
                 quoted_scripts: &mut quoted_scripts,
                 quoted_script_depth: 0,
+                scope_diagnostics_deferred: false,
+                enclosing_key: None,
             })?;
         }
         if fallback_context {
@@ -502,6 +587,53 @@ struct SemanticValidationInput<'data, 'hir, 'session, 'cancel> {
     expansion: &'data mut MacroExpansionSession,
     quoted_scripts: &'session mut QuotedScriptSession<'cancel>,
     quoted_script_depth: usize,
+    /// True when scope decisions for this subtree belong to the macro-contract
+    /// layer (definition-site entry contracts plus call-site validation) rather
+    /// than this walk. Set for scripted-macro expansion trees: their scope
+    /// findings duplicated the contract layer's, at call-site positions and
+    /// once per invocation. Content validation (keys, values, cardinality,
+    /// bindings) still runs.
+    scope_diagnostics_deferred: bool,
+    /// Key of the property owning this container, when the container is a
+    /// property block. EU4 accepts `else`/`else_if` both as siblings after an
+    /// `if` and nested as children of one, so the orphan check needs the
+    /// enclosing key to accept the nested form.
+    enclosing_key: Option<&'data str>,
+}
+
+/// Detects a key that is unknown in the current context but defined in the
+/// sibling context, so the unknown-key message can say what went wrong instead
+/// of only that the key is unexpected.
+fn sibling_context_key_kind(
+    snapshot: &AnalysisSnapshot,
+    trigger_like: bool,
+    effect_like: bool,
+    parent_path: &[std::sync::Arc<str>],
+    property: &ScriptProperty,
+) -> Option<&'static str> {
+    let sibling = if trigger_like && !effect_like {
+        "effect"
+    } else if effect_like && !trigger_like {
+        "trigger"
+    } else {
+        return None;
+    };
+    let kind = if sibling == "effect" {
+        "an effect"
+    } else {
+        "a trigger"
+    };
+    [parent_path, &[]]
+        .iter()
+        .any(|path| {
+            semantic_rules_for_container_key(snapshot, sibling, path, &property.key)
+                .into_iter()
+                .any(|rule| {
+                    matches!(rule.key, KeyMatcher::Exact(_))
+                        && semantic_property_structure_matches(rule, property)
+                })
+        })
+        .then_some(kind)
 }
 
 fn validate_semantic_container(
@@ -522,6 +654,8 @@ fn validate_semantic_container(
         expansion,
         quoted_scripts,
         quoted_script_depth,
+        scope_diagnostics_deferred,
+        enclosing_key,
     } = input;
     cancellation.checkpoint()?;
     let rules = semantic_rules_for_container(snapshot, context, parent_path, scope);
@@ -542,6 +676,12 @@ fn validate_semantic_container(
         || profile.semantic_context_inherits(context, "trigger");
     let effect_like = context.eq_ignore_ascii_case("effect")
         || profile.semantic_context_inherits(context, "effect");
+    // Structural lints describe authored shapes only; scripted-macro expansion
+    // output belongs to its definition site and is linted there.
+    let authored = expansion.authoring();
+    if authored && (trigger_like || effect_like) {
+        lint_conditional_siblings(properties, enclosing_key, diagnostics);
+    }
     // Case-folded occurrence counting with a linear scan: containers repeat a handful of
     // distinct keys, and the scan avoids lowercasing and cloning a String per property.
     let mut counts: Vec<(&str, u32)> = Vec::new();
@@ -568,6 +708,12 @@ fn validate_semantic_container(
             && profile.is_transparent_scope_wrapper(&property.key))
             || ((trigger_like || effect_like)
                 && profile.is_dynamic_scope_expression(&property.key));
+        if authored && trigger_like && is_boolean_container_key(&property.key) {
+            lint_boolean_container(property, diagnostics);
+        }
+        if authored && (trigger_like || effect_like) && is_conditional_key(&property.key) {
+            lint_conditional_block(property, effect_like, diagnostics);
+        }
         let matching =
             semantic_rules_for_container_key(snapshot, context, parent_path, &property.key)
                 .into_iter()
@@ -587,14 +733,31 @@ fn validate_semantic_container(
             // EU4 logical wrappers retain their parent context. Owner-local parameter keys are
             // likewise deferred until a call site supplies the concrete key spelling.
         } else if matching.is_empty() {
+            let message = match sibling_context_key_kind(
+                snapshot,
+                trigger_like,
+                effect_like,
+                parent_path,
+                property,
+            ) {
+                Some("an effect") => format!(
+                    "`{}` is an effect and cannot be used inside a trigger block",
+                    property.key
+                ),
+                Some("a trigger") => format!(
+                    "`{}` is a trigger and cannot be used inside an effect block; conditions belong in a `limit` block",
+                    property.key
+                ),
+                _ => format!(
+                    "unexpected key `{}` in rule context `{context}`",
+                    property.key
+                ),
+            };
             diagnostics.push(Diagnostic::new(
                 DiagnosticCode::UnknownKey,
                 DiagnosticCode::UnknownKey.severity(),
                 property.key_range,
-                format!(
-                    "unexpected key `{}` in rule context `{context}`",
-                    property.key
-                ),
+                message,
             ));
         } else {
             let scoped_matching = matching
@@ -602,7 +765,7 @@ fn validate_semantic_container(
                 .filter(|rule| semantic_scope_allows(rule, scope))
                 .copied()
                 .collect::<Vec<_>>();
-            if scoped_matching.is_empty() {
+            if scoped_matching.is_empty() && !scope_diagnostics_deferred {
                 diagnostics.push(semantic_diagnostic(
                     DiagnosticCode::RuleWrongScope,
                     semantic_rule_severity(
@@ -884,6 +1047,8 @@ fn validate_semantic_container(
                     expansion,
                     quoted_scripts,
                     quoted_script_depth,
+                    scope_diagnostics_deferred,
+                    enclosing_key: Some(property.key.as_ref()),
                 })?;
             }
             continue;
@@ -917,6 +1082,7 @@ fn validate_semantic_container(
                 &next_scope,
                 property,
                 quoted_script_depth,
+                scope_diagnostics_deferred,
             )?;
             continue;
         }
@@ -987,6 +1153,8 @@ fn validate_semantic_container(
                     expansion,
                     quoted_scripts,
                     quoted_script_depth,
+                    scope_diagnostics_deferred,
+                    enclosing_key: Some(property.key.as_ref()),
                 })?;
                 validate_semantic_container(SemanticValidationInput {
                     snapshot,
@@ -1003,6 +1171,8 @@ fn validate_semantic_container(
                     expansion,
                     quoted_scripts,
                     quoted_script_depth,
+                    scope_diagnostics_deferred,
+                    enclosing_key: Some(property.key.as_ref()),
                 })?;
                 continue;
             }
@@ -1025,6 +1195,8 @@ fn validate_semantic_container(
             expansion,
             quoted_scripts,
             quoted_script_depth,
+            scope_diagnostics_deferred,
+            enclosing_key: Some(property.key.as_ref()),
         })?;
     }
     for (value, value_range) in bare_values {
@@ -1210,6 +1382,7 @@ fn validate_quoted_script(
     scope: &ScopeContext,
     property: &ScriptProperty,
     depth: usize,
+    scope_diagnostics_deferred: bool,
 ) -> Result<(), Cancelled> {
     let ValidationState {
         snapshot,
@@ -1277,6 +1450,8 @@ fn validate_quoted_script(
         expansion,
         quoted_scripts,
         quoted_script_depth: depth.saturating_add(1),
+        scope_diagnostics_deferred,
+        enclosing_key: None,
     })
 }
 
@@ -1328,12 +1503,21 @@ fn validate_scripted_macro_expansion(
     match expansion.enter(&resolved) {
         Ok(()) => {}
         Err(ExpansionEnterFailure::Cycle(chain)) => {
-            diagnostics.push(Diagnostic::new(
-                DiagnosticCode::MacroExpansionCycle,
-                DiagnosticCode::MacroExpansionCycle.severity(),
-                property.key_range,
-                format!("scripted macro expansion cycle: {}", chain.join(" -> ")),
-            ));
+            // Definition-site SCC analysis already reports statically known
+            // cycles at every participating definition; the call-site report
+            // stays reserved for cycles only expansion can reveal.
+            if !macro_cycles::macro_cycle_reported(
+                snapshot,
+                &resolved.summary.kind,
+                &resolved.summary.name,
+            ) {
+                diagnostics.push(Diagnostic::new(
+                    DiagnosticCode::MacroExpansionCycle,
+                    DiagnosticCode::MacroExpansionCycle.severity(),
+                    property.key_range,
+                    format!("scripted macro expansion cycle: {}", chain.join(" -> ")),
+                ));
+            }
             return Ok(());
         }
         Err(ExpansionEnterFailure::Limit(limit)) => {
@@ -1409,6 +1593,10 @@ fn validate_scripted_macro_expansion(
         expansion,
         quoted_scripts,
         quoted_script_depth: 0,
+        // Scope authority for an expansion tree sits with the macro-contract
+        // layer: the definition-site entry contract and the call-site check.
+        scope_diagnostics_deferred: true,
+        enclosing_key: None,
     });
     expansion.leave();
     validation?;

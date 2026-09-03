@@ -106,6 +106,11 @@ Layer responsibilities:
 - Overridden definitions may be retained for explanation but must not become active navigation targets.
 - The Vanilla cache is built or updated only on first configuration, explicit user refresh, or an automatic rule-hash mismatch rebuild at LSP startup; it does not auto-refresh on file changes.
 
+### Soundness over Completeness
+
+- Diagnostics follow the Rust principle: prefer rejecting valid code (false positive) over accepting invalid code (false negative).
+- A rule-data gap is fixed by completing the rule data, never by relaxing, widening, or bypassing the check to silence the report. For example, a scripted effect whose inferred scope contract is empty is reported as an error at its definition, and the fix is rule data, not a severity downgrade.
+
 ### Error Recovery
 
 - Syntax errors do not prevent producing a local CST.

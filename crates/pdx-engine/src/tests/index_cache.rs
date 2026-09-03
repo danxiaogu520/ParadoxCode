@@ -136,6 +136,55 @@ fn vanilla_cache_preserves_scripted_macro_references_without_hir() {
 }
 
 #[test]
+fn definition_attribute_summaries_survive_live_and_cached_indexing() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-engine-attr-cache-{nonce}"));
+    let vanilla = root.join("vanilla");
+    fs::create_dir_all(vanilla.join("common/event_modifiers")).expect("modifier directory");
+    fs::write(
+        vanilla.join("common/event_modifiers/00_test.txt"),
+        "war_mod = { global_tax_modifier = 0.1 local_unrest = -1 }
+",
+    )
+    .expect("event modifier");
+
+    let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
+    let mut host = AnalysisHost::with_profile(rules, pdx_game::eu4::profile());
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(0),
+        SourceRootKind::Vanilla,
+        fs::canonicalize(&vanilla).expect("canonical Vanilla root"),
+    )]));
+    host.refresh_source_roots().expect("scan Vanilla");
+    let snapshot = host.snapshot();
+    let live = snapshot
+        .index()
+        .active_definition_attributes("event_modifier", "war_mod")
+        .expect("live attribute summary")
+        .clone();
+    assert_eq!(
+        live.attribute_keys,
+        vec!["global_tax_modifier".to_owned(), "local_unrest".to_owned()]
+    );
+
+    let cache = IndexCache::from_snapshot(&snapshot).expect("build cache");
+    let cache_path = root.join("cache/vanilla.pdxindex");
+    cache.save(&cache_path).expect("save cache");
+    let loaded = IndexCache::load(&cache_path).expect("load cache");
+    assert_eq!(
+        loaded
+            .index()
+            .active_definition_attributes("event_modifier", "war_mod")
+            .expect("cached attribute summary"),
+        &live
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn corrupted_navigation_position_is_rejected_without_symbol_table_scans() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

@@ -537,7 +537,8 @@
     "name_field": null,
     "name_from_file": false,
     "starts_with": null,
-    "type_key_filter": null
+    "type_key_filter": null,
+    "body_context": "modifier"
   },
   "faction": {
     "name": "faction",

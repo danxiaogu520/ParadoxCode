@@ -28,7 +28,7 @@ mod write;
 /// by the old encoding-recovery sanitizer, which could expose braces from malformed comments as
 /// active syntax. Older caches are rebuilt once by the CLI or LSP, the same way a rules update
 /// triggers a rebuild; no legacy reader is retained.
-pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 10;
+pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 11;
 
 /// Oldest on-disk cache schema this executable can still load.
 pub const MIN_SUPPORTED_CACHE_SCHEMA_VERSION: u32 = CURRENT_CACHE_SCHEMA_VERSION;

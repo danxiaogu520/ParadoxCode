@@ -6,7 +6,7 @@ use std::sync::Arc;
 use pdx_rules::{RuleSet, SymbolResolutionPolicy};
 use pdx_text::{PositionRange, TextRange};
 
-use crate::hir::MacroTemplate;
+use crate::hir::{DefinitionAttributes, MacroTemplate};
 use crate::model::{LocalisationPreview, SourceFileId, WorkspaceError, WorkspaceScanToken};
 
 /// Compact, file-grouped UTF-16 positions for indexed ranges.
@@ -504,6 +504,9 @@ pub struct FileIndexShard {
     pub references: Vec<Reference>,
     /// Callable signatures and normalized templates for scripted macro definitions in this file.
     pub macro_definitions: Vec<MacroDefinitionSummary>,
+    /// Retained attribute-key summaries for definitions whose profile rule
+    /// asked for them.
+    pub definition_attributes: Vec<DefinitionAttributes>,
     /// Syntax error count retained as a cheap health signal.
     pub syntax_error_count: usize,
 }
@@ -799,6 +802,26 @@ impl WorkspaceIndex {
                 summary.definition_range == definition.range
                     && summary.kind.eq_ignore_ascii_case(kind)
                     && summary.name.eq_ignore_ascii_case(name)
+            })
+    }
+
+    /// Returns the retained attribute-key summary belonging to the uniquely
+    /// active definition, mirroring [`Self::active_macro_definition`].
+    #[must_use]
+    pub fn active_definition_attributes(
+        &self,
+        kind: &str,
+        name: &str,
+    ) -> Option<&DefinitionAttributes> {
+        let definition = self.active_definition(kind, name)?;
+        self.shards
+            .get(&definition.file_id)?
+            .definition_attributes
+            .iter()
+            .find(|attributes| {
+                attributes.definition_range == definition.range
+                    && attributes.kind.eq_ignore_ascii_case(kind)
+                    && attributes.name.eq_ignore_ascii_case(name)
             })
     }
 

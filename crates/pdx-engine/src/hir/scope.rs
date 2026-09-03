@@ -71,7 +71,15 @@ pub(super) fn lower_scope_facts(
                 })
             });
         if !skip_root {
-            lowering.lower_nested(property_index, &context, &[], &initial);
+            // Definition-style types may declare a wrapper rule for the entry key
+            // itself (e.g. `root:luck`'s any_scalar country blocks whose bodies are
+            // trigger clauses). Apply that transition before descending so entry
+            // bodies validate in the declared child context instead of the bare
+            // type context, where the wrapper's any-key matcher would also capture
+            // nested keys with a mismatching shape.
+            if !lowering.lower_type_root_transition(property_index, &context, &initial) {
+                lowering.lower_nested(property_index, &context, &[], &initial);
+            }
             continue;
         }
         for &child_index in &property_children[property_index] {
@@ -301,6 +309,84 @@ impl<'a> ScopeFactLowering<'a> {
             std::rc::Rc::clone(&buckets),
         );
         buckets
+    }
+
+    /// Applies the root property's own rule transition for a definition-style
+    /// type context. Returns `true` when a transition rule was selected and the
+    /// entry's children were lowered in the destination context.
+    fn lower_type_root_transition(
+        &mut self,
+        parent_index: usize,
+        context: &str,
+        state: &ScopeState,
+    ) -> bool {
+        let buckets = self.buckets_for(context, &[]);
+        let matching = {
+            let ScopeFactLowering {
+                properties,
+                profile,
+                ..
+            } = self;
+            buckets.matches_for(&properties[parent_index].key, profile, state)
+        };
+        let selected = {
+            let ScopeFactLowering {
+                properties,
+                property_children,
+                rules,
+                child_matches,
+                ..
+            } = self;
+            statically_selected_transition_with_memo(
+                &matching,
+                properties,
+                property_children,
+                parent_index,
+                rules,
+                context,
+                &[],
+                false,
+                child_matches,
+            )
+        };
+        let Some(rule) = selected else {
+            return false;
+        };
+        // Entry-key wrappers are only authoritative when the context provides
+        // nothing but wildcard matchers (`root:luck`'s lone `any_scalar` rule:
+        // the entry key is a tag and its body is a trigger clause). A context
+        // that also declares named keys (`root:imperial_incident`'s `event`,
+        // `can_stop`, ...) describes the entry body itself; its wildcard rules
+        // then target entry children, and rerouting would strand those keys.
+        if !buckets.exact.is_empty() || !buckets.enums.is_empty() {
+            return false;
+        }
+        if !matches!(rule.key, KeyMatcher::AnyScalar | KeyMatcher::Date) {
+            return false;
+        }
+        // Only a genuine child-context switch reroutes the entry body. Rules
+        // that merely extend the structural path (e.g. `series` wrappers in
+        // mission files) must keep the default descent, which anchors nested
+        // mission entries at the file root.
+        if rule
+            .child_context
+            .as_deref()
+            .is_none_or(|child| child.eq_ignore_ascii_case(context))
+        {
+            return false;
+        }
+        let (next_context, next_path) = transition_destination(
+            rule,
+            context,
+            &[],
+            &self.properties[parent_index].key,
+            false,
+        );
+        let next_state = child_scope_state(state, rule, self.rules, self.profile);
+        let fact_index = self.facts.len() - 1;
+        self.facts[fact_index].transition = Some(next_state.clone());
+        self.lower_nested(parent_index, &next_context, &next_path, &next_state);
+        true
     }
 
     fn lower_nested(

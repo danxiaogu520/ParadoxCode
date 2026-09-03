@@ -16,7 +16,9 @@
     "documentation": [
       "Must match a scripted guiButtonType in a .gui file"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -42,7 +44,9 @@
     "documentation": [
       "If true, the button will be shown in the interface"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -68,7 +72,9 @@
     "documentation": [
       "If true, the button will be clickable"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -94,7 +100,9 @@
     "documentation": [
       "The code that runs when the button is clicked"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -120,7 +128,9 @@
     "documentation": [
       "Tooltip to display while hovering this button. Not required, but highly recommended."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -153,7 +163,9 @@
     "documentation": [
       "Which frame of the frame file to use"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -181,7 +193,9 @@
     "documentation": [
       "When to use the specified frame"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -207,7 +221,9 @@
     "documentation": [
       "Which frame file to use"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -233,7 +249,9 @@
     "documentation": [
       "Must match a scripted instantTextBoxType in a .gui file"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -259,7 +277,9 @@
     "documentation": [
       "If true, the text box will be shown"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -285,7 +305,9 @@
     "documentation": [
       "Tooltip to display while hovering this text. Optional."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -311,7 +333,9 @@
     "documentation": [
       "Must match a scripted iconType in a .gui file"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -337,7 +361,9 @@
     "documentation": [
       "If true, the icon will be shown in the interface"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -363,7 +389,9 @@
     "documentation": [
       "Tooltip to display while hovering this icon. Optional."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -396,7 +424,9 @@
     "documentation": [
       "Which frame of the frame file to use"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -424,7 +454,9 @@
     "documentation": [
       "When to use the specified frame"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -450,7 +482,9 @@
     "documentation": [
       "Which frame file to use"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -476,7 +510,9 @@
     "documentation": [
       "Use the value of a variable to determine the icon frame"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -502,7 +538,9 @@
     "documentation": [
       "Must match a scripted windowType in a .gui file"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -528,7 +566,9 @@
     "documentation": [
       "Determines when the window is visible, and will affect every other gui object inside it, not running their potentials if the window isn't visible."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -552,7 +592,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -576,7 +618,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [
       [
@@ -611,7 +655,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -635,7 +681,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -661,7 +709,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -685,7 +735,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -711,7 +763,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -739,7 +793,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -765,7 +821,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -793,7 +851,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -819,7 +879,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -847,7 +909,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -873,7 +937,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -901,7 +967,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -925,7 +993,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -951,7 +1021,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -979,7 +1051,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1005,7 +1079,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1033,7 +1109,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1059,7 +1137,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1087,7 +1167,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1113,7 +1195,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1141,7 +1225,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1165,7 +1251,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1191,7 +1279,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1219,7 +1309,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1245,7 +1337,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1273,7 +1367,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1299,7 +1395,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1327,7 +1425,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1353,7 +1453,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1381,7 +1483,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1405,7 +1509,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1434,7 +1540,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1463,7 +1571,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1492,7 +1602,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1518,7 +1630,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1542,7 +1656,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -1564,7 +1680,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1586,7 +1704,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1611,7 +1731,9 @@
     "documentation": [
       "Unit display definitions are keyed by unit type."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,

@@ -14,7 +14,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [
       [
@@ -47,7 +49,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [
       [
@@ -80,7 +84,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [
       [
@@ -120,7 +126,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -144,7 +152,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [
       [
@@ -182,7 +192,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -210,7 +222,9 @@
     "documentation": [
       "The AI will not try to integrate this country if the decision is available, meant to prevent them from using diplomatic power integrating countries that will get annexed or changed."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -238,7 +252,9 @@
     "documentation": [
       "The AI will not try to core this province if the decision is available, meant to prevent them from using monarch power coring provinces that will get cored or given away to another country."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -267,7 +283,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 3,
@@ -293,7 +311,9 @@
     "documentation": [
       "Changes the color used in the decision tab"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -319,7 +339,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -343,7 +365,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [
       [
@@ -378,7 +402,9 @@
     "documentation": [
       "Wrapper block containing all country decision instances."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,

@@ -86,6 +86,7 @@ fn write_cache(
 ) -> Result<(), IndexCacheError> {
     transaction.execute_batch(
         "DROP TABLE IF EXISTS macro_parameters;
+         DROP TABLE IF EXISTS definition_attributes;
          DROP TABLE IF EXISTS macro_definitions;
          DROP TABLE IF EXISTS symbol_references;
          DROP TABLE IF EXISTS navigation_positions;
@@ -136,7 +137,17 @@ fn write_cache(
              FOREIGN KEY(file_id, macro_ordinal)
                  REFERENCES macro_definitions(file_id, ordinal)
          );
-         CREATE TABLE symbol_references(
+         CREATE TABLE definition_attributes(
+            file_id BLOB NOT NULL REFERENCES source_files(file_id),
+            ordinal INTEGER NOT NULL,
+            kind TEXT NOT NULL,
+            name TEXT NOT NULL,
+            definition_range_start INTEGER NOT NULL,
+            definition_range_end INTEGER NOT NULL,
+            attribute_keys TEXT NOT NULL,
+            PRIMARY KEY(file_id, ordinal)
+        );
+        CREATE TABLE symbol_references(
              file_id BLOB NOT NULL REFERENCES source_files(file_id),
              ordinal INTEGER NOT NULL,
              kind TEXT NOT NULL,
@@ -217,6 +228,10 @@ fn write_cache(
         "INSERT INTO macro_definitions(file_id, ordinal, kind, name, definition_range_start, definition_range_end, template_payload)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )?;
+    let mut insert_definition_attributes = transaction.prepare(
+        "INSERT INTO definition_attributes(file_id, ordinal, kind, name, definition_range_start, definition_range_end, attribute_keys)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+    )?;
     let mut insert_macro_parameter = transaction.prepare(
         "INSERT INTO macro_parameters(file_id, macro_ordinal, ordinal, name, required)
          VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -273,6 +288,36 @@ fn write_cache(
                 reference.name,
                 i64::from(reference.range.start()),
                 i64::from(reference.range.end())
+            ])?;
+        }
+        for (ordinal, attributes) in shard.definition_attributes.iter().enumerate() {
+            if !shard.definitions.iter().any(|definition| {
+                definition.kind.eq_ignore_ascii_case(&attributes.kind)
+                    && definition.name.eq_ignore_ascii_case(&attributes.name)
+                    && definition.range == attributes.definition_range
+            }) {
+                return Err(IndexCacheError::InvalidData(format!(
+                    "attribute summary {} `{}` has no matching definition",
+                    attributes.kind, attributes.name
+                )));
+            }
+            if attributes.attribute_keys.iter().any(|key| key.is_empty()) {
+                return Err(IndexCacheError::InvalidData(format!(
+                    "attribute summary {} `{}` retains an empty key",
+                    attributes.kind, attributes.name
+                )));
+            }
+            let keys_payload = serde_json::to_string(&attributes.attribute_keys).map_err(|_| {
+                IndexCacheError::InvalidData("attribute keys are not encodable".into())
+            })?;
+            insert_definition_attributes.execute(params![
+                encode_file_id(*id),
+                i64::try_from(ordinal).unwrap_or(i64::MAX),
+                attributes.kind,
+                attributes.name,
+                i64::from(attributes.definition_range.start()),
+                i64::from(attributes.definition_range.end()),
+                keys_payload,
             ])?;
         }
         for (macro_ordinal, summary) in shard.macro_definitions.iter().enumerate() {

@@ -81,6 +81,7 @@ fn bulk_index_build_retains_every_shard_and_definition() {
             }],
             references: Vec::new(),
             macro_definitions: Vec::new(),
+            definition_attributes: Vec::new(),
             syntax_error_count: 0,
         },
         FileIndexShard {
@@ -95,6 +96,7 @@ fn bulk_index_build_retains_every_shard_and_definition() {
             }],
             references: Vec::new(),
             macro_definitions: Vec::new(),
+            definition_attributes: Vec::new(),
             syntax_error_count: 0,
         },
     ];
@@ -234,6 +236,7 @@ fn symbol_case_policy_controls_definition_lookup_identity() {
         }],
         references: Vec::new(),
         macro_definitions: Vec::new(),
+        definition_attributes: Vec::new(),
         syntax_error_count: 0,
     }]);
     index.configure_case_sensitivity(&rules);
@@ -329,6 +332,7 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
             definitions: vec![definition(first_file, "old.1")],
             references: vec![reference(first_file, "old.1")],
             macro_definitions: Vec::new(),
+            definition_attributes: Vec::new(),
             syntax_error_count: 0,
         },
         FileIndexShard {
@@ -336,6 +340,7 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
             definitions: vec![definition(second_file, "untouched.1")],
             references: vec![reference(second_file, "untouched.1")],
             macro_definitions: Vec::new(),
+            definition_attributes: Vec::new(),
             syntax_error_count: 0,
         },
     ]);
@@ -345,6 +350,7 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
         definitions: vec![definition(first_file, "new.1")],
         references: vec![reference(first_file, "new.1")],
         macro_definitions: Vec::new(),
+        definition_attributes: Vec::new(),
         syntax_error_count: 1,
     });
 
@@ -389,6 +395,7 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
             definitions: vec![definition(first_file)],
             references: Vec::new(),
             macro_definitions: Vec::new(),
+            definition_attributes: Vec::new(),
             syntax_error_count: 0,
         },
         FileIndexShard {
@@ -396,6 +403,7 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
             definitions: vec![definition(second_file)],
             references: Vec::new(),
             macro_definitions: Vec::new(),
+            definition_attributes: Vec::new(),
             syntax_error_count: 0,
         },
     ]);
@@ -470,6 +478,7 @@ fn identical_collector_records_resolve_as_one_physical_definition() {
         definitions: vec![definition.clone(), definition],
         references: Vec::new(),
         macro_definitions: Vec::new(),
+        definition_attributes: Vec::new(),
         syntax_error_count: 0,
     }]);
 
@@ -504,6 +513,7 @@ fn identical_collector_records_resolve_as_one_physical_definition() {
         ],
         references: Vec::new(),
         macro_definitions: Vec::new(),
+        definition_attributes: Vec::new(),
         syntax_error_count: 0,
     }]);
     assert!(

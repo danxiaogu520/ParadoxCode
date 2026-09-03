@@ -232,6 +232,12 @@ pub struct TypeDescriptor {
     /// rules as the root scaffold (for example `country_decisions` or the event entries).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub root_entries: Option<String>,
+    /// Context in which this type's definition bodies are interpreted, when it
+    /// is shared with other types instead of living under `type:{name}` (for
+    /// example modifier-bearing types whose attributes validate in the
+    /// `modifier` context).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_context: Option<String>,
     /// Optional generic scripted-macro capabilities for this type.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scripted_macro: Option<ScriptedMacroDescriptor>,
@@ -339,7 +345,10 @@ pub struct SemanticRule {
     pub deprecated: bool,
     /// Documentation comments attached to the first-party declaration.
     pub documentation: Vec<String>,
-    /// Scopes in which this rule is valid. An empty list means `scope = any` or no restriction.
+    /// Scopes in which this rule is valid.
+    ///
+    /// The first-party JSON source must spell an unrestricted rule as `["any"]`; compilation
+    /// normalizes that declaration to an empty runtime list for compatibility and hashing.
     pub allowed_scopes: Vec<String>,
     /// Scope entered by a nested block matched by this rule.
     pub push_scope: Option<String>,

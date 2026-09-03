@@ -233,7 +233,7 @@
       "documentation": ["ROOT is the new vassal; FROM is its overlord."]
     },
     "on_culture_demoted": "country",
-    "on_culture_promoted": "province",
+    "on_culture_promoted": "country",
     "on_death_election": {
       "root": "country",
       "documentation": ["ROOT is the country where a ruler's death triggers an election."]

@@ -120,6 +120,25 @@ pub enum DiagnosticCode {
     MacroExpansionCycle,
     /// Scripted-macro expansion exceeded a bounded work or size limit.
     AnalysisIncomplete,
+    /// A boolean logic container (AND/OR/NOT) has a degenerate or misleading shape.
+    LogicalContainer,
+    /// A condition evaluates to a statically known truth value.
+    ConstantCondition,
+    /// An effect-side `if`/`else_if` block lacks the `limit` that carries its condition.
+    MissingLimit,
+    /// A conditional block has an empty body.
+    EmptyBlock,
+    /// An `else`/`else_if` block has no preceding `if`/`else_if` sibling.
+    OrphanElse,
+    /// A scripted macro's inferred entry-scope contract is empty, so no scope
+    /// can run its body correctly.
+    EmptyScopeContract,
+    /// An effect applies a typed definition whose scope-attributed attributes
+    /// cannot act in the effect's scope.
+    ModifierScopeMismatch,
+    /// A scripted macro is called in a scope its inferred entry contract
+    /// rejects.
+    MacroCallScopeMismatch,
 }
 
 impl DiagnosticCode {
@@ -139,6 +158,14 @@ impl DiagnosticCode {
         Self::InvalidScopeCommand,
         Self::MacroExpansionCycle,
         Self::AnalysisIncomplete,
+        Self::LogicalContainer,
+        Self::ConstantCondition,
+        Self::MissingLimit,
+        Self::EmptyBlock,
+        Self::OrphanElse,
+        Self::EmptyScopeContract,
+        Self::ModifierScopeMismatch,
+        Self::MacroCallScopeMismatch,
     ];
 
     /// Parses a wire-facing diagnostic category.
@@ -168,6 +195,14 @@ impl DiagnosticCode {
             Self::InvalidScopeCommand => "InvalidScopeCommand",
             Self::MacroExpansionCycle => "MacroExpansionCycle",
             Self::AnalysisIncomplete => "AnalysisIncomplete",
+            Self::LogicalContainer => "LogicalContainer",
+            Self::ConstantCondition => "ConstantCondition",
+            Self::MissingLimit => "MissingLimit",
+            Self::EmptyBlock => "EmptyBlock",
+            Self::OrphanElse => "OrphanElse",
+            Self::EmptyScopeContract => "EmptyScopeContract",
+            Self::ModifierScopeMismatch => "ModifierScopeMismatch",
+            Self::MacroCallScopeMismatch => "MacroCallScopeMismatch",
         }
     }
 
@@ -185,6 +220,13 @@ impl DiagnosticCode {
             // Expansion limits are analysis-side work bounds; reaching one means this
             // file was not fully validated, not that the file itself is wrong.
             Self::AnalysisIncomplete => Severity::Information,
+            // Structural lints describe valid-but-misleading script shapes; the game
+            // still loads them, so they stay below error severity except for control
+            // flow that cannot match any branch chain.
+            Self::LogicalContainer
+            | Self::ConstantCondition
+            | Self::MissingLimit
+            | Self::EmptyBlock => Severity::Warning,
             Self::Syntax
             | Self::UnknownSymbol
             | Self::AmbiguousSymbol
@@ -192,7 +234,17 @@ impl DiagnosticCode {
             | Self::InvalidValue
             | Self::Cardinality
             | Self::RuleWrongScope
-            | Self::MacroExpansionCycle => Severity::Error,
+            | Self::MacroExpansionCycle
+            // An empty contract means the definition is unusable in every
+            // scope; rejecting it at the definition follows the same Rust
+            // principle as rejecting a recursive expansion.
+            | Self::EmptyScopeContract
+            | Self::MacroCallScopeMismatch
+            | Self::OrphanElse => Severity::Error,
+            // The game still loads cross-class modifier applications, so the
+            // scope class of the applied attributes is recorded as information
+            // rather than rejected.
+            Self::ModifierScopeMismatch => Severity::Information,
         }
     }
 }

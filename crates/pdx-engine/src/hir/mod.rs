@@ -77,7 +77,7 @@ fn lower_shared_impl(
     let unknown_constructs = collected.unknown_constructs;
     let parameter_conditionals = collected.parameter_conditionals;
     let scope_facts = scope::lower_scope_facts(&properties, logical_path, rules, profile);
-    let (definitions, mut references) = semantics::lower_semantics(
+    let (definitions, mut references, definition_attributes) = semantics::lower_semantics(
         &properties,
         &localisation_entries,
         &bare_values,
@@ -142,6 +142,7 @@ fn lower_shared_impl(
         parameter_definitions,
         parameter_references,
         macro_templates,
+        definition_attributes,
     }
 }
 

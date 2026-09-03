@@ -8,6 +8,7 @@ use std::sync::Arc;
 use pdx_text::{LogicalPath, PositionRange, TextRange};
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
 
+use crate::hir::DefinitionAttributes;
 use crate::index::{
     Definition, FileIndexShard, LocalisationPreviewMap, MacroDefinitionSummary,
     MacroParameterSignature, PositionMap, Reference, WorkspaceIndex,
@@ -28,7 +29,7 @@ use super::{
 };
 
 /// Row-count and text-length limits per table, in validation order.
-const TABLE_LIMITS: [(&str, usize, &str); 7] = [
+const TABLE_LIMITS: [(&str, usize, &str); 8] = [
     (
         "source_files",
         MAX_CACHE_FILES,
@@ -37,6 +38,7 @@ const TABLE_LIMITS: [(&str, usize, &str); 7] = [
     ("definitions", MAX_CACHE_SYMBOLS, "kind, name"),
     ("symbol_references", MAX_CACHE_SYMBOLS, "kind, name"),
     ("macro_definitions", MAX_CACHE_SYMBOLS, "kind, name"),
+    ("definition_attributes", MAX_CACHE_SYMBOLS, "kind, name"),
     ("macro_parameters", MAX_CACHE_SYMBOLS, "name"),
     // Position payloads have their own byte budget below; the row count is per file.
     ("navigation_positions", MAX_CACHE_FILES, ""),
@@ -130,6 +132,7 @@ fn load_connection(
         references,
         macros,
         macro_parameters,
+        definition_attributes,
         positions,
         previews,
     ] = table_counts;
@@ -138,6 +141,7 @@ fn load_connection(
         + references
         + macros
         + macro_parameters
+        + definition_attributes
         + positions
         + previews
         + definitions
@@ -276,11 +280,11 @@ impl LoadProgress<'_> {
     }
 }
 
-fn validate_table_limits(connection: &Connection) -> Result<[usize; 7], IndexCacheError> {
+fn validate_table_limits(connection: &Connection) -> Result<[usize; 8], IndexCacheError> {
     // One scan per table returns both the row count and the longest text field, so the
     // bounds checks never rescan a table. The order matches TABLE_LIMITS so failures can
     // name the offending table statically. Navigation payloads have their own budget.
-    let mut counts = [0usize; 7];
+    let mut counts = [0usize; 8];
     for (index, (table, limit, fields)) in TABLE_LIMITS.iter().enumerate() {
         let (count, max) = if fields.is_empty() {
             let count =
@@ -442,6 +446,7 @@ fn load_index(
                 definitions: Vec::new(),
                 references: Vec::new(),
                 macro_definitions: Vec::new(),
+                definition_attributes: Vec::new(),
                 syntax_error_count,
             }),
         );
@@ -451,6 +456,8 @@ fn load_index(
     progress.report(definition_count);
     let macro_count = load_macro_definitions(connection, &mut shards)?;
     progress.report(macro_count);
+    let attribute_count = load_definition_attributes(connection, &mut shards)?;
+    progress.report(attribute_count);
     let reference_count = load_references(connection, &mut shards)?;
     progress.report(reference_count);
     // Membership sets replace per-position linear scans of a shard's symbol vectors, which
@@ -501,6 +508,7 @@ fn load_index(
             shard.definitions.shrink_to_fit();
             shard.references.shrink_to_fit();
             shard.macro_definitions.shrink_to_fit();
+            shard.definition_attributes.shrink_to_fit();
         }
     }
     Ok((
@@ -519,6 +527,81 @@ fn load_index(
         file_fingerprints,
         file_metadata_fingerprints,
     ))
+}
+
+fn load_definition_attributes(
+    connection: &Connection,
+    shards: &mut BTreeMap<SourceFileId, Arc<FileIndexShard>>,
+) -> Result<usize, IndexCacheError> {
+    let mut rows_loaded = 0usize;
+    let mut statement = connection.prepare(
+        "SELECT file_id, ordinal, kind, name, definition_range_start, definition_range_end, attribute_keys
+         FROM definition_attributes ORDER BY file_id, ordinal",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, Vec<u8>>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, i64>(4)?,
+            row.get::<_, i64>(5)?,
+            row.get::<_, String>(6)?,
+        ))
+    })?;
+    for row in rows {
+        let (file_id, ordinal, kind, name, start, end, keys_payload) = row?;
+        let file_id = decode_file_id(&file_id)?;
+        let ordinal = usize::try_from(ordinal).map_err(|_| {
+            IndexCacheError::InvalidData("negative attribute summary ordinal".to_owned())
+        })?;
+        let definition_range = decode_range(start, end)?;
+        let shard = shards.get_mut(&file_id).map(Arc::make_mut).ok_or_else(|| {
+            IndexCacheError::InvalidData(format!(
+                "attribute summary references unknown file {}",
+                file_id.get()
+            ))
+        })?;
+        if ordinal != shard.definition_attributes.len() {
+            return Err(IndexCacheError::InvalidData(
+                "attribute summary ordinals are not contiguous".to_owned(),
+            ));
+        }
+        if shard.definition_attributes.iter().any(|summary| {
+            summary.kind.eq_ignore_ascii_case(&kind)
+                && summary.name.eq_ignore_ascii_case(&name)
+                && summary.definition_range == definition_range
+        }) {
+            return Err(IndexCacheError::InvalidData(format!(
+                "duplicate attribute summary {kind} `{name}`"
+            )));
+        }
+        if !shard.definitions.iter().any(|definition| {
+            definition.kind.eq_ignore_ascii_case(&kind)
+                && definition.name.eq_ignore_ascii_case(&name)
+                && definition.range == definition_range
+        }) {
+            return Err(IndexCacheError::InvalidData(format!(
+                "attribute summary {kind} `{name}` has no matching definition"
+            )));
+        }
+        let attribute_keys: Vec<String> = serde_json::from_str(&keys_payload).map_err(|_| {
+            IndexCacheError::InvalidData("attribute keys are not decodable".to_owned())
+        })?;
+        if attribute_keys.iter().any(|key| key.is_empty()) {
+            return Err(IndexCacheError::InvalidData(format!(
+                "attribute summary {kind} `{name}` retains an empty key"
+            )));
+        }
+        shard.definition_attributes.push(DefinitionAttributes {
+            kind,
+            name,
+            definition_range,
+            attribute_keys,
+        });
+        rows_loaded = rows_loaded.saturating_add(1);
+    }
+    Ok(rows_loaded)
 }
 
 fn load_macro_definitions(

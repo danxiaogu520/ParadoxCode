@@ -388,7 +388,8 @@
       },
       "kind": "event_modifier",
       "name_field": null,
-      "requires_value": false
+      "requires_value": false,
+      "retain_attributes": true
     },
     {
       "path": {
