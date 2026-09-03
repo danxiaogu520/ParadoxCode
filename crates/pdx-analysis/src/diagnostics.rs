@@ -1,10 +1,10 @@
+use crate::dynamic_contracts;
+use crate::dynamic_cycles;
 use crate::lints::{
     is_boolean_container_key, is_conditional_key, lint_boolean_container, lint_conditional_block,
     lint_conditional_siblings,
 };
 use crate::localisation::localisation_command_diagnostics;
-use crate::macro_contracts;
-use crate::macro_cycles;
 use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
 use crate::resolution::*;
 use crate::semantic::*;
@@ -12,11 +12,11 @@ use crate::suggest::best_suggestion;
 use crate::support::*;
 use crate::types::*;
 use pdx_engine::hir::{
-    HirFile, HirParameterReferenceKind, MacroTemplate, MacroTemplateFragment, MacroTemplateItem,
-    MacroTemplateProperty, MacroTemplateToken, MacroTemplateValue, Scope,
+    HirFile, HirParameterReferenceKind, Scope, Template, TemplateFragment, TemplateItem,
+    TemplateProperty, TemplateToken, TemplateValue,
 };
 use pdx_engine::{
-    AnalysisSnapshot, DocumentId, DocumentSource, MacroDefinitionSummary, SourceFileId,
+    AnalysisSnapshot, DocumentId, DocumentSource, DynamicDefinitionSummary, SourceFileId,
 };
 use pdx_parser::{FileFormat, SyntaxError};
 use pdx_rules::{KeyMatcher, RuleShape};
@@ -187,25 +187,25 @@ pub(crate) fn analyze_input_with_cancellation(
     cancellation.checkpoint()?;
     let resolution = DirectResolutionContext::new(snapshot);
     let mut diagnostics = DiagnosticCollector::new(syntax_diagnostics(input));
-    // Definition-site macro analyses run first: they warm the per-revision
+    // Definition-site dynamic analyses run first: they warm the per-revision
     // caches the call-site checks consult.
     diagnostics
         .values
-        .extend(macro_cycles::macro_cycle_diagnostics(
+        .extend(dynamic_cycles::dynamic_cycle_diagnostics(
             snapshot,
             input,
             cancellation,
         )?);
     diagnostics
         .values
-        .extend(macro_contracts::macro_contract_diagnostics(
+        .extend(dynamic_contracts::dynamic_contract_diagnostics(
             snapshot,
             input,
             cancellation,
         )?);
     diagnostics
         .values
-        .extend(macro_contracts::macro_call_site_diagnostics(
+        .extend(dynamic_contracts::dynamic_call_site_diagnostics(
             snapshot,
             input,
             cancellation,
@@ -261,11 +261,11 @@ pub(crate) fn analyze_input_with_cancellation(
                     && builtin_rule_has_key(snapshot, "trigger", &reference.name))
                     || (reference.kind.eq_ignore_ascii_case("scripted_effect")
                         && builtin_rule_has_key(snapshot, "effect", &reference.name)) => {}
-            // Scalar arguments inside a scripted macro invocation are untyped
+            // Scalar arguments inside a dynamic definition invocation are untyped
             // parameter values, not localisation key references.
             Resolution::Missing
                 if reference.kind.eq_ignore_ascii_case("localisation")
-                    && localisation_reference_is_macro_argument(
+                    && localisation_reference_is_dynamic_argument(
                         snapshot,
                         input,
                         reference.range,
@@ -333,9 +333,9 @@ fn builtin_rule_has_key(snapshot: &AnalysisSnapshot, context: &str, key: &str) -
         })
 }
 
-/// Returns whether a localisation-kind reference sits inside a scripted macro
+/// Returns whether a localisation-kind reference sits inside a dynamic definition
 /// invocation, where scalar arguments are untyped parameter values.
-fn localisation_reference_is_macro_argument(
+fn localisation_reference_is_dynamic_argument(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     range: TextRange,
@@ -349,7 +349,7 @@ fn localisation_reference_is_macro_argument(
         return false;
     };
     // A definition body (path length 2) keeps localisation validation; only
-    // nested invocations carry opaque macro arguments.
+    // nested invocations carry opaque dynamic arguments.
     if property.path.len() < 3 {
         return false;
     }
@@ -579,7 +579,7 @@ struct SemanticValidationInput<'data, 'hir, 'session, 'cancel> {
     container_range: TextRange,
     quoted_scripts: &'session mut QuotedScriptSession<'cancel>,
     quoted_script_depth: usize,
-    /// True when scope decisions for this subtree belong to the macro-contract
+    /// True when scope decisions for this subtree belong to the dynamic-contract
     /// layer (definition-site entry contracts plus call-site validation) rather
     /// than this walk. Set for quoted-script payloads of dynamic-rule
     /// invocations: their scope findings would duplicate the contract layer's,
@@ -892,13 +892,7 @@ fn validate_semantic_container(
                     }))
             });
             if !parameterized_invocation {
-                validate_scripted_macro_arguments(
-                    snapshot,
-                    applicable,
-                    property,
-                    scope,
-                    diagnostics,
-                );
+                validate_dynamic_arguments(snapshot, applicable, property, scope, diagnostics);
                 validate_dynamic_dispatch_keys(snapshot, applicable, property, diagnostics);
                 validate_dynamic_quoted_payloads(
                     ValidationState {
@@ -1451,7 +1445,7 @@ fn owner_local_parameter_in_range(
     })
 }
 
-fn validate_scripted_macro_arguments(
+fn validate_dynamic_arguments(
     snapshot: &AnalysisSnapshot,
     rules: &[&pdx_rules::SemanticRule],
     property: &ScriptProperty,
@@ -1464,13 +1458,13 @@ fn validate_scripted_macro_arguments(
     let summary = rules.iter().find_map(|rule| {
         let type_name = match &rule.key {
             pdx_rules::KeyMatcher::Type(type_name) | pdx_rules::KeyMatcher::Dynamic(type_name)
-                if scripted_macro_type(snapshot, type_name) =>
+                if dynamic_definition_type(snapshot, type_name) =>
             {
                 type_name
             }
             _ => return None,
         };
-        macro_definition_summary(snapshot, type_name, &property.key)
+        dynamic_definition_summary(snapshot, type_name, &property.key)
     });
     let Some(summary) = summary else {
         return;
@@ -1486,7 +1480,7 @@ fn validate_scripted_macro_arguments(
                 Severity::Warning,
                 argument.key_range,
                 format!(
-                    "macro parameter `{}` is provided more than once",
+                    "dynamic parameter `{}` is provided more than once",
                     argument.key
                 ),
             ));
@@ -1497,7 +1491,7 @@ fn validate_scripted_macro_arguments(
         .iter()
         .filter(|parameter| {
             parameter.required
-                && !macro_parameter_is_runtime_optional(&summary, &parameter.name)
+                && !dynamic_parameter_is_runtime_optional(&summary, &parameter.name)
                 && !counts
                     .keys()
                     .any(|name| name.eq_ignore_ascii_case(&parameter.name))
@@ -1510,7 +1504,7 @@ fn validate_scripted_macro_arguments(
             DiagnosticCode::Cardinality.severity(),
             property.key_range,
             format!(
-                "macro `{}` is missing required parameter(s): {}",
+                "dynamic definition `{}` is missing required parameter(s): {}",
                 summary.name,
                 missing.join(", ")
             ),
@@ -1560,7 +1554,7 @@ fn validate_scripted_macro_arguments(
 /// argument blocks forward rather than require.
 fn template_branch_active_missing(
     snapshot: &AnalysisSnapshot,
-    template: &MacroTemplate,
+    template: &Template,
     context: &str,
     supplied: &std::collections::BTreeSet<String>,
 ) -> Vec<String> {
@@ -1580,14 +1574,14 @@ fn template_branch_active_missing(
 /// signature's concern.
 fn branch_conditional_items(
     snapshot: &AnalysisSnapshot,
-    items: &[MacroTemplateItem],
+    items: &[TemplateItem],
     context: &str,
     runtime_guarded: bool,
     supplied: &std::collections::BTreeSet<String>,
     missing: &mut Vec<String>,
 ) {
     for item in items {
-        if let MacroTemplateItem::Conditional(conditional) = item {
+        if let TemplateItem::Conditional(conditional) = item {
             let guard_supplied = supplied.contains(&conditional.name.to_ascii_lowercase());
             if conditional.negated != guard_supplied {
                 branch_active_body(
@@ -1608,7 +1602,7 @@ fn branch_conditional_items(
 /// forwarding semantics.
 fn branch_active_body(
     snapshot: &AnalysisSnapshot,
-    items: &[MacroTemplateItem],
+    items: &[TemplateItem],
     context: &str,
     runtime_guarded: bool,
     supplied: &std::collections::BTreeSet<String>,
@@ -1616,14 +1610,14 @@ fn branch_active_body(
 ) {
     for item in items {
         match item {
-            MacroTemplateItem::Property(property) => {
+            TemplateItem::Property(property) => {
                 let property_guarded = runtime_guarded && !is_limit_property(property);
                 branch_active_record_token(&property.key, property_guarded, supplied, missing);
                 match &property.value {
-                    MacroTemplateValue::Scalar(token) => {
+                    TemplateValue::Scalar(token) => {
                         branch_active_record_token(token, property_guarded, supplied, missing);
                     }
-                    MacroTemplateValue::Block { items, .. } => {
+                    TemplateValue::Block { items, .. } => {
                         if branch_active_forwards_arguments(snapshot, context, property) {
                             continue;
                         }
@@ -1638,10 +1632,10 @@ fn branch_active_body(
                     }
                 }
             }
-            MacroTemplateItem::BareValue(token) => {
+            TemplateItem::BareValue(token) => {
                 branch_active_record_token(token, runtime_guarded, supplied, missing);
             }
-            MacroTemplateItem::Conditional(conditional) => {
+            TemplateItem::Conditional(conditional) => {
                 let guard_supplied = supplied.contains(&conditional.name.to_ascii_lowercase());
                 if conditional.negated != guard_supplied {
                     branch_active_body(
@@ -1661,7 +1655,7 @@ fn branch_active_body(
 /// Records parameters used in a token as missing unless supplied; parameters
 /// inside runtime branch alternatives are optional and not recorded.
 fn branch_active_record_token(
-    token: &MacroTemplateToken,
+    token: &TemplateToken,
     runtime_guarded: bool,
     supplied: &std::collections::BTreeSet<String>,
     missing: &mut Vec<String>,
@@ -1670,7 +1664,7 @@ fn branch_active_record_token(
         return;
     }
     for fragment in &token.fragments {
-        let MacroTemplateFragment::Parameter { name, .. } = fragment else {
+        let TemplateFragment::Parameter { name, .. } = fragment else {
             continue;
         };
         if !supplied.contains(&name.to_ascii_lowercase())
@@ -1689,13 +1683,13 @@ fn branch_active_record_token(
 fn branch_active_forwards_arguments(
     snapshot: &AnalysisSnapshot,
     context: &str,
-    property: &MacroTemplateProperty,
+    property: &TemplateProperty,
 ) -> bool {
-    let [MacroTemplateFragment::Literal(key)] = property.key.fragments.as_slice() else {
+    let [TemplateFragment::Literal(key)] = property.key.fragments.as_slice() else {
         return false;
     };
     crate::dynamic_rules::dynamic_kind_for_context(snapshot, context)
-        .and_then(|kind| resolve_macro_definition(snapshot, &kind, key.trim()))
+        .and_then(|kind| resolve_dynamic_definition(snapshot, &kind, key.trim()))
         .is_some()
 }
 
@@ -1909,7 +1903,7 @@ fn dynamic_row_for_invocation(
 ) -> Option<crate::dynamic_rules::DynamicRuleRow> {
     let type_name = rules.iter().find_map(|rule| match &rule.key {
         KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
-            if scripted_macro_type(snapshot, type_name) =>
+            if dynamic_definition_type(snapshot, type_name) =>
         {
             Some(type_name.as_str())
         }
@@ -1979,7 +1973,7 @@ fn validate_dynamic_dispatch_keys(
     }
     let Some(type_name) = rules.iter().find_map(|rule| match &rule.key {
         pdx_rules::KeyMatcher::Type(type_name) | pdx_rules::KeyMatcher::Dynamic(type_name)
-            if scripted_macro_type(snapshot, type_name) =>
+            if dynamic_definition_type(snapshot, type_name) =>
         {
             Some(type_name.as_str())
         }
@@ -1994,17 +1988,17 @@ fn validate_dynamic_dispatch_keys(
     if !row.dispatches_dynamically {
         return;
     }
-    let Some(resolved) = resolve_macro_definition(snapshot, type_name, &property.key) else {
+    let Some(resolved) = resolve_dynamic_definition(snapshot, type_name, &property.key) else {
         return;
     };
     let Some(template) = resolved.summary.template.as_ref() else {
         return;
     };
-    let bindings = macro_cycles::scalar_argument_bindings(property);
+    let bindings = dynamic_cycles::scalar_argument_bindings(property);
     let mut walker = DispatchKeyWalker {
         snapshot,
         context: resolved.body_context.clone(),
-        macro_name: row.name.clone(),
+        definition_name: row.name.clone(),
         bindings: &bindings,
         invocation: property,
         diagnostics,
@@ -2015,19 +2009,19 @@ fn validate_dynamic_dispatch_keys(
 struct DispatchKeyWalker<'a> {
     snapshot: &'a AnalysisSnapshot,
     context: String,
-    macro_name: String,
+    definition_name: String,
     bindings: &'a std::collections::BTreeMap<String, String>,
     invocation: &'a ScriptProperty,
     diagnostics: &'a mut Vec<Diagnostic>,
 }
 
 impl DispatchKeyWalker<'_> {
-    fn walk_items(&mut self, items: &[MacroTemplateItem]) {
+    fn walk_items(&mut self, items: &[TemplateItem]) {
         for item in items {
             match item {
-                MacroTemplateItem::Property(property) => {
+                TemplateItem::Property(property) => {
                     self.check_property(property);
-                    if let MacroTemplateValue::Block { items, .. } = &property.value {
+                    if let TemplateValue::Block { items, .. } = &property.value {
                         if self.block_is_argument_list(property) {
                             // A nested dynamic-rule call's block assigns callee
                             // parameters (`helper = { AMOUNT = $X$ }`): its keys
@@ -2037,10 +2031,10 @@ impl DispatchKeyWalker<'_> {
                         self.walk_items(items);
                     }
                 }
-                MacroTemplateItem::Conditional(conditional) => {
+                TemplateItem::Conditional(conditional) => {
                     self.walk_items(&conditional.items);
                 }
-                MacroTemplateItem::BareValue(_) => {}
+                TemplateItem::BareValue(_) => {}
             }
         }
     }
@@ -2050,24 +2044,24 @@ impl DispatchKeyWalker<'_> {
     /// callee names rendered from a fully-bound `$param$` key; an unbound or
     /// partially-rendered key makes the block unknowable, and unknowable
     /// blocks stay silent rather than report against a guessed target.
-    fn block_is_argument_list(&self, property: &MacroTemplateProperty) -> bool {
+    fn block_is_argument_list(&self, property: &TemplateProperty) -> bool {
         let Some(rendered) = self.rendered_key(property) else {
             return true;
         };
         crate::dynamic_rules::dynamic_kind_for_context(self.snapshot, &self.context)
-            .and_then(|kind| resolve_macro_definition(self.snapshot, &kind, &rendered))
+            .and_then(|kind| resolve_dynamic_definition(self.snapshot, &kind, &rendered))
             .is_some()
     }
 
     /// The property key with `$param$` fragments substituted from the
     /// invocation's bindings; `None` when a parameter is unbound or the
     /// rendered result still contains a parameter.
-    fn rendered_key(&self, property: &MacroTemplateProperty) -> Option<String> {
+    fn rendered_key(&self, property: &TemplateProperty) -> Option<String> {
         let mut rendered = String::new();
         for fragment in &property.key.fragments {
             match fragment {
-                MacroTemplateFragment::Literal(literal) => rendered.push_str(literal),
-                MacroTemplateFragment::Parameter { name, .. } => {
+                TemplateFragment::Literal(literal) => rendered.push_str(literal),
+                TemplateFragment::Parameter { name, .. } => {
                     let bound = self.bindings.get(&name.to_ascii_lowercase())?;
                     rendered.push_str(bound);
                 }
@@ -2080,11 +2074,11 @@ impl DispatchKeyWalker<'_> {
         Some(rendered.to_owned())
     }
 
-    fn check_property(&mut self, property: &MacroTemplateProperty) {
+    fn check_property(&mut self, property: &TemplateProperty) {
         let fragments = &property.key.fragments;
         if !fragments
             .iter()
-            .any(|fragment| matches!(fragment, MacroTemplateFragment::Parameter { .. }))
+            .any(|fragment| matches!(fragment, TemplateFragment::Parameter { .. }))
         {
             return;
         }
@@ -2092,8 +2086,8 @@ impl DispatchKeyWalker<'_> {
         let mut last_parameter = None;
         for fragment in fragments {
             match fragment {
-                MacroTemplateFragment::Literal(literal) => rendered.push_str(literal),
-                MacroTemplateFragment::Parameter { name, .. } => {
+                TemplateFragment::Literal(literal) => rendered.push_str(literal),
+                TemplateFragment::Parameter { name, .. } => {
                     let Some(bound) = self.bindings.get(&name.to_ascii_lowercase()) else {
                         // An unbound optional parameter omits or defers the
                         // statement; the rendered key is unknowable.
@@ -2147,33 +2141,33 @@ impl DispatchKeyWalker<'_> {
             value_range,
             format!(
                 "argument `{}` for parameter `{parameter}` of scripted `{}` does not name a known {} key",
-                value, self.macro_name, self.context
+                value, self.definition_name, self.context
             ),
         ));
     }
 }
 
-/// Re-evaluates branch-local optionality from the persisted macro template. Vanilla macro
+/// Re-evaluates branch-local optionality from the persisted dynamic template. Vanilla dynamic
 /// signatures can come from an older index cache whose compact `required` flags predate runtime
 /// `if`/`else` branch awareness; the template remains sufficient to correct that metadata at the
 /// call site without changing the cache schema.
-fn macro_parameter_is_runtime_optional(summary: &MacroDefinitionSummary, name: &str) -> bool {
+fn dynamic_parameter_is_runtime_optional(summary: &DynamicDefinitionSummary, name: &str) -> bool {
     let Some(template) = summary.template.as_ref() else {
         return false;
     };
     template_parameter_runtime_optional(template, name)
 }
 
-fn template_parameter_runtime_optional(template: &MacroTemplate, name: &str) -> bool {
+fn template_parameter_runtime_optional(template: &Template, name: &str) -> bool {
     fn visit_token(
-        token: &MacroTemplateToken,
+        token: &TemplateToken,
         name: &str,
         runtime_guarded: bool,
         seen: &mut bool,
         unguarded: &mut bool,
     ) {
         for fragment in &token.fragments {
-            let MacroTemplateFragment::Parameter {
+            let TemplateFragment::Parameter {
                 name: parameter, ..
             } = fragment
             else {
@@ -2187,7 +2181,7 @@ fn template_parameter_runtime_optional(template: &MacroTemplate, name: &str) -> 
     }
 
     fn visit_items(
-        items: &[MacroTemplateItem],
+        items: &[TemplateItem],
         name: &str,
         runtime_guarded: bool,
         seen: &mut bool,
@@ -2195,14 +2189,14 @@ fn template_parameter_runtime_optional(template: &MacroTemplate, name: &str) -> 
     ) {
         for item in items {
             match item {
-                MacroTemplateItem::Property(property) => {
+                TemplateItem::Property(property) => {
                     let property_guarded = runtime_guarded && !is_limit_property(property);
                     visit_token(&property.key, name, property_guarded, seen, unguarded);
                     match &property.value {
-                        MacroTemplateValue::Scalar(token) => {
+                        TemplateValue::Scalar(token) => {
                             visit_token(token, name, property_guarded, seen, unguarded)
                         }
-                        MacroTemplateValue::Block { items, .. } => visit_items(
+                        TemplateValue::Block { items, .. } => visit_items(
                             items,
                             name,
                             property_guarded || is_runtime_branch_key(&property.key),
@@ -2211,10 +2205,10 @@ fn template_parameter_runtime_optional(template: &MacroTemplate, name: &str) -> 
                         ),
                     }
                 }
-                MacroTemplateItem::BareValue(token) => {
+                TemplateItem::BareValue(token) => {
                     visit_token(token, name, runtime_guarded, seen, unguarded);
                 }
-                MacroTemplateItem::Conditional(conditional) => {
+                TemplateItem::Conditional(conditional) => {
                     visit_items(&conditional.items, name, runtime_guarded, seen, unguarded)
                 }
             }
@@ -2227,15 +2221,15 @@ fn template_parameter_runtime_optional(template: &MacroTemplate, name: &str) -> 
     seen && !unguarded
 }
 
-fn is_limit_property(property: &MacroTemplateProperty) -> bool {
-    let [MacroTemplateFragment::Literal(key)] = property.key.fragments.as_slice() else {
+fn is_limit_property(property: &TemplateProperty) -> bool {
+    let [TemplateFragment::Literal(key)] = property.key.fragments.as_slice() else {
         return false;
     };
     key.trim().eq_ignore_ascii_case("limit")
 }
 
-fn is_runtime_branch_key(key: &MacroTemplateToken) -> bool {
-    let [MacroTemplateFragment::Literal(key)] = key.fragments.as_slice() else {
+fn is_runtime_branch_key(key: &TemplateToken) -> bool {
+    let [TemplateFragment::Literal(key)] = key.fragments.as_slice() else {
         return false;
     };
     matches!(

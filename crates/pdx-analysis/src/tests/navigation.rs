@@ -25,14 +25,15 @@ fn navigation_and_rename_include_references_inside_quoted_script() {
         definitions.join("00_quoted_navigation.txt"),
         "for_variable_amount = { $effect$ }\n",
     )
-    .expect("workspace macro definition");
+    .expect("workspace dynamic definition");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
         SourceRootKind::CurrentMod,
         root.clone(),
     )]));
-    host.refresh_source_roots().expect("scan workspace macro");
+    host.refresh_source_roots()
+        .expect("scan workspace definitions");
     let id = DocumentId::new("file:///tmp/events/quoted-navigation.txt");
     let text = concat!(
         "country_event = { id = quoted_target.1 }\n",
@@ -99,7 +100,7 @@ fn references_find_quoted_script_symbols_in_unopened_workspace_files() {
         scripted_effects.join("00_quoted_navigation.txt"),
         "for_variable_amount = { $effect$ }\n",
     )
-    .expect("workspace macro definition");
+    .expect("workspace dynamic definition");
     let definition_path = events.join("definition.txt");
     let reference_path = events.join("reference.txt");
     let definition_text = "country_event = { id = quoted_disk.1 }\n";
@@ -190,7 +191,7 @@ fn localisation_values_offer_indexed_localisation_symbols() {
 }
 
 #[test]
-fn scripted_macro_calls_resolve_scalar_and_block_forms_with_overlay_priority() {
+fn dynamic_calls_resolve_scalar_and_block_forms_with_overlay_priority() {
     use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use std::fs;
 
@@ -198,7 +199,7 @@ fn scripted_macro_calls_resolve_scalar_and_block_forms_with_overlay_priority() {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-scripted-macro-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-definition-{nonce}"));
     let definitions_dir = root.join("common/scripted_effects");
     let events_dir = root.join("events");
     fs::create_dir_all(&definitions_dir).expect("definitions directory");
@@ -263,7 +264,7 @@ fn scripted_macro_calls_resolve_scalar_and_block_forms_with_overlay_priority() {
         definition(&snapshot, &use_id, scalar_position)[0].document,
         Some(definition_id.clone())
     );
-    let scalar_hover = hover(&snapshot, &use_id, scalar_position).expect("macro signature hover");
+    let scalar_hover = hover(&snapshot, &use_id, scalar_position).expect("dynamic signature hover");
     assert!(scalar_hover.contents.contains("#### Callable signature"));
     assert!(scalar_hover.contents.contains("named parameter block"));
     assert!(
@@ -280,7 +281,7 @@ fn scripted_macro_calls_resolve_scalar_and_block_forms_with_overlay_priority() {
     let invalid_position = u32::try_from(
         invalid_use_text
             .find("overlay_effect = no")
-            .expect("invalid macro call")
+            .expect("invalid dynamic call")
             + 1,
     )
     .expect("invalid position");
@@ -307,7 +308,7 @@ fn scripted_macro_calls_resolve_scalar_and_block_forms_with_overlay_priority() {
     .expect("invalid scalar position");
     assert!(
         definition(&invalid_snapshot, &invalid_use_id, invalid_scalar).is_empty(),
-        "parameterized macros require a named block"
+        "parameterized definitions require a named block"
     );
     assert!(
         diagnostics(&invalid_snapshot, &invalid_use_id)

@@ -1,18 +1,17 @@
-//! Query-local inference of scripted-macro argument value constraints.
+//! Query-local inference of dynamic-definition argument value constraints.
 
 use std::collections::BTreeMap;
 
 use pdx_engine::AnalysisSnapshot;
 use pdx_engine::hir::{
-    MacroTemplateFragment, MacroTemplateItem, MacroTemplateProperty, MacroTemplateToken,
-    MacroTemplateValue,
+    TemplateFragment, TemplateItem, TemplateProperty, TemplateToken, TemplateValue,
 };
 use pdx_rules::{KeyMatcher, RuleShape, ValueMatcher};
 
 use crate::semantic::{
-    MacroDefinitionIdentity, ResolvedMacroDefinition, resolve_macro_definition,
-    scripted_macro_type, semantic_child_scope, semantic_rule_key_matches, semantic_scope_allows,
-    semantic_transition_destination,
+    DynamicDefinitionIdentity, ResolvedDynamicDefinition, dynamic_definition_type,
+    resolve_dynamic_definition, semantic_child_scope, semantic_rule_key_matches,
+    semantic_scope_allows, semantic_transition_destination,
 };
 use crate::support::{ScopeContext, ScriptProperty};
 use crate::types::{CancellationToken, Cancelled};
@@ -22,22 +21,22 @@ use super::{
 };
 
 #[derive(Clone, Debug)]
-pub(crate) struct MacroValueConstraintSite {
+pub(crate) struct DynamicValueConstraintSite {
     pub(crate) matchers: Vec<ValueMatcher>,
     pub(crate) scope: ScopeContext,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct MacroQuotedScriptConstraintSite {
+pub(crate) struct DynamicQuotedScriptConstraintSite {
     pub(crate) context: String,
     pub(crate) parent_path: Vec<std::sync::Arc<str>>,
     pub(crate) scope: ScopeContext,
 }
 
 #[derive(Clone, Debug, Default)]
-struct MacroArgumentConstraints {
-    values: Vec<MacroValueConstraintSite>,
-    quoted_scripts: Vec<MacroQuotedScriptConstraintSite>,
+struct DynamicArgumentConstraints {
+    values: Vec<DynamicValueConstraintSite>,
+    quoted_scripts: Vec<DynamicQuotedScriptConstraintSite>,
 }
 
 #[derive(Clone, Debug)]
@@ -66,58 +65,58 @@ struct SymbolicProperty {
     value: SymbolicValue,
 }
 
-pub(crate) fn infer_macro_value_constraints(
+pub(crate) fn infer_dynamic_value_constraints(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
     target: &ScriptProperty,
     cancellation: &CancellationToken,
-) -> Result<Vec<MacroValueConstraintSite>, Cancelled> {
-    infer_macro_argument_constraints(snapshot, context, target, cancellation)
+) -> Result<Vec<DynamicValueConstraintSite>, Cancelled> {
+    infer_dynamic_argument_constraints(snapshot, context, target, cancellation)
         .map(|constraints| constraints.values)
 }
 
-pub(crate) fn infer_macro_quoted_script_constraints(
+pub(crate) fn infer_dynamic_quoted_script_constraints(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
     target: &ScriptProperty,
     cancellation: &CancellationToken,
-) -> Result<Vec<MacroQuotedScriptConstraintSite>, Cancelled> {
-    infer_macro_argument_constraints(snapshot, context, target, cancellation)
+) -> Result<Vec<DynamicQuotedScriptConstraintSite>, Cancelled> {
+    infer_dynamic_argument_constraints(snapshot, context, target, cancellation)
         .map(|constraints| constraints.quoted_scripts)
 }
 
-fn infer_macro_argument_constraints(
+fn infer_dynamic_argument_constraints(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
     target: &ScriptProperty,
     cancellation: &CancellationToken,
-) -> Result<MacroArgumentConstraints, Cancelled> {
+) -> Result<DynamicArgumentConstraints, Cancelled> {
     let Some(invocation) = context.container_property.as_ref() else {
-        return Ok(MacroArgumentConstraints::default());
+        return Ok(DynamicArgumentConstraints::default());
     };
     let Some((owner_kind, owner_name, caller_scope)) =
-        macro_parameter_owner(snapshot, context, target, invocation)
+        dynamic_parameter_owner(snapshot, context, target, invocation)
     else {
-        return Ok(MacroArgumentConstraints::default());
+        return Ok(DynamicArgumentConstraints::default());
     };
-    let Some(resolved) = resolve_macro_definition(snapshot, &owner_kind, &owner_name) else {
-        return Ok(MacroArgumentConstraints::default());
+    let Some(resolved) = resolve_dynamic_definition(snapshot, &owner_kind, &owner_name) else {
+        return Ok(DynamicArgumentConstraints::default());
     };
     let Some(template) = resolved.summary.template.clone() else {
-        return Ok(MacroArgumentConstraints::default());
+        return Ok(DynamicArgumentConstraints::default());
     };
     let bindings = invocation_bindings(invocation, Some(target));
     let mut collector = ConstraintCollector::new(snapshot, cancellation);
     if !collector.budget.enter(&resolved) {
-        return Ok(MacroArgumentConstraints::default());
+        return Ok(DynamicArgumentConstraints::default());
     }
     let result = (|| {
         let container = collector.instantiate_items(&template.items, &bindings)?;
         collector.collect_container(&container, &resolved.body_context, &[], &caller_scope)?;
         Ok(if collector.exhausted {
-            MacroArgumentConstraints::default()
+            DynamicArgumentConstraints::default()
         } else {
-            MacroArgumentConstraints {
+            DynamicArgumentConstraints {
                 values: collector.value_sites.clone(),
                 quoted_scripts: collector.quoted_script_sites.clone(),
             }
@@ -127,7 +126,7 @@ fn infer_macro_argument_constraints(
     result
 }
 
-fn macro_parameter_owner(
+fn dynamic_parameter_owner(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
     target: &ScriptProperty,
@@ -156,7 +155,7 @@ fn macro_parameter_owner(
                 .last()?
                 .strip_prefix('<')?
                 .strip_suffix('>')?;
-            if !scripted_macro_type(snapshot, owner_kind) {
+            if !dynamic_definition_type(snapshot, owner_kind) {
                 return None;
             }
             let owner_name = candidate.parent_path.last()?;
@@ -194,8 +193,8 @@ struct ConstraintCollector<'a> {
     cancellation: &'a CancellationToken,
     budget: SymbolicBudget,
     exhausted: bool,
-    value_sites: Vec<MacroValueConstraintSite>,
-    quoted_script_sites: Vec<MacroQuotedScriptConstraintSite>,
+    value_sites: Vec<DynamicValueConstraintSite>,
+    quoted_script_sites: Vec<DynamicQuotedScriptConstraintSite>,
 }
 
 impl<'a> ConstraintCollector<'a> {
@@ -212,7 +211,7 @@ impl<'a> ConstraintCollector<'a> {
 
     fn instantiate_items(
         &mut self,
-        items: &[MacroTemplateItem],
+        items: &[TemplateItem],
         bindings: &BTreeMap<String, SymbolicToken>,
     ) -> Result<SymbolicContainer, Cancelled> {
         let mut container = SymbolicContainer::default();
@@ -222,17 +221,17 @@ impl<'a> ConstraintCollector<'a> {
                 break;
             }
             match item {
-                MacroTemplateItem::Property(property) => {
+                TemplateItem::Property(property) => {
                     container
                         .properties
                         .push(self.instantiate_property(property, bindings)?);
                 }
-                MacroTemplateItem::BareValue(token) => {
+                TemplateItem::BareValue(token) => {
                     container
                         .bare_values
                         .push(self.render_token(token, bindings));
                 }
-                MacroTemplateItem::Conditional(conditional) => {
+                TemplateItem::Conditional(conditional) => {
                     let supplied = bindings.contains_key(&conditional.name.to_ascii_lowercase());
                     if supplied != conditional.negated {
                         let nested = self.instantiate_items(&conditional.items, bindings)?;
@@ -247,15 +246,15 @@ impl<'a> ConstraintCollector<'a> {
 
     fn instantiate_property(
         &mut self,
-        property: &MacroTemplateProperty,
+        property: &TemplateProperty,
         bindings: &BTreeMap<String, SymbolicToken>,
     ) -> Result<SymbolicProperty, Cancelled> {
         let key = self.render_token(&property.key, bindings);
         let value = match &property.value {
-            MacroTemplateValue::Scalar(token) => {
+            TemplateValue::Scalar(token) => {
                 SymbolicValue::Scalar(self.render_token(token, bindings))
             }
-            MacroTemplateValue::Block { items, .. } => {
+            TemplateValue::Block { items, .. } => {
                 SymbolicValue::Block(self.instantiate_items(items, bindings)?)
             }
         };
@@ -268,10 +267,10 @@ impl<'a> ConstraintCollector<'a> {
 
     fn render_token(
         &mut self,
-        token: &MacroTemplateToken,
+        token: &TemplateToken,
         bindings: &BTreeMap<String, SymbolicToken>,
     ) -> SymbolicToken {
-        if let [MacroTemplateFragment::Parameter { name, .. }] = token.fragments.as_slice() {
+        if let [TemplateFragment::Parameter { name, .. }] = token.fragments.as_slice() {
             let rendered = bindings
                 .get(&name.to_ascii_lowercase())
                 .cloned()
@@ -287,8 +286,8 @@ impl<'a> ConstraintCollector<'a> {
         let mut value = String::new();
         for fragment in &token.fragments {
             match fragment {
-                MacroTemplateFragment::Literal(literal) => value.push_str(literal),
-                MacroTemplateFragment::Parameter { name, .. } => {
+                TemplateFragment::Literal(literal) => value.push_str(literal),
+                TemplateFragment::Parameter { name, .. } => {
                     let Some(SymbolicToken::Concrete(argument)) =
                         bindings.get(&name.to_ascii_lowercase())
                     else {
@@ -321,7 +320,7 @@ impl<'a> ConstraintCollector<'a> {
             .iter()
             .any(|value| matches!(value, SymbolicToken::Target))
         {
-            let site = MacroQuotedScriptConstraintSite {
+            let site = DynamicQuotedScriptConstraintSite {
                 context: context.to_owned(),
                 parent_path: parent_path.to_vec(),
                 scope: scope.clone(),
@@ -347,7 +346,7 @@ impl<'a> ConstraintCollector<'a> {
                 .iter()
                 .copied()
                 .filter(|rule| {
-                    // Leaf-value rules participate so a macro parameter inside a leaf-value
+                    // Leaf-value rules participate so a dynamic parameter inside a leaf-value
                     // container (for example `required_missions = { $MISSION$ }`) inherits the
                     // container's value-type constraint.
                     semantic_rule_key_matches(self.snapshot, rule, parent_path, key)
@@ -366,14 +365,14 @@ impl<'a> ConstraintCollector<'a> {
                     matchers.sort_by_key(|matcher| format!("{matcher:?}"));
                     matchers.dedup();
                     if !matchers.is_empty() {
-                        self.value_sites.push(MacroValueConstraintSite {
+                        self.value_sites.push(DynamicValueConstraintSite {
                             matchers,
                             scope: scope.clone(),
                         });
                     }
                 }
                 SymbolicValue::Block(children) => {
-                    if self.follow_nested_macro(key, children, &matching, scope)? {
+                    if self.follow_nested_dynamic(key, children, &matching, scope)? {
                         continue;
                     }
                     let transparent_wrapper = context.eq_ignore_ascii_case("trigger")
@@ -432,7 +431,7 @@ impl<'a> ConstraintCollector<'a> {
         Ok(())
     }
 
-    fn follow_nested_macro(
+    fn follow_nested_dynamic(
         &mut self,
         key: &str,
         arguments: &SymbolicContainer,
@@ -441,7 +440,7 @@ impl<'a> ConstraintCollector<'a> {
     ) -> Result<bool, Cancelled> {
         let Some(type_name) = matching.iter().find_map(|rule| match &rule.key {
             KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
-                if scripted_macro_type(self.snapshot, type_name) =>
+                if dynamic_definition_type(self.snapshot, type_name) =>
             {
                 Some(type_name.as_str())
             }
@@ -449,7 +448,7 @@ impl<'a> ConstraintCollector<'a> {
         }) else {
             return Ok(false);
         };
-        let Some(resolved) = resolve_macro_definition(self.snapshot, type_name, key) else {
+        let Some(resolved) = resolve_dynamic_definition(self.snapshot, type_name, key) else {
             if symbolic_container_contains_target(arguments) {
                 self.exhausted = true;
             }
@@ -494,13 +493,13 @@ impl<'a> ConstraintCollector<'a> {
 /// workspace can be diagnosed without a new build.
 #[derive(Debug, Default)]
 struct SymbolicBudget {
-    stack: Vec<MacroDefinitionIdentity>,
+    stack: Vec<DynamicDefinitionIdentity>,
     nodes: usize,
     token_bytes: usize,
 }
 
 impl SymbolicBudget {
-    fn enter(&mut self, resolved: &ResolvedMacroDefinition) -> bool {
+    fn enter(&mut self, resolved: &ResolvedDynamicDefinition) -> bool {
         if self.stack.contains(&resolved.identity) || self.stack.len() >= max_symbolic_depth() {
             return false;
         }
@@ -525,19 +524,19 @@ impl SymbolicBudget {
 
 fn max_symbolic_depth() -> usize {
     static VALUE: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
-    *VALUE.get_or_init(|| env_budget("PDX_MACRO_EXPANSION_DEPTH", 32, 1, 1024))
+    *VALUE.get_or_init(|| env_budget("PDX_DYNAMIC_DEPTH", 32, 1, 1024))
 }
 
 fn max_symbolic_nodes() -> usize {
     static VALUE: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
-    *VALUE.get_or_init(|| env_budget("PDX_MACRO_EXPANDED_NODES", 200_000, 1, 100_000_000))
+    *VALUE.get_or_init(|| env_budget("PDX_DYNAMIC_NODES", 200_000, 1, 100_000_000))
 }
 
 fn max_symbolic_token_bytes() -> usize {
     static VALUE: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
     *VALUE.get_or_init(|| {
         env_budget(
-            "PDX_MACRO_EXPANDED_TOKEN_BYTES",
+            "PDX_DYNAMIC_TOKEN_BYTES",
             4 * 1024 * 1024,
             1,
             u64::MAX as usize,

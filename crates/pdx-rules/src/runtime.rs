@@ -111,11 +111,11 @@ pub struct RuleSet {
     /// Root-context selection probes this per descriptor during lowering; building the
     /// `root:<name>` string and scanning rules per probe dominated context resolution.
     pub(crate) root_context_types: FxHashSet<Box<str>>,
-    /// Lowercased type name -> trimmed scripted-macro body context for enabled macros.
+    /// Lowercased type name -> trimmed dynamic-definition body context for enabled dynamic definitions.
     ///
-    /// Macro-shape probes run per property during validation; the previous linear scan over
+    /// Dynamic-shape probes run per property during validation; the previous linear scan over
     /// type descriptors (plus a trimmed clone per hit) is now a single map probe.
-    pub(crate) scripted_macro_contexts: FxHashMap<Box<str>, Option<Box<str>>>,
+    pub(crate) dynamic_definition_contexts: FxHashMap<Box<str>, Option<Box<str>>>,
     /// Whether each rule's context is `effect` or `trigger`, precomputed once so scope
     /// link resolution stops re-lowercasing rule contexts per lookup.
     pub(crate) effect_trigger_contexts: Vec<bool>,
@@ -153,7 +153,7 @@ impl RuleSet {
             semantic_exact_rules_by_context_key: FxHashMap::default(),
             semantic_non_exact_rules_by_context: FxHashMap::default(),
             root_context_types: FxHashSet::default(),
-            scripted_macro_contexts: FxHashMap::default(),
+            dynamic_definition_contexts: FxHashMap::default(),
             effect_trigger_contexts: Vec::new(),
             dynamic_write_keys: FxHashMap::default(),
         }
@@ -208,15 +208,15 @@ impl RuleSet {
             FxHashMap::<Box<str>, FxHashMap<Box<str>, Vec<usize>>>::default();
         let mut semantic_non_exact_rules_by_context = FxHashMap::<Box<str>, Vec<usize>>::default();
         let mut root_context_types = FxHashSet::<Box<str>>::default();
-        let mut scripted_macro_contexts = FxHashMap::<Box<str>, Option<Box<str>>>::default();
+        let mut dynamic_definition_contexts = FxHashMap::<Box<str>, Option<Box<str>>>::default();
         for (type_name, descriptor) in &model.semantic.type_descriptors {
             let context = descriptor
-                .scripted_macro
+                .dynamic_definition
                 .as_ref()
-                .filter(|descriptor| descriptor.macro_enabled)
+                .filter(|descriptor| descriptor.enabled)
                 .map(|descriptor| Box::from(descriptor.body_context.trim()));
             if context.is_some() {
-                scripted_macro_contexts
+                dynamic_definition_contexts
                     .insert(type_name.to_ascii_lowercase().into_boxed_str(), context);
             }
         }
@@ -277,7 +277,7 @@ impl RuleSet {
             semantic_exact_rules_by_context_key,
             semantic_non_exact_rules_by_context,
             root_context_types,
-            scripted_macro_contexts,
+            dynamic_definition_contexts,
             effect_trigger_contexts,
             dynamic_write_keys,
         }
@@ -412,14 +412,14 @@ impl RuleSet {
         self.root_context_types.contains(type_name.as_ref())
     }
 
-    /// Returns the trimmed body context of a type's enabled scripted macro, if any.
+    /// Returns the trimmed body context of a type's enabled dynamic definition, if any.
     ///
-    /// The result may be an empty string (macro enabled but blank context); callers keep
+    /// The result may be an empty string (enabled but blank context); callers keep
     /// their own emptiness handling. Equivalent to scanning `type_descriptors` for a
-    /// case-insensitive name match with an enabled `scripted_macro`.
-    pub fn scripted_macro_context(&self, type_name: &str) -> Option<&str> {
+    /// case-insensitive name match with an enabled `dynamic_definition`.
+    pub fn dynamic_definition_context(&self, type_name: &str) -> Option<&str> {
         let type_name = normalized_ascii_query(type_name);
-        self.scripted_macro_contexts
+        self.dynamic_definition_contexts
             .get(type_name.as_ref())
             .and_then(|context| context.as_deref())
     }

@@ -16,10 +16,10 @@ mod sqlite;
 pub use canonical::RuleHash;
 pub use matcher::{FileMatcher, KeyMatcher, ValueMatcher};
 pub use model::{
-    FileCategory, FileResolutionPolicy, LocalisationBinding, LocalisationBindingCondition,
-    ParserKind, RuleRecord, RuleShape, RulesModel, ScriptedMacroDescriptor, ScriptedMacroUsage,
-    SemanticModel, SemanticRule, SymbolDescriptor, SymbolResolutionPolicy, TypeDescriptor,
-    TypeRootScope,
+    DynamicDefinitionDescriptor, DynamicDefinitionUsage, FileCategory, FileResolutionPolicy,
+    LocalisationBinding, LocalisationBindingCondition, ParserKind, RuleRecord, RuleShape,
+    RulesModel, SemanticModel, SemanticRule, SymbolDescriptor, SymbolResolutionPolicy,
+    TypeDescriptor, TypeRootScope,
 };
 pub use profile::{
     GameProfile, ProfileConditionalDefinitionRule, ProfileContainerDefinitionRule,
@@ -31,7 +31,7 @@ pub use profile::{
 pub use runtime::{RuleSet, RulesError};
 
 /// The first runtime schema version reserved for the generated rule database.
-pub const CURRENT_SCHEMA_VERSION: u32 = 24;
+pub const CURRENT_SCHEMA_VERSION: u32 = 25;
 
 #[cfg(test)]
 mod tests;

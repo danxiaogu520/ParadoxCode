@@ -10,8 +10,8 @@ use rusqlite::{Connection, OpenFlags, OptionalExtension};
 
 use crate::hir::DefinitionAttributes;
 use crate::index::{
-    Definition, FileIndexShard, FlagWrite, LocalisationPreviewMap, MacroDefinitionSummary,
-    MacroParameterSignature, PositionMap, Reference, WorkspaceIndex,
+    Definition, DynamicDefinitionSummary, DynamicParameterSignature, FileIndexShard, FlagWrite,
+    LocalisationPreviewMap, PositionMap, Reference, WorkspaceIndex,
 };
 use crate::model::LocalisationPreview;
 use crate::scan::stable_file_id;
@@ -37,9 +37,9 @@ const TABLE_LIMITS: [(&str, usize, &str); 8] = [
     ),
     ("definitions", MAX_CACHE_SYMBOLS, "kind, name"),
     ("symbol_references", MAX_CACHE_SYMBOLS, "kind, name"),
-    ("macro_definitions", MAX_CACHE_SYMBOLS, "kind, name"),
+    ("dynamic_definitions", MAX_CACHE_SYMBOLS, "kind, name"),
     ("definition_attributes", MAX_CACHE_SYMBOLS, "kind, name"),
-    ("macro_parameters", MAX_CACHE_SYMBOLS, "name"),
+    ("dynamic_parameters", MAX_CACHE_SYMBOLS, "name"),
     // Position payloads have their own byte budget below; the row count is per file.
     ("navigation_positions", MAX_CACHE_FILES, ""),
     (
@@ -130,8 +130,8 @@ fn load_connection(
         files,
         definitions,
         references,
-        macros,
-        macro_parameters,
+        dynamic_definitions,
+        dynamic_parameters,
         definition_attributes,
         positions,
         previews,
@@ -139,8 +139,8 @@ fn load_connection(
     let total = files
         + definitions
         + references
-        + macros
-        + macro_parameters
+        + dynamic_definitions
+        + dynamic_parameters
         + definition_attributes
         + positions
         + previews
@@ -320,16 +320,16 @@ fn validate_table_limits(connection: &Connection) -> Result<[usize; 8], IndexCac
         }
     }
     let max_template = connection.query_row(
-        "SELECT COALESCE(MAX(length(template_payload)), 0) FROM macro_definitions",
+        "SELECT COALESCE(MAX(length(template_payload)), 0) FROM dynamic_definitions",
         [],
         |row| row.get::<_, i64>(0),
     )?;
     if max_template < 0
-        || usize::try_from(max_template).map_or(true, |max| max > super::MAX_MACRO_TEMPLATE_BYTES)
+        || usize::try_from(max_template).map_or(true, |max| max > super::MAX_TEMPLATE_BYTES)
     {
         return Err(IndexCacheError::LimitExceeded(
-            "macro template byte",
-            super::MAX_MACRO_TEMPLATE_BYTES,
+            "dynamic template byte",
+            super::MAX_TEMPLATE_BYTES,
         ));
     }
     let max_position_payload = connection.query_row(
@@ -445,7 +445,7 @@ fn load_index(
                 file_id: id,
                 definitions: Vec::new(),
                 references: Vec::new(),
-                macro_definitions: Vec::new(),
+                dynamic_definitions: Vec::new(),
                 definition_attributes: Vec::new(),
                 flag_writes: Vec::new(),
                 syntax_error_count,
@@ -455,8 +455,8 @@ fn load_index(
     progress.report(source_files.len());
     let definition_count = load_definitions(connection, &mut shards)?;
     progress.report(definition_count);
-    let macro_count = load_macro_definitions(connection, &mut shards)?;
-    progress.report(macro_count);
+    let dynamic_count = load_dynamic_definitions(connection, &mut shards)?;
+    progress.report(dynamic_count);
     let attribute_count = load_definition_attributes(connection, &mut shards)?;
     progress.report(attribute_count);
     let reference_count = load_references(connection, &mut shards)?;
@@ -510,7 +510,7 @@ fn load_index(
         if let Some(shard) = std::sync::Arc::get_mut(shard) {
             shard.definitions.shrink_to_fit();
             shard.references.shrink_to_fit();
-            shard.macro_definitions.shrink_to_fit();
+            shard.dynamic_definitions.shrink_to_fit();
             shard.definition_attributes.shrink_to_fit();
         }
     }
@@ -607,14 +607,14 @@ fn load_definition_attributes(
     Ok(rows_loaded)
 }
 
-fn load_macro_definitions(
+fn load_dynamic_definitions(
     connection: &Connection,
     shards: &mut BTreeMap<SourceFileId, Arc<FileIndexShard>>,
 ) -> Result<usize, IndexCacheError> {
     let mut rows_loaded = 0usize;
     let mut statement = connection.prepare(
         "SELECT file_id, ordinal, kind, name, definition_range_start, definition_range_end, template_payload
-         FROM macro_definitions ORDER BY file_id, ordinal",
+         FROM dynamic_definitions ORDER BY file_id, ordinal",
     )?;
     let rows = statement.query_map([], |row| {
         Ok((
@@ -631,26 +631,26 @@ fn load_macro_definitions(
         let (file_id, ordinal, kind, name, start, end, template_payload) = row?;
         let file_id = decode_file_id(&file_id)?;
         let ordinal = usize::try_from(ordinal)
-            .map_err(|_| IndexCacheError::InvalidData("negative macro ordinal".to_owned()))?;
+            .map_err(|_| IndexCacheError::InvalidData("negative dynamic ordinal".to_owned()))?;
         let definition_range = decode_range(start, end)?;
         let shard = shards.get_mut(&file_id).map(Arc::make_mut).ok_or_else(|| {
             IndexCacheError::InvalidData(format!(
-                "macro definition references unknown file {}",
+                "dynamic definition references unknown file {}",
                 file_id.get()
             ))
         })?;
-        if ordinal != shard.macro_definitions.len() {
+        if ordinal != shard.dynamic_definitions.len() {
             return Err(IndexCacheError::InvalidData(
-                "macro definition ordinals are not contiguous".to_owned(),
+                "dynamic definition ordinals are not contiguous".to_owned(),
             ));
         }
-        if shard.macro_definitions.iter().any(|summary| {
+        if shard.dynamic_definitions.iter().any(|summary| {
             summary.kind.eq_ignore_ascii_case(&kind)
                 && summary.name.eq_ignore_ascii_case(&name)
                 && summary.definition_range == definition_range
         }) {
             return Err(IndexCacheError::InvalidData(format!(
-                "duplicate macro summary {kind} `{name}`"
+                "duplicate dynamic definition summary {kind} `{name}`"
             )));
         }
         if !shard.definitions.iter().any(|definition| {
@@ -659,14 +659,14 @@ fn load_macro_definitions(
                 && definition.range == definition_range
         }) {
             return Err(IndexCacheError::InvalidData(format!(
-                "macro summary {kind} `{name}` has no matching definition"
+                "dynamic definition summary {kind} `{name}` has no matching definition"
             )));
         }
         let template = template_payload
             .as_deref()
             .map(|payload| template_codec::decode(payload, &kind, &name, definition_range))
             .transpose()?;
-        shard.macro_definitions.push(MacroDefinitionSummary {
+        shard.dynamic_definitions.push(DynamicDefinitionSummary {
             kind,
             name,
             definition_range,
@@ -678,8 +678,8 @@ fn load_macro_definitions(
     drop(statement);
 
     let mut statement = connection.prepare(
-        "SELECT file_id, macro_ordinal, ordinal, name, required
-         FROM macro_parameters ORDER BY file_id, macro_ordinal, ordinal",
+        "SELECT file_id, dynamic_ordinal, ordinal, name, required
+         FROM dynamic_parameters ORDER BY file_id, dynamic_ordinal, ordinal",
     )?;
     let rows = statement.query_map([], |row| {
         Ok((
@@ -691,19 +691,19 @@ fn load_macro_definitions(
         ))
     })?;
     for row in rows {
-        let (file_id, macro_ordinal, ordinal, name, required) = row?;
+        let (file_id, dynamic_ordinal, ordinal, name, required) = row?;
         let file_id = decode_file_id(&file_id)?;
-        let macro_ordinal = usize::try_from(macro_ordinal)
-            .map_err(|_| IndexCacheError::InvalidData("negative macro ordinal".to_owned()))?;
+        let dynamic_ordinal = usize::try_from(dynamic_ordinal)
+            .map_err(|_| IndexCacheError::InvalidData("negative dynamic ordinal".to_owned()))?;
         let ordinal = usize::try_from(ordinal).map_err(|_| {
-            IndexCacheError::InvalidData("negative macro parameter ordinal".to_owned())
+            IndexCacheError::InvalidData("negative dynamic parameter ordinal".to_owned())
         })?;
         let required = match required {
             0 => false,
             1 => true,
             _ => {
                 return Err(IndexCacheError::InvalidData(
-                    "macro parameter required flag is not boolean".to_owned(),
+                    "dynamic parameter required flag is not boolean".to_owned(),
                 ));
             }
         };
@@ -711,15 +711,15 @@ fn load_macro_definitions(
             .get_mut(&file_id)
             .and_then(|shard| {
                 Arc::make_mut(shard)
-                    .macro_definitions
-                    .get_mut(macro_ordinal)
+                    .dynamic_definitions
+                    .get_mut(dynamic_ordinal)
             })
             .ok_or_else(|| {
-                IndexCacheError::InvalidData("macro parameter has no owner".to_owned())
+                IndexCacheError::InvalidData("dynamic parameter has no owner".to_owned())
             })?;
         if ordinal != summary.parameters.len() {
             return Err(IndexCacheError::InvalidData(
-                "macro parameter ordinals are not contiguous".to_owned(),
+                "dynamic parameter ordinals are not contiguous".to_owned(),
             ));
         }
         if name.is_empty()
@@ -729,12 +729,12 @@ fn load_macro_definitions(
                 .any(|parameter| parameter.name.eq_ignore_ascii_case(&name))
         {
             return Err(IndexCacheError::InvalidData(
-                "macro parameter name is empty or duplicated".to_owned(),
+                "dynamic parameter name is empty or duplicated".to_owned(),
             ));
         }
         summary
             .parameters
-            .push(MacroParameterSignature { name, required });
+            .push(DynamicParameterSignature { name, required });
         rows_loaded = rows_loaded.saturating_add(1);
     }
     Ok(rows_loaded)

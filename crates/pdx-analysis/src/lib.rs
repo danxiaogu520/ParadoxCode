@@ -5,13 +5,13 @@
 
 mod completion;
 mod diagnostics;
+mod dynamic_contracts;
+mod dynamic_cycles;
 mod dynamic_rules;
 mod hover;
 mod inlay;
 mod lints;
 mod localisation;
-mod macro_contracts;
-mod macro_cycles;
 mod modifier_scope;
 mod navigation;
 mod quick_fix;

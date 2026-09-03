@@ -121,7 +121,7 @@ fn lower_shared_impl(
         rules,
         profile,
     );
-    let macro_templates = templates::lower_macro_templates(
+    let dynamic_templates = templates::lower_dynamic_templates(
         &syntax,
         &definitions,
         &parameter_conditionals,
@@ -141,7 +141,7 @@ fn lower_shared_impl(
         parameter_conditionals,
         parameter_definitions,
         parameter_references,
-        macro_templates,
+        dynamic_templates,
         definition_attributes,
     }
 }

@@ -45,25 +45,26 @@ fn previous_cache_schema_is_rejected_before_table_loading() {
 }
 
 #[test]
-fn vanilla_cache_preserves_scripted_macro_references_without_hir() {
+fn vanilla_cache_preserves_dynamic_definition_references_without_hir() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
     let root = std::env::temp_dir().join(format!("pdx-engine-vanilla-scripted-cache-{nonce}"));
     let vanilla = root.join("vanilla");
-    fs::create_dir_all(vanilla.join("common/scripted_effects")).expect("macro directory");
+    fs::create_dir_all(vanilla.join("common/scripted_effects"))
+        .expect("scripted effects directory");
     fs::create_dir_all(vanilla.join("events")).expect("event directory");
     fs::write(
         vanilla.join("common/scripted_effects/defs.txt"),
         "cached_effect = { value = $amount$ [[optional] value = $optional$ ] }\n",
     )
-    .expect("macro definitions");
+    .expect("dynamic definitions");
     fs::write(
         vanilla.join("events/use.txt"),
         "country_event = { immediate = { cached_effect = { amount = 1 } } }\n",
     )
-    .expect("macro call");
+    .expect("dynamic call");
 
     let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
     let mut host = AnalysisHost::with_profile(rules, pdx_game::eu4::profile());
@@ -86,20 +87,20 @@ fn vanilla_cache_preserves_scripted_macro_references_without_hir() {
     }));
     let signature = snapshot
         .index()
-        .active_macro_definition("scripted_effect", "cached_effect")
+        .active_dynamic_definition("scripted_effect", "cached_effect")
         .expect("signature before caching");
     assert!(
         signature.template.is_some(),
-        "live index omitted macro template"
+        "live index omitted dynamic template"
     );
     assert_eq!(
         signature.parameters,
         vec![
-            MacroParameterSignature {
+            DynamicParameterSignature {
                 name: "amount".to_owned(),
                 required: true,
             },
-            MacroParameterSignature {
+            DynamicParameterSignature {
                 name: "optional".to_owned(),
                 required: false,
             },
@@ -116,14 +117,14 @@ fn vanilla_cache_preserves_scripted_macro_references_without_hir() {
     assert_eq!(
         loaded
             .index()
-            .active_macro_definition("scripted_effect", "cached_effect")
+            .active_dynamic_definition("scripted_effect", "cached_effect")
             .expect("signature after caching"),
         signature
     );
     let connection = rusqlite::Connection::open(&cache_path).expect("open cache for corruption");
     connection
         .execute(
-            "UPDATE macro_definitions SET template_payload = ?1 WHERE name = ?2",
+            "UPDATE dynamic_definitions SET template_payload = ?1 WHERE name = ?2",
             rusqlite::params![b"{}".as_slice(), "cached_effect"],
         )
         .expect("corrupt template payload");
@@ -233,7 +234,8 @@ fn refreshed_cache_reindexes_changed_files_and_drops_deleted_ones() {
     let root = std::env::temp_dir().join(format!("pdx-engine-refresh-cache-{nonce}"));
     let vanilla = root.join("vanilla");
     fs::create_dir_all(vanilla.join("events")).expect("event directory");
-    fs::create_dir_all(vanilla.join("common/scripted_effects")).expect("macro directory");
+    fs::create_dir_all(vanilla.join("common/scripted_effects"))
+        .expect("scripted effects directory");
     fs::write(
         vanilla.join("events/a.txt"),
         "country_event = { id = refresh.1 }\n",
@@ -248,7 +250,7 @@ fn refreshed_cache_reindexes_changed_files_and_drops_deleted_ones() {
         vanilla.join("common/scripted_effects/effect.txt"),
         "refresh_effect = { value = $amount$ }\n",
     )
-    .expect("macro fixture");
+    .expect("definition fixture");
 
     let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
     let mut host = AnalysisHost::with_profile(rules.clone(), pdx_game::eu4::profile());
@@ -318,9 +320,9 @@ fn refreshed_cache_reindexes_changed_files_and_drops_deleted_ones() {
     assert!(
         reloaded
             .index()
-            .active_macro_definition("scripted_effect", "refresh_effect")
+            .active_dynamic_definition("scripted_effect", "refresh_effect")
             .is_some(),
-        "unchanged macro definition must survive the refresh"
+        "unchanged dynamic definition must survive the refresh"
     );
     // The unchanged file keeps its identity and fingerprint.
     let unchanged = reloaded
@@ -767,13 +769,14 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
         .as_nanos();
     let root = std::env::temp_dir().join(format!("pdx-engine-dependency-cache-{nonce}"));
     let dependency = root.join("dependency");
-    fs::create_dir_all(dependency.join("common/scripted_effects")).expect("macro directory");
+    fs::create_dir_all(dependency.join("common/scripted_effects"))
+        .expect("scripted effects directory");
     fs::create_dir_all(dependency.join("events")).expect("event directory");
     fs::write(
         dependency.join("common/scripted_effects/dep_effects.txt"),
         "dep_cached_effect = { value = $amount$ }\n",
     )
-    .expect("macro definitions");
+    .expect("dynamic definitions");
     fs::write(
         dependency.join("events/dep_events.txt"),
         "country_event = { id = dep.1 immediate = { dep_cached_effect = { amount = 1 } } }\n",
@@ -832,11 +835,11 @@ fn dependency_index_cache_installs_into_a_configured_root_without_rescanning() {
     assert!(snapshot.index().references_iter().any(|reference| {
         &*reference.kind == "scripted_effect" && &*reference.name == "dep_cached_effect"
     }));
-    let macro_after_install = snapshot
+    let dynamic_after_install = snapshot
         .index()
-        .active_macro_definition("scripted_effect", "dep_cached_effect")
-        .expect("cached dependency macro remains active");
-    assert!(macro_after_install.template.is_some());
+        .active_dynamic_definition("scripted_effect", "dep_cached_effect")
+        .expect("cached dependency definition remains active");
+    assert!(dynamic_after_install.template.is_some());
     let kinds = snapshot
         .index()
         .references_iter()

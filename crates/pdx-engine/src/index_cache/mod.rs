@@ -30,7 +30,7 @@ mod write;
 /// by the old encoding-recovery sanitizer, which could expose braces from malformed comments as
 /// active syntax. Older caches are rebuilt once by the CLI or LSP, the same way a rules update
 /// triggers a rebuild; no legacy reader is retained.
-pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 12;
+pub const CURRENT_CACHE_SCHEMA_VERSION: u32 = 13;
 
 /// Oldest on-disk cache schema this executable can still load.
 pub const MIN_SUPPORTED_CACHE_SCHEMA_VERSION: u32 = CURRENT_CACHE_SCHEMA_VERSION;
@@ -40,8 +40,8 @@ const MAX_CACHE_BYTES: u64 = 1024 * 1024 * 1024;
 const MAX_CACHE_FILES: usize = 100_000;
 const MAX_CACHE_SYMBOLS: usize = 5_000_000;
 const MAX_TEXT_FIELD_BYTES: usize = 1024 * 1024;
-const MAX_MACRO_TEMPLATE_BYTES: usize = 16 * 1024 * 1024;
-const MAX_MACRO_TEMPLATE_NODES: usize = 1_000_000;
+const MAX_TEMPLATE_BYTES: usize = 16 * 1024 * 1024;
+const MAX_TEMPLATE_NODES: usize = 1_000_000;
 /// One file can hold at most this many encoded navigation position bytes.
 const MAX_POSITION_PAYLOAD_BYTES: u64 = 256 * 1024 * 1024;
 /// Free pages are reclaimed from databases only when they hold at least this many bytes and
@@ -148,13 +148,13 @@ impl IndexCache {
                 .index()
                 .shards
                 .values()
-                .map(|shard| shard.macro_definitions.len())
+                .map(|shard| shard.dynamic_definitions.len())
                 .sum::<usize>(),
             snapshot
                 .index()
                 .shards
                 .values()
-                .flat_map(|shard| shard.macro_definitions.iter())
+                .flat_map(|shard| shard.dynamic_definitions.iter())
                 .map(|summary| summary.parameters.len())
                 .sum::<usize>(),
         )?;
@@ -217,7 +217,7 @@ impl IndexCache {
     /// Reindexes this cache against its recorded source directory, avoiding reads for files whose
     /// recorded filesystem metadata is unchanged and parsing only files whose content changed.
     ///
-    /// The rules must match the hash recorded in the cache: shard contents (kinds, macro
+    /// The rules must match the hash recorded in the cache: shard contents (kinds, dynamic-definition
     /// summaries, references) depend on the rules, so a different hash needs a full rebuild.
     pub fn refresh(&self, rules: &RuleSet, profile: &GameProfile) -> Result<Self, IndexCacheError> {
         refresh::refresh_cancellable(self, rules, profile, &WorkspaceScanToken::new(), None)
@@ -431,14 +431,14 @@ impl From<rusqlite::Error> for IndexCacheError {
 fn validate_cache_limits(
     definition_count: usize,
     reference_count: usize,
-    macro_definition_count: usize,
-    macro_parameter_count: usize,
+    dynamic_definition_count: usize,
+    dynamic_parameter_count: usize,
 ) -> Result<(), IndexCacheError> {
     for (label, count) in [
         ("definition", definition_count),
         ("reference", reference_count),
-        ("macro summary", macro_definition_count),
-        ("macro parameter", macro_parameter_count),
+        ("dynamic definition summary", dynamic_definition_count),
+        ("dynamic parameter", dynamic_parameter_count),
     ] {
         if count > MAX_CACHE_SYMBOLS {
             return Err(IndexCacheError::LimitExceeded(label, MAX_CACHE_SYMBOLS));

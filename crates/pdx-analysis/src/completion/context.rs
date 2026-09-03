@@ -1,7 +1,7 @@
 use crate::semantic::*;
 use crate::support::*;
 use crate::{
-    completion::macro_constraints::infer_macro_quoted_script_constraints,
+    completion::dynamic_constraints::infer_dynamic_quoted_script_constraints,
     quoted_script::{QuotedScriptParse, QuotedScriptSession},
     types::{CancellationToken, Cancelled},
 };
@@ -25,9 +25,9 @@ pub(crate) struct SemanticCompletionContext {
     /// Keys already present in the active container.  Completion uses this to distinguish a
     /// missing required member from one that is already satisfied.
     pub(crate) existing_keys: Vec<String>,
-    /// Whether this context was inferred from a scripted-macro body rather than directly from
-    /// the caller's syntax. Macro-inferred rules get the highest schema tier.
-    pub(crate) macro_inferred: bool,
+    /// Whether this context was inferred from a dynamic-definition body rather than directly from
+    /// the caller's syntax. Dynamic-inferred rules get the highest schema tier.
+    pub(crate) dynamic_inferred: bool,
     /// Whether this container is a type's file-root entry scaffold (`root_entries`).
     ///
     /// Only this container suppresses single-instance (`max_occurs = 1`) keys that are already
@@ -100,7 +100,7 @@ pub(crate) fn semantic_completion_context_with_cancellation(
                 parent_path: Vec::new(),
                 structural_containers: Vec::new(),
                 alternative_containers: Vec::new(),
-                macro_inferred: false,
+                dynamic_inferred: false,
                 container_property: None,
                 skip_type_instance,
                 properties: root.block,
@@ -128,7 +128,7 @@ pub(crate) fn semantic_completion_context_with_cancellation(
                 parent_path: Vec::new(),
                 structural_containers: Vec::new(),
                 alternative_containers: Vec::new(),
-                macro_inferred: false,
+                dynamic_inferred: false,
                 container_property: None,
                 skip_type_instance: false,
                 properties,
@@ -216,7 +216,7 @@ struct SemanticCompletionContainerInput<'a> {
     parent_path: Vec<std::sync::Arc<str>>,
     structural_containers: Vec<(String, Vec<std::sync::Arc<str>>)>,
     alternative_containers: Vec<SemanticCompletionContainer>,
-    macro_inferred: bool,
+    dynamic_inferred: bool,
     container_property: Option<ScriptProperty>,
     skip_type_instance: bool,
     properties: Vec<ScriptProperty>,
@@ -238,7 +238,7 @@ fn semantic_completion_container(
         parent_path,
         structural_containers,
         alternative_containers,
-        macro_inferred,
+        dynamic_inferred,
         container_property,
         skip_type_instance,
         properties,
@@ -272,7 +272,7 @@ fn semantic_completion_container(
                     parent_path: parent_path.clone(),
                     structural_containers,
                     alternative_containers,
-                    macro_inferred,
+                    dynamic_inferred,
                     container_property: Some(property.clone()),
                     skip_type_instance: false,
                     properties: property.block.clone(),
@@ -349,7 +349,7 @@ fn semantic_completion_container(
                         .collect(),
                     structural_containers,
                     alternative_containers: Vec::new(),
-                    macro_inferred,
+                    dynamic_inferred,
                     container_property: Some(property.clone()),
                     skip_type_instance: false,
                     properties: property.block.clone(),
@@ -375,7 +375,7 @@ fn semantic_completion_container(
                     .iter()
                     .map(|child| child.key.to_string())
                     .collect(),
-                macro_inferred,
+                dynamic_inferred,
                 scope: scope.clone(),
                 container_property: container_property.clone(),
                 property: Some(property.clone()),
@@ -384,7 +384,7 @@ fn semantic_completion_container(
                 wrapper_container: skip_type_instance,
                 root_entry_container: false,
             };
-            let inferred = infer_macro_quoted_script_constraints(
+            let inferred = infer_dynamic_quoted_script_constraints(
                 snapshot,
                 &argument_context,
                 property,
@@ -415,7 +415,7 @@ fn semantic_completion_container(
                         parent_path: primary.parent_path.clone(),
                         structural_containers: Vec::new(),
                         alternative_containers: alternatives,
-                        macro_inferred: true,
+                        dynamic_inferred: true,
                         container_property: Some(property.clone()),
                         skip_type_instance: false,
                         properties: quoted_properties,
@@ -512,7 +512,7 @@ fn semantic_completion_container(
                     parent_path: primary.parent_path,
                     structural_containers,
                     alternative_containers,
-                    macro_inferred,
+                    dynamic_inferred,
                     container_property: Some(property.clone()),
                     skip_type_instance: false,
                     properties: quoted_properties,
@@ -533,7 +533,7 @@ fn semantic_completion_container(
                 parent_path: primary.parent_path,
                 structural_containers,
                 alternative_containers,
-                macro_inferred,
+                dynamic_inferred,
                 container_property: Some(property.clone()),
                 skip_type_instance: false,
                 properties: property.block.clone(),
@@ -562,7 +562,7 @@ fn semantic_completion_container(
         structural_containers,
         alternative_containers,
         existing_keys,
-        macro_inferred,
+        dynamic_inferred,
         scope,
         container_property,
         property,

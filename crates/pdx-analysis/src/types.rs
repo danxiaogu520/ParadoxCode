@@ -116,9 +116,9 @@ pub enum DiagnosticCode {
     TargetWrongScope,
     /// A scope-changing command is not valid in the current scope context.
     InvalidScopeCommand,
-    /// Recursive scripted-macro expansion reached a definition already on the active stack.
-    MacroExpansionCycle,
-    /// Scripted-macro expansion exceeded a bounded work or size limit.
+    /// Recursive dynamic-definition expansion reached a definition already on the active stack.
+    DynamicDefinitionCycle,
+    /// Dynamic-definition analysis exceeded a bounded work or size limit.
     AnalysisIncomplete,
     /// A boolean logic container (AND/OR/NOT) has a degenerate or misleading shape.
     LogicalContainer,
@@ -130,15 +130,15 @@ pub enum DiagnosticCode {
     EmptyBlock,
     /// An `else`/`else_if` block has no preceding `if`/`else_if` sibling.
     OrphanElse,
-    /// A scripted macro's inferred entry-scope contract is empty, so no scope
+    /// A dynamic definition's inferred entry-scope contract is empty, so no scope
     /// can run its body correctly.
     EmptyScopeContract,
     /// An effect applies a typed definition whose scope-attributed attributes
     /// cannot act in the effect's scope.
     ModifierScopeMismatch,
-    /// A scripted macro is called in a scope its inferred entry contract
+    /// A dynamic definition is called in a scope its inferred entry contract
     /// rejects.
-    MacroCallScopeMismatch,
+    DynamicCallScopeMismatch,
 }
 
 impl DiagnosticCode {
@@ -156,7 +156,7 @@ impl DiagnosticCode {
         Self::InvalidTarget,
         Self::TargetWrongScope,
         Self::InvalidScopeCommand,
-        Self::MacroExpansionCycle,
+        Self::DynamicDefinitionCycle,
         Self::AnalysisIncomplete,
         Self::LogicalContainer,
         Self::ConstantCondition,
@@ -165,7 +165,7 @@ impl DiagnosticCode {
         Self::OrphanElse,
         Self::EmptyScopeContract,
         Self::ModifierScopeMismatch,
-        Self::MacroCallScopeMismatch,
+        Self::DynamicCallScopeMismatch,
     ];
 
     /// Parses a wire-facing diagnostic category.
@@ -193,7 +193,7 @@ impl DiagnosticCode {
             Self::InvalidTarget => "InvalidTarget",
             Self::TargetWrongScope => "TargetWrongScope",
             Self::InvalidScopeCommand => "InvalidScopeCommand",
-            Self::MacroExpansionCycle => "MacroExpansionCycle",
+            Self::DynamicDefinitionCycle => "DynamicDefinitionCycle",
             Self::AnalysisIncomplete => "AnalysisIncomplete",
             Self::LogicalContainer => "LogicalContainer",
             Self::ConstantCondition => "ConstantCondition",
@@ -202,7 +202,7 @@ impl DiagnosticCode {
             Self::OrphanElse => "OrphanElse",
             Self::EmptyScopeContract => "EmptyScopeContract",
             Self::ModifierScopeMismatch => "ModifierScopeMismatch",
-            Self::MacroCallScopeMismatch => "MacroCallScopeMismatch",
+            Self::DynamicCallScopeMismatch => "DynamicCallScopeMismatch",
         }
     }
 
@@ -234,12 +234,12 @@ impl DiagnosticCode {
             | Self::InvalidValue
             | Self::Cardinality
             | Self::RuleWrongScope
-            | Self::MacroExpansionCycle
+            | Self::DynamicDefinitionCycle
             // An empty contract means the definition is unusable in every
             // scope; rejecting it at the definition follows the same Rust
             // principle as rejecting a recursive expansion.
             | Self::EmptyScopeContract
-            | Self::MacroCallScopeMismatch
+            | Self::DynamicCallScopeMismatch
             | Self::OrphanElse => Severity::Error,
             // The game still loads cross-class modifier applications, so the
             // scope class of the applied attributes is recorded as information
@@ -507,8 +507,8 @@ pub enum CompletionKind {
     Key,
     /// A script command or trigger predicate.
     Command,
-    /// A workspace-defined `scripted_effect` or `scripted_trigger` macro.
-    ScriptedMacro,
+    /// A workspace-defined `scripted_effect` or `scripted_trigger` definition.
+    DynamicDefinition,
     /// A scalar value without a more specific semantic category.
     Value,
     /// A member of a statically declared enum.
@@ -519,8 +519,8 @@ pub enum CompletionKind {
     Symbol,
     /// A localisation key.
     Localisation,
-    /// A parameter declared by a scripted macro.
-    MacroParameter,
+    /// A parameter declared by a dynamic definition.
+    DynamicParameter,
 }
 
 /// Completion query output.

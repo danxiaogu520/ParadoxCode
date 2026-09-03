@@ -1,6 +1,6 @@
 use super::{
-    HirParameterReferenceKind, HirReferenceOrigin, MacroTemplateFragment, MacroTemplateItem,
-    MacroTemplateValue, ScopeState, ScopeValue, lower, lower_with_profile, property_children,
+    HirParameterReferenceKind, HirReferenceOrigin, ScopeState, ScopeValue, TemplateFragment,
+    TemplateItem, TemplateValue, lower, lower_with_profile, property_children,
     resolve_scope_expression, semantic_root_context,
 };
 use pdx_game::eu4::{bootstrap_rules, first_party_rules, profile};
@@ -372,7 +372,7 @@ fn profile_lowering_associates_local_parameter_definitions_and_uses() {
         !runtime_branch_hir.parameter_is_required(runtime_branch_owner, "amount")
             && !runtime_branch_hir
                 .parameter_is_required(runtime_branch_owner, "republican_tradition"),
-        "mutually exclusive runtime branch values are optional at the macro call site"
+        "mutually exclusive runtime branch values are optional at the dynamic call site"
     );
     assert!(
         runtime_branch_hir.parameter_is_required(runtime_branch_owner, "limit_government"),
@@ -381,7 +381,7 @@ fn profile_lowering_associates_local_parameter_definitions_and_uses() {
 }
 
 #[test]
-fn scripted_macro_lowering_keeps_body_context_calls_and_local_parameter_uses() {
+fn dynamic_lowering_keeps_body_context_calls_and_local_parameter_uses() {
     let rules = first_party_rules().expect("first-party rules");
     let path = LogicalPath::parse("common/scripted_effects/rewrite.txt").expect("logical path");
     let source = concat!(
@@ -395,7 +395,7 @@ fn scripted_macro_lowering_keeps_body_context_calls_and_local_parameter_uses() {
     let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile());
 
     assert!(hir.references().iter().any(|reference| {
-        reference.origin == HirReferenceOrigin::ScriptedMacro
+        reference.origin == HirReferenceOrigin::DynamicDefinition
             && reference.kind == "scripted_effect"
             && reference.name == "apply_effect"
     }));
@@ -406,12 +406,12 @@ fn scripted_macro_lowering_keeps_body_context_calls_and_local_parameter_uses() {
             property.key == "apply_effect"
                 && property.path.first().is_some_and(|root| root == "wrapper")
         })
-        .expect("macro body property");
+        .expect("definition body property");
     let body_fact = hir
         .scope_facts()
         .iter()
         .find(|fact| fact.range == body_property.key_range)
-        .expect("macro body scope fact");
+        .expect("definition body scope fact");
     assert_eq!(body_fact.context, "effect");
 
     assert!(
@@ -453,14 +453,14 @@ fn scripted_macro_lowering_keeps_body_context_calls_and_local_parameter_uses() {
         .expect("trigger root fact");
     assert_eq!(trigger_root.context, "trigger");
     assert!(trigger_hir.references().iter().any(|reference| {
-        reference.origin == HirReferenceOrigin::ScriptedMacro
+        reference.origin == HirReferenceOrigin::DynamicDefinition
             && reference.kind == "scripted_trigger"
             && reference.name == "apply_trigger"
     }));
 }
 
 #[test]
-fn scripted_macro_templates_preserve_order_conditionals_and_token_fragments() {
+fn dynamic_templates_preserve_order_conditionals_and_token_fragments() {
     let rules = first_party_rules().expect("first-party rules");
     let path = LogicalPath::parse("common/scripted_effects/template.txt").expect("logical path");
     let source = concat!(
@@ -474,7 +474,7 @@ fn scripted_macro_templates_preserve_order_conditionals_and_token_fragments() {
     let hir = lower_with_profile(parse(FileFormat::Script, source), &path, &rules, &profile());
 
     let template = hir
-        .macro_template(
+        .dynamic_template(
             "scripted_effect",
             "wrapper",
             hir.definitions()
@@ -483,17 +483,17 @@ fn scripted_macro_templates_preserve_order_conditionals_and_token_fragments() {
                 .expect("wrapper definition")
                 .range,
         )
-        .expect("macro template");
+        .expect("dynamic template");
     assert_eq!(template.items.len(), 4);
 
-    let MacroTemplateItem::Property(first) = &template.items[0] else {
+    let TemplateItem::Property(first) = &template.items[0] else {
         panic!("first item must be a property");
     };
     assert_eq!(
         first.key.fragments,
         [
-            MacroTemplateFragment::Literal("prefix_".to_owned()),
-            MacroTemplateFragment::Parameter {
+            TemplateFragment::Literal("prefix_".to_owned()),
+            TemplateFragment::Parameter {
                 name: "TARGET".to_owned(),
                 range: hir
                     .parameter_references()
@@ -504,45 +504,42 @@ fn scripted_macro_templates_preserve_order_conditionals_and_token_fragments() {
             },
         ]
     );
-    let MacroTemplateValue::Scalar(value) = &first.value else {
+    let TemplateValue::Scalar(value) = &first.value else {
         panic!("first value must be scalar");
     };
     assert!(matches!(
         value.fragments.as_slice(),
-        [MacroTemplateFragment::Parameter { name, .. }] if name == "VALUE"
+        [TemplateFragment::Parameter { name, .. }] if name == "VALUE"
     ));
 
-    let MacroTemplateItem::Conditional(optional) = &template.items[1] else {
+    let TemplateItem::Conditional(optional) = &template.items[1] else {
         panic!("second item must be conditional");
     };
     assert_eq!(optional.name, "OPTION");
     assert!(!optional.negated);
     assert!(matches!(
         optional.items.as_slice(),
-        [MacroTemplateItem::Property(_)]
+        [TemplateItem::Property(_)]
     ));
 
-    let MacroTemplateItem::Conditional(skipped) = &template.items[2] else {
+    let TemplateItem::Conditional(skipped) = &template.items[2] else {
         panic!("third item must be conditional");
     };
     assert_eq!(skipped.name, "SKIP");
     assert!(skipped.negated);
     assert!(matches!(
         skipped.items.as_slice(),
-        [
-            MacroTemplateItem::BareValue(_),
-            MacroTemplateItem::BareValue(_)
-        ]
+        [TemplateItem::BareValue(_), TemplateItem::BareValue(_)]
     ));
 
-    let MacroTemplateItem::Property(nested) = &template.items[3] else {
+    let TemplateItem::Property(nested) = &template.items[3] else {
         panic!("fourth item must be nested property");
     };
-    assert!(matches!(nested.value, MacroTemplateValue::Block { .. }));
+    assert!(matches!(nested.value, TemplateValue::Block { .. }));
 }
 
 #[test]
-fn scripted_macro_templates_skip_syntax_damaged_owners() {
+fn dynamic_templates_skip_syntax_damaged_owners() {
     let rules = first_party_rules().expect("first-party rules");
     let path = LogicalPath::parse("common/scripted_effects/broken.txt").expect("logical path");
     let hir = lower_with_profile(
@@ -551,11 +548,11 @@ fn scripted_macro_templates_skip_syntax_damaged_owners() {
         &rules,
         &profile(),
     );
-    assert!(hir.macro_templates().is_empty());
+    assert!(hir.dynamic_templates().is_empty());
 }
 
 #[test]
-fn scripted_macro_lowering_retains_scalar_candidates_for_signature_resolution() {
+fn dynamic_lowering_retains_scalar_candidates_for_signature_resolution() {
     let rules = first_party_rules().expect("first-party rules");
     let path =
         LogicalPath::parse("common/scripted_effects/value_matchers.txt").expect("logical path");
@@ -576,7 +573,7 @@ fn scripted_macro_lowering_retains_scalar_candidates_for_signature_resolution() 
                 .as_ref()
                 .is_some_and(|scalar| scalar.value == "yes")
         })
-        .expect("yes macro call");
+        .expect("yes dynamic call");
     let no_property = apply_effect_properties
         .iter()
         .find(|property| {
@@ -585,13 +582,13 @@ fn scripted_macro_lowering_retains_scalar_candidates_for_signature_resolution() 
                 .as_ref()
                 .is_some_and(|scalar| scalar.value == "no")
         })
-        .expect("no macro call");
+        .expect("no dynamic call");
 
     let references = hir
         .references()
         .iter()
         .filter(|reference| {
-            reference.origin == HirReferenceOrigin::ScriptedMacro
+            reference.origin == HirReferenceOrigin::DynamicDefinition
                 && reference.kind == "scripted_effect"
                 && reference.name == "apply_effect"
         })
@@ -610,7 +607,7 @@ fn scripted_macro_lowering_retains_scalar_candidates_for_signature_resolution() 
 }
 
 #[test]
-fn scripted_macro_lowering_rejects_non_scalar_block_matchers() {
+fn dynamic_lowering_rejects_non_scalar_block_matchers() {
     let original_rules = first_party_rules().expect("first-party rules");
     let mut model = original_rules.model().clone();
     for rule in &mut model.semantic.rules {
@@ -631,7 +628,7 @@ fn scripted_macro_lowering_rejects_non_scalar_block_matchers() {
     );
 
     assert!(!hir.references().iter().any(|reference| {
-        reference.origin == HirReferenceOrigin::ScriptedMacro
+        reference.origin == HirReferenceOrigin::DynamicDefinition
             && reference.kind == "scripted_effect"
             && reference.name == "apply_effect"
     }));

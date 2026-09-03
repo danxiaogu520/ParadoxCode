@@ -1,14 +1,14 @@
-//! Versioned serialization for source-independent scripted-macro template IR.
+//! Versioned serialization for source-independent scripted-dynamic template IR.
 
 use pdx_text::TextRange;
 use serde::{Deserialize, Serialize};
 
 use crate::hir::{
-    MacroTemplate, MacroTemplateConditional, MacroTemplateFragment, MacroTemplateItem,
-    MacroTemplateProperty, MacroTemplateToken, MacroTemplateValue,
+    Template, TemplateConditional, TemplateFragment, TemplateItem, TemplateProperty, TemplateToken,
+    TemplateValue,
 };
 
-use super::{IndexCacheError, MAX_MACRO_TEMPLATE_BYTES, MAX_MACRO_TEMPLATE_NODES};
+use super::{IndexCacheError, MAX_TEMPLATE_BYTES, MAX_TEMPLATE_NODES};
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(transparent)]
@@ -16,7 +16,7 @@ struct Range([u32; 2]);
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Template {
+struct EncodedTemplate {
     kind: String,
     name: String,
     definition_range: Range,
@@ -81,10 +81,10 @@ struct Budget {
 impl Budget {
     fn node(&mut self) -> Result<(), IndexCacheError> {
         self.nodes = self.nodes.saturating_add(1);
-        if self.nodes > MAX_MACRO_TEMPLATE_NODES {
+        if self.nodes > MAX_TEMPLATE_NODES {
             return Err(IndexCacheError::LimitExceeded(
-                "macro template node",
-                MAX_MACRO_TEMPLATE_NODES,
+                "dynamic template node",
+                MAX_TEMPLATE_NODES,
             ));
         }
         Ok(())
@@ -92,24 +92,24 @@ impl Budget {
 
     fn text(&mut self, value: &str) -> Result<(), IndexCacheError> {
         self.text_bytes = self.text_bytes.saturating_add(value.len());
-        if self.text_bytes > MAX_MACRO_TEMPLATE_BYTES {
+        if self.text_bytes > MAX_TEMPLATE_BYTES {
             return Err(IndexCacheError::LimitExceeded(
-                "macro template text byte",
-                MAX_MACRO_TEMPLATE_BYTES,
+                "dynamic template text byte",
+                MAX_TEMPLATE_BYTES,
             ));
         }
         Ok(())
     }
 }
 
-pub(super) fn encode(template: &MacroTemplate) -> Result<Vec<u8>, IndexCacheError> {
-    let dto = Template::from(template);
+pub(super) fn encode(template: &Template) -> Result<Vec<u8>, IndexCacheError> {
+    let dto = EncodedTemplate::from(template);
     let payload = serde_json::to_vec(&dto)
         .map_err(|error| IndexCacheError::InvalidData(error.to_string()))?;
-    if payload.len() > MAX_MACRO_TEMPLATE_BYTES {
+    if payload.len() > MAX_TEMPLATE_BYTES {
         return Err(IndexCacheError::LimitExceeded(
-            "macro template byte",
-            MAX_MACRO_TEMPLATE_BYTES,
+            "dynamic template byte",
+            MAX_TEMPLATE_BYTES,
         ));
     }
     Ok(payload)
@@ -120,15 +120,15 @@ pub(super) fn decode(
     expected_kind: &str,
     expected_name: &str,
     expected_definition_range: TextRange,
-) -> Result<MacroTemplate, IndexCacheError> {
-    if payload.len() > MAX_MACRO_TEMPLATE_BYTES {
+) -> Result<Template, IndexCacheError> {
+    if payload.len() > MAX_TEMPLATE_BYTES {
         return Err(IndexCacheError::LimitExceeded(
-            "macro template byte",
-            MAX_MACRO_TEMPLATE_BYTES,
+            "dynamic template byte",
+            MAX_TEMPLATE_BYTES,
         ));
     }
-    let dto: Template = serde_json::from_slice(payload).map_err(|error| {
-        IndexCacheError::InvalidData(format!("invalid macro template payload: {error}"))
+    let dto: EncodedTemplate = serde_json::from_slice(payload).map_err(|error| {
+        IndexCacheError::InvalidData(format!("invalid dynamic template payload: {error}"))
     })?;
     let mut budget = Budget::default();
     let template = dto.into_model(&mut budget)?;
@@ -137,7 +137,7 @@ pub(super) fn decode(
         || template.definition_range != expected_definition_range
     {
         return Err(IndexCacheError::InvalidData(format!(
-            "macro template identity does not match {expected_kind} `{expected_name}`"
+            "dynamic template identity does not match {expected_kind} `{expected_name}`"
         )));
     }
     validate_template_ranges(&template)?;
@@ -146,7 +146,7 @@ pub(super) fn decode(
 
 fn decode_range(range: Range) -> Result<TextRange, IndexCacheError> {
     TextRange::new(range.0[0], range.0[1]).ok_or_else(|| {
-        IndexCacheError::InvalidData("macro template range end precedes start".to_owned())
+        IndexCacheError::InvalidData("dynamic template range end precedes start".to_owned())
     })
 }
 
@@ -154,34 +154,31 @@ fn range_within(inner: TextRange, outer: TextRange) -> bool {
     inner.start() >= outer.start() && inner.end() <= outer.end()
 }
 
-fn validate_template_ranges(template: &MacroTemplate) -> Result<(), IndexCacheError> {
+fn validate_template_ranges(template: &Template) -> Result<(), IndexCacheError> {
     if !range_within(template.body_range, template.definition_range) {
         return Err(IndexCacheError::InvalidData(
-            "macro template body range escapes its definition".to_owned(),
+            "dynamic template body range escapes its definition".to_owned(),
         ));
     }
     validate_items_ranges(&template.items, template.definition_range)
 }
 
-fn validate_items_ranges(
-    items: &[MacroTemplateItem],
-    owner: TextRange,
-) -> Result<(), IndexCacheError> {
+fn validate_items_ranges(items: &[TemplateItem], owner: TextRange) -> Result<(), IndexCacheError> {
     for item in items {
         match item {
-            MacroTemplateItem::Property(property) => {
+            TemplateItem::Property(property) => {
                 require_range(property.range, owner)?;
                 validate_token_range(&property.key, owner)?;
                 match &property.value {
-                    MacroTemplateValue::Scalar(token) => validate_token_range(token, owner)?,
-                    MacroTemplateValue::Block { range, items } => {
+                    TemplateValue::Scalar(token) => validate_token_range(token, owner)?,
+                    TemplateValue::Block { range, items } => {
                         require_range(*range, owner)?;
                         validate_items_ranges(items, owner)?;
                     }
                 }
             }
-            MacroTemplateItem::BareValue(token) => validate_token_range(token, owner)?,
-            MacroTemplateItem::Conditional(conditional) => {
+            TemplateItem::BareValue(token) => validate_token_range(token, owner)?,
+            TemplateItem::Conditional(conditional) => {
                 require_range(conditional.range, owner)?;
                 validate_items_ranges(&conditional.items, owner)?;
             }
@@ -190,13 +187,10 @@ fn validate_items_ranges(
     Ok(())
 }
 
-fn validate_token_range(
-    token: &MacroTemplateToken,
-    owner: TextRange,
-) -> Result<(), IndexCacheError> {
+fn validate_token_range(token: &TemplateToken, owner: TextRange) -> Result<(), IndexCacheError> {
     require_range(token.range, owner)?;
     for fragment in &token.fragments {
-        if let MacroTemplateFragment::Parameter { range, .. } = fragment {
+        if let TemplateFragment::Parameter { range, .. } = fragment {
             require_range(*range, owner)?;
         }
     }
@@ -208,13 +202,13 @@ fn require_range(range: TextRange, owner: TextRange) -> Result<(), IndexCacheErr
         Ok(())
     } else {
         Err(IndexCacheError::InvalidData(
-            "macro template item range escapes its definition".to_owned(),
+            "dynamic template item range escapes its definition".to_owned(),
         ))
     }
 }
 
-impl From<&MacroTemplate> for Template {
-    fn from(template: &MacroTemplate) -> Self {
+impl From<&Template> for EncodedTemplate {
+    fn from(template: &Template) -> Self {
         Self {
             kind: template.kind.clone(),
             name: template.name.clone(),
@@ -225,12 +219,12 @@ impl From<&MacroTemplate> for Template {
     }
 }
 
-impl Template {
-    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplate, IndexCacheError> {
+impl EncodedTemplate {
+    fn into_model(self, budget: &mut Budget) -> Result<Template, IndexCacheError> {
         budget.node()?;
         budget.text(&self.kind)?;
         budget.text(&self.name)?;
-        Ok(MacroTemplate {
+        Ok(Template {
             kind: self.kind,
             name: self.name,
             definition_range: decode_range(self.definition_range)?,
@@ -243,7 +237,7 @@ impl Template {
 fn decode_items(
     items: Vec<Item>,
     budget: &mut Budget,
-) -> Result<Vec<MacroTemplateItem>, IndexCacheError> {
+) -> Result<Vec<TemplateItem>, IndexCacheError> {
     items
         .into_iter()
         .map(|item| item.into_model(budget))
@@ -251,26 +245,24 @@ fn decode_items(
 }
 
 impl Item {
-    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateItem, IndexCacheError> {
+    fn into_model(self, budget: &mut Budget) -> Result<TemplateItem, IndexCacheError> {
         budget.node()?;
         match self {
-            Self::Property(property) => {
-                Ok(MacroTemplateItem::Property(property.into_model(budget)?))
+            Self::Property(property) => Ok(TemplateItem::Property(property.into_model(budget)?)),
+            Self::BareValue(token) => Ok(TemplateItem::BareValue(token.into_model(budget)?)),
+            Self::Conditional(conditional) => {
+                Ok(TemplateItem::Conditional(conditional.into_model(budget)?))
             }
-            Self::BareValue(token) => Ok(MacroTemplateItem::BareValue(token.into_model(budget)?)),
-            Self::Conditional(conditional) => Ok(MacroTemplateItem::Conditional(
-                conditional.into_model(budget)?,
-            )),
         }
     }
 }
 
 impl Property {
-    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateProperty, IndexCacheError> {
+    fn into_model(self, budget: &mut Budget) -> Result<TemplateProperty, IndexCacheError> {
         if let Some(operator) = &self.operator {
             budget.text(operator)?;
         }
-        Ok(MacroTemplateProperty {
+        Ok(TemplateProperty {
             key: self.key.into_model(budget)?,
             range: decode_range(self.range)?,
             operator: self.operator,
@@ -280,10 +272,10 @@ impl Property {
 }
 
 impl Value {
-    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateValue, IndexCacheError> {
+    fn into_model(self, budget: &mut Budget) -> Result<TemplateValue, IndexCacheError> {
         match self {
-            Self::Scalar(token) => Ok(MacroTemplateValue::Scalar(token.into_model(budget)?)),
-            Self::Block { range, items } => Ok(MacroTemplateValue::Block {
+            Self::Scalar(token) => Ok(TemplateValue::Scalar(token.into_model(budget)?)),
+            Self::Block { range, items } => Ok(TemplateValue::Block {
                 range: decode_range(range)?,
                 items: decode_items(items, budget)?,
             }),
@@ -292,9 +284,9 @@ impl Value {
 }
 
 impl Conditional {
-    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateConditional, IndexCacheError> {
+    fn into_model(self, budget: &mut Budget) -> Result<TemplateConditional, IndexCacheError> {
         budget.text(&self.name)?;
-        Ok(MacroTemplateConditional {
+        Ok(TemplateConditional {
             name: self.name,
             negated: self.negated,
             range: decode_range(self.range)?,
@@ -304,8 +296,8 @@ impl Conditional {
 }
 
 impl Token {
-    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateToken, IndexCacheError> {
-        Ok(MacroTemplateToken {
+    fn into_model(self, budget: &mut Budget) -> Result<TemplateToken, IndexCacheError> {
+        Ok(TemplateToken {
             range: decode_range(self.range)?,
             quoted: self.quoted,
             fragments: self
@@ -318,16 +310,16 @@ impl Token {
 }
 
 impl Fragment {
-    fn into_model(self, budget: &mut Budget) -> Result<MacroTemplateFragment, IndexCacheError> {
+    fn into_model(self, budget: &mut Budget) -> Result<TemplateFragment, IndexCacheError> {
         budget.node()?;
         match self {
             Self::Literal(value) => {
                 budget.text(&value)?;
-                Ok(MacroTemplateFragment::Literal(value))
+                Ok(TemplateFragment::Literal(value))
             }
             Self::Parameter { name, range } => {
                 budget.text(&name)?;
-                Ok(MacroTemplateFragment::Parameter {
+                Ok(TemplateFragment::Parameter {
                     name,
                     range: decode_range(range)?,
                 })
@@ -342,18 +334,18 @@ impl From<TextRange> for Range {
     }
 }
 
-impl From<&MacroTemplateItem> for Item {
-    fn from(item: &MacroTemplateItem) -> Self {
+impl From<&TemplateItem> for Item {
+    fn from(item: &TemplateItem) -> Self {
         match item {
-            MacroTemplateItem::Property(property) => Self::Property(property.into()),
-            MacroTemplateItem::BareValue(token) => Self::BareValue(token.into()),
-            MacroTemplateItem::Conditional(conditional) => Self::Conditional(conditional.into()),
+            TemplateItem::Property(property) => Self::Property(property.into()),
+            TemplateItem::BareValue(token) => Self::BareValue(token.into()),
+            TemplateItem::Conditional(conditional) => Self::Conditional(conditional.into()),
         }
     }
 }
 
-impl From<&MacroTemplateProperty> for Property {
-    fn from(property: &MacroTemplateProperty) -> Self {
+impl From<&TemplateProperty> for Property {
+    fn from(property: &TemplateProperty) -> Self {
         Self {
             key: (&property.key).into(),
             range: property.range.into(),
@@ -363,11 +355,11 @@ impl From<&MacroTemplateProperty> for Property {
     }
 }
 
-impl From<&MacroTemplateValue> for Value {
-    fn from(value: &MacroTemplateValue) -> Self {
+impl From<&TemplateValue> for Value {
+    fn from(value: &TemplateValue) -> Self {
         match value {
-            MacroTemplateValue::Scalar(token) => Self::Scalar(token.into()),
-            MacroTemplateValue::Block { range, items } => Self::Block {
+            TemplateValue::Scalar(token) => Self::Scalar(token.into()),
+            TemplateValue::Block { range, items } => Self::Block {
                 range: (*range).into(),
                 items: items.iter().map(Item::from).collect(),
             },
@@ -375,8 +367,8 @@ impl From<&MacroTemplateValue> for Value {
     }
 }
 
-impl From<&MacroTemplateConditional> for Conditional {
-    fn from(conditional: &MacroTemplateConditional) -> Self {
+impl From<&TemplateConditional> for Conditional {
+    fn from(conditional: &TemplateConditional) -> Self {
         Self {
             name: conditional.name.clone(),
             negated: conditional.negated,
@@ -386,8 +378,8 @@ impl From<&MacroTemplateConditional> for Conditional {
     }
 }
 
-impl From<&MacroTemplateToken> for Token {
-    fn from(token: &MacroTemplateToken) -> Self {
+impl From<&TemplateToken> for Token {
+    fn from(token: &TemplateToken) -> Self {
         Self {
             range: token.range.into(),
             quoted: token.quoted,
@@ -396,11 +388,11 @@ impl From<&MacroTemplateToken> for Token {
     }
 }
 
-impl From<&MacroTemplateFragment> for Fragment {
-    fn from(fragment: &MacroTemplateFragment) -> Self {
+impl From<&TemplateFragment> for Fragment {
+    fn from(fragment: &TemplateFragment) -> Self {
         match fragment {
-            MacroTemplateFragment::Literal(value) => Self::Literal(value.clone()),
-            MacroTemplateFragment::Parameter { name, range } => Self::Parameter {
+            TemplateFragment::Literal(value) => Self::Literal(value.clone()),
+            TemplateFragment::Parameter { name, range } => Self::Parameter {
                 name: name.clone(),
                 range: (*range).into(),
             },

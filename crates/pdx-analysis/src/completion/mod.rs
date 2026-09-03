@@ -8,12 +8,12 @@ use pdx_text::{TextRange, TextSize};
 
 mod candidates;
 mod context;
-mod macro_constraints;
+mod dynamic_constraints;
 mod support;
 
 pub(crate) use candidates::*;
 pub(crate) use context::*;
-pub(crate) use macro_constraints::infer_macro_quoted_script_constraints;
+pub(crate) use dynamic_constraints::infer_dynamic_quoted_script_constraints;
 pub(crate) use support::*;
 
 /// Computes key, value, localisation, and symbol completion.
@@ -45,7 +45,7 @@ pub fn complete_with_cancellation(
             items: Vec::new(),
         });
     };
-    if let Some(items) = macro_parameter_completion(snapshot, &input, position, cancellation)? {
+    if let Some(items) = dynamic_parameter_completion(snapshot, &input, position, cancellation)? {
         return Ok(CompletionResult {
             revision: snapshot.revision(),
             items,
@@ -99,7 +99,7 @@ pub fn complete_with_cancellation(
         cancellation.checkpoint()?;
         if value_context {
             if let Some(property) = context.property.as_ref() {
-                let inferred = add_inferred_macro_value_items(InferredMacroCompletionInput {
+                let inferred = add_inferred_dynamic_value_items(InferredDynamicCompletionInput {
                     snapshot,
                     context,
                     property,
@@ -161,7 +161,7 @@ pub fn complete_with_cancellation(
     })
 }
 
-fn macro_parameter_completion(
+fn dynamic_parameter_completion(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     position: TextSize,
@@ -180,7 +180,7 @@ fn macro_parameter_completion(
     let Some(owner) = hir.definitions().iter().find(|definition| {
         position >= definition.range.start()
             && position <= definition.range.end()
-            && crate::semantic::scripted_macro_type(snapshot, &definition.kind)
+            && crate::semantic::dynamic_definition_type(snapshot, &definition.kind)
     }) else {
         return Ok(None);
     };
@@ -195,11 +195,11 @@ fn macro_parameter_completion(
         let label = format!("${}$", parameter.name);
         items.push(CompletionItem {
             label: label.clone(),
-            kind: CompletionKind::MacroParameter,
+            kind: CompletionKind::DynamicParameter,
             detail: if value_context {
-                "macro parameter (value)".to_owned()
+                "dynamic parameter (value)".to_owned()
             } else {
-                "macro parameter (key)".to_owned()
+                "dynamic parameter (key)".to_owned()
             },
             documentation: None,
             replacement_range,

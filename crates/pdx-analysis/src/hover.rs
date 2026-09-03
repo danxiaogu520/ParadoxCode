@@ -678,11 +678,11 @@ pub(crate) fn hover_for_symbol(
                     value
                 ));
             }
-            if let Some(summary) = macro_definition_summary(snapshot, kind, name) {
-                let mut signature = macro_signature_hover(&summary);
-                if crate::semantic::scripted_macro_type(snapshot, kind) {
+            if let Some(summary) = dynamic_definition_summary(snapshot, kind, name) {
+                let mut signature = dynamic_signature_hover(&summary);
+                if crate::semantic::dynamic_definition_type(snapshot, kind) {
                     signature.push('\n');
-                    signature.push_str(&crate::macro_contracts::contract_hover_line(
+                    signature.push_str(&crate::dynamic_contracts::contract_hover_line(
                         snapshot, kind, name,
                     ));
                 }
@@ -750,7 +750,7 @@ pub(crate) fn hover_for_symbol(
     })
 }
 
-fn macro_signature_hover(summary: &pdx_engine::MacroDefinitionSummary) -> String {
+fn dynamic_signature_hover(summary: &pdx_engine::DynamicDefinitionSummary) -> String {
     let invocation = match summary.parameters.len() {
         0 => format!("`{} = yes`", summary.name),
         _ => "named parameter block".to_owned(),

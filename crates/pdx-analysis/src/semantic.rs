@@ -9,8 +9,8 @@ use pdx_engine::hir::{
 };
 use pdx_engine::intern_shard_string;
 use pdx_engine::{
-    AnalysisSnapshot, DocumentId, DocumentSource, FlagWriteIndex, FlagWriteMembership,
-    MacroDefinitionSummary, MacroParameterSignature, SourceFileId, SourceRootKind,
+    AnalysisSnapshot, DocumentId, DocumentSource, DynamicDefinitionSummary,
+    DynamicParameterSignature, FlagWriteIndex, FlagWriteMembership, SourceFileId, SourceRootKind,
 };
 use pdx_rules::{GameProfile, KeyMatcher, RuleShape, ValueMatcher};
 use pdx_text::{LogicalPath, TextRange};
@@ -66,7 +66,7 @@ struct ContextRuleView {
 thread_local! {
     /// Reusable key buffer for snapshot query-cache probes.
     ///
-    /// Validation probes the rule-view, macro-resolution, and member-name caches per
+    /// Validation probes the rule-view, dynamic-resolution, and member-name caches per
     /// property and per rule; formatting a fresh owned key for every probe dominated
     /// steady-state allocator traffic. The buffer is borrowed only for the duration of
     /// the cache read, and miss paths run after the borrow ends.
@@ -1475,7 +1475,7 @@ pub(crate) fn parameter_names_for_owner(
     owner_kind: &str,
     owner_name: &str,
 ) -> Option<Vec<String>> {
-    macro_definition_summary(snapshot, owner_kind, owner_name).map(|summary| {
+    dynamic_definition_summary(snapshot, owner_kind, owner_name).map(|summary| {
         summary
             .parameters
             .into_iter()
@@ -1484,16 +1484,16 @@ pub(crate) fn parameter_names_for_owner(
     })
 }
 
-pub(crate) fn macro_definition_summary(
+pub(crate) fn dynamic_definition_summary(
     snapshot: &AnalysisSnapshot,
     owner_kind: &str,
     owner_name: &str,
-) -> Option<MacroDefinitionSummary> {
-    resolve_macro_definition(snapshot, owner_kind, owner_name).map(|resolved| resolved.summary)
+) -> Option<DynamicDefinitionSummary> {
+    resolve_dynamic_definition(snapshot, owner_kind, owner_name).map(|resolved| resolved.summary)
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum MacroDefinitionIdentity {
+pub(crate) enum DynamicDefinitionIdentity {
     Overlay {
         document: DocumentId,
         version: Option<i64>,
@@ -1507,43 +1507,43 @@ pub(crate) enum MacroDefinitionIdentity {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct ResolvedMacroDefinition {
-    pub(crate) identity: MacroDefinitionIdentity,
-    pub(crate) summary: MacroDefinitionSummary,
+pub(crate) struct ResolvedDynamicDefinition {
+    pub(crate) identity: DynamicDefinitionIdentity,
+    pub(crate) summary: DynamicDefinitionSummary,
     pub(crate) body_context: String,
 }
 
-pub(crate) fn resolve_macro_definition(
+pub(crate) fn resolve_dynamic_definition(
     snapshot: &AnalysisSnapshot,
     owner_kind: &str,
     owner_name: &str,
-) -> Option<ResolvedMacroDefinition> {
+) -> Option<ResolvedDynamicDefinition> {
     // The resolution scans every open overlay document, and it is invoked once per
     // (property, rule) during diagnostics, completion, and hover. Memoize per
     // (revision, kind, name) so a revision pays for the scan only once.
     let revision = snapshot.revision();
-    if let Some(cached) = probe_query_cache::<Option<ResolvedMacroDefinition>>(
+    if let Some(cached) = probe_query_cache::<Option<ResolvedDynamicDefinition>>(
         snapshot,
         revision,
-        &["macro-definition:", owner_kind, ":", owner_name],
+        &["dynamic-definition:", owner_kind, ":", owner_name],
     ) {
         return cached.as_ref().clone();
     }
-    let resolved = resolve_macro_definition_uncached(snapshot, owner_kind, owner_name);
+    let resolved = resolve_dynamic_definition_uncached(snapshot, owner_kind, owner_name);
     snapshot.query_cache().insert(
         revision,
         pdx_engine::CacheDomain::Documents,
-        format!("macro-definition:{owner_kind}:{owner_name}"),
+        format!("dynamic-definition:{owner_kind}:{owner_name}"),
         Arc::new(resolved.clone()),
     );
     resolved
 }
 
-fn resolve_macro_definition_uncached(
+fn resolve_dynamic_definition_uncached(
     snapshot: &AnalysisSnapshot,
     owner_kind: &str,
     owner_name: &str,
-) -> Option<ResolvedMacroDefinition> {
+) -> Option<ResolvedDynamicDefinition> {
     let body_context = snapshot
         .rules()
         .model()
@@ -1551,8 +1551,8 @@ fn resolve_macro_definition_uncached(
         .type_descriptors
         .iter()
         .find(|(kind, _)| kind.eq_ignore_ascii_case(owner_kind))
-        .and_then(|(_, descriptor)| descriptor.scripted_macro.as_ref())
-        .filter(|descriptor| descriptor.macro_enabled)?
+        .and_then(|(_, descriptor)| descriptor.dynamic_definition.as_ref())
+        .filter(|descriptor| descriptor.enabled)?
         .body_context
         .clone();
     let mut overlay_candidates = Vec::new();
@@ -1568,13 +1568,13 @@ fn resolve_macro_definition_uncached(
             definition.kind.eq_ignore_ascii_case(owner_kind)
                 && definition.name.eq_ignore_ascii_case(owner_name)
         }) {
-            overlay_candidates.push(ResolvedMacroDefinition {
-                identity: MacroDefinitionIdentity::Overlay {
+            overlay_candidates.push(ResolvedDynamicDefinition {
+                identity: DynamicDefinitionIdentity::Overlay {
                     document: document.id().clone(),
                     version: document.version(),
                     definition_range: definition.range,
                 },
-                summary: macro_summary_in_hir(
+                summary: dynamic_summary_in_hir(
                     &hir,
                     &definition.kind,
                     &definition.name,
@@ -1604,11 +1604,11 @@ fn resolve_macro_definition_uncached(
     }
     let summary = snapshot
         .index()
-        .active_macro_definition(owner_kind, owner_name)
+        .active_dynamic_definition(owner_kind, owner_name)
         .cloned()?;
     let state = snapshot.file_state(definition.file_id);
-    Some(ResolvedMacroDefinition {
-        identity: MacroDefinitionIdentity::File {
+    Some(ResolvedDynamicDefinition {
+        identity: DynamicDefinitionIdentity::File {
             file: definition.file_id,
             revision: state.map_or(0, pdx_engine::FileState::revision),
             definition_range: definition.range,
@@ -1618,36 +1618,36 @@ fn resolve_macro_definition_uncached(
     })
 }
 
-fn macro_summary_in_hir(
+fn dynamic_summary_in_hir(
     hir: &HirFile,
     kind: &str,
     name: &str,
     owner_range: TextRange,
-) -> MacroDefinitionSummary {
+) -> DynamicDefinitionSummary {
     let parameters = hir
         .parameter_definitions_for_owner(owner_range)
-        .map(|definition| MacroParameterSignature {
+        .map(|definition| DynamicParameterSignature {
             name: definition.name.clone(),
             required: hir.parameter_is_required(owner_range, &definition.name),
         })
         .collect();
-    MacroDefinitionSummary {
+    DynamicDefinitionSummary {
         kind: kind.to_owned(),
         name: name.to_owned(),
         definition_range: owner_range,
         parameters,
-        template: hir.macro_template(kind, name, owner_range).cloned(),
+        template: hir.dynamic_template(kind, name, owner_range).cloned(),
     }
 }
 
-/// Builds the canonical invocation snippet for a resolved scripted macro signature. Snippet bodies
+/// Builds the canonical invocation snippet for a resolved dynamic definition signature. Snippet bodies
 /// use relative indentation only; the client re-indents multi-line snippets to the insertion line.
 pub(crate) fn scripted_definition_snippet(
     snapshot: &AnalysisSnapshot,
     kind_name: &str,
     definition_name: &str,
 ) -> String {
-    let Some(summary) = macro_definition_summary(snapshot, kind_name, definition_name) else {
+    let Some(summary) = dynamic_definition_summary(snapshot, kind_name, definition_name) else {
         return format!("{definition_name} = {{\n\t$0\n}}");
     };
     if summary.parameters.is_empty() {
@@ -1729,7 +1729,7 @@ pub(crate) fn semantic_property_matches(
     property: &ScriptProperty,
     scope_context: &ScopeContext,
 ) -> bool {
-    if let Some(matches) = scripted_macro_call_shape_matches(snapshot, rule, property) {
+    if let Some(matches) = dynamic_call_shape_matches(snapshot, rule, property) {
         return matches;
     }
     if !semantic_property_structure_matches(rule, property) {
@@ -1812,7 +1812,7 @@ pub(crate) fn semantic_scope_value_match(
 }
 
 /// Returns whether a property satisfies the rule shape and operator independently of its scalar
-/// spelling. Macro definition placeholders use this to defer only the binding-dependent matcher.
+/// spelling. Dynamic definition placeholders use this to defer only the binding-dependent matcher.
 pub(crate) fn semantic_property_structure_matches(
     rule: &pdx_rules::SemanticRule,
     property: &ScriptProperty,
@@ -1839,21 +1839,21 @@ pub(crate) fn semantic_property_structure_matches(
     true
 }
 
-fn scripted_macro_call_shape_matches(
+fn dynamic_call_shape_matches(
     snapshot: &AnalysisSnapshot,
     rule: &pdx_rules::SemanticRule,
     property: &ScriptProperty,
 ) -> Option<bool> {
     let type_name = match &rule.key {
         KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
-            if scripted_macro_type(snapshot, type_name) =>
+            if dynamic_definition_type(snapshot, type_name) =>
         {
             type_name
         }
         _ => return None,
     };
-    let summary = macro_definition_summary(snapshot, type_name, &property.key)?;
-    Some(scripted_macro_invocation_shape_matches(
+    let summary = dynamic_definition_summary(snapshot, type_name, &property.key)?;
+    Some(dynamic_invocation_shape_matches(
         snapshot,
         type_name,
         &summary,
@@ -1862,10 +1862,10 @@ fn scripted_macro_call_shape_matches(
     ))
 }
 
-pub(crate) fn scripted_macro_invocation_shape_matches(
+pub(crate) fn dynamic_invocation_shape_matches(
     snapshot: &AnalysisSnapshot,
     type_name: &str,
-    summary: &MacroDefinitionSummary,
+    summary: &DynamicDefinitionSummary,
     scalar: Option<&str>,
     is_block: bool,
 ) -> bool {
@@ -1884,7 +1884,7 @@ pub(crate) fn scripted_macro_invocation_shape_matches(
                 .type_descriptors
                 .iter()
                 .find(|(kind, _)| kind.eq_ignore_ascii_case(type_name))
-                .and_then(|(_, descriptor)| descriptor.scripted_macro.as_ref())
+                .and_then(|(_, descriptor)| descriptor.dynamic_definition.as_ref())
                 .map(|descriptor| descriptor.body_context.as_str());
             if body_context.is_some_and(|context| context.eq_ignore_ascii_case("trigger")) {
                 value.eq_ignore_ascii_case("yes") || value.eq_ignore_ascii_case("no")
@@ -1908,7 +1908,7 @@ pub(crate) fn semantic_dynamic_value_matches(
             || workspace_member(snapshot, "variable_name", value);
     }
     if kind == "variable" {
-        // EU4 variables may be introduced by runtime effects, scripted macro arguments, and
+        // EU4 variables may be introduced by runtime effects, dynamic definition arguments, and
         // define-style constants that are not enumerable from a workspace snapshot.
         return !value.is_empty();
     }
@@ -2032,7 +2032,7 @@ fn workspace_member_kinds(snapshot: &AnalysisSnapshot, type_name: &str) -> Vec<S
 }
 
 /// Returns members visible at this snapshot, with open overlays replacing their backing files.
-/// Macro names intentionally come from definitions, not from a static Vanilla name list.
+/// Dynamic definition names intentionally come from definitions, not from a static Vanilla name list.
 pub(crate) fn effective_workspace_member_names(
     snapshot: &AnalysisSnapshot,
     type_name: &str,
@@ -2359,8 +2359,11 @@ pub(crate) fn localisation_key_index(snapshot: &AnalysisSnapshot) -> Arc<Localis
     index
 }
 
-pub(crate) fn scripted_macro_type(snapshot: &AnalysisSnapshot, type_name: &str) -> bool {
-    snapshot.rules().scripted_macro_context(type_name).is_some()
+pub(crate) fn dynamic_definition_type(snapshot: &AnalysisSnapshot, type_name: &str) -> bool {
+    snapshot
+        .rules()
+        .dynamic_definition_context(type_name)
+        .is_some()
 }
 
 /// Per-revision view of every definition identity visible to membership queries.

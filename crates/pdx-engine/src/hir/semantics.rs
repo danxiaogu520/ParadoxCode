@@ -40,7 +40,7 @@ fn semantic_root_context_with_confidence(
     logical_path: Option<&LogicalPath>,
     key: &str,
 ) -> (Option<String>, bool) {
-    if let Some(context) = scripted_macro_path_context(rules, logical_path) {
+    if let Some(context) = dynamic_definition_path_context(rules, logical_path) {
         return (Some(context), false);
     }
     let semantic = &rules.model().semantic;
@@ -180,7 +180,7 @@ pub fn semantic_file_root_context(
         .map(|(type_name, _)| format!("type:{type_name}"))
 }
 
-pub(super) fn scripted_macro_path_context(
+pub(super) fn dynamic_definition_path_context(
     rules: &RuleSet,
     logical_path: Option<&LogicalPath>,
 ) -> Option<String> {
@@ -195,28 +195,28 @@ pub(super) fn scripted_macro_path_context(
         .type_descriptors
         .values()
         .filter_map(|descriptor| {
-            let macro_descriptor = descriptor.scripted_macro.as_ref()?;
-            if !macro_descriptor.macro_enabled
+            let dynamic_descriptor = descriptor.dynamic_definition.as_ref()?;
+            if !dynamic_descriptor.enabled
                 || !semantic_type_path_matches_lowered(descriptor, &lowered)
             {
                 return None;
             }
-            let context = macro_descriptor.body_context.trim();
+            let context = dynamic_descriptor.body_context.trim();
             (!context.is_empty()).then(|| context.to_owned())
         })
         .next()
 }
 
-pub(super) fn scripted_macro_type_context(rules: &RuleSet, type_name: &str) -> Option<String> {
+pub(super) fn dynamic_definition_type_context(rules: &RuleSet, type_name: &str) -> Option<String> {
     rules
-        .scripted_macro_context(type_name)
+        .dynamic_definition_context(type_name)
         .filter(|context| !context.is_empty())
         .map(str::to_owned)
 }
 
-pub(super) fn is_scripted_macro_type(rules: &RuleSet, type_name: &str) -> bool {
-    // Blank body contexts keep the type non-macro for shape checks, as before.
-    scripted_macro_type_context(rules, type_name).is_some()
+pub(super) fn is_dynamic_definition_type(rules: &RuleSet, type_name: &str) -> bool {
+    // Blank body contexts keep the type non-dynamic for shape checks, as before.
+    dynamic_definition_type_context(rules, type_name).is_some()
 }
 
 /// Whether a top-level property key may be a type instance for `descriptor`.
@@ -541,7 +541,11 @@ pub(super) fn lower_semantics(
     definitions.extend(semantic_type_definitions(properties, logical_path, rules));
     deduplicate_definitions(&mut definitions);
 
-    references.extend(scripted_macro_references(properties, &fact_index, rules));
+    references.extend(dynamic_definition_references(
+        properties,
+        &fact_index,
+        rules,
+    ));
     references.extend(semantic_typed_references(
         properties,
         &fact_index,
@@ -885,7 +889,7 @@ fn deduplicate_definitions(definitions: &mut Vec<HirDefinition>) {
     });
 }
 
-fn scripted_macro_references(
+fn dynamic_definition_references(
     properties: &[HirProperty],
     fact_index: &ScopeFactIndex<'_>,
     rules: &RuleSet,
@@ -902,13 +906,13 @@ fn scripted_macro_references(
         for rule in rules.semantic_rules_for_context(&fact.context) {
             let type_name = match &rule.key {
                 KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
-                    if is_scripted_macro_type(rules, type_name) =>
+                    if is_dynamic_definition_type(rules, type_name) =>
                 {
                     type_name
                 }
                 _ => continue,
             };
-            let Some(body_context) = scripted_macro_type_context(rules, type_name) else {
+            let Some(body_context) = dynamic_definition_type_context(rules, type_name) else {
                 continue;
             };
             if !body_context.eq_ignore_ascii_case(&fact.context)
@@ -921,7 +925,7 @@ fn scripted_macro_references(
                 kind: type_name.clone(),
                 name: property.key.clone(),
                 range: property.key_range,
-                origin: HirReferenceOrigin::ScriptedMacro,
+                origin: HirReferenceOrigin::DynamicDefinition,
             });
         }
     }

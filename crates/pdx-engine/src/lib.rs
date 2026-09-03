@@ -20,9 +20,9 @@ mod string_pool;
 
 pub use host::AnalysisHost;
 pub use index::{
-    Definition, FileIndexShard, FlagWrite, FlagWriteIndex, FlagWriteMembership,
-    LocalisationPreviewMap, LocalisationPreviewMapIter, MacroDefinitionSummary,
-    MacroParameterSignature, PositionMap, PositionMapIter, Reference, WorkspaceIndex,
+    Definition, DynamicDefinitionSummary, DynamicParameterSignature, FileIndexShard, FlagWrite,
+    FlagWriteIndex, FlagWriteMembership, LocalisationPreviewMap, LocalisationPreviewMapIter,
+    PositionMap, PositionMapIter, Reference, WorkspaceIndex,
 };
 pub use index_cache::{
     CURRENT_CACHE_SCHEMA_VERSION, IndexCache, IndexCacheError, IndexCacheMetadata,

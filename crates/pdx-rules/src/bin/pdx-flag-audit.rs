@@ -11,7 +11,7 @@
 //! - `engine_set`: reads that no scanned statement ever writes — the
 //!   engine-defined seed list for the unknown-flag diagnostic
 //!
-//! Names containing `$` (macro parameters) are skipped: their runtime value
+//! Names containing `$` (dynamic parameters) are skipped: their runtime value
 //! is not statically knowable.
 
 use std::collections::BTreeMap;
