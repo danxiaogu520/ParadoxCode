@@ -9,10 +9,10 @@ use pdx_engine::hir::{
 };
 use pdx_rules::{KeyMatcher, RuleShape, ValueMatcher};
 
-use crate::macro_expansion::MacroExpansionSession;
 use crate::semantic::{
-    resolve_macro_definition, scripted_macro_type, semantic_child_scope, semantic_rule_key_matches,
-    semantic_scope_allows, semantic_transition_destination,
+    MacroDefinitionIdentity, ResolvedMacroDefinition, resolve_macro_definition,
+    scripted_macro_type, semantic_child_scope, semantic_rule_key_matches, semantic_scope_allows,
+    semantic_transition_destination,
 };
 use crate::support::{ScopeContext, ScriptProperty};
 use crate::types::{CancellationToken, Cancelled};
@@ -108,7 +108,7 @@ fn infer_macro_argument_constraints(
     };
     let bindings = invocation_bindings(invocation, Some(target));
     let mut collector = ConstraintCollector::new(snapshot, cancellation);
-    if collector.expansion.enter(&resolved).is_err() {
+    if !collector.budget.enter(&resolved) {
         return Ok(MacroArgumentConstraints::default());
     }
     let result = (|| {
@@ -123,7 +123,7 @@ fn infer_macro_argument_constraints(
             }
         })
     })();
-    collector.expansion.leave();
+    collector.budget.leave();
     result
 }
 
@@ -192,7 +192,7 @@ fn invocation_bindings(
 struct ConstraintCollector<'a> {
     snapshot: &'a AnalysisSnapshot,
     cancellation: &'a CancellationToken,
-    expansion: MacroExpansionSession,
+    budget: SymbolicBudget,
     exhausted: bool,
     value_sites: Vec<MacroValueConstraintSite>,
     quoted_script_sites: Vec<MacroQuotedScriptConstraintSite>,
@@ -203,7 +203,7 @@ impl<'a> ConstraintCollector<'a> {
         Self {
             snapshot,
             cancellation,
-            expansion: MacroExpansionSession::default(),
+            budget: SymbolicBudget::default(),
             exhausted: false,
             value_sites: Vec::new(),
             quoted_script_sites: Vec::new(),
@@ -277,7 +277,7 @@ impl<'a> ConstraintCollector<'a> {
                 .cloned()
                 .unwrap_or(SymbolicToken::Unknown);
             if let SymbolicToken::Concrete(value) = &rendered
-                && self.expansion.charge_token_bytes(value.len()).is_err()
+                && !self.budget.charge_token_bytes(value.len())
             {
                 self.exhausted = true;
                 return SymbolicToken::Unknown;
@@ -298,7 +298,7 @@ impl<'a> ConstraintCollector<'a> {
                 }
             }
         }
-        if self.expansion.charge_token_bytes(value.len()).is_err() {
+        if !self.budget.charge_token_bytes(value.len()) {
             self.exhausted = true;
             SymbolicToken::Unknown
         } else {
@@ -461,7 +461,7 @@ impl<'a> ConstraintCollector<'a> {
             }
             return Ok(true);
         };
-        if self.expansion.enter(&resolved).is_err() {
+        if !self.budget.enter(&resolved) {
             if symbolic_container_contains_target(arguments) {
                 self.exhausted = true;
             }
@@ -472,19 +472,88 @@ impl<'a> ConstraintCollector<'a> {
             let container = self.instantiate_items(&template.items, &bindings)?;
             self.collect_container(&container, &resolved.body_context, &[], scope)
         })();
-        self.expansion.leave();
+        self.budget.leave();
         result?;
         Ok(true)
     }
 
     fn charge_node(&mut self) -> bool {
-        if self.expansion.charge_node().is_err() {
+        if !self.budget.charge_node() {
             self.exhausted = true;
             false
         } else {
             true
         }
     }
+}
+
+/// Cycle guard and instantiation budgets for the symbolic walker. Genuine
+/// recursion is rejected earlier by definition-site cycle analysis; these
+/// bounds keep a deep acyclic fan-out from starving completion. Each budget
+/// can be raised or lowered through an environment variable so a pathological
+/// workspace can be diagnosed without a new build.
+#[derive(Debug, Default)]
+struct SymbolicBudget {
+    stack: Vec<MacroDefinitionIdentity>,
+    nodes: usize,
+    token_bytes: usize,
+}
+
+impl SymbolicBudget {
+    fn enter(&mut self, resolved: &ResolvedMacroDefinition) -> bool {
+        if self.stack.contains(&resolved.identity) || self.stack.len() >= max_symbolic_depth() {
+            return false;
+        }
+        self.stack.push(resolved.identity.clone());
+        true
+    }
+
+    fn leave(&mut self) {
+        let _ = self.stack.pop();
+    }
+
+    fn charge_node(&mut self) -> bool {
+        self.nodes = self.nodes.saturating_add(1);
+        self.nodes <= max_symbolic_nodes()
+    }
+
+    fn charge_token_bytes(&mut self, bytes: usize) -> bool {
+        self.token_bytes = self.token_bytes.saturating_add(bytes);
+        self.token_bytes <= max_symbolic_token_bytes()
+    }
+}
+
+fn max_symbolic_depth() -> usize {
+    static VALUE: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *VALUE.get_or_init(|| env_budget("PDX_MACRO_EXPANSION_DEPTH", 32, 1, 1024))
+}
+
+fn max_symbolic_nodes() -> usize {
+    static VALUE: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *VALUE.get_or_init(|| env_budget("PDX_MACRO_EXPANDED_NODES", 200_000, 1, 100_000_000))
+}
+
+fn max_symbolic_token_bytes() -> usize {
+    static VALUE: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *VALUE.get_or_init(|| {
+        env_budget(
+            "PDX_MACRO_EXPANDED_TOKEN_BYTES",
+            4 * 1024 * 1024,
+            1,
+            u64::MAX as usize,
+        )
+    })
+}
+
+/// Reads one budget override; unparseable values fall back to the default so a
+/// typo can never silently disable the safety net.
+fn env_budget(name: &str, default: usize, min: usize, max: usize) -> usize {
+    let Some(raw) = std::env::var(name).ok() else {
+        return default;
+    };
+    raw.trim()
+        .parse::<usize>()
+        .map_or(default, |parsed| parsed.clamp(min, max))
 }
 
 fn symbolic_bindings(arguments: &[SymbolicProperty]) -> BTreeMap<String, SymbolicToken> {

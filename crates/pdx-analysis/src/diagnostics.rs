@@ -5,9 +5,6 @@ use crate::lints::{
 use crate::localisation::localisation_command_diagnostics;
 use crate::macro_contracts;
 use crate::macro_cycles;
-use crate::macro_expansion::{
-    ExpansionEnterFailure, ExpansionFailure, MacroExpansionSession, scalar_argument_bindings,
-};
 use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
 use crate::resolution::*;
 use crate::semantic::*;
@@ -24,8 +21,6 @@ use pdx_engine::{
 use pdx_parser::{FileFormat, SyntaxError};
 use pdx_rules::{KeyMatcher, RuleShape};
 use pdx_text::TextRange;
-
-const MAX_EXPANDED_DIAGNOSTICS_PER_INVOCATION: usize = 32;
 
 /// Single finalization point for diagnostics emitted by syntax, semantic, and reference passes.
 ///
@@ -193,7 +188,7 @@ pub(crate) fn analyze_input_with_cancellation(
     let resolution = DirectResolutionContext::new(snapshot);
     let mut diagnostics = DiagnosticCollector::new(syntax_diagnostics(input));
     // Definition-site macro analyses run first: they warm the per-revision
-    // caches the expansion guard and call-site checks consult.
+    // caches the call-site checks consult.
     diagnostics
         .values
         .extend(macro_cycles::macro_cycle_diagnostics(
@@ -378,7 +373,6 @@ pub(crate) fn semantic_rule_diagnostics(
     let root_bare_values = script_bare_values(input, parsed.root());
     cancellation.checkpoint()?;
     let mut diagnostics = Vec::new();
-    let mut expansion = MacroExpansionSession::default();
     let mut quoted_scripts = QuotedScriptSession::new(cancellation);
     if let Some(context) = semantic_file_root_context(snapshot, input.path.as_ref()) {
         let root_refs: Vec<&ScriptProperty> = roots.iter().collect();
@@ -401,7 +395,6 @@ pub(crate) fn semantic_rule_diagnostics(
             cancellation,
             block_container: true,
             container_range: parsed.root().range(),
-            expansion: &mut expansion,
             quoted_scripts: &mut quoted_scripts,
             quoted_script_depth: 0,
             scope_diagnostics_deferred: false,
@@ -469,7 +462,6 @@ pub(crate) fn semantic_rule_diagnostics(
                     cancellation,
                     block_container: child.block_range.is_some(),
                     container_range: child.block_range.unwrap_or(child.key_range),
-                    expansion: &mut expansion,
                     quoted_scripts: &mut quoted_scripts,
                     quoted_script_depth: 0,
                     scope_diagnostics_deferred: false,
@@ -535,7 +527,6 @@ pub(crate) fn semantic_rule_diagnostics(
                 cancellation,
                 block_container: property.block_range.is_some(),
                 container_range: property.block_range.unwrap_or(property.key_range),
-                expansion: &mut expansion,
                 quoted_scripts: &mut quoted_scripts,
                 quoted_script_depth: 0,
                 scope_diagnostics_deferred: false,
@@ -586,15 +577,14 @@ struct SemanticValidationInput<'data, 'hir, 'session, 'cancel> {
     cancellation: &'data CancellationToken,
     block_container: bool,
     container_range: TextRange,
-    expansion: &'data mut MacroExpansionSession,
     quoted_scripts: &'session mut QuotedScriptSession<'cancel>,
     quoted_script_depth: usize,
     /// True when scope decisions for this subtree belong to the macro-contract
     /// layer (definition-site entry contracts plus call-site validation) rather
-    /// than this walk. Set for scripted-macro expansion trees: their scope
-    /// findings duplicated the contract layer's, at call-site positions and
-    /// once per invocation. Content validation (keys, values, cardinality,
-    /// bindings) still runs.
+    /// than this walk. Set for quoted-script payloads of dynamic-rule
+    /// invocations: their scope findings would duplicate the contract layer's,
+    /// at call-site positions and once per invocation. Content validation
+    /// (keys, values, cardinality, bindings) still runs.
     scope_diagnostics_deferred: bool,
     /// Key of the property owning this container, when the container is a
     /// property block. EU4 accepts `else`/`else_if` both as siblings after an
@@ -653,7 +643,6 @@ fn validate_semantic_container(
         cancellation,
         block_container,
         container_range,
-        expansion,
         quoted_scripts,
         quoted_script_depth,
         scope_diagnostics_deferred,
@@ -678,10 +667,7 @@ fn validate_semantic_container(
         || profile.semantic_context_inherits(context, "trigger");
     let effect_like = context.eq_ignore_ascii_case("effect")
         || profile.semantic_context_inherits(context, "effect");
-    // Structural lints describe authored shapes only; scripted-macro expansion
-    // output belongs to its definition site and is linted there.
-    let authored = expansion.authoring();
-    if authored && (trigger_like || effect_like) {
+    if trigger_like || effect_like {
         lint_conditional_siblings(properties, enclosing_key, diagnostics);
     }
     // Case-folded occurrence counting with a linear scan: containers repeat a handful of
@@ -710,10 +696,10 @@ fn validate_semantic_container(
             && profile.is_transparent_scope_wrapper(&property.key))
             || ((trigger_like || effect_like)
                 && profile.is_dynamic_scope_expression(&property.key));
-        if authored && trigger_like && is_boolean_container_key(&property.key) {
+        if trigger_like && is_boolean_container_key(&property.key) {
             lint_boolean_container(property, diagnostics);
         }
-        if authored && (trigger_like || effect_like) && is_conditional_key(&property.key) {
+        if (trigger_like || effect_like) && is_conditional_key(&property.key) {
             lint_conditional_block(property, effect_like, diagnostics);
         }
         let matching =
@@ -905,41 +891,20 @@ fn validate_semantic_container(
                             && property.range.end() <= definition.owner_range.end()
                     }))
             });
-            let arguments_allow_expansion = parameterized_invocation
-                || validate_scripted_macro_arguments(
+            if !parameterized_invocation {
+                validate_scripted_macro_arguments(
                     snapshot,
                     applicable,
                     property,
                     scope,
                     diagnostics,
                 );
-            if !parameterized_invocation {
                 validate_dynamic_dispatch_keys(snapshot, applicable, property, diagnostics);
                 validate_dynamic_quoted_payloads(
                     ValidationState {
                         snapshot,
                         diagnostics,
                         cancellation,
-                        expansion,
-                        quoted_scripts,
-                    },
-                    applicable,
-                    property,
-                    scope,
-                    quoted_script_depth,
-                )?;
-            }
-            if valid
-                && !scoped_matching.is_empty()
-                && arguments_allow_expansion
-                && !parameterized_invocation
-            {
-                validate_scripted_macro_expansion(
-                    ValidationState {
-                        snapshot,
-                        diagnostics,
-                        cancellation,
-                        expansion,
                         quoted_scripts,
                     },
                     applicable,
@@ -1068,7 +1033,6 @@ fn validate_semantic_container(
                     cancellation,
                     block_container: property.block_range.is_some(),
                     container_range: property.block_range.unwrap_or(property.key_range),
-                    expansion,
                     quoted_scripts,
                     quoted_script_depth,
                     scope_diagnostics_deferred,
@@ -1098,7 +1062,6 @@ fn validate_semantic_container(
                     snapshot,
                     diagnostics,
                     cancellation,
-                    expansion,
                     quoted_scripts,
                 },
                 &next_context,
@@ -1174,7 +1137,6 @@ fn validate_semantic_container(
                     cancellation,
                     block_container: true,
                     container_range: property.block_range.unwrap_or(property.key_range),
-                    expansion,
                     quoted_scripts,
                     quoted_script_depth,
                     scope_diagnostics_deferred,
@@ -1192,7 +1154,6 @@ fn validate_semantic_container(
                     cancellation,
                     block_container: true,
                     container_range: property.block_range.unwrap_or(property.key_range),
-                    expansion,
                     quoted_scripts,
                     quoted_script_depth,
                     scope_diagnostics_deferred,
@@ -1216,7 +1177,6 @@ fn validate_semantic_container(
             cancellation,
             block_container: property.block_range.is_some(),
             container_range: property.block_range.unwrap_or(property.key_range),
-            expansion,
             quoted_scripts,
             quoted_script_depth,
             scope_diagnostics_deferred,
@@ -1395,7 +1355,6 @@ struct ValidationState<'data, 'session, 'cancel> {
     snapshot: &'data AnalysisSnapshot,
     diagnostics: &'data mut Vec<Diagnostic>,
     cancellation: &'data CancellationToken,
-    expansion: &'data mut MacroExpansionSession,
     quoted_scripts: &'session mut QuotedScriptSession<'cancel>,
 }
 
@@ -1412,7 +1371,6 @@ fn validate_quoted_script(
         snapshot,
         diagnostics,
         cancellation,
-        expansion,
         quoted_scripts,
     } = state;
     cancellation.checkpoint()?;
@@ -1471,7 +1429,6 @@ fn validate_quoted_script(
         cancellation,
         block_container: true,
         container_range: range,
-        expansion,
         quoted_scripts,
         quoted_script_depth: depth.saturating_add(1),
         scope_diagnostics_deferred,
@@ -1494,245 +1451,15 @@ fn owner_local_parameter_in_range(
     })
 }
 
-fn validate_scripted_macro_expansion(
-    state: ValidationState<'_, '_, '_>,
-    rules: &[&pdx_rules::SemanticRule],
-    property: &ScriptProperty,
-    scope: &ScopeContext,
-    quoted_script_depth: usize,
-) -> Result<(), Cancelled> {
-    // P2 shadow of the dynamic-rules refactor: the expansion machinery keeps
-    // running — cycle guard, budgets, argument binding, body re-validation —
-    // as the arbitration baseline for the derived dynamic-rule layer, but its
-    // findings are no longer published: call sites validate against
-    // `DynamicRuleRow` and the definition body is checked at its definition.
-    // Set PDX_MACRO_EXPANSION_PUBLISH=1 to restore publication (arbitration,
-    // debugging) or PDX_DYNAMIC_RULES_SHADOW=1 to log shadow findings.
-    let ValidationState {
-        snapshot,
-        diagnostics: output,
-        cancellation,
-        expansion,
-        quoted_scripts,
-    } = state;
-    let mut sink: Vec<Diagnostic> = Vec::new();
-    let mut macro_name: Option<String> = None;
-    let result = expand_scripted_macro_into_sink(
-        ValidationState {
-            snapshot,
-            diagnostics: &mut sink,
-            cancellation,
-            expansion,
-            quoted_scripts,
-        },
-        rules,
-        property,
-        scope,
-        quoted_script_depth,
-        &mut macro_name,
-    );
-    publish_or_shadow_expansion(macro_name.as_deref(), &sink, output);
-    result
-}
-
-/// Publishes or shadows the expansion sink; see
-/// [`validate_scripted_macro_expansion`].
-fn publish_or_shadow_expansion(
-    macro_name: Option<&str>,
-    sink: &[Diagnostic],
-    output: &mut Vec<Diagnostic>,
-) {
-    if std::env::var("PDX_MACRO_EXPANSION_PUBLISH").is_ok_and(|value| !value.is_empty()) {
-        output.extend(sink.iter().cloned());
-        return;
-    }
-    if std::env::var("PDX_DYNAMIC_RULES_SHADOW").is_ok_and(|value| !value.is_empty())
-        && let Some(name) = macro_name
-    {
-        for diagnostic in sink {
-            eprintln!(
-                "[shadow-expansion] `{name}` {}: {}",
-                diagnostic.code.as_str(),
-                diagnostic.message
-            );
-        }
-    }
-}
-
-fn expand_scripted_macro_into_sink(
-    state: ValidationState<'_, '_, '_>,
-    rules: &[&pdx_rules::SemanticRule],
-    property: &ScriptProperty,
-    scope: &ScopeContext,
-    quoted_script_depth: usize,
-    macro_name: &mut Option<String>,
-) -> Result<(), Cancelled> {
-    let ValidationState {
-        snapshot,
-        diagnostics,
-        cancellation,
-        expansion,
-        quoted_scripts,
-    } = state;
-    let Some(type_name) = rules.iter().find_map(|rule| match &rule.key {
-        pdx_rules::KeyMatcher::Type(type_name) | pdx_rules::KeyMatcher::Dynamic(type_name)
-            if scripted_macro_type(snapshot, type_name) =>
-        {
-            Some(type_name.as_str())
-        }
-        _ => None,
-    }) else {
-        return Ok(());
-    };
-    let Some(resolved) = resolve_macro_definition(snapshot, type_name, &property.key) else {
-        return Ok(());
-    };
-    *macro_name = Some(resolved.summary.name.clone());
-    let Some(template) = resolved.summary.template.as_ref() else {
-        return Ok(());
-    };
-    match expansion.enter(&resolved) {
-        Ok(()) => {}
-        Err(ExpansionEnterFailure::Cycle(chain)) => {
-            // Definition-site SCC analysis already reports statically known
-            // cycles at every participating definition; the call-site report
-            // stays reserved for cycles only expansion can reveal.
-            if !macro_cycles::macro_cycle_reported(
-                snapshot,
-                &resolved.summary.kind,
-                &resolved.summary.name,
-            ) {
-                diagnostics.push(Diagnostic::new(
-                    DiagnosticCode::MacroExpansionCycle,
-                    DiagnosticCode::MacroExpansionCycle.severity(),
-                    property.key_range,
-                    format!("scripted macro expansion cycle: {}", chain.join(" -> ")),
-                ));
-            }
-            return Ok(());
-        }
-        Err(ExpansionEnterFailure::Limit(limit)) => {
-            if expansion.should_report_limit() {
-                diagnostics.push(macro_expansion_limit(property.key_range, limit));
-            }
-            return Ok(());
-        }
-    }
-    let expanded = match expansion.expand(
-        template,
-        property,
-        cancellation,
-        quoted_scripts,
-        quoted_script_depth,
-    ) {
-        Ok(Ok(expanded)) => expanded,
-        Ok(Err(ExpansionFailure::MissingParameter(name))) => {
-            diagnostics.push(Diagnostic::new(
-                DiagnosticCode::Cardinality,
-                DiagnosticCode::Cardinality.severity(),
-                property.key_range,
-                format!(
-                    "macro `{}` expansion requires parameter `{name}` in the active branch",
-                    resolved.summary.name
-                ),
-            ));
-            expansion.leave();
-            return Ok(());
-        }
-        Ok(Err(ExpansionFailure::InvalidArgument { name, range })) => {
-            diagnostics.push(Diagnostic::new(
-                DiagnosticCode::InvalidValue,
-                DiagnosticCode::InvalidValue.severity(),
-                range,
-                format!("macro parameter `{name}` must be a scalar token for expansion"),
-            ));
-            expansion.leave();
-            return Ok(());
-        }
-        Ok(Err(ExpansionFailure::OmitOptionalProperty)) => {
-            expansion.leave();
-            return Ok(());
-        }
-        Ok(Err(ExpansionFailure::Limit(limit))) => {
-            if expansion.should_report_limit() {
-                diagnostics.push(macro_expansion_limit(property.key_range, limit));
-            }
-            expansion.leave();
-            return Ok(());
-        }
-        Err(cancelled) => {
-            expansion.leave();
-            return Err(cancelled);
-        }
-    };
-    let first_expanded_diagnostic = diagnostics.len();
-    let expanded_property_refs: Vec<&ScriptProperty> = expanded.properties.iter().collect();
-    let expanded_value_refs: Vec<&(std::sync::Arc<str>, TextRange)> =
-        expanded.bare_values.iter().collect();
-    let validation = validate_semantic_container(SemanticValidationInput {
-        snapshot,
-        context: &resolved.body_context,
-        parent_path: &[],
-        properties: &expanded_property_refs,
-        bare_values: &expanded_value_refs,
-        scope,
-        hir: None,
-        diagnostics,
-        cancellation,
-        block_container: true,
-        container_range: property.key_range,
-        expansion,
-        quoted_scripts,
-        quoted_script_depth: 0,
-        // Scope authority for an expansion tree sits with the macro-contract
-        // layer: the definition-site entry contract and the call-site check.
-        scope_diagnostics_deferred: true,
-        enclosing_key: None,
-    });
-    expansion.leave();
-    validation?;
-    let expanded_diagnostic_count = diagnostics.len().saturating_sub(first_expanded_diagnostic);
-    if expanded_diagnostic_count > MAX_EXPANDED_DIAGNOSTICS_PER_INVOCATION {
-        let omitted = expanded_diagnostic_count - MAX_EXPANDED_DIAGNOSTICS_PER_INVOCATION;
-        diagnostics.truncate(first_expanded_diagnostic + MAX_EXPANDED_DIAGNOSTICS_PER_INVOCATION);
-        diagnostics.push(
-            Diagnostic::new(
-                DiagnosticCode::AnalysisIncomplete,
-                DiagnosticCode::AnalysisIncomplete.severity(),
-                property.key_range,
-                format!("scripted macro expansion omitted {omitted} additional diagnostic(s)"),
-            )
-            .with_certainty(DiagnosticCertainty::Unresolved),
-        );
-    }
-    for diagnostic in &mut diagnostics[first_expanded_diagnostic..] {
-        diagnostic.message = format!(
-            "in expansion of `{}`: {}",
-            resolved.summary.name, diagnostic.message
-        );
-    }
-    Ok(())
-}
-
-fn macro_expansion_limit(range: TextRange, limit: &'static str) -> Diagnostic {
-    Diagnostic::new(
-        DiagnosticCode::AnalysisIncomplete,
-        DiagnosticCode::AnalysisIncomplete.severity(),
-        range,
-        format!("scripted macro expansion exceeded the {limit} limit"),
-    )
-    .with_certainty(DiagnosticCertainty::Unresolved)
-}
-
 fn validate_scripted_macro_arguments(
     snapshot: &AnalysisSnapshot,
     rules: &[&pdx_rules::SemanticRule],
     property: &ScriptProperty,
     scope: &ScopeContext,
     diagnostics: &mut Vec<Diagnostic>,
-) -> bool {
+) {
     if property.block_range.is_none() {
-        return true;
+        return;
     }
     let summary = rules.iter().find_map(|rule| {
         let type_name = match &rule.key {
@@ -1746,7 +1473,7 @@ fn validate_scripted_macro_arguments(
         macro_definition_summary(snapshot, type_name, &property.key)
     });
     let Some(summary) = summary else {
-        return true;
+        return;
     };
 
     let mut counts = std::collections::BTreeMap::<String, usize>::new();
@@ -1788,7 +1515,7 @@ fn validate_scripted_macro_arguments(
                 missing.join(", ")
             ),
         ));
-        return false;
+        return;
     }
     // A conditional whose guard is supplied (or, for `[!X]`, absent)
     // activates its body; parameters the body then uses without a runtime
@@ -1813,17 +1540,16 @@ fn validate_scripted_macro_arguments(
                     summary.name
                 ),
             ));
-            return false;
+            return;
         }
     }
     // The derived dynamic row carries the usage-site value constraints that
     // the definition body infers for each parameter; check the caller's
-    // arguments against them here, at the call site, instead of validating a
-    // rendered expansion.
+    // arguments against them here, at the call site, without instantiating
+    // the definition body.
     if let Some(row) = row {
         validate_dynamic_argument_values(snapshot, &row, property, scope, diagnostics);
     }
-    true
 }
 
 /// Parameters that activated conditional branches use without a runtime
@@ -2117,7 +1843,6 @@ fn validate_forwarded_to_any_parameter(
 /// `$BODY$` usage, quoted template tokens, or QuotedScript-shape sites): the
 /// quoted string is parsed and its statements validated in the definition's
 /// body context, with diagnostics mapped onto the argument's quoted range.
-/// This is the row-driven replacement for expansion-tree payload validation.
 fn validate_dynamic_quoted_payloads(
     state: ValidationState<'_, '_, '_>,
     rules: &[&pdx_rules::SemanticRule],
@@ -2132,7 +1857,6 @@ fn validate_dynamic_quoted_payloads(
         snapshot,
         diagnostics,
         cancellation,
-        expansion,
         quoted_scripts,
     } = state;
     let Some(row) = dynamic_row_for_invocation(snapshot, rules, invocation) else {
@@ -2161,7 +1885,6 @@ fn validate_dynamic_quoted_payloads(
                 snapshot,
                 diagnostics: &mut *diagnostics,
                 cancellation,
-                expansion: &mut *expansion,
                 quoted_scripts: &mut *quoted_scripts,
             },
             &row.context,
@@ -2170,7 +1893,7 @@ fn validate_dynamic_quoted_payloads(
             argument,
             quoted_script_depth,
             // Scope authority for payload statements sits with the
-            // definition-site contract, as it did for expansion trees.
+            // definition-site contract, not this call-site walk.
             true,
         )?;
     }
@@ -2242,9 +1965,9 @@ fn effective_parameter_sites(
 
 /// Renders the `$param$` keys of a dynamically dispatching scripted
 /// definition with the caller's argument bindings and rejects bindings that
-/// do not name a known key in the definition's body context. This string-level
-/// key check is the only call-site residue of macro expansion: no tree is
-/// instantiated and the body itself is validated at its definition.
+/// do not name a known key in the definition's body context. The check stays
+/// string-level: no tree is instantiated and the body itself is validated at
+/// its definition.
 fn validate_dynamic_dispatch_keys(
     snapshot: &AnalysisSnapshot,
     rules: &[&pdx_rules::SemanticRule],
@@ -2277,7 +2000,7 @@ fn validate_dynamic_dispatch_keys(
     let Some(template) = resolved.summary.template.as_ref() else {
         return;
     };
-    let bindings = scalar_argument_bindings(property);
+    let bindings = macro_cycles::scalar_argument_bindings(property);
     let mut walker = DispatchKeyWalker {
         snapshot,
         context: resolved.body_context.clone(),
@@ -2326,7 +2049,7 @@ impl DispatchKeyWalker<'_> {
     /// argument list rather than statements. Covers literal callee names and
     /// callee names rendered from a fully-bound `$param$` key; an unbound or
     /// partially-rendered key makes the block unknowable, and unknowable
-    /// blocks stay silent to match expansion's omit-on-unbound semantics.
+    /// blocks stay silent rather than report against a guessed target.
     fn block_is_argument_list(&self, property: &MacroTemplateProperty) -> bool {
         let Some(rendered) = self.rendered_key(property) else {
             return true;

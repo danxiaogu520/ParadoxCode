@@ -21,7 +21,6 @@ use pdx_engine::{AnalysisSnapshot, DocumentId, DocumentSource, SourceFileId};
 use pdx_parser::FileFormat;
 use pdx_text::TextRange;
 
-use crate::macro_expansion::scalar_argument_bindings;
 use crate::semantic::{probe_query_cache, resolve_macro_definition, scripted_macro_type};
 use crate::support::{
     ParsedContent, ParsedInput, ScriptProperty, input_for_document, input_for_source_file,
@@ -80,14 +79,6 @@ pub(crate) fn macro_cycle_diagnostics(
         ));
     }
     Ok(diagnostics)
-}
-
-/// True when `(kind, name)` already has a definition-site cycle diagnostic, so
-/// the expansion-time guard can stay silent for the same root cause.
-pub(crate) fn macro_cycle_reported(snapshot: &AnalysisSnapshot, kind: &str, name: &str) -> bool {
-    let revision = snapshot.revision();
-    probe_query_cache::<MacroCycleReport>(snapshot, revision, &[CYCLE_CACHE_KEY])
-        .is_some_and(|report| report.message(kind, name).is_some())
 }
 
 pub(crate) fn macro_cycle_report(
@@ -633,4 +624,18 @@ fn cycle_chain(component: &[usize], edges: &[Vec<usize>]) -> Vec<usize> {
     // Unreachable for a strongly connected component with more than one member;
     // fall back to the member list so the message never panics.
     component.to_vec()
+}
+
+/// Scalar argument bindings of one scripted invocation, keyed by lowercased
+/// parameter name (later duplicates win, matching engine lookups). Only scalar
+/// arguments can name another scripted definition, so block arguments are
+/// omitted; callers treat them as unresolvable.
+pub(crate) fn scalar_argument_bindings(invocation: &ScriptProperty) -> BTreeMap<String, String> {
+    let mut bindings = BTreeMap::new();
+    for argument in &invocation.block {
+        if let Some((value, _)) = &argument.scalar {
+            bindings.insert(argument.key.to_ascii_lowercase(), value.to_string());
+        }
+    }
+    bindings
 }
