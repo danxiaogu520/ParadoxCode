@@ -408,46 +408,6 @@
     },
     {
       "table": "enums",
-      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:25:0",
-      "source_order": 5260,
-      "fields": {
-        "child_count": "380",
-        "key": "enum[bribe_effect_options]",
-        "line": "287",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "enums",
-      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:61:0",
-      "source_order": 5701,
-      "fields": {
-        "child_count": "109",
-        "key": "enum[scaling_with_estate_influence_options]",
-        "line": "1858",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "enums",
-      "logical_id": "common/scripted_triggers_and_effects:common/scripted_triggers_and_effects:root:8:0",
-      "source_order": 5177,
-      "fields": {
-        "directives": "cardinality 1..3",
-        "key": "enum[power_categories]",
-        "line": "96",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "yes"
-      }
-    },
-    {
-      "table": "enums",
       "logical_id": "common/trade_consolidated:common/trade_consolidated:root:4:0",
       "source_order": 6250,
       "fields": {

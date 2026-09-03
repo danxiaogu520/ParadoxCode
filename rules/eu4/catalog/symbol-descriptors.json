@@ -241,11 +241,6 @@
       "case_sensitive": false
     },
     {
-      "kind_id": "bribe_effect_options",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
       "kind_id": "building",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
@@ -8072,11 +8067,6 @@
     },
     {
       "kind_id": "ruler_personality",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
-      "kind_id": "scaling_with_estate_influence_options",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },
