@@ -278,7 +278,7 @@ fn build_dynamic_rule_report(
         };
         let mut derivation = Derivation::new(snapshot, profile);
         if let Some(template) = resolved.summary.template.as_ref() {
-            derivation.walk_items(&template.items, &resolved.body_context, entry_flow);
+            derivation.walk_items(&template.items, &resolved.body_context, &[], entry_flow);
         }
         let parameters = merge_parameter_rows(&resolved.summary.parameters, &derivation);
         let row = DynamicRuleRow {
@@ -385,16 +385,22 @@ impl<'a> Derivation<'a> {
         }
     }
 
-    fn walk_items(&mut self, items: &[MacroTemplateItem], context: &str, flow: ScopeFlow) {
+    fn walk_items(
+        &mut self,
+        items: &[MacroTemplateItem],
+        context: &str,
+        path: &[Arc<str>],
+        flow: ScopeFlow,
+    ) {
         for item in items {
             match item {
                 MacroTemplateItem::Property(property) => {
-                    self.walk_property(property, context, flow.clone());
+                    self.walk_property(property, context, path, flow.clone());
                 }
                 MacroTemplateItem::Conditional(conditional) => {
                     // A conditional branch is active whenever its parameter is
                     // supplied, so it must stand on its own.
-                    self.walk_items(&conditional.items, context, flow.clone());
+                    self.walk_items(&conditional.items, context, path, flow.clone());
                 }
                 MacroTemplateItem::BareValue(token) => {
                     // A bare `$PARAM$` is a payload injection: the caller
@@ -408,7 +414,13 @@ impl<'a> Derivation<'a> {
         }
     }
 
-    fn walk_property(&mut self, property: &MacroTemplateProperty, context: &str, flow: ScopeFlow) {
+    fn walk_property(
+        &mut self,
+        property: &MacroTemplateProperty,
+        context: &str,
+        path: &[Arc<str>],
+        flow: ScopeFlow,
+    ) {
         if token_has_parameter(&property.key) {
             self.dynamic_dispatch = true;
             for name in token_parameters(&property.key) {
@@ -418,7 +430,7 @@ impl<'a> Derivation<'a> {
             // is still walked under an unknown scope so parameter usage and
             // inner scope switches are not lost.
             if let MacroTemplateValue::Block { items, .. } = &property.value {
-                self.walk_items(items, context, ScopeFlow::Unknown);
+                self.walk_items(items, context, path, ScopeFlow::Unknown);
             }
             return;
         }
@@ -436,7 +448,9 @@ impl<'a> Derivation<'a> {
             // trigger context `THIS` denotes the entry scope itself and keeps
             // the current flow.
             if let MacroTemplateValue::Block { items, .. } = &property.value {
-                self.walk_items(items, context, child_flow);
+                // The re-targeted subtree starts a fresh rule namespace so
+                // inner statements keep matching root-level rows.
+                self.walk_items(items, context, &[], child_flow);
             }
             return;
         }
@@ -448,14 +462,14 @@ impl<'a> Derivation<'a> {
         }
         let wants_block = matches!(property.value, MacroTemplateValue::Block { .. });
         let matching: Vec<&pdx_rules::SemanticRule> =
-            semantic_rules_for_container_key(self.snapshot, context, &[], key)
+            semantic_rules_for_container_key(self.snapshot, context, path, key)
                 .into_iter()
                 .filter(|rule| {
-                    semantic_rule_key_matches(self.snapshot, rule, &[], key)
+                    semantic_rule_key_matches(self.snapshot, rule, path, key)
                         && rule_has_shape(rule, wants_block)
                 })
                 .collect();
-        self.record_parameter_sites(property, &matching);
+        self.record_parameter_sites(property, path, &matching);
 
         // Scope gate: which reachable scopes execute this statement?
         let accepted = self.accepted_scopes(&flow, &matching);
@@ -474,7 +488,7 @@ impl<'a> Derivation<'a> {
             // The statement cannot run, but its subtree may still carry
             // parameter usage; walk it opaquely to keep collecting.
             if let MacroTemplateValue::Block { items, .. } = &property.value {
-                self.walk_items(items, context, ScopeFlow::Unknown);
+                self.walk_items(items, context, &[], ScopeFlow::Unknown);
             }
             return;
         }
@@ -491,7 +505,7 @@ impl<'a> Derivation<'a> {
                 required_scopes: Vec::new(),
             });
             if let MacroTemplateValue::Block { items, .. } = &property.value {
-                self.walk_items(items, context, ScopeFlow::Unknown);
+                self.walk_items(items, context, &[], ScopeFlow::Unknown);
             }
             return;
         }
@@ -535,7 +549,15 @@ impl<'a> Derivation<'a> {
         }
 
         if let MacroTemplateValue::Block { items, .. } = &property.value {
-            self.walk_block_children(items, context, &matching, flow);
+            // A child_context switch starts a fresh rule namespace; only
+            // same-context accumulation extends the path (mirroring
+            // `semantic_transition_destination`).
+            let child_path_vec = if matching.iter().any(|rule| rule.child_context.is_some()) {
+                Vec::new()
+            } else {
+                child_path(path, key)
+            };
+            self.walk_block_children(items, context, &child_path_vec, &matching, flow);
         }
     }
 
@@ -546,6 +568,7 @@ impl<'a> Derivation<'a> {
         &mut self,
         items: &[MacroTemplateItem],
         context: &str,
+        path: &[Arc<str>],
         matching: &[&pdx_rules::SemanticRule],
         flow: ScopeFlow,
     ) {
@@ -573,7 +596,7 @@ impl<'a> Derivation<'a> {
                 Some(accepted) if !accepted.is_empty() => ScopeFlow::Known(accepted),
                 _ => flow.clone(),
             };
-            self.walk_items(items, &child_context, child_flow);
+            self.walk_items(items, &child_context, path, child_flow);
             return;
         }
         let pushed: BTreeSet<String> = containers
@@ -586,10 +609,10 @@ impl<'a> Derivation<'a> {
         if pushed.is_empty() || register_retargeting {
             // No single pushed scope (unknown statement, quoted script, or a
             // register rewrite): opaque subtree.
-            self.walk_items(items, &child_context, ScopeFlow::Unknown);
+            self.walk_items(items, &child_context, path, ScopeFlow::Unknown);
             return;
         }
-        self.walk_items(items, &child_context, ScopeFlow::Known(pushed));
+        self.walk_items(items, &child_context, path, ScopeFlow::Known(pushed));
     }
 
     /// Scopes in `flow` the statement's rows accept; `None` when the flow is
@@ -619,6 +642,7 @@ impl<'a> Derivation<'a> {
     fn record_parameter_sites(
         &mut self,
         property: &MacroTemplateProperty,
+        _path: &[Arc<str>],
         matching: &[&pdx_rules::SemanticRule],
     ) {
         let MacroTemplateValue::Scalar(token) = &property.value else {
@@ -679,6 +703,14 @@ impl<'a> Derivation<'a> {
             .entry(name.to_ascii_lowercase())
             .or_default()
     }
+}
+
+/// The parent path of a block property's children.
+fn child_path(path: &[Arc<str>], key: &str) -> Vec<Arc<str>> {
+    let mut child = Vec::with_capacity(path.len() + 1);
+    child.extend(path.iter().cloned());
+    child.push(Arc::from(key));
+    child
 }
 
 /// True for scope-link keys whose target the caller decides at runtime;
