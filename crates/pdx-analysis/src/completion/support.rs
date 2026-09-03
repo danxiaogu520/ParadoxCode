@@ -143,8 +143,8 @@ pub(crate) enum CompletionMatchQuality {
 /// commands without hard-coding that EU4 construct in the ranking layer.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) enum CompletionSchemaTier {
-    /// A value inferred from every active scripted-macro use site.
-    MacroInferred,
+    /// A value inferred from every active dynamic-definition use site.
+    DynamicInferred,
     /// A rule attached to the explicit parent path of the current block.
     ExplicitParentMember,
     /// A rule from the current semantic context, such as `effect` or `trigger`.
@@ -160,7 +160,7 @@ pub(crate) enum CompletionSchemaTier {
 pub(crate) enum CompletionSpecificity {
     Exact,
     Enum,
-    ScriptedMacro,
+    DynamicDefinition,
     Type,
     Value,
     Localisation,
@@ -169,7 +169,7 @@ pub(crate) enum CompletionSpecificity {
     Fallback,
 }
 
-/// Semantic rank inputs shared by key, value, and macro candidate builders.
+/// Semantic rank inputs shared by key, value, and dynamic candidate builders.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct CompletionRankContext {
     pub(crate) schema_tier: CompletionSchemaTier,

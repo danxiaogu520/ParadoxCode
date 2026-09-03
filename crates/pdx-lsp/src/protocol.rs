@@ -523,14 +523,14 @@ pub(crate) fn completion_kind(kind: CompletionKind) -> CompletionItemKind {
     match kind {
         CompletionKind::Key => CompletionItemKind::PROPERTY,
         CompletionKind::Command => CompletionItemKind::METHOD,
-        // LSP has no dedicated macro kind; scripted macros are callable definitions.
-        CompletionKind::ScriptedMacro => CompletionItemKind::FUNCTION,
+        // LSP has no dedicated dynamic-definition kind; scripted definitions are callable functions.
+        CompletionKind::DynamicDefinition => CompletionItemKind::FUNCTION,
         CompletionKind::Value => CompletionItemKind::VALUE,
         CompletionKind::EnumMember => CompletionItemKind::ENUM_MEMBER,
         CompletionKind::Scope => CompletionItemKind::VARIABLE,
         CompletionKind::Symbol => CompletionItemKind::FUNCTION,
         CompletionKind::Localisation => CompletionItemKind::REFERENCE,
-        CompletionKind::MacroParameter => CompletionItemKind::VARIABLE,
+        CompletionKind::DynamicParameter => CompletionItemKind::VARIABLE,
     }
 }
 
@@ -760,7 +760,7 @@ mod tests {
             CompletionItemKind::METHOD
         );
         assert_eq!(
-            completion_kind(CompletionKind::ScriptedMacro),
+            completion_kind(CompletionKind::DynamicDefinition),
             CompletionItemKind::FUNCTION
         );
         assert_eq!(
@@ -784,7 +784,7 @@ mod tests {
             CompletionItemKind::REFERENCE
         );
         assert_eq!(
-            completion_kind(CompletionKind::MacroParameter),
+            completion_kind(CompletionKind::DynamicParameter),
             CompletionItemKind::VARIABLE
         );
     }

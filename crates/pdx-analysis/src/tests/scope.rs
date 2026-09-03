@@ -266,7 +266,7 @@ fn eu4_replace_scope_links_populate_from_intrinsics() {
 }
 
 #[test]
-fn scripted_macro_scope_mismatch_surfaces_at_the_call_site() {
+fn dynamic_scope_mismatch_surfaces_at_the_call_site() {
     use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use std::fs;
 
@@ -325,14 +325,14 @@ fn scripted_macro_scope_mismatch_surfaces_at_the_call_site() {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-scope-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-scope-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     fs::create_dir_all(&definitions).expect("definition directory");
     fs::write(
         definitions.join("00_scope.txt"),
         "country_wrapper = { fixture_country_only = yes }\n",
     )
-    .expect("macro definition");
+    .expect("dynamic definition");
     let mut host = eu4_host(RuleSet::from_model(model));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -340,7 +340,7 @@ fn scripted_macro_scope_mismatch_surfaces_at_the_call_site() {
         root.clone(),
     )]));
     host.refresh_source_roots().expect("scan definition");
-    let id = DocumentId::new("file:///tmp/events/macro-scope.txt");
+    let id = DocumentId::new("file:///tmp/events/dynamic-scope.txt");
     let source = concat!(
         "country_event = { immediate = { ",
         "country_wrapper = yes ",
@@ -351,22 +351,24 @@ fn scripted_macro_scope_mismatch_surfaces_at_the_call_site() {
         .expect("open calls");
 
     let results = diagnostics(&host.snapshot(), &id);
-    // Scope authority for expansion trees sits with the macro-contract layer:
+    // Scope authority for expansion trees sits with the dynamic-contract layer:
     // the nested call in province scope is reported once, at the call site,
     // instead of once per offending statement inside the expansion.
     let call_site = results
         .iter()
-        .filter(|diagnostic| diagnostic.code == DiagnosticCode::MacroCallScopeMismatch)
+        .filter(|diagnostic| diagnostic.code == DiagnosticCode::DynamicCallScopeMismatch)
         .collect::<Vec<_>>();
     assert_eq!(call_site.len(), 1, "{results:?}");
-    let nested_call = source.rfind("country_wrapper").expect("nested macro call");
+    let nested_call = source
+        .rfind("country_wrapper")
+        .expect("nested dynamic call");
     assert_eq!(
         call_site[0].range.start(),
         u32::try_from(nested_call).expect("call range")
     );
     assert_eq!(
         call_site[0].message,
-        "scripted macro `country_wrapper` requires entry scope country but is called in `province` scope"
+        "dynamic definition `country_wrapper` requires entry scope country but is called in `province` scope"
     );
     assert!(
         results.iter().all(

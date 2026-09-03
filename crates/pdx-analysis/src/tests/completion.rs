@@ -1405,7 +1405,7 @@ fn scripted_definition_completion_snippet_includes_parameters() {
         .iter()
         .find(|item| item.label == "apply")
         .expect("scripted effect item");
-    assert_eq!(snippet.kind, CompletionKind::ScriptedMacro);
+    assert_eq!(snippet.kind, CompletionKind::DynamicDefinition);
     assert_eq!(snippet.insert_text, "apply = {\n\tzeta = $1\n\t$0\n}");
 
     let trigger_id = DocumentId::new("file:///tmp/events/snippet-trigger.txt");
@@ -1418,12 +1418,12 @@ fn scripted_definition_completion_snippet_includes_parameters() {
         u32::try_from(trigger_text.find("ch").expect("trigger prefix") + 1)
             .expect("trigger position"),
     );
-    let trigger_macro = trigger_completion
+    let trigger_dynamic = trigger_completion
         .items
         .iter()
         .find(|item| item.label == "check")
         .expect("scripted trigger item");
-    assert_eq!(trigger_macro.kind, CompletionKind::ScriptedMacro);
+    assert_eq!(trigger_dynamic.kind, CompletionKind::DynamicDefinition);
     assert_eq!(
         crate::semantic::scripted_definition_snippet(&host.snapshot(), "scripted_effect", "plain"),
         "plain = yes"
@@ -1444,12 +1444,12 @@ fn scripted_definition_completion_snippet_includes_parameters() {
 }
 
 #[test]
-fn scripted_macro_call_block_completes_only_the_owners_parameter_keys() {
+fn dynamic_call_blocks_complete_only_the_owners_parameter_keys() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-call-keys-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-call-keys-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
     std::fs::write(
@@ -1459,7 +1459,7 @@ fn scripted_macro_call_block_completes_only_the_owners_parameter_keys() {
             "other = { add_stability = $OTHER$ }\n",
         ),
     )
-    .expect("macro definitions");
+    .expect("dynamic definitions");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -1467,7 +1467,7 @@ fn scripted_macro_call_block_completes_only_the_owners_parameter_keys() {
         root.clone(),
     )]));
     host.refresh_source_roots().expect("scan definitions");
-    let id = DocumentId::new("file:///tmp/events/macro-call-keys.txt");
+    let id = DocumentId::new("file:///tmp/events/dynamic-call-keys.txt");
     let text = "country_event = { immediate = { scaled = { AM } } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open call");
@@ -1478,19 +1478,19 @@ fn scripted_macro_call_block_completes_only_the_owners_parameter_keys() {
         .iter()
         .find(|item| item.label == "AMOUNT")
         .unwrap_or_else(|| panic!("missing owner parameter completion: {items:?}"));
-    assert_eq!(amount.kind, CompletionKind::MacroParameter);
+    assert_eq!(amount.kind, CompletionKind::DynamicParameter);
     assert_eq!(amount.detail, "parameter");
     assert!(items.iter().all(|item| item.label != "OTHER"), "{items:?}");
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 
 #[test]
-fn scripted_macro_argument_values_follow_direct_and_nested_body_constraints() {
+fn dynamic_argument_values_follow_direct_and_nested_body_constraints() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-call-values-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-call-values-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
     std::fs::write(
@@ -1502,14 +1502,14 @@ fn scripted_macro_argument_values_follow_direct_and_nested_body_constraints() {
             "outer_bool = { inner_bool = { VALUE = $OUTER$ } }\n",
         ),
     )
-    .expect("macro definitions");
+    .expect("dynamic definitions");
     let triggers = root.join("common/scripted_triggers");
     std::fs::create_dir_all(&triggers).expect("trigger definition directory");
     std::fs::write(
         triggers.join("00_complete.txt"),
         "bool_trigger = { uses_karma = $VALUE$ }\n",
     )
-    .expect("macro trigger definition");
+    .expect("dynamic trigger definition");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -1523,10 +1523,10 @@ fn scripted_macro_argument_values_follow_direct_and_nested_body_constraints() {
         ("direct_float", "VALUE", &[][..]),
         ("outer_bool", "OUTER", &["yes", "no"][..]),
     ];
-    for (index, (macro_name, parameter, expected)) in cases.into_iter().enumerate() {
-        let id = DocumentId::new(format!("file:///tmp/events/macro-value-{index}.txt"));
+    for (index, (definition_name, parameter, expected)) in cases.into_iter().enumerate() {
+        let id = DocumentId::new(format!("file:///tmp/events/dynamic-value-{index}.txt"));
         let text = format!(
-            "country_event = {{ immediate = {{ {macro_name} = {{ {parameter} =  }} }} }}\n"
+            "country_event = {{ immediate = {{ {definition_name} = {{ {parameter} =  }} }} }}\n"
         );
         host.open_document(id.clone(), 1, text.clone(), None)
             .expect("open call");
@@ -1540,17 +1540,17 @@ fn scripted_macro_argument_values_follow_direct_and_nested_body_constraints() {
         for label in expected {
             assert!(
                 labels.contains(label),
-                "{macro_name}.{parameter} missing {label}: {items:?}"
+                "{definition_name}.{parameter} missing {label}: {items:?}"
             );
         }
-        if macro_name == "direct_float" {
+        if definition_name == "direct_float" {
             assert!(
                 labels.iter().all(|label| *label != "0"),
-                "open-ended float macro arguments must not offer `0`: {items:?}"
+                "open-ended float dynamic arguments must not offer `0`: {items:?}"
             );
         }
     }
-    let trigger_id = DocumentId::new("file:///tmp/events/macro-trigger-value.txt");
+    let trigger_id = DocumentId::new("file:///tmp/events/dynamic-trigger-value.txt");
     let trigger_text = "country_event = { trigger = { bool_trigger = { VALUE =  } } }\n";
     host.open_document(trigger_id.clone(), 1, trigger_text.to_owned(), None)
         .expect("open trigger call");
@@ -1565,16 +1565,16 @@ fn scripted_macro_argument_values_follow_direct_and_nested_body_constraints() {
 }
 
 #[test]
-fn scripted_macro_bare_parameter_infers_quoted_effect_completion_context() {
+fn dynamic_bare_parameter_infers_quoted_effect_completion_context() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-quoted-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-quoted-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
     std::fs::write(definitions.join("00_complete.txt"), "inject = { $BODY$ }\n")
-        .expect("macro definition");
+        .expect("dynamic definition");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -1582,7 +1582,7 @@ fn scripted_macro_bare_parameter_infers_quoted_effect_completion_context() {
         root.clone(),
     )]));
     host.refresh_source_roots().expect("scan definitions");
-    let id = DocumentId::new("file:///tmp/events/macro-quoted.txt");
+    let id = DocumentId::new("file:///tmp/events/dynamic-quoted.txt");
     let text = "country_event = { immediate = { inject = { BODY = \"add_pre\" } } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open call");
@@ -1594,21 +1594,21 @@ fn scripted_macro_bare_parameter_infers_quoted_effect_completion_context() {
     let add_prestige = items
         .iter()
         .find(|item| item.label == "add_prestige")
-        .expect("quoted macro argument did not inherit effect completion");
+        .expect("quoted dynamic argument did not inherit effect completion");
     assert!(
         add_prestige.sort_score < 10_000_000,
-        "macro-inferred candidates must retain the highest schema tier: {items:?}"
+        "dynamic-inferred candidates must retain the highest schema tier: {items:?}"
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 
 #[test]
-fn scripted_macro_argument_value_inference_handles_conditionals_scope_and_conflicts() {
+fn dynamic_argument_value_inference_handles_conditionals_scope_and_conflicts() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-value-kinds-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-value-kinds-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
     std::fs::write(
@@ -1622,7 +1622,7 @@ fn scripted_macro_argument_value_inference_handles_conditionals_scope_and_confli
             "cycle_b = { cycle_a = { VALUE = $VALUE$ } }\n",
         ),
     )
-    .expect("macro definitions");
+    .expect("dynamic definitions");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -1630,11 +1630,11 @@ fn scripted_macro_argument_value_inference_handles_conditionals_scope_and_confli
         root.clone(),
     )]));
     host.refresh_source_roots().expect("scan definitions");
-    let localisation_id = DocumentId::new("file:///tmp/localisation/macro_l_english.yml");
+    let localisation_id = DocumentId::new("file:///tmp/localisation/dynamic_l_english.yml");
     host.open_document(
         localisation_id,
         1,
-        "l_english:\n macro_tip:0 \"Macro tip\"\n".to_owned(),
+        "l_english:\n dynamic_tip:0 \"Dynamic tip\"\n".to_owned(),
         None,
     )
     .expect("open localisation");
@@ -1658,13 +1658,13 @@ fn scripted_macro_argument_value_inference_handles_conditionals_scope_and_confli
     assert!(active.iter().any(|item| item.label == "yes"), "{active:?}");
     assert!(active.iter().any(|item| item.label == "no"), "{active:?}");
     assert!(
-        active.iter().all(|item| item.label != "macro_tip"),
+        active.iter().all(|item| item.label != "dynamic_tip"),
         "inactive negative branch leaked: {active:?}"
     );
 
     let inactive = complete_argument(&host, "conditional-inactive", "conditional = { VALUE =  }");
     assert!(
-        inactive.iter().any(|item| item.label == "macro_tip"),
+        inactive.iter().any(|item| item.label == "dynamic_tip"),
         "negative branch localisation constraint missing: {inactive:?}"
     );
     assert!(
@@ -1692,7 +1692,7 @@ fn scripted_macro_argument_value_inference_handles_conditionals_scope_and_confli
     let nested_scoped = complete(&host.snapshot(), &nested_scope_id, nested_scope_position).items;
     assert!(
         nested_scoped.iter().any(|item| item.label == "THIS"),
-        "macro body scope transition was not applied: {nested_scoped:?}"
+        "definition body scope transition was not applied: {nested_scoped:?}"
     );
 
     let conflict = complete_argument(&host, "conflict", "conflict = { VALUE =  }");
@@ -1715,7 +1715,7 @@ fn scripted_macro_argument_value_inference_handles_conditionals_scope_and_confli
 }
 
 #[test]
-fn vanilla_cache_only_macro_value_completion_uses_persisted_body_constraints() {
+fn vanilla_cache_only_dynamic_value_completion_uses_persisted_body_constraints() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -1727,7 +1727,7 @@ fn vanilla_cache_only_macro_value_completion_uses_persisted_body_constraints() {
         definitions.join("00_cached.txt"),
         "cached_bool = { set_primitive = $VALUE$ }\n",
     )
-    .expect("macro definition");
+    .expect("dynamic definition");
     let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
     let mut vanilla_host = eu4_host(rules.clone());
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -1749,12 +1749,12 @@ fn vanilla_cache_only_macro_value_completion_uses_persisted_body_constraints() {
     let items = complete(&host.snapshot(), &id, position).items;
     assert!(
         items.iter().any(|item| item.label == "yes") && items.iter().any(|item| item.label == "no"),
-        "cache-only macro body constraints were not restored: {items:?}"
+        "cache-only definition body constraints were not restored: {items:?}"
     );
 }
 
 #[test]
-fn vanilla_cache_only_macro_completes_inside_quoted_effect_payload() {
+fn vanilla_cache_only_dynamic_completes_inside_quoted_effect_payload() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -1766,7 +1766,7 @@ fn vanilla_cache_only_macro_completes_inside_quoted_effect_payload() {
         definitions.join("00_cached.txt"),
         "cached_inject = { $BODY$ }\n",
     )
-    .expect("macro definition");
+    .expect("dynamic definition");
     let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
     let mut vanilla_host = eu4_host(rules.clone());
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -1790,17 +1790,17 @@ fn vanilla_cache_only_macro_completes_inside_quoted_effect_payload() {
     let items = complete(&host.snapshot(), &id, position).items;
     assert!(
         items.iter().any(|item| item.label == "add_prestige"),
-        "cache-only quoted macro argument did not inherit effect completion: {items:?}"
+        "cache-only quoted dynamic argument did not inherit effect completion: {items:?}"
     );
 }
 
 #[test]
-fn vanilla_cache_macro_templates_preserve_nested_conditional_and_scope_semantics() {
+fn vanilla_cache_dynamic_templates_preserve_nested_conditional_and_scope_semantics() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-cached-macro-semantics-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-cached-dynamic-semantics-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     let localisation = root.join("localisation");
     std::fs::create_dir_all(&definitions).expect("definition directory");
@@ -1814,10 +1814,10 @@ fn vanilla_cache_macro_templates_preserve_nested_conditional_and_scope_semantics
             "cached_scoped = { owner = { join_trade_league = $WHO$ } }\n",
         ),
     )
-    .expect("macro definitions");
+    .expect("dynamic definitions");
     std::fs::write(
         localisation.join("cached_l_english.yml"),
-        "l_english:\n cached_macro_tip:0 \"Cached macro tip\"\n",
+        "l_english:\n cached_dynamic_tip:0 \"Cached dynamic tip\"\n",
     )
     .expect("localisation");
     let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
@@ -1860,7 +1860,7 @@ fn vanilla_cache_macro_templates_preserve_nested_conditional_and_scope_semantics
     );
     assert!(active.iter().any(|item| item.label == "yes"), "{active:?}");
     assert!(
-        active.iter().all(|item| item.label != "cached_macro_tip"),
+        active.iter().all(|item| item.label != "cached_dynamic_tip"),
         "inactive negative branch leaked from cached template: {active:?}"
     );
 
@@ -1871,7 +1871,9 @@ fn vanilla_cache_macro_templates_preserve_nested_conditional_and_scope_semantics
         "cached_conditional = { VALUE =  }",
     );
     assert!(
-        inactive.iter().any(|item| item.label == "cached_macro_tip"),
+        inactive
+            .iter()
+            .any(|item| item.label == "cached_dynamic_tip"),
         "negative branch was not restored from cached template: {inactive:?}"
     );
     assert!(
@@ -1892,12 +1894,12 @@ fn vanilla_cache_macro_templates_preserve_nested_conditional_and_scope_semantics
 }
 
 #[test]
-fn current_mod_macro_template_overrides_cached_vanilla_template() {
+fn current_mod_dynamic_template_overrides_cached_vanilla_template() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-priority-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-priority-{nonce}"));
     let vanilla = root.join("vanilla");
     let current = root.join("current");
     std::fs::create_dir_all(vanilla.join("common/scripted_effects")).expect("Vanilla directory");
@@ -1905,17 +1907,17 @@ fn current_mod_macro_template_overrides_cached_vanilla_template() {
     std::fs::create_dir_all(current.join("localisation")).expect("localisation directory");
     std::fs::write(
         vanilla.join("common/scripted_effects/00_priority.txt"),
-        "priority_macro = { set_primitive = $VALUE$ }\n",
+        "priority_dynamic = { set_primitive = $VALUE$ }\n",
     )
-    .expect("Vanilla macro");
+    .expect("Vanilla definition");
     std::fs::write(
         current.join("common/scripted_effects/00_priority.txt"),
-        "priority_macro = { custom_tooltip = $VALUE$ }\n",
+        "priority_dynamic = { custom_tooltip = $VALUE$ }\n",
     )
-    .expect("current macro");
+    .expect("current definition");
     std::fs::write(
         current.join("localisation/priority_l_english.yml"),
-        "l_english:\n current_macro_tip:0 \"Current macro tip\"\n",
+        "l_english:\n current_dynamic_tip:0 \"Current dynamic tip\"\n",
     )
     .expect("current localisation");
     let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
@@ -1937,33 +1939,33 @@ fn current_mod_macro_template_overrides_cached_vanilla_template() {
     )]));
     host.refresh_source_roots().expect("scan current Mod");
     host.install_index_cache(cache).expect("install cache");
-    let id = DocumentId::new("file:///tmp/events/priority-macro.txt");
-    let text = "country_event = { immediate = { priority_macro = { VALUE =  } } }\n";
+    let id = DocumentId::new("file:///tmp/events/priority-dynamic.txt");
+    let text = "country_event = { immediate = { priority_dynamic = { VALUE =  } } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open call");
     let position = u32::try_from(text.find("=  }").expect("empty value") + 2).expect("position");
     let items = complete(&host.snapshot(), &id, position).items;
 
     assert!(
-        items.iter().any(|item| item.label == "current_macro_tip"),
-        "current Mod macro template did not win: {items:?}"
+        items.iter().any(|item| item.label == "current_dynamic_tip"),
+        "current Mod dynamic template did not win: {items:?}"
     );
     assert!(
         items
             .iter()
             .all(|item| item.label != "yes" && item.label != "no"),
-        "cached Vanilla macro template leaked through an active override: {items:?}"
+        "cached Vanilla dynamic template leaked through an active override: {items:?}"
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 
 #[test]
-fn scripted_macro_body_completes_owner_local_dollar_parameters() {
+fn dynamic_bodies_complete_owner_local_dollar_parameters() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-param-complete-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-param-complete-{nonce}"));
     let path = root.join("common/scripted_effects/00_complete.txt");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -1975,7 +1977,7 @@ fn scripted_macro_body_completes_owner_local_dollar_parameters() {
     let text =
         "probe = { add_prestige = $PRESTIGE$ custom_tooltip = $TOOLTIP$ add_stability = $ }\n";
     host.open_document(id.clone(), 1, text.to_owned(), Some(path))
-        .expect("open macro definition");
+        .expect("open dynamic definition");
     let position =
         u32::try_from(text.find("$ }").expect("incomplete parameter") + 1).expect("position");
 
@@ -1993,12 +1995,12 @@ fn scripted_macro_body_completes_owner_local_dollar_parameters() {
 }
 
 #[test]
-fn dollar_completion_does_not_leak_parameters_between_macro_owners() {
+fn dollar_completion_does_not_leak_parameters_between_dynamic_owners() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-param-owner-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-param-owner-{nonce}"));
     let path = root.join("common/scripted_effects/00_complete.txt");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -2012,7 +2014,7 @@ fn dollar_completion_does_not_leak_parameters_between_macro_owners() {
         "second = { add_prestige = $SECOND$ add_stability = $ }\n",
     );
     host.open_document(id.clone(), 1, text.to_owned(), Some(path))
-        .expect("open macro definitions");
+        .expect("open dynamic definitions");
     let position =
         u32::try_from(text.rfind("$ }").expect("incomplete parameter") + 1).expect("position");
 
@@ -2026,12 +2028,12 @@ fn dollar_completion_does_not_leak_parameters_between_macro_owners() {
 }
 
 #[test]
-fn scripted_macro_dollar_completion_marks_key_usage() {
+fn dynamic_dollar_completion_marks_key_usage() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-key-complete-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-key-complete-{nonce}"));
     let path = root.join("common/scripted_effects/00_complete.txt");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -2042,7 +2044,7 @@ fn scripted_macro_dollar_completion_marks_key_usage() {
     let id = DocumentId::new("file:///tmp/common/scripted_effects/00_complete.txt");
     let text = "probe = { $EFFECT$ = yes $ = yes }\n";
     host.open_document(id.clone(), 1, text.to_owned(), Some(path))
-        .expect("open macro definition");
+        .expect("open dynamic definition");
     let position = u32::try_from(text.rfind("$ =").expect("incomplete key") + 1).expect("position");
 
     let item = complete(&host.snapshot(), &id, position)
@@ -2050,8 +2052,8 @@ fn scripted_macro_dollar_completion_marks_key_usage() {
         .into_iter()
         .find(|item| item.label == "$EFFECT$")
         .expect("key parameter completion");
-    assert_eq!(item.kind, CompletionKind::MacroParameter);
-    assert_eq!(item.detail, "macro parameter (key)");
+    assert_eq!(item.kind, CompletionKind::DynamicParameter);
+    assert_eq!(item.detail, "dynamic parameter (key)");
 }
 
 #[test]
@@ -2110,7 +2112,7 @@ fn scope_value_completion_offers_intrinsics_links_and_chains() {
         structural_containers: Vec::new(),
         alternative_containers: Vec::new(),
         existing_keys: Vec::new(),
-        macro_inferred: false,
+        dynamic_inferred: false,
         scope: crate::ScopeContext {
             profile: snapshot.game_profile_handle(),
             root: std::sync::Arc::from("province"),

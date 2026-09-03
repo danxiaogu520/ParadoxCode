@@ -1,7 +1,7 @@
 use super::{
-    CURRENT_SCHEMA_VERSION, FileCategory, FileMatcher, FileResolutionPolicy, GameProfile,
-    KeyMatcher, ParserKind, ProfileMatchMode, ProfileTextMatcher, RuleRecord, RuleSet, RuleShape,
-    RulesModel, ScriptedMacroDescriptor, ScriptedMacroUsage, SemanticRule, TypeDescriptor,
+    CURRENT_SCHEMA_VERSION, DynamicDefinitionDescriptor, DynamicDefinitionUsage, FileCategory,
+    FileMatcher, FileResolutionPolicy, GameProfile, KeyMatcher, ParserKind, ProfileMatchMode,
+    ProfileTextMatcher, RuleRecord, RuleSet, RuleShape, RulesModel, SemanticRule, TypeDescriptor,
     TypeRootScope, ValueMatcher,
 };
 use pdx_text::LogicalPath;
@@ -358,13 +358,13 @@ fn date_key_matcher_accepts_campaign_dates_only() {
 }
 
 #[test]
-fn canonical_hash_includes_scripted_macro_metadata() {
+fn canonical_hash_includes_dynamic_definition_metadata() {
     let descriptor = TypeDescriptor {
         name: "scripted_effect".to_owned(),
-        scripted_macro: Some(ScriptedMacroDescriptor {
+        dynamic_definition: Some(DynamicDefinitionDescriptor {
             body_context: "effect".to_owned(),
-            macro_enabled: true,
-            usage: ScriptedMacroUsage {
+            enabled: true,
+            usage: DynamicDefinitionUsage {
                 replacement: true,
                 condition: true,
                 dynamic_key: true,
@@ -387,9 +387,9 @@ fn canonical_hash_includes_scripted_macro_metadata() {
         .type_descriptors
         .get_mut("scripted_effect")
         .expect("scripted descriptor")
-        .scripted_macro
+        .dynamic_definition
         .as_mut()
-        .expect("macro metadata")
+        .expect("dynamic metadata")
         .usage
         .opaque_text = false;
 
@@ -478,7 +478,7 @@ fn canonical_hash_includes_game_profile_data() {
 }
 
 #[test]
-fn type_descriptor_macro_metadata_is_strict_and_old_source_defaults_it() {
+fn type_descriptor_dynamic_metadata_is_strict_and_defaults_old_sources() {
     let old_source = r#"{
         "name": "legacy",
         "path": null,
@@ -493,11 +493,11 @@ fn type_descriptor_macro_metadata_is_strict_and_old_source_defaults_it() {
         "type_key_filter": null
     }"#;
     let descriptor: TypeDescriptor = serde_json::from_str(old_source).expect("legacy descriptor");
-    assert!(descriptor.scripted_macro.is_none());
+    assert!(descriptor.dynamic_definition.is_none());
     assert!(
         serde_json::to_value(&descriptor)
             .expect("serialize legacy descriptor")
-            .get("scripted_macro")
+            .get("dynamic_definition")
             .is_none()
     );
 
@@ -513,9 +513,9 @@ fn type_descriptor_macro_metadata_is_strict_and_old_source_defaults_it() {
         "name_from_file": false,
         "starts_with": null,
         "type_key_filter": null,
-        "scripted_macro": {
+        "dynamic_definition": {
             "body_context": "effect",
-            "macro_enabled": true,
+            "enabled": true,
             "usage": {
                 "replacement": true,
                 "condition": false,
@@ -544,10 +544,10 @@ fn sqlite_round_trip_validates_logical_hash() {
         "scripted_trigger".to_owned(),
         TypeDescriptor {
             name: "scripted_trigger".to_owned(),
-            scripted_macro: Some(ScriptedMacroDescriptor {
+            dynamic_definition: Some(DynamicDefinitionDescriptor {
                 body_context: "trigger".to_owned(),
-                macro_enabled: true,
-                usage: ScriptedMacroUsage {
+                enabled: true,
+                usage: DynamicDefinitionUsage {
                     replacement: true,
                     condition: true,
                     dynamic_key: true,

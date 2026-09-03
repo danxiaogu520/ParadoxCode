@@ -1,6 +1,6 @@
 use super::support::*;
+use crate::dynamic_contracts::ScopeContract;
 use crate::dynamic_rules::{DynamicBodyFindingKind, dynamic_rule_row};
-use crate::macro_contracts::ScopeContract;
 use pdx_rules::ValueMatcher;
 
 /// Opens one scripted-effects file as a current-mod workspace and returns the

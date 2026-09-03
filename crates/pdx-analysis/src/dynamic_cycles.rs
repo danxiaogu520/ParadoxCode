@@ -1,10 +1,10 @@
-//! Definition-site cycle detection for scripted macros.
+//! Definition-site cycle detection for dynamic definitions.
 //!
 //! The expansion-time guard reports a cycle at the call site where recursion
 //! first repeats, which can sit far from every participating definition. This
-//! module answers the definition-side question instead: which scripted-macro
+//! module answers the definition-side question instead: which dynamic-definition
 //! *definitions* can never finish expanding because they participate in a call
-//! cycle. The call graph is built from the lowered macro templates (literal
+//! cycle. The call graph is built from the lowered dynamic templates (literal
 //! keys are static calls) plus invocation argument bindings (a `$param$` used
 //! in key position is a dynamic call whose target comes from each call site),
 //! then reduced to strongly connected components. Every definition inside a
@@ -14,14 +14,12 @@
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
-use pdx_engine::hir::{
-    MacroTemplate, MacroTemplateFragment, MacroTemplateItem, MacroTemplateToken, MacroTemplateValue,
-};
+use pdx_engine::hir::{Template, TemplateFragment, TemplateItem, TemplateToken, TemplateValue};
 use pdx_engine::{AnalysisSnapshot, DocumentId, DocumentSource, SourceFileId};
 use pdx_parser::FileFormat;
 use pdx_text::TextRange;
 
-use crate::semantic::{probe_query_cache, resolve_macro_definition, scripted_macro_type};
+use crate::semantic::{dynamic_definition_type, probe_query_cache, resolve_dynamic_definition};
 use crate::support::{
     ParsedContent, ParsedInput, ScriptProperty, input_for_document, input_for_source_file,
     script_properties,
@@ -29,16 +27,16 @@ use crate::support::{
 use crate::types::{CancellationToken, Cancelled, Diagnostic, DiagnosticCode};
 
 /// Cache key for the workspace-wide cycle report inside the snapshot query cache.
-const CYCLE_CACHE_KEY: &str = "macro-cycle-graph";
+const CYCLE_CACHE_KEY: &str = "dynamic-cycle-graph";
 
-/// Workspace-wide result: every cyclic macro definition keyed by
+/// Workspace-wide result: every cyclic dynamic definition keyed by
 /// `(kind lowercased, name lowercased)` with its definition-site message.
 #[derive(Clone, Debug, Default)]
-pub(crate) struct MacroCycleReport {
+pub(crate) struct DynamicCycleReport {
     entries: BTreeMap<(String, String), String>,
 }
 
-impl MacroCycleReport {
+impl DynamicCycleReport {
     pub(crate) fn message(&self, kind: &str, name: &str) -> Option<&str> {
         self.entries
             .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
@@ -46,8 +44,8 @@ impl MacroCycleReport {
     }
 }
 
-/// Returns definition-site cycle diagnostics for the macros defined in `input`.
-pub(crate) fn macro_cycle_diagnostics(
+/// Returns definition-site cycle diagnostics for the dynamic definitions in `input`.
+pub(crate) fn dynamic_cycle_diagnostics(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     cancellation: &CancellationToken,
@@ -59,21 +57,21 @@ pub(crate) fn macro_cycle_diagnostics(
     let Some(hir) = input.hir.as_deref() else {
         return Ok(Vec::new());
     };
-    let report = macro_cycle_report(snapshot, cancellation)?;
+    let report = dynamic_cycle_report(snapshot, cancellation)?;
     if report.entries.is_empty() {
         return Ok(Vec::new());
     }
     let mut diagnostics = Vec::new();
     for definition in hir.definitions() {
-        if !scripted_macro_type(snapshot, &definition.kind) {
+        if !dynamic_definition_type(snapshot, &definition.kind) {
             continue;
         }
         let Some(message) = report.message(&definition.kind, definition.name.as_str()) else {
             continue;
         };
         diagnostics.push(Diagnostic::new(
-            DiagnosticCode::MacroExpansionCycle,
-            DiagnosticCode::MacroExpansionCycle.severity(),
+            DiagnosticCode::DynamicDefinitionCycle,
+            DiagnosticCode::DynamicDefinitionCycle.severity(),
             definition.selection_range,
             message.to_owned(),
         ));
@@ -81,13 +79,13 @@ pub(crate) fn macro_cycle_diagnostics(
     Ok(diagnostics)
 }
 
-pub(crate) fn macro_cycle_report(
+pub(crate) fn dynamic_cycle_report(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
-) -> Result<Arc<MacroCycleReport>, Cancelled> {
+) -> Result<Arc<DynamicCycleReport>, Cancelled> {
     let revision = snapshot.revision();
     if let Some(cached) =
-        probe_query_cache::<MacroCycleReport>(snapshot, revision, &[CYCLE_CACHE_KEY])
+        probe_query_cache::<DynamicCycleReport>(snapshot, revision, &[CYCLE_CACHE_KEY])
     {
         return Ok(cached);
     }
@@ -102,8 +100,8 @@ pub(crate) fn macro_cycle_report(
     Ok(report)
 }
 
-/// One live scripted-macro definition in the call graph.
-struct MacroNode {
+/// One live dynamic-definition definition in the call graph.
+struct DynamicNode {
     kind: String,
     name: String,
     /// Lowercased parameter names used in key position inside the template.
@@ -113,14 +111,14 @@ struct MacroNode {
 fn build_cycle_report(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
-) -> Result<MacroCycleReport, Cancelled> {
+) -> Result<DynamicCycleReport, Cancelled> {
     cancellation.checkpoint()?;
     // Node names come from both live surfaces: the workspace index (file-backed
     // definitions) and open overlay documents, matching resolve order.
     let mut candidates: Vec<(String, String)> = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for definition in snapshot.index().definitions_iter() {
-        if !scripted_macro_type(snapshot, &definition.kind) {
+        if !dynamic_definition_type(snapshot, &definition.kind) {
             continue;
         }
         if seen.insert((
@@ -139,7 +137,7 @@ fn build_cycle_report(
             continue;
         };
         for definition in hir.definitions() {
-            if !scripted_macro_type(snapshot, &definition.kind) {
+            if !dynamic_definition_type(snapshot, &definition.kind) {
                 continue;
             }
             if seen.insert((
@@ -151,16 +149,16 @@ fn build_cycle_report(
         }
     }
     if candidates.is_empty() {
-        return Ok(MacroCycleReport::default());
+        return Ok(DynamicCycleReport::default());
     }
 
     // Resolve every candidate to its live definition. Ambiguous or unresolved
     // names are skipped: the expansion-time guard still covers them.
-    let mut nodes: Vec<MacroNode> = Vec::new();
-    let mut templates: Vec<MacroTemplate> = Vec::new();
+    let mut nodes: Vec<DynamicNode> = Vec::new();
+    let mut templates: Vec<Template> = Vec::new();
     for (kind, name) in &candidates {
         cancellation.checkpoint()?;
-        let Some(resolved) = resolve_macro_definition(snapshot, kind, name) else {
+        let Some(resolved) = resolve_dynamic_definition(snapshot, kind, name) else {
             continue;
         };
         let Some(template) = resolved.summary.template else {
@@ -168,7 +166,7 @@ fn build_cycle_report(
         };
         let mut dynamic_key_params = Vec::new();
         collect_dynamic_key_params(&template.items, &mut dynamic_key_params);
-        nodes.push(MacroNode {
+        nodes.push(DynamicNode {
             kind: kind.clone(),
             name: resolved.summary.name.clone(),
             dynamic_key_params,
@@ -183,7 +181,7 @@ fn build_cycle_report(
         })
     };
 
-    // Static edges: a property key that is one literal naming a same-kind macro.
+    // Static edges: a property key that is one literal naming a same-kind definition.
     let mut edges: Vec<Vec<usize>> = vec![Vec::new(); nodes.len()];
     let mut needs_bindings = false;
     for (source, node) in nodes.iter().enumerate() {
@@ -200,9 +198,9 @@ fn build_cycle_report(
     }
 
     // Dynamic edges: for every `$param$` used as a key, each call-site binding
-    // that renders the key to a same-kind macro name adds that edge. Only
+    // that renders the key to a same-kind definition name adds that edge. Only
     // computed when at least one template actually uses a parameter in key
-    // position, so plain-parameter macros never trigger a workspace scan.
+    // position, so plain-parameter definitions never trigger a workspace scan.
     if needs_bindings {
         let mut bindings = HashMap::<(String, String), Vec<BTreeMap<String, String>>>::new();
         collect_call_site_bindings(snapshot, &nodes, &mut bindings, cancellation)?;
@@ -237,11 +235,11 @@ fn build_cycle_report(
 
 fn collect_call_site_bindings(
     snapshot: &AnalysisSnapshot,
-    nodes: &[MacroNode],
+    nodes: &[DynamicNode],
     bindings: &mut HashMap<(String, String), Vec<BTreeMap<String, String>>>,
     cancellation: &CancellationToken,
 ) -> Result<(), Cancelled> {
-    // Only macros that use a parameter in key position need their call sites.
+    // Only definitions that use a parameter in key position need their call sites.
     let wanted: std::collections::HashSet<(String, String)> = nodes
         .iter()
         .filter(|node| !node.dynamic_key_params.is_empty())
@@ -259,7 +257,7 @@ fn collect_call_site_bindings(
     // each file is parsed at most once and searched for invocation properties.
     let mut file_sites: Vec<(SourceFileId, String, String, TextRange)> = Vec::new();
     for reference in snapshot.index().references_iter() {
-        if !scripted_macro_type(snapshot, &reference.kind) {
+        if !dynamic_definition_type(snapshot, &reference.kind) {
             continue;
         }
         let key = (
@@ -285,7 +283,7 @@ fn collect_call_site_bindings(
             continue;
         };
         for reference in hir.references() {
-            if !scripted_macro_type(snapshot, &reference.kind) {
+            if !dynamic_definition_type(snapshot, &reference.kind) {
                 continue;
             }
             let key = (
@@ -366,33 +364,33 @@ fn find_property_by_key_range(
         })
 }
 
-fn collect_dynamic_key_params(items: &[MacroTemplateItem], params: &mut Vec<String>) {
+fn collect_dynamic_key_params(items: &[TemplateItem], params: &mut Vec<String>) {
     for item in items {
         match item {
-            MacroTemplateItem::Property(property) => {
+            TemplateItem::Property(property) => {
                 if token_has_parameter(&property.key)
                     && let Some(name) = first_parameter_name(&property.key)
                     && !params.iter().any(|param| param.eq_ignore_ascii_case(name))
                 {
                     params.push(name.to_ascii_lowercase());
                 }
-                if let MacroTemplateValue::Block { items, .. } = &property.value {
+                if let TemplateValue::Block { items, .. } = &property.value {
                     collect_dynamic_key_params(items, params);
                 }
             }
-            MacroTemplateItem::Conditional(conditional) => {
+            TemplateItem::Conditional(conditional) => {
                 collect_dynamic_key_params(&conditional.items, params);
             }
-            MacroTemplateItem::BareValue(_) => {}
+            TemplateItem::BareValue(_) => {}
         }
     }
 }
 
-fn collect_literal_callees(items: &[MacroTemplateItem], callees: &mut Vec<String>) {
+fn collect_literal_callees(items: &[TemplateItem], callees: &mut Vec<String>) {
     for item in items {
         match item {
-            MacroTemplateItem::Property(property) => {
-                if let [MacroTemplateFragment::Literal(key)] = property.key.fragments.as_slice() {
+            TemplateItem::Property(property) => {
+                if let [TemplateFragment::Literal(key)] = property.key.fragments.as_slice() {
                     let key = key.trim();
                     if !key.is_empty()
                         && !callees
@@ -402,14 +400,14 @@ fn collect_literal_callees(items: &[MacroTemplateItem], callees: &mut Vec<String
                         callees.push(key.to_owned());
                     }
                 }
-                if let MacroTemplateValue::Block { items, .. } = &property.value {
+                if let TemplateValue::Block { items, .. } = &property.value {
                     collect_literal_callees(items, callees);
                 }
             }
-            MacroTemplateItem::Conditional(conditional) => {
+            TemplateItem::Conditional(conditional) => {
                 collect_literal_callees(&conditional.items, callees);
             }
-            MacroTemplateItem::BareValue(_) => {}
+            TemplateItem::BareValue(_) => {}
         }
     }
 }
@@ -417,13 +415,13 @@ fn collect_literal_callees(items: &[MacroTemplateItem], callees: &mut Vec<String
 /// Keys that contain a parameter fragment, rendered with one call-site binding
 /// set; parameters without a binding leave the key unrenderable and skipped.
 fn collect_rendered_param_keys(
-    items: &[MacroTemplateItem],
+    items: &[TemplateItem],
     bindings: &BTreeMap<String, String>,
     rendered: &mut Vec<String>,
 ) {
     for item in items {
         match item {
-            MacroTemplateItem::Property(property) => {
+            TemplateItem::Property(property) => {
                 if token_has_parameter(&property.key)
                     && let Some(key) = render_token(&property.key, bindings)
                     && !rendered
@@ -432,38 +430,38 @@ fn collect_rendered_param_keys(
                 {
                     rendered.push(key);
                 }
-                if let MacroTemplateValue::Block { items, .. } = &property.value {
+                if let TemplateValue::Block { items, .. } = &property.value {
                     collect_rendered_param_keys(items, bindings, rendered);
                 }
             }
-            MacroTemplateItem::Conditional(conditional) => {
+            TemplateItem::Conditional(conditional) => {
                 collect_rendered_param_keys(&conditional.items, bindings, rendered);
             }
-            MacroTemplateItem::BareValue(_) => {}
+            TemplateItem::BareValue(_) => {}
         }
     }
 }
 
-fn token_has_parameter(token: &MacroTemplateToken) -> bool {
+fn token_has_parameter(token: &TemplateToken) -> bool {
     token
         .fragments
         .iter()
-        .any(|fragment| matches!(fragment, MacroTemplateFragment::Parameter { .. }))
+        .any(|fragment| matches!(fragment, TemplateFragment::Parameter { .. }))
 }
 
-fn first_parameter_name(token: &MacroTemplateToken) -> Option<&str> {
+fn first_parameter_name(token: &TemplateToken) -> Option<&str> {
     token.fragments.iter().find_map(|fragment| match fragment {
-        MacroTemplateFragment::Parameter { name, .. } => Some(name.as_str()),
+        TemplateFragment::Parameter { name, .. } => Some(name.as_str()),
         _ => None,
     })
 }
 
-fn render_token(token: &MacroTemplateToken, bindings: &BTreeMap<String, String>) -> Option<String> {
+fn render_token(token: &TemplateToken, bindings: &BTreeMap<String, String>) -> Option<String> {
     let mut rendered = String::new();
     for fragment in &token.fragments {
         match fragment {
-            MacroTemplateFragment::Literal(literal) => rendered.push_str(literal),
-            MacroTemplateFragment::Parameter { name, .. } => {
+            TemplateFragment::Literal(literal) => rendered.push_str(literal),
+            TemplateFragment::Parameter { name, .. } => {
                 let value = bindings.get(&name.to_ascii_lowercase())?;
                 rendered.push_str(unquote(value).trim());
             }
@@ -484,7 +482,7 @@ fn unquote(value: &str) -> &str {
         .unwrap_or(value)
 }
 
-fn report_from_graph(nodes: &[MacroNode], edges: &[Vec<usize>]) -> MacroCycleReport {
+fn report_from_graph(nodes: &[DynamicNode], edges: &[Vec<usize>]) -> DynamicCycleReport {
     let components = tarjan_scc(edges);
     let mut entries = BTreeMap::new();
     for component in components {
@@ -519,13 +517,13 @@ fn report_from_graph(nodes: &[MacroNode], edges: &[Vec<usize>]) -> MacroCycleRep
                     nodes[index].name.to_ascii_lowercase(),
                 ),
                 format!(
-                    "scripted macro `{}` is part of a definition cycle: {rotated}",
+                    "dynamic definition `{}` is part of a definition cycle: {rotated}",
                     nodes[index].name
                 ),
             );
         }
     }
-    MacroCycleReport { entries }
+    DynamicCycleReport { entries }
 }
 
 /// Iterative Tarjan strongly-connected components.

@@ -11,7 +11,7 @@ use pdx_text::{LineIndex, LogicalPath, PositionRange, TextRange};
 
 use crate::hir::{HirFile, lower_shared, lower_shared_with_profile};
 use crate::index::{
-    Definition, FileIndexShard, MacroDefinitionSummary, MacroParameterSignature, Reference,
+    Definition, DynamicDefinitionSummary, DynamicParameterSignature, FileIndexShard, Reference,
 };
 use crate::model::{
     DocumentId, DocumentSnapshot, DocumentSource, FileState, ParsedSource, SourceFile,
@@ -422,7 +422,7 @@ pub(crate) fn build_file_state_with_cache(
                 file_id: file.id,
                 definitions: Vec::new(),
                 references: Vec::new(),
-                macro_definitions: Vec::new(),
+                dynamic_definitions: Vec::new(),
                 definition_attributes: Vec::new(),
                 flag_writes: Vec::new(),
                 syntax_error_count: 0,
@@ -446,7 +446,7 @@ pub(crate) fn build_file_state_with_cache(
             file_id: file.id,
             definitions: Vec::new(),
             references: Vec::new(),
-            macro_definitions: Vec::new(),
+            dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
             syntax_error_count: parsed.errors().len(),
@@ -455,7 +455,7 @@ pub(crate) fn build_file_state_with_cache(
             file_id: file.id,
             definitions: Vec::new(),
             references: Vec::new(),
-            macro_definitions: Vec::new(),
+            dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
             syntax_error_count: 0,
@@ -494,7 +494,7 @@ pub(crate) fn empty_file_state(file: &SourceFile, revision: u64) -> FileState {
             file_id: file.id,
             definitions: Vec::new(),
             references: Vec::new(),
-            macro_definitions: Vec::new(),
+            dynamic_definitions: Vec::new(),
             definition_attributes: Vec::new(),
             flag_writes: Vec::new(),
             syntax_error_count: 0,
@@ -538,12 +538,12 @@ fn shard_from_parsed(
     references.shrink_to_fit();
     let mut flag_writes = collect_flag_writes(hir, rules);
     flag_writes.shrink_to_fit();
-    let macro_definitions = collect_macro_definitions(hir, rules);
+    let dynamic_definitions = collect_dynamic_definitions(hir, rules);
     FileIndexShard {
         file_id: file.id,
         definitions,
         references,
-        macro_definitions,
+        dynamic_definitions,
         definition_attributes: hir.definition_attributes().to_vec(),
         flag_writes,
         syntax_error_count: parsed.errors().len(),
@@ -574,34 +574,34 @@ fn collect_flag_writes(hir: &HirFile, rules: &RuleSet) -> Vec<crate::index::Flag
     writes
 }
 
-fn collect_macro_definitions(hir: &HirFile, rules: &RuleSet) -> Vec<MacroDefinitionSummary> {
+fn collect_dynamic_definitions(hir: &HirFile, rules: &RuleSet) -> Vec<DynamicDefinitionSummary> {
     let mut summaries = Vec::new();
     for definition in hir.definitions() {
-        let macro_enabled = rules
+        let enabled = rules
             .model()
             .semantic
             .type_descriptors
             .iter()
             .find(|(kind, _)| kind.eq_ignore_ascii_case(&definition.kind))
-            .and_then(|(_, descriptor)| descriptor.scripted_macro.as_ref())
-            .is_some_and(|descriptor| descriptor.macro_enabled);
-        if !macro_enabled {
+            .and_then(|(_, descriptor)| descriptor.dynamic_definition.as_ref())
+            .is_some_and(|descriptor| descriptor.enabled);
+        if !enabled {
             continue;
         }
         let parameters = hir
             .parameter_definitions_for_owner(definition.range)
-            .map(|parameter| MacroParameterSignature {
+            .map(|parameter| DynamicParameterSignature {
                 name: parameter.name.clone(),
                 required: hir.parameter_is_required(definition.range, &parameter.name),
             })
             .collect();
-        summaries.push(MacroDefinitionSummary {
+        summaries.push(DynamicDefinitionSummary {
             kind: definition.kind.clone(),
             name: definition.name.clone(),
             definition_range: definition.range,
             parameters,
             template: hir
-                .macro_template(&definition.kind, &definition.name, definition.range)
+                .dynamic_template(&definition.kind, &definition.name, definition.range)
                 .cloned(),
         });
     }

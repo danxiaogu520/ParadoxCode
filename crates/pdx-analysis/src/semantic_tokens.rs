@@ -1,7 +1,7 @@
 //! Editor-neutral semantic token queries.
 //!
 //! Highlighting is a deterministic single pass over the loss-aware CST plus a flat set of
-//! rule-known keys and active scripted macro names. Classification never depends on diagnostics
+//! rule-known keys and active dynamic definition names. Classification never depends on diagnostics
 //! validity: a document with syntax errors still produces tokens from every recoverable node. The
 //! stable legend contract lives in [`crate::SemanticTokenType`]; protocol adapters only convert
 //! ranges and legend indices.
@@ -75,7 +75,7 @@ pub fn semantic_tokens_in_range_with_cancellation(
 }
 
 /// Builds the flat set of rule-known script keys: profile fallback keys, exact semantic-rule
-/// keys, symbol descriptor kinds, and active workspace-defined scripted macro names. Record table
+/// keys, symbol descriptor kinds, and active workspace-defined dynamic definition names. Record table
 /// column names are deliberately excluded so CWT metadata never colors script text.
 /// Rule- and profile-derived key set, rebuilt only when the rules change.
 ///
@@ -121,10 +121,10 @@ fn static_semantic_keys(snapshot: &AnalysisSnapshot) -> Arc<BTreeSet<String>> {
 
 fn semantic_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
     let mut keys = (*static_semantic_keys(snapshot)).clone();
-    // Completion classifies workspace-defined scripted macros as callable functions. Reuse the
+    // Completion classifies workspace-defined dynamic definitions as callable functions. Reuse the
     // same effective (overlay-aware and source-priority-aware) member view for source coloring so
-    // a macro does not switch back to the generic property color after insertion.
-    let macro_types = snapshot
+    // a definition does not switch back to the generic property color after insertion.
+    let dynamic_types = snapshot
         .rules()
         .model()
         .semantic
@@ -132,13 +132,13 @@ fn semantic_keys(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
         .iter()
         .filter_map(|(type_name, descriptor)| {
             descriptor
-                .scripted_macro
+                .dynamic_definition
                 .as_ref()
-                .filter(|macro_descriptor| macro_descriptor.macro_enabled)
+                .filter(|dynamic_descriptor| dynamic_descriptor.enabled)
                 .map(|_| type_name.clone())
         })
         .collect::<Vec<_>>();
-    for type_name in macro_types {
+    for type_name in dynamic_types {
         keys.extend(
             effective_workspace_member_names(snapshot, &type_name)
                 .into_iter()

@@ -1,33 +1,32 @@
-//! Ordered, source-ranged scripted-macro templates.
+//! Ordered, source-ranged dynamic-definition templates.
 
 use pdx_parser::{CstKind, CstNode, ParsedFile};
 use pdx_rules::RuleSet;
 use pdx_text::TextRange;
 
 use super::{
-    HirDefinition, HirParameterConditional, HirParameterReference, MacroTemplate,
-    MacroTemplateConditional, MacroTemplateFragment, MacroTemplateItem, MacroTemplateProperty,
-    MacroTemplateToken, MacroTemplateValue, range_within,
+    HirDefinition, HirParameterConditional, HirParameterReference, Template, TemplateConditional,
+    TemplateFragment, TemplateItem, TemplateProperty, TemplateToken, TemplateValue, range_within,
 };
 
-pub(super) fn lower_macro_templates(
+pub(super) fn lower_dynamic_templates(
     syntax: &ParsedFile,
     definitions: &[HirDefinition],
     conditionals: &[HirParameterConditional],
     references: &[HirParameterReference],
     rules: &RuleSet,
-) -> Vec<MacroTemplate> {
+) -> Vec<Template> {
     let mut templates = Vec::new();
     for definition in definitions {
-        let macro_enabled = rules
+        let enabled = rules
             .model()
             .semantic
             .type_descriptors
             .iter()
             .find(|(kind, _)| kind.eq_ignore_ascii_case(&definition.kind))
-            .and_then(|(_, descriptor)| descriptor.scripted_macro.as_ref())
-            .is_some_and(|descriptor| descriptor.macro_enabled);
-        if !macro_enabled
+            .and_then(|(_, descriptor)| descriptor.dynamic_definition.as_ref())
+            .is_some_and(|descriptor| descriptor.enabled);
+        if !enabled
             || syntax.errors().iter().any(|error| {
                 error.range.start() >= definition.range.start()
                     && error.range.end() <= definition.range.end()
@@ -49,7 +48,7 @@ pub(super) fn lower_macro_templates(
         else {
             continue;
         };
-        templates.push(MacroTemplate {
+        templates.push(Template {
             kind: definition.kind.clone(),
             name: definition.name.clone(),
             definition_range: definition.range,
@@ -66,18 +65,18 @@ fn template_items<'t>(
     nodes: impl Iterator<Item = CstNode<'t>>,
     conditionals: &[HirParameterConditional],
     references: &[&HirParameterReference],
-) -> Option<Vec<MacroTemplateItem>> {
+) -> Option<Vec<TemplateItem>> {
     let mut items = Vec::new();
     for node in nodes {
         match node.kind() {
-            CstKind::Property => items.push(MacroTemplateItem::Property(template_property(
+            CstKind::Property => items.push(TemplateItem::Property(template_property(
                 syntax,
                 node,
                 conditionals,
                 references,
             )?)),
             CstKind::BareValue | CstKind::QuotedString => {
-                items.push(MacroTemplateItem::BareValue(template_token(
+                items.push(TemplateItem::BareValue(template_token(
                     syntax, node, references,
                 )?));
             }
@@ -89,7 +88,7 @@ fn template_items<'t>(
                     .children()
                     .filter(|child| child.kind() != CstKind::ParameterCondition)
                     .collect::<Vec<_>>();
-                items.push(MacroTemplateItem::Conditional(MacroTemplateConditional {
+                items.push(TemplateItem::Conditional(TemplateConditional {
                     name: conditional.name.clone(),
                     negated: conditional.negated,
                     range: conditional.range,
@@ -122,7 +121,7 @@ fn template_property(
     node: CstNode<'_>,
     conditionals: &[HirParameterConditional],
     references: &[&HirParameterReference],
-) -> Option<MacroTemplateProperty> {
+) -> Option<TemplateProperty> {
     let key = node.children().find(|child| child.kind() == CstKind::Key)?;
     let operator = node
         .children()
@@ -138,15 +137,15 @@ fn template_property(
         .next()?;
     let value = match value.kind() {
         CstKind::BareValue | CstKind::QuotedString => {
-            MacroTemplateValue::Scalar(template_token(syntax, value, references)?)
+            TemplateValue::Scalar(template_token(syntax, value, references)?)
         }
-        CstKind::Block => MacroTemplateValue::Block {
+        CstKind::Block => TemplateValue::Block {
             range: value.range(),
             items: template_items(syntax, value.children(), conditionals, references)?,
         },
         _ => return None,
     };
-    Some(MacroTemplateProperty {
+    Some(TemplateProperty {
         key: template_token(syntax, key, references)?,
         range: node.range(),
         operator,
@@ -158,7 +157,7 @@ fn template_token(
     syntax: &ParsedFile,
     node: CstNode<'_>,
     references: &[&HirParameterReference],
-) -> Option<MacroTemplateToken> {
+) -> Option<TemplateToken> {
     let raw = syntax.text(node.range())?;
     let quoted = raw.starts_with('"') && raw.ends_with('"') && raw.len() >= 2;
     let content_range = if quoted {
@@ -182,31 +181,31 @@ fn template_token(
             continue;
         }
         if cursor < reference.range.start() {
-            fragments.push(MacroTemplateFragment::Literal(
+            fragments.push(TemplateFragment::Literal(
                 syntax
                     .text(TextRange::new(cursor, reference.range.start())?)?
                     .to_owned(),
             ));
         }
-        fragments.push(MacroTemplateFragment::Parameter {
+        fragments.push(TemplateFragment::Parameter {
             name: reference.name.clone(),
             range: reference.range,
         });
         cursor = reference.range.end();
     }
     if cursor < content_range.end() {
-        fragments.push(MacroTemplateFragment::Literal(
+        fragments.push(TemplateFragment::Literal(
             syntax
                 .text(TextRange::new(cursor, content_range.end())?)?
                 .to_owned(),
         ));
     }
     if fragments.is_empty() {
-        fragments.push(MacroTemplateFragment::Literal(
+        fragments.push(TemplateFragment::Literal(
             syntax.text(content_range)?.to_owned(),
         ));
     }
-    Some(MacroTemplateToken {
+    Some(TemplateToken {
         range: node.range(),
         quoted,
         fragments,

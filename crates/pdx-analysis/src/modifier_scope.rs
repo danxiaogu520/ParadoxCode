@@ -55,7 +55,7 @@ pub(crate) fn modifier_scope_diagnostics(
     Ok(diagnostics)
 }
 
-/// Body contexts of all macro-enabled types: the callable contexts in which
+/// Body contexts of all dynamic-enabled types: the callable contexts in which
 /// effect-like keys carry semantic rows.
 fn callable_body_contexts(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
     snapshot
@@ -66,10 +66,10 @@ fn callable_body_contexts(snapshot: &AnalysisSnapshot) -> BTreeSet<String> {
         .values()
         .filter_map(|descriptor| {
             descriptor
-                .scripted_macro
+                .dynamic_definition
                 .as_ref()
-                .filter(|macro_descriptor| macro_descriptor.macro_enabled)
-                .map(|macro_descriptor| macro_descriptor.body_context.to_ascii_lowercase())
+                .filter(|dynamic_descriptor| dynamic_descriptor.enabled)
+                .map(|dynamic_descriptor| dynamic_descriptor.body_context.to_ascii_lowercase())
         })
         .collect()
 }

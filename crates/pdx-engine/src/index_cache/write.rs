@@ -85,9 +85,9 @@ fn write_cache(
     progress: Option<&(dyn Fn(usize, usize) + Sync)>,
 ) -> Result<(), IndexCacheError> {
     transaction.execute_batch(
-        "DROP TABLE IF EXISTS macro_parameters;
+        "DROP TABLE IF EXISTS dynamic_parameters;
          DROP TABLE IF EXISTS definition_attributes;
-         DROP TABLE IF EXISTS macro_definitions;
+         DROP TABLE IF EXISTS dynamic_definitions;
          DROP TABLE IF EXISTS symbol_references;
          DROP TABLE IF EXISTS flag_writes;
          DROP TABLE IF EXISTS navigation_positions;
@@ -127,7 +127,7 @@ fn write_cache(
              range_end INTEGER NOT NULL,
              PRIMARY KEY(file_id, ordinal)
          );
-        CREATE TABLE macro_definitions(
+        CREATE TABLE dynamic_definitions(
              file_id BLOB NOT NULL REFERENCES source_files(file_id),
              ordinal INTEGER NOT NULL,
              kind TEXT NOT NULL,
@@ -137,15 +137,15 @@ fn write_cache(
              template_payload BLOB,
              PRIMARY KEY(file_id, ordinal)
          );
-         CREATE TABLE macro_parameters(
+         CREATE TABLE dynamic_parameters(
              file_id BLOB NOT NULL,
-             macro_ordinal INTEGER NOT NULL,
+             dynamic_ordinal INTEGER NOT NULL,
              ordinal INTEGER NOT NULL,
              name TEXT NOT NULL,
              required INTEGER NOT NULL CHECK(required IN (0, 1)),
-             PRIMARY KEY(file_id, macro_ordinal, ordinal),
-             FOREIGN KEY(file_id, macro_ordinal)
-                 REFERENCES macro_definitions(file_id, ordinal)
+             PRIMARY KEY(file_id, dynamic_ordinal, ordinal),
+             FOREIGN KEY(file_id, dynamic_ordinal)
+                 REFERENCES dynamic_definitions(file_id, ordinal)
          );
          CREATE TABLE definition_attributes(
             file_id BLOB NOT NULL REFERENCES source_files(file_id),
@@ -238,16 +238,16 @@ fn write_cache(
         "INSERT INTO flag_writes(file_id, ordinal, kind, name, range_start, range_end)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
     )?;
-    let mut insert_macro = transaction.prepare(
-        "INSERT INTO macro_definitions(file_id, ordinal, kind, name, definition_range_start, definition_range_end, template_payload)
+    let mut insert_dynamic = transaction.prepare(
+        "INSERT INTO dynamic_definitions(file_id, ordinal, kind, name, definition_range_start, definition_range_end, template_payload)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )?;
     let mut insert_definition_attributes = transaction.prepare(
         "INSERT INTO definition_attributes(file_id, ordinal, kind, name, definition_range_start, definition_range_end, attribute_keys)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )?;
-    let mut insert_macro_parameter = transaction.prepare(
-        "INSERT INTO macro_parameters(file_id, macro_ordinal, ordinal, name, required)
+    let mut insert_dynamic_parameter = transaction.prepare(
+        "INSERT INTO dynamic_parameters(file_id, dynamic_ordinal, ordinal, name, required)
          VALUES (?1, ?2, ?3, ?4, ?5)",
     )?;
     let mut files_written = 0usize;
@@ -344,8 +344,8 @@ fn write_cache(
                 keys_payload,
             ])?;
         }
-        for (macro_ordinal, summary) in shard.macro_definitions.iter().enumerate() {
-            if shard.macro_definitions[..macro_ordinal]
+        for (dynamic_ordinal, summary) in shard.dynamic_definitions.iter().enumerate() {
+            if shard.dynamic_definitions[..dynamic_ordinal]
                 .iter()
                 .any(|candidate| {
                     candidate.kind.eq_ignore_ascii_case(&summary.kind)
@@ -354,7 +354,7 @@ fn write_cache(
                 })
             {
                 return Err(IndexCacheError::InvalidData(format!(
-                    "duplicate macro summary {} `{}`",
+                    "duplicate dynamic definition summary {} `{}`",
                     summary.kind, summary.name
                 )));
             }
@@ -364,7 +364,7 @@ fn write_cache(
                     && definition.range == summary.definition_range
             }) {
                 return Err(IndexCacheError::InvalidData(format!(
-                    "macro summary {} `{}` has no matching definition",
+                    "dynamic definition summary {} `{}` has no matching definition",
                     summary.kind, summary.name
                 )));
             }
@@ -377,16 +377,16 @@ fn write_cache(
                         || template.definition_range != summary.definition_range
                     {
                         return Err(IndexCacheError::InvalidData(format!(
-                            "macro template identity does not match {} `{}`",
+                            "dynamic template identity does not match {} `{}`",
                             summary.kind, summary.name
                         )));
                     }
                     template_codec::encode(template)
                 })
                 .transpose()?;
-            insert_macro.execute(params![
+            insert_dynamic.execute(params![
                 encode_file_id(*id),
-                i64::try_from(macro_ordinal).unwrap_or(i64::MAX),
+                i64::try_from(dynamic_ordinal).unwrap_or(i64::MAX),
                 summary.kind,
                 summary.name,
                 i64::from(summary.definition_range.start()),
@@ -400,13 +400,13 @@ fn write_cache(
                         .any(|candidate| candidate.name.eq_ignore_ascii_case(&parameter.name))
                 {
                     return Err(IndexCacheError::InvalidData(format!(
-                        "macro parameter name in {} `{}` is empty or duplicated",
+                        "dynamic parameter name in {} `{}` is empty or duplicated",
                         summary.kind, summary.name
                     )));
                 }
-                insert_macro_parameter.execute(params![
+                insert_dynamic_parameter.execute(params![
                     encode_file_id(*id),
-                    i64::try_from(macro_ordinal).unwrap_or(i64::MAX),
+                    i64::try_from(dynamic_ordinal).unwrap_or(i64::MAX),
                     i64::try_from(ordinal).unwrap_or(i64::MAX),
                     parameter.name,
                     i64::from(parameter.required),
@@ -420,8 +420,8 @@ fn write_cache(
     drop(insert_source_file);
     drop(insert_definition);
     drop(insert_reference);
-    drop(insert_macro);
-    drop(insert_macro_parameter);
+    drop(insert_dynamic);
+    drop(insert_dynamic_parameter);
     let mut by_file: BTreeMap<SourceFileId, Vec<(TextRange, PositionRange)>> = BTreeMap::new();
     for ((file_id, range), position) in cache.index.position_ranges() {
         if !cache.source_files.contains_key(&file_id) {

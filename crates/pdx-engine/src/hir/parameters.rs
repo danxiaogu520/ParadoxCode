@@ -4,7 +4,7 @@ use pdx_parser::{ParsedFile, TokenKind};
 use pdx_rules::{GameProfile, RuleSet};
 use pdx_text::{LogicalPath, TextRange};
 
-use super::semantics::scripted_macro_path_context;
+use super::semantics::dynamic_definition_path_context;
 use super::{
     HirParameterConditional, HirParameterDefinition, HirParameterReference,
     HirParameterReferenceKind, HirProperty, range_within,
@@ -21,13 +21,13 @@ pub(super) fn lower_parameters(
     let Some(logical_path) = logical_path else {
         return (Vec::new(), Vec::new());
     };
-    let macro_path = scripted_macro_path_context(rules, Some(logical_path)).is_some();
+    let dynamic_path = dynamic_definition_path_context(rules, Some(logical_path)).is_some();
     let token_rules = profile
         .into_iter()
         .flat_map(|profile| profile.token_definitions.iter())
         .filter(|rule| rule.path.matches(logical_path.as_str()))
         .collect::<Vec<_>>();
-    if token_rules.is_empty() && !macro_path {
+    if token_rules.is_empty() && !dynamic_path {
         return (Vec::new(), Vec::new());
     }
     let delimiters = token_rules

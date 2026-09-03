@@ -250,16 +250,16 @@ fn quoted_script_diagnostics_map_nested_escapes_and_recovered_syntax() {
 }
 
 #[test]
-fn scripted_macro_bare_parameter_validates_quoted_effect_payload_at_call_site() {
+fn dynamic_bare_parameter_validates_quoted_effect_payload_at_call_site() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-quoted-diag-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-quoted-diag-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
     std::fs::write(definitions.join("00_validate.txt"), "inject = { $BODY$ }\n")
-        .expect("macro definition");
+        .expect("dynamic definition");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -267,7 +267,7 @@ fn scripted_macro_bare_parameter_validates_quoted_effect_payload_at_call_site() 
         root.clone(),
     )]));
     host.refresh_source_roots().expect("scan definitions");
-    let id = DocumentId::new("file:///tmp/events/macro-quoted-diagnostic.txt");
+    let id = DocumentId::new("file:///tmp/events/dynamic-quoted-diagnostic.txt");
     let text = "country_event = { immediate = { inject = { BODY = \"definitely_unknown_effect = yes\" } } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open call");
@@ -296,12 +296,12 @@ fn scripted_macro_bare_parameter_validates_quoted_effect_payload_at_call_site() 
 }
 
 #[test]
-fn scripted_macro_preserves_literal_quoted_script_through_nested_expansion() {
+fn dynamic_definitions_preserve_literal_quoted_script_through_nested_calls() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-nested-quoted-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-nested-quoted-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
     std::fs::write(
@@ -311,7 +311,7 @@ fn scripted_macro_preserves_literal_quoted_script_through_nested_expansion() {
             "wrapper = { inject = { BODY = \"add_prestige = 1\" } }\n",
         ),
     )
-    .expect("macro definitions");
+    .expect("dynamic definitions");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -319,7 +319,7 @@ fn scripted_macro_preserves_literal_quoted_script_through_nested_expansion() {
         root.clone(),
     )]));
     host.refresh_source_roots().expect("scan definitions");
-    let id = DocumentId::new("file:///tmp/events/macro-nested-quoted.txt");
+    let id = DocumentId::new("file:///tmp/events/dynamic-nested-quoted.txt");
     host.open_document(
         id.clone(),
         1,
@@ -340,12 +340,12 @@ fn scripted_macro_preserves_literal_quoted_script_through_nested_expansion() {
 }
 
 #[test]
-fn scripted_macro_omits_missing_optional_forwarded_arguments() {
+fn dynamic_definitions_omit_missing_optional_forwarded_arguments() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-forwarded-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-forwarded-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
     std::fs::write(
@@ -356,7 +356,7 @@ fn scripted_macro_omits_missing_optional_forwarded_arguments() {
             "composite = { set_country_flag = PREFIX_$optional$_END }\n",
         ),
     )
-    .expect("macro definitions");
+    .expect("dynamic definitions");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -364,7 +364,7 @@ fn scripted_macro_omits_missing_optional_forwarded_arguments() {
         root.clone(),
     )]));
     host.refresh_source_roots().expect("scan definitions");
-    let id = DocumentId::new("file:///tmp/events/macro-forwarded.txt");
+    let id = DocumentId::new("file:///tmp/events/dynamic-forwarded.txt");
     host.open_document(
         id.clone(),
         1,
@@ -384,7 +384,7 @@ fn scripted_macro_omits_missing_optional_forwarded_arguments() {
 }
 
 #[test]
-fn runtime_branch_macro_accepts_the_amount_only_legitimacy_call() {
+fn runtime_branch_dynamic_accepts_the_amount_only_legitimacy_call() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -401,7 +401,7 @@ fn runtime_branch_macro_accepts_the_amount_only_legitimacy_call() {
             "else = { add_legitimacy = $amount$ } }\n",
         ),
     )
-    .expect("macro definition");
+    .expect("dynamic definition");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -432,7 +432,7 @@ fn runtime_branch_macro_accepts_the_amount_only_legitimacy_call() {
 }
 
 #[test]
-fn cached_runtime_branch_macro_recomputes_optional_parameters_from_the_template() {
+fn cached_runtime_branch_dynamic_recomputes_optional_parameters_from_the_template() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -449,7 +449,7 @@ fn cached_runtime_branch_macro_recomputes_optional_parameters_from_the_template(
             "else = { add_legitimacy = $amount$ } }\n",
         ),
     )
-    .expect("macro definition");
+    .expect("dynamic definition");
     let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
     let mut vanilla_host = eu4_host(rules.clone());
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -911,14 +911,14 @@ fn embedded_first_party_rules_drive_runtime_value_diagnostics() {
 }
 
 #[test]
-fn scripted_macro_blocks_validate_required_and_duplicate_parameters() {
+fn dynamic_calls_validate_required_and_duplicate_parameters() {
     use std::fs;
 
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-args-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-args-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     fs::create_dir_all(&definitions).expect("scripted effect directory");
     fs::write(
@@ -934,7 +934,7 @@ fn scripted_macro_blocks_validate_required_and_duplicate_parameters() {
         root.clone(),
     )]));
     host.refresh_source_roots().expect("scan definitions");
-    let id = DocumentId::new("file:///tmp/events/macro-arguments.txt");
+    let id = DocumentId::new("file:///tmp/events/dynamic-arguments.txt");
     host.open_document(
         id.clone(),
         1,
@@ -947,7 +947,7 @@ fn scripted_macro_blocks_validate_required_and_duplicate_parameters() {
         .to_owned(),
         None,
     )
-    .expect("open macro calls");
+    .expect("open dynamic calls");
 
     let results = diagnostics(&host.snapshot(), &id);
     assert!(results.iter().any(|item| {
@@ -968,12 +968,12 @@ fn scripted_macro_blocks_validate_required_and_duplicate_parameters() {
 }
 
 #[test]
-fn scripted_macro_definition_parameters_do_not_trigger_value_or_key_diagnostics() {
+fn dynamic_definition_parameters_do_not_trigger_value_or_key_diagnostics() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-placeholders-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-placeholders-{nonce}"));
     let definition_path = root.join("common/scripted_effects/00_placeholders.txt");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -988,7 +988,7 @@ fn scripted_macro_definition_parameters_do_not_trigger_value_or_key_diagnostics(
         "probe = { add_prestige = $PRESTIGE$ $EFFECT$ = yes }\n".to_owned(),
         Some(definition_path),
     )
-    .expect("open macro definition");
+    .expect("open dynamic definition");
 
     let results = diagnostics(&host.snapshot(), &id);
     assert!(
@@ -998,12 +998,12 @@ fn scripted_macro_definition_parameters_do_not_trigger_value_or_key_diagnostics(
                 && !(diagnostic.code == DiagnosticCode::UnknownKey
                     && diagnostic.message.contains("$EFFECT$"))
         }),
-        "owner-local macro placeholders must defer binding-dependent checks: {results:?}"
+        "owner-local dynamic placeholders must defer binding-dependent checks: {results:?}"
     );
 }
 
 #[test]
-fn dollar_tokens_outside_scripted_macro_definitions_remain_diagnosable() {
+fn dollar_tokens_outside_dynamic_definitions_remain_diagnosable() {
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/literal-dollar.txt");
     host.open_document(
@@ -1030,7 +1030,7 @@ fn dynamic_rule_call_site_validates_argument_values_and_dispatch_keys() {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-expand-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-expand-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
     std::fs::write(
@@ -1040,7 +1040,7 @@ fn dynamic_rule_call_site_validates_argument_values_and_dispatch_keys() {
             "dynamic = { $EFFECT$ = yes }\n",
         ),
     )
-    .expect("macro definitions");
+    .expect("dynamic definitions");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -1103,7 +1103,7 @@ fn dynamic_rule_dispatch_accepts_known_keys_and_scope_registers() {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-dispatch-ok-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-dispatch-ok-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
     std::fs::write(
@@ -1113,7 +1113,7 @@ fn dynamic_rule_dispatch_accepts_known_keys_and_scope_registers() {
             "scoped = { $SCOPE$ = { add_prestige = 1 } }\n",
         ),
     )
-    .expect("macro definitions");
+    .expect("dynamic definitions");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -1156,12 +1156,12 @@ fn dynamic_rule_dispatch_accepts_known_keys_and_scope_registers() {
 }
 
 #[test]
-fn scripted_macro_definition_defers_parameterized_nested_invocations() {
+fn dynamic_definitions_defer_parameterized_nested_invocations() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-forward-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-forward-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
     let definition_path = definitions.join("00_forward.txt");
@@ -1173,7 +1173,7 @@ fn scripted_macro_definition_defers_parameterized_nested_invocations() {
         "numeric_helper = { [[1] always = $1$ ] }\n",
         "numeric_wrapper = { numeric_helper = { 1 = \"$1$\" } }\n",
     );
-    std::fs::write(&definition_path, definitions_source).expect("macro definitions");
+    std::fs::write(&definition_path, definitions_source).expect("dynamic definitions");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -1250,19 +1250,19 @@ fn scripted_macro_definition_defers_parameterized_nested_invocations() {
 }
 
 #[test]
-fn scripted_macro_missing_required_parameter_is_reported_once() {
+fn dynamic_missing_required_parameter_is_reported_once() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-required-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-required-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
     std::fs::write(
         definitions.join("00_required.txt"),
         "helper = { add_prestige = $AMOUNT$ }\n",
     )
-    .expect("macro definition");
+    .expect("dynamic definition");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -1297,14 +1297,14 @@ fn dynamic_rule_arguments_reject_block_bindings_and_use_last_duplicate_scalar() 
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-binding-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-binding-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
     std::fs::write(
         definitions.join("00_binding.txt"),
         "scaled = { add_prestige = $AMOUNT$ }\n",
     )
-    .expect("macro definition");
+    .expect("dynamic definition");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -1353,12 +1353,12 @@ fn dynamic_rule_arguments_reject_block_bindings_and_use_last_duplicate_scalar() 
 }
 
 #[test]
-fn scripted_macro_expansion_activates_conditionals_and_reports_cycles() {
+fn dynamic_definitions_activate_conditionals_and_report_cycles() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-cycle-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-cycle-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
     std::fs::write(
@@ -1369,7 +1369,7 @@ fn scripted_macro_expansion_activates_conditionals_and_reports_cycles() {
             "second = { first = yes }\n",
         ),
     )
-    .expect("macro definitions");
+    .expect("dynamic definitions");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -1419,7 +1419,7 @@ fn scripted_macro_expansion_activates_conditionals_and_reports_cycles() {
     assert!(
         !results
             .iter()
-            .any(|diagnostic| diagnostic.code == DiagnosticCode::MacroExpansionCycle),
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::DynamicDefinitionCycle),
         "call site must not duplicate the definition-site report: {results:?}"
     );
     let snapshot = host.snapshot();
@@ -1441,7 +1441,7 @@ fn scripted_macro_expansion_activates_conditionals_and_reports_cycles() {
     .expect("definition diagnostics");
     assert!(
         definition_results.iter().any(|diagnostic| {
-            diagnostic.code == DiagnosticCode::MacroExpansionCycle
+            diagnostic.code == DiagnosticCode::DynamicDefinitionCycle
                 && diagnostic.message.contains("`first`")
                 && diagnostic.message.contains("first -> second -> first")
         }),
@@ -1449,7 +1449,7 @@ fn scripted_macro_expansion_activates_conditionals_and_reports_cycles() {
     );
     assert!(
         definition_results.iter().any(|diagnostic| {
-            diagnostic.code == DiagnosticCode::MacroExpansionCycle
+            diagnostic.code == DiagnosticCode::DynamicDefinitionCycle
                 && diagnostic.message.contains("`second`")
                 && diagnostic.message.contains("second -> first -> second")
         }),
@@ -1464,18 +1464,18 @@ fn deeply_nested_dynamic_rule_chains_validate_without_expansion_budgets() {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-depth-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-depth-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
     let mut source = String::new();
     for depth in 0..34 {
         source.push_str(&format!(
-            "macro_{depth} = {{ macro_{} = yes }}\n",
+            "nested_{depth} = {{ nested_{} = yes }}\n",
             depth + 1
         ));
     }
-    source.push_str("macro_34 = { add_prestige = 1 }\n");
-    std::fs::write(definitions.join("00_depth.txt"), source).expect("macro definitions");
+    source.push_str("nested_34 = { add_prestige = 1 }\n");
+    std::fs::write(definitions.join("00_depth.txt"), source).expect("dynamic definitions");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -1487,7 +1487,7 @@ fn deeply_nested_dynamic_rule_chains_validate_without_expansion_budgets() {
     host.open_document(
         id.clone(),
         1,
-        "country_event = { immediate = { macro_0 = yes } }\n".to_owned(),
+        "country_event = { immediate = { nested_0 = yes } }\n".to_owned(),
         None,
     )
     .expect("open call");
@@ -1505,13 +1505,13 @@ fn deeply_nested_dynamic_rule_chains_validate_without_expansion_budgets() {
 }
 
 #[test]
-fn empty_macro_expansion_maps_required_cardinality_to_the_call() {
+fn empty_dynamic_calls_map_required_cardinality_to_the_call() {
     let mut model = pdx_game::eu4::first_party_rules()
         .expect("first-party rules")
         .model()
         .clone();
     model.semantic.rules.push(SemanticRule {
-        id: "fixture:effect:required-in-empty-macro".to_owned(),
+        id: "fixture:effect:required-in-empty-definition".to_owned(),
         context: "effect".to_owned(),
         parent_path: Vec::new(),
         key: KeyMatcher::Exact("fixture_required".to_owned()),
@@ -1537,11 +1537,11 @@ fn empty_macro_expansion_maps_required_cardinality_to_the_call() {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-empty-macro-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-empty-dynamic-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
-    std::fs::write(definitions.join("00_empty.txt"), "empty_macro = { }\n")
-        .expect("macro definition");
+    std::fs::write(definitions.join("00_empty.txt"), "empty_dynamic = { }\n")
+        .expect("dynamic definition");
     let mut host = eu4_host(RuleSet::from_model(model));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -1549,13 +1549,13 @@ fn empty_macro_expansion_maps_required_cardinality_to_the_call() {
         root.clone(),
     )]));
     host.refresh_source_roots().expect("scan definition");
-    let id = DocumentId::new("file:///tmp/events/empty-macro.txt");
-    let source = "country_event = { immediate = { empty_macro = yes } }\n";
+    let id = DocumentId::new("file:///tmp/events/empty-dynamic.txt");
+    let source = "country_event = { immediate = { empty_dynamic = yes } }\n";
     host.open_document(id.clone(), 1, source.to_owned(), None)
         .expect("open call");
 
     let results = diagnostics(&host.snapshot(), &id);
-    let call_start = u32::try_from(source.find("empty_macro").expect("call")).expect("range");
+    let call_start = u32::try_from(source.find("empty_dynamic").expect("call")).expect("range");
     // Body-container cardinality now surfaces through the ordinary container
     // check at the invocation's own container, unprefixed by expansion
     // bookkeeping.
@@ -1569,7 +1569,7 @@ fn empty_macro_expansion_maps_required_cardinality_to_the_call() {
         "{results:?}"
     );
     let snapshot = host.snapshot();
-    let row = crate::dynamic_rules::dynamic_rule_row(&snapshot, "scripted_effect", "empty_macro")
+    let row = crate::dynamic_rules::dynamic_rule_row(&snapshot, "scripted_effect", "empty_dynamic")
         .expect("empty definition still derives a row");
     assert!(row.parameters.is_empty());
     assert!(row.body_findings.is_empty());
@@ -1582,14 +1582,14 @@ fn vanilla_cache_only_dynamic_row_records_unknown_body_statement() {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-cached-macro-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-cached-dynamic-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     std::fs::create_dir_all(&definitions).expect("definition directory");
     std::fs::write(
         definitions.join("00_cached.txt"),
-        "cached_macro = { definitely_unknown_key = yes }\n",
+        "cached_dynamic = { definitely_unknown_key = yes }\n",
     )
-    .expect("macro definition");
+    .expect("dynamic definition");
     let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
     let mut vanilla_host = eu4_host(rules.clone());
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -1605,11 +1605,11 @@ fn vanilla_cache_only_dynamic_row_records_unknown_body_statement() {
 
     let mut host = eu4_host(rules);
     host.install_index_cache(cache).expect("install cache");
-    let id = DocumentId::new("file:///tmp/events/cached-macro.txt");
+    let id = DocumentId::new("file:///tmp/events/cached-dynamic.txt");
     host.open_document(
         id.clone(),
         1,
-        "country_event = { immediate = { cached_macro = yes } }\n".to_owned(),
+        "country_event = { immediate = { cached_dynamic = yes } }\n".to_owned(),
         None,
     )
     .expect("open call");
@@ -1617,8 +1617,9 @@ fn vanilla_cache_only_dynamic_row_records_unknown_body_statement() {
     // The persisted template is enough to derive the body finding without the
     // original source; publishing definition-site findings is P3.
     let snapshot = host.snapshot();
-    let row = crate::dynamic_rules::dynamic_rule_row(&snapshot, "scripted_effect", "cached_macro")
-        .expect("cache-only definition derives a row");
+    let row =
+        crate::dynamic_rules::dynamic_rule_row(&snapshot, "scripted_effect", "cached_dynamic")
+            .expect("cache-only definition derives a row");
     assert!(
         row.body_findings.iter().any(|finding| {
             finding.kind == crate::dynamic_rules::DynamicBodyFindingKind::UnknownStatement
@@ -1636,7 +1637,7 @@ fn vanilla_cache_only_dynamic_row_records_unknown_body_statement() {
 }
 
 #[test]
-fn vanilla_cache_only_macro_validates_quoted_payload_at_exact_call_site_range() {
+fn vanilla_cache_only_dynamic_validates_quoted_payload_at_exact_call_site_range() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -1649,7 +1650,7 @@ fn vanilla_cache_only_macro_validates_quoted_payload_at_exact_call_site_range() 
         definitions.join("00_cached.txt"),
         "cached_inject = { $BODY$ }\n",
     )
-    .expect("macro definition");
+    .expect("dynamic definition");
     let rules = pdx_game::eu4::first_party_rules().expect("first-party rules");
     let mut vanilla_host = eu4_host(rules.clone());
     vanilla_host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
@@ -2090,7 +2091,7 @@ fn embedded_flag_templates_do_not_constrain_the_argument() {
 }
 
 #[test]
-fn unresolved_macro_placeholders_do_not_become_symbol_errors() {
+fn unresolved_dynamic_placeholders_do_not_become_symbol_errors() {
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/common/scripted_triggers/placeholders.txt");
     let text = "wrapper = { $global_trigger$ = yes custom_trigger_tooltip = { tooltip = $tooltip$ always = yes } }\n";
@@ -3123,12 +3124,12 @@ fn logic_container_lints_fire_on_degenerate_shapes() {
 }
 
 #[test]
-fn scripted_macro_cycles_are_reported_at_definition_sites() {
+fn dynamic_cycles_are_reported_at_definition_sites() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-cycles-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-cycles-{nonce}"));
     let effects = root.join("common/scripted_effects");
     std::fs::create_dir_all(&effects).expect("scripted effects directory");
     std::fs::write(
@@ -3141,7 +3142,7 @@ fn scripted_macro_cycles_are_reported_at_definition_sites() {
             "dispatch = { $action$ = yes }\n",
         ),
     )
-    .expect("macro definitions");
+    .expect("dynamic definitions");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -3171,7 +3172,7 @@ fn scripted_macro_cycles_are_reported_at_definition_sites() {
     let all = diagnostics(&host.snapshot(), &definitions);
     let cycles: Vec<&Diagnostic> = all
         .iter()
-        .filter(|diagnostic| diagnostic.code == DiagnosticCode::MacroExpansionCycle)
+        .filter(|diagnostic| diagnostic.code == DiagnosticCode::DynamicDefinitionCycle)
         .collect();
 
     let ping_offset = u32::try_from(definition_text.find("ping = ").expect("ping")).expect("u32");
@@ -3217,7 +3218,7 @@ fn scripted_macro_cycles_are_reported_at_definition_sites() {
         !cycles
             .iter()
             .any(|diagnostic| diagnostic.message.contains("`honest`")),
-        "acyclic macros stay unreported: {cycles:?}"
+        "acyclic definitions stay unreported: {cycles:?}"
     );
 
     // The runtime expansion guard stays silent for statically known cycles;
@@ -3234,19 +3235,19 @@ fn scripted_macro_cycles_are_reported_at_definition_sites() {
     assert!(
         !event_diagnostics
             .iter()
-            .any(|diagnostic| diagnostic.code == DiagnosticCode::MacroExpansionCycle),
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::DynamicDefinitionCycle),
         "call sites no longer duplicate definition-site cycle reports: {event_diagnostics:?}"
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 
 #[test]
-fn scripted_macro_scope_contracts_infer_and_reject_empty_intersections() {
+fn dynamic_scope_contracts_infer_and_reject_empty_intersections() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-contracts-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-contracts-{nonce}"));
     let effects = root.join("common/scripted_effects");
     std::fs::create_dir_all(&effects).expect("scripted effects directory");
     let body = concat!(
@@ -3266,7 +3267,7 @@ fn scripted_macro_scope_contracts_infer_and_reject_empty_intersections() {
         // Dynamic $param$ dispatch is not narrowed.
         "dynamic_dispatch = { $action$ = yes }\n",
         // Dynamic scope links re-target runtime scopes; their bodies must not
-        // constrain the entry (ROOT is the event root, not the macro entry).
+        // constrain the entry (ROOT is the event root, not the definition entry).
         "root_opaque = { add_prestige = 1 ROOT = { change_province_name = \"Z\" } }\n",
         // A THIS block only evaluates the entry scope in trigger context;
         // as an effect container it must not constrain the entry either.
@@ -3278,7 +3279,7 @@ fn scripted_macro_scope_contracts_infer_and_reject_empty_intersections() {
         // An OR branch with no scope knowledge keeps the whole OR unconstrained.
         "or_open = { if = { limit = { OR = { unknown_branch_key = yes is_capital = yes } } add_prestige = 1 } }\n",
     );
-    std::fs::write(effects.join("00_contracts.txt"), body).expect("macro definitions");
+    std::fs::write(effects.join("00_contracts.txt"), body).expect("dynamic definitions");
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
         SourceRootId::new(1),
@@ -3333,36 +3334,36 @@ fn scripted_macro_scope_contracts_infer_and_reject_empty_intersections() {
     );
 
     // The inferred contracts behind those diagnostics, via the hover view.
-    use crate::macro_contracts::{ScopeContract, contract_hover_line, macro_contract};
+    use crate::dynamic_contracts::{ScopeContract, contract_hover_line, dynamic_contract};
     assert_eq!(
-        macro_contract(&snapshot, "scripted_effect", "clash"),
+        dynamic_contract(&snapshot, "scripted_effect", "clash"),
         Some(ScopeContract::Empty)
     );
     assert_eq!(
-        macro_contract(&snapshot, "scripted_effect", "fine"),
+        dynamic_contract(&snapshot, "scripted_effect", "fine"),
         Some(ScopeContract::Scopes(vec!["country".to_owned()]))
     );
     assert_eq!(
-        macro_contract(&snapshot, "scripted_effect", "helper_province"),
+        dynamic_contract(&snapshot, "scripted_effect", "helper_province"),
         Some(ScopeContract::Scopes(vec!["province".to_owned()]))
     );
     assert_eq!(
-        macro_contract(&snapshot, "scripted_effect", "root_opaque"),
+        dynamic_contract(&snapshot, "scripted_effect", "root_opaque"),
         Some(ScopeContract::Scopes(vec!["country".to_owned()])),
         "ROOT blocks re-target the event root and must not narrow the entry"
     );
     assert_eq!(
-        macro_contract(&snapshot, "scripted_effect", "this_opaque"),
+        dynamic_contract(&snapshot, "scripted_effect", "this_opaque"),
         Some(ScopeContract::Scopes(vec!["country".to_owned()])),
         "THIS effect blocks do not run in the entry scope"
     );
     assert_eq!(
-        macro_contract(&snapshot, "scripted_effect", "or_union"),
+        dynamic_contract(&snapshot, "scripted_effect", "or_union"),
         Some(ScopeContract::Scopes(vec!["country".to_owned()])),
         "OR branches union, so the province branch does not clash with add_prestige"
     );
     assert_eq!(
-        macro_contract(&snapshot, "scripted_effect", "or_open"),
+        dynamic_contract(&snapshot, "scripted_effect", "or_open"),
         Some(ScopeContract::Scopes(vec!["country".to_owned()])),
         "an unconstrained OR branch keeps the OR unconstrained"
     );
@@ -3536,7 +3537,7 @@ fn modifier_scope_mismatch_reports_cross_scope_modifier_applications() {
 }
 
 #[test]
-fn macro_call_sites_are_validated_against_entry_contracts() {
+fn dynamic_call_sites_are_validated_against_entry_contracts() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -3551,7 +3552,7 @@ fn macro_call_sites_are_validated_against_entry_contracts() {
         "province_helper = { change_province_name = \"X\" }\n",
         "unconstrained_helper = { custom_tooltip = some_tip }\n",
     );
-    std::fs::write(effects_dir.join("00_effects.txt"), effects).expect("macro definitions");
+    std::fs::write(effects_dir.join("00_effects.txt"), effects).expect("dynamic definitions");
     let events = concat!(
         "country_event = {\n",
         "    id = call_site_test.1\n",
@@ -3563,7 +3564,7 @@ fn macro_call_sites_are_validated_against_entry_contracts() {
         "country_event = {\n",
         "    id = call_site_test.2\n",
         "    title = call_site_test.2.t\n",
-        "    option = { name = bad_province_macro\n",
+        "    option = { name = bad_province_dynamic\n",
         "        province_helper = yes\n",
         "    }\n",
         "}\n",
@@ -3584,7 +3585,7 @@ fn macro_call_sites_are_validated_against_entry_contracts() {
         "province_event = {\n",
         "    id = call_site_test.5\n",
         "    title = call_site_test.5.t\n",
-        "    option = { name = bad_country_macro\n",
+        "    option = { name = bad_country_dynamic\n",
         "        country_helper = yes\n",
         "    }\n",
         "}\n",
@@ -3611,12 +3612,12 @@ fn macro_call_sites_are_validated_against_entry_contracts() {
     let all = diagnostics(&snapshot, &document);
     let mismatches: Vec<&Diagnostic> = all
         .iter()
-        .filter(|diagnostic| diagnostic.code == DiagnosticCode::MacroCallScopeMismatch)
+        .filter(|diagnostic| diagnostic.code == DiagnosticCode::DynamicCallScopeMismatch)
         .collect();
     assert_eq!(
         mismatches.len(),
         2,
-        "only the two cross-scope macro calls are reported: {all:?}"
+        "only the two cross-scope dynamic calls are reported: {all:?}"
     );
 
     let key_after = |anchor: &str, key: &str| -> TextRange {
@@ -3628,8 +3629,8 @@ fn macro_call_sites_are_validated_against_entry_contracts() {
         let start = u32::try_from(key_at).expect("u32");
         TextRange::new(start, start + u32::try_from(key.len()).expect("u32")).expect("range")
     };
-    let bad_country = key_after("bad_country_macro", "country_helper");
-    let bad_province = key_after("bad_province_macro", "province_helper");
+    let bad_country = key_after("bad_country_dynamic", "country_helper");
+    let bad_province = key_after("bad_province_dynamic", "province_helper");
     let country_case = mismatches
         .iter()
         .find(|diagnostic| diagnostic.range == bad_country)
@@ -3637,7 +3638,7 @@ fn macro_call_sites_are_validated_against_entry_contracts() {
     assert_eq!(country_case.severity, Severity::Error);
     assert_eq!(
         country_case.message,
-        "scripted macro `country_helper` requires entry scope country but is called in `province` scope"
+        "dynamic definition `country_helper` requires entry scope country but is called in `province` scope"
     );
     let province_case = mismatches
         .iter()
@@ -3645,7 +3646,7 @@ fn macro_call_sites_are_validated_against_entry_contracts() {
         .expect("province_helper mismatch reported at its key");
     assert_eq!(
         province_case.message,
-        "scripted macro `province_helper` requires entry scope province but is called in `country` scope"
+        "dynamic definition `province_helper` requires entry scope province but is called in `country` scope"
     );
 
     std::fs::remove_dir_all(root).expect("cleanup");

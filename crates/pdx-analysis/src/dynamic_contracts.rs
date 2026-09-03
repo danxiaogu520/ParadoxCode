@@ -1,6 +1,6 @@
-//! Definition-site entry-scope contracts for scripted macros.
+//! Definition-site entry-scope contracts for dynamic definitions.
 //!
-//! A scripted macro's body executes in the caller's scope, so the macro is
+//! A dynamic definition's body executes in the caller's scope, so the definition is
 //! only usable where every statement in its body is valid. This module infers
 //! that entry contract once per definition: it walks the lowered template,
 //! collects the `allowed_scopes` of each body statement's matching rules, and
@@ -18,27 +18,27 @@
 //!
 //! Calls with a `$param$` in key position dispatch dynamically; their targets
 //! are unknowable at definition time, so they do not narrow the contract (the
-//! flag is kept for reporting and hover). Nested scripted-macro calls
+//! flag is kept for reporting and hover). Nested dynamic-definition calls
 //! contribute the callee's own inferred contract.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use pdx_engine::hir::{
-    MacroTemplateFragment, MacroTemplateItem, MacroTemplateProperty, MacroTemplateToken,
-    MacroTemplateValue, ScopeValue,
+    ScopeValue, TemplateFragment, TemplateItem, TemplateProperty, TemplateToken, TemplateValue,
 };
 use pdx_engine::{AnalysisSnapshot, DocumentSource};
 use pdx_rules::{GameProfile, RuleShape};
 
 use crate::semantic::{
-    ResolvedMacroDefinition, probe_query_cache, resolve_macro_definition, scripted_macro_type,
+    ResolvedDynamicDefinition, dynamic_definition_type, probe_query_cache,
+    resolve_dynamic_definition,
 };
 use crate::support::ParsedInput;
 use crate::types::{CancellationToken, Cancelled, Diagnostic, DiagnosticCode, uncancelled};
 
 /// Cache key for the workspace-wide contract report inside the query cache.
-const CONTRACT_CACHE_KEY: &str = "macro-scope-contracts";
+const CONTRACT_CACHE_KEY: &str = "dynamic-scope-contracts";
 
 /// One inferred entry contract.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -54,7 +54,7 @@ pub(crate) enum ScopeContract {
 }
 
 impl ScopeContract {
-    /// True when `scope` may enter a macro carrying this contract.
+    /// True when `scope` may enter a definition carrying this contract.
     pub(crate) fn accepts(&self, profile: &GameProfile, scope: &str) -> bool {
         match self {
             Self::Unconstrained | Self::Unknown => true,
@@ -75,15 +75,15 @@ impl ScopeContract {
     }
 }
 
-/// Workspace-wide inference result for every live scripted macro definition.
+/// Workspace-wide inference result for every live dynamic definition.
 #[derive(Clone, Debug, Default)]
-pub(crate) struct MacroContractReport {
+pub(crate) struct DynamicContractReport {
     contracts: BTreeMap<(String, String), ScopeContract>,
     /// Definitions whose template dispatches through a `$param$` key.
     dynamic: BTreeSet<(String, String)>,
 }
 
-impl MacroContractReport {
+impl DynamicContractReport {
     pub(crate) fn contract(&self, kind: &str, name: &str) -> Option<&ScopeContract> {
         self.contracts
             .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
@@ -95,9 +95,9 @@ impl MacroContractReport {
     }
 }
 
-/// Returns definition-site diagnostics for macros defined in `input` whose
+/// Returns definition-site diagnostics for dynamic definitions in `input` whose
 /// inferred entry contract is empty.
-pub(crate) fn macro_contract_diagnostics(
+pub(crate) fn dynamic_contract_diagnostics(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     cancellation: &CancellationToken,
@@ -109,13 +109,13 @@ pub(crate) fn macro_contract_diagnostics(
     let Some(hir) = input.hir.as_deref() else {
         return Ok(Vec::new());
     };
-    let report = macro_contract_report(snapshot, cancellation)?;
+    let report = dynamic_contract_report(snapshot, cancellation)?;
     if report.contracts.is_empty() {
         return Ok(Vec::new());
     }
     let mut diagnostics = Vec::new();
     for definition in hir.definitions() {
-        if !scripted_macro_type(snapshot, &definition.kind) {
+        if !dynamic_definition_type(snapshot, &definition.kind) {
             continue;
         }
         let Some(ScopeContract::Empty) = report.contract(&definition.kind, &definition.name) else {
@@ -126,7 +126,7 @@ pub(crate) fn macro_contract_diagnostics(
             DiagnosticCode::EmptyScopeContract.severity(),
             definition.selection_range,
             format!(
-                "scripted macro `{}` has an empty inferred entry scope: no scope satisfies every statement in its body",
+                "dynamic definition `{}` has an empty inferred entry scope: no scope satisfies every statement in its body",
                 definition.name
             ),
         ));
@@ -134,16 +134,16 @@ pub(crate) fn macro_contract_diagnostics(
     Ok(diagnostics)
 }
 
-/// Returns diagnostics for macro call sites whose ambient scope cannot enter
+/// Returns diagnostics for dynamic call sites whose ambient scope cannot enter
 /// the callee's inferred contract.
 ///
-/// A macro body runs in the caller's scope, so a call in an incompatible
-/// scope executes the body where its statements do not apply. Only pure macro
+/// A definition body runs in the caller's scope, so a call in an incompatible
+/// scope executes the body where its statements do not apply. Only pure dynamic
 /// calls participate: a key that also matches a builtin rule row may be the
 /// builtin (the contract's `Any` case), and keys with no rows stay with the
 /// unknown-key lint. Empty contracts are already reported at their definition
 /// site and are not repeated per call site.
-pub(crate) fn macro_call_site_diagnostics(
+pub(crate) fn dynamic_call_site_diagnostics(
     snapshot: &AnalysisSnapshot,
     input: &ParsedInput,
     cancellation: &CancellationToken,
@@ -155,7 +155,7 @@ pub(crate) fn macro_call_site_diagnostics(
     let Some(hir) = input.hir.as_deref() else {
         return Ok(Vec::new());
     };
-    let report = macro_contract_report(snapshot, cancellation)?;
+    let report = dynamic_contract_report(snapshot, cancellation)?;
     if report.contracts.is_empty() {
         return Ok(Vec::new());
     }
@@ -180,7 +180,7 @@ pub(crate) fn macro_call_site_diagnostics(
             .iter()
             .map(|segment| Arc::<str>::from(segment.as_str()))
             .collect();
-        let mut macro_kind: Option<String> = None;
+        let mut dynamic_kind: Option<String> = None;
         let mut builtin = false;
         for rule in crate::semantic::semantic_rules_for_container_key(
             snapshot,
@@ -198,9 +198,9 @@ pub(crate) fn macro_call_site_diagnostics(
             }
             match &rule.key {
                 pdx_rules::KeyMatcher::Type(kind) | pdx_rules::KeyMatcher::Dynamic(kind)
-                    if crate::semantic::scripted_macro_type(snapshot, kind) =>
+                    if crate::semantic::dynamic_definition_type(snapshot, kind) =>
                 {
-                    macro_kind.get_or_insert_with(|| kind.clone());
+                    dynamic_kind.get_or_insert_with(|| kind.clone());
                 }
                 _ => {
                     builtin = true;
@@ -211,10 +211,10 @@ pub(crate) fn macro_call_site_diagnostics(
         if builtin {
             continue;
         }
-        let Some(macro_kind) = macro_kind else {
+        let Some(dynamic_kind) = dynamic_kind else {
             continue;
         };
-        let Some(contract) = report.contract(&macro_kind, &property.key) else {
+        let Some(contract) = report.contract(&dynamic_kind, &property.key) else {
             continue;
         };
         // Empty contracts are already reported at the definition site;
@@ -226,11 +226,11 @@ pub(crate) fn macro_call_site_diagnostics(
             continue;
         }
         diagnostics.push(Diagnostic::new(
-            DiagnosticCode::MacroCallScopeMismatch,
-            DiagnosticCode::MacroCallScopeMismatch.severity(),
+            DiagnosticCode::DynamicCallScopeMismatch,
+            DiagnosticCode::DynamicCallScopeMismatch.severity(),
             property.key_range,
             format!(
-                "scripted macro `{}` requires entry scope {} but is called in `{}` scope",
+                "dynamic definition `{}` requires entry scope {} but is called in `{}` scope",
                 property.key,
                 expected.join(", "),
                 ambient
@@ -240,21 +240,21 @@ pub(crate) fn macro_call_site_diagnostics(
     Ok(diagnostics)
 }
 
-/// Returns the workspace contract for one macro, computing the report when the
+/// Returns the workspace contract for one definition, computing the report when the
 /// per-revision cache is cold. Hover and call-site validation share this view.
-pub(crate) fn macro_contract(
+pub(crate) fn dynamic_contract(
     snapshot: &AnalysisSnapshot,
     kind: &str,
     name: &str,
 ) -> Option<ScopeContract> {
     let cancellation = CancellationToken::new();
-    let report = uncancelled(macro_contract_report(snapshot, &cancellation));
+    let report = uncancelled(dynamic_contract_report(snapshot, &cancellation));
     report.contract(kind, name).cloned()
 }
 
-/// One-line hover summary of a macro's inferred contract.
+/// One-line hover summary of a definition's inferred contract.
 pub(crate) fn contract_hover_line(snapshot: &AnalysisSnapshot, kind: &str, name: &str) -> String {
-    let contract = macro_contract(snapshot, kind, name);
+    let contract = dynamic_contract(snapshot, kind, name);
     let scope = contract.map_or_else(|| "unknown".to_owned(), |contract| contract.display());
     let dispatch = if contract_is_dynamic(snapshot, kind, name) {
         " (dynamic `$param$` dispatch: not narrowed)"
@@ -266,23 +266,23 @@ pub(crate) fn contract_hover_line(snapshot: &AnalysisSnapshot, kind: &str, name:
 
 fn contract_is_dynamic(snapshot: &AnalysisSnapshot, kind: &str, name: &str) -> bool {
     let cancellation = CancellationToken::new();
-    let report = uncancelled(macro_contract_report(snapshot, &cancellation));
+    let report = uncancelled(dynamic_contract_report(snapshot, &cancellation));
     report.is_dynamic(kind, name)
 }
 
-fn macro_contract_report(
+fn dynamic_contract_report(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
-) -> Result<Arc<MacroContractReport>, Cancelled> {
+) -> Result<Arc<DynamicContractReport>, Cancelled> {
     let revision = snapshot.revision();
     if let Some(cached) =
-        probe_query_cache::<MacroContractReport>(snapshot, revision, &[CONTRACT_CACHE_KEY])
+        probe_query_cache::<DynamicContractReport>(snapshot, revision, &[CONTRACT_CACHE_KEY])
     {
         return Ok(cached);
     }
     cancellation.checkpoint()?;
     let report = build_contract_report(snapshot, cancellation)?;
-    if std::env::var("PDX_DEBUG_MACRO_CONTRACTS").is_ok_and(|value| !value.is_empty()) {
+    if std::env::var("PDX_DEBUG_DYNAMIC_CONTRACTS").is_ok_and(|value| !value.is_empty()) {
         let count = |predicate: &dyn Fn(&ScopeContract) -> bool| {
             report
                 .contracts
@@ -291,7 +291,7 @@ fn macro_contract_report(
                 .count()
         };
         eprintln!(
-            "macro contracts: {} definitions, {} constrained, {} unconstrained, {} dynamic, {} empty",
+            "dynamic contracts: {} definitions, {} constrained, {} unconstrained, {} dynamic, {} empty",
             report.contracts.len(),
             count(&|contract| matches!(contract, ScopeContract::Scopes(_))),
             count(&|contract| matches!(contract, ScopeContract::Unconstrained)),
@@ -317,7 +317,7 @@ enum Statement<'rule> {
     Scopes(Vec<String>),
     /// A callee with an empty contract: nothing can enter this call chain.
     Impossible,
-    /// A key that is both a builtin rule and a scripted macro: either accepts.
+    /// A key that is both a builtin rule and a dynamic definition: either accepts.
     Any(Vec<Statement<'rule>>),
 }
 
@@ -353,7 +353,7 @@ struct ContractInference<'a> {
 }
 
 impl<'a> ContractInference<'a> {
-    fn contract_of(&mut self, resolved: &ResolvedMacroDefinition) -> ScopeContract {
+    fn contract_of(&mut self, resolved: &ResolvedDynamicDefinition) -> ScopeContract {
         let key = (
             resolved.summary.kind.to_ascii_lowercase(),
             resolved.summary.name.to_ascii_lowercase(),
@@ -430,30 +430,30 @@ impl<'a> StatementInference<'a> {
 
     fn walk_items(
         &mut self,
-        items: &[MacroTemplateItem],
+        items: &[TemplateItem],
         context: &str,
-        macros: &mut ContractInference<'_>,
+        contracts: &mut ContractInference<'_>,
     ) {
         for item in items {
             match item {
-                MacroTemplateItem::Property(property) => {
-                    self.walk_property(property, context, macros);
+                TemplateItem::Property(property) => {
+                    self.walk_property(property, context, contracts);
                 }
-                MacroTemplateItem::Conditional(conditional) => {
+                TemplateItem::Conditional(conditional) => {
                     // A conditional branch is active whenever its parameter is
                     // supplied, so its statements constrain the contract too.
-                    self.walk_items(&conditional.items, context, macros);
+                    self.walk_items(&conditional.items, context, contracts);
                 }
-                MacroTemplateItem::BareValue(_) => {}
+                TemplateItem::BareValue(_) => {}
             }
         }
     }
 
     fn walk_property(
         &mut self,
-        property: &MacroTemplateProperty,
+        property: &TemplateProperty,
         context: &str,
-        macros: &mut ContractInference<'_>,
+        contracts: &mut ContractInference<'_>,
     ) {
         if token_has_parameter(&property.key) {
             self.dynamic = true;
@@ -470,12 +470,12 @@ impl<'a> StatementInference<'a> {
             // Dynamic scope links re-target a scope the caller decides at
             // runtime (the event root, the previous scope, the sender, a
             // saved event target); their bodies constrain that target, not
-            // the macro entry, so they neither constrain nor descend.
+            // the definition entry, so they neither constrain nor descend.
             return;
         }
         if lowered == "or" {
-            if let MacroTemplateValue::Block { items, .. } = &property.value
-                && let Some(statement) = self.or_statement(items, context, macros)
+            if let TemplateValue::Block { items, .. } = &property.value
+                && let Some(statement) = self.or_statement(items, context, contracts)
             {
                 self.statements.push(statement);
             }
@@ -484,7 +484,7 @@ impl<'a> StatementInference<'a> {
         // Rows matching this statement in the body context; keep only rows of
         // the statement's own shape so a scalar-only row cannot narrow a block
         // call and vice versa.
-        let wants_block = matches!(property.value, MacroTemplateValue::Block { .. });
+        let wants_block = matches!(property.value, TemplateValue::Block { .. });
         let matching: Vec<&'a pdx_rules::SemanticRule> =
             crate::semantic::semantic_rules_for_container_key(self.snapshot, context, &[], key)
                 .into_iter()
@@ -493,11 +493,11 @@ impl<'a> StatementInference<'a> {
                         && rule_has_shape(rule, wants_block)
                 })
                 .collect();
-        // A same-kind scripted macro call contributes its own contract; a key
-        // that is both builtin and macro accepts through either path.
-        let callee = macro_kind_for_context(self.snapshot, context)
-            .and_then(|kind| resolve_macro_definition(self.snapshot, &kind, key));
-        let callee_contract = callee.as_ref().map(|callee| macros.contract_of(callee));
+        // A same-kind dynamic definition call contributes its own contract; a key
+        // that is both builtin and dynamic accepts through either path.
+        let callee = dynamic_kind_for_context(self.snapshot, context)
+            .and_then(|kind| resolve_dynamic_definition(self.snapshot, &kind, key));
+        let callee_contract = callee.as_ref().map(|callee| contracts.contract_of(callee));
         let mut statement = Vec::with_capacity(2);
         if matching.iter().all(|rule| !rule.allowed_scopes.is_empty()) && !matching.is_empty() {
             for rule in &matching {
@@ -528,7 +528,7 @@ impl<'a> StatementInference<'a> {
         // Descend into same-scope containers so nested statements also
         // constrain the entry scope. A rule row that pushes or replaces the
         // scope evaluates its children elsewhere, so it must not contribute.
-        if let MacroTemplateValue::Block { items, .. } = &property.value {
+        if let TemplateValue::Block { items, .. } = &property.value {
             let containers: Vec<&pdx_rules::SemanticRule> = matching
                 .iter()
                 .copied()
@@ -550,7 +550,7 @@ impl<'a> StatementInference<'a> {
                     .find_map(|rule| rule.child_context.as_deref())
                     .unwrap_or(context)
                     .to_owned();
-                self.walk_items(items, &child_context, macros);
+                self.walk_items(items, &child_context, contracts);
             }
         }
     }
@@ -560,14 +560,14 @@ impl<'a> StatementInference<'a> {
     /// combine with any-of semantics instead of intersecting.
     fn or_statement(
         &mut self,
-        items: &[MacroTemplateItem],
+        items: &[TemplateItem],
         context: &str,
-        macros: &mut ContractInference<'_>,
+        contracts: &mut ContractInference<'_>,
     ) -> Option<Statement<'a>> {
         let mut branches = Vec::new();
         for item in items {
             let mut branch = StatementInference::new(self.snapshot, self.profile);
-            branch.walk_items(std::slice::from_ref(item), context, macros);
+            branch.walk_items(std::slice::from_ref(item), context, contracts);
             if branch.dynamic {
                 self.dynamic = true;
             }
@@ -592,7 +592,7 @@ impl<'a> StatementInference<'a> {
 }
 
 /// True for scope-link keys whose target the caller decides at runtime. Their
-/// bodies constrain that unknown target, never the macro entry. `THIS` is the
+/// bodies constrain that unknown target, never the definition entry. `THIS` is the
 /// exception in trigger context, where it denotes the entry scope itself;
 /// everywhere else a `THIS` block does not run in the entry scope.
 fn is_dynamic_scope_link(lowered: &str, context: &str) -> bool {
@@ -603,9 +603,9 @@ fn is_dynamic_scope_link(lowered: &str, context: &str) -> bool {
     }
 }
 
-/// Resolves the scripted-macro kind whose descriptor declares `context` as its
+/// Resolves the dynamic-definition kind whose descriptor declares `context` as its
 /// body context (e.g. `effect` -> `scripted_effect`), from rule data only.
-fn macro_kind_for_context(snapshot: &AnalysisSnapshot, context: &str) -> Option<String> {
+fn dynamic_kind_for_context(snapshot: &AnalysisSnapshot, context: &str) -> Option<String> {
     snapshot
         .rules()
         .model()
@@ -614,11 +614,13 @@ fn macro_kind_for_context(snapshot: &AnalysisSnapshot, context: &str) -> Option<
         .iter()
         .find(|(_, descriptor)| {
             descriptor
-                .scripted_macro
+                .dynamic_definition
                 .as_ref()
-                .is_some_and(|macro_descriptor| {
-                    macro_descriptor.macro_enabled
-                        && macro_descriptor.body_context.eq_ignore_ascii_case(context)
+                .is_some_and(|dynamic_descriptor| {
+                    dynamic_descriptor.enabled
+                        && dynamic_descriptor
+                            .body_context
+                            .eq_ignore_ascii_case(context)
                 })
         })
         .map(|(kind, _)| kind.clone())
@@ -632,16 +634,16 @@ fn rule_has_shape(rule: &pdx_rules::SemanticRule, wants_block: bool) -> bool {
     }
 }
 
-fn token_has_parameter(token: &MacroTemplateToken) -> bool {
+fn token_has_parameter(token: &TemplateToken) -> bool {
     token
         .fragments
         .iter()
-        .any(|fragment| matches!(fragment, MacroTemplateFragment::Parameter { .. }))
+        .any(|fragment| matches!(fragment, TemplateFragment::Parameter { .. }))
 }
 
-fn single_literal(token: &MacroTemplateToken) -> Option<&str> {
+fn single_literal(token: &TemplateToken) -> Option<&str> {
     match token.fragments.as_slice() {
-        [MacroTemplateFragment::Literal(text)] => Some(text),
+        [TemplateFragment::Literal(text)] => Some(text),
         _ => None,
     }
 }
@@ -649,12 +651,12 @@ fn single_literal(token: &MacroTemplateToken) -> Option<&str> {
 fn build_contract_report(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
-) -> Result<MacroContractReport, Cancelled> {
+) -> Result<DynamicContractReport, Cancelled> {
     let profile = snapshot.game_profile();
     let mut candidates: Vec<(String, String)> = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for definition in snapshot.index().definitions_iter() {
-        if !scripted_macro_type(snapshot, &definition.kind) {
+        if !dynamic_definition_type(snapshot, &definition.kind) {
             continue;
         }
         if seen.insert((
@@ -673,7 +675,7 @@ fn build_contract_report(
             continue;
         };
         for definition in hir.definitions() {
-            if !scripted_macro_type(snapshot, &definition.kind) {
+            if !dynamic_definition_type(snapshot, &definition.kind) {
                 continue;
             }
             if seen.insert((
@@ -694,7 +696,7 @@ fn build_contract_report(
     let mut contracts = BTreeMap::new();
     for (kind, name) in &candidates {
         cancellation.checkpoint()?;
-        let Some(resolved) = resolve_macro_definition(snapshot, kind, name) else {
+        let Some(resolved) = resolve_dynamic_definition(snapshot, kind, name) else {
             continue;
         };
         let key = (
@@ -704,7 +706,7 @@ fn build_contract_report(
         let contract = inference.contract_of(&resolved);
         contracts.insert(key, contract);
     }
-    Ok(MacroContractReport {
+    Ok(DynamicContractReport {
         contracts,
         dynamic: inference.dynamic,
     })

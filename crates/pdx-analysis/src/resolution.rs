@@ -10,7 +10,7 @@ use pdx_text::{LogicalPath, TextRange, TextSize};
 #[cfg(test)]
 use std::cell::Cell;
 
-use crate::completion::{SemanticCompletionContext, infer_macro_quoted_script_constraints};
+use crate::completion::{SemanticCompletionContext, infer_dynamic_quoted_script_constraints};
 use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
 use crate::semantic::*;
 use crate::support::*;
@@ -159,12 +159,12 @@ fn semantic_data_with_cancellation_uncached(
                 HirReferenceOrigin::Profile
                     | HirReferenceOrigin::Semantic
                     | HirReferenceOrigin::SemanticTyped
-                    | HirReferenceOrigin::ScriptedMacro
+                    | HirReferenceOrigin::DynamicDefinition
                     | HirReferenceOrigin::DerivedLocalisation
             )
         })
         .filter(|reference| semantic_reference_is_active(&inactive_semantic_references, reference))
-        .filter(|reference| scripted_macro_reference_is_callable(snapshot, hir, reference))
+        .filter(|reference| dynamic_reference_is_callable(snapshot, hir, reference))
         .filter(|reference| {
             !matches!(
                 reference.kind.to_ascii_lowercase().as_str(),
@@ -175,7 +175,7 @@ fn semantic_data_with_cancellation_uncached(
                 .any(|character| character.is_whitespace() || matches!(character, '=' | '{' | '}'))
         })
         .filter(|reference| {
-            reference.origin != HirReferenceOrigin::ScriptedMacro
+            reference.origin != HirReferenceOrigin::DynamicDefinition
                 || workspace_member(snapshot, &reference.kind, &reference.name)
         })
         .filter(|reference| {
@@ -280,7 +280,7 @@ impl QuotedSemanticCollector<'_, '_, '_, '_, '_> {
                     structural_containers: Vec::new(),
                     alternative_containers: Vec::new(),
                     existing_keys: Vec::new(),
-                    macro_inferred: false,
+                    dynamic_inferred: false,
                     scope: container.scope.clone(),
                     container_property: Some(invocation.clone()),
                     property: Some(property.clone()),
@@ -289,7 +289,7 @@ impl QuotedSemanticCollector<'_, '_, '_, '_, '_> {
                     wrapper_container: false,
                     root_entry_container: false,
                 };
-                let inferred = infer_macro_quoted_script_constraints(
+                let inferred = infer_dynamic_quoted_script_constraints(
                     self.snapshot,
                     &inference_context,
                     property,
@@ -464,16 +464,16 @@ fn collect_embedded_property_semantics(
     {
         let type_name = match &rule.key {
             KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
-                if scripted_macro_type(snapshot, type_name) =>
+                if dynamic_definition_type(snapshot, type_name) =>
             {
                 type_name
             }
             _ => continue,
         };
-        let Some(summary) = macro_definition_summary(snapshot, type_name, &property.key) else {
+        let Some(summary) = dynamic_definition_summary(snapshot, type_name, &property.key) else {
             continue;
         };
-        if scripted_macro_invocation_shape_matches(
+        if dynamic_invocation_shape_matches(
             snapshot,
             type_name,
             &summary,
@@ -507,15 +507,15 @@ fn embedded_reference(
     }
 }
 
-fn scripted_macro_reference_is_callable(
+fn dynamic_reference_is_callable(
     snapshot: &AnalysisSnapshot,
     hir: &HirFile,
     reference: &HirReference,
 ) -> bool {
-    if reference.origin != HirReferenceOrigin::ScriptedMacro {
+    if reference.origin != HirReferenceOrigin::DynamicDefinition {
         return true;
     }
-    scripted_macro_reference_range_is_callable(
+    dynamic_reference_range_is_callable(
         snapshot,
         hir,
         &reference.kind,
@@ -524,14 +524,14 @@ fn scripted_macro_reference_is_callable(
     )
 }
 
-fn scripted_macro_reference_range_is_callable(
+fn dynamic_reference_range_is_callable(
     snapshot: &AnalysisSnapshot,
     hir: &HirFile,
     kind: &str,
     name: &str,
     range: TextRange,
 ) -> bool {
-    let Some(summary) = macro_definition_summary(snapshot, kind, name) else {
+    let Some(summary) = dynamic_definition_summary(snapshot, kind, name) else {
         return false;
     };
     let Some(property) = hir
@@ -541,7 +541,7 @@ fn scripted_macro_reference_range_is_callable(
     else {
         return false;
     };
-    scripted_macro_invocation_shape_matches(
+    dynamic_invocation_shape_matches(
         snapshot,
         kind,
         &summary,
@@ -1252,20 +1252,20 @@ pub(crate) fn index_definition(
     }
 }
 
-/// Converts one persisted reference into an editor-neutral location, retaining the same macro
+/// Converts one persisted reference into an editor-neutral location, retaining the same dynamic
 /// callability filters used when exhaustive semantic workspaces were built.
 pub(crate) fn indexed_reference(
     snapshot: &AnalysisSnapshot,
     reference: &Reference,
 ) -> Option<ReferenceInternal> {
-    if scripted_macro_type(snapshot, &reference.kind) {
+    if dynamic_definition_type(snapshot, &reference.kind) {
         if !workspace_member(snapshot, &reference.kind, &reference.name) {
             return None;
         }
         if let Some(hir) = snapshot
             .file_state(reference.file_id)
             .and_then(|state| state.hir())
-            && !scripted_macro_reference_range_is_callable(
+            && !dynamic_reference_range_is_callable(
                 snapshot,
                 hir,
                 &reference.kind,

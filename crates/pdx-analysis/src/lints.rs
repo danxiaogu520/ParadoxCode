@@ -5,7 +5,7 @@
 //! obvious reading (NOT with several conditions), that are dead or redundant
 //! (constant conditions, empty blocks), or that break branch chaining (an
 //! `else` without a preceding `if`). They run only on authored containers —
-//! never on scripted-macro expansions, whose bodies belong to the definition
+//! never on dynamic-definition expansions, whose bodies belong to the definition
 //! site.
 
 use crate::support::ScriptProperty;

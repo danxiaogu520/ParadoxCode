@@ -1374,9 +1374,9 @@
     "name_from_file": false,
     "starts_with": null,
     "type_key_filter": null,
-    "scripted_macro": {
+    "dynamic_definition": {
       "body_context": "effect",
-      "macro_enabled": true,
+      "enabled": true,
       "usage": {
         "replacement": true,
         "condition": true,
@@ -1410,9 +1410,9 @@
     "name_from_file": false,
     "starts_with": null,
     "type_key_filter": null,
-    "scripted_macro": {
+    "dynamic_definition": {
       "body_context": "trigger",
-      "macro_enabled": true,
+      "enabled": true,
       "usage": {
         "replacement": true,
         "condition": true,

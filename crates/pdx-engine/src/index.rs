@@ -6,7 +6,7 @@ use std::sync::Arc;
 use pdx_rules::{RuleSet, SymbolResolutionPolicy};
 use pdx_text::{PositionRange, TextRange};
 
-use crate::hir::{DefinitionAttributes, MacroTemplate};
+use crate::hir::{DefinitionAttributes, Template};
 use crate::model::{LocalisationPreview, SourceFileId, WorkspaceError, WorkspaceScanToken};
 
 /// Compact, file-grouped UTF-16 positions for indexed ranges.
@@ -432,9 +432,9 @@ fn sort_position_entries(
     entries
 }
 
-/// One parameter in the callable signature of a scripted macro definition.
+/// One parameter in the callable signature of a dynamic definition definition.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MacroParameterSignature {
+pub struct DynamicParameterSignature {
     /// Parameter spelling as inferred from the definition body.
     pub name: String,
     /// Whether every observed use requires the caller to provide this parameter.
@@ -445,9 +445,9 @@ pub struct MacroParameterSignature {
 ///
 /// The optional template is normalized, source-ranged semantic IR. It contains neither source
 /// text nor CST pointers, so the same representation can drive live-workspace and cache-only
-/// analysis without teaching the engine any concrete macro names.
+/// analysis without teaching the engine any concrete definition names.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MacroDefinitionSummary {
+pub struct DynamicDefinitionSummary {
     /// Dynamic symbol kind, for example `scripted_effect`.
     pub kind: String,
     /// Definition name as written in source.
@@ -455,9 +455,9 @@ pub struct MacroDefinitionSummary {
     /// Full range of the owning symbol definition.
     pub definition_range: TextRange,
     /// Parameters in first-use order.
-    pub parameters: Vec<MacroParameterSignature>,
-    /// Reusable body semantics, when the definition could be lowered as a macro template.
-    pub template: Option<MacroTemplate>,
+    pub parameters: Vec<DynamicParameterSignature>,
+    /// Reusable body semantics, when the definition could be lowered as a dynamic template.
+    pub template: Option<Template>,
 }
 
 /// One symbol definition retained in an index shard.
@@ -589,8 +589,8 @@ pub struct FileIndexShard {
     pub definitions: Vec<Definition>,
     /// References in source order.
     pub references: Vec<Reference>,
-    /// Callable signatures and normalized templates for scripted macro definitions in this file.
-    pub macro_definitions: Vec<MacroDefinitionSummary>,
+    /// Callable signatures and normalized templates for dynamic definition definitions in this file.
+    pub dynamic_definitions: Vec<DynamicDefinitionSummary>,
     /// Retained attribute-key summaries for definitions whose profile rule
     /// asked for them.
     pub definition_attributes: Vec<DefinitionAttributes>,
@@ -877,17 +877,17 @@ impl WorkspaceIndex {
             .map_or(&[], |shard| shard.references.as_slice())
     }
 
-    /// Returns the callable summary belonging to the uniquely active macro definition.
+    /// Returns the callable summary belonging to the uniquely active dynamic definition.
     #[must_use]
-    pub fn active_macro_definition(
+    pub fn active_dynamic_definition(
         &self,
         kind: &str,
         name: &str,
-    ) -> Option<&MacroDefinitionSummary> {
+    ) -> Option<&DynamicDefinitionSummary> {
         let definition = self.active_definition(kind, name)?;
         self.shards
             .get(&definition.file_id)?
-            .macro_definitions
+            .dynamic_definitions
             .iter()
             .find(|summary| {
                 summary.definition_range == definition.range
@@ -897,7 +897,7 @@ impl WorkspaceIndex {
     }
 
     /// Returns the retained attribute-key summary belonging to the uniquely
-    /// active definition, mirroring [`Self::active_macro_definition`].
+    /// active definition, mirroring [`Self::active_dynamic_definition`].
     #[must_use]
     pub fn active_definition_attributes(
         &self,

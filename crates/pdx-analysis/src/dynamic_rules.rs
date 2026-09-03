@@ -35,18 +35,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use pdx_engine::hir::{
-    MacroTemplateFragment, MacroTemplateItem, MacroTemplateProperty, MacroTemplateToken,
-    MacroTemplateValue,
+    TemplateFragment, TemplateItem, TemplateProperty, TemplateToken, TemplateValue,
 };
-use pdx_engine::{AnalysisSnapshot, CacheDomain, DocumentSource, MacroParameterSignature};
+use pdx_engine::{AnalysisSnapshot, CacheDomain, DocumentSource, DynamicParameterSignature};
 use pdx_rules::{GameProfile, RuleShape, ValueMatcher};
 use pdx_text::TextRange;
 
-use crate::macro_contracts::{ScopeContract, macro_contract};
-use crate::macro_cycles::macro_cycle_report;
+use crate::dynamic_contracts::{ScopeContract, dynamic_contract};
+use crate::dynamic_cycles::dynamic_cycle_report;
 use crate::semantic::{
-    probe_query_cache, resolve_macro_definition, scripted_macro_type, semantic_rule_key_matches,
-    semantic_rules_for_container_key,
+    dynamic_definition_type, probe_query_cache, resolve_dynamic_definition,
+    semantic_rule_key_matches, semantic_rules_for_container_key,
 };
 use crate::types::{CancellationToken, Cancelled, uncancelled};
 
@@ -219,7 +218,7 @@ fn build_dynamic_rule_report(
     let mut candidates: Vec<(String, String)> = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for definition in snapshot.index().definitions_iter() {
-        if !scripted_macro_type(snapshot, &definition.kind) {
+        if !dynamic_definition_type(snapshot, &definition.kind) {
             continue;
         }
         if seen.insert((
@@ -238,7 +237,7 @@ fn build_dynamic_rule_report(
             continue;
         };
         for definition in hir.definitions() {
-            if !scripted_macro_type(snapshot, &definition.kind) {
+            if !dynamic_definition_type(snapshot, &definition.kind) {
                 continue;
             }
             if seen.insert((
@@ -252,10 +251,10 @@ fn build_dynamic_rule_report(
     let mut rows = BTreeMap::new();
     // The definition-site cycle analysis is computed here so shadow rows carry
     // the flag even before any diagnostics pass warms the cache.
-    let cycles = macro_cycle_report(snapshot, cancellation)?;
+    let cycles = dynamic_cycle_report(snapshot, cancellation)?;
     for (kind, name) in &candidates {
         cancellation.checkpoint()?;
-        let Some(resolved) = resolve_macro_definition(snapshot, kind, name) else {
+        let Some(resolved) = resolve_dynamic_definition(snapshot, kind, name) else {
             continue;
         };
         let key = (
@@ -266,7 +265,7 @@ fn build_dynamic_rule_report(
         // nested callees; reuse it instead of re-inferring here. Empty
         // contracts are a definition error on their own and would turn every
         // body statement into a finding, so their bodies walk as unknown.
-        let contract = macro_contract(snapshot, &resolved.summary.kind, &resolved.summary.name)
+        let contract = dynamic_contract(snapshot, &resolved.summary.kind, &resolved.summary.name)
             .unwrap_or(ScopeContract::Unknown);
         let entry_flow = match &contract {
             ScopeContract::Scopes(scopes) => {
@@ -301,7 +300,7 @@ fn build_dynamic_rule_report(
 /// Merges the walk's parameter usage with the indexed call signature, keeping
 /// the signature's first-use order and required flags.
 fn merge_parameter_rows(
-    signature: &[MacroParameterSignature],
+    signature: &[DynamicParameterSignature],
     derivation: &Derivation<'_>,
 ) -> Vec<DynamicParameterRow> {
     let mut rows = Vec::with_capacity(signature.len());
@@ -387,22 +386,22 @@ impl<'a> Derivation<'a> {
 
     fn walk_items(
         &mut self,
-        items: &[MacroTemplateItem],
+        items: &[TemplateItem],
         context: &str,
         path: &[Arc<str>],
         flow: ScopeFlow,
     ) {
         for item in items {
             match item {
-                MacroTemplateItem::Property(property) => {
+                TemplateItem::Property(property) => {
                     self.walk_property(property, context, path, flow.clone());
                 }
-                MacroTemplateItem::Conditional(conditional) => {
+                TemplateItem::Conditional(conditional) => {
                     // A conditional branch is active whenever its parameter is
                     // supplied, so it must stand on its own.
                     self.walk_items(&conditional.items, context, path, flow.clone());
                 }
-                MacroTemplateItem::BareValue(token) => {
+                TemplateItem::BareValue(token) => {
                     // A bare `$PARAM$` is a payload injection: the caller
                     // supplies a (usually quoted) script fragment that the
                     // payload path validates in P3, never scalar matching.
@@ -416,7 +415,7 @@ impl<'a> Derivation<'a> {
 
     fn walk_property(
         &mut self,
-        property: &MacroTemplateProperty,
+        property: &TemplateProperty,
         context: &str,
         path: &[Arc<str>],
         flow: ScopeFlow,
@@ -429,7 +428,7 @@ impl<'a> Derivation<'a> {
             // The rendered key is unknowable at definition time; the subtree
             // is still walked under an unknown scope so parameter usage and
             // inner scope switches are not lost.
-            if let MacroTemplateValue::Block { items, .. } = &property.value {
+            if let TemplateValue::Block { items, .. } = &property.value {
                 self.walk_items(items, context, path, ScopeFlow::Unknown);
             }
             return;
@@ -447,7 +446,7 @@ impl<'a> Derivation<'a> {
             // still contain scope-switching containers worth walking. In
             // trigger context `THIS` denotes the entry scope itself and keeps
             // the current flow.
-            if let MacroTemplateValue::Block { items, .. } = &property.value {
+            if let TemplateValue::Block { items, .. } = &property.value {
                 // The re-targeted subtree starts a fresh rule namespace so
                 // inner statements keep matching root-level rows.
                 self.walk_items(items, context, &[], child_flow);
@@ -460,7 +459,7 @@ impl<'a> Derivation<'a> {
         if is_structural_sub_block(&lowered) {
             return;
         }
-        let wants_block = matches!(property.value, MacroTemplateValue::Block { .. });
+        let wants_block = matches!(property.value, TemplateValue::Block { .. });
         let matching: Vec<&pdx_rules::SemanticRule> =
             semantic_rules_for_container_key(self.snapshot, context, path, key)
                 .into_iter()
@@ -487,7 +486,7 @@ impl<'a> Derivation<'a> {
             });
             // The statement cannot run, but its subtree may still carry
             // parameter usage; walk it opaquely to keep collecting.
-            if let MacroTemplateValue::Block { items, .. } = &property.value {
+            if let TemplateValue::Block { items, .. } = &property.value {
                 self.walk_items(items, context, &[], ScopeFlow::Unknown);
             }
             return;
@@ -504,17 +503,17 @@ impl<'a> Derivation<'a> {
                 reachable_scopes: Vec::new(),
                 required_scopes: Vec::new(),
             });
-            if let MacroTemplateValue::Block { items, .. } = &property.value {
+            if let TemplateValue::Block { items, .. } = &property.value {
                 self.walk_items(items, context, &[], ScopeFlow::Unknown);
             }
             return;
         }
         // Nested dynamic-rule calls gate on the callee's own contract.
         if let Some(callee) = dynamic_kind_for_context(self.snapshot, context)
-            .and_then(|kind| resolve_macro_definition(self.snapshot, &kind, key))
+            .and_then(|kind| resolve_dynamic_definition(self.snapshot, &kind, key))
         {
             let callee_contract =
-                macro_contract(self.snapshot, &callee.summary.kind, &callee.summary.name);
+                dynamic_contract(self.snapshot, &callee.summary.kind, &callee.summary.name);
             if let (Some(current), Some(ScopeContract::Scopes(required))) =
                 (flow.scopes(), callee_contract.as_ref())
             {
@@ -542,13 +541,13 @@ impl<'a> Derivation<'a> {
             // Argument blocks are parameter assignments, not effect
             // statements: record forwarding edges for scalar-bound arguments
             // and stop.
-            if let MacroTemplateValue::Block { items, .. } = &property.value {
+            if let TemplateValue::Block { items, .. } = &property.value {
                 self.record_forwarded_arguments(&callee.summary.kind, &callee.summary.name, items);
             }
             return;
         }
 
-        if let MacroTemplateValue::Block { items, .. } = &property.value {
+        if let TemplateValue::Block { items, .. } = &property.value {
             // A child_context switch starts a fresh rule namespace; only
             // same-context accumulation extends the path (mirroring
             // `semantic_transition_destination`).
@@ -566,7 +565,7 @@ impl<'a> Derivation<'a> {
     /// pushed scope, and anything unknown walks opaquely.
     fn walk_block_children(
         &mut self,
-        items: &[MacroTemplateItem],
+        items: &[TemplateItem],
         context: &str,
         path: &[Arc<str>],
         matching: &[&pdx_rules::SemanticRule],
@@ -641,11 +640,11 @@ impl<'a> Derivation<'a> {
 
     fn record_parameter_sites(
         &mut self,
-        property: &MacroTemplateProperty,
+        property: &TemplateProperty,
         _path: &[Arc<str>],
         matching: &[&pdx_rules::SemanticRule],
     ) {
-        let MacroTemplateValue::Scalar(token) = &property.value else {
+        let TemplateValue::Scalar(token) = &property.value else {
             return;
         };
         let names: Vec<String> = token_parameters(token).map(str::to_owned).collect();
@@ -689,13 +688,13 @@ impl<'a> Derivation<'a> {
         &mut self,
         callee_kind: &str,
         callee_name: &str,
-        items: &[MacroTemplateItem],
+        items: &[TemplateItem],
     ) {
         for item in items {
-            let MacroTemplateItem::Property(property) = item else {
+            let TemplateItem::Property(property) = item else {
                 continue;
             };
-            if let MacroTemplateValue::Scalar(token) = &property.value {
+            if let TemplateValue::Scalar(token) = &property.value {
                 let parameter = single_literal(&property.key)
                     .map(str::trim)
                     .filter(|key| !key.is_empty())
@@ -771,47 +770,49 @@ pub(crate) fn dynamic_kind_for_context(
         .iter()
         .find(|(_, descriptor)| {
             descriptor
-                .scripted_macro
+                .dynamic_definition
                 .as_ref()
-                .is_some_and(|macro_descriptor| {
-                    macro_descriptor.macro_enabled
-                        && macro_descriptor.body_context.eq_ignore_ascii_case(context)
+                .is_some_and(|dynamic_descriptor| {
+                    dynamic_descriptor.enabled
+                        && dynamic_descriptor
+                            .body_context
+                            .eq_ignore_ascii_case(context)
                 })
         })
         .map(|(kind, _)| kind.clone())
 }
 
-fn token_has_parameter(token: &MacroTemplateToken) -> bool {
+fn token_has_parameter(token: &TemplateToken) -> bool {
     token
         .fragments
         .iter()
-        .any(|fragment| matches!(fragment, MacroTemplateFragment::Parameter { .. }))
+        .any(|fragment| matches!(fragment, TemplateFragment::Parameter { .. }))
 }
 
 /// True when the parameter is the token's entire content; embedded
 /// parameters (`$param$_suffix`, `$prefix$_$param$`) render to derived
 /// runtime names.
-fn is_bare_parameter(token: &MacroTemplateToken, name: &str) -> bool {
+fn is_bare_parameter(token: &TemplateToken, name: &str) -> bool {
     matches!(
         token.fragments.as_slice(),
-        [MacroTemplateFragment::Parameter { name: parameter, .. }]
+        [TemplateFragment::Parameter { name: parameter, .. }]
             if parameter.eq_ignore_ascii_case(name)
     )
 }
 
-fn token_parameters(token: &MacroTemplateToken) -> impl Iterator<Item = &str> {
+fn token_parameters(token: &TemplateToken) -> impl Iterator<Item = &str> {
     token
         .fragments
         .iter()
         .filter_map(|fragment| match fragment {
-            MacroTemplateFragment::Parameter { name, .. } => Some(name.as_str()),
-            MacroTemplateFragment::Literal(_) => None,
+            TemplateFragment::Parameter { name, .. } => Some(name.as_str()),
+            TemplateFragment::Literal(_) => None,
         })
 }
 
-fn single_literal(token: &MacroTemplateToken) -> Option<&str> {
+fn single_literal(token: &TemplateToken) -> Option<&str> {
     match token.fragments.as_slice() {
-        [MacroTemplateFragment::Literal(text)] => Some(text),
+        [TemplateFragment::Literal(text)] => Some(text),
         _ => None,
     }
 }

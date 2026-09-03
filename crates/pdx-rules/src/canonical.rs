@@ -287,15 +287,15 @@ pub(crate) fn canonical_hash(model: &RulesModel) -> RuleHash {
         }
         put_opt_str(&mut bytes, descriptor.root_entries.as_deref());
         put_opt_str(&mut bytes, descriptor.body_context.as_deref());
-        match &descriptor.scripted_macro {
-            Some(scripted_macro) => {
+        match &descriptor.dynamic_definition {
+            Some(dynamic_definition) => {
                 bytes.push(1);
-                put_str(&mut bytes, &scripted_macro.body_context);
-                bytes.push(u8::from(scripted_macro.macro_enabled));
-                bytes.push(u8::from(scripted_macro.usage.replacement));
-                bytes.push(u8::from(scripted_macro.usage.condition));
-                bytes.push(u8::from(scripted_macro.usage.dynamic_key));
-                bytes.push(u8::from(scripted_macro.usage.opaque_text));
+                put_str(&mut bytes, &dynamic_definition.body_context);
+                bytes.push(u8::from(dynamic_definition.enabled));
+                bytes.push(u8::from(dynamic_definition.usage.replacement));
+                bytes.push(u8::from(dynamic_definition.usage.condition));
+                bytes.push(u8::from(dynamic_definition.usage.dynamic_key));
+                bytes.push(u8::from(dynamic_definition.usage.opaque_text));
             }
             None => bytes.push(0),
         }

@@ -54,12 +54,12 @@ fn script_tokens_cover_comments_operators_keys_and_scalars() {
 }
 
 #[test]
-fn indexed_scripted_macro_names_use_the_function_token_color() {
+fn indexed_dynamic_definition_names_use_the_function_token_color() {
     use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use std::fs;
 
     let root = std::env::temp_dir().join(format!(
-        "pdx-analysis-semantic-macro-colors-{}",
+        "pdx-analysis-semantic-dynamic-colors-{}",
         std::process::id()
     ));
     fs::create_dir_all(root.join("common/scripted_effects")).expect("effect directory");
@@ -81,9 +81,10 @@ fn indexed_scripted_macro_names_use_the_function_token_color() {
         SourceRootKind::CurrentMod,
         root.clone(),
     )]));
-    host.refresh_source_roots().expect("index scripted macros");
+    host.refresh_source_roots()
+        .expect("index dynamic definitions");
 
-    let id = DocumentId::new("file:///tmp/events/semantic-macros.txt");
+    let id = DocumentId::new("file:///tmp/events/semantic-definitions.txt");
     let text = "country_event = { immediate = { apply = yes } trigger = { check = yes } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open source document");

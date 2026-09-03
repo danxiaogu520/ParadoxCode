@@ -249,20 +249,20 @@ pub struct HirParameterReference {
     pub kind: HirParameterReferenceKind,
 }
 
-/// One source token retained by a scripted-macro template.
+/// One source token retained by a dynamic-definition template.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MacroTemplateToken {
+pub struct TemplateToken {
     /// Exact definition-side token range, including quotes when present.
     pub range: TextRange,
     /// Whether the source token was quoted.
     pub quoted: bool,
     /// Literal and parameter fragments in source order, excluding surrounding quotes.
-    pub fragments: Vec<MacroTemplateFragment>,
+    pub fragments: Vec<TemplateFragment>,
 }
 
-/// One literal or parameter fragment within a macro template token.
+/// One literal or parameter fragment within a dynamic template token.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum MacroTemplateFragment {
+pub enum TemplateFragment {
     /// Definition-side text copied without interpretation.
     Literal(String),
     /// One owner-local parameter slot.
@@ -274,36 +274,36 @@ pub enum MacroTemplateFragment {
     },
 }
 
-/// The value attached to a property in a macro template.
+/// The value attached to a property in a dynamic template.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum MacroTemplateValue {
+pub enum TemplateValue {
     /// One scalar token.
-    Scalar(MacroTemplateToken),
+    Scalar(TemplateToken),
     /// One ordered script block.
     Block {
         /// Exact definition-side block range.
         range: TextRange,
         /// Properties, bare values, and conditional blocks in source order.
-        items: Vec<MacroTemplateItem>,
+        items: Vec<TemplateItem>,
     },
 }
 
-/// One property retained in a macro template.
+/// One property retained in a dynamic template.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MacroTemplateProperty {
+pub struct TemplateProperty {
     /// Token supplying the property key.
-    pub key: MacroTemplateToken,
+    pub key: TemplateToken,
     /// Full definition-side property range.
     pub range: TextRange,
     /// Operator spelling recovered by the parser.
     pub operator: Option<String>,
     /// Scalar or block value.
-    pub value: MacroTemplateValue,
+    pub value: TemplateValue,
 }
 
-/// One conditional block retained in a macro template.
+/// One conditional block retained in a dynamic template.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MacroTemplateConditional {
+pub struct TemplateConditional {
     /// Parameter spelling without `!`.
     pub name: String,
     /// Whether the body is active when the parameter is absent.
@@ -311,23 +311,23 @@ pub struct MacroTemplateConditional {
     /// Full definition-side conditional range.
     pub range: TextRange,
     /// Ordered body items.
-    pub items: Vec<MacroTemplateItem>,
+    pub items: Vec<TemplateItem>,
 }
 
-/// One ordered item in a macro template container.
+/// One ordered item in a dynamic template container.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum MacroTemplateItem {
+pub enum TemplateItem {
     /// A key/operator/value property.
-    Property(MacroTemplateProperty),
+    Property(TemplateProperty),
     /// A standalone scalar in a mixed block.
-    BareValue(MacroTemplateToken),
+    BareValue(TemplateToken),
     /// A supplied/absent parameter conditional.
-    Conditional(MacroTemplateConditional),
+    Conditional(TemplateConditional),
 }
 
 /// Reusable, source-ranged body of one scripted effect or trigger definition.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MacroTemplate {
+pub struct Template {
     /// Dynamic symbol kind, such as `scripted_effect`.
     pub kind: String,
     /// Definition name as written in source.
@@ -337,7 +337,7 @@ pub struct MacroTemplate {
     /// Exact body block range.
     pub body_range: TextRange,
     /// Ordered body items.
-    pub items: Vec<MacroTemplateItem>,
+    pub items: Vec<TemplateItem>,
 }
 
 /// The interpretation layer that emitted a HIR reference.
@@ -353,8 +353,8 @@ pub enum HirReferenceOrigin {
     /// layer can omit unresolved typed values from its navigation view while retaining the
     /// semantic validator's more precise value diagnostic.
     SemanticTyped,
-    /// A concrete scripted-effect or scripted-trigger invocation selected by macro rules.
-    ScriptedMacro,
+    /// A concrete scripted-effect or scripted-trigger invocation selected by dynamic-definition metadata.
+    DynamicDefinition,
     /// A required type-instance localisation mapping expanded from a first-party template.
     DerivedLocalisation,
     /// A conservative bare value associated with the file category.
@@ -376,7 +376,7 @@ pub struct HirFile {
     pub(super) parameter_conditionals: Vec<HirParameterConditional>,
     pub(super) parameter_definitions: Vec<HirParameterDefinition>,
     pub(super) parameter_references: Vec<HirParameterReference>,
-    pub(super) macro_templates: Vec<MacroTemplate>,
+    pub(super) dynamic_templates: Vec<Template>,
     pub(super) definition_attributes: Vec<DefinitionAttributes>,
 }
 
@@ -492,21 +492,21 @@ impl HirFile {
         &self.parameter_references
     }
 
-    /// Returns reusable scripted-macro templates in definition source order.
+    /// Returns reusable dynamic-definition templates in definition source order.
     #[must_use]
-    pub fn macro_templates(&self) -> &[MacroTemplate] {
-        &self.macro_templates
+    pub fn dynamic_templates(&self) -> &[Template] {
+        &self.dynamic_templates
     }
 
     /// Finds the template belonging to one exact definition range and kind/name identity.
     #[must_use]
-    pub fn macro_template(
+    pub fn dynamic_template(
         &self,
         kind: &str,
         name: &str,
         definition_range: TextRange,
-    ) -> Option<&MacroTemplate> {
-        self.macro_templates.iter().find(|template| {
+    ) -> Option<&Template> {
+        self.dynamic_templates.iter().find(|template| {
             template.definition_range == definition_range
                 && template.kind.eq_ignore_ascii_case(kind)
                 && template.name.eq_ignore_ascii_case(name)

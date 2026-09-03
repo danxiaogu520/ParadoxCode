@@ -965,7 +965,7 @@ fn eu4_scripted_effect_params_are_owner_qualified() {
 }
 
 #[test]
-fn unresolved_macro_signature_keeps_parameter_blocks_open_world() {
+fn unresolved_dynamic_signature_keeps_parameter_blocks_open_world() {
     use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use std::fs;
 
@@ -973,7 +973,7 @@ fn unresolved_macro_signature_keeps_parameter_blocks_open_world() {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("pdx-analysis-open-macro-params-{nonce}"));
+    let root = std::env::temp_dir().join(format!("pdx-analysis-open-dynamic-params-{nonce}"));
     let definitions = root.join("common/scripted_effects");
     fs::create_dir_all(&definitions).expect("scripted effect directory");
     fs::write(
@@ -993,8 +993,9 @@ fn unresolved_macro_signature_keeps_parameter_blocks_open_world() {
         SourceRootKind::CurrentMod,
         root.clone(),
     )]));
-    host.refresh_source_roots().expect("scan ambiguous macros");
-    let id = DocumentId::new("file:///tmp/events/open-macro-params.txt");
+    host.refresh_source_roots()
+        .expect("scan ambiguous definitions");
+    let id = DocumentId::new("file:///tmp/events/open-dynamic-params.txt");
     let invocation =
         "country_event = { immediate = { ambiguous_effect = { foreign_parameter = 1 } } }\n";
     host.open_document(id.clone(), 1, invocation.to_owned(), None)

@@ -10,7 +10,7 @@ use pdx_rules::{
 use pdx_text::TextRange;
 
 use super::context::SemanticCompletionContext;
-use super::macro_constraints::infer_macro_value_constraints;
+use super::dynamic_constraints::infer_dynamic_value_constraints;
 #[cfg(test)]
 use super::support::finalize_completion_items;
 use super::support::{
@@ -90,9 +90,9 @@ fn key_completion_kind(
     match &rule.key {
         KeyMatcher::Enum(_) => CompletionKind::EnumMember,
         KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
-            if scripted_macro_type(snapshot, type_name) =>
+            if dynamic_definition_type(snapshot, type_name) =>
         {
-            CompletionKind::ScriptedMacro
+            CompletionKind::DynamicDefinition
         }
         KeyMatcher::Exact(_) | KeyMatcher::Type(_) | KeyMatcher::Dynamic(_)
             if is_command_context(&rule.context) =>
@@ -110,8 +110,8 @@ fn key_specificity(
     match &rule.key {
         KeyMatcher::Exact(_) => CompletionSpecificity::Exact,
         KeyMatcher::Enum(_) => CompletionSpecificity::Enum,
-        KeyMatcher::Type(type_name) if scripted_macro_type(snapshot, type_name) => {
-            CompletionSpecificity::ScriptedMacro
+        KeyMatcher::Type(type_name) if dynamic_definition_type(snapshot, type_name) => {
+            CompletionSpecificity::DynamicDefinition
         }
         KeyMatcher::Type(_) => CompletionSpecificity::Type,
         KeyMatcher::Dynamic(_) => CompletionSpecificity::Dynamic,
@@ -166,8 +166,8 @@ pub(crate) fn semantic_rules_for_completion<'rule, 'path>(
         rule,
         parent_path: &context.parent_path,
         scope: &context.scope,
-        schema_tier: if context.macro_inferred {
-            CompletionSchemaTier::MacroInferred
+        schema_tier: if context.dynamic_inferred {
+            CompletionSchemaTier::DynamicInferred
         } else {
             CompletionSchemaTier::CurrentContext
         },
@@ -203,8 +203,8 @@ pub(crate) fn semantic_rules_for_completion<'rule, 'path>(
                 rule,
                 parent_path: &alternative.parent_path,
                 scope: &alternative.scope,
-                schema_tier: if context.macro_inferred {
-                    CompletionSchemaTier::MacroInferred
+                schema_tier: if context.dynamic_inferred {
+                    CompletionSchemaTier::DynamicInferred
                 } else {
                     CompletionSchemaTier::Alternative
                 },
@@ -326,7 +326,7 @@ pub(crate) fn add_semantic_key_items_ranked(
                 for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
                     let insert_text = if !insert_assignment {
                         label.clone()
-                    } else if scripted_macro_type(snapshot, type_name) {
+                    } else if dynamic_definition_type(snapshot, type_name) {
                         scripted_definition_snippet(snapshot, type_name, label)
                     } else {
                         key_insert_text(rule, label, true)
@@ -362,7 +362,7 @@ pub(crate) fn add_semantic_key_items_ranked(
                                 items,
                                 CompletionItem {
                                     label: label.clone(),
-                                    kind: CompletionKind::MacroParameter,
+                                    kind: CompletionKind::DynamicParameter,
                                     detail: "parameter".to_owned(),
                                     documentation: documentation.clone(),
                                     replacement_range,
@@ -990,7 +990,7 @@ pub(crate) fn add_semantic_value_items(
     }
 }
 
-pub(crate) struct InferredMacroCompletionInput<'a> {
+pub(crate) struct InferredDynamicCompletionInput<'a> {
     pub(crate) snapshot: &'a AnalysisSnapshot,
     pub(crate) context: &'a SemanticCompletionContext,
     pub(crate) property: &'a ScriptProperty,
@@ -1001,10 +1001,10 @@ pub(crate) struct InferredMacroCompletionInput<'a> {
     pub(crate) cancellation: &'a CancellationToken,
 }
 
-pub(crate) fn add_inferred_macro_value_items(
-    input: InferredMacroCompletionInput<'_>,
+pub(crate) fn add_inferred_dynamic_value_items(
+    input: InferredDynamicCompletionInput<'_>,
 ) -> Result<bool, Cancelled> {
-    let InferredMacroCompletionInput {
+    let InferredDynamicCompletionInput {
         snapshot,
         context,
         property,
@@ -1014,7 +1014,7 @@ pub(crate) fn add_inferred_macro_value_items(
         prefix,
         cancellation,
     } = input;
-    let sites = infer_macro_value_constraints(snapshot, context, property, cancellation)?;
+    let sites = infer_dynamic_value_constraints(snapshot, context, property, cancellation)?;
     if sites.is_empty() {
         return Ok(false);
     }
@@ -1027,7 +1027,7 @@ pub(crate) fn add_inferred_macro_value_items(
             structural_containers: Vec::new(),
             alternative_containers: Vec::new(),
             existing_keys: Vec::new(),
-            macro_inferred: false,
+            dynamic_inferred: false,
             scope: site.scope,
             container_property: None,
             property: None,
@@ -1096,7 +1096,7 @@ fn add_inferred_matcher_items(
             replacement_range,
             prefix,
             false,
-            CompletionSchemaTier::MacroInferred,
+            CompletionSchemaTier::DynamicInferred,
             CompletionSpecificity::Exact,
         ),
         ValueMatcher::Bool => {
@@ -1109,7 +1109,7 @@ fn add_inferred_matcher_items(
                     replacement_range,
                     prefix,
                     false,
-                    CompletionSchemaTier::MacroInferred,
+                    CompletionSchemaTier::DynamicInferred,
                     CompletionSpecificity::Value,
                 );
             }
@@ -1127,7 +1127,7 @@ fn add_inferred_matcher_items(
                     replacement_range,
                     prefix,
                     false,
-                    CompletionSchemaTier::MacroInferred,
+                    CompletionSchemaTier::DynamicInferred,
                     CompletionSpecificity::Type,
                 );
             }
@@ -1142,7 +1142,7 @@ fn add_inferred_matcher_items(
                     replacement_range,
                     prefix,
                     false,
-                    CompletionSchemaTier::MacroInferred,
+                    CompletionSchemaTier::DynamicInferred,
                 );
             }
         }
@@ -1158,7 +1158,7 @@ fn add_inferred_matcher_items(
                     replacement_range,
                     prefix,
                     false,
-                    CompletionSchemaTier::MacroInferred,
+                    CompletionSchemaTier::DynamicInferred,
                 );
             }
         }
@@ -1172,7 +1172,7 @@ fn add_inferred_matcher_items(
                     replacement_range,
                     prefix,
                     false,
-                    CompletionSchemaTier::MacroInferred,
+                    CompletionSchemaTier::DynamicInferred,
                 );
             }
         }
@@ -1186,7 +1186,7 @@ fn add_inferred_matcher_items(
                     replacement_range,
                     prefix,
                     false,
-                    CompletionSchemaTier::MacroInferred,
+                    CompletionSchemaTier::DynamicInferred,
                     CompletionSpecificity::Dynamic,
                 );
             }

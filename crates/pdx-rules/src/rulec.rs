@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 
 /// Current version of the developer-maintained source layout.
-pub const SOURCE_FORMAT_VERSION: u32 = 9;
+pub const SOURCE_FORMAT_VERSION: u32 = 10;
 
 const SOURCE_MANIFEST: &str = "manifest.json";
 
@@ -714,15 +714,15 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
                 descriptor.name
             )));
         }
-        if let Some(scripted_macro) = &descriptor.scripted_macro {
-            if scripted_macro.body_context.trim().is_empty() {
+        if let Some(dynamic_definition) = &descriptor.dynamic_definition {
+            if dynamic_definition.body_context.trim().is_empty() {
                 return Err(CompileError::Validation(format!(
-                    "type descriptor {identity} has an empty scripted macro body context"
+                    "type descriptor {identity} has an empty dynamic definition body context"
                 )));
             }
-            if scripted_macro.macro_enabled && !scripted_macro.usage.is_nonempty() {
+            if dynamic_definition.enabled && !dynamic_definition.usage.is_nonempty() {
                 return Err(CompileError::Validation(format!(
-                    "type descriptor {identity} enables scripted macros without a usage capability"
+                    "type descriptor {identity} enables dynamic definitions without a usage capability"
                 )));
             }
         }
@@ -1077,7 +1077,7 @@ fn temporary_path(output: &Path) -> PathBuf {
 mod tests {
     use super::*;
     use crate::{
-        KeyMatcher, RuleShape, ScriptedMacroDescriptor, ScriptedMacroUsage, SemanticRule,
+        DynamicDefinitionDescriptor, DynamicDefinitionUsage, KeyMatcher, RuleShape, SemanticRule,
         TypeDescriptor, ValueMatcher,
     };
 
@@ -1230,7 +1230,7 @@ mod tests {
     }
 
     #[test]
-    fn validation_rejects_enabled_scripted_macro_without_usage() {
+    fn validation_rejects_enabled_dynamic_definition_without_usage() {
         let mut model = RulesModel {
             game_id: "eu4".to_owned(),
             ..RulesModel::default()
@@ -1239,15 +1239,15 @@ mod tests {
             "scripted_effect".to_owned(),
             TypeDescriptor {
                 name: "scripted_effect".to_owned(),
-                scripted_macro: Some(ScriptedMacroDescriptor {
+                dynamic_definition: Some(DynamicDefinitionDescriptor {
                     body_context: "effect".to_owned(),
-                    macro_enabled: true,
-                    usage: ScriptedMacroUsage::default(),
+                    enabled: true,
+                    usage: DynamicDefinitionUsage::default(),
                 }),
                 ..TypeDescriptor::default()
             },
         );
-        let error = validate_model(&model).expect_err("empty macro usage must be rejected");
+        let error = validate_model(&model).expect_err("empty dynamic usage must be rejected");
         assert!(error.to_string().contains("usage capability"));
     }
 
@@ -1557,25 +1557,25 @@ mod tests {
                 "missions/missions:23:quoted-script:root:mission_series:trigger",
                 "missions/missions:25:quoted-script:root:mission_series:effect",
             ],
-            "first-party quoted Script rules must describe fixed schemas, not workspace macros"
+            "first-party quoted Script rules must describe fixed schemas, not workspace definitions"
         );
         let scripted_effect = source_model
             .semantic
             .type_descriptors
             .get("scripted_effect")
-            .and_then(|descriptor| descriptor.scripted_macro.as_ref())
-            .expect("scripted effect macro descriptor");
+            .and_then(|descriptor| descriptor.dynamic_definition.as_ref())
+            .expect("scripted effect dynamic descriptor");
         assert_eq!(scripted_effect.body_context, "effect");
-        assert!(scripted_effect.macro_enabled);
+        assert!(scripted_effect.enabled);
         assert!(scripted_effect.usage.is_nonempty());
         let scripted_trigger = source_model
             .semantic
             .type_descriptors
             .get("scripted_trigger")
-            .and_then(|descriptor| descriptor.scripted_macro.as_ref())
-            .expect("scripted trigger macro descriptor");
+            .and_then(|descriptor| descriptor.dynamic_definition.as_ref())
+            .expect("scripted trigger dynamic descriptor");
         assert_eq!(scripted_trigger.body_context, "trigger");
-        assert!(scripted_trigger.macro_enabled);
+        assert!(scripted_trigger.enabled);
         assert!(scripted_trigger.usage.is_nonempty());
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

@@ -208,11 +208,11 @@ pub(super) fn refresh_cancellable(
         shards.values().map(|shard| shard.references.len()).sum(),
         shards
             .values()
-            .map(|shard| shard.macro_definitions.len())
+            .map(|shard| shard.dynamic_definitions.len())
             .sum(),
         shards
             .values()
-            .flat_map(|shard| shard.macro_definitions.iter())
+            .flat_map(|shard| shard.dynamic_definitions.iter())
             .map(|summary| summary.parameters.len())
             .sum(),
     )?;
