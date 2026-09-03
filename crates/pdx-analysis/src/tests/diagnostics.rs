@@ -250,7 +250,7 @@ fn quoted_script_diagnostics_map_nested_escapes_and_recovered_syntax() {
 }
 
 #[test]
-fn scripted_macro_bare_parameter_quoted_payload_waits_for_row_validation() {
+fn scripted_macro_bare_parameter_validates_quoted_effect_payload_at_call_site() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -271,27 +271,27 @@ fn scripted_macro_bare_parameter_quoted_payload_waits_for_row_validation() {
     let text = "country_event = { immediate = { inject = { BODY = \"definitely_unknown_effect = yes\" } } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open call");
+    let expected_start =
+        u32::try_from(text.find("definitely_unknown_effect").expect("key")).expect("range start");
 
-    // Quoted script payloads (`$BODY$` bound to a quoted script string) were
-    // validated by instantiating an expansion tree. Row-driven quoted-payload
-    // validation returns in P3; until then the shadow phase must stay silent
-    // rather than report through the retired path.
+    // Payload parameters are validated by parsing the quoted binding and
+    // mapping diagnostics onto its in-string range, without an expansion
+    // tree.
     let diagnostics = diagnostics(&host.snapshot(), &id);
-    assert!(
-        !diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.message.contains("definitely_unknown_effect")),
-        "{diagnostics:?}"
+    let unknown = diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.code == DiagnosticCode::UnknownKey
+                && diagnostic.message.contains("definitely_unknown_effect")
+        })
+        .unwrap_or_else(|| panic!("missing quoted payload diagnostic: {diagnostics:?}"));
+
+    assert_eq!(unknown.range.start(), expected_start);
+    assert_eq!(
+        unknown.range.end(),
+        expected_start + u32::try_from("definitely_unknown_effect".len()).expect("length")
     );
-    let snapshot = host.snapshot();
-    let row = crate::dynamic_rules::dynamic_rule_row(&snapshot, "scripted_effect", "inject")
-        .expect("row");
-    assert!(
-        row.parameters
-            .iter()
-            .any(|parameter| parameter.name == "BODY" && parameter.quoted_script),
-        "quoted payload parameters are recorded on the row: {row:?}"
-    );
+    assert!(!unknown.message.contains("in expansion of"));
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 
@@ -1389,13 +1389,29 @@ fn scripted_macro_expansion_activates_conditionals_and_reports_cycles() {
         .expect("open calls");
 
     let results = diagnostics(&host.snapshot(), &id);
-    // Branch-active parameter requirement (`ENABLED = yes` makes `AMOUNT`
-    // required) moves to definition-site body validation in P3; the call site
-    // must not fabricate it from the static signature meanwhile.
+    // `ENABLED = yes` activates the branch, making `AMOUNT` required for
+    // this invocation; the call without `AMOUNT` is rejected at the call
+    // site, from the persisted template alone.
+    let branch_call_start =
+        u32::try_from(source.find("conditional = { ENABLED").expect("branch call")).expect("range");
     assert!(
-        !results
-            .iter()
-            .any(|diagnostic| diagnostic.message.contains("requires parameter `AMOUNT`")),
+        results.iter().any(|diagnostic| {
+            diagnostic.code == DiagnosticCode::Cardinality
+                && diagnostic.range.start() == branch_call_start
+                && diagnostic
+                    .message
+                    .contains("requires parameter(s) `AMOUNT` in the active branch")
+        }),
+        "{results:?}"
+    );
+    // The guard-less invocation leaves the branch inactive and stays clean.
+    let plain_call_start =
+        u32::try_from(source.find("conditional = { }").expect("plain call")).expect("range");
+    assert!(
+        !results.iter().any(|diagnostic| {
+            diagnostic.range.start() == plain_call_start
+                && diagnostic.message.contains("active branch")
+        }),
         "{results:?}"
     );
     // Statically known cycles are now rejected at the definitions themselves
@@ -1620,7 +1636,7 @@ fn vanilla_cache_only_dynamic_row_records_unknown_body_statement() {
 }
 
 #[test]
-fn vanilla_cache_only_macro_quoted_payload_waits_for_row_validation() {
+fn vanilla_cache_only_macro_validates_quoted_payload_at_exact_call_site_range() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -1654,25 +1670,26 @@ fn vanilla_cache_only_macro_quoted_payload_waits_for_row_validation() {
     let text = "country_event = { immediate = { cached_inject = { BODY = \"definitely_unknown_effect = yes\" } } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open call");
+    let expected_start =
+        u32::try_from(text.find("definitely_unknown_effect").expect("key")).expect("range");
 
-    // Cache-only quoted payload validation moves to the row-driven path in
-    // P3; the shadow phase stays silent instead of re-instantiating trees.
+    // The persisted template marks BODY a payload parameter, so the
+    // cache-only definition still gets row-driven payload validation at the
+    // exact in-string range.
     let results = diagnostics(&host.snapshot(), &id);
-    assert!(
-        !results
-            .iter()
-            .any(|diagnostic| diagnostic.message.contains("definitely_unknown_effect")),
-        "{results:?}"
+    let unknown = results
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.code == DiagnosticCode::UnknownKey
+                && diagnostic.message.contains("definitely_unknown_effect")
+        })
+        .unwrap_or_else(|| panic!("missing cache-only quoted diagnostic: {results:?}"));
+    assert_eq!(unknown.range.start(), expected_start);
+    assert_eq!(
+        unknown.range.end(),
+        expected_start + u32::try_from("definitely_unknown_effect".len()).expect("length")
     );
-    let snapshot = host.snapshot();
-    let row = crate::dynamic_rules::dynamic_rule_row(&snapshot, "scripted_effect", "cached_inject")
-        .expect("cache-only quoted row");
-    assert!(
-        row.parameters
-            .iter()
-            .any(|parameter| parameter.name == "BODY" && parameter.quoted_script),
-        "{row:?}"
-    );
+    assert!(!unknown.message.contains("in expansion of"));
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 

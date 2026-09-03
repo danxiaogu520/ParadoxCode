@@ -629,9 +629,12 @@ impl<'a> Derivation<'a> {
             return;
         }
         let matchers: Vec<ValueMatcher> = matching.iter().map(|rule| rule.value.clone()).collect();
+        let payload_site = matching
+            .iter()
+            .any(|rule| matches!(rule.shape, RuleShape::QuotedScript));
         for name in names {
             let usage = self.parameter(&name);
-            if token.quoted {
+            if token.quoted || payload_site {
                 usage.quoted_script = true;
             }
             if !matchers.is_empty() {

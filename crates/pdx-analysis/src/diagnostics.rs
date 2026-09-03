@@ -915,6 +915,19 @@ fn validate_semantic_container(
                 );
             if !parameterized_invocation {
                 validate_dynamic_dispatch_keys(snapshot, applicable, property, diagnostics);
+                validate_dynamic_quoted_payloads(
+                    ValidationState {
+                        snapshot,
+                        diagnostics,
+                        cancellation,
+                        expansion,
+                        quoted_scripts,
+                    },
+                    applicable,
+                    property,
+                    scope,
+                    quoted_script_depth,
+                )?;
             }
             if valid
                 && !scoped_matching.is_empty()
@@ -1777,16 +1790,187 @@ fn validate_scripted_macro_arguments(
         ));
         return false;
     }
+    // A conditional whose guard is supplied (or, for `[!X]`, absent)
+    // activates its body; parameters the body then uses without a runtime
+    // guard become required for this invocation.
+    let row = crate::dynamic_rules::dynamic_rule_row(snapshot, &summary.kind, &summary.name);
+    if let (Some(template), Some(row)) = (summary.template.as_ref(), row.as_ref()) {
+        let supplied: std::collections::BTreeSet<String> = counts.keys().cloned().collect();
+        let branch_missing =
+            template_branch_active_missing(snapshot, template, &row.context, &supplied);
+        if !branch_missing.is_empty() {
+            let names = branch_missing
+                .iter()
+                .map(|name| format!("`{name}`"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            diagnostics.push(Diagnostic::new(
+                DiagnosticCode::Cardinality,
+                DiagnosticCode::Cardinality.severity(),
+                property.key_range,
+                format!(
+                    "scripted `{}` requires parameter(s) {names} in the active branch",
+                    summary.name
+                ),
+            ));
+            return false;
+        }
+    }
     // The derived dynamic row carries the usage-site value constraints that
     // the definition body infers for each parameter; check the caller's
     // arguments against them here, at the call site, instead of validating a
     // rendered expansion.
-    if let Some(row) =
-        crate::dynamic_rules::dynamic_rule_row(snapshot, &summary.kind, &summary.name)
-    {
+    if let Some(row) = row {
         validate_dynamic_argument_values(snapshot, &row, property, scope, diagnostics);
     }
     true
+}
+
+/// Parameters that activated conditional branches use without a runtime
+/// guard, in body order, deduplicated. Only bodies reached through an
+/// activated `[X]`/`[!X]` conditional are requirements of this invocation:
+/// parameters outside conditionals belong to the static signature check,
+/// runtime `if`/`else` subtrees are alternatives, and nested dynamic-rule
+/// argument blocks forward rather than require.
+fn template_branch_active_missing(
+    snapshot: &AnalysisSnapshot,
+    template: &MacroTemplate,
+    context: &str,
+    supplied: &std::collections::BTreeSet<String>,
+) -> Vec<String> {
+    let mut missing = Vec::new();
+    branch_conditional_items(
+        snapshot,
+        &template.items,
+        context,
+        false,
+        supplied,
+        &mut missing,
+    );
+    missing
+}
+
+/// Considers only conditionals; non-conditional items are the static
+/// signature's concern.
+fn branch_conditional_items(
+    snapshot: &AnalysisSnapshot,
+    items: &[MacroTemplateItem],
+    context: &str,
+    runtime_guarded: bool,
+    supplied: &std::collections::BTreeSet<String>,
+    missing: &mut Vec<String>,
+) {
+    for item in items {
+        if let MacroTemplateItem::Conditional(conditional) = item {
+            let guard_supplied = supplied.contains(&conditional.name.to_ascii_lowercase());
+            if conditional.negated != guard_supplied {
+                branch_active_body(
+                    snapshot,
+                    &conditional.items,
+                    context,
+                    runtime_guarded,
+                    supplied,
+                    missing,
+                );
+            }
+        }
+    }
+}
+
+/// One activated body: collect unguarded parameter usage, recurse into
+/// nested conditionals by their own guards, and keep runtime-branch and
+/// forwarding semantics.
+fn branch_active_body(
+    snapshot: &AnalysisSnapshot,
+    items: &[MacroTemplateItem],
+    context: &str,
+    runtime_guarded: bool,
+    supplied: &std::collections::BTreeSet<String>,
+    missing: &mut Vec<String>,
+) {
+    for item in items {
+        match item {
+            MacroTemplateItem::Property(property) => {
+                let property_guarded = runtime_guarded && !is_limit_property(property);
+                branch_active_record_token(&property.key, property_guarded, supplied, missing);
+                match &property.value {
+                    MacroTemplateValue::Scalar(token) => {
+                        branch_active_record_token(token, property_guarded, supplied, missing);
+                    }
+                    MacroTemplateValue::Block { items, .. } => {
+                        if branch_active_forwards_arguments(snapshot, context, property) {
+                            continue;
+                        }
+                        branch_active_body(
+                            snapshot,
+                            items,
+                            context,
+                            property_guarded || is_runtime_branch_key(&property.key),
+                            supplied,
+                            missing,
+                        );
+                    }
+                }
+            }
+            MacroTemplateItem::BareValue(token) => {
+                branch_active_record_token(token, runtime_guarded, supplied, missing);
+            }
+            MacroTemplateItem::Conditional(conditional) => {
+                let guard_supplied = supplied.contains(&conditional.name.to_ascii_lowercase());
+                if conditional.negated != guard_supplied {
+                    branch_active_body(
+                        snapshot,
+                        &conditional.items,
+                        context,
+                        runtime_guarded,
+                        supplied,
+                        missing,
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// Records parameters used in a token as missing unless supplied; parameters
+/// inside runtime branch alternatives are optional and not recorded.
+fn branch_active_record_token(
+    token: &MacroTemplateToken,
+    runtime_guarded: bool,
+    supplied: &std::collections::BTreeSet<String>,
+    missing: &mut Vec<String>,
+) {
+    if runtime_guarded {
+        return;
+    }
+    for fragment in &token.fragments {
+        let MacroTemplateFragment::Parameter { name, .. } = fragment else {
+            continue;
+        };
+        if !supplied.contains(&name.to_ascii_lowercase())
+            && !missing
+                .iter()
+                .any(|recorded| recorded.eq_ignore_ascii_case(name))
+        {
+            missing.push(name.clone());
+        }
+    }
+}
+
+/// True when the property is a nested dynamic-rule call whose block assigns
+/// callee parameters; forwarded parameters render at this definition's own
+/// call sites, so they are not requirements here.
+fn branch_active_forwards_arguments(
+    snapshot: &AnalysisSnapshot,
+    context: &str,
+    property: &MacroTemplateProperty,
+) -> bool {
+    let [MacroTemplateFragment::Literal(key)] = property.key.fragments.as_slice() else {
+        return false;
+    };
+    crate::dynamic_rules::dynamic_kind_for_context(snapshot, context)
+        .and_then(|kind| resolve_macro_definition(snapshot, &kind, key.trim()))
+        .is_some()
 }
 
 /// Checks one invocation's arguments against the parameter rows of its
@@ -1927,6 +2111,88 @@ fn validate_forwarded_to_any_parameter(
             );
         }
     }
+}
+
+/// Validates quoted script payloads bound to payload parameters (bare
+/// `$BODY$` usage, quoted template tokens, or QuotedScript-shape sites): the
+/// quoted string is parsed and its statements validated in the definition's
+/// body context, with diagnostics mapped onto the argument's quoted range.
+/// This is the row-driven replacement for expansion-tree payload validation.
+fn validate_dynamic_quoted_payloads(
+    state: ValidationState<'_, '_, '_>,
+    rules: &[&pdx_rules::SemanticRule],
+    invocation: &ScriptProperty,
+    scope: &ScopeContext,
+    quoted_script_depth: usize,
+) -> Result<(), Cancelled> {
+    if invocation.block_range.is_none() {
+        return Ok(());
+    }
+    let ValidationState {
+        snapshot,
+        diagnostics,
+        cancellation,
+        expansion,
+        quoted_scripts,
+    } = state;
+    let Some(row) = dynamic_row_for_invocation(snapshot, rules, invocation) else {
+        return Ok(());
+    };
+    for (index, argument) in invocation.block.iter().enumerate() {
+        // Bindings keep the last duplicate; earlier occurrences are stale.
+        let superseded = invocation.block[index + 1..]
+            .iter()
+            .any(|later| later.key.eq_ignore_ascii_case(&argument.key));
+        if superseded {
+            continue;
+        }
+        let Some(parameter) = row
+            .parameters
+            .iter()
+            .find(|parameter| parameter.name.eq_ignore_ascii_case(&argument.key))
+        else {
+            continue;
+        };
+        if !parameter.quoted_script || argument.quoted_source.is_none() {
+            continue;
+        }
+        validate_quoted_script(
+            ValidationState {
+                snapshot,
+                diagnostics: &mut *diagnostics,
+                cancellation,
+                expansion: &mut *expansion,
+                quoted_scripts: &mut *quoted_scripts,
+            },
+            &row.context,
+            &[],
+            scope,
+            argument,
+            quoted_script_depth,
+            // Scope authority for payload statements sits with the
+            // definition-site contract, as it did for expansion trees.
+            true,
+        )?;
+    }
+    Ok(())
+}
+
+/// Resolves the derived dynamic row for one scripted invocation from the
+/// matching rule rows' dynamic type.
+fn dynamic_row_for_invocation(
+    snapshot: &AnalysisSnapshot,
+    rules: &[&pdx_rules::SemanticRule],
+    invocation: &ScriptProperty,
+) -> Option<crate::dynamic_rules::DynamicRuleRow> {
+    let type_name = rules.iter().find_map(|rule| match &rule.key {
+        KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
+            if scripted_macro_type(snapshot, type_name) =>
+        {
+            Some(type_name.as_str())
+        }
+        _ => None,
+    })?;
+    crate::dynamic_rules::dynamic_rule_row(snapshot, type_name, &invocation.key)
 }
 
 /// The sites constraining one parameter, following forwarding edges into
