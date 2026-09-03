@@ -119,6 +119,11 @@ pub struct RuleSet {
     /// Whether each rule's context is `effect` or `trigger`, precomputed once so scope
     /// link resolution stops re-lowercasing rule contexts per lookup.
     pub(crate) effect_trigger_contexts: Vec<bool>,
+    /// Lowercased exact key -> dynamic value kind for leaf rules whose value
+    /// is a `dynamic_set` write site (`set_country_flag = X` declares `X`).
+    /// Precomputed once so the engine's per-file property scan resolves each
+    /// write key with a single map probe.
+    pub(crate) dynamic_write_keys: FxHashMap<Box<str>, Box<str>>,
 }
 
 impl RuleSet {
@@ -150,6 +155,7 @@ impl RuleSet {
             root_context_types: FxHashSet::default(),
             scripted_macro_contexts: FxHashMap::default(),
             effect_trigger_contexts: Vec::new(),
+            dynamic_write_keys: FxHashMap::default(),
         }
     }
 
@@ -215,10 +221,22 @@ impl RuleSet {
             }
         }
         let mut effect_trigger_contexts = Vec::with_capacity(model.semantic.rules.len());
+        let mut dynamic_write_keys = FxHashMap::<Box<str>, Box<str>>::default();
         for (index, rule) in model.semantic.rules.iter().enumerate() {
             let context_key: Box<str> = rule.context.to_ascii_lowercase().into_boxed_str();
             effect_trigger_contexts
                 .push(context_key.as_ref() == "effect" || context_key.as_ref() == "trigger");
+            if rule.parent_path.is_empty()
+                && matches!(rule.shape, crate::RuleShape::Leaf)
+                && let KeyMatcher::Exact(key) = &rule.key
+                && let crate::ValueMatcher::DynamicSet(kind) = &rule.value
+                && !key.trim().is_empty()
+                && !kind.is_empty()
+            {
+                dynamic_write_keys
+                    .entry(key.to_ascii_lowercase().into_boxed_str())
+                    .or_insert_with(|| kind.to_ascii_lowercase().into_boxed_str());
+            }
             match &rule.key {
                 KeyMatcher::Exact(key) => {
                     let key: Box<str> = key.to_ascii_lowercase().into_boxed_str();
@@ -261,7 +279,28 @@ impl RuleSet {
             root_context_types,
             scripted_macro_contexts,
             effect_trigger_contexts,
+            dynamic_write_keys,
         }
+    }
+
+    /// Returns the dynamic value kind a leaf write site with this exact key
+    /// declares members of, when the rule data marks the key as a
+    /// `dynamic_set` writer (for example `set_country_flag` -> `country_flag`).
+    pub fn dynamic_write_kind(&self, key: &str) -> Option<&str> {
+        let lowered = key.to_ascii_lowercase();
+        self.dynamic_write_keys
+            .get(lowered.as_str())
+            .map(Box::as_ref)
+    }
+
+    /// Returns whether rule data declares any write site for this dynamic
+    /// value kind (case-folded), meaning the kind's membership is decidable
+    /// from write sites plus engine seeds.
+    pub fn is_dynamic_write_kind(&self, kind: &str) -> bool {
+        let lowered = kind.to_ascii_lowercase();
+        self.dynamic_write_keys
+            .values()
+            .any(|candidate| candidate.as_ref() == lowered.as_str())
     }
 
     /// Returns the normalized model.

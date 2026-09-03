@@ -661,8 +661,21 @@ impl<'a> Derivation<'a> {
             if token.quoted || payload_site {
                 usage.quoted_script = true;
             }
-            if !matchers.is_empty() {
-                usage.sites.push(matchers.clone());
+            let site = if is_bare_parameter(token, &name) {
+                matchers.clone()
+            } else {
+                // Parameters embedded with literal affixes (`$param$_exclude`)
+                // render to a derived name at runtime; dynamic membership
+                // matchers constrain the rendered spelling, not the bare
+                // argument.
+                matchers
+                    .iter()
+                    .filter(|matcher| !matches!(matcher, ValueMatcher::Dynamic(_)))
+                    .cloned()
+                    .collect::<Vec<_>>()
+            };
+            if !site.is_empty() {
+                usage.sites.push(site);
             }
         }
     }
@@ -773,6 +786,17 @@ fn token_has_parameter(token: &MacroTemplateToken) -> bool {
         .fragments
         .iter()
         .any(|fragment| matches!(fragment, MacroTemplateFragment::Parameter { .. }))
+}
+
+/// True when the parameter is the token's entire content; embedded
+/// parameters (`$param$_suffix`, `$prefix$_$param$`) render to derived
+/// runtime names.
+fn is_bare_parameter(token: &MacroTemplateToken, name: &str) -> bool {
+    matches!(
+        token.fragments.as_slice(),
+        [MacroTemplateFragment::Parameter { name: parameter, .. }]
+            if parameter.eq_ignore_ascii_case(name)
+    )
 }
 
 fn token_parameters(token: &MacroTemplateToken) -> impl Iterator<Item = &str> {

@@ -493,6 +493,93 @@ pub struct Reference {
     pub range: TextRange,
 }
 
+/// One `dynamic_set` write site (`set_country_flag = name`), retained so the
+/// analysis layer can decide flag-kind membership without reparsing files.
+///
+/// `name` keeps parameter spellings verbatim (`built_dev_$building$`): the
+/// index treats them as prefix/suffix patterns, and a fully parameterized
+/// name makes the kind's membership undecidable.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FlagWrite {
+    /// Dynamic value kind written (for example `country_flag`), lowercased.
+    pub kind: Arc<str>,
+    /// Written name as spelled in source, `$param$` fragments included.
+    pub name: Arc<str>,
+    /// Exact source range of the written name.
+    pub range: TextRange,
+}
+
+/// How a name relates to one dynamic kind's write sites.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FlagWriteMembership {
+    /// Some write site spells the name literally.
+    Literal,
+    /// Some parameterized write site's prefix/suffix pattern admits the name.
+    Pattern,
+    /// Some write site is fully parameterized, so every name is reachable.
+    Open,
+    /// No write site can produce the name.
+    Unknown,
+}
+
+/// Per-kind write-site view backing [`WorkspaceIndex::flag_write_membership`].
+/// Shared with the analysis layer, which folds open-overlay writes into the
+/// same view.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct FlagWriteIndex {
+    /// Lowercased literal write names.
+    literals: BTreeSet<Box<str>>,
+    /// Lowercased literal segments around the `$param$` spans of write names.
+    patterns: BTreeSet<(Box<str>, Box<str>)>,
+    /// Whether a fully parameterized write exists for the kind.
+    open: bool,
+}
+
+impl FlagWriteIndex {
+    /// Membership of one name against this view; identical semantics to
+    /// [`WorkspaceIndex::flag_write_membership`], usable for views the
+    /// analysis layer folds from open overlays.
+    #[must_use]
+    pub fn membership(&self, member: &str) -> FlagWriteMembership {
+        if self.open {
+            return FlagWriteMembership::Open;
+        }
+        let lowered = member.to_ascii_lowercase();
+        if self.literals.contains(lowered.as_str()) {
+            return FlagWriteMembership::Literal;
+        }
+        if self.patterns.iter().any(|(prefix, suffix)| {
+            lowered.len() >= prefix.len() + suffix.len()
+                && lowered.starts_with(prefix.as_ref())
+                && lowered.ends_with(suffix.as_ref())
+        }) {
+            return FlagWriteMembership::Pattern;
+        }
+        FlagWriteMembership::Unknown
+    }
+
+    /// Folds one write-site name (literal or `$param$` template) into the view.
+    pub fn record(&mut self, name: &str) {
+        let lowered = name.to_ascii_lowercase();
+        if !lowered.contains('$') {
+            self.literals.insert(Box::from(lowered));
+            return;
+        }
+        let mut segments = lowered.split('$');
+        let prefix = segments.next().unwrap_or_default();
+        let suffix = segments.next_back().unwrap_or_default();
+        if prefix.is_empty() && suffix.is_empty() {
+            // `$PARAM$`: every name is reachable through the parameter, so
+            // membership is undecidable from write sites alone. Multi-span
+            // names whose whole literal middle is empty land here too;
+            // over-accepting beats rejecting a reachable name.
+            self.open = true;
+        } else {
+            self.patterns.insert((Box::from(prefix), Box::from(suffix)));
+        }
+    }
+}
+
 /// Atomic parse/HIR/index output for one source file.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FileIndexShard {
@@ -507,6 +594,8 @@ pub struct FileIndexShard {
     /// Retained attribute-key summaries for definitions whose profile rule
     /// asked for them.
     pub definition_attributes: Vec<DefinitionAttributes>,
+    /// `dynamic_set` write sites (`set_country_flag = name`) in source order.
+    pub flag_writes: Vec<FlagWrite>,
     /// Syntax error count retained as a cheap health signal.
     pub syntax_error_count: usize,
 }
@@ -529,6 +618,8 @@ pub struct WorkspaceIndex {
     /// names inside. Nested BTree iteration preserves the previous `(kind, name)` order.
     definitions: BTreeMap<Box<str>, BTreeMap<Box<str>, Vec<DefinitionPointer>>>,
     case_sensitive_kinds: BTreeSet<String>,
+    /// Lowercased dynamic kind -> write-site view for flag-style membership.
+    flag_writes: BTreeMap<Box<str>, FlagWriteIndex>,
     /// Cached UTF-16 positions for files whose source text is not retained, such as Vanilla.
     pub(crate) position_ranges: PositionMap,
 }
@@ -1078,6 +1169,7 @@ impl WorkspaceIndex {
         cancellation: &WorkspaceScanToken,
     ) -> Result<(), WorkspaceError> {
         self.definitions.clear();
+        self.flag_writes.clear();
         for (file_id, shard) in &self.shards {
             cancellation.checkpoint()?;
             for (ordinal, definition) in shard.definitions.iter().enumerate() {
@@ -1094,6 +1186,12 @@ impl WorkspaceIndex {
                         active: definition.active,
                     });
             }
+            for write in &shard.flag_writes {
+                self.flag_writes
+                    .entry(Box::from(write.kind.to_ascii_lowercase()))
+                    .or_default()
+                    .record(&write.name);
+            }
         }
         for by_name in self.definitions.values_mut() {
             for values in by_name.values_mut() {
@@ -1102,6 +1200,18 @@ impl WorkspaceIndex {
             }
         }
         Ok(())
+    }
+
+    /// Returns how a name relates to one dynamic kind's indexed write sites.
+    ///
+    /// Kinds without any indexed write answer `Unknown`; callers that know the
+    /// kind from rule data combine this with their own seeds (for example the
+    /// engine-defined flag whitelist) before rejecting a name.
+    #[must_use]
+    pub fn flag_write_membership(&self, kind: &str, member: &str) -> FlagWriteMembership {
+        self.flag_writes
+            .get(kind.to_ascii_lowercase().as_str())
+            .map_or(FlagWriteMembership::Unknown, |view| view.membership(member))
     }
 }
 

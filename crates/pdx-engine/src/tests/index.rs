@@ -82,6 +82,7 @@ fn bulk_index_build_retains_every_shard_and_definition() {
             references: Vec::new(),
             macro_definitions: Vec::new(),
             definition_attributes: Vec::new(),
+            flag_writes: Vec::new(),
             syntax_error_count: 0,
         },
         FileIndexShard {
@@ -97,6 +98,7 @@ fn bulk_index_build_retains_every_shard_and_definition() {
             references: Vec::new(),
             macro_definitions: Vec::new(),
             definition_attributes: Vec::new(),
+            flag_writes: Vec::new(),
             syntax_error_count: 0,
         },
     ];
@@ -237,6 +239,7 @@ fn symbol_case_policy_controls_definition_lookup_identity() {
         references: Vec::new(),
         macro_definitions: Vec::new(),
         definition_attributes: Vec::new(),
+        flag_writes: Vec::new(),
         syntax_error_count: 0,
     }]);
     index.configure_case_sensitivity(&rules);
@@ -333,6 +336,7 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
             references: vec![reference(first_file, "old.1")],
             macro_definitions: Vec::new(),
             definition_attributes: Vec::new(),
+            flag_writes: Vec::new(),
             syntax_error_count: 0,
         },
         FileIndexShard {
@@ -341,6 +345,7 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
             references: vec![reference(second_file, "untouched.1")],
             macro_definitions: Vec::new(),
             definition_attributes: Vec::new(),
+            flag_writes: Vec::new(),
             syntax_error_count: 0,
         },
     ]);
@@ -351,6 +356,7 @@ fn shard_replacement_updates_only_its_definition_and_reference_buckets() {
         references: vec![reference(first_file, "new.1")],
         macro_definitions: Vec::new(),
         definition_attributes: Vec::new(),
+        flag_writes: Vec::new(),
         syntax_error_count: 1,
     });
 
@@ -396,6 +402,7 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
             references: Vec::new(),
             macro_definitions: Vec::new(),
             definition_attributes: Vec::new(),
+            flag_writes: Vec::new(),
             syntax_error_count: 0,
         },
         FileIndexShard {
@@ -404,6 +411,7 @@ fn replacement_re_resolves_only_affected_symbol_buckets_without_hiding_ties() {
             references: Vec::new(),
             macro_definitions: Vec::new(),
             definition_attributes: Vec::new(),
+            flag_writes: Vec::new(),
             syntax_error_count: 0,
         },
     ]);
@@ -479,6 +487,7 @@ fn identical_collector_records_resolve_as_one_physical_definition() {
         references: Vec::new(),
         macro_definitions: Vec::new(),
         definition_attributes: Vec::new(),
+        flag_writes: Vec::new(),
         syntax_error_count: 0,
     }]);
 
@@ -514,11 +523,69 @@ fn identical_collector_records_resolve_as_one_physical_definition() {
         references: Vec::new(),
         macro_definitions: Vec::new(),
         definition_attributes: Vec::new(),
+        flag_writes: Vec::new(),
         syntax_error_count: 0,
     }]);
     assert!(
         distinct
             .active_definition("scripted_effect", "apply")
             .is_none()
+    );
+}
+
+#[test]
+fn flag_write_membership_distinguishes_literals_patterns_and_open_kinds() {
+    let file_id = SourceFileId::new(7);
+    let range = TextRange::new(4, 12).expect("range");
+    let write = |kind: &str, name: &str| FlagWrite {
+        kind: kind.into(),
+        name: name.into(),
+        range,
+    };
+    let index = WorkspaceIndex::from_shards([FileIndexShard {
+        file_id,
+        definitions: Vec::new(),
+        references: Vec::new(),
+        macro_definitions: Vec::new(),
+        definition_attributes: Vec::new(),
+        flag_writes: vec![
+            write("country_flag", "rebels_defeated"),
+            write("country_flag", "built_dev_$building$"),
+            write("province_flag", "$PARAM$"),
+        ],
+        syntax_error_count: 0,
+    }]);
+
+    assert_eq!(
+        index.flag_write_membership("country_flag", "rebels_defeated"),
+        FlagWriteMembership::Literal
+    );
+    // Case-folded on both sides.
+    assert_eq!(
+        index.flag_write_membership("COUNTRY_FLAG", "Rebels_Defeated"),
+        FlagWriteMembership::Literal
+    );
+    assert_eq!(
+        index.flag_write_membership("country_flag", "built_dev_marketplace"),
+        FlagWriteMembership::Pattern
+    );
+    // A pattern must match both anchor segments; the bare prefix is not enough.
+    assert_eq!(
+        index.flag_write_membership("country_flag", "built_dev"),
+        FlagWriteMembership::Unknown
+    );
+    assert_eq!(
+        index.flag_write_membership("country_flag", "unrelated"),
+        FlagWriteMembership::Unknown
+    );
+    // A fully parameterized write makes the kind's membership undecidable.
+    assert_eq!(
+        index.flag_write_membership("province_flag", "anything"),
+        FlagWriteMembership::Open
+    );
+    // Kinds without writes are unknown, not open.
+    assert_eq!(
+        index.flag_write_membership("consort_flag", "anything"),
+        FlagWriteMembership::Unknown
     );
 }

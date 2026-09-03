@@ -1957,21 +1957,135 @@ fn custom_government_attributes_remain_open_world() {
 }
 
 #[test]
-fn runtime_flags_remain_open_world_for_semantic_validation() {
+fn closed_flag_kinds_require_a_reachable_write_or_engine_seed() {
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
-    let id = DocumentId::new("file:///tmp/events/runtime-flags.txt");
-    let text = "country_event = { id = runtime.1 trigger = { has_country_flag = engine_supplied_flag } immediate = { clr_country_flag = engine_supplied_flag } }\n";
+    let id = DocumentId::new("file:///tmp/events/closed-flags.txt");
+    // `la_pleiade` is an engine-set global flag (whitelisted);
+    // `akkodha` is an engine-set consort flag; `never_set_anywhere` is a
+    // country flag with no write site, overlay write, or engine seed.
+    let text = concat!(
+        "country_event = { id = closed.1 ",
+        "trigger = { has_global_flag = la_pleiade ",
+        "had_consort_flag = { flag = akkodha days = 100 } ",
+        "has_country_flag = never_set_anywhere ",
+        "has_country_flag = fresh_local_flag ",
+        "any_owned_province = { has_province_flag = built_dev_barracks } } ",
+        "immediate = { set_country_flag = fresh_local_flag ",
+        "random_owned_province = { set_province_flag = built_dev_barracks } } }\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open event");
+
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    let unknown = diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue)
+        .collect::<Vec<_>>();
+    assert!(
+        unknown.len() == 1,
+        "exactly the unseeded country flag read must be rejected: {diagnostics:?}"
+    );
+    // The generic value-mismatch message names the key, not the value, so the
+    // rejected range itself must cover `never_set_anywhere`.
+    assert!(
+        unknown[0].message.contains("has_country_flag"),
+        "the rejected read names its key: {diagnostics:?}"
+    );
+    assert_eq!(
+        unknown[0]
+            .range
+            .end()
+            .saturating_sub(unknown[0].range.start()),
+        u32::try_from("never_set_anywhere".len()).expect("flag name length"),
+        "the rejected range covers the unknown flag value: {diagnostics:?}"
+    );
+    // The overlay document's own writes and the engine seeds stay legal.
+    assert!(
+        diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.message.contains("la_pleiade")
+                && !diagnostic.message.contains("akkodha")
+                && !diagnostic.message.contains("fresh_local_flag")
+                && !diagnostic.message.contains("built_dev_barracks")),
+        "seeded, written, and pattern-reachable flags must validate: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn parameterized_flag_writes_admit_their_expansions() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-flag-patterns-{nonce}"));
+    let effects = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&effects).expect("scripted effects directory");
+    // `built_dev_$building$` writes every expansion of `$building$`, so a
+    // literal read of one expansion is reachable without a literal write.
+    std::fs::write(
+        effects.join("00_patterns.txt"),
+        "unlock_building_dev = { set_province_flag = built_dev_$building$ }\n",
+    )
+    .expect("definition file");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+    let id = DocumentId::new("file:///tmp/events/flag-patterns.txt");
+    let text = "country_event = { id = pattern.1 trigger = { has_province_flag = built_dev_marketplace } immediate = { set_province_flag = built_$OTHER$ } }\n";
     host.open_document(id.clone(), 1, text.to_owned(), None)
         .expect("open event");
 
     let diagnostics = diagnostics(&host.snapshot(), &id);
     assert!(
-        diagnostics.iter().all(|diagnostic| {
-            diagnostic.code != DiagnosticCode::InvalidValue
-                || (!diagnostic.message.contains("has_country_flag")
-                    && !diagnostic.message.contains("clr_country_flag"))
-        }),
-        "runtime flags must not require a statically indexed setter: {diagnostics:?}"
+        diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.message.contains("built_dev_marketplace")),
+        "a literal expansion of a parameterized write is reachable: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn embedded_flag_templates_do_not_constrain_the_argument() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-embedded-flag-{nonce}"));
+    let effects = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&effects).expect("scripted effects directory");
+    // `$target$_exclude` reads a flag whose runtime name is rendered from
+    // the argument; the bare argument itself never names a flag.
+    std::fs::write(
+        effects.join("00_exclusions.txt"),
+        concat!(
+            "best_province = { any_owned_province = { ",
+            "limit = { NOT = { has_province_flag = $target$_exclude } } ",
+            "save_event_target_as = $target$ } }\n",
+        ),
+    )
+    .expect("definition file");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+    let id = DocumentId::new("file:///tmp/events/embedded-flag.txt");
+    let text = "country_event = { id = embedded.1 immediate = { best_province = { target = mission_province_target } } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open event");
+
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.message.contains("mission_province_target")),
+        "embedded flag templates constrain the rendered name, not the bare argument: {diagnostics:?}"
     );
 }
 

@@ -4,11 +4,12 @@ use std::sync::Arc;
 
 pub(crate) use super::{
     AnalysisHost, AnalysisSnapshot, Definition, DiskFileChange, DiskFileChangeKind, DocumentError,
-    DocumentId, DocumentSource, FileIndexShard, IndexCache, IndexCacheError, LocalisationPreview,
-    LocalisationPreviewMap, MacroParameterSignature, ParsedSource, PositionMap, Reference,
-    SourceFileId, SourceRoot, SourceRootId, SourceRootKind, TextChange, WorkspaceChange,
-    WorkspaceError, WorkspaceIndex, WorkspaceScanFilters, WorkspaceScanIssueKind,
-    WorkspaceScanLimits, WorkspaceScanToken, pipeline_counts, reset_pipeline_counts,
+    DocumentId, DocumentSource, FileIndexShard, FlagWrite, FlagWriteMembership, IndexCache,
+    IndexCacheError, LocalisationPreview, LocalisationPreviewMap, MacroParameterSignature,
+    ParsedSource, PositionMap, Reference, SourceFileId, SourceRoot, SourceRootId, SourceRootKind,
+    TextChange, WorkspaceChange, WorkspaceError, WorkspaceIndex, WorkspaceScanFilters,
+    WorkspaceScanIssueKind, WorkspaceScanLimits, WorkspaceScanToken, pipeline_counts,
+    reset_pipeline_counts,
 };
 use pdx_rules::{RuleSet, RulesModel, SymbolDescriptor, SymbolResolutionPolicy};
 use pdx_text::{LogicalPath, Position, PositionRange, TextRange};
