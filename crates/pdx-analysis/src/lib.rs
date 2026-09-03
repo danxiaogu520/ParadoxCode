@@ -5,6 +5,7 @@
 
 mod completion;
 mod diagnostics;
+mod dynamic_rules;
 mod hover;
 mod inlay;
 mod lints;

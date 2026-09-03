@@ -90,7 +90,7 @@ pub(crate) fn macro_cycle_reported(snapshot: &AnalysisSnapshot, kind: &str, name
         .is_some_and(|report| report.message(kind, name).is_some())
 }
 
-fn macro_cycle_report(
+pub(crate) fn macro_cycle_report(
     snapshot: &AnalysisSnapshot,
     cancellation: &CancellationToken,
 ) -> Result<Arc<MacroCycleReport>, Cancelled> {
