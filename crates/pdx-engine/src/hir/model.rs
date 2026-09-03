@@ -143,6 +143,21 @@ pub struct HirLocalisationEntry {
     pub name_range: TextRange,
 }
 
+/// Attribute-key summary retained for one profile-interpreted definition whose
+/// rule asked for retention. Keys are the body's direct property keys, as
+/// written, in source order.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DefinitionAttributes {
+    /// Dynamic symbol kind matching the HIR definition.
+    pub kind: String,
+    /// Definition name as written in source.
+    pub name: String,
+    /// Full range of the owning symbol definition.
+    pub definition_range: TextRange,
+    /// Direct body property keys in source order, as written.
+    pub attribute_keys: Vec<String>,
+}
+
 /// One profile-interpreted symbol definition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HirDefinition {
@@ -362,6 +377,7 @@ pub struct HirFile {
     pub(super) parameter_definitions: Vec<HirParameterDefinition>,
     pub(super) parameter_references: Vec<HirParameterReference>,
     pub(super) macro_templates: Vec<MacroTemplate>,
+    pub(super) definition_attributes: Vec<DefinitionAttributes>,
 }
 
 impl HirFile {
@@ -399,6 +415,12 @@ impl HirFile {
     #[must_use]
     pub fn definitions(&self) -> &[HirDefinition] {
         &self.definitions
+    }
+
+    /// Returns retained attribute-key summaries in deterministic source order.
+    #[must_use]
+    pub fn definition_attributes(&self) -> &[DefinitionAttributes] {
+        &self.definition_attributes
     }
 
     /// Returns profile- and category-interpreted references in deterministic source order.

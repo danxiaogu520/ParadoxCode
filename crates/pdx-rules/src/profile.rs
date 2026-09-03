@@ -118,6 +118,10 @@ pub struct ProfileDefinitionRule {
     pub name_field: Option<String>,
     /// Whether parser recovery must have produced a value wrapper.
     pub requires_value: bool,
+    /// Whether the index retains the definition body's direct attribute keys
+    /// so analysis can classify them without re-reading the file.
+    #[serde(default)]
+    pub retain_attributes: bool,
 }
 
 /// One scalar-reference interpretation supplied by a game profile.

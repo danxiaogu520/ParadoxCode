@@ -289,7 +289,52 @@ fn parse_semantic_fragments(
     for fragment in read_fragments_parallel::<Vec<crate::SemanticRule>>(paths, files)? {
         rules.extend(fragment);
     }
+    for rule in &mut rules {
+        normalize_explicit_any(rule)?;
+    }
     Ok(rules)
+}
+
+/// Requires an explicit source scope declaration and normalizes
+/// `allowed_scopes = ["any"]` to the canonical unrestricted form (an empty list).
+///
+/// The two spellings are logically identical, so the compiled model, canonical
+/// hash, and SQLite artifact keep exactly one representation; the declaration
+/// remains visible in the JSON source as authoring intent. Combining `any`
+/// with a concrete scope is a source error: `any` already admits every scope,
+/// so a second entry is either redundant or contradictory.
+fn normalize_explicit_any(rule: &mut crate::SemanticRule) -> Result<(), CompileError> {
+    if rule.allowed_scopes.is_empty() {
+        return Err(CompileError::Validation(format!(
+            "semantic rule `{}` has an empty allowed_scopes list; declare `any` explicitly for an unrestricted rule",
+            rule.id
+        )));
+    }
+    if rule
+        .allowed_scopes
+        .iter()
+        .any(|scope| scope.trim().is_empty())
+    {
+        return Err(CompileError::Validation(format!(
+            "semantic rule `{}` declares an empty scope name",
+            rule.id
+        )));
+    }
+    if !rule
+        .allowed_scopes
+        .iter()
+        .any(|scope| scope.trim().eq_ignore_ascii_case("any"))
+    {
+        return Ok(());
+    }
+    if rule.allowed_scopes.len() == 1 {
+        rule.allowed_scopes.clear();
+        return Ok(());
+    }
+    Err(CompileError::Validation(format!(
+        "semantic rule `{}` declares scope `any` together with other scopes; `any` must stand alone",
+        rule.id
+    )))
 }
 
 enum ParsedTypeFragment {
@@ -1070,6 +1115,73 @@ mod tests {
     }
 
     #[test]
+    fn semantic_source_requires_explicit_scope_and_normalizes_any() {
+        fn base() -> SemanticRule {
+            SemanticRule {
+                id: "any-scope".to_owned(),
+                context: "effect".to_owned(),
+                parent_path: Vec::new(),
+                key: KeyMatcher::Exact("key".to_owned()),
+                operator: None,
+                value: ValueMatcher::AnyScalar,
+                shape: RuleShape::Leaf,
+                child_context: None,
+                alternative_id: None,
+                severity: None,
+                required: false,
+                deprecated: false,
+                documentation: Vec::new(),
+                allowed_scopes: Vec::new(),
+                push_scope: None,
+                replace_scope: Vec::new(),
+                min_occurs: None,
+                strict_min: false,
+                max_occurs: None,
+                source_file: "semantic-rules.json".to_owned(),
+                line: 1,
+            }
+        }
+        let mut empty = base();
+        let error = normalize_explicit_any(&mut empty).expect_err("empty source scope must fail");
+        assert!(
+            error.to_string().contains("declare `any` explicitly"),
+            "the validation error should explain the source spelling"
+        );
+
+        let mut blank = base();
+        blank.allowed_scopes = vec!["  ".to_owned()];
+        assert!(
+            normalize_explicit_any(&mut blank).is_err(),
+            "a blank scope name must fail"
+        );
+
+        let mut unrestricted = base();
+        unrestricted.allowed_scopes = vec!["any".to_owned()];
+        assert!(normalize_explicit_any(&mut unrestricted).is_ok());
+        assert!(
+            unrestricted.allowed_scopes.is_empty(),
+            "`any` compiles to the canonical unrestricted form"
+        );
+
+        let mut case_insensitive = base();
+        case_insensitive.allowed_scopes = vec!["ANY".to_owned()];
+        assert!(normalize_explicit_any(&mut case_insensitive).is_ok());
+        assert!(case_insensitive.allowed_scopes.is_empty());
+
+        let mut mixed = base();
+        mixed.allowed_scopes = vec!["any".to_owned(), "country".to_owned()];
+        assert!(
+            normalize_explicit_any(&mut mixed).is_err(),
+            "`any` combined with a concrete scope is a source error"
+        );
+
+        let mut scoped = base();
+        scoped.allowed_scopes = vec!["country".to_owned()];
+        assert!(normalize_explicit_any(&mut scoped).is_ok());
+        assert_eq!(scoped.allowed_scopes, vec!["country".to_owned()]);
+    }
+
+    #[test]
     fn validation_requires_quoted_script_context_and_opaque_value() {
         let mut rule = SemanticRule {
             id: "quoted".to_owned(),
@@ -1176,7 +1288,7 @@ mod tests {
         assert_eq!(source_model.file_categories.len(), 124);
         assert_eq!(source_model.symbol_descriptors.len(), 2667);
         assert_eq!(source_model.records.len(), 13_719);
-        assert_eq!(source_model.semantic.rules.len(), 8_533);
+        assert_eq!(source_model.semantic.rules.len(), 8_553);
         assert_eq!(source_model.semantic.enum_values.len(), 72);
         assert_eq!(source_model.semantic.type_root_keys.len(), 7);
         assert_eq!(source_model.semantic.type_root_scopes.len(), 2);
@@ -1224,6 +1336,214 @@ mod tests {
         assert_eq!(source_model.semantic.type_descriptors.len(), 152);
         assert_eq!(source_model.semantic.localisation_bindings.len(), 187);
         assert_eq!(source_model.profile.scan_roots.len(), 126);
+        for (key, expected_scopes) in [
+            ("is_janissary_modifier", &["country"][..]),
+            ("monthly_asha_vahishta", &["country"][..]),
+            ("local_center_of_trade_upgrade_cost", &["province"][..]),
+            ("enable_forced_march", &["unit"][..]),
+        ] {
+            let rows = source_model
+                .semantic
+                .rules
+                .iter()
+                .filter(|rule| {
+                    rule.context.eq_ignore_ascii_case("modifier")
+                        && matches!(&rule.key, KeyMatcher::Exact(candidate) if candidate.eq_ignore_ascii_case(key))
+                })
+                .collect::<Vec<_>>();
+            assert!(!rows.is_empty(), "missing modifier rule for {key}");
+            assert!(
+                rows.iter().all(|rule| {
+                    rule.allowed_scopes
+                        .iter()
+                        .map(String::as_str)
+                        .eq(expected_scopes.iter().copied())
+                }),
+                "modifier rule {key} must use scopes {expected_scopes:?}"
+            );
+        }
+        let vanilla_modifier_enum = source_model
+            .semantic
+            .rules
+            .iter()
+            .find(|rule| rule.id == "eu4:modifier:vanilla_exported_keys")
+            .expect("Vanilla modifier enum fallback");
+        assert_eq!(
+            vanilla_modifier_enum.allowed_scopes,
+            ["country"],
+            "the vanilla export enum keys are country-class, closing the three-class modifier partition"
+        );
+        let top_level_exact = |context: &str, key: &str| {
+            source_model
+                .semantic
+                .rules
+                .iter()
+                .filter(|rule| {
+                    rule.context.eq_ignore_ascii_case(context)
+                        && rule.parent_path.is_empty()
+                        && matches!(&rule.key, KeyMatcher::Exact(candidate) if candidate.eq_ignore_ascii_case(key))
+                })
+                .collect::<Vec<_>>()
+        };
+        let kill_leader = top_level_exact("effect", "kill_leader");
+        assert_eq!(kill_leader.len(), 2);
+        assert!(kill_leader.iter().any(|rule| {
+            rule.allowed_scopes == ["country", "province"] && matches!(rule.shape, RuleShape::Node)
+        }));
+        assert!(kill_leader.iter().any(|rule| {
+            rule.allowed_scopes == ["country", "province"]
+                && matches!(rule.shape, RuleShape::Leaf)
+                && matches!(rule.value, ValueMatcher::AnyScalar)
+        }));
+        // The unit-spawn family (army quintet + owner-ruled ship quartet
+        // E053-E056) is a country+province dual; both value alternatives
+        // stay available.
+        for key in [
+            "artillery",
+            "cavalry",
+            "infantry",
+            "mercenary_infantry",
+            "mercenary_cavalry",
+            "heavy_ship",
+            "light_ship",
+            "galley",
+            "transport",
+        ] {
+            let rows = top_level_exact("effect", key);
+            assert!(
+                rows.iter().any(|rule| {
+                    rule.allowed_scopes == ["country", "province"]
+                        && matches!(
+                            &rule.value,
+                            ValueMatcher::Scope(Some(scope)) if scope == "province"
+                        )
+                }),
+                "{key} must keep a province-target value alternative in country+province scope"
+            );
+            assert!(
+                rows.iter().any(|rule| {
+                    rule.allowed_scopes == ["country", "province"]
+                        && matches!(
+                            &rule.value,
+                            ValueMatcher::Scope(Some(scope)) if scope == "country"
+                        )
+                }),
+                "{key} must keep a country-target value alternative in country+province scope"
+            );
+        }
+        // 2026-09-04 arbitration: the claim/core mutation and comparison
+        // families are country+province duals (wiki + vanilla usage +
+        // cwtools agreement); both value alternatives stay available.
+        for key in [
+            "add_claim",
+            "add_core",
+            "add_permanent_claim",
+            "add_territorial_core",
+            "remove_claim",
+            "remove_core",
+            "remove_territorial_core",
+        ] {
+            let rows = top_level_exact("effect", key);
+            assert!(
+                rows.iter().any(|rule| {
+                    rule.allowed_scopes == ["country", "province"]
+                        && matches!(
+                            &rule.value,
+                            ValueMatcher::Scope(Some(scope)) if scope == "province"
+                        )
+                }),
+                "{key} must keep a province-target value alternative in country+province scope"
+            );
+            assert!(
+                rows.iter().any(|rule| {
+                    rule.allowed_scopes == ["country", "province"]
+                        && matches!(
+                            &rule.value,
+                            ValueMatcher::Scope(Some(scope)) if scope == "country"
+                        )
+                }),
+                "{key} must keep a country-target value alternative in country+province scope"
+            );
+        }
+        for key in [
+            "has_discovered",
+            "is_claim",
+            "is_core",
+            "is_state_core",
+            "is_territorial_core",
+            "is_permanent_claim",
+        ] {
+            let rows = top_level_exact("trigger", key);
+            assert!(
+                rows.iter().any(|rule| {
+                    rule.allowed_scopes == ["country", "province"]
+                        && matches!(
+                            &rule.value,
+                            ValueMatcher::Scope(Some(scope)) if scope == "province"
+                        )
+                }),
+                "{key} must keep a province-target value alternative in country+province scope"
+            );
+            assert!(
+                rows.iter().any(|rule| {
+                    rule.allowed_scopes == ["country", "province"]
+                        && matches!(
+                            &rule.value,
+                            ValueMatcher::Scope(Some(scope)) if scope == "country"
+                        )
+                }),
+                "{key} must keep a country-target value alternative in country+province scope"
+            );
+        }
+        let exists_bool = top_level_exact("trigger", "exists")
+            .into_iter()
+            .find(|rule| matches!(rule.value, ValueMatcher::Bool))
+            .expect("exists bool alternative");
+        assert!(
+            exists_bool.allowed_scopes.is_empty(),
+            "exists is scope-unrestricted again (wiki Anywhere; arbitration T007)"
+        );
+        // Pins for the 2026-09-04 arbitration decisions.
+        for (context, key, expected_scopes) in [
+            ("trigger", "culture", &["province"][..]),
+            ("trigger", "same_continent", &["country", "province"][..]),
+            ("trigger", "religion", &["country", "province"][..]),
+            ("trigger", "unrest", &["country", "province"][..]),
+            ("trigger", "is_council_enabled", &[][..]),
+            ("trigger", "is_or_was_tag", &["country"][..]),
+            ("effect", "recall_merchant", &["province"][..]),
+            ("effect", "enable_council", &[][..]),
+            ("effect", "set_papacy_active", &[][..]),
+            ("effect", "add_garrison", &["province"][..]),
+            // cwtools-compare arbitration (Round 10, same day).
+            ("trigger", "check_variable", &["country", "province"][..]),
+            (
+                "trigger",
+                "any_owned_province",
+                &["country", "province"][..],
+            ),
+            ("effect", "decolonize", &["country", "province"][..]),
+            ("effect", "set_bankruptcy", &["country"][..]),
+            ("effect", "remove_country_modifier", &["country"][..]),
+            (
+                "trigger",
+                "has_leader",
+                &["country", "mercenary_company"][..],
+            ),
+            ("effect", "enable_religion", &[][..]),
+            ("trigger", "num_of_centers_of_reformation", &[][..]),
+        ] {
+            let rows = top_level_exact(context, key);
+            assert!(!rows.is_empty(), "missing rule for {context}:{key}");
+            assert!(
+                rows.iter().all(|rule| rule
+                    .allowed_scopes
+                    .iter()
+                    .map(String::as_str)
+                    .eq(expected_scopes.iter().copied())),
+                "{context}:{key} must use scopes {expected_scopes:?} after the 2026-09-04 arbitration"
+            );
+        }
         let quoted_script_rules = source_model
             .semantic
             .rules

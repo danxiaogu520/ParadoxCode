@@ -423,6 +423,7 @@ pub(crate) fn build_file_state_with_cache(
                 definitions: Vec::new(),
                 references: Vec::new(),
                 macro_definitions: Vec::new(),
+                definition_attributes: Vec::new(),
                 syntax_error_count: 0,
             }),
             cached_localisation_previews: None,
@@ -445,6 +446,7 @@ pub(crate) fn build_file_state_with_cache(
             definitions: Vec::new(),
             references: Vec::new(),
             macro_definitions: Vec::new(),
+            definition_attributes: Vec::new(),
             syntax_error_count: parsed.errors().len(),
         },
         (None, _) => FileIndexShard {
@@ -452,6 +454,7 @@ pub(crate) fn build_file_state_with_cache(
             definitions: Vec::new(),
             references: Vec::new(),
             macro_definitions: Vec::new(),
+            definition_attributes: Vec::new(),
             syntax_error_count: 0,
         },
     };
@@ -489,6 +492,7 @@ pub(crate) fn empty_file_state(file: &SourceFile, revision: u64) -> FileState {
             definitions: Vec::new(),
             references: Vec::new(),
             macro_definitions: Vec::new(),
+            definition_attributes: Vec::new(),
             syntax_error_count: 0,
         }),
         cached_localisation_previews: None,
@@ -534,6 +538,7 @@ fn shard_from_parsed(
         definitions,
         references,
         macro_definitions,
+        definition_attributes: hir.definition_attributes().to_vec(),
         syntax_error_count: parsed.errors().len(),
     }
 }

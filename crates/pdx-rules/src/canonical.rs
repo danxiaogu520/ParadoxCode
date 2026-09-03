@@ -286,6 +286,7 @@ pub(crate) fn canonical_hash(model: &RulesModel) -> RuleHash {
             None => bytes.push(0),
         }
         put_opt_str(&mut bytes, descriptor.root_entries.as_deref());
+        put_opt_str(&mut bytes, descriptor.body_context.as_deref());
         match &descriptor.scripted_macro {
             Some(scripted_macro) => {
                 bytes.push(1);

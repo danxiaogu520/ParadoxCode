@@ -7,8 +7,8 @@ use pdx_rules::{
 use pdx_text::{LogicalPath, TextRange, TextSize};
 
 use super::{
-    HirDefinition, HirLocalisationEntry, HirProperty, HirReference, HirReferenceOrigin, HirScalar,
-    ScopeFact, range_within,
+    DefinitionAttributes, HirDefinition, HirLocalisationEntry, HirProperty, HirReference,
+    HirReferenceOrigin, HirScalar, ScopeFact, range_within,
 };
 
 /// Selects the semantic root context using only immutable rule/profile inputs.
@@ -403,7 +403,11 @@ pub(super) fn lower_semantics(
     rules: &RuleSet,
     profile: Option<&GameProfile>,
     scope_facts: &[ScopeFact],
-) -> (Vec<HirDefinition>, Vec<HirReference>) {
+) -> (
+    Vec<HirDefinition>,
+    Vec<HirReference>,
+    Vec<DefinitionAttributes>,
+) {
     let mut definitions = localisation_entries
         .iter()
         .map(|entry| HirDefinition {
@@ -414,6 +418,7 @@ pub(super) fn lower_semantics(
         })
         .collect::<Vec<_>>();
     let mut references = Vec::new();
+    let mut definition_attributes = Vec::new();
     let path = logical_path.map_or("", LogicalPath::as_str);
     let fact_index = ScopeFactIndex::new(scope_facts);
     let mut root_contexts = RootContextCache::new(logical_path);
@@ -426,7 +431,19 @@ pub(super) fn lower_semantics(
                     .definition(path, &property.key)
                     .filter(|rule| !rule.requires_value || property.value_range.is_some())
                 {
-                    definitions.push(definition_from_rule(properties, property_index, rule));
+                    let definition = definition_from_rule(properties, property_index, rule);
+                    if rule.retain_attributes {
+                        definition_attributes.push(DefinitionAttributes {
+                            kind: definition.kind.clone(),
+                            name: definition.name.clone(),
+                            definition_range: definition.range,
+                            attribute_keys: property_children[property_index]
+                                .iter()
+                                .map(|&child| properties[child].key.clone())
+                                .collect(),
+                        });
+                    }
+                    definitions.push(definition);
                 }
                 for rule in profile
                     .conditional_definitions
@@ -562,7 +579,7 @@ pub(super) fn lower_semantics(
             origin: HirReferenceOrigin::Category,
         }));
     }
-    (definitions, references)
+    (definitions, references, definition_attributes)
 }
 
 fn semantic_rules_describe_property(

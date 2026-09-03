@@ -1296,12 +1296,46 @@ fn scripted_macro_expansion_activates_conditionals_and_reports_cycles() {
         }),
         "{results:?}"
     );
+    // Statically known cycles are now rejected at the definitions themselves
+    // (Rust-style definition-site checking); the call site must not duplicate.
     assert!(
-        results.iter().any(|diagnostic| {
+        !results
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::MacroExpansionCycle),
+        "call site must not duplicate the definition-site report: {results:?}"
+    );
+    let snapshot = host.snapshot();
+    let definitions_file = snapshot
+        .source_files()
+        .iter()
+        .find(|(_, file)| {
+            file.logical_path
+                .as_str()
+                .ends_with("scripted_effects/00_expand.txt")
+        })
+        .map(|(id, _)| id)
+        .expect("definitions file is indexed");
+    let definition_results = crate::source_file_diagnostics_with_cancellation(
+        &snapshot,
+        *definitions_file,
+        &CancellationToken::new(),
+    )
+    .expect("definition diagnostics");
+    assert!(
+        definition_results.iter().any(|diagnostic| {
             diagnostic.code == DiagnosticCode::MacroExpansionCycle
+                && diagnostic.message.contains("`first`")
                 && diagnostic.message.contains("first -> second -> first")
         }),
-        "{results:?}"
+        "the cycle must be reported at the participating definitions: {definition_results:?}"
+    );
+    assert!(
+        definition_results.iter().any(|diagnostic| {
+            diagnostic.code == DiagnosticCode::MacroExpansionCycle
+                && diagnostic.message.contains("`second`")
+                && diagnostic.message.contains("second -> first -> second")
+        }),
+        "both participants report the rotated cycle walk: {definition_results:?}"
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
@@ -2494,6 +2528,17 @@ fn common_alerts_and_units_display_use_path_specific_semantics() {
         Some(std::path::PathBuf::from("/tmp/common/alerts.txt")),
     )
     .expect("open alerts");
+
+    let tags = DocumentId::new("file:///tmp/common/country_tags/test.txt");
+    host.open_document(
+        tags.clone(),
+        1,
+        "SPA = \"countries/Spain.txt\"\nCAS = \"countries/Castile.txt\"\n".to_owned(),
+        Some(std::path::PathBuf::from(
+            "/tmp/common/country_tags/test.txt",
+        )),
+    )
+    .expect("open country tags");
     let alert_diagnostics = diagnostics(&host.snapshot(), &alerts);
     assert!(
         alert_diagnostics.iter().all(|diagnostic| {
@@ -2537,6 +2582,74 @@ fn common_alerts_and_units_display_use_path_specific_semantics() {
                 && diagnostic.code != DiagnosticCode::UnknownBareValue
         }),
         "lucky-country trigger blocks must use the trigger context: {lucky_diagnostics:?}"
+    );
+    assert!(
+        lucky_diagnostics.is_empty(),
+        "scalar triggers directly inside lucky-country blocks must validate against the trigger rules, not the file root rule: {lucky_diagnostics:?}"
+    );
+}
+
+#[test]
+fn lucky_country_blocks_accept_scalar_triggers() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        std::path::PathBuf::from("/tmp"),
+    )]));
+    let lucky = DocumentId::new("file:///tmp/common/historial_lucky.txt");
+    host.open_document(
+        lucky.clone(),
+        1,
+        "RUS = { always = yes }\nPRU = { is_year = 1700 always = no }\n".to_owned(),
+        Some(std::path::PathBuf::from("/tmp/common/historial_lucky.txt")),
+    )
+    .expect("open historial lucky");
+    let lucky_diagnostics = diagnostics(&host.snapshot(), &lucky);
+    assert!(
+        lucky_diagnostics.is_empty(),
+        "boolean and scalar triggers directly inside lucky-country blocks are valid: {lucky_diagnostics:?}"
+    );
+}
+
+#[test]
+fn imperial_incident_entries_keep_their_structured_body_context() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        std::path::PathBuf::from("/tmp"),
+    )]));
+    let id = DocumentId::new("file:///tmp/common/imperial_incidents/00_test.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        concat!(
+            "incident_probe = {\n",
+            "    event = incidents_probe.1\n",
+            "    default_option = 0\n",
+            "    can_stop = { NOT = { exists = BUR } }\n",
+            "    0 = { factor = 1 }\n",
+            "    1 = {\n",
+            "        factor = 1\n",
+            "        modifier = { factor = 100 is_year = 1500 }\n",
+            "    }\n",
+            "}\n",
+        )
+        .to_owned(),
+        Some(std::path::PathBuf::from(
+            "/tmp/common/imperial_incidents/00_test.txt",
+        )),
+    )
+    .expect("open imperial incident");
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results
+            .iter()
+            .all(|diagnostic| diagnostic.code != DiagnosticCode::UnknownKey),
+        // The any_scalar option wrapper describes the numeric entry children,
+        // not the entry key itself; entry bodies keep the structured context.
+        "imperial incident entry bodies must validate against their own keys: {results:?}"
     );
 }
 
@@ -2649,4 +2762,638 @@ fn evicted_frontend_diagnostics_match_retained() {
         "evicted diagnostics must match"
     );
     std::fs::remove_dir_all(cleanup).unwrap();
+}
+
+#[test]
+fn logic_container_lints_fire_on_degenerate_shapes() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        std::path::PathBuf::from("/tmp"),
+    )]));
+    let id = DocumentId::new("file:///tmp/events/lint_probe.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        concat!(
+            "country_event = { id = lint.1\n",
+            "  trigger = {\n",
+            "    NOT = { always = yes is_year = 1500 }\n",
+            "    OR = { has_country_flag = lint_flag }\n",
+            "    AND = { }\n",
+            "  }\n",
+            "  option = { name = lint.1.a\n",
+            "    if = { limit = { always = yes } add_prestige = 1\n",
+            "      else = { add_prestige = 4 }\n",
+            "    }\n",
+            "    else = { add_prestige = 2 }\n",
+            "    ai_chance = { factor = 0 }\n",
+            "  }\n",
+            "  option = { name = lint.1.b\n",
+            "    else = { add_prestige = 3 }\n",
+            "    has_country_flag = lint_flag\n",
+            "  }\n",
+            "}\n",
+            "country_event = { id = lint.2 trigger = { add_prestige = 1 } option = { name = lint.2.a } }\n",
+        )
+        .to_owned(),
+        Some(std::path::PathBuf::from("/tmp/events/lint_probe.txt")),
+    )
+    .expect("open lint probe");
+    let all = diagnostics(&host.snapshot(), &id);
+    let codes: Vec<(DiagnosticCode, String)> = all
+        .iter()
+        .map(|diagnostic| (diagnostic.code, diagnostic.message.clone()))
+        .collect();
+
+    assert!(
+        codes.iter().any(|(code, message)| {
+            *code == DiagnosticCode::LogicalContainer && message.contains("AND of NOTs")
+        }),
+        "NOT with multiple conditions must explain the NOR reading: {codes:?}"
+    );
+    assert!(
+        codes.iter().any(|(code, message)| {
+            *code == DiagnosticCode::LogicalContainer && message.contains("single condition")
+        }),
+        "single-condition OR must be flagged: {codes:?}"
+    );
+    assert!(
+        codes
+            .iter()
+            .any(|(code, message)| *code == DiagnosticCode::LogicalContainer
+                && message.contains("empty `AND`")),
+        "empty AND container must be flagged: {codes:?}"
+    );
+    assert!(
+        codes
+            .iter()
+            .any(|(code, message)| *code == DiagnosticCode::ConstantCondition
+                && message.contains("always true")),
+        "constant always-yes limit must be flagged: {codes:?}"
+    );
+    assert_eq!(
+        codes
+            .iter()
+            .filter(|(code, _)| *code == DiagnosticCode::OrphanElse)
+            .count(),
+        1,
+        "exactly the option-level else is orphaned; sibling and nested forms after an `if` are valid: {codes:?}"
+    );
+    assert!(
+        codes
+            .iter()
+            .any(|(code, message)| *code == DiagnosticCode::UnknownKey
+                && message.contains("is an effect and cannot be used inside a trigger block")),
+        "effect-in-trigger must sharpen the unknown-key message: {codes:?}"
+    );
+    assert!(
+        codes
+            .iter()
+            .any(|(code, message)| *code == DiagnosticCode::UnknownKey
+                && message.contains("is a trigger and cannot be used inside an effect block")),
+        "trigger-in-effect must sharpen the unknown-key message: {codes:?}"
+    );
+    assert!(
+        !all.iter()
+            .any(|diagnostic| diagnostic.message.contains("unexpected key `add_prestige`")),
+        "the sharpened effect-in-trigger message replaces the generic wording: {codes:?}"
+    );
+    // A deliberate `ai_chance = { factor = 0 }` (AI never picks this option)
+    // is a standard EU4 idiom and must stay silent.
+    assert!(
+        !all.iter()
+            .any(|diagnostic| diagnostic.message.contains("never chooses")),
+        "zero AI weight is intentional authoring and is not diagnosed: {codes:?}"
+    );
+}
+
+#[test]
+fn scripted_macro_cycles_are_reported_at_definition_sites() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-cycles-{nonce}"));
+    let effects = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&effects).expect("scripted effects directory");
+    std::fs::write(
+        effects.join("00_cycles.txt"),
+        concat!(
+            "ping = { pong = yes }\n",
+            "pong = { ping = yes }\n",
+            "loop_self = { loop_self = yes }\n",
+            "honest = { add_prestige = 1 }\n",
+            "dispatch = { $action$ = yes }\n",
+        ),
+    )
+    .expect("macro definitions");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    // The dynamic dispatch cycle only closes through a call-site binding:
+    // `dispatch` renders its key to `relay`, and `relay` calls `dispatch`.
+    std::fs::write(
+        effects.join("01_dispatch.txt"),
+        "relay = { dispatch = { action = relay } }\n",
+    )
+    .expect("dispatch definition");
+    host.refresh_source_roots().expect("rescan dispatch");
+
+    let definitions = DocumentId::new("file:///tmp/common/scripted_effects/00_cycles.txt");
+    let definition_text = std::fs::read_to_string(effects.join("00_cycles.txt")).expect("text");
+    host.open_document(
+        definitions.clone(),
+        1,
+        definition_text.clone(),
+        Some(effects.join("00_cycles.txt")),
+    )
+    .expect("open definitions");
+    let all = diagnostics(&host.snapshot(), &definitions);
+    let cycles: Vec<&Diagnostic> = all
+        .iter()
+        .filter(|diagnostic| diagnostic.code == DiagnosticCode::MacroExpansionCycle)
+        .collect();
+
+    let ping_offset = u32::try_from(definition_text.find("ping = ").expect("ping")).expect("u32");
+    assert!(
+        cycles.iter().any(|diagnostic| {
+            diagnostic.message.contains("`ping`")
+                && diagnostic.message.contains("ping -> pong -> ping")
+                && diagnostic.range.start() == ping_offset
+        }),
+        "mutual recursion must be reported at the definition site: {cycles:?}"
+    );
+    let pong_offset = u32::try_from(
+        definition_text
+            .find("\npong = ")
+            .map(|offset| offset + 1)
+            .expect("pong"),
+    )
+    .expect("u32");
+    assert!(
+        cycles
+            .iter()
+            .any(|diagnostic| diagnostic.range.start() == pong_offset),
+        "both cycle participants are reported at their definitions: {cycles:?}"
+    );
+    let self_offset =
+        u32::try_from(definition_text.find("loop_self = ").expect("self")).expect("u32");
+    assert!(
+        cycles.iter().any(|diagnostic| {
+            diagnostic.message.contains("loop_self -> loop_self")
+                && diagnostic.range.start() == self_offset
+        }),
+        "self-recursion must be reported at the definition site: {cycles:?}"
+    );
+    let dispatch_offset =
+        u32::try_from(definition_text.find("dispatch = ").expect("dispatch")).expect("u32");
+    assert!(
+        cycles.iter().any(|diagnostic| {
+            diagnostic.message.contains("`dispatch`") && diagnostic.range.start() == dispatch_offset
+        }),
+        "the parameter-bound dispatch cycle must close through call-site bindings: {cycles:?}"
+    );
+    assert!(
+        !cycles
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("`honest`")),
+        "acyclic macros stay unreported: {cycles:?}"
+    );
+
+    // The runtime expansion guard stays silent for statically known cycles;
+    // call sites must not re-report what the definitions already say.
+    let event = DocumentId::new("file:///tmp/events/cycle_call.txt");
+    host.open_document(
+        event.clone(),
+        1,
+        "country_event = { id = cycle.1 immediate = { ping = yes } }\n".to_owned(),
+        Some(std::path::PathBuf::from("/tmp/events/cycle_call.txt")),
+    )
+    .expect("open call site");
+    let event_diagnostics = diagnostics(&host.snapshot(), &event);
+    assert!(
+        !event_diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::MacroExpansionCycle),
+        "call sites no longer duplicate definition-site cycle reports: {event_diagnostics:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn scripted_macro_scope_contracts_infer_and_reject_empty_intersections() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-macro-contracts-{nonce}"));
+    let effects = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&effects).expect("scripted effects directory");
+    let body = concat!(
+        // Direct clash: add_prestige wants country, add_province_modifier wants province.
+        "clash = { add_prestige = 1 add_province_modifier = { name = clash_mod duration = 1 } }\n",
+        // The clash also closes through a callee whose own contract is province-only.
+        "via_callee = { helper_province = yes add_prestige = 1 }\n",
+        "helper_province = { change_province_name = \"X\" }\n",
+        // Compatible single-scope bodies must not error.
+        "fine = { add_prestige = 1 add_manpower = 1000 }\n",
+        // add_core has alternative province and country rows: either accepts.
+        "dual_ok = { add_prestige = 1 add_core = FRA }\n",
+        // A scope-switching container constrains only through its own row.
+        "scoped_ok = { any_country = { change_province_name = \"Y\" } }\n",
+        // Same-scope containers (if/limit) are descended, not treated as switches.
+        "nested_ok = { if = { limit = { always = yes } add_prestige = 1 } }\n",
+        // Dynamic $param$ dispatch is not narrowed.
+        "dynamic_dispatch = { $action$ = yes }\n",
+        // Dynamic scope links re-target runtime scopes; their bodies must not
+        // constrain the entry (ROOT is the event root, not the macro entry).
+        "root_opaque = { add_prestige = 1 ROOT = { change_province_name = \"Z\" } }\n",
+        // A THIS block only evaluates the entry scope in trigger context;
+        // as an effect container it must not constrain the entry either.
+        "this_opaque = { add_prestige = 1 THIS = { change_province_name = \"W\" } }\n",
+        // OR branches union: one satisfiable branch is enough, so the
+        // province-only and country-only limits of the two branches combine
+        // instead of clashing.
+        "or_union = { if = { limit = { OR = { is_capital = yes has_estate_privilege = some_priv } } add_prestige = 1 } }\n",
+        // An OR branch with no scope knowledge keeps the whole OR unconstrained.
+        "or_open = { if = { limit = { OR = { unknown_branch_key = yes is_capital = yes } } add_prestige = 1 } }\n",
+    );
+    std::fs::write(effects.join("00_contracts.txt"), body).expect("macro definitions");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    let definitions = DocumentId::new("file:///tmp/common/scripted_effects/00_contracts.txt");
+    host.open_document(
+        definitions.clone(),
+        1,
+        body.to_owned(),
+        Some(effects.join("00_contracts.txt")),
+    )
+    .expect("open definitions");
+    let snapshot = host.snapshot();
+    let all = diagnostics(&snapshot, &definitions);
+    let empty: Vec<&Diagnostic> = all
+        .iter()
+        .filter(|diagnostic| diagnostic.code == DiagnosticCode::EmptyScopeContract)
+        .collect();
+
+    let clash_offset = u32::try_from(body.find("clash = ").expect("clash")).expect("u32");
+    assert!(
+        empty.iter().any(|diagnostic| {
+            diagnostic.message.contains("`clash`")
+                && diagnostic.message.contains("empty inferred entry scope")
+                && diagnostic.range.start() == clash_offset
+        }),
+        "the country/province clash must be an error at the definition site: {empty:?}"
+    );
+    let via_offset = u32::try_from(body.find("via_callee = ").expect("via_callee")).expect("u32");
+    assert!(
+        empty
+            .iter()
+            .any(|diagnostic| diagnostic.range.start() == via_offset),
+        "an empty contract propagates through a same-kind callee: {empty:?}"
+    );
+    let empty_names: Vec<&str> = empty
+        .iter()
+        .map(|diagnostic| {
+            let start = usize::try_from(diagnostic.range.start()).expect("usize");
+            let end = usize::try_from(diagnostic.range.end()).expect("usize");
+            body[start..end].trim_end_matches(" =")
+        })
+        .collect();
+    assert_eq!(
+        empty_names,
+        vec!["clash", "via_callee"],
+        "only the two empty-contract definitions are reported: {all:?}"
+    );
+
+    // The inferred contracts behind those diagnostics, via the hover view.
+    use crate::macro_contracts::{ScopeContract, contract_hover_line, macro_contract};
+    assert_eq!(
+        macro_contract(&snapshot, "scripted_effect", "clash"),
+        Some(ScopeContract::Empty)
+    );
+    assert_eq!(
+        macro_contract(&snapshot, "scripted_effect", "fine"),
+        Some(ScopeContract::Scopes(vec!["country".to_owned()]))
+    );
+    assert_eq!(
+        macro_contract(&snapshot, "scripted_effect", "helper_province"),
+        Some(ScopeContract::Scopes(vec!["province".to_owned()]))
+    );
+    assert_eq!(
+        macro_contract(&snapshot, "scripted_effect", "root_opaque"),
+        Some(ScopeContract::Scopes(vec!["country".to_owned()])),
+        "ROOT blocks re-target the event root and must not narrow the entry"
+    );
+    assert_eq!(
+        macro_contract(&snapshot, "scripted_effect", "this_opaque"),
+        Some(ScopeContract::Scopes(vec!["country".to_owned()])),
+        "THIS effect blocks do not run in the entry scope"
+    );
+    assert_eq!(
+        macro_contract(&snapshot, "scripted_effect", "or_union"),
+        Some(ScopeContract::Scopes(vec!["country".to_owned()])),
+        "OR branches union, so the province branch does not clash with add_prestige"
+    );
+    assert_eq!(
+        macro_contract(&snapshot, "scripted_effect", "or_open"),
+        Some(ScopeContract::Scopes(vec!["country".to_owned()])),
+        "an unconstrained OR branch keeps the OR unconstrained"
+    );
+    let fine_hover = contract_hover_line(&snapshot, "scripted_effect", "fine");
+    assert!(
+        fine_hover.contains("Inferred entry scope: country"),
+        "hover states the narrowed contract: {fine_hover}"
+    );
+    let dispatch_hover = contract_hover_line(&snapshot, "scripted_effect", "dynamic_dispatch");
+    assert!(
+        dispatch_hover.contains("dynamic `$param$` dispatch"),
+        "hover flags dynamic dispatch: {dispatch_hover}"
+    );
+    assert!(
+        contract_hover_line(&snapshot, "scripted_effect", "clash")
+            .contains("definition can never run"),
+        "hover explains the empty contract"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn modifier_scope_mismatch_reports_cross_scope_modifier_applications() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-modifier-scope-{nonce}"));
+    let modifiers_dir = root.join("common/event_modifiers");
+    let events_dir = root.join("events");
+    std::fs::create_dir_all(&modifiers_dir).expect("modifier directory");
+    std::fs::create_dir_all(&events_dir).expect("events directory");
+    let modifiers = concat!(
+        "country_mod = { global_tax_modifier = 0.1 discipline = 0.05 }\n",
+        "province_mod = { local_unrest = -1 local_defensiveness = 0.2 }\n",
+        "mixed_mod = { global_tax_modifier = 0.1 local_unrest = -1 }\n",
+        "unscoped_mod = { monthly_militarized_society = 0.1 }\n",
+        "unit_mod = { land_morale_constant = 0.5 }\n",
+    );
+    std::fs::write(modifiers_dir.join("00_mods.txt"), modifiers).expect("modifier definitions");
+    let events = concat!(
+        "country_event = {\n",
+        "    id = test_event.1\n",
+        "    title = test_event.1.t\n",
+        "    option = { name = opt_bad_country\n",
+        "        add_province_modifier = { name = country_mod duration = 100 }\n",
+        "    }\n",
+        "    option = { name = opt_bad_province\n",
+        "        add_country_modifier = { name = province_mod duration = 100 }\n",
+        "    }\n",
+        "    option = { name = opt_ok\n",
+        "        add_country_modifier = { name = country_mod duration = 100 }\n",
+        "    }\n",
+        "    option = { name = opt_mixed\n",
+        "        add_permanent_province_modifier = { name = mixed_mod duration = -1 }\n",
+        "    }\n",
+        "    option = { name = opt_unknown\n",
+        "        add_country_modifier = { name = no_such_modifier duration = 100 }\n",
+        "    }\n",
+        "    option = { name = opt_unscoped\n",
+        "        add_country_modifier = { name = unscoped_mod duration = 100 }\n",
+        "    }\n",
+        "    option = { name = opt_unit_country\n",
+        "        add_country_modifier = { name = unit_mod duration = 100 }\n",
+        "    }\n",
+        "    option = { name = opt_unit_province\n",
+        "        add_province_modifier = { name = unit_mod duration = 100 }\n",
+        "    }\n",
+        "}\n",
+    );
+    std::fs::write(events_dir.join("test_events.txt"), events).expect("event document");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    // The call-site document is open as an overlay; the modifier definitions
+    // resolve through the scanned index.
+    let document = DocumentId::new("file:///tmp/events/test_events.txt");
+    host.open_document(
+        document.clone(),
+        1,
+        events.to_owned(),
+        Some(events_dir.join("test_events.txt")),
+    )
+    .expect("open events");
+    let snapshot = host.snapshot();
+    let all = diagnostics(&snapshot, &document);
+    let mismatches: Vec<&Diagnostic> = all
+        .iter()
+        .filter(|diagnostic| diagnostic.code == DiagnosticCode::ModifierScopeMismatch)
+        .collect();
+    assert_eq!(
+        mismatches.len(),
+        4,
+        "exactly the four cross-scope applications are reported: {all:?}"
+    );
+    // The country application of a unit-class modifier stays compatible and
+    // contributes no diagnostic.
+
+    // Locate the `name` value range; searching for the bare name would first
+    // hit the `province_mod` prefix inside `add_province_modifier`.
+    let offset = |name: &str| -> TextRange {
+        let needle = format!("= {name} ");
+        let position = events.find(&needle).unwrap_or_else(|| panic!("{name}"));
+        let start = u32::try_from(position + 2).expect("u32");
+        TextRange::new(start, start + u32::try_from(name.len()).expect("u32")).expect("range")
+    };
+    // Province-scoped effect applying country-class attributes: the game loads
+    // them, so the application is recorded at information severity.
+    let country_range = offset("country_mod");
+    let country_case = mismatches
+        .iter()
+        .find(|diagnostic| diagnostic.range == country_range)
+        .expect("info on the country_mod application");
+    assert_eq!(country_case.severity, Severity::Information);
+    assert_eq!(
+        country_case.message,
+        "modifier `country_mod` applies country-class attributes (global_tax_modifier, discipline) \
+         in province scope"
+    );
+    // Country-scoped effect applying province-class attributes: information.
+    let province_range = offset("province_mod");
+    let province_case = mismatches
+        .iter()
+        .find(|diagnostic| diagnostic.range == province_range)
+        .expect("info on the province_mod application");
+    assert_eq!(province_case.severity, Severity::Information);
+    assert_eq!(
+        province_case.message,
+        "modifier `province_mod` applies unexpected province-class attributes (local_unrest, \
+         local_defensiveness) in country scope"
+    );
+    // Mixed definition under a province effect still reports the country part.
+    let mixed_range = offset("mixed_mod");
+    let mixed_case = mismatches
+        .iter()
+        .find(|diagnostic| diagnostic.range == mixed_range)
+        .expect("info on the mixed_mod application");
+    assert_eq!(mixed_case.severity, Severity::Information);
+    assert!(mixed_case.message.contains("global_tax_modifier"));
+    assert!(!mixed_case.message.contains("local_unrest"));
+
+    // Unit-class attributes in a province application are unexpected and also
+    // reported at information severity; only the second `unit_mod` application
+    // (opt_unit_province) reports.
+    let first_unit = events.find("= unit_mod ").expect("first unit_mod");
+    let second_unit = events[first_unit + 1..]
+        .find("= unit_mod ")
+        .map(|position| first_unit + 1 + position)
+        .expect("second unit_mod");
+    let start = u32::try_from(second_unit + 2).expect("u32");
+    let unit_range = TextRange::new(start, start + u32::try_from("unit_mod".len()).expect("u32"))
+        .expect("range");
+    let unit_case = mismatches
+        .iter()
+        .find(|diagnostic| diagnostic.range == unit_range)
+        .expect("info on the province-side unit_mod application");
+    assert_eq!(unit_case.severity, Severity::Information);
+    assert_eq!(
+        unit_case.message,
+        "modifier `unit_mod` applies unexpected unit-class attributes (land_morale_constant) \
+         in province scope"
+    );
+
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn macro_call_sites_are_validated_against_entry_contracts() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-call-sites-{nonce}"));
+    let effects_dir = root.join("common/scripted_effects");
+    let events_dir = root.join("events");
+    std::fs::create_dir_all(&effects_dir).expect("effects directory");
+    std::fs::create_dir_all(&events_dir).expect("events directory");
+    let effects = concat!(
+        "country_helper = { add_prestige = 1 }\n",
+        "province_helper = { change_province_name = \"X\" }\n",
+        "unconstrained_helper = { custom_tooltip = some_tip }\n",
+    );
+    std::fs::write(effects_dir.join("00_effects.txt"), effects).expect("macro definitions");
+    let events = concat!(
+        "country_event = {\n",
+        "    id = call_site_test.1\n",
+        "    title = call_site_test.1.t\n",
+        "    option = { name = ok_country\n",
+        "        country_helper = yes\n",
+        "    }\n",
+        "}\n",
+        "country_event = {\n",
+        "    id = call_site_test.2\n",
+        "    title = call_site_test.2.t\n",
+        "    option = { name = bad_province_macro\n",
+        "        province_helper = yes\n",
+        "    }\n",
+        "}\n",
+        "country_event = {\n",
+        "    id = call_site_test.3\n",
+        "    title = call_site_test.3.t\n",
+        "    option = { name = ok_unconstrained\n",
+        "        unconstrained_helper = yes\n",
+        "    }\n",
+        "}\n",
+        "province_event = {\n",
+        "    id = call_site_test.4\n",
+        "    title = call_site_test.4.t\n",
+        "    option = { name = ok_province\n",
+        "        province_helper = yes\n",
+        "    }\n",
+        "}\n",
+        "province_event = {\n",
+        "    id = call_site_test.5\n",
+        "    title = call_site_test.5.t\n",
+        "    option = { name = bad_country_macro\n",
+        "        country_helper = yes\n",
+        "    }\n",
+        "}\n",
+    );
+    std::fs::write(events_dir.join("call_sites.txt"), events).expect("event document");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    let document = DocumentId::new("file:///tmp/events/call_sites.txt");
+    host.open_document(
+        document.clone(),
+        1,
+        events.to_owned(),
+        Some(events_dir.join("call_sites.txt")),
+    )
+    .expect("open events");
+    let snapshot = host.snapshot();
+    let all = diagnostics(&snapshot, &document);
+    let mismatches: Vec<&Diagnostic> = all
+        .iter()
+        .filter(|diagnostic| diagnostic.code == DiagnosticCode::MacroCallScopeMismatch)
+        .collect();
+    assert_eq!(
+        mismatches.len(),
+        2,
+        "only the two cross-scope macro calls are reported: {all:?}"
+    );
+
+    let key_after = |anchor: &str, key: &str| -> TextRange {
+        let anchor_at = events.find(anchor).unwrap_or_else(|| panic!("{anchor}"));
+        let key_at = anchor_at
+            + events[anchor_at..]
+                .find(key)
+                .unwrap_or_else(|| panic!("{key}"));
+        let start = u32::try_from(key_at).expect("u32");
+        TextRange::new(start, start + u32::try_from(key.len()).expect("u32")).expect("range")
+    };
+    let bad_country = key_after("bad_country_macro", "country_helper");
+    let bad_province = key_after("bad_province_macro", "province_helper");
+    let country_case = mismatches
+        .iter()
+        .find(|diagnostic| diagnostic.range == bad_country)
+        .expect("country_helper mismatch reported at its key");
+    assert_eq!(country_case.severity, Severity::Error);
+    assert_eq!(
+        country_case.message,
+        "scripted macro `country_helper` requires entry scope country but is called in `province` scope"
+    );
+    let province_case = mismatches
+        .iter()
+        .find(|diagnostic| diagnostic.range == bad_province)
+        .expect("province_helper mismatch reported at its key");
+    assert_eq!(
+        province_case.message,
+        "scripted macro `province_helper` requires entry scope province but is called in `country` scope"
+    );
+
+    std::fs::remove_dir_all(root).expect("cleanup");
 }

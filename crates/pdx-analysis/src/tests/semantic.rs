@@ -179,6 +179,7 @@ fn area_scope_transition_keeps_province_trigger_valid() {
         kind: "area".to_owned(),
         name_field: None,
         requires_value: false,
+        retain_attributes: false,
     });
     let mut host = AnalysisHost::with_profile(rules, profile);
     let root = std::env::temp_dir().join(format!(
@@ -407,6 +408,210 @@ fn semantic_alternative_selection_refuses_equal_scores() {
         .as_deref(),
         Some("left-alternative")
     );
+}
+
+#[test]
+fn first_party_alternatives_select_value_shape_by_current_scope() {
+    let host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let snapshot = host.snapshot();
+    let accepts =
+        |context: &str, key: &str, value: Option<&str>, block: bool, current_scope: &str| {
+            let property = crate::ScriptProperty {
+                key: std::sync::Arc::from(key),
+                key_range: TextRange::empty(0),
+                range: TextRange::empty(0),
+                operator: Some(std::sync::Arc::from("=")),
+                scalar: value.map(|value| {
+                    (
+                        std::sync::Arc::from(value),
+                        TextRange::empty(u32::try_from(key.len() + 3).expect("offset")),
+                    )
+                }),
+                quoted: false,
+                quoted_source: None,
+                block_range: block.then(|| TextRange::empty(0)),
+                block: Vec::new(),
+                bare_values: Vec::new(),
+            };
+            let mut scope = crate::ScopeContext::new(snapshot.game_profile_handle());
+            scope.root = std::sync::Arc::from(current_scope);
+            scope.current = std::sync::Arc::from(current_scope);
+            let candidates = snapshot
+                .rules()
+                .semantic_rules_for_context_key(context, key)
+                .filter(|rule| {
+                    rule.parent_path.is_empty()
+                        && crate::semantic::semantic_rule_key_matches(&snapshot, rule, &[], key)
+                })
+                .collect::<Vec<_>>();
+            candidates.into_iter().any(|rule| {
+                crate::semantic::semantic_scope_allows(rule, &scope)
+                    && crate::semantic::semantic_property_matches(
+                        &snapshot, rule, &property, &scope,
+                    )
+            })
+        };
+
+    // kill_leader is a country+province dual (cwtools-compare arbitration):
+    // both the block shape and the scalar spelling resolve in either scope.
+    assert!(accepts("effect", "kill_leader", None, true, "country"));
+    assert!(accepts(
+        "effect",
+        "kill_leader",
+        Some("general"),
+        false,
+        "country"
+    ));
+    assert!(accepts(
+        "effect",
+        "kill_leader",
+        Some("general"),
+        false,
+        "province"
+    ));
+    assert!(accepts("effect", "kill_leader", None, true, "province"));
+
+    // Absolute scope switches (emperor, enum[country_tags], global iterators,
+    // type addresses) are unrestricted: usable from any scope.
+    assert!(accepts("effect", "emperor", None, true, "country"));
+    assert!(accepts("effect", "emperor", None, true, "province"));
+    assert!(accepts("effect", "emperor", None, true, "unit"));
+    assert!(accepts(
+        "effect",
+        "emperor",
+        None,
+        true,
+        "mercenary_company"
+    ));
+    assert!(accepts("trigger", "emperor", None, true, "province"));
+    assert!(accepts(
+        "trigger",
+        "emperor",
+        None,
+        true,
+        "mercenary_company"
+    ));
+    assert!(accepts("effect", "every_country", None, true, "unit"));
+    assert!(accepts("trigger", "any_province", None, true, "country"));
+    // every_owned_province is a country+province dual (cwtools-compare
+    // arbitration): unit scope no longer accepts it.
+    assert!(accepts(
+        "effect",
+        "every_owned_province",
+        None,
+        true,
+        "country"
+    ));
+    assert!(accepts(
+        "effect",
+        "every_owned_province",
+        None,
+        true,
+        "province"
+    ));
+    assert!(!accepts(
+        "effect",
+        "every_owned_province",
+        None,
+        true,
+        "unit"
+    ));
+
+    // All estate_loyalty variants are country-scope only.
+    assert!(accepts("trigger", "estate_loyalty", None, true, "country"));
+    assert!(!accepts(
+        "trigger",
+        "estate_loyalty",
+        None,
+        true,
+        "province"
+    ));
+
+    // change_national_focus accepts the `none` spelling in country scope only.
+    assert!(accepts(
+        "effect",
+        "change_national_focus",
+        Some("none"),
+        false,
+        "country"
+    ));
+    assert!(!accepts(
+        "effect",
+        "change_national_focus",
+        Some("none"),
+        false,
+        "province"
+    ));
+
+    // trade_range is province-class; trade-node contexts accept it through the
+    // one-way trade_node→province compatibility, not by declaration.
+    assert!(accepts(
+        "trigger",
+        "trade_range",
+        Some("owner"),
+        false,
+        "province"
+    ));
+    assert!(accepts(
+        "trigger",
+        "trade_range",
+        Some("owner"),
+        false,
+        "trade_node"
+    ));
+    assert!(!accepts(
+        "trigger",
+        "trade_range",
+        Some("owner"),
+        false,
+        "country"
+    ));
+    assert!(accepts(
+        "trigger",
+        "same_continent",
+        Some("owner"),
+        false,
+        "country"
+    ));
+    assert!(accepts(
+        "trigger",
+        "same_continent",
+        Some("capital_scope"),
+        false,
+        "province"
+    ));
+
+    assert!(accepts(
+        "trigger",
+        "has_discovered",
+        Some("capital_scope"),
+        false,
+        "country"
+    ));
+    // Value-shape selection no longer gates on current scope for the flattened
+    // country+province groups: ROOT resolves to a country and now matches the
+    // former province-side alternative in both scopes.
+    assert!(accepts(
+        "trigger",
+        "has_discovered",
+        Some("ROOT"),
+        false,
+        "country"
+    ));
+    assert!(accepts(
+        "trigger",
+        "has_discovered",
+        Some("owner"),
+        false,
+        "province"
+    ));
+    assert!(accepts(
+        "trigger",
+        "has_discovered",
+        Some("ROOT"),
+        false,
+        "province"
+    ));
 }
 
 #[test]

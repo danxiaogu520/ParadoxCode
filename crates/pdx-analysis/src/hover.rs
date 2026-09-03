@@ -679,7 +679,14 @@ pub(crate) fn hover_for_symbol(
                 ));
             }
             if let Some(summary) = macro_definition_summary(snapshot, kind, name) {
-                sections.push(macro_signature_hover(&summary));
+                let mut signature = macro_signature_hover(&summary);
+                if crate::semantic::scripted_macro_type(snapshot, kind) {
+                    signature.push('\n');
+                    signature.push_str(&crate::macro_contracts::contract_hover_line(
+                        snapshot, kind, name,
+                    ));
+                }
+                sections.push(signature);
             }
         } else {
             // Ambiguous symbols still deserve a preview when any candidate carries localisation

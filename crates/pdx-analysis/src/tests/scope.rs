@@ -266,7 +266,7 @@ fn eu4_replace_scope_links_populate_from_intrinsics() {
 }
 
 #[test]
-fn scripted_macro_expansion_uses_the_callers_nested_scope() {
+fn scripted_macro_scope_mismatch_surfaces_at_the_call_site() {
     use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
     use std::fs;
 
@@ -351,23 +351,29 @@ fn scripted_macro_expansion_uses_the_callers_nested_scope() {
         .expect("open calls");
 
     let results = diagnostics(&host.snapshot(), &id);
-    let wrong_scope = results
+    // Scope authority for expansion trees sits with the macro-contract layer:
+    // the nested call in province scope is reported once, at the call site,
+    // instead of once per offending statement inside the expansion.
+    let call_site = results
         .iter()
-        .filter(|diagnostic| {
-            diagnostic.code == DiagnosticCode::RuleWrongScope
-                && diagnostic.message.contains("fixture_country_only")
-        })
+        .filter(|diagnostic| diagnostic.code == DiagnosticCode::MacroCallScopeMismatch)
         .collect::<Vec<_>>();
-    assert_eq!(wrong_scope.len(), 1, "{results:?}");
-    assert!(
-        wrong_scope[0]
-            .message
-            .contains("in expansion of `country_wrapper`")
-    );
+    assert_eq!(call_site.len(), 1, "{results:?}");
     let nested_call = source.rfind("country_wrapper").expect("nested macro call");
     assert_eq!(
-        wrong_scope[0].range.start(),
+        call_site[0].range.start(),
         u32::try_from(nested_call).expect("call range")
+    );
+    assert_eq!(
+        call_site[0].message,
+        "scripted macro `country_wrapper` requires entry scope country but is called in `province` scope"
+    );
+    assert!(
+        results.iter().all(
+            |diagnostic| !(diagnostic.code == DiagnosticCode::RuleWrongScope
+                && diagnostic.message.contains("fixture_country_only"))
+        ),
+        "the expansion walk no longer reports scope findings: {results:?}"
     );
     fs::remove_dir_all(root).expect("cleanup");
 }

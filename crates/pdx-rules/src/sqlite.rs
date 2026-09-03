@@ -92,6 +92,7 @@ fn schema(connection: &Connection) -> Result<(), RulesError> {
             type_key_filter TEXT NOT NULL DEFAULT '',
             type_key_filter_negate INTEGER NOT NULL DEFAULT 0,
             root_entries TEXT,
+            body_context TEXT,
             scripted_macro_body_context TEXT,
             scripted_macro_enabled INTEGER NOT NULL DEFAULT 0,
             scripted_macro_replacement INTEGER NOT NULL DEFAULT 0,
@@ -355,7 +356,7 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
     for (type_name, descriptor) in &rules.model.semantic.type_descriptors {
         let scripted_macro = descriptor.scripted_macro.as_ref();
         transaction.execute(
-            "INSERT INTO type_descriptors(type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate, root_entries, scripted_macro_body_context, scripted_macro_enabled, scripted_macro_replacement, scripted_macro_condition, scripted_macro_dynamic_key, scripted_macro_opaque_text) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
+            "INSERT INTO type_descriptors(type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate, root_entries, body_context, scripted_macro_body_context, scripted_macro_enabled, scripted_macro_replacement, scripted_macro_condition, scripted_macro_dynamic_key, scripted_macro_opaque_text) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
             params![
                 type_name,
                 descriptor.path,
@@ -380,6 +381,7 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
                     descriptor.type_key_filter.as_ref().is_some_and(|(_, negate)| *negate),
                 ),
                 descriptor.root_entries,
+                descriptor.body_context,
                 scripted_macro.map(|value| value.body_context.as_str()),
                 i64::from(scripted_macro.is_some_and(|value| value.macro_enabled)),
                 i64::from(scripted_macro.is_some_and(|value| value.usage.replacement)),
@@ -755,7 +757,7 @@ fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesEr
         "NULL, 0, 0, 0, 0, 0"
     };
     let descriptor_query = format!(
-        "SELECT type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate, root_entries, {scripted_macro_columns} FROM type_descriptors ORDER BY type_name"
+        "SELECT type_name, path, path_file, path_extension, path_strict, type_per_file, skip_root_keys, name_field, name_from_file, starts_with, type_key_filter, type_key_filter_negate, root_entries, body_context, {scripted_macro_columns} FROM type_descriptors ORDER BY type_name"
     );
     let mut statement = connection.prepare(&descriptor_query)?;
     let rows = statement.query_map([], |row| {
@@ -763,12 +765,12 @@ fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesEr
         let skip_root_paths: String = row.get(6)?;
         let type_key_filter: String = row.get(10)?;
         let type_key_filter_negate: bool = row.get::<_, i64>(11)? != 0;
-        let scripted_macro_body_context: Option<String> = row.get(13)?;
-        let scripted_macro_enabled: bool = row.get::<_, i64>(14)? != 0;
-        let scripted_macro_replacement: bool = row.get::<_, i64>(15)? != 0;
-        let scripted_macro_condition: bool = row.get::<_, i64>(16)? != 0;
-        let scripted_macro_dynamic_key: bool = row.get::<_, i64>(17)? != 0;
-        let scripted_macro_opaque_text: bool = row.get::<_, i64>(18)? != 0;
+        let scripted_macro_body_context: Option<String> = row.get(14)?;
+        let scripted_macro_enabled: bool = row.get::<_, i64>(15)? != 0;
+        let scripted_macro_replacement: bool = row.get::<_, i64>(16)? != 0;
+        let scripted_macro_condition: bool = row.get::<_, i64>(17)? != 0;
+        let scripted_macro_dynamic_key: bool = row.get::<_, i64>(18)? != 0;
+        let scripted_macro_opaque_text: bool = row.get::<_, i64>(19)? != 0;
         Ok(TypeDescriptor {
             name: type_name.clone(),
             path: row.get(1)?,
@@ -788,6 +790,7 @@ fn read_semantic_model(connection: &Connection) -> Result<SemanticModel, RulesEr
             name_from_file: row.get::<_, i64>(8)? != 0,
             starts_with: row.get(9)?,
             root_entries: row.get(12)?,
+            body_context: row.get(13)?,
             type_key_filter: if type_key_filter.is_empty() {
                 None
             } else {

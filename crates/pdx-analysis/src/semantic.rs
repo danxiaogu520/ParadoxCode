@@ -75,7 +75,7 @@ thread_local! {
 }
 
 /// Probes the snapshot query cache with a key assembled from `parts` without allocating.
-fn probe_query_cache<T: Send + Sync + 'static>(
+pub(crate) fn probe_query_cache<T: Send + Sync + 'static>(
     snapshot: &AnalysisSnapshot,
     revision: u64,
     parts: &[&str],
@@ -1750,8 +1750,14 @@ pub(crate) fn semantic_property_matches(
         rule.value,
         ValueMatcher::Int { .. } | ValueMatcher::Float { .. }
     ) && scope_member(snapshot, None, value, scope_context))
+        // A type literal may still be supplied through a runtime-dynamic target or an
+        // untracked register. A statically known scope must instead match an explicit
+        // `scope[...]` alternative, so a country ROOT cannot satisfy `<province_id>`.
         || (matches!(rule.value, ValueMatcher::Type(_))
-            && scope_member(snapshot, None, value, scope_context))
+            && matches!(
+                resolve_scope_member(snapshot, value, scope_context),
+                ScopeResolution::Dynamic | ScopeResolution::Unresolved
+            ))
 }
 
 /// Classification used by diagnostics when a rule's value matcher is scope-based.
@@ -2862,6 +2868,34 @@ pub(crate) fn resolve_scope_member(
         };
     }
     let lowered = member.to_ascii_lowercase().replace('_', "");
+    let register_scope = if lowered == "root" {
+        Some(context.root.as_ref())
+    } else if lowered == "this" {
+        Some(context.current.as_ref())
+    } else if let Some(depth) = repeated_scope_register_depth(&lowered, "from") {
+        let Some(scope) = context.from.get(depth) else {
+            // FROM registers are not tracked in every context; an unknown register is a
+            // legitimate scope reference that the analysis cannot disprove.
+            return ScopeResolution::Unresolved;
+        };
+        Some(scope.as_ref())
+    } else if let Some(depth) = repeated_scope_register_depth(&lowered, "previous")
+        .or_else(|| repeated_scope_register_depth(&lowered, "prev"))
+    {
+        let Some(scope) = context.previous.get(depth) else {
+            // PREV registers are not tracked in every context; an unknown register is a
+            // legitimate scope reference that the analysis cannot disprove.
+            return ScopeResolution::Unresolved;
+        };
+        Some(scope.as_ref())
+    } else {
+        None
+    };
+    if let Some(scope) = register_scope {
+        return ScopeResolution::Known {
+            scope: intern_shard_string(scope),
+        };
+    }
     if let Some(destination) = snapshot
         .rules()
         .exact_semantic_rules(member)
@@ -2875,24 +2909,7 @@ pub(crate) fn resolve_scope_member(
             scope: intern_shard_string(destination),
         };
     }
-    let resolved = if lowered == "root" {
-        Some(context.root.as_ref())
-    } else if lowered == "this" {
-        Some(context.current.as_ref())
-    } else if let Some(depth) = repeated_scope_register_depth(&lowered, "from") {
-        context.from.get(depth).map(|value| value.as_ref())
-    } else if let Some(depth) = repeated_scope_register_depth(&lowered, "previous")
-        .or_else(|| repeated_scope_register_depth(&lowered, "prev"))
-    {
-        context.previous.get(depth).map(|value| value.as_ref())
-    } else {
-        Some(member)
-    };
-    let Some(resolved) = resolved else {
-        // FROM/PREV registers are not tracked in every context; an unknown register is
-        // a legitimate scope reference that the analysis cannot disprove.
-        return ScopeResolution::Unresolved;
-    };
+    let resolved = member;
     if !context.profile.is_scope(resolved) {
         // Country tags are valid scope references, e.g. `who = TRP`.
         return if context.profile.enum_extra_member("country_tags", member)

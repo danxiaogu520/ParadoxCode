@@ -16,7 +16,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -40,7 +42,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -64,7 +68,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -88,7 +94,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -114,7 +122,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -140,7 +150,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -166,7 +178,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -190,7 +204,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -214,7 +230,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -240,7 +258,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -266,7 +286,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -292,7 +314,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -318,7 +342,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -344,7 +370,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -370,7 +398,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -396,7 +426,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -422,7 +454,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -446,7 +480,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -470,7 +506,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -496,7 +534,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -522,7 +562,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -546,7 +588,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -572,7 +616,9 @@
     "severity": 2,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -598,7 +644,9 @@
     "documentation": [
       "If yes, every country will be notified which options are selected."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -624,7 +672,9 @@
     "documentation": [
       "Only displays the event to country validating the trigger"
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -648,7 +698,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -674,7 +726,9 @@
     "severity": 2,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -702,7 +756,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -726,7 +782,9 @@
     "severity": 3,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -750,7 +808,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -781,7 +841,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -805,7 +867,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -833,7 +897,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -857,7 +923,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -886,7 +954,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -910,7 +980,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -934,7 +1006,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -960,7 +1034,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -986,7 +1062,9 @@
     "severity": 2,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1014,7 +1092,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1042,7 +1122,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1070,7 +1152,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1098,7 +1182,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1122,7 +1208,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -1150,7 +1238,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1176,7 +1266,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1208,7 +1300,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -1234,7 +1328,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1262,7 +1358,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1290,7 +1388,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1314,7 +1414,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -1338,7 +1440,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1364,7 +1468,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": null,
@@ -1393,7 +1499,9 @@
     "documentation": [
       "Scope-based event camera target."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1424,7 +1532,9 @@
     "documentation": [
       "Scope-based event option camera target."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1451,7 +1561,9 @@
     "documentation": [
       "Country event block; repeatable within one file."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1478,7 +1590,9 @@
     "documentation": [
       "Province event block; repeatable within one file."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1505,7 +1619,9 @@
     "documentation": [
       "Event id namespace; declared at most once per file."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1532,7 +1648,9 @@
     "documentation": [
       "Restrict events to normal or historical nations."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "any"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,

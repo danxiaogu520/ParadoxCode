@@ -18,7 +18,9 @@
     "documentation": [
       "Will affect Janissary regiments if CoC DLC is available, otherwise used as a country modifier."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -46,7 +48,9 @@
     "documentation": [
       "Will affect Rajput regiments if Dharma DLC is available, otherwise used as a country modifier."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -75,7 +79,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -104,7 +110,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -133,7 +141,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -162,7 +172,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -191,7 +203,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -220,7 +234,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -249,7 +265,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -278,7 +296,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -307,7 +327,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -336,7 +358,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -365,7 +389,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -394,7 +420,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -423,7 +451,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -452,7 +482,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -481,7 +513,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -510,7 +544,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -539,7 +575,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -568,7 +606,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -597,7 +637,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -626,7 +668,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -655,7 +699,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -684,7 +730,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -713,7 +761,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -742,7 +792,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -771,7 +823,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -800,7 +854,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -829,7 +885,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -858,7 +916,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -887,7 +947,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -916,7 +978,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -945,7 +1009,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -974,7 +1040,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1003,7 +1071,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1032,7 +1102,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1061,7 +1133,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1090,7 +1164,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1119,7 +1195,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1148,7 +1226,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1177,7 +1257,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1206,7 +1288,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1235,7 +1319,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1264,7 +1350,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1293,7 +1381,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1322,7 +1412,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1351,7 +1443,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1380,7 +1474,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1409,7 +1505,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1438,7 +1536,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1467,7 +1567,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1496,7 +1598,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1525,7 +1629,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1554,7 +1660,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1583,7 +1691,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1612,7 +1722,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1641,7 +1753,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1670,7 +1784,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1699,7 +1815,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1728,7 +1846,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1757,7 +1877,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1786,7 +1908,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1815,7 +1939,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1844,7 +1970,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1873,7 +2001,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1902,7 +2032,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1931,7 +2063,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1960,7 +2094,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -1989,7 +2125,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2018,7 +2156,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2047,7 +2187,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2076,7 +2218,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2105,7 +2249,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2134,7 +2280,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2163,7 +2311,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2192,7 +2342,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2221,7 +2373,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2250,7 +2404,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2279,7 +2435,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2308,7 +2466,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2337,7 +2497,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2366,7 +2528,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2395,7 +2559,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2424,7 +2590,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2453,7 +2621,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2482,7 +2652,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2511,7 +2683,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2540,7 +2714,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2569,7 +2745,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2598,7 +2776,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2627,7 +2807,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2656,7 +2838,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2685,7 +2869,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2714,7 +2900,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2743,7 +2931,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2772,7 +2962,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2801,7 +2993,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2830,7 +3024,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2859,7 +3055,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2888,7 +3086,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2917,7 +3117,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2946,7 +3148,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -2975,7 +3179,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3004,7 +3210,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3033,7 +3241,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3062,7 +3272,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3091,7 +3303,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3120,7 +3334,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3149,7 +3365,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3178,7 +3396,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3207,7 +3427,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3236,7 +3458,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3265,7 +3489,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3294,7 +3520,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3323,7 +3551,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3352,7 +3582,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3381,7 +3613,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3410,7 +3644,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3439,7 +3675,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3468,7 +3706,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3497,7 +3737,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3526,7 +3768,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3555,7 +3799,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3584,7 +3830,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3613,7 +3861,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3642,7 +3892,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3671,7 +3923,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3700,7 +3954,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3729,7 +3985,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3758,7 +4016,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3787,7 +4047,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3816,7 +4078,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3845,7 +4109,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3874,7 +4140,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3903,7 +4171,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3932,7 +4202,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3961,7 +4233,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -3990,7 +4264,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4019,7 +4295,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4048,7 +4326,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4077,7 +4357,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4106,7 +4388,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4135,7 +4419,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4164,7 +4450,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4193,7 +4481,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4222,7 +4512,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4251,7 +4543,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4280,7 +4574,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4309,7 +4605,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4338,7 +4636,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4367,7 +4667,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4396,7 +4698,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4425,7 +4729,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4454,7 +4760,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4483,7 +4791,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4512,7 +4822,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4541,7 +4853,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4570,7 +4884,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4599,7 +4915,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4628,7 +4946,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4657,7 +4977,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4686,7 +5008,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4715,7 +5039,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4744,7 +5070,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4773,7 +5101,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4802,7 +5132,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4831,7 +5163,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4860,7 +5194,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4889,7 +5225,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4918,7 +5256,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4947,7 +5287,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -4976,7 +5318,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5005,7 +5349,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5034,7 +5380,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5063,7 +5411,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5092,7 +5442,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5121,7 +5473,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5150,7 +5504,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5179,7 +5535,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5208,7 +5566,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5237,7 +5597,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5266,7 +5628,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5295,7 +5659,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5324,7 +5690,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5353,7 +5721,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5382,7 +5752,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5411,7 +5783,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5440,7 +5814,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5469,7 +5845,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5498,7 +5876,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5527,7 +5907,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5556,7 +5938,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5585,7 +5969,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5614,7 +6000,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5643,7 +6031,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5672,7 +6062,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5701,7 +6093,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5730,7 +6124,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5759,7 +6155,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5788,7 +6186,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5817,7 +6217,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5846,7 +6248,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5875,7 +6279,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5904,7 +6310,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5933,7 +6341,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5962,7 +6372,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -5991,7 +6403,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6020,7 +6434,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6049,7 +6465,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6078,7 +6496,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6107,7 +6527,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6136,7 +6558,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6165,7 +6589,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6194,7 +6620,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6223,7 +6651,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6252,7 +6682,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6281,7 +6713,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6310,7 +6744,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6339,7 +6775,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6368,7 +6806,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6397,7 +6837,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6426,7 +6868,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6455,7 +6899,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6484,7 +6930,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6513,7 +6961,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6542,7 +6992,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6571,7 +7023,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6600,7 +7054,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6629,7 +7085,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6658,7 +7116,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6687,7 +7147,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6716,7 +7178,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6745,7 +7209,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6774,7 +7240,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6803,7 +7271,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6832,7 +7302,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6861,7 +7333,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6890,7 +7364,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6919,7 +7395,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6948,7 +7426,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -6977,7 +7457,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7006,7 +7488,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7035,7 +7519,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7064,7 +7550,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7093,7 +7581,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7122,7 +7612,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7151,7 +7643,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7180,7 +7674,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7209,7 +7705,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7238,7 +7736,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7267,7 +7767,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7296,7 +7798,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7325,7 +7829,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7354,7 +7860,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7383,7 +7891,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7412,7 +7922,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7441,7 +7953,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7470,7 +7984,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7499,7 +8015,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7528,7 +8046,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7557,7 +8077,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7586,7 +8108,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7615,7 +8139,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7644,7 +8170,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7673,7 +8201,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7702,7 +8232,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7731,7 +8263,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7760,7 +8294,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7789,7 +8325,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7818,7 +8356,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7847,7 +8387,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7876,7 +8418,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7905,7 +8449,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7934,7 +8480,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7963,7 +8511,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -7992,7 +8542,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8021,7 +8573,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8050,7 +8604,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8079,7 +8635,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8108,7 +8666,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8137,7 +8697,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8166,7 +8728,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8195,7 +8759,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8224,7 +8790,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8253,7 +8821,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8282,7 +8852,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8311,7 +8883,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8340,7 +8914,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8369,7 +8945,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8398,7 +8976,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8427,7 +9007,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8456,7 +9038,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8485,7 +9069,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8514,7 +9100,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8543,7 +9131,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8572,7 +9162,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8601,7 +9193,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8630,7 +9224,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8659,7 +9255,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8688,7 +9286,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8717,7 +9317,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8746,7 +9348,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8775,7 +9379,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8804,7 +9410,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8833,7 +9441,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8862,7 +9472,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8891,7 +9503,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8920,7 +9534,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8949,7 +9565,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -8978,7 +9596,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9007,7 +9627,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9036,7 +9658,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9065,7 +9689,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9094,7 +9720,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9123,7 +9751,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9152,7 +9782,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9181,7 +9813,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9210,7 +9844,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9239,7 +9875,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9268,7 +9906,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9297,7 +9937,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9326,7 +9968,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9355,7 +9999,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9384,7 +10030,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9413,7 +10061,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9442,7 +10092,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9471,7 +10123,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9500,7 +10154,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9529,7 +10185,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9558,7 +10216,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9587,7 +10247,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9616,7 +10278,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9645,7 +10309,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9674,7 +10340,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9703,7 +10371,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9732,7 +10402,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9761,7 +10433,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9790,7 +10464,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9819,7 +10495,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9848,7 +10526,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9877,7 +10557,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9906,7 +10588,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9935,7 +10619,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9964,7 +10650,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -9993,7 +10681,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10022,7 +10712,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10051,7 +10743,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10080,7 +10774,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10109,7 +10805,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10138,7 +10836,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10167,7 +10867,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10196,7 +10898,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10225,7 +10929,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10254,7 +10960,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10283,7 +10991,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10312,7 +11022,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10341,7 +11053,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10370,7 +11084,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10399,7 +11115,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10428,7 +11146,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10457,7 +11177,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10486,7 +11208,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10515,7 +11239,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10544,7 +11270,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10573,7 +11301,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10602,7 +11332,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10631,7 +11363,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10660,7 +11394,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10689,7 +11425,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10718,7 +11456,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10747,7 +11487,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10776,7 +11518,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10805,7 +11549,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10834,7 +11580,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10863,7 +11611,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10892,7 +11642,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10921,7 +11673,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10950,7 +11704,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -10979,7 +11735,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11008,7 +11766,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11037,7 +11797,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11066,7 +11828,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11095,7 +11859,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11124,7 +11890,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11153,7 +11921,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11182,7 +11952,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11302,7 +12074,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11641,7 +12415,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -11702,7 +12478,7 @@
     "required": false,
     "documentation": [],
     "allowed_scopes": [
-      "country"
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -11980,7 +12756,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -12328,7 +13106,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -12684,7 +13464,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -13043,7 +13825,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -13072,7 +13856,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -13431,7 +14217,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -13777,7 +14565,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -14116,7 +14906,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -14455,7 +15247,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -14608,7 +15402,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14637,7 +15433,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14661,7 +15459,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14685,7 +15485,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14709,7 +15511,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14738,7 +15542,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14767,7 +15573,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -14796,7 +15604,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14820,7 +15630,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14844,7 +15656,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14868,7 +15682,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14897,7 +15713,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14926,7 +15744,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14955,7 +15775,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -14984,7 +15806,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15008,7 +15832,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15037,7 +15863,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15066,7 +15894,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -15095,7 +15925,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15124,7 +15956,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15153,7 +15987,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15182,7 +16018,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15211,7 +16049,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15240,7 +16080,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15269,7 +16111,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15293,7 +16137,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15322,7 +16168,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15351,7 +16199,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15380,7 +16230,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -15409,7 +16261,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15438,7 +16292,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15467,7 +16323,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15496,7 +16354,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15520,7 +16380,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15544,7 +16406,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15568,7 +16432,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15592,7 +16458,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 1,
@@ -15681,7 +16549,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -16034,7 +16904,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -16385,7 +17257,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -16414,7 +17288,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -16770,7 +17646,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -17129,7 +18007,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -17488,7 +18368,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -17835,7 +18717,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -18160,7 +19044,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -18487,7 +19373,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -18832,7 +19720,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -19171,7 +20061,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -19512,7 +20404,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -19843,7 +20737,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -19872,7 +20768,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -20023,7 +20921,6 @@
     "required": false,
     "documentation": [],
     "allowed_scopes": [
-      "country",
       "unit"
     ],
     "push_scope": null,
@@ -20209,7 +21106,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -20548,7 +21447,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -20637,7 +21538,6 @@
     "required": false,
     "documentation": [],
     "allowed_scopes": [
-      "country",
       "unit"
     ],
     "push_scope": null,
@@ -20669,7 +21569,6 @@
     "required": false,
     "documentation": [],
     "allowed_scopes": [
-      "country",
       "unit"
     ],
     "push_scope": null,
@@ -20726,7 +21625,6 @@
     "required": false,
     "documentation": [],
     "allowed_scopes": [
-      "country",
       "unit"
     ],
     "push_scope": null,
@@ -20820,7 +21718,6 @@
     "required": false,
     "documentation": [],
     "allowed_scopes": [
-      "country",
       "unit"
     ],
     "push_scope": null,
@@ -20882,7 +21779,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -21221,7 +22120,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -21468,7 +22369,6 @@
     "required": false,
     "documentation": [],
     "allowed_scopes": [
-      "country",
       "unit"
     ],
     "push_scope": null,
@@ -21561,7 +22461,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -21900,7 +22802,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -22227,7 +23131,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -22542,7 +23448,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -22851,7 +23759,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -23178,7 +24088,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -23207,7 +24119,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -23546,7 +24460,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -23855,7 +24771,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -24159,7 +25077,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -24480,7 +25400,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -24799,7 +25721,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -24890,7 +25814,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -24919,7 +25845,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -24948,7 +25876,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -24977,7 +25907,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25006,7 +25938,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25035,7 +25969,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25064,7 +26000,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25093,7 +26031,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25122,7 +26062,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25151,7 +26093,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25180,7 +26124,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25209,7 +26155,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25238,7 +26186,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25267,7 +26217,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25296,7 +26248,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25325,7 +26279,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "province"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25354,7 +26310,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25383,7 +26341,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25412,7 +26372,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25441,7 +26403,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25470,7 +26434,9 @@
     "severity": null,
     "required": false,
     "documentation": [],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25502,7 +26468,9 @@
     "documentation": [
       "Monthly Asha Vahishta government mechanic power modifier."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
@@ -25534,7 +26502,9 @@
     "documentation": [
       "Numeric EU4 modifier keys exported by the current Vanilla game version."
     ],
-    "allowed_scopes": [],
+    "allowed_scopes": [
+      "country"
+    ],
     "push_scope": null,
     "replace_scope": [],
     "min_occurs": 0,
