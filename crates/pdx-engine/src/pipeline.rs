@@ -424,6 +424,7 @@ pub(crate) fn build_file_state_with_cache(
                 references: Vec::new(),
                 macro_definitions: Vec::new(),
                 definition_attributes: Vec::new(),
+                flag_writes: Vec::new(),
                 syntax_error_count: 0,
             }),
             cached_localisation_previews: None,
@@ -447,6 +448,7 @@ pub(crate) fn build_file_state_with_cache(
             references: Vec::new(),
             macro_definitions: Vec::new(),
             definition_attributes: Vec::new(),
+            flag_writes: Vec::new(),
             syntax_error_count: parsed.errors().len(),
         },
         (None, _) => FileIndexShard {
@@ -455,6 +457,7 @@ pub(crate) fn build_file_state_with_cache(
             references: Vec::new(),
             macro_definitions: Vec::new(),
             definition_attributes: Vec::new(),
+            flag_writes: Vec::new(),
             syntax_error_count: 0,
         },
     };
@@ -493,6 +496,7 @@ pub(crate) fn empty_file_state(file: &SourceFile, revision: u64) -> FileState {
             references: Vec::new(),
             macro_definitions: Vec::new(),
             definition_attributes: Vec::new(),
+            flag_writes: Vec::new(),
             syntax_error_count: 0,
         }),
         cached_localisation_previews: None,
@@ -532,6 +536,8 @@ fn shard_from_parsed(
     // growth doubling does not leave ~2x slack per file.
     definitions.shrink_to_fit();
     references.shrink_to_fit();
+    let mut flag_writes = collect_flag_writes(hir, rules);
+    flag_writes.shrink_to_fit();
     let macro_definitions = collect_macro_definitions(hir, rules);
     FileIndexShard {
         file_id: file.id,
@@ -539,8 +545,33 @@ fn shard_from_parsed(
         references,
         macro_definitions,
         definition_attributes: hir.definition_attributes().to_vec(),
+        flag_writes,
         syntax_error_count: parsed.errors().len(),
     }
+}
+
+/// Collects `dynamic_set` write sites (`set_country_flag = name`) from the
+/// flattened HIR property list. Names keep `$param$` fragments verbatim; the
+/// index interprets them as reachability patterns.
+fn collect_flag_writes(hir: &HirFile, rules: &RuleSet) -> Vec<crate::index::FlagWrite> {
+    let mut writes = Vec::new();
+    for property in hir.properties() {
+        let Some(kind) = rules.dynamic_write_kind(&property.key) else {
+            continue;
+        };
+        let Some(scalar) = &property.scalar else {
+            continue;
+        };
+        if scalar.value.is_empty() {
+            continue;
+        }
+        writes.push(crate::index::FlagWrite {
+            kind: crate::string_pool::intern_shard_string(kind),
+            name: crate::string_pool::intern_shard_string(&scalar.value),
+            range: scalar.range,
+        });
+    }
+    writes
 }
 
 fn collect_macro_definitions(hir: &HirFile, rules: &RuleSet) -> Vec<MacroDefinitionSummary> {

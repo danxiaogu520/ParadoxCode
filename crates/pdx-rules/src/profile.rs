@@ -369,6 +369,19 @@ pub struct GameProfile {
     pub dynamic_value_prefixes: Vec<String>,
     /// Dynamic value kinds that cannot be proven complete from workspace declarations.
     pub open_world_value_kinds: Vec<String>,
+    /// Dynamic value kinds whose membership is decidable: a name is legal when
+    /// an indexed write site, an open overlay write, or an engine seed can
+    /// produce it, and rejected otherwise. Write keys exist for other kinds
+    /// too (for example `save_event_target_as`), but those stay under the
+    /// open-world/enum resolution above.
+    #[serde(default)]
+    pub closed_dynamic_kinds: Vec<String>,
+    /// Members a dynamic value kind acquires from the engine itself: names the
+    /// game reads although no scanned script statement ever writes them
+    /// (for example EU4's hardcoded consort flags). Keyed by kind, folded on
+    /// lookup.
+    #[serde(default)]
+    pub engine_set_flags: BTreeMap<String, Vec<String>>,
     /// semantic type/enum spellings mapped to workspace symbol kinds.
     pub member_kind_aliases: BTreeMap<String, String>,
     /// Value kinds whose member lookups also try a suffixed spelling.
@@ -574,6 +587,8 @@ impl GameProfile {
             dynamic_scope_prefixes: Vec::new(),
             dynamic_value_prefixes: Vec::new(),
             open_world_value_kinds: Vec::new(),
+            engine_set_flags: BTreeMap::new(),
+            closed_dynamic_kinds: Vec::new(),
             member_kind_aliases: BTreeMap::new(),
             member_name_suffixes: Vec::new(),
             fallback_keys: Vec::new(),
@@ -687,6 +702,35 @@ impl GameProfile {
     pub fn is_open_world_value_kind(&self, kind: &str) -> bool {
         self.open_world_value_kinds
             .iter()
+            .any(|candidate| candidate.eq_ignore_ascii_case(kind))
+    }
+
+    /// Returns whether a dynamic kind's membership is decidable from write
+    /// sites plus engine seeds, making unknown names an error.
+    #[must_use]
+    pub fn is_closed_dynamic_kind(&self, kind: &str) -> bool {
+        self.closed_dynamic_kinds
+            .iter()
+            .any(|candidate| candidate.eq_ignore_ascii_case(kind))
+    }
+
+    /// Returns whether the engine itself defines this member of a dynamic
+    /// value kind, making a read of it legal without any script write.
+    #[must_use]
+    pub fn is_engine_set_flag(&self, kind: &str, member: &str) -> bool {
+        self.engine_set_flags
+            .iter()
+            .find(|(candidate, _)| candidate.eq_ignore_ascii_case(kind))
+            .is_some_and(|(_, members)| {
+                members.iter().any(|name| name.eq_ignore_ascii_case(member))
+            })
+    }
+
+    /// Returns whether the engine seeds any member of this dynamic value kind.
+    #[must_use]
+    pub fn has_engine_set_flags(&self, kind: &str) -> bool {
+        self.engine_set_flags
+            .keys()
             .any(|candidate| candidate.eq_ignore_ascii_case(kind))
     }
 

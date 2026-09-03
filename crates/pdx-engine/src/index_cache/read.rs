@@ -10,7 +10,7 @@ use rusqlite::{Connection, OpenFlags, OptionalExtension};
 
 use crate::hir::DefinitionAttributes;
 use crate::index::{
-    Definition, FileIndexShard, LocalisationPreviewMap, MacroDefinitionSummary,
+    Definition, FileIndexShard, FlagWrite, LocalisationPreviewMap, MacroDefinitionSummary,
     MacroParameterSignature, PositionMap, Reference, WorkspaceIndex,
 };
 use crate::model::LocalisationPreview;
@@ -447,6 +447,7 @@ fn load_index(
                 references: Vec::new(),
                 macro_definitions: Vec::new(),
                 definition_attributes: Vec::new(),
+                flag_writes: Vec::new(),
                 syntax_error_count,
             }),
         );
@@ -460,6 +461,8 @@ fn load_index(
     progress.report(attribute_count);
     let reference_count = load_references(connection, &mut shards)?;
     progress.report(reference_count);
+    let flag_write_count = load_flag_writes(connection, &mut shards)?;
+    progress.report(flag_write_count);
     // Membership sets replace per-position linear scans of a shard's symbol vectors, which
     // are quadratic for files with tens of thousands of symbols (the EU4 localisation
     // files). Validation semantics are identical: a position range must belong to a
@@ -888,6 +891,48 @@ fn load_references(
                 kind: crate::string_pool::intern_shard_string(&kind),
                 name: crate::string_pool::intern_shard_string(&name),
                 file_id,
+                range,
+            });
+        rows_loaded = rows_loaded.saturating_add(1);
+    }
+    Ok(rows_loaded)
+}
+
+fn load_flag_writes(
+    connection: &Connection,
+    shards: &mut BTreeMap<SourceFileId, Arc<FileIndexShard>>,
+) -> Result<usize, IndexCacheError> {
+    let mut rows_loaded = 0usize;
+    let mut statement = connection.prepare(
+        "SELECT file_id, kind, name, range_start, range_end
+         FROM flag_writes ORDER BY file_id, ordinal",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, Vec<u8>>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, i64>(3)?,
+            row.get::<_, i64>(4)?,
+        ))
+    })?;
+    for row in rows {
+        let (file_id, kind, name, start, end) = row?;
+        let file_id = decode_file_id(&file_id)?;
+        let range = decode_range(start, end)?;
+        shards
+            .get_mut(&file_id)
+            .ok_or_else(|| {
+                IndexCacheError::InvalidData(format!(
+                    "flag write targets unknown file {}",
+                    file_id.get()
+                ))
+            })
+            .map(Arc::make_mut)?
+            .flag_writes
+            .push(FlagWrite {
+                kind: crate::string_pool::intern_shard_string(&kind),
+                name: crate::string_pool::intern_shard_string(&name),
                 range,
             });
         rows_loaded = rows_loaded.saturating_add(1);

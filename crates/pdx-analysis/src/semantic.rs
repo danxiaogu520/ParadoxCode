@@ -9,8 +9,8 @@ use pdx_engine::hir::{
 };
 use pdx_engine::intern_shard_string;
 use pdx_engine::{
-    AnalysisSnapshot, DocumentId, DocumentSource, MacroDefinitionSummary, MacroParameterSignature,
-    SourceFileId, SourceRootKind,
+    AnalysisSnapshot, DocumentId, DocumentSource, FlagWriteIndex, FlagWriteMembership,
+    MacroDefinitionSummary, MacroParameterSignature, SourceFileId, SourceRootKind,
 };
 use pdx_rules::{GameProfile, KeyMatcher, RuleShape, ValueMatcher};
 use pdx_text::{LogicalPath, TextRange};
@@ -1926,10 +1926,96 @@ pub(crate) fn semantic_dynamic_value_matches(
     if scope_member(snapshot, None, value, scope_context) {
         return true;
     }
+    // Closed dynamic kinds (the flag family) have decidable membership: a
+    // name is legal when a write site, an overlay document, or an engine seed
+    // can produce it, and rejected otherwise. The profile decides which kinds
+    // are closed; write keys alone do not, because kinds such as
+    // `event_target` also have writers but stay open-world.
+    if snapshot.game_profile().is_closed_dynamic_kind(&kind) {
+        return dynamic_write_member(snapshot, &kind, value);
+    }
     if snapshot.game_profile().is_open_world_value_kind(&kind) {
         return !value.is_empty();
     }
     enum_member(snapshot, &kind, value) || workspace_member(snapshot, &kind, value)
+}
+
+/// Membership for a closed dynamic kind: indexed write sites, open overlay
+/// writes, and engine seeds each make a name legal.
+fn dynamic_write_member(snapshot: &AnalysisSnapshot, kind: &str, value: &str) -> bool {
+    // A partially parameterized spelling (`built_$BUILDING$`) resolves at
+    // runtime; rejecting it would flag every definition body that forwards a
+    // flag name.
+    if value.contains('$') {
+        return true;
+    }
+    match snapshot.index().flag_write_membership(kind, value) {
+        FlagWriteMembership::Literal | FlagWriteMembership::Pattern | FlagWriteMembership::Open => {
+            true
+        }
+        FlagWriteMembership::Unknown => {
+            overlay_flag_write_membership(snapshot, kind, value)
+                || snapshot.game_profile().is_engine_set_flag(kind, value)
+        }
+    }
+}
+
+/// Cached per-revision overlay write-site views shared by membership probes
+/// (the query cache hands out the map behind an `Arc`).
+type FlagWriteViews = std::collections::BTreeMap<Box<str>, FlagWriteIndex>;
+
+/// Write-site view of open overlay documents, cached per revision. Overlay
+/// edits do not flush into the workspace index immediately, so the live HIR is
+/// folded here; open files are few, keeping the per-revision walk cheap.
+fn overlay_flag_writes(snapshot: &AnalysisSnapshot) -> std::sync::Arc<FlagWriteViews> {
+    use std::collections::BTreeMap;
+    let revision = snapshot.revision();
+    const CACHE_KEY: &str = "overlay-flag-writes";
+    if let Some(cached) = snapshot
+        .query_cache()
+        .get::<FlagWriteViews>(revision, CACHE_KEY)
+    {
+        return cached;
+    }
+    let rules = snapshot.rules();
+    let mut views: BTreeMap<Box<str>, FlagWriteIndex> = BTreeMap::new();
+    for document in snapshot
+        .documents()
+        .values()
+        .filter(|document| document.source() == DocumentSource::Overlay)
+    {
+        let Some(hir) = document.hir_handle() else {
+            continue;
+        };
+        for property in hir.properties() {
+            let Some(kind) = rules.dynamic_write_kind(&property.key) else {
+                continue;
+            };
+            let Some(scalar) = &property.scalar else {
+                continue;
+            };
+            if !scalar.value.is_empty() {
+                views
+                    .entry(Box::from(kind.to_ascii_lowercase()))
+                    .or_default()
+                    .record(&scalar.value);
+            }
+        }
+    }
+    let views = std::sync::Arc::new(views);
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Index,
+        CACHE_KEY.to_owned(),
+        views.clone(),
+    );
+    views
+}
+
+fn overlay_flag_write_membership(snapshot: &AnalysisSnapshot, kind: &str, value: &str) -> bool {
+    overlay_flag_writes(snapshot)
+        .get(kind)
+        .is_some_and(|view| view.membership(value) != FlagWriteMembership::Unknown)
 }
 
 fn workspace_member_kinds(snapshot: &AnalysisSnapshot, type_name: &str) -> Vec<String> {

@@ -89,6 +89,7 @@ fn write_cache(
          DROP TABLE IF EXISTS definition_attributes;
          DROP TABLE IF EXISTS macro_definitions;
          DROP TABLE IF EXISTS symbol_references;
+         DROP TABLE IF EXISTS flag_writes;
          DROP TABLE IF EXISTS navigation_positions;
          DROP TABLE IF EXISTS definitions;
          DROP TABLE IF EXISTS localisation_previews;
@@ -117,7 +118,16 @@ fn write_cache(
              active INTEGER NOT NULL CHECK(active IN (0, 1)),
              PRIMARY KEY(file_id, ordinal)
          );
-         CREATE TABLE macro_definitions(
+         CREATE TABLE flag_writes(
+             file_id BLOB NOT NULL REFERENCES source_files(file_id),
+             ordinal INTEGER NOT NULL,
+             kind TEXT NOT NULL,
+             name TEXT NOT NULL,
+             range_start INTEGER NOT NULL,
+             range_end INTEGER NOT NULL,
+             PRIMARY KEY(file_id, ordinal)
+         );
+        CREATE TABLE macro_definitions(
              file_id BLOB NOT NULL REFERENCES source_files(file_id),
              ordinal INTEGER NOT NULL,
              kind TEXT NOT NULL,
@@ -224,6 +234,10 @@ fn write_cache(
         "INSERT INTO symbol_references(file_id, ordinal, kind, name, range_start, range_end)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
     )?;
+    let mut insert_flag_write = transaction.prepare(
+        "INSERT INTO flag_writes(file_id, ordinal, kind, name, range_start, range_end)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+    )?;
     let mut insert_macro = transaction.prepare(
         "INSERT INTO macro_definitions(file_id, ordinal, kind, name, definition_range_start, definition_range_end, template_payload)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -288,6 +302,16 @@ fn write_cache(
                 reference.name,
                 i64::from(reference.range.start()),
                 i64::from(reference.range.end())
+            ])?;
+        }
+        for (ordinal, write) in shard.flag_writes.iter().enumerate() {
+            insert_flag_write.execute(params![
+                encode_file_id(*id),
+                i64::try_from(ordinal).unwrap_or(i64::MAX),
+                write.kind,
+                write.name,
+                i64::from(write.range.start()),
+                i64::from(write.range.end())
             ])?;
         }
         for (ordinal, attributes) in shard.definition_attributes.iter().enumerate() {
