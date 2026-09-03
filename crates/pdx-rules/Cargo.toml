@@ -13,6 +13,7 @@ publish = false
 
 [dependencies]
 rustc-hash = "2"
+pdx-parser = { path = "../pdx-parser" }
 pdx-text = { path = "../pdx-text" }
 rusqlite = { version = "0.40", features = ["bundled"] }
 rayon = "1.11"
@@ -24,5 +25,10 @@ sha2 = "0.11"
 name = "pdx-bake"
 path = "src/bin/pdx-bake.rs"
 
+[[bin]]
+name = "pdx-flag-audit"
+path = "src/bin/pdx-flag-audit.rs"
+
 [lints]
 workspace = true
+
