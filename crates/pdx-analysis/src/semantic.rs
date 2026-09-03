@@ -1064,7 +1064,18 @@ pub(crate) fn semantic_leaf_value_matches(
     value: &str,
     scope: &ScopeContext,
 ) -> bool {
-    match &rule.value {
+    semantic_matcher_accepts(snapshot, &rule.value, value, scope)
+}
+
+/// Matches one bare value matcher against a scalar, resolving the
+/// workspace-backed matcher kinds (dynamic kinds, types, enums, scopes).
+pub(crate) fn semantic_matcher_accepts(
+    snapshot: &AnalysisSnapshot,
+    matcher: &ValueMatcher,
+    value: &str,
+    scope: &ScopeContext,
+) -> bool {
+    match matcher {
         ValueMatcher::Dynamic(kind) => semantic_dynamic_value_matches(snapshot, kind, value, scope),
         ValueMatcher::DynamicSet(_) => !value.is_empty(),
         matcher => matcher.matches(

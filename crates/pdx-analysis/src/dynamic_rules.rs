@@ -26,8 +26,9 @@
 //! shadow layer: findings are derived and cached but not yet published as
 //! diagnostics.
 
-// Phase 1 shadow: the derivation is exercised through tests only until the
-// P2 call-site switch starts consuming these rows in production paths.
+// Call-site validation (P2) consumes rows, parameters, and findings data;
+// body findings publication, hover/completion, and the report accessors
+// arrive in P3 and read the remaining fields.
 #![allow(dead_code)]
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -56,7 +57,8 @@ const DYNAMIC_RULES_CACHE_KEY: &str = "dynamic-rule-rows";
 /// the value constraints inferred from every usage site in the definition
 /// body. `sites` holds one matcher set per usage site: the argument must
 /// satisfy every site (each site's matchers are alternatives from
-/// `alternative_id` rule rows).
+/// `alternative_id` rule rows). Parameters forwarded into a nested call carry
+/// the edge so call-site validation can borrow the callee's constraints.
 #[derive(Clone, Debug)]
 pub(crate) struct DynamicParameterRow {
     pub(crate) name: String,
@@ -69,6 +71,20 @@ pub(crate) struct DynamicParameterRow {
     pub(crate) quoted_script: bool,
     /// The parameter participates in a dynamic key dispatch.
     pub(crate) used_in_key: bool,
+    /// `(callee kind, callee name, callee parameter)` edges for arguments
+    /// forwarded as `callee = { PARAM = $THIS$ }`. `parameter` is `None`
+    /// when the callee parameter name itself is rendered from a `$param$`
+    /// key (`callee = { $WHICH$ = $THIS$ }`), so the binding may land on any
+    /// of the callee's parameters.
+    pub(crate) forwarded_to: Vec<ForwardedParameter>,
+}
+
+/// One forwarding edge from an owner parameter into a nested call.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ForwardedParameter {
+    pub(crate) kind: String,
+    pub(crate) name: String,
+    pub(crate) parameter: Option<String>,
 }
 
 /// Why a body statement can never run.
@@ -79,6 +95,11 @@ pub(crate) enum DynamicBodyFindingKind {
     /// A nested dynamic-rule call requires entry scopes disjoint from the
     /// scopes that reach the call.
     NestedCallMismatch,
+    /// A literal statement key matches no rule row in its context. Data-only
+    /// until the P3 arbitration calibrates the definition-site walk against
+    /// vanilla; it is the replacement for expansion-time body checking of
+    /// cache-only (closed) files.
+    UnknownStatement,
 }
 
 /// One statement in a definition body that no reachable scope can execute.
@@ -296,6 +317,7 @@ fn merge_parameter_rows(
             sites: usage.map_or_else(Vec::new, |usage| usage.sites.clone()),
             quoted_script: usage.is_some_and(|usage| usage.quoted_script),
             used_in_key: usage.is_some_and(|usage| usage.used_in_key),
+            forwarded_to: usage.map_or_else(Vec::new, |usage| usage.forwarded_to.clone()),
         });
     }
     // Usage the signature missed (guarded template-only forms) still rows as
@@ -308,6 +330,7 @@ fn merge_parameter_rows(
                 sites: usage.sites.clone(),
                 quoted_script: usage.quoted_script,
                 used_in_key: usage.used_in_key,
+                forwarded_to: usage.forwarded_to.clone(),
             });
         }
     }
@@ -338,6 +361,7 @@ struct ParameterUsage {
     sites: Vec<Vec<ValueMatcher>>,
     quoted_script: bool,
     used_in_key: bool,
+    forwarded_to: Vec<ForwardedParameter>,
 }
 
 /// One definition's derivation walk: collects parameter usage and records
@@ -372,7 +396,14 @@ impl<'a> Derivation<'a> {
                     // supplied, so it must stand on its own.
                     self.walk_items(&conditional.items, context, flow.clone());
                 }
-                MacroTemplateItem::BareValue(_) => {}
+                MacroTemplateItem::BareValue(token) => {
+                    // A bare `$PARAM$` is a payload injection: the caller
+                    // supplies a (usually quoted) script fragment that the
+                    // payload path validates in P3, never scalar matching.
+                    for name in token_parameters(token) {
+                        self.parameter(name).quoted_script = true;
+                    }
+                }
             }
         }
     }
@@ -447,6 +478,23 @@ impl<'a> Derivation<'a> {
             }
             return;
         }
+        // A literal statement matching no rule row in its context is the
+        // definition-side replacement for expansion-time body checking of
+        // closed (cache-only) files. Boolean containers are structural and
+        // validated by the lint layer, not by rule rows alone.
+        if matching.is_empty() && !crate::lints::is_boolean_container_key(&lowered) {
+            self.findings.push(DynamicBodyFinding {
+                kind: DynamicBodyFindingKind::UnknownStatement,
+                key_range: property.key.range,
+                statement: key.to_owned(),
+                reachable_scopes: Vec::new(),
+                required_scopes: Vec::new(),
+            });
+            if let MacroTemplateValue::Block { items, .. } = &property.value {
+                self.walk_items(items, context, ScopeFlow::Unknown);
+            }
+            return;
+        }
         // Nested dynamic-rule calls gate on the callee's own contract.
         if let Some(callee) = dynamic_kind_for_context(self.snapshot, context)
             .and_then(|kind| resolve_macro_definition(self.snapshot, &kind, key))
@@ -478,9 +526,10 @@ impl<'a> Derivation<'a> {
                 }
             }
             // Argument blocks are parameter assignments, not effect
-            // statements: record forwarded parameters and stop.
+            // statements: record forwarding edges for scalar-bound arguments
+            // and stop.
             if let MacroTemplateValue::Block { items, .. } = &property.value {
-                self.record_forwarded_arguments(items);
+                self.record_forwarded_arguments(&callee.summary.kind, &callee.summary.name, items);
             }
             return;
         }
@@ -591,14 +640,32 @@ impl<'a> Derivation<'a> {
         }
     }
 
-    fn record_forwarded_arguments(&mut self, items: &[MacroTemplateItem]) {
+    /// Records forwarding edges for arguments bound as
+    /// `callee = { PARAM = $OWNER_PARAM$ }` so call-site validation can borrow
+    /// the callee parameter's own constraints. Keys that render the callee
+    /// parameter name from a `$param$` fragment record an edge with no fixed
+    /// parameter target.
+    fn record_forwarded_arguments(
+        &mut self,
+        callee_kind: &str,
+        callee_name: &str,
+        items: &[MacroTemplateItem],
+    ) {
         for item in items {
             let MacroTemplateItem::Property(property) = item else {
                 continue;
             };
             if let MacroTemplateValue::Scalar(token) = &property.value {
+                let parameter = single_literal(&property.key)
+                    .map(str::trim)
+                    .filter(|key| !key.is_empty())
+                    .map(str::to_owned);
                 for name in token_parameters(token) {
-                    self.parameter(name);
+                    self.parameter(name).forwarded_to.push(ForwardedParameter {
+                        kind: callee_kind.to_owned(),
+                        name: callee_name.to_owned(),
+                        parameter: parameter.clone(),
+                    });
                 }
             }
         }
@@ -644,7 +711,10 @@ fn required_scopes_of_rows(rows: &[&pdx_rules::SemanticRule]) -> Vec<String> {
 /// Resolves the dynamic-definition kind whose descriptor declares `context`
 /// as its body context (e.g. `effect` -> `scripted_effect`), from rule data
 /// only.
-fn dynamic_kind_for_context(snapshot: &AnalysisSnapshot, context: &str) -> Option<String> {
+pub(crate) fn dynamic_kind_for_context(
+    snapshot: &AnalysisSnapshot,
+    context: &str,
+) -> Option<String> {
     snapshot
         .rules()
         .model()

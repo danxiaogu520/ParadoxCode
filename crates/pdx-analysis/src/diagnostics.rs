@@ -5,7 +5,9 @@ use crate::lints::{
 use crate::localisation::localisation_command_diagnostics;
 use crate::macro_contracts;
 use crate::macro_cycles;
-use crate::macro_expansion::{ExpansionEnterFailure, ExpansionFailure, MacroExpansionSession};
+use crate::macro_expansion::{
+    ExpansionEnterFailure, ExpansionFailure, MacroExpansionSession, scalar_argument_bindings,
+};
 use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
 use crate::resolution::*;
 use crate::semantic::*;
@@ -904,7 +906,16 @@ fn validate_semantic_container(
                     }))
             });
             let arguments_allow_expansion = parameterized_invocation
-                || validate_scripted_macro_arguments(snapshot, applicable, property, diagnostics);
+                || validate_scripted_macro_arguments(
+                    snapshot,
+                    applicable,
+                    property,
+                    scope,
+                    diagnostics,
+                );
+            if !parameterized_invocation {
+                validate_dynamic_dispatch_keys(snapshot, applicable, property, diagnostics);
+            }
             if valid
                 && !scoped_matching.is_empty()
                 && arguments_allow_expansion
@@ -1477,6 +1488,72 @@ fn validate_scripted_macro_expansion(
     scope: &ScopeContext,
     quoted_script_depth: usize,
 ) -> Result<(), Cancelled> {
+    // P2 shadow of the dynamic-rules refactor: the expansion machinery keeps
+    // running — cycle guard, budgets, argument binding, body re-validation —
+    // as the arbitration baseline for the derived dynamic-rule layer, but its
+    // findings are no longer published: call sites validate against
+    // `DynamicRuleRow` and the definition body is checked at its definition.
+    // Set PDX_MACRO_EXPANSION_PUBLISH=1 to restore publication (arbitration,
+    // debugging) or PDX_DYNAMIC_RULES_SHADOW=1 to log shadow findings.
+    let ValidationState {
+        snapshot,
+        diagnostics: output,
+        cancellation,
+        expansion,
+        quoted_scripts,
+    } = state;
+    let mut sink: Vec<Diagnostic> = Vec::new();
+    let mut macro_name: Option<String> = None;
+    let result = expand_scripted_macro_into_sink(
+        ValidationState {
+            snapshot,
+            diagnostics: &mut sink,
+            cancellation,
+            expansion,
+            quoted_scripts,
+        },
+        rules,
+        property,
+        scope,
+        quoted_script_depth,
+        &mut macro_name,
+    );
+    publish_or_shadow_expansion(macro_name.as_deref(), &sink, output);
+    result
+}
+
+/// Publishes or shadows the expansion sink; see
+/// [`validate_scripted_macro_expansion`].
+fn publish_or_shadow_expansion(
+    macro_name: Option<&str>,
+    sink: &[Diagnostic],
+    output: &mut Vec<Diagnostic>,
+) {
+    if std::env::var("PDX_MACRO_EXPANSION_PUBLISH").is_ok_and(|value| !value.is_empty()) {
+        output.extend(sink.iter().cloned());
+        return;
+    }
+    if std::env::var("PDX_DYNAMIC_RULES_SHADOW").is_ok_and(|value| !value.is_empty())
+        && let Some(name) = macro_name
+    {
+        for diagnostic in sink {
+            eprintln!(
+                "[shadow-expansion] `{name}` {}: {}",
+                diagnostic.code.as_str(),
+                diagnostic.message
+            );
+        }
+    }
+}
+
+fn expand_scripted_macro_into_sink(
+    state: ValidationState<'_, '_, '_>,
+    rules: &[&pdx_rules::SemanticRule],
+    property: &ScriptProperty,
+    scope: &ScopeContext,
+    quoted_script_depth: usize,
+    macro_name: &mut Option<String>,
+) -> Result<(), Cancelled> {
     let ValidationState {
         snapshot,
         diagnostics,
@@ -1497,6 +1574,7 @@ fn validate_scripted_macro_expansion(
     let Some(resolved) = resolve_macro_definition(snapshot, type_name, &property.key) else {
         return Ok(());
     };
+    *macro_name = Some(resolved.summary.name.clone());
     let Some(template) = resolved.summary.template.as_ref() else {
         return Ok(());
     };
@@ -1637,6 +1715,7 @@ fn validate_scripted_macro_arguments(
     snapshot: &AnalysisSnapshot,
     rules: &[&pdx_rules::SemanticRule],
     property: &ScriptProperty,
+    scope: &ScopeContext,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> bool {
     if property.block_range.is_none() {
@@ -1698,7 +1777,391 @@ fn validate_scripted_macro_arguments(
         ));
         return false;
     }
+    // The derived dynamic row carries the usage-site value constraints that
+    // the definition body infers for each parameter; check the caller's
+    // arguments against them here, at the call site, instead of validating a
+    // rendered expansion.
+    if let Some(row) =
+        crate::dynamic_rules::dynamic_rule_row(snapshot, &summary.kind, &summary.name)
+    {
+        validate_dynamic_argument_values(snapshot, &row, property, scope, diagnostics);
+    }
     true
+}
+
+/// Checks one invocation's arguments against the parameter rows of its
+/// derived dynamic rule: scalar shape where the body uses the parameter as a
+/// value, and value matching against the inferred per-site matchers.
+fn validate_dynamic_argument_values(
+    snapshot: &AnalysisSnapshot,
+    row: &crate::dynamic_rules::DynamicRuleRow,
+    invocation: &ScriptProperty,
+    scope: &ScopeContext,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for (index, argument) in invocation.block.iter().enumerate() {
+        // Forwarded parameters (`K = $K$` inside another definition) render
+        // at that definition's own call sites; they cannot be checked here.
+        if argument
+            .scalar
+            .as_ref()
+            .is_some_and(|(value, _)| value.contains('$'))
+        {
+            continue;
+        }
+        let Some(parameter) = row
+            .parameters
+            .iter()
+            .find(|parameter| parameter.name.eq_ignore_ascii_case(&argument.key))
+        else {
+            continue;
+        };
+        // Bindings keep the last duplicate; earlier occurrences are stale and
+        // already carry their own cardinality warning.
+        let superseded = invocation.block[index + 1..]
+            .iter()
+            .any(|later| later.key.eq_ignore_ascii_case(&argument.key));
+        if superseded {
+            continue;
+        }
+        let sites = effective_parameter_sites(snapshot, row, parameter, &mut Vec::new());
+        let Some((value, value_range)) = argument.scalar.as_ref() else {
+            if sites.is_empty() {
+                continue;
+            }
+            diagnostics.push(
+                Diagnostic::new(
+                    DiagnosticCode::InvalidValue,
+                    DiagnosticCode::InvalidValue.severity(),
+                    argument.key_range,
+                    format!(
+                        "parameter `{}` of scripted `{}` is used as a scalar value in its body and must be provided as one",
+                        parameter.name, row.name
+                    ),
+                )
+                .with_certainty(DiagnosticCertainty::Contextual),
+            );
+            continue;
+        };
+        if parameter.quoted_script {
+            // Quoted script payloads are validated by the quoted-script
+            // machinery, not by scalar matching.
+            continue;
+        }
+        if let Some(rejected) = sites.iter().find(|site| {
+            !site
+                .iter()
+                .any(|matcher| semantic_matcher_accepts(snapshot, matcher, value, scope))
+        }) {
+            let expected = rejected
+                .iter()
+                .map(semantic_value_matcher_label)
+                .collect::<Vec<_>>()
+                .join(" or ");
+            diagnostics.push(
+                Diagnostic::new(
+                    DiagnosticCode::InvalidValue,
+                    DiagnosticCode::InvalidValue.severity(),
+                    *value_range,
+                    format!(
+                        "argument `{}` for parameter `{}` of scripted `{}` does not match its usage in the definition body (expected {expected})",
+                        value, parameter.name, row.name
+                    ),
+                )
+                .with_certainty(DiagnosticCertainty::Contextual),
+            );
+        }
+        validate_forwarded_to_any_parameter(
+            snapshot,
+            row,
+            parameter,
+            value,
+            *value_range,
+            scope,
+            diagnostics,
+        );
+    }
+}
+
+/// Forwards whose callee parameter name is itself rendered from a `$param$`
+/// key (`helper = { $WHICH$ = $X$ }`) can land on any of the callee's
+/// parameters: the binding must be acceptable to at least one of them.
+fn validate_forwarded_to_any_parameter(
+    snapshot: &AnalysisSnapshot,
+    row: &crate::dynamic_rules::DynamicRuleRow,
+    parameter: &crate::dynamic_rules::DynamicParameterRow,
+    value: &str,
+    value_range: TextRange,
+    scope: &ScopeContext,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for edge in parameter
+        .forwarded_to
+        .iter()
+        .filter(|edge| edge.parameter.is_none())
+    {
+        let Some(callee) = crate::dynamic_rules::dynamic_rule_row(snapshot, &edge.kind, &edge.name)
+        else {
+            continue;
+        };
+        let acceptable = callee.parameters.iter().any(|candidate| {
+            candidate.quoted_script && value.starts_with('"')
+                || candidate.sites.is_empty()
+                || candidate.sites.iter().any(|site| {
+                    site.iter()
+                        .any(|matcher| semantic_matcher_accepts(snapshot, matcher, value, scope))
+                })
+        });
+        if !acceptable {
+            diagnostics.push(
+                Diagnostic::new(
+                    DiagnosticCode::InvalidValue,
+                    DiagnosticCode::InvalidValue.severity(),
+                    value_range,
+                    format!(
+                        "argument `{}` for parameter `{}` of scripted `{}` does not match any parameter of scripted `{}` it can be forwarded to",
+                        value, parameter.name, row.name, callee.name
+                    ),
+                )
+                .with_certainty(DiagnosticCertainty::Contextual),
+            );
+        }
+    }
+}
+
+/// The sites constraining one parameter, following forwarding edges into
+/// nested calls so a forwarded argument inherits the callee parameter's own
+/// constraints. `visited` guards forwarding cycles.
+fn effective_parameter_sites(
+    snapshot: &AnalysisSnapshot,
+    row: &crate::dynamic_rules::DynamicRuleRow,
+    parameter: &crate::dynamic_rules::DynamicParameterRow,
+    visited: &mut Vec<(String, String)>,
+) -> Vec<Vec<pdx_rules::ValueMatcher>> {
+    if !parameter.sites.is_empty() || parameter.forwarded_to.is_empty() {
+        return parameter.sites.clone();
+    }
+    let identity = (row.kind.to_ascii_lowercase(), row.name.to_ascii_lowercase());
+    if visited.contains(&identity) {
+        return parameter.sites.clone();
+    }
+    visited.push(identity);
+    let mut sites = parameter.sites.clone();
+    for edge in &parameter.forwarded_to {
+        let Some(callee_parameter_name) = &edge.parameter else {
+            // Rendered-target edges are checked by
+            // `validate_forwarded_to_any_parameter` instead.
+            continue;
+        };
+        let Some(callee) = crate::dynamic_rules::dynamic_rule_row(snapshot, &edge.kind, &edge.name)
+        else {
+            continue;
+        };
+        let Some(callee_parameter) = callee
+            .parameters
+            .iter()
+            .find(|candidate| candidate.name.eq_ignore_ascii_case(callee_parameter_name))
+        else {
+            continue;
+        };
+        sites.extend(effective_parameter_sites(
+            snapshot,
+            &callee,
+            callee_parameter,
+            visited,
+        ));
+    }
+    sites
+}
+
+/// Renders the `$param$` keys of a dynamically dispatching scripted
+/// definition with the caller's argument bindings and rejects bindings that
+/// do not name a known key in the definition's body context. This string-level
+/// key check is the only call-site residue of macro expansion: no tree is
+/// instantiated and the body itself is validated at its definition.
+fn validate_dynamic_dispatch_keys(
+    snapshot: &AnalysisSnapshot,
+    rules: &[&pdx_rules::SemanticRule],
+    property: &ScriptProperty,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if property.block_range.is_none() {
+        return;
+    }
+    let Some(type_name) = rules.iter().find_map(|rule| match &rule.key {
+        pdx_rules::KeyMatcher::Type(type_name) | pdx_rules::KeyMatcher::Dynamic(type_name)
+            if scripted_macro_type(snapshot, type_name) =>
+        {
+            Some(type_name.as_str())
+        }
+        _ => None,
+    }) else {
+        return;
+    };
+    let Some(row) = crate::dynamic_rules::dynamic_rule_row(snapshot, type_name, &property.key)
+    else {
+        return;
+    };
+    if !row.dispatches_dynamically {
+        return;
+    }
+    let Some(resolved) = resolve_macro_definition(snapshot, type_name, &property.key) else {
+        return;
+    };
+    let Some(template) = resolved.summary.template.as_ref() else {
+        return;
+    };
+    let bindings = scalar_argument_bindings(property);
+    let mut walker = DispatchKeyWalker {
+        snapshot,
+        context: resolved.body_context.clone(),
+        macro_name: row.name.clone(),
+        bindings: &bindings,
+        invocation: property,
+        diagnostics,
+    };
+    walker.walk_items(&template.items);
+}
+
+struct DispatchKeyWalker<'a> {
+    snapshot: &'a AnalysisSnapshot,
+    context: String,
+    macro_name: String,
+    bindings: &'a std::collections::BTreeMap<String, String>,
+    invocation: &'a ScriptProperty,
+    diagnostics: &'a mut Vec<Diagnostic>,
+}
+
+impl DispatchKeyWalker<'_> {
+    fn walk_items(&mut self, items: &[MacroTemplateItem]) {
+        for item in items {
+            match item {
+                MacroTemplateItem::Property(property) => {
+                    self.check_property(property);
+                    if let MacroTemplateValue::Block { items, .. } = &property.value {
+                        if self.block_is_argument_list(property) {
+                            // A nested dynamic-rule call's block assigns callee
+                            // parameters (`helper = { AMOUNT = $X$ }`): its keys
+                            // name parameters, they do not dispatch.
+                            continue;
+                        }
+                        self.walk_items(items);
+                    }
+                }
+                MacroTemplateItem::Conditional(conditional) => {
+                    self.walk_items(&conditional.items);
+                }
+                MacroTemplateItem::BareValue(_) => {}
+            }
+        }
+    }
+
+    /// True when the property is a nested dynamic-rule call whose block is an
+    /// argument list rather than statements. Covers literal callee names and
+    /// callee names rendered from a fully-bound `$param$` key; an unbound or
+    /// partially-rendered key makes the block unknowable, and unknowable
+    /// blocks stay silent to match expansion's omit-on-unbound semantics.
+    fn block_is_argument_list(&self, property: &MacroTemplateProperty) -> bool {
+        let Some(rendered) = self.rendered_key(property) else {
+            return true;
+        };
+        crate::dynamic_rules::dynamic_kind_for_context(self.snapshot, &self.context)
+            .and_then(|kind| resolve_macro_definition(self.snapshot, &kind, &rendered))
+            .is_some()
+    }
+
+    /// The property key with `$param$` fragments substituted from the
+    /// invocation's bindings; `None` when a parameter is unbound or the
+    /// rendered result still contains a parameter.
+    fn rendered_key(&self, property: &MacroTemplateProperty) -> Option<String> {
+        let mut rendered = String::new();
+        for fragment in &property.key.fragments {
+            match fragment {
+                MacroTemplateFragment::Literal(literal) => rendered.push_str(literal),
+                MacroTemplateFragment::Parameter { name, .. } => {
+                    let bound = self.bindings.get(&name.to_ascii_lowercase())?;
+                    rendered.push_str(bound);
+                }
+            }
+        }
+        let rendered = rendered.trim();
+        if rendered.is_empty() || rendered.contains('$') {
+            return None;
+        }
+        Some(rendered.to_owned())
+    }
+
+    fn check_property(&mut self, property: &MacroTemplateProperty) {
+        let fragments = &property.key.fragments;
+        if !fragments
+            .iter()
+            .any(|fragment| matches!(fragment, MacroTemplateFragment::Parameter { .. }))
+        {
+            return;
+        }
+        let mut rendered = String::new();
+        let mut last_parameter = None;
+        for fragment in fragments {
+            match fragment {
+                MacroTemplateFragment::Literal(literal) => rendered.push_str(literal),
+                MacroTemplateFragment::Parameter { name, .. } => {
+                    let Some(bound) = self.bindings.get(&name.to_ascii_lowercase()) else {
+                        // An unbound optional parameter omits or defers the
+                        // statement; the rendered key is unknowable.
+                        return;
+                    };
+                    rendered.push_str(bound);
+                    last_parameter = Some(name.clone());
+                }
+            }
+        }
+        let rendered = rendered.trim();
+        if rendered.is_empty() || rendered.contains('$') {
+            return;
+        }
+        let lowered = rendered.to_ascii_lowercase();
+        let is_scope_register = matches!(
+            lowered.as_str(),
+            "this" | "root" | "prev" | "from" | "fromfrom" | "fromfromfrom"
+        ) || lowered.starts_with("event_target:")
+            || lowered.starts_with("global_event_target:");
+        if is_scope_register {
+            return;
+        }
+        let known = semantic_rules_for_container_key(self.snapshot, &self.context, &[], rendered)
+            .iter()
+            .any(|rule| semantic_rule_key_matches(self.snapshot, rule, &[], rendered));
+        if known {
+            return;
+        }
+        // Blame the argument that supplied the offending key fragment.
+        let Some(parameter) = last_parameter else {
+            return;
+        };
+        let Some((value, value_range)) = self.invocation.block.iter().find_map(|argument| {
+            argument
+                .key
+                .eq_ignore_ascii_case(&parameter)
+                .then(|| {
+                    argument
+                        .scalar
+                        .as_ref()
+                        .map(|(value, range)| (value.clone(), *range))
+                })
+                .flatten()
+        }) else {
+            return;
+        };
+        self.diagnostics.push(Diagnostic::new(
+            DiagnosticCode::InvalidValue,
+            DiagnosticCode::InvalidValue.severity(),
+            value_range,
+            format!(
+                "argument `{}` for parameter `{parameter}` of scripted `{}` does not name a known {} key",
+                value, self.macro_name, self.context
+            ),
+        ));
+    }
 }
 
 /// Re-evaluates branch-local optionality from the persisted macro template. Vanilla macro
