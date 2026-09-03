@@ -208,16 +208,6 @@ enum QuotedScalarOffsets {
 }
 
 impl QuotedScalarSource {
-    pub(crate) fn synthetic(source: Arc<str>, fallback: TextRange) -> Self {
-        let offsets = (0..=source.len())
-            .map(|_| fallback.start())
-            .collect::<Vec<_>>();
-        Self {
-            source,
-            source_offsets: QuotedScalarOffsets::Mapped(offsets.into()),
-        }
-    }
-
     pub(crate) fn source(&self) -> &str {
         &self.source
     }

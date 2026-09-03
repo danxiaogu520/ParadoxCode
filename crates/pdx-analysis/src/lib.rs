@@ -12,7 +12,6 @@ mod lints;
 mod localisation;
 mod macro_contracts;
 mod macro_cycles;
-mod macro_expansion;
 mod modifier_scope;
 mod navigation;
 mod quick_fix;
