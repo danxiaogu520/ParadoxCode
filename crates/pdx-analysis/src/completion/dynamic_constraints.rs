@@ -37,6 +37,10 @@ pub(crate) struct DynamicQuotedScriptConstraintSite {
 struct DynamicArgumentConstraints {
     values: Vec<DynamicValueConstraintSite>,
     quoted_scripts: Vec<DynamicQuotedScriptConstraintSite>,
+    /// True when at least one usage site constrains the parameter value to a
+    /// non-enumerable shape (numbers, opaque strings, dynamic sets): no item
+    /// can be offered, and callers must treat the value as constrained.
+    unenumerable: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -65,14 +69,27 @@ struct SymbolicProperty {
     value: SymbolicValue,
 }
 
+/// The inferred completion story for a dynamic parameter's value.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct DynamicValueConstraints {
+    pub(crate) sites: Vec<DynamicValueConstraintSite>,
+    /// At least one usage site constrains the value to a non-enumerable
+    /// shape, so nothing can be offered yet the value is not free-form.
+    pub(crate) unenumerable: bool,
+}
+
 pub(crate) fn infer_dynamic_value_constraints(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
     target: &ScriptProperty,
     cancellation: &CancellationToken,
-) -> Result<Vec<DynamicValueConstraintSite>, Cancelled> {
-    infer_dynamic_argument_constraints(snapshot, context, target, cancellation)
-        .map(|constraints| constraints.values)
+) -> Result<DynamicValueConstraints, Cancelled> {
+    infer_dynamic_argument_constraints(snapshot, context, target, cancellation).map(|constraints| {
+        DynamicValueConstraints {
+            sites: constraints.values,
+            unenumerable: constraints.unenumerable,
+        }
+    })
 }
 
 pub(crate) fn infer_dynamic_quoted_script_constraints(
@@ -119,6 +136,7 @@ fn infer_dynamic_argument_constraints(
             DynamicArgumentConstraints {
                 values: collector.value_sites.clone(),
                 quoted_scripts: collector.quoted_script_sites.clone(),
+                unenumerable: collector.unenumerable_value_site,
             }
         })
     })();
@@ -195,6 +213,7 @@ struct ConstraintCollector<'a> {
     exhausted: bool,
     value_sites: Vec<DynamicValueConstraintSite>,
     quoted_script_sites: Vec<DynamicQuotedScriptConstraintSite>,
+    unenumerable_value_site: bool,
 }
 
 impl<'a> ConstraintCollector<'a> {
@@ -206,6 +225,7 @@ impl<'a> ConstraintCollector<'a> {
             exhausted: false,
             value_sites: Vec::new(),
             quoted_script_sites: Vec::new(),
+            unenumerable_value_site: false,
         }
     }
 
@@ -356,11 +376,17 @@ impl<'a> ConstraintCollector<'a> {
                 .collect::<Vec<_>>();
             match &property.value {
                 SymbolicValue::Scalar(SymbolicToken::Target) => {
-                    let mut matchers = matching
+                    let mut raw = matching
                         .iter()
                         .filter(|rule| matches!(rule.shape, RuleShape::Leaf | RuleShape::LeafValue))
                         .map(|rule| rule.value.clone())
-                        .filter(is_completion_constraint)
+                        .collect::<Vec<_>>();
+                    raw.sort_by_key(|matcher| format!("{matcher:?}"));
+                    raw.dedup();
+                    let mut matchers = raw
+                        .iter()
+                        .filter(|matcher| is_completion_constraint(matcher))
+                        .cloned()
                         .collect::<Vec<_>>();
                     matchers.sort_by_key(|matcher| format!("{matcher:?}"));
                     matchers.dedup();
@@ -369,6 +395,11 @@ impl<'a> ConstraintCollector<'a> {
                             matchers,
                             scope: scope.clone(),
                         });
+                    } else if !raw.is_empty() {
+                        // Every constraint at this site is a non-enumerable
+                        // shape (numbers, opaque strings): the parameter is
+                        // not free-form, but no item can be offered.
+                        self.unenumerable_value_site = true;
                     }
                 }
                 SymbolicValue::Block(children) => {
