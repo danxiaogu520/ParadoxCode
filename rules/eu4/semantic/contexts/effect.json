@@ -16979,7 +16979,7 @@
     ],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": 0,
     "strict_min": true,
     "max_occurs": null,
     "source_file": "semantic-rules.json",
@@ -20415,7 +20415,7 @@
     ],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": 0,
     "strict_min": true,
     "max_occurs": null,
     "source_file": "semantic-rules.json",
@@ -22057,7 +22057,7 @@
     "required": false,
     "documentation": [],
     "allowed_scopes": [
-      "country"
+      "any"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -47140,6 +47140,7 @@
       "Scopes to all provinces sharing a border (or sea zone?) with the current scope. Does not include empty provinces."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": "province",

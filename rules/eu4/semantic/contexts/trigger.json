@@ -1802,6 +1802,7 @@
       "Scopes to one province that shares a border (or sea zone?) with the current scope."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": "province",
@@ -18607,6 +18608,7 @@
       "Returns true if the province culture is X, or the same as the specified scope."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -23700,6 +23702,7 @@
       "Returns true if the province culture is X, or the same as the specified scope."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -24034,6 +24037,7 @@
       "Returns true if the province culture is X, or the same as the specified scope."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -24399,6 +24403,7 @@
       "Returns true if the province culture is X, or the same as the specified scope."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -24725,6 +24730,7 @@
       "Returns true if the province culture is X, or the same as the specified scope."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -25053,6 +25059,7 @@
       "Returns true if the province culture is X, or the same as the specified scope."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -25366,6 +25373,7 @@
       "Returns true if the province culture is X, or the same as the specified scope."
     ],
     "allowed_scopes": [
+      "country",
       "province"
     ],
     "push_scope": null,
@@ -30879,7 +30887,8 @@
       "Returns true if the country's or province's total development has grown by the specified amount"
     ],
     "allowed_scopes": [
-      "country"
+      "country",
+      "province"
     ],
     "push_scope": null,
     "replace_scope": [],
