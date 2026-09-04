@@ -372,6 +372,7 @@ dependencies = [
 name = "pdx-rules"
 version = "0.3.0"
 dependencies = [
+ "pdx-parser",
  "pdx-text",
  "rayon",
  "rusqlite",
