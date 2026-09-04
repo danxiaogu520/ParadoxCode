@@ -792,3 +792,102 @@ fn vanilla_cache_localisation_hover_shows_derived_text_without_source_state() {
     assert!(host.snapshot().file_state(localisation_file).is_none());
     std::fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn dynamic_parameter_hovers_and_payload_arguments_are_diagnosable() {
+    use std::fs;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-hover-{nonce}"));
+    let effects = root.join("common/scripted_effects");
+    fs::create_dir_all(&effects).expect("scripted effects directory");
+    let definitions_body = concat!(
+        "stable = { add_stability = $AMT$ }\n",
+        "inject = { $BODY$ }\n",
+    );
+    fs::write(effects.join("00_hover.txt"), definitions_body).expect("definitions");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    // Definition-site parameter hover carries the inferred constraints.
+    let definitions = DocumentId::new("file:///tmp/common/scripted_effects/00_hover.txt");
+    host.open_document(
+        definitions.clone(),
+        1,
+        definitions_body.to_owned(),
+        Some(effects.join("00_hover.txt")),
+    )
+    .expect("open definitions");
+    let definition_hover_position =
+        u32::try_from(definitions_body.find("$AMT$").expect("parameter reference") + 1)
+            .expect("position");
+    let definition_hover = hover(&host.snapshot(), &definitions, definition_hover_position)
+        .expect("definition-site parameter hover");
+    assert!(
+        definition_hover.contents.contains("### parameter `AMT`")
+            && definition_hover
+                .contents
+                .contains("Local to scripted definition")
+            && definition_hover
+                .contents
+                .contains("Inferred value constraints")
+            && definition_hover.contents.contains("integer"),
+        "definition-site hover must include inferred constraints: {}",
+        definition_hover.contents
+    );
+
+    let id = DocumentId::new("file:///tmp/events/dynamic-hover.txt");
+    let text = concat!(
+        "country_event = { id = batch.1 immediate = { ",
+        "stable = { AMT = 1 } ",
+        "inject = { BODY = add_prestige } ",
+        "inject = { BODY = \"add_prestige = 5\" } ",
+        "} }\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open call sites");
+
+    // Call-site argument keys resolve to the definition parameter.
+    let call_hover_position =
+        u32::try_from(text.find("AMT = 1").expect("argument key") + 1).expect("position");
+    let call_hover =
+        hover(&host.snapshot(), &id, call_hover_position).expect("call-site parameter hover");
+    assert!(
+        call_hover
+            .contents
+            .contains("parameter `AMT` of scripted `stable`")
+            && call_hover.contents.contains("Presence: `required`")
+            && call_hover.contents.contains("Inferred value constraints")
+            && call_hover.contents.contains("integer")
+            && !call_hover.contents.contains("PDX property"),
+        "call-site argument keys hover as parameters: {}",
+        call_hover.contents
+    );
+
+    // Only the unquoted payload argument warns; the quoted one stays clean.
+    let results = diagnostics(&host.snapshot(), &id);
+    let payload_warnings: Vec<&crate::Diagnostic> = results
+        .iter()
+        .filter(|item| {
+            item.message
+                .contains("spliced into a quoted script payload")
+        })
+        .collect();
+    assert_eq!(
+        payload_warnings.len(),
+        1,
+        "exactly the unquoted payload argument warns: {results:?}"
+    );
+    assert!(payload_warnings[0].message.contains("`BODY`"));
+
+    fs::remove_dir_all(root).expect("cleanup");
+}

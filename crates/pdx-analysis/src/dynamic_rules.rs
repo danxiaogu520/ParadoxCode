@@ -149,6 +149,14 @@ impl DynamicRuleReport {
             .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
     }
 
+    /// The row for a definition whose kind the caller does not know; names
+    /// are unique across dynamic kinds in practice.
+    pub(crate) fn row_by_name(&self, name: &str) -> Option<&DynamicRuleRow> {
+        self.rows
+            .values()
+            .find(|row| row.name.eq_ignore_ascii_case(name))
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.rows.len()
     }
@@ -168,6 +176,17 @@ pub(crate) fn dynamic_rule_row(
     let cancellation = CancellationToken::new();
     let report = uncancelled(dynamic_rule_report(snapshot, &cancellation));
     report.row(kind, name).cloned()
+}
+
+/// Snapshot-level lookup by definition name alone, for callers that only
+/// hold the owner's spelling.
+pub(crate) fn dynamic_rule_row_by_name(
+    snapshot: &AnalysisSnapshot,
+    name: &str,
+) -> Option<DynamicRuleRow> {
+    let cancellation = CancellationToken::new();
+    let report = uncancelled(dynamic_rule_report(snapshot, &cancellation));
+    report.row_by_name(name).cloned()
 }
 
 fn dynamic_rule_report(

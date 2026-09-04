@@ -66,20 +66,28 @@ pub fn hover_with_cancellation(
             }
             pdx_engine::hir::HirParameterReferenceKind::Conditional => "conditional",
         };
-        let owner = owner_name.map_or_else(
+        let owner = owner_name.as_deref().map_or_else(
             || "scripted definition".to_owned(),
-            |name| format!("scripted definition {}", code_span(&name)),
+            |name| format!("scripted definition {}", code_span(name)),
         );
+        let mut contents = format!(
+            "### parameter {}\n\n- Local to {owner}; inferred from its first use\n- Presence: `{}`\n- Syntax: `{syntax}`\n- Occurrences in owner: {occurrences}",
+            code_span(&definition.name),
+            if optional {
+                "optional"
+            } else {
+                "required/inferred"
+            },
+        );
+        if let Some(owner) = owner_name.as_deref()
+            && let Some(contract) =
+                dynamic_parameter_contract_lines(snapshot, None, owner, &definition.name)
+        {
+            contents.push('\n');
+            contents.push_str(&contract);
+        }
         return Ok(Some(Hover {
-            contents: format!(
-                "### parameter {}\n\n- Local to {owner}; inferred from its first use\n- Presence: `{}`\n- Syntax: `{syntax}`\n- Occurrences in owner: {occurrences}",
-                code_span(&definition.name),
-                if optional {
-                    "optional"
-                } else {
-                    "required/inferred"
-                },
-            ),
+            contents,
             range: Some(reference.name_range),
         }));
     }
@@ -132,6 +140,14 @@ pub fn hover_with_cancellation(
         ));
     }
     cancellation.checkpoint()?;
+    if let Some(contents) =
+        dynamic_invocation_parameter_hover(snapshot, &input, position, cancellation)?
+    {
+        return Ok(Some(Hover {
+            contents,
+            range: Some(range),
+        }));
+    }
     if let Some(details) = semantic_rule_hover_at(snapshot, &input, position, cancellation)? {
         return Ok(Some(Hover {
             contents: format!("### PDX property {}\n\n{details}", code_span(&word)),
@@ -178,6 +194,123 @@ pub(crate) fn is_property_key_at(input: &ParsedInput, position: TextSize) -> boo
             .iter()
             .any(|property| contains(property.key_range, position))
     })
+}
+
+/// Hover for an argument key at a dynamic call site (`stable = { AMT = 1 }`):
+/// resolves the definition's parameter row so the hover shows the parameter
+/// contract instead of the generic property rows behind the parameter enum.
+fn dynamic_invocation_parameter_hover(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    position: TextSize,
+    cancellation: &CancellationToken,
+) -> Result<Option<String>, Cancelled> {
+    let Some(context) =
+        semantic_completion_context_with_cancellation(snapshot, input, position, cancellation)?
+    else {
+        return Ok(None);
+    };
+    let Some(property) = context.property.as_ref() else {
+        return Ok(None);
+    };
+    if !contains(property.key_range, position) {
+        return Ok(None);
+    }
+    let Some(invocation) = context.container_property.as_ref() else {
+        return Ok(None);
+    };
+    let Some((owner_kind, owner_name, _)) =
+        dynamic_parameter_owner(snapshot, &context, property, invocation)
+    else {
+        return Ok(None);
+    };
+    let Some(row) = crate::dynamic_rules::dynamic_rule_row(snapshot, &owner_kind, &owner_name)
+    else {
+        return Ok(None);
+    };
+    let Some(parameter) = row
+        .parameters
+        .iter()
+        .find(|parameter| parameter.name.eq_ignore_ascii_case(&property.key))
+    else {
+        return Ok(None);
+    };
+    let mut contents = format!(
+        "### parameter {} of scripted {}\n\n- Presence: `{}`",
+        code_span(&parameter.name),
+        code_span(&row.name),
+        if parameter.required {
+            "required"
+        } else {
+            "optional"
+        },
+    );
+    if let Some(contract) =
+        dynamic_parameter_contract_lines(snapshot, Some(&owner_kind), &owner_name, &property.key)
+    {
+        contents.push('\n');
+        contents.push_str(&contract);
+    }
+    Ok(Some(contents))
+}
+
+/// Shared contract lines for a dynamic parameter: payload nature, dispatch,
+/// forwarding edges, and the value constraints its usage sites imply
+/// (following forwarding edges into nested calls). Constraint labels are
+/// self-contained code spans and must not be wrapped again.
+fn dynamic_parameter_contract_lines(
+    snapshot: &AnalysisSnapshot,
+    owner_kind: Option<&str>,
+    owner_name: &str,
+    parameter_name: &str,
+) -> Option<String> {
+    let row = owner_kind
+        .and_then(|kind| crate::dynamic_rules::dynamic_rule_row(snapshot, kind, owner_name))
+        .or_else(|| crate::dynamic_rules::dynamic_rule_row_by_name(snapshot, owner_name))?;
+    let parameter = row
+        .parameters
+        .iter()
+        .find(|parameter| parameter.name.eq_ignore_ascii_case(parameter_name))?;
+    let mut lines = Vec::new();
+    if parameter.quoted_script {
+        lines.push(
+            "- Payload: quoted script (the caller's raw text is spliced into the body)".to_owned(),
+        );
+    }
+    if parameter.used_in_key {
+        lines.push("- Dispatch: rendered as a statement key in the body".to_owned());
+    }
+    for edge in &parameter.forwarded_to {
+        let target = match &edge.parameter {
+            Some(name) => format!("`{}` (parameter `{}`)", edge.name, name),
+            None => format!("`{}` (rendered parameter key)", edge.name),
+        };
+        lines.push(format!("- Forwarded to scripted {target}"));
+    }
+    let sites =
+        crate::diagnostics::effective_parameter_sites(snapshot, &row, parameter, &mut Vec::new());
+    if !sites.is_empty() {
+        let rendered = sites
+            .iter()
+            .map(|matchers| {
+                matchers
+                    .iter()
+                    .map(semantic_value_hover_label)
+                    .collect::<Vec<_>>()
+                    .join(" or ")
+            })
+            .collect::<Vec<_>>()
+            .join("; ");
+        lines.push(format!(
+            "- Inferred value constraints (per usage site): {rendered}"
+        ));
+    } else if !parameter.quoted_script
+        && !parameter.used_in_key
+        && parameter.forwarded_to.is_empty()
+    {
+        lines.push("- Inferred value constraints: none".to_owned());
+    }
+    (!lines.is_empty()).then(|| lines.join("\n"))
 }
 
 pub(crate) fn semantic_rule_hover_at(
