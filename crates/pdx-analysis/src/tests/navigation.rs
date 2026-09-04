@@ -314,9 +314,14 @@ fn dynamic_calls_resolve_scalar_and_block_forms_with_overlay_priority() {
         diagnostics(&invalid_snapshot, &invalid_use_id)
             .iter()
             .any(|item| {
-                item.code == DiagnosticCode::InvalidValue
+                item.code == DiagnosticCode::Cardinality
                     && item.message.contains("`scalar_effect`")
-            })
+                    && item
+                        .message
+                        .contains("missing required parameter(s): `amount`")
+            }),
+        "scalar calls of parameterized definitions report missing parameters: {:?}",
+        diagnostics(&invalid_snapshot, &invalid_use_id)
     );
 
     host.close_document(&invalid_use_id)
