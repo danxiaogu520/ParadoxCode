@@ -1997,18 +1997,16 @@ fn validate_dynamic_dispatch_keys(
     let bindings = dynamic_cycles::scalar_argument_bindings(property);
     let mut walker = DispatchKeyWalker {
         snapshot,
-        context: resolved.body_context.clone(),
         definition_name: row.name.clone(),
         bindings: &bindings,
         invocation: property,
         diagnostics,
     };
-    walker.walk_items(&template.items);
+    walker.walk_items(&template.items, &resolved.body_context, true);
 }
 
 struct DispatchKeyWalker<'a> {
     snapshot: &'a AnalysisSnapshot,
-    context: String,
     definition_name: String,
     bindings: &'a std::collections::BTreeMap<String, String>,
     invocation: &'a ScriptProperty,
@@ -2016,27 +2014,68 @@ struct DispatchKeyWalker<'a> {
 }
 
 impl DispatchKeyWalker<'_> {
-    fn walk_items(&mut self, items: &[TemplateItem]) {
+    fn walk_items(&mut self, items: &[TemplateItem], context: &str, key_checks: bool) {
         for item in items {
             match item {
                 TemplateItem::Property(property) => {
-                    self.check_property(property);
+                    if key_checks {
+                        self.check_property(property, context);
+                    }
                     if let TemplateValue::Block { items, .. } = &property.value {
-                        if self.block_is_argument_list(property) {
+                        if self.block_is_argument_list(property, context) {
                             // A nested dynamic-rule call's block assigns callee
                             // parameters (`helper = { AMOUNT = $X$ }`): its keys
                             // name parameters, they do not dispatch.
                             continue;
                         }
-                        self.walk_items(items);
+                        let lowered = self
+                            .rendered_key(property)
+                            .map(|key| key.to_ascii_lowercase());
+                        if lowered.as_deref().is_some_and(is_display_only_block) {
+                            continue;
+                        }
+                        let branch_keyed = lowered
+                            .as_deref()
+                            .is_some_and(is_value_keyed_branch_container);
+                        let Some(child_context) = self.child_block_context(property, context)
+                        else {
+                            continue;
+                        };
+                        self.walk_items(items, &child_context, !branch_keyed);
                     }
                 }
                 TemplateItem::Conditional(conditional) => {
-                    self.walk_items(&conditional.items);
+                    self.walk_items(&conditional.items, context, key_checks);
                 }
                 TemplateItem::BareValue(_) => {}
             }
         }
+    }
+
+    /// The context in which a container block's contents validate, or `None`
+    /// when the walker should not descend: display-only blocks (`tooltip`)
+    /// render their contents for the tooltip without executing them, and
+    /// quoted-script payloads validate as quotes at their definition.
+    fn child_block_context(&self, property: &TemplateProperty, context: &str) -> Option<String> {
+        let rendered = self.rendered_key(property)?;
+        let lowered = rendered.to_ascii_lowercase();
+        if is_display_only_block(&lowered) {
+            return None;
+        }
+        let rows = semantic_rules_for_container_key(self.snapshot, context, &[], &rendered);
+        if rows
+            .iter()
+            .any(|rule| matches!(rule.shape, RuleShape::QuotedScript))
+        {
+            return None;
+        }
+        let switched = rows.iter().find_map(|rule| {
+            rule.child_context
+                .as_deref()
+                .filter(|child| !child.eq_ignore_ascii_case(context))
+                .map(str::to_owned)
+        });
+        Some(switch_child_context(&lowered, context, switched))
     }
 
     /// True when the property is a nested dynamic-rule call whose block is an
@@ -2044,11 +2083,11 @@ impl DispatchKeyWalker<'_> {
     /// callee names rendered from a fully-bound `$param$` key; an unbound or
     /// partially-rendered key makes the block unknowable, and unknowable
     /// blocks stay silent rather than report against a guessed target.
-    fn block_is_argument_list(&self, property: &TemplateProperty) -> bool {
+    fn block_is_argument_list(&self, property: &TemplateProperty, context: &str) -> bool {
         let Some(rendered) = self.rendered_key(property) else {
             return true;
         };
-        crate::dynamic_rules::dynamic_kind_for_context(self.snapshot, &self.context)
+        crate::dynamic_rules::dynamic_kind_for_context(self.snapshot, context)
             .and_then(|kind| resolve_dynamic_definition(self.snapshot, &kind, &rendered))
             .is_some()
     }
@@ -2074,7 +2113,7 @@ impl DispatchKeyWalker<'_> {
         Some(rendered.to_owned())
     }
 
-    fn check_property(&mut self, property: &TemplateProperty) {
+    fn check_property(&mut self, property: &TemplateProperty, context: &str) {
         let fragments = &property.key.fragments;
         if !fragments
             .iter()
@@ -2102,6 +2141,11 @@ impl DispatchKeyWalker<'_> {
         if rendered.is_empty() || rendered.contains('$') {
             return;
         }
+        if rendered.parse::<f64>().is_ok() {
+            // Numeric keys are weights or id selectors (`random_list = { 0 = … }`),
+            // never key lookups.
+            return;
+        }
         let lowered = rendered.to_ascii_lowercase();
         let is_scope_register = matches!(
             lowered.as_str(),
@@ -2111,7 +2155,7 @@ impl DispatchKeyWalker<'_> {
         if is_scope_register {
             return;
         }
-        let known = semantic_rules_for_container_key(self.snapshot, &self.context, &[], rendered)
+        let known = semantic_rules_for_container_key(self.snapshot, context, &[], rendered)
             .iter()
             .any(|rule| semantic_rule_key_matches(self.snapshot, rule, &[], rendered));
         if known {
@@ -2141,10 +2185,39 @@ impl DispatchKeyWalker<'_> {
             value_range,
             format!(
                 "argument `{}` for parameter `{parameter}` of scripted `{}` does not name a known {} key",
-                value, self.definition_name, self.context
+                value, self.definition_name, context
             ),
         ));
     }
+}
+
+/// Blocks whose contents render for display only; their keys reference real
+/// effects but never execute, so a rendered key mismatch is cosmetic at worst.
+fn is_display_only_block(lowered: &str) -> bool {
+    matches!(lowered, "tooltip")
+}
+
+/// Containers whose branch keys are VALUES, not keys: `random`/`random_list`
+/// branch on a rendered weight and `trigger_switch` branches on the
+/// `on_trigger` value, so rendered branch keys never resolve through the
+/// rule key index.
+fn is_value_keyed_branch_container(lowered: &str) -> bool {
+    matches!(lowered, "random" | "random_list" | "trigger_switch")
+}
+
+/// Resolves the walked child context from the row-declared switch, falling
+/// back to the trigger context for structural sub-blocks (`limit`-style
+/// gates) whose rows the current context does not declare.
+fn switch_child_context(lowered: &str, context: &str, switched: Option<String>) -> String {
+    switched.unwrap_or_else(|| {
+        if crate::dynamic_rules::is_structural_sub_block(lowered)
+            && !context.eq_ignore_ascii_case("trigger")
+        {
+            "trigger".to_owned()
+        } else {
+            context.to_owned()
+        }
+    })
 }
 
 /// Re-evaluates branch-local optionality from the persisted dynamic template. Vanilla dynamic

@@ -657,24 +657,21 @@ impl<'a> Derivation<'a> {
             .any(|rule| matches!(rule.shape, RuleShape::QuotedScript));
         for name in names {
             let usage = self.parameter(&name);
-            if token.quoted || payload_site {
+            // A quoted scalar template (`name = "$name$"`) is a string
+            // substitution: the caller's quoted argument validates as a
+            // scalar against the site's matchers. Only quoted-script-shaped
+            // rows mark payloads (bare value-position injections are marked
+            // by the walk).
+            if payload_site {
                 usage.quoted_script = true;
             }
-            let site = if is_bare_parameter(token, &name) {
-                matchers.clone()
-            } else {
-                // Parameters embedded with literal affixes (`$param$_exclude`)
-                // render to a derived name at runtime; dynamic membership
-                // matchers constrain the rendered spelling, not the bare
-                // argument.
-                matchers
-                    .iter()
-                    .filter(|matcher| !matches!(matcher, ValueMatcher::Dynamic(_)))
-                    .cloned()
-                    .collect::<Vec<_>>()
-            };
-            if !site.is_empty() {
-                usage.sites.push(site);
+            // Only whole-token parameters constrain the bare argument.
+            // Parameters embedded with literal affixes (`$school$_modifier`,
+            // `change_$stat$`) render to derived runtime names whose members
+            // the bare argument cannot satisfy, so their sites contribute no
+            // call-site constraint.
+            if is_bare_parameter(token, &name) && !matchers.is_empty() {
+                usage.sites.push(matchers.clone());
             }
         }
     }
@@ -738,7 +735,7 @@ fn dynamic_scope_link_flow(lowered: &str, context: &str, flow: &ScopeFlow) -> Op
 
 /// Sub-blocks that validate in a different context than their parent effect
 /// container; skipped by the shadow walk.
-fn is_structural_sub_block(lowered: &str) -> bool {
+pub(crate) fn is_structural_sub_block(lowered: &str) -> bool {
     matches!(
         lowered,
         "limit" | "trigger" | "mtth" | "mean_time_to_happen"
