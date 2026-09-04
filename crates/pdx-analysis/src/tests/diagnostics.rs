@@ -2091,6 +2091,181 @@ fn embedded_flag_templates_do_not_constrain_the_argument() {
 }
 
 #[test]
+fn dispatch_keys_inside_limits_validate_in_the_trigger_context() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-limit-dispatch-{nonce}"));
+    let effects = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&effects).expect("scripted effects directory");
+    // `adm` names a ruler-skill trigger inside the limit gate while
+    // `change_adm` and `add_adm_power` name effects; vanilla's
+    // change_ruler_stat helper relies on exactly this split.
+    std::fs::write(
+        effects.join("00_stats.txt"),
+        concat!(
+            "gain_ruler_stat = { if = { limit = { NOT = { $type$ = 6 } } ",
+            "change_$type$ = 1 } else = { add_$type$_power = 100 } }\n",
+        ),
+    )
+    .expect("definition file");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+    let id = DocumentId::new("file:///tmp/events/limit-dispatch.txt");
+    let text =
+        "country_event = { id = stats.1 immediate = { gain_ruler_stat = { type = adm } } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open event");
+
+    let adm_diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        adm_diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.message.contains("does not name a known")),
+        "limit-gate dispatch keys must be checked against triggers, not effects: {adm_diagnostics:?}"
+    );
+
+    let bad = DocumentId::new("file:///tmp/events/limit-dispatch-typo.txt");
+    let typo =
+        "country_event = { id = stats.2 immediate = { gain_ruler_stat = { type = banana } } }\n";
+    host.open_document(bad.clone(), 1, typo.to_owned(), None)
+        .expect("open typo event");
+    let typo_diagnostics = diagnostics(&host.snapshot(), &bad);
+    assert!(
+        typo_diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("banana")),
+        "a bogus dispatch fragment must still be rejected: {typo_diagnostics:?}"
+    );
+}
+
+#[test]
+fn tooltip_blocks_do_not_dispatch_validate() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-tooltip-dispatch-{nonce}"));
+    let effects = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&effects).expect("scripted effects directory");
+    // `tooltip` contents render for display only; a rendered key that names
+    // nothing is cosmetic, not an executable error.
+    std::fs::write(
+        effects.join("00_display.txt"),
+        "render_display = { tooltip = { change_$flavor$ = 1 } }\n",
+    )
+    .expect("definition file");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+    let id = DocumentId::new("file:///tmp/events/tooltip-dispatch.txt");
+    let text =
+        "country_event = { id = display.1 immediate = { render_display = { flavor = banana } } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open event");
+
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.message.contains("banana")),
+        "display-only tooltip blocks must not validate rendered keys: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn value_keyed_branch_containers_do_not_dispatch_validate() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-branch-dispatch-{nonce}"));
+    let effects = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&effects).expect("scripted effects directory");
+    // `random_list` branches on a rendered weight and `trigger_switch` on the
+    // `on_trigger` value; the rendered branch keys are values, not rule keys.
+    std::fs::write(
+        effects.join("00_branches.txt"),
+        concat!(
+            "pick_branch = { random_list = { ",
+            "$weight$ = { set_country_flag = picked } } ",
+            "trigger_switch = { on_trigger = primary_culture ",
+            "$culture$ = { change_primary_culture = $culture$ } } }\n",
+        ),
+    )
+    .expect("definition file");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+    let id = DocumentId::new("file:///tmp/events/branch-dispatch.txt");
+    let text = "country_event = { id = branch.1 immediate = { pick_branch = { weight = 0 culture = prussian } } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open event");
+
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.message.contains("does not name a known")),
+        "value-keyed branch keys must not resolve through the rule key index: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn embedded_modifier_templates_do_not_constrain_the_argument() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-embedded-modifier-{nonce}"));
+    let effects = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&effects).expect("scripted effects directory");
+    // `$privilege$_loyal` names a runtime-rendered modifier; the bare
+    // argument names an estate privilege, which no modifier row accepts.
+    std::fs::write(
+        effects.join("00_loyal.txt"),
+        concat!(
+            "grant_loyal = { add_country_modifier = { ",
+            "name = $privilege$_loyal duration = -1 } }\n",
+        ),
+    )
+    .expect("definition file");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+    let id = DocumentId::new("file:///tmp/events/embedded-modifier.txt");
+    let text = "country_event = { id = loyal.1 immediate = { grant_loyal = { privilege = estate_nobles_royal_court_tasks } } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open event");
+
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        diagnostics.iter().all(|diagnostic| !diagnostic
+            .message
+            .contains("estate_nobles_royal_court_tasks")),
+        "embedded modifier templates constrain the rendered name, not the bare argument: {diagnostics:?}"
+    );
+}
+
+#[test]
 fn unresolved_dynamic_placeholders_do_not_become_symbol_errors() {
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/common/scripted_triggers/placeholders.txt");
