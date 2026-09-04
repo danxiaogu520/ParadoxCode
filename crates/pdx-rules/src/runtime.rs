@@ -507,6 +507,51 @@ impl RuleSet {
         self.model.classify(path)
     }
 
+    /// Derives a logical path for a document addressed by URI without a physical
+    /// path, such as an editor scratch buffer.
+    ///
+    /// URIs carry arbitrary prefixes (`file:///`, percent-encoded drive letters,
+    /// scheme names), while game directories are identified by their trailing
+    /// structure. Every trailing run of path segments is tried as a candidate,
+    /// but only candidates a *directory-aware* file category recognizes count:
+    /// an extension-only category proves nothing about directories, so a path
+    /// that only classifies that way keeps the caller's bare-file-name fallback
+    /// instead of preserving URI junk segments. Among recognized candidates the
+    /// most specific category wins, so `file:///tmp/common/scripted_effects/
+    /// 00_a.txt` derives `common/scripted_effects/00_a.txt`.
+    #[must_use]
+    pub fn logical_path_for_uri(&self, uri: &str) -> Option<LogicalPath> {
+        let body = uri.split_once("://").map_or(uri, |(_, rest)| rest);
+        let segments: Vec<&str> = body
+            .split(['/', '\\'])
+            .filter(|segment| !segment.is_empty())
+            .collect();
+        if !segments.last()?.contains('.') {
+            return None;
+        }
+        let mut best: Option<((u8, usize), LogicalPath)> = None;
+        for start in (0..segments.len()).rev() {
+            let candidate = segments[start..].join("/");
+            let Ok(path) = LogicalPath::parse(&candidate) else {
+                continue;
+            };
+            let Some(category) = self.model.classify(&path) else {
+                continue;
+            };
+            let score @ (rank, _) = category.matcher.specificity();
+            if rank == 0 {
+                continue;
+            }
+            if best
+                .as_ref()
+                .is_none_or(|(best_score, _)| *best_score < score)
+            {
+                best = Some((score, path));
+            }
+        }
+        best.map(|(_, path)| path)
+    }
+
     /// Returns the stable game profile identity carried by this artifact.
     #[must_use]
     pub fn game_id(&self) -> &str {

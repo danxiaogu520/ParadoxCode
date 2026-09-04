@@ -588,3 +588,54 @@ fn sqlite_round_trip_validates_logical_hash() {
     ));
     std::fs::remove_file(path).expect("remove temporary rules");
 }
+
+#[test]
+fn logical_path_for_uri_keeps_the_most_specific_trailing_directory() {
+    let category = |id: &str, path_prefix: Option<&str>| FileCategory {
+        id: id.to_owned(),
+        parser: ParserKind::Script,
+        resolution: FileResolutionPolicy::Merge,
+        matcher: FileMatcher {
+            path_prefix: path_prefix.map(str::to_owned),
+            path_exact: None,
+            extensions: vec!["txt".to_owned()],
+            path_suffix: None,
+            path_exclude_prefixes: Vec::new(),
+            case_sensitive: false,
+        },
+    };
+    let rules = RuleSet::from_model(RulesModel {
+        file_categories: vec![
+            category("script", None),
+            category("common-root", Some("common")),
+            category("scripted-effects", Some("common/scripted_effects")),
+            category("events", Some("events")),
+        ],
+        ..RulesModel::default()
+    });
+
+    let derived = |uri: &str| {
+        rules
+            .logical_path_for_uri(uri)
+            .map(|path| path.as_str().to_owned())
+    };
+
+    // Arbitrary URI prefixes are dropped; the deepest recognized directory wins.
+    assert_eq!(
+        derived("file:///tmp/common/scripted_effects/00_a.txt").as_deref(),
+        Some("common/scripted_effects/00_a.txt")
+    );
+    // 目录感知候选胜出: URI 垃圾前缀被剥掉。
+    assert_eq!(
+        derived("file:///c%/Users/mod/events/hello.txt").as_deref(),
+        Some("events/hello.txt")
+    );
+    // Scheme-less identifiers behave the same.
+    assert_eq!(
+        derived("common/scripted_effects/00_a.txt").as_deref(),
+        Some("common/scripted_effects/00_a.txt")
+    );
+    // Unrecognizable buffers yield nothing so callers keep the bare file name.
+    assert_eq!(derived("untitled:Untitled-1"), None);
+    assert_eq!(derived("file:///tmp/no-extension"), None);
+}
