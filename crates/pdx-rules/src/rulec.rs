@@ -1505,7 +1505,7 @@ mod tests {
         );
         // Pins for the 2026-09-04 arbitration decisions.
         for (context, key, expected_scopes) in [
-            ("trigger", "culture", &["province"][..]),
+            ("trigger", "culture", &["country", "province"][..]),
             ("trigger", "same_continent", &["country", "province"][..]),
             ("trigger", "religion", &["country", "province"][..]),
             ("trigger", "unrest", &["country", "province"][..]),
