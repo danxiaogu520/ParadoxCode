@@ -13,7 +13,9 @@ mod support;
 
 pub(crate) use candidates::*;
 pub(crate) use context::*;
-pub(crate) use dynamic_constraints::infer_dynamic_quoted_script_constraints;
+pub(crate) use dynamic_constraints::{
+    dynamic_parameter_owner, infer_dynamic_quoted_script_constraints,
+};
 pub(crate) use support::*;
 
 /// Computes key, value, localisation, and symbol completion.

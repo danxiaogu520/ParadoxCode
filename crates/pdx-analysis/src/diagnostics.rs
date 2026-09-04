@@ -2002,7 +2002,26 @@ fn validate_dynamic_quoted_payloads(
         else {
             continue;
         };
-        if !parameter.quoted_script || argument.quoted_source.is_none() {
+        if !parameter.quoted_script {
+            continue;
+        }
+        if argument.quoted_source.is_none() {
+            // A payload parameter splices its raw text into a quoted script;
+            // an unquoted bare scalar renders as script content it almost
+            // certainly is not.
+            if !argument.quoted
+                && let Some((_, range)) = argument.scalar.as_ref()
+            {
+                diagnostics.push(Diagnostic::new(
+                    DiagnosticCode::InvalidValue,
+                    Severity::Warning,
+                    *range,
+                    format!(
+                        "parameter `{}` of scripted `{}` is spliced into a quoted script payload; provide its value as a quoted script",
+                        argument.key, row.name
+                    ),
+                ));
+            }
             continue;
         }
         validate_quoted_script(
@@ -2046,7 +2065,7 @@ fn dynamic_row_for_invocation(
 /// The sites constraining one parameter, following forwarding edges into
 /// nested calls so a forwarded argument inherits the callee parameter's own
 /// constraints. `visited` guards forwarding cycles.
-fn effective_parameter_sites(
+pub(crate) fn effective_parameter_sites(
     snapshot: &AnalysisSnapshot,
     row: &crate::dynamic_rules::DynamicRuleRow,
     parameter: &crate::dynamic_rules::DynamicParameterRow,

@@ -144,7 +144,7 @@ fn infer_dynamic_argument_constraints(
     result
 }
 
-fn dynamic_parameter_owner(
+pub(crate) fn dynamic_parameter_owner(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
     target: &ScriptProperty,
