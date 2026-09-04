@@ -49,6 +49,7 @@ pub(crate) fn input_for_document(
     let path = document
         .path()
         .and_then(|path| logical_path(snapshot, path))
+        .or_else(|| snapshot.rules().logical_path_for_uri(id.as_str()))
         .or_else(|| {
             id.as_str()
                 .split(['/', '\\'])
