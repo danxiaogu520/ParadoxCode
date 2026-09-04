@@ -1028,10 +1028,14 @@ pub(crate) fn add_inferred_dynamic_value_items(
         prefix,
         cancellation,
     } = input;
-    let sites = infer_dynamic_value_constraints(snapshot, context, property, cancellation)?;
-    if sites.is_empty() {
-        return Ok(false);
+    let constraints = infer_dynamic_value_constraints(snapshot, context, property, cancellation)?;
+    if constraints.sites.is_empty() {
+        // A non-enumerable constraint (numbers, opaque strings) is still a
+        // constraint: offer nothing rather than falling back to the generic
+        // value items for this context.
+        return Ok(constraints.unenumerable);
     }
+    let sites = constraints.sites;
     let mut intersection: Option<BTreeMap<(String, CompletionKind), RankedCompletionItem>> = None;
     for site in sites {
         cancellation.checkpoint()?;

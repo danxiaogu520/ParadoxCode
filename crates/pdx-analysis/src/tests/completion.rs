@@ -1754,6 +1754,63 @@ fn vanilla_cache_only_dynamic_value_completion_uses_persisted_body_constraints()
 }
 
 #[test]
+fn non_enumerable_dynamic_value_constraints_suppress_generic_fallback() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-unenumerable-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&definitions).expect("definition directory");
+    std::fs::write(
+        definitions.join("00_unenumerable.txt"),
+        concat!(
+            "stable_boost = { add_stability = $AMT$ }\n",
+            "flag_flip = { set_primitive = $VALUE$ }\n",
+        ),
+    )
+    .expect("dynamic definitions");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    let id = DocumentId::new("file:///tmp/events/unenumerable.txt");
+    let text =
+        "country_event = { immediate = { stable_boost = { AMT =  } flag_flip = { VALUE =  } } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open call");
+
+    // A numeric usage site constrains the value but offers nothing; the
+    // generic value items for the context (scope links) must not leak in.
+    let amount_position =
+        u32::try_from(text.find("AMT =  ").expect("amount value") + "AMT = ".len() + 1)
+            .expect("position");
+    let amount_items = complete(&host.snapshot(), &id, amount_position).items;
+    assert!(
+        amount_items.is_empty(),
+        "non-enumerable constraints must offer nothing instead of the generic fallback: {amount_items:?}"
+    );
+
+    // Enumerable constraints keep completing.
+    let value_position =
+        u32::try_from(text.find("VALUE =  ").expect("flag value") + "VALUE = ".len() + 1)
+            .expect("position");
+    let value_items = complete(&host.snapshot(), &id, value_position).items;
+    assert!(
+        value_items.iter().any(|item| item.label == "yes")
+            && value_items.iter().any(|item| item.label == "no"),
+        "enumerable constraints keep offering members: {value_items:?}"
+    );
+
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn vanilla_cache_only_dynamic_completes_inside_quoted_effect_payload() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
