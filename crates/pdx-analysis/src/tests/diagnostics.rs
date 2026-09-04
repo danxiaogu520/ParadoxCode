@@ -1003,6 +1003,160 @@ fn dynamic_definition_parameters_do_not_trigger_value_or_key_diagnostics() {
 }
 
 #[test]
+fn dynamic_invocation_diagnostics_report_precise_messages() {
+    use std::fs;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-messages-{nonce}"));
+    let effects = root.join("common/scripted_effects");
+    fs::create_dir_all(&effects).expect("scripted effects directory");
+    let definitions_body = concat!(
+        "stable = { add_stability = $AMT$ }\n",
+        "noargs = { add_prestige = 1 }\n",
+        "dynamic_dispatch = { $action$ = yes }\n",
+        "weird = { totally_unknown_effect_xyz = yes }\n",
+    );
+    fs::write(effects.join("00_messages.txt"), definitions_body).expect("definitions");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    // Definition bodies must keep the generic unknown-key message: an unknown
+    // statement inside a definition is an unknown effect, not a parameter.
+    let definitions = DocumentId::new("file:///tmp/common/scripted_effects/00_messages.txt");
+    host.open_document(
+        definitions.clone(),
+        1,
+        definitions_body.to_owned(),
+        Some(effects.join("00_messages.txt")),
+    )
+    .expect("open definitions");
+    let definition_results = diagnostics(&host.snapshot(), &definitions);
+    let body_unknown: Vec<&Diagnostic> = definition_results
+        .iter()
+        .filter(|item| {
+            item.code == DiagnosticCode::UnknownKey
+                && item.message.contains("totally_unknown_effect_xyz")
+        })
+        .collect();
+    assert!(
+        !body_unknown.is_empty(),
+        "unknown statements in definition bodies stay diagnosable: {definition_results:?}"
+    );
+    assert!(
+        body_unknown
+            .iter()
+            .all(|item| item.message.contains("in rule context")),
+        "definition bodies must not be mistaken for invocation argument blocks: {body_unknown:?}"
+    );
+
+    let id = DocumentId::new("file:///tmp/events/dynamic-messages.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        concat!(
+            "country_event = { id = batch.1 immediate = { ",
+            "stable = yes ",
+            "stable = { AMT = { 1 } } ",
+            "stable = { BOGUS = 1 } ",
+            "noargs = yes ",
+            "no_such_call = { X = 1 } ",
+            "dynamic_dispatch = { root_op = yes } ",
+            "} }\n",
+        )
+        .to_owned(),
+        None,
+    )
+    .expect("open call sites");
+
+    let results = diagnostics(&host.snapshot(), &id);
+
+    // #3: scalar invocation of a parameterized definition gets the dedicated
+    // missing-parameter message, not the generic value mismatch.
+    assert!(
+        results.iter().any(|item| {
+            item.code == DiagnosticCode::Cardinality
+                && item.message.contains(
+                    "missing required parameter(s): `AMT`; provide them in a parameter block",
+                )
+        }),
+        "scalar calls must explain the missing parameters: {results:?}"
+    );
+    assert!(
+        results
+            .iter()
+            .all(|item| !(item.code == DiagnosticCode::InvalidValue
+                && item.message.contains("value of `stable` does not match"))),
+        "the generic value mismatch must not duplicate the dynamic message: {results:?}"
+    );
+
+    // #4: block-for-scalar arguments report only the dedicated message.
+    assert!(
+        results.iter().any(|item| {
+            item.message
+                .contains("parameter `AMT` of scripted `stable` is used as a scalar value")
+        }),
+        "block-for-scalar keeps its dedicated message: {results:?}"
+    );
+    assert!(
+        results
+            .iter()
+            .all(|item| !(item.code == DiagnosticCode::InvalidValue
+                && item.message.contains("value of `AMT` does not match"))),
+        "argument shape mismatches belong to the dynamic layer only: {results:?}"
+    );
+
+    // #5: unknown parameters name their owner and the known parameters.
+    assert!(
+        results.iter().any(|item| {
+            item.code == DiagnosticCode::UnknownKey
+                && item
+                    .message
+                    .contains("unexpected parameter `BOGUS` of scripted `stable` (known: AMT)")
+        }),
+        "unknown parameters must name the scripted definition: {results:?}"
+    );
+
+    // Zero-parameter definitions stay legal as scalars.
+    assert!(
+        results
+            .iter()
+            .all(|item| !item.message.contains("`noargs`")),
+        "zero-parameter scalar calls remain legal: {results:?}"
+    );
+
+    // Unresolved invocations keep the generic unknown-key message.
+    assert!(
+        results.iter().any(|item| {
+            item.code == DiagnosticCode::UnknownKey
+                && item
+                    .message
+                    .contains("unexpected key `no_such_call` in rule context")
+        }),
+        "unresolved invocations keep the generic message: {results:?}"
+    );
+
+    // Dispatching invocations bind caller-chosen keys; they must not be
+    // mistaken for parameters.
+    assert!(
+        results
+            .iter()
+            .all(|item| !item.message.contains("unexpected parameter `root_op`")),
+        "dispatch keys are not parameters: {results:?}"
+    );
+
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn dollar_tokens_outside_dynamic_definitions_remain_diagnosable() {
     let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
     let id = DocumentId::new("file:///tmp/events/literal-dollar.txt");
@@ -3824,5 +3978,64 @@ fn dynamic_call_sites_are_validated_against_entry_contracts() {
         "dynamic definition `province_helper` requires entry scope province but is called in `country` scope"
     );
 
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn overlay_without_physical_path_routes_dynamic_definition_directories() {
+    // 以 URI 打开、不带物理路径的 scripted_triggers 文档必须按目录路由:
+    // 定义索引为 scripted_trigger、语句按 trigger 上下文校验, 而不是落到
+    // 任意的 type_per_file 兜底上下文(曾误路由为 type:customideas)。
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-overlay-route-{nonce}"));
+    let triggers = root.join("common/scripted_triggers");
+    std::fs::create_dir_all(&triggers).expect("trigger directory");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan");
+
+    let body = "is_rich = { treasury = { value > 100 } }\n";
+    let definitions = DocumentId::new("file:///tmp/common/scripted_triggers/00_route.txt");
+    host.open_document(definitions.clone(), 1, body.to_owned(), None)
+        .expect("open overlay without physical path");
+    let snapshot = host.snapshot();
+
+    let definition_diagnostics = diagnostics(&snapshot, &definitions);
+    assert!(
+        definition_diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.message.contains("customideas")),
+        "the overlay must not fall back to an arbitrary type context: {definition_diagnostics:?}"
+    );
+    let hover = hover(&snapshot, &definitions, pdx_text::TextSize::from(0u32)).expect("hover");
+    assert!(
+        hover.contents.contains("scripted_trigger `is_rich`"),
+        "definition must be indexed as scripted_trigger: {}",
+        hover.contents
+    );
+
+    // 调用侧按 trigger 解析, 不误报未知键。
+    let call = DocumentId::new("file:///tmp/events/overlay-route.txt");
+    host.open_document(
+        call.clone(),
+        1,
+        "country_event = { id = fixture.1 trigger = { is_rich = yes } option = { } }\n".to_owned(),
+        None,
+    )
+    .expect("open call");
+    let call_diagnostics = diagnostics(&host.snapshot(), &call);
+    assert!(
+        call_diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.code != DiagnosticCode::UnknownKey),
+        "the overlay definition must resolve at call sites: {call_diagnostics:?}"
+    );
     std::fs::remove_dir_all(root).expect("cleanup");
 }

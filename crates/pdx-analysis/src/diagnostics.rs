@@ -736,10 +736,19 @@ fn validate_semantic_container(
                     "`{}` is a trigger and cannot be used inside an effect block; conditions belong in a `limit` block",
                     property.key
                 ),
-                _ => format!(
-                    "unexpected key `{}` in rule context `{context}`",
-                    property.key
-                ),
+                _ => dynamic_invocation_parameter_message(
+                    snapshot,
+                    context,
+                    parent_path,
+                    hir,
+                    property,
+                )
+                .unwrap_or_else(|| {
+                    format!(
+                        "unexpected key `{}` in rule context `{context}`",
+                        property.key
+                    )
+                }),
             };
             diagnostics.push(Diagnostic::new(
                 DiagnosticCode::UnknownKey,
@@ -775,6 +784,13 @@ fn validate_semantic_container(
             } else {
                 &scoped_matching
             };
+            let dynamic_owned_value_mismatch = dynamic_layer_owns_value_diagnostic(
+                snapshot,
+                applicable,
+                parent_path,
+                property,
+                scope,
+            );
             let parameterized_scalar = property.scalar.as_ref().is_some_and(|(_, range)| {
                 hir.is_some_and(|hir| {
                     owner_local_parameter_in_range(
@@ -788,7 +804,7 @@ fn validate_semantic_container(
                 semantic_property_matches(snapshot, rule, property, scope)
                     || (parameterized_scalar && semantic_property_structure_matches(rule, property))
             });
-            if !valid {
+            if !valid && !dynamic_owned_value_mismatch {
                 let scope_value = property.scalar.as_ref().and_then(|(value, _)| {
                     applicable
                         .iter()
@@ -1445,17 +1461,12 @@ fn owner_local_parameter_in_range(
     })
 }
 
-fn validate_dynamic_arguments(
+fn dynamic_invocation_summary(
     snapshot: &AnalysisSnapshot,
     rules: &[&pdx_rules::SemanticRule],
-    property: &ScriptProperty,
-    scope: &ScopeContext,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    if property.block_range.is_none() {
-        return;
-    }
-    let summary = rules.iter().find_map(|rule| {
+    key: &str,
+) -> Option<DynamicDefinitionSummary> {
+    rules.iter().find_map(|rule| {
         let type_name = match &rule.key {
             pdx_rules::KeyMatcher::Type(type_name) | pdx_rules::KeyMatcher::Dynamic(type_name)
                 if dynamic_definition_type(snapshot, type_name) =>
@@ -1464,9 +1475,124 @@ fn validate_dynamic_arguments(
             }
             _ => return None,
         };
-        dynamic_definition_summary(snapshot, type_name, &property.key)
-    });
-    let Some(summary) = summary else {
+        dynamic_definition_summary(snapshot, type_name, key)
+    })
+}
+
+/// True when the dynamic-definition layer owns the message for this
+/// property's value shape, so the generic value-mismatch diagnostic stays
+/// silent: either the key is a parameter of a resolved invocation (argument
+/// shape and argument values carry dedicated diagnostics), or the property
+/// is a scalar invocation of a definition with required parameters (the
+/// missing-parameter diagnostic fires instead). Scope-target verdicts stay
+/// with the generic layer.
+fn dynamic_layer_owns_value_diagnostic(
+    snapshot: &AnalysisSnapshot,
+    rules: &[&pdx_rules::SemanticRule],
+    parent_path: &[std::sync::Arc<str>],
+    property: &ScriptProperty,
+    scope: &ScopeContext,
+) -> bool {
+    if let Some((value, _)) = property.scalar.as_ref() {
+        let scope_valued = rules.iter().any(|rule| {
+            !matches!(
+                semantic_scope_value_match(snapshot, rule, value, scope),
+                ScopeValueMatch::NotScopeRule
+            )
+        });
+        if scope_valued {
+            return false;
+        }
+    }
+    if rules.iter().any(|rule| {
+        matches!(
+            qualified_parameter_domain(snapshot, rule, parent_path),
+            QualifiedParameterDomain::Known(_)
+        )
+    }) {
+        return true;
+    }
+    if property.block_range.is_none() {
+        return dynamic_invocation_summary(snapshot, rules, &property.key).is_some_and(|summary| {
+            summary.parameters.iter().any(|parameter| {
+                parameter.required
+                    && !dynamic_parameter_is_runtime_optional(&summary, &parameter.name)
+            })
+        });
+    }
+    false
+}
+
+/// True when `range` sits inside a dynamic-definition body in this file:
+/// unknown statements there are ordinary unknown effects or triggers, not
+/// invocation parameters.
+fn inside_dynamic_definition_body(
+    snapshot: &AnalysisSnapshot,
+    hir: Option<&HirFile>,
+    range: TextRange,
+) -> bool {
+    hir.is_some_and(|hir| {
+        hir.definitions().iter().any(|definition| {
+            definition.range.start() <= range.start()
+                && range.end() <= definition.range.end()
+                && dynamic_definition_type(snapshot, &definition.kind)
+        })
+    })
+}
+
+/// The unknown-key message for a key sitting directly inside a dynamic
+/// invocation's argument block: name the scripted definition and its known
+/// parameters instead of only the rule context.
+fn dynamic_invocation_parameter_message(
+    snapshot: &AnalysisSnapshot,
+    context: &str,
+    parent_path: &[std::sync::Arc<str>],
+    hir: Option<&HirFile>,
+    property: &ScriptProperty,
+) -> Option<String> {
+    let owner_name = parent_path.last()?;
+    let kind = crate::dynamic_rules::dynamic_kind_for_context(snapshot, context)?;
+    let summary = dynamic_definition_summary(snapshot, &kind, owner_name)?;
+    if inside_dynamic_definition_body(snapshot, hir, property.key_range) {
+        return None;
+    }
+    if crate::dynamic_rules::dynamic_rule_row(snapshot, &kind, owner_name)
+        .is_some_and(|row| row.dispatches_dynamically)
+    {
+        // A dispatching invocation binds arbitrary caller-chosen keys; only
+        // the dispatch-key validator can judge them.
+        return None;
+    }
+    if summary.parameters.is_empty() {
+        return Some(format!(
+            "unexpected key `{}`: scripted `{}` takes no parameters",
+            property.key, summary.name
+        ));
+    }
+    let names = summary
+        .parameters
+        .iter()
+        .map(|parameter| parameter.name.as_str())
+        .collect::<Vec<_>>()
+        .join(", ");
+    Some(format!(
+        "unexpected parameter `{}` of scripted `{}` (known: {names})",
+        property.key, summary.name
+    ))
+}
+
+fn validate_dynamic_arguments(
+    snapshot: &AnalysisSnapshot,
+    rules: &[&pdx_rules::SemanticRule],
+    property: &ScriptProperty,
+    scope: &ScopeContext,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    // Scalar invocations (`stable = yes`) cannot bind anything, but fall
+    // through: a definition with required parameters must still get the
+    // dedicated missing-parameter message instead of only the generic
+    // value mismatch.
+    let Some(summary) = dynamic_invocation_summary(snapshot, rules, &property.key) else {
         return;
     };
 
@@ -1499,12 +1625,17 @@ fn validate_dynamic_arguments(
         .map(|parameter| format!("`{}`", parameter.name))
         .collect::<Vec<_>>();
     if !missing.is_empty() {
+        let hint = if property.block_range.is_none() {
+            "; provide them in a parameter block"
+        } else {
+            ""
+        };
         diagnostics.push(Diagnostic::new(
             DiagnosticCode::Cardinality,
             DiagnosticCode::Cardinality.severity(),
             property.key_range,
             format!(
-                "dynamic definition `{}` is missing required parameter(s): {}",
+                "dynamic definition `{}` is missing required parameter(s): {}{hint}",
                 summary.name,
                 missing.join(", ")
             ),
