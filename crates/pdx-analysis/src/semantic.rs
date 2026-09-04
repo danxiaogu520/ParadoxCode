@@ -2441,18 +2441,66 @@ impl MemberKindView {
 /// `(kind, folded name)` definition counts hidden by open overlays, per document revision.
 struct OverlayHiddenCounts(rustc_hash::FxHashMap<Box<str>, rustc_hash::FxHashMap<Box<str>, u32>>);
 
+/// Thread-local fast path for one snapshot-derived view.
+///
+/// The key is `(host identity, revision)`. Revision numbers are only unique
+/// within a single [`AnalysisHost`]: without the host id, a second host on the
+/// same thread (test harnesses, vanilla or dependency scans) that reaches the
+/// same revision number would reuse this slot and observe the first host's
+/// view — stale membership data reports live definitions as absent.
+struct SnapshotFastPath<T> {
+    entry: std::cell::RefCell<Option<((u64, u64), T)>>,
+}
+
+impl<T> SnapshotFastPath<T> {
+    const fn new() -> Self {
+        Self {
+            entry: std::cell::RefCell::new(None),
+        }
+    }
+
+    /// Returns a clone of the cached value when it was stored for this exact
+    /// snapshot (same host, same revision).
+    fn get_cloned(&self, snapshot: &AnalysisSnapshot, clone: impl FnOnce(&T) -> T) -> Option<T> {
+        let key = (snapshot.host_identity(), snapshot.revision());
+        self.entry
+            .borrow()
+            .as_ref()
+            .filter(|(seen, _)| *seen == key)
+            .map(|(_, value)| clone(value))
+    }
+
+    /// Runs `f` against the entry stored for this exact snapshot, installing
+    /// `init` first when the slot belongs to another host or revision.
+    fn with_entry<R>(
+        &self,
+        snapshot: &AnalysisSnapshot,
+        init: impl FnOnce() -> T,
+        f: impl FnOnce(&mut T) -> R,
+    ) -> R {
+        let key = (snapshot.host_identity(), snapshot.revision());
+        let mut entry = self.entry.borrow_mut();
+        if entry.as_ref().is_none_or(|(seen, _)| *seen != key) {
+            *entry = Some((key, init()));
+        }
+        let (_, value) = entry.as_mut().expect("entry installed above");
+        f(value)
+    }
+
+    /// Stores `value` for this snapshot, replacing an entry from any other
+    /// host or revision.
+    fn set(&self, snapshot: &AnalysisSnapshot, value: T) {
+        let key = (snapshot.host_identity(), snapshot.revision());
+        *self.entry.borrow_mut() = Some((key, value));
+    }
+}
+
 fn overlay_hidden_counts(snapshot: &AnalysisSnapshot) -> Arc<OverlayHiddenCounts> {
     thread_local! {
-        static SLOT: std::cell::RefCell<Option<(u64, Arc<OverlayHiddenCounts>)>> =
-            const { std::cell::RefCell::new(None) };
+        static SLOT: SnapshotFastPath<Arc<OverlayHiddenCounts>> = const { SnapshotFastPath::new() };
     }
     let revision = snapshot.revision();
-    if let Some(cached) = SLOT.with(|slot| {
-        slot.borrow()
-            .as_ref()
-            .filter(|(seen, _)| *seen == revision)
-            .map(|(_, view)| Arc::clone(view))
-    }) {
+    if let Some(cached) = SLOT.with(|slot| slot.get_cloned(snapshot, Arc::clone)) {
         return cached;
     }
     let cache_key = "workspace-membership-hidden";
@@ -2460,7 +2508,7 @@ fn overlay_hidden_counts(snapshot: &AnalysisSnapshot) -> Arc<OverlayHiddenCounts
         .query_cache()
         .get::<OverlayHiddenCounts>(revision, cache_key)
     {
-        SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&cached))));
+        SLOT.with(|slot| slot.set(snapshot, Arc::clone(&cached)));
         return cached;
     }
     let mut counts = OverlayHiddenCounts(rustc_hash::FxHashMap::default());
@@ -2658,16 +2706,10 @@ fn membership_view_type_names(rules: &pdx_rules::RuleSet) -> Vec<String> {
 /// map stays a single shared allocation, and a revision change invalidates the slot.
 fn workspace_membership(snapshot: &AnalysisSnapshot) -> Arc<WorkspaceMembership> {
     thread_local! {
-        static SLOT: std::cell::RefCell<Option<(u64, Arc<WorkspaceMembership>)>> =
-            const { std::cell::RefCell::new(None) };
+        static SLOT: SnapshotFastPath<Arc<WorkspaceMembership>> = const { SnapshotFastPath::new() };
     }
     let revision = snapshot.revision();
-    if let Some(cached) = SLOT.with(|slot| {
-        slot.borrow()
-            .as_ref()
-            .filter(|(seen, _)| *seen == revision)
-            .map(|(_, view)| Arc::clone(view))
-    }) {
+    if let Some(cached) = SLOT.with(|slot| slot.get_cloned(snapshot, Arc::clone)) {
         return cached;
     }
     let cache_key = "workspace-membership";
@@ -2737,16 +2779,9 @@ struct MembershipBundle {
 
 fn membership_bundle(snapshot: &AnalysisSnapshot) -> Arc<MembershipBundle> {
     thread_local! {
-        static SLOT: std::cell::RefCell<Option<(u64, Arc<MembershipBundle>)>> =
-            const { std::cell::RefCell::new(None) };
+        static SLOT: SnapshotFastPath<Arc<MembershipBundle>> = const { SnapshotFastPath::new() };
     }
-    let revision = snapshot.revision();
-    if let Some(cached) = SLOT.with(|slot| {
-        slot.borrow()
-            .as_ref()
-            .filter(|(seen, _)| *seen == revision)
-            .map(|(_, bundle)| Arc::clone(bundle))
-    }) {
+    if let Some(cached) = SLOT.with(|slot| slot.get_cloned(snapshot, Arc::clone)) {
         return cached;
     }
     let bundle = Arc::new(MembershipBundle {
@@ -2754,7 +2789,7 @@ fn membership_bundle(snapshot: &AnalysisSnapshot) -> Arc<MembershipBundle> {
         hidden: overlay_hidden_counts(snapshot),
         members: overlay_members(snapshot),
     });
-    SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&bundle))));
+    SLOT.with(|slot| slot.set(snapshot, Arc::clone(&bundle)));
     bundle
 }
 
@@ -2767,37 +2802,28 @@ const WORKSPACE_MEMBER_MEMO_CAP: usize = 1 << 16;
 type WorkspaceMemberMemo = rustc_hash::FxHashMap<Box<str>, rustc_hash::FxHashMap<Box<str>, bool>>;
 
 thread_local! {
-    /// Repeat-probe memo for [`workspace_member`], keyed by snapshot revision.
-    /// Rule matching probes the same `(type, member)` pairs for every property
-    /// (dynamic keys, scope fields, variable names), and answers depend only on
-    /// the immutable snapshot, so one computation per distinct pair per revision
-    /// is enough. Nested maps keep every probe allocation-free for
-    /// already-lowercase members.
-    static WORKSPACE_MEMBER_MEMO: std::cell::RefCell<Option<(u64, WorkspaceMemberMemo)>> =
-        const { std::cell::RefCell::new(None) };
+    /// Repeat-probe memo for [`workspace_member`], keyed by host identity and
+    /// snapshot revision. Rule matching probes the same `(type, member)` pairs
+    /// for every property (dynamic keys, scope fields, variable names), and
+    /// answers depend only on the immutable snapshot, so one computation per
+    /// distinct pair per revision is enough. Nested maps keep every probe
+    /// allocation-free for already-lowercase members.
+    static WORKSPACE_MEMBER_MEMO: SnapshotFastPath<WorkspaceMemberMemo> =
+        const { SnapshotFastPath::new() };
 }
 
 pub(crate) fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, member: &str) -> bool {
-    let revision = snapshot.revision();
     let lowered = if member.bytes().any(|byte| byte.is_ascii_uppercase()) {
         std::borrow::Cow::Owned(member.to_ascii_lowercase())
     } else {
         std::borrow::Cow::Borrowed(member)
     };
-    let memoized = WORKSPACE_MEMBER_MEMO.with(|memo| {
-        let mut slot = memo.borrow_mut();
-        let entry = slot.get_or_insert((revision, rustc_hash::FxHashMap::default()));
-        if entry.0 != revision {
-            *entry = (revision, rustc_hash::FxHashMap::default());
-        }
-        if let Some(answer) = entry
-            .1
-            .get::<str>(type_name)
-            .and_then(|members| members.get::<str>(lowered.as_ref()))
-        {
-            return Some(*answer);
-        }
-        None
+    let memoized = WORKSPACE_MEMBER_MEMO.with(|slot| {
+        slot.with_entry(snapshot, rustc_hash::FxHashMap::default, |memo| {
+            memo.get::<str>(type_name)
+                .and_then(|members| members.get::<str>(lowered.as_ref()))
+                .copied()
+        })
     });
     if let Some(answer) = memoized {
         return answer;
@@ -2807,15 +2833,13 @@ pub(crate) fn workspace_member(snapshot: &AnalysisSnapshot, type_name: &str, mem
         bundle
             .membership
             .contains(snapshot, &bundle.hidden, &bundle.members, type_name, member);
-    WORKSPACE_MEMBER_MEMO.with(|memo| {
-        let mut slot = memo.borrow_mut();
-        let Some(entry) = slot.as_mut() else {
-            return;
-        };
-        let members = entry.1.entry(Box::from(type_name)).or_default();
-        if members.len() < WORKSPACE_MEMBER_MEMO_CAP {
-            members.insert(Box::from(lowered.as_ref()), answer);
-        }
+    WORKSPACE_MEMBER_MEMO.with(|slot| {
+        slot.with_entry(snapshot, rustc_hash::FxHashMap::default, |memo| {
+            let members = memo.entry(Box::from(type_name)).or_default();
+            if members.len() < WORKSPACE_MEMBER_MEMO_CAP {
+                members.insert(Box::from(lowered.as_ref()), answer);
+            }
+        })
     });
     answer
 }
@@ -2868,21 +2892,15 @@ pub(crate) struct OverlayMembers {
 /// revision it observes so membership checks skip the query-cache lock entirely.
 pub(crate) fn overlay_members(snapshot: &AnalysisSnapshot) -> Arc<OverlayMembers> {
     thread_local! {
-        static SLOT: std::cell::RefCell<Option<(u64, Arc<OverlayMembers>)>> =
-            const { std::cell::RefCell::new(None) };
+        static SLOT: SnapshotFastPath<Arc<OverlayMembers>> = const { SnapshotFastPath::new() };
     }
     let revision = snapshot.revision();
-    if let Some(cached) = SLOT.with(|slot| {
-        slot.borrow()
-            .as_ref()
-            .filter(|(seen, _)| *seen == revision)
-            .map(|(_, view)| Arc::clone(view))
-    }) {
+    if let Some(cached) = SLOT.with(|slot| slot.get_cloned(snapshot, Arc::clone)) {
         return cached;
     }
     let key = "overlay-members";
     if let Some(cached) = snapshot.query_cache().get::<OverlayMembers>(revision, key) {
-        SLOT.with(|slot| *slot.borrow_mut() = Some((revision, Arc::clone(&cached))));
+        SLOT.with(|slot| slot.set(snapshot, Arc::clone(&cached)));
         return cached;
     }
     let mut members = OverlayMembers::default();

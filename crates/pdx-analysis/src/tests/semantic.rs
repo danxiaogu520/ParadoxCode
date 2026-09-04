@@ -1075,3 +1075,83 @@ fn eu4_legacy_governments_use_eu4_reform_semantics() {
     );
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn membership_caches_do_not_leak_across_hosts_with_equal_revisions() {
+    // 两个 host 各自的 revision 计数独立, 恰好在相同 revision 上查询时,
+    // thread-local 快路径必须按 host 身份区分, 否则第二个 host 会读到
+    // 第一个 host 的成员视图, 把自己的定义误报为不存在。
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let make_host = |suffix: &str, definitions: &str| {
+        let root = std::env::temp_dir().join(format!("pdx-analysis-host-leak-{suffix}-{nonce}"));
+        let effects = root.join("common/scripted_effects");
+        std::fs::create_dir_all(&effects).expect("definitions directory");
+        std::fs::write(effects.join("00_definitions.txt"), definitions).expect("definitions");
+        let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+        host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+            SourceRootId::new(1),
+            SourceRootKind::CurrentMod,
+            root,
+        )]));
+        host.refresh_source_roots().expect("scan definitions");
+        host
+    };
+
+    // Host A: 在某个 revision 上做一次完整诊断, 填满成员快路径。
+    let mut host_a = make_host("a", "stable = { add_stability = $AMT$ }\n");
+    let id_a = DocumentId::new("file:///tmp/events/host-leak-a.txt");
+    host_a
+        .open_document(
+            id_a.clone(),
+            1,
+            "country_event = { id = fixture.1 immediate = { stable = { AMT = 1 } } }\n".to_owned(),
+            None,
+        )
+        .expect("open call a");
+    let diagnostics_a = diagnostics(&host_a.snapshot(), &id_a);
+    assert!(
+        diagnostics_a
+            .iter()
+            .all(|diagnostic| diagnostic.code != DiagnosticCode::UnknownKey),
+        "host_a baseline must be clean: {diagnostics_a:?}"
+    );
+
+    // Host B: 新 host, 其调用恰好落在与 host_a 相同的 revision 上。
+    let mut host_b = make_host(
+        "b",
+        "guarded = { add_stability = $AMT$ [[EXTRA] add_manpower = $EXTRA$ ] }\n",
+    );
+    let id_b = DocumentId::new("file:///tmp/events/host-leak-b.txt");
+    host_b
+        .open_document(
+            id_b.clone(),
+            1,
+            "country_event = { id = fixture.1 immediate = { guarded = { AMT = 1 EXTRA = 2 } } }\n"
+                .to_owned(),
+            None,
+        )
+        .expect("open call b");
+    let snapshot_b = host_b.snapshot();
+    assert!(
+        (snapshot_b.host_identity(), snapshot_b.revision())
+            != (
+                host_a.snapshot().host_identity(),
+                host_a.snapshot().revision()
+            )
+            || snapshot_b.host_identity() != host_a.snapshot().host_identity(),
+        "the fixture must keep the two hosts distinguishable"
+    );
+    let diagnostics_b = diagnostics(&snapshot_b, &id_b);
+    let unknown = diagnostics_b
+        .iter()
+        .filter(|diagnostic| diagnostic.code == DiagnosticCode::UnknownKey)
+        .collect::<Vec<_>>();
+    assert!(
+        unknown.is_empty(),
+        "host_b's own definitions must resolve even when another host \
+         reached the same revision first: {unknown:?}"
+    );
+}
