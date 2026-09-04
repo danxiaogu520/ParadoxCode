@@ -14,6 +14,8 @@
  * Usage:
  *   node scripts/performance/head-to-head.mjs --workspace <mod> --cache <vanilla.pdxindex> \
  *       --label baseline --out performance-results/baseline.json
+ *   node scripts/performance/head-to-head.mjs --workspace <mod> --cache <vanilla.pdxindex> \
+ *       --dependency EDG=/path/to/reference-mod --label with-reference-mod
  *   node scripts/performance/head-to-head.mjs --compare performance-results/baseline.json \
  *       performance-results/candidate.json
  */
@@ -34,6 +36,7 @@ const DEFAULT_SAMPLE_INTERVAL_MS = 250;
 const DEFAULT_SAMPLES = 6;
 const DEFAULT_IDLE_WINDOW_MS = 20_000;
 const DEFAULT_CLOSE_SETTLE_MS = 2_500;
+const DEFAULT_EDIT_GRACE_MS = 2_000;
 const SCRIPT_DIRECTORIES = ['common', 'events', 'missions', 'decisions'];
 
 const USAGE = `Usage: node scripts/performance/head-to-head.mjs [options]
@@ -43,9 +46,13 @@ Options:
   --workspace DIR            mod/workspace root to measure (required unless --compare)
   --cache FILE               Vanilla .pdxindex cache (required unless --no-cache)
   --no-cache                 run without a Vanilla cache (explicit; numbers not comparable)
+  --dependency ID=PATH       live dependency root added to initializationOptions
+                             (repeatable; mirrors the editor's paradoxcode.dependencies)
   --samples N                files to measure interactively (default ${DEFAULT_SAMPLES})
   --idle-window-ms N         post-ready idle observation window (default ${DEFAULT_IDLE_WINDOW_MS})
   --close-settle-ms N        wait after each didClose for background work (default ${DEFAULT_CLOSE_SETTLE_MS})
+  --edit-grace-ms N          didChange publication window before treating the batch as
+                             suppressed by the server's identical-result dedupe (default ${DEFAULT_EDIT_GRACE_MS})
   --sample-interval-ms N     process sampling interval (default ${DEFAULT_SAMPLE_INTERVAL_MS})
   --timeout-ms N             initialize timeout (default ${DEFAULT_TIMEOUT_MS})
   --no-workspace-diagnostics disable workspaceWideDiagnostics (interactive-latency mode)
@@ -64,9 +71,11 @@ function parseArguments(argv) {
     samples: process.env.PDX_PERF_SAMPLES ? Number(process.env.PDX_PERF_SAMPLES) : DEFAULT_SAMPLES,
     idleWindowMs: DEFAULT_IDLE_WINDOW_MS,
     closeSettleMs: DEFAULT_CLOSE_SETTLE_MS,
+    editGraceMs: DEFAULT_EDIT_GRACE_MS,
     sampleIntervalMs: DEFAULT_SAMPLE_INTERVAL_MS,
     timeoutMs: DEFAULT_TIMEOUT_MS,
     workspaceDiagnostics: true,
+    dependencies: [],
     help: false,
     compare: [],
     noCache: false,
@@ -82,15 +91,36 @@ function parseArguments(argv) {
       case '--workspace': options.workspace = next(); break;
       case '--cache': options.cache = next(); break;
       case '--no-cache': options.noCache = true; break;
+      case '--dependency': {
+        const value = next();
+        const separator = value.indexOf('=');
+        if (separator <= 0 || separator === value.length - 1) {
+          throw new Error(`--dependency expects ID=PATH, got ${JSON.stringify(value)}`);
+        }
+        options.dependencies.push({
+          id: value.slice(0, separator),
+          path: value.slice(separator + 1),
+        });
+        break;
+      }
       case '--samples': options.samples = Number(next()); break;
       case '--idle-window-ms': options.idleWindowMs = Number(next()); break;
       case '--close-settle-ms': options.closeSettleMs = Number(next()); break;
+      case '--edit-grace-ms': options.editGraceMs = Number(next()); break;
       case '--sample-interval-ms': options.sampleIntervalMs = Number(next()); break;
       case '--timeout-ms': options.timeoutMs = Number(next()); break;
       case '--no-workspace-diagnostics': options.workspaceDiagnostics = false; break;
       case '--label': options.label = next(); break;
       case '--out': options.out = next(); break;
-      case '--compare': options.compare.push(next()); break;
+      case '--compare': {
+        options.compare.push(next());
+        // Also accept the documented two-argument form `--compare A.json B.json`.
+        const following = argv[index + 1];
+        if (options.compare.length === 1 && following && !following.startsWith('--')) {
+          options.compare.push(argv[(index += 1)]);
+        }
+        break;
+      }
       case '--help': options.help = true; break;
       default: throw new Error(`unknown option ${argument}\n\n${USAGE}`);
     }
@@ -259,6 +289,10 @@ async function currentLabel() {
 
 async function runMeasurement(options) {
   requireDirectory(options.workspace, 'Workspace');
+  for (const dependency of options.dependencies) {
+    if (!dependency.id.trim()) throw new Error('--dependency id must not be empty');
+    requireDirectory(inputPath(dependency.path), `Dependency ${dependency.id}`);
+  }
   const serverPath = inputPath(
     options.server ??
       join('target', 'release', process.platform === 'win32' ? 'pdx-ls.exe' : 'pdx-ls'),
@@ -279,6 +313,13 @@ async function runMeasurement(options) {
   const files = sampleFiles(scriptFiles, options.samples);
   console.log(`workspace: ${options.workspace}`);
   console.log(`cache: ${cache ? basename(cache) : '(disabled)'}`);
+  console.log(
+    `dependencies: ${
+      options.dependencies.length === 0
+        ? '(none)'
+        : options.dependencies.map((dependency) => `${dependency.id} -> ${dependency.path}`).join(', ')
+    }`,
+  );
   console.log(`server: ${serverPath}`);
   console.log(`files: ${files.length} sampled of ${scriptFiles.length}`);
   console.log(`label: ${label}`);
@@ -286,6 +327,12 @@ async function runMeasurement(options) {
   const initializationOptions = {
     workspaceWideDiagnostics: options.workspaceDiagnostics,
   };
+  if (options.dependencies.length > 0) {
+    initializationOptions.dependencies = options.dependencies.map((dependency) => ({
+      id: dependency.id,
+      path: inputPath(dependency.path),
+    }));
+  }
   if (cache) initializationOptions.vanillaIndexCache = cache;
   else initializationOptions.vanillaIndexCache = join(process.env.TMPDIR ?? '/tmp', `pdx-h2h-no-cache-${process.pid}.pdxindex`);
 
@@ -295,6 +342,7 @@ async function runMeasurement(options) {
     server: basename(serverPath),
     workspace: options.workspace,
     cache: cache ? basename(cache) : null,
+    dependencies: initializationOptions.dependencies ?? [],
     workspaceDiagnostics: options.workspaceDiagnostics,
     samples: files.length,
     startup: {},
@@ -365,6 +413,7 @@ async function runMeasurement(options) {
         bytes: Buffer.byteLength(text, 'utf8'),
       };
 
+      try {
       const tOpen = performance.now();
       client.notify('textDocument/didOpen', {
         textDocument: { uri, languageId: 'eu4', version: 1, text },
@@ -383,6 +432,8 @@ async function runMeasurement(options) {
       let completionItems = 0;
       let completionElapsed = 0;
       let completionProbes = 0;
+      let completionMaxItems = 0;
+      let completionMaxMs = 0;
       for (const position of completionCandidates(text)) {
         completionProbes += 1;
         const completion = await timedRequest(
@@ -394,23 +445,44 @@ async function runMeasurement(options) {
         const count = Array.isArray(completion.result)
           ? completion.result.length
           : completion.result?.items?.length ?? 0;
-        if (count > 0) {
+        if (count > 0 && completionItems === 0) {
           completionItems = count;
           completionElapsed = completion.elapsed;
-          break;
+        }
+        if (count > completionMaxItems) {
+          completionMaxItems = count;
+          completionMaxMs = completion.elapsed;
         }
       }
       entry.completionItems = completionItems;
       entry.completionMs = completionElapsed;
       entry.completionProbes = completionProbes;
+      entry.completionMaxItems = completionMaxItems;
+      entry.completionMaxMs = completionMaxMs;
 
       const tChange = performance.now();
       client.notify('textDocument/didChange', {
         textDocument: { uri, version: 2 },
         contentChanges: [{ text: `${text}\n# perf-edit` }],
       });
-      const changedAt = await waitForDiagnostic(client, uri, REQUEST_TIMEOUT_MS);
-      entry.changeToDiagnosticsMs = changedAt - tChange;
+      // The server dedupes byte-identical diagnostic batches, so a comment-only
+      // edit on a file whose diagnostics do not change never republishes. Wait
+      // one grace window; if nothing arrives, prove the server is still serving
+      // this document and record the suppression instead of hanging until the
+      // request timeout.
+      try {
+        const changedAt = await waitForDiagnostic(client, uri, options.editGraceMs);
+        entry.changeToDiagnosticsMs = changedAt - tChange;
+      } catch (error) {
+        if (!/^timed out/.test(error.message)) throw error;
+        await timedRequest(
+          client,
+          'textDocument/hover',
+          { textDocument: { uri }, position: hoverPosition(text) },
+          REQUEST_TIMEOUT_MS,
+        );
+        entry.diagnosticsSuppressed = true;
+      }
 
       const tClose = performance.now();
       const closeStartCpu = sampler.cpuSeconds;
@@ -423,18 +495,37 @@ async function runMeasurement(options) {
         `${entry.file}: open->diag ${entry.openToDiagnosticsMs.toFixed(0)} ms, ` +
           `hover ${entry.hoverMs.toFixed(0)} ms, completion ${entry.completionMs.toFixed(0)} ms ` +
           `(${entry.completionItems ?? 0} items after ${entry.completionProbes} probe(s)), ` +
-          `edit->diag ${entry.changeToDiagnosticsMs.toFixed(0)} ms, ` +
+          `max completion ${entry.completionMaxMs.toFixed(0)} ms (${entry.completionMaxItems} items), ` +
+          `edit->diag ${
+            entry.diagnosticsSuppressed
+              ? 'suppressed'
+              : `${entry.changeToDiagnosticsMs.toFixed(0)} ms`
+          }, ` +
           `close cpu +${entry.closeSettleCpuSeconds?.toFixed(1) ?? 'n/a'} s`,
       );
+      } catch (error) {
+        console.error(`failed while measuring ${entry.file}: ${error.message}`);
+        console.error(`server stderr (tail):\n${client.serverStderr.slice(-4_000)}`);
+        throw error;
+      }
     }
 
     measurement.aggregates = {
       openToDiagnosticsMs: aggregate(measurement.perFile.map((entry) => entry.openToDiagnosticsMs)),
       hoverMs: aggregate(measurement.perFile.map((entry) => entry.hoverMs)),
       completionMs: aggregate(measurement.perFile.map((entry) => entry.completionMs)),
-      changeToDiagnosticsMs: aggregate(measurement.perFile.map((entry) => entry.changeToDiagnosticsMs)),
+      completionMaxMs: aggregate(measurement.perFile.map((entry) => entry.completionMaxMs)),
+      completionMaxItems: aggregate(measurement.perFile.map((entry) => entry.completionMaxItems)),
+      changeToDiagnosticsMs: aggregate(
+        measurement.perFile
+          .map((entry) => entry.changeToDiagnosticsMs)
+          .filter((value) => value !== undefined),
+      ),
       closeSettleCpuSeconds: aggregate(measurement.perFile.map((entry) => entry.closeSettleCpuSeconds)),
     };
+    measurement.diagnosticsSuppressedCount = measurement.perFile.filter(
+      (entry) => entry.diagnosticsSuppressed,
+    ).length;
 
     await client.request('shutdown', null, 10_000).catch(() => undefined);
     client.notify('exit', null);
@@ -461,6 +552,7 @@ async function runMeasurement(options) {
     if (!stats) continue;
     console.log(`${name}: p50 ${stats.p50?.toFixed(0)} ms, p99 ${stats.p99?.toFixed(0)} ms, max ${stats.max?.toFixed(0)} ms`);
   }
+  console.log(`diagnostics suppressed (identical republish): ${measurement.diagnosticsSuppressedCount ?? 0} file(s)`);
   return measurement;
 }
 
@@ -472,7 +564,9 @@ function flatten(result) {
       rows.push([prefix, value]);
       return;
     }
-    if (Array.isArray(value)) return;
+    // Strings would otherwise enumerate into index/character pairs, and a
+    // single-character string enumerates into itself (infinite recursion).
+    if (typeof value === 'string' || Array.isArray(value)) return;
     for (const [key, child] of Object.entries(value)) visit(prefix ? `${prefix}.${ key}` : key, child);
   };
   visit('', result);

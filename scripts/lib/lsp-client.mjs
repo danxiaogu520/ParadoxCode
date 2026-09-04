@@ -10,8 +10,21 @@
  */
 
 import { performance } from 'node:perf_hooks';
+import { appendFileSync } from 'node:fs';
 
 const JSON_RPC_VERSION = '2.0';
+
+// Env-gated wire trace shared by the debugging sessions: each line records the
+// client-local time, direction, and a compact message summary. Off by default.
+const TRACE_PATH = process.env.PDX_LSP_CLIENT_TRACE;
+function trace(direction, detail) {
+  if (!TRACE_PATH) return;
+  try {
+    appendFileSync(TRACE_PATH, `${performance.now().toFixed(1)} ${direction} ${detail}\n`, 'utf8');
+  } catch {
+    // Tracing is best-effort; never break the transport for it.
+  }
+}
 
 export class LspProtocolError extends Error {
   constructor(message) {
@@ -106,6 +119,16 @@ export class LspClient {
     // Arrival stamp for the performance script; non-JSON metadata never
     // round-trips because received messages are never re-serialized.
     message._at = performance.now();
+    if (message.method === undefined && message.id !== undefined) {
+      trace('<=', `response id=${message.id}`);
+    } else if (message.method !== undefined) {
+      const params = message.params ?? {};
+      const detail =
+        message.method === 'textDocument/publishDiagnostics'
+          ? `publishDiagnostics ${(params.uri ?? '').split('/').pop()} n=${params.diagnostics?.length ?? 0} at=${message._at.toFixed(1)}`
+          : message.method;
+      trace('<=', `${message.id !== undefined ? `request ${message.id} ` : ''}${detail}`);
+    }
     if (message.id !== undefined && message.method === undefined) {
       // Response to one of our requests.
       const pending = this.pending.get(message.id);
@@ -186,6 +209,7 @@ export class LspClient {
   }
 
   notify(method, params) {
+    trace('=>', method);
     this.send({ jsonrpc: JSON_RPC_VERSION, method, ...(params === undefined ? {} : { params }) });
   }
 
@@ -193,6 +217,7 @@ export class LspClient {
     const id = this.nextId;
     this.nextId += 1;
     const effectiveTimeout = timeoutMs ?? this.timeoutMs;
+    trace('=>', `request ${id} ${method}`);
     return new Promise((resolveRequest, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
