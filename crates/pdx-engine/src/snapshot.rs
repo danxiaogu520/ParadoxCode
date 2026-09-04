@@ -230,6 +230,17 @@ impl AnalysisSnapshot {
         &self.query_cache
     }
 
+    /// Returns the identity of the analysis state that produced this snapshot.
+    ///
+    /// Snapshots share an id if and only if they come from the same `AnalysisHost`;
+    /// revision numbers alone are only unique within one host. Thread-local fast
+    /// paths keyed by revision must include this id so a second host reaching the
+    /// same revision cannot observe the first host's cached views.
+    #[must_use]
+    pub fn host_identity(&self) -> u64 {
+        self.query_cache.id()
+    }
+
     /// Returns the bounded scan profile selected by the workspace configuration.
     #[must_use]
     pub const fn scan_limits(&self) -> WorkspaceScanLimits {

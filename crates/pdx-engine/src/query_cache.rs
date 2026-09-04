@@ -45,7 +45,16 @@ pub struct SnapshotQueryCache {
     // and cheap enough that sharding is unnecessary at current worker counts.
     state: RwLock<CacheState>,
     capacity: usize,
+    /// Identity of the analysis state that owns this cache. Each `AnalysisHost`
+    /// allocates its own cache, so this id distinguishes hosts that happen to
+    /// reach the same revision number — analysis-layer thread-local fast paths
+    /// key on it to avoid serving one host's view to another.
+    id: u64,
 }
+
+/// Monotonic source of [`SnapshotQueryCache::id`] values. Allocations are
+/// never reused while a cache lives, so ids are unique among live hosts.
+static NEXT_CACHE_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 struct CacheState {
     revision: Option<u64>,
@@ -79,7 +88,20 @@ impl SnapshotQueryCache {
                 documents: FxHashMap::default(),
             }),
             capacity,
+            id: NEXT_CACHE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
         }
+    }
+
+    /// Returns the identity of the owning analysis state.
+    ///
+    /// Two snapshots share an id if and only if they come from the same
+    /// `AnalysisHost`; distinct hosts never do. Higher layers key per-snapshot
+    /// thread-local fast paths on this together with the revision so a second
+    /// host reaching the same revision number cannot observe the first host's
+    /// cached views.
+    #[must_use]
+    pub fn id(&self) -> u64 {
+        self.id
     }
 
     fn write(&self) -> std::sync::RwLockWriteGuard<'_, CacheState> {
