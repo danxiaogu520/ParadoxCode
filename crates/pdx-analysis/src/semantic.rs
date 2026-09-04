@@ -1967,7 +1967,7 @@ type FlagWriteViews = std::collections::BTreeMap<Box<str>, FlagWriteIndex>;
 /// Write-site view of open overlay documents, cached per revision. Overlay
 /// edits do not flush into the workspace index immediately, so the live HIR is
 /// folded here; open files are few, keeping the per-revision walk cheap.
-fn overlay_flag_writes(snapshot: &AnalysisSnapshot) -> std::sync::Arc<FlagWriteViews> {
+pub(crate) fn overlay_flag_writes(snapshot: &AnalysisSnapshot) -> std::sync::Arc<FlagWriteViews> {
     use std::collections::BTreeMap;
     let revision = snapshot.revision();
     const CACHE_KEY: &str = "overlay-flag-writes";

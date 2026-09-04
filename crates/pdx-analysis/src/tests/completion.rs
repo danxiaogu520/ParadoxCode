@@ -3458,3 +3458,71 @@ fn technology_file_root_offers_groups_and_tables() {
         "technology wrappers must insert block skeletons"
     );
 }
+
+#[test]
+fn closed_flag_kinds_complete_indexed_overlay_and_engine_seeded_names() {
+    use pdx_engine::{SourceRoot, SourceRootId, SourceRootKind, WorkspaceChange};
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-flag-completion-{nonce}"));
+    let events = root.join("events");
+    std::fs::create_dir_all(&events).expect("events directory");
+    std::fs::write(
+        events.join("00_disk.txt"),
+        "country_event = { id = disk.1 immediate = { set_global_flag = disk_written_flag } }\n",
+    )
+    .expect("disk event");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    let id = DocumentId::new("file:///tmp/events/flag-completion.txt");
+    let text = concat!(
+        "country_event = { id = complete.1 ",
+        "trigger = { has_global_flag = \n } ",
+        "immediate = { set_global_flag = overlay_written_flag } }\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open event");
+    let position = u32::try_from(
+        text.find("has_global_flag = ")
+            .expect("has_global_flag value")
+            + "has_global_flag = ".len(),
+    )
+    .expect("position");
+    let result = complete(&host.snapshot(), &id, position);
+    let labels = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"disk_written_flag"),
+        "an indexed disk write must complete: {labels:?}"
+    );
+    assert!(
+        labels.contains(&"overlay_written_flag"),
+        "an open-overlay write must complete without an index flush: {labels:?}"
+    );
+    assert!(
+        labels.contains(&"la_pleiade"),
+        "an engine-set global flag must complete: {labels:?}"
+    );
+    let engine_seeded = result
+        .items
+        .iter()
+        .find(|item| item.label == "la_pleiade")
+        .expect("engine seed item");
+    assert_eq!(
+        engine_seeded.detail, "engine-set global_flag",
+        "engine-set seeds carry their provenance"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}

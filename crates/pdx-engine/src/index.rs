@@ -578,6 +578,13 @@ impl FlagWriteIndex {
             self.patterns.insert((Box::from(prefix), Box::from(suffix)));
         }
     }
+
+    /// Lowercased literal write names recorded for this kind, in lexical
+    /// order. Pattern templates render at runtime and cannot be enumerated;
+    /// callers that need those spellings should complete the prefix instead.
+    pub fn literal_names(&self) -> impl Iterator<Item = &str> {
+        self.literals.iter().map(Box::as_ref)
+    }
 }
 
 /// Atomic parse/HIR/index output for one source file.
@@ -1212,6 +1219,13 @@ impl WorkspaceIndex {
         self.flag_writes
             .get(kind.to_ascii_lowercase().as_str())
             .map_or(FlagWriteMembership::Unknown, |view| view.membership(member))
+    }
+
+    /// Per-kind write-site view, for callers that enumerate the known names
+    /// (completion) instead of probing one member's membership.
+    #[must_use]
+    pub fn flag_write_index(&self, kind: &str) -> Option<&FlagWriteIndex> {
+        self.flag_writes.get(kind.to_ascii_lowercase().as_str())
     }
 }
 

@@ -957,6 +957,20 @@ pub(crate) fn add_semantic_value_items(
                         CompletionSpecificity::Dynamic,
                     );
                 }
+                if snapshot.game_profile().is_closed_dynamic_kind(kind) {
+                    // Closed kinds validate against reachable write sites and
+                    // engine seeds, so their known names are enumerable.
+                    add_closed_dynamic_kind_items(
+                        snapshot,
+                        items,
+                        kind,
+                        &documentation,
+                        replacement_range,
+                        prefix,
+                        rule.deprecated,
+                        candidate.schema_tier,
+                    );
+                }
                 for (label, detail) in scope_expression_candidates(snapshot, context, None) {
                     add_scope_completion_ranked(
                         items,
@@ -1315,6 +1329,60 @@ pub(crate) fn scope_link_rules(snapshot: &AnalysisSnapshot) -> Vec<(String, Vec<
     links.sort();
     links.dedup();
     links
+}
+
+/// Known names of a closed dynamic kind: workspace-indexed write literals,
+/// open-overlay writes, and the profile's engine-set seeds. Validation accepts
+/// exactly these plus runtime-rendered `$param$` spellings, which cannot be
+/// enumerated.
+#[expect(clippy::too_many_arguments)]
+fn add_closed_dynamic_kind_items(
+    snapshot: &AnalysisSnapshot,
+    items: &mut Vec<RankedCompletionItem>,
+    kind: &str,
+    documentation: &Option<String>,
+    replacement_range: TextRange,
+    prefix: &str,
+    deprecated: bool,
+    schema_tier: CompletionSchemaTier,
+) {
+    let mut seen: std::collections::BTreeSet<Box<str>> = std::collections::BTreeSet::new();
+    let mut push = |items: &mut Vec<RankedCompletionItem>, label: &str, detail: &str| {
+        if !seen.insert(Box::from(label.to_ascii_lowercase())) {
+            return;
+        }
+        add_value_completion_ranked(
+            items,
+            label,
+            detail,
+            documentation.clone(),
+            replacement_range,
+            prefix,
+            deprecated,
+            schema_tier,
+            CompletionSpecificity::Dynamic,
+        );
+    };
+    if let Some(view) = snapshot.index().flag_write_index(kind) {
+        for label in view.literal_names() {
+            push(items, label, kind);
+        }
+    }
+    for (view_kind, view) in crate::semantic::overlay_flag_writes(snapshot).iter() {
+        if view_kind.eq_ignore_ascii_case(kind) {
+            for label in view.literal_names() {
+                push(items, label, kind);
+            }
+        }
+    }
+    let engine_detail = format!("engine-set {kind}");
+    for (seed_kind, seeds) in &snapshot.game_profile().engine_set_flags {
+        if seed_kind.eq_ignore_ascii_case(kind) {
+            for label in seeds {
+                push(items, label, &engine_detail);
+            }
+        }
+    }
 }
 
 #[expect(clippy::too_many_arguments)]
