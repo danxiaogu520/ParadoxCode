@@ -901,7 +901,8 @@ impl SnapshotRequestContext {
                 .map_err(cancelled_error)?;
         let actions = fixes
             .into_iter()
-            .map(|fix| {
+            .map(|code_fix| {
+                let fix = code_fix.fix;
                 let edit = WorkspaceEdit::new(HashMap::from([(
                     params.text_document.uri.clone(),
                     vec![TextEdit {
@@ -909,10 +910,25 @@ impl SnapshotRequestContext {
                         new_text: fix.new_text,
                     }],
                 )]));
+                // Editors group an action with its diagnostic (lightbulb on the
+                // squiggle) when the wire form is attached; the paired
+                // diagnostic goes through the same conversion as publication.
+                let associated = diagnostic_values_for_text_with_ignored_and_overrides(
+                    vec![code_fix.diagnostic],
+                    Some(&self.snapshot),
+                    document.line_index(),
+                    document.text(),
+                    &self.ignored_diagnostic_codes,
+                    &self.diagnostic_severity_overrides,
+                )
+                .pop()
+                .map(|value| vec![value]);
                 CodeActionOrCommand::CodeAction(CodeAction {
                     title: fix.title,
                     kind: Some(CodeActionKind::QUICKFIX),
                     edit: Some(edit),
+                    diagnostics: associated,
+                    is_preferred: fix.preferred.then_some(true),
                     ..CodeAction::default()
                 })
             })

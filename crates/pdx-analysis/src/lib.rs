@@ -40,16 +40,16 @@ pub use navigation::{
     prepare_rename, prepare_rename_with_cancellation, references, references_with_cancellation,
     rename, rename_with_cancellation, workspace_symbols, workspace_symbols_with_cancellation,
 };
-pub use quick_fix::{MAX_QUICK_FIXES, quick_fixes_with_cancellation};
+pub use quick_fix::{CodeFix, MAX_QUICK_FIXES, quick_fixes_with_cancellation};
 pub use resolution::localisation_values_by_key;
 pub use semantic_tokens::{
     semantic_tokens, semantic_tokens_in_range_with_cancellation, semantic_tokens_with_cancellation,
 };
 pub use types::{
     AnalysisResult, CancellationToken, Cancelled, CompletionItem, CompletionKind, CompletionResult,
-    Diagnostic, DiagnosticCertainty, DiagnosticCode, DiagnosticProvenance, FileAnalysis, Hover,
-    Location, PrepareRenameResult, QuickFix, ReferenceInfo, RelatedLocation, RenameError,
-    RenameFailure, ScopeInlayHint, SemanticToken, SemanticTokenType, Severity, Symbol,
+    Diagnostic, DiagnosticCertainty, DiagnosticCode, DiagnosticProvenance, DiagnosticTag,
+    FileAnalysis, Hover, Location, PrepareRenameResult, QuickFix, ReferenceInfo, RelatedLocation,
+    RenameError, RenameFailure, ScopeInlayHint, SemanticToken, SemanticTokenType, Severity, Symbol,
     WorkspaceEditPlan, WorkspaceSymbol, WorkspaceTextEdit,
 };
 

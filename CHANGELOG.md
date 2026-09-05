@@ -7,6 +7,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Diagnostics system refactor, message quality round:
+  - The diagnostic code table is consolidated from 22 to 18 codes. Removed:
+    `UnknownSymbol`, `AmbiguousSymbol`, `UnknownScope`, `InvalidTarget`,
+    `TargetWrongScope`, `AnalysisIncomplete`, `UnknownBareValue`;
+    `RuleWrongScope` renamed to `WrongScope`; added `UnknownLocalisationKey`,
+    `AmbiguousDefinition`, `InvalidDependency`. Removed codes are not
+    aliased - configurations naming them fail fast at initialize. See
+    `docs/diagnostics.md` for the full migration table.
+  - Duplicate definitions resolve later-wins and report one
+    `AmbiguousDefinition` warning at the effective definition with a related
+    location on the shadowed one.
+  - EU4 mission trees validate dependencies in the main pipeline
+    (`InvalidDependency`): missing required missions, illegal placements
+    (slot/row rule), cycles, and zero positions.
+  - Messages describe the script, never the rule index: rule provenance,
+    matcher vocabulary (`int`, `enum[...]`), "bare value"/"value clause"
+    wording are gone from every user-facing surface; constraints render on
+    `expected:` lines; cardinality findings anchor on the block's opening
+    brace or the over-quota entry; parser errors quote the offending token;
+    quoted-script limit messages state their numbers.
+  - Did-you-mean suggestions (with quick fixes) cover unknown keys, enum
+    values, localisation keys, symbols, scope names/commands, and
+    localisation commands.
+  - Diagnostics carry editor tags: over-quota and always-true findings are
+    `Unnecessary` (dimmed); usage of deprecated declarations is `Deprecated`
+    (strikethrough). `codeDescription` links every code to
+    `docs/diagnostics.md`; code actions associate with their diagnostic and
+    did-you-mean fixes are preferred; `publishDiagnostics` carries the
+    document version; the list-truncation marker anchors on the last
+    retained diagnostic instead of (0,0).
+
 ## [0.3.0] - 2026-09-02
 
 This release ships a profile-driven performance round (whole-workspace validation CPU -68%, peak

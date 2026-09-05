@@ -9,8 +9,8 @@ use lsp_types::{
     Range as LspRange, ShowMessageParams, SymbolKind, Uri,
 };
 use pdx_analysis::{
-    CancellationToken, Cancelled, CompletionKind, Diagnostic, DiagnosticCode, Location,
-    RelatedLocation, RenameError, RenameFailure, Severity, diagnostics_with_cancellation,
+    CancellationToken, Cancelled, CompletionKind, Diagnostic, DiagnosticCode, DiagnosticTag,
+    Location, RelatedLocation, RenameError, RenameFailure, Severity, diagnostics_with_cancellation,
 };
 use pdx_engine::{AnalysisSnapshot, DocumentError, DocumentId};
 use pdx_rules::RulesError;
@@ -323,6 +323,8 @@ pub(crate) fn diagnostic_values_for_text_with_ignored_and_overrides(
                 related_information,
                 None,
             );
+            value.code_description = code_description_for(diagnostic.code.as_str());
+            value.tags = lsp_tags(&diagnostic.tags);
             // Certainty is current client-facing metadata; internal rule provenance never
             // crosses the LSP boundary.
             let mut metadata = json!({
@@ -372,6 +374,31 @@ fn related_information_for(
         })
         .collect::<Vec<_>>();
     (values.len() == related.len()).then_some(values)
+}
+
+/// Base URL of the per-code diagnostic documentation; each code anchors to
+/// its own section.
+const DIAGNOSTIC_DOCS_URL: &str =
+    "https://github.com/danxiaogu520/ParadoxCode/blob/main/docs/diagnostics.md";
+
+/// Returns the documentation link editors show next to the diagnostic code.
+fn code_description_for(code: &str) -> Option<lsp_types::CodeDescription> {
+    let href = format!("{DIAGNOSTIC_DOCS_URL}#{}", code.to_ascii_lowercase())
+        .parse::<Uri>()
+        .ok()?;
+    Some(lsp_types::CodeDescription { href })
+}
+
+/// Converts editor-neutral tags to their wire representation.
+fn lsp_tags(tags: &[DiagnosticTag]) -> Option<Vec<lsp_types::DiagnosticTag>> {
+    (!tags.is_empty()).then(|| {
+        tags.iter()
+            .map(|tag| match tag {
+                DiagnosticTag::Unnecessary => lsp_types::DiagnosticTag::UNNECESSARY,
+                DiagnosticTag::Deprecated => lsp_types::DiagnosticTag::DEPRECATED,
+            })
+            .collect()
+    })
 }
 
 /// Applies workspace and source-level diagnostic suppressions before publication. Keeping this
@@ -513,11 +540,15 @@ fn inline_diagnostic_suppressed(
     false
 }
 
-pub(crate) fn diagnostics_notification(uri: &str, values: Value) -> Value {
+pub(crate) fn diagnostics_notification(uri: &str, values: Value, version: Option<i64>) -> Value {
+    let mut params = json!({"uri": uri, "diagnostics": values});
+    if let Some(version) = version {
+        params["version"] = json!(version);
+    }
     json!({
         "jsonrpc": JSON_RPC_VERSION,
         "method": "textDocument/publishDiagnostics",
-        "params": {"uri": uri, "diagnostics": values},
+        "params": params,
     })
 }
 
@@ -753,11 +784,13 @@ mod tests {
     };
     use lsp_types::{CompletionItemKind, NumberOrString};
     use pdx_analysis::{
-        CompletionKind, Diagnostic, DiagnosticCode, DiagnosticProvenance, Location, QuickFix,
-        RelatedLocation, Severity,
+        CompletionKind, Diagnostic, DiagnosticCode, DiagnosticProvenance, DiagnosticTag, Location,
+        QuickFix, RelatedLocation, Severity,
     };
     use pdx_engine::DocumentId;
     use pdx_text::TextRange;
+
+    use super::diagnostics_notification;
 
     /// The snapshot-request routing table must agree with the wire method names the
     /// real protocol library uses. Hardcoding a wrong spelling here silently breaks
@@ -863,6 +896,50 @@ the game clamps this to the nearest column"
         // Without a snapshot the related location cannot resolve to a URI and
         // is dropped instead of breaking publication.
         assert!(value.get("relatedInformation").is_none());
+    }
+
+    #[test]
+    fn lsp_diagnostics_carry_tags_and_code_description() {
+        let diagnostic = Diagnostic::new(
+            DiagnosticCode::Cardinality,
+            Severity::Warning,
+            TextRange::new(0, 1).expect("range"),
+            "over quota".to_owned(),
+        )
+        .with_tag(DiagnosticTag::Unnecessary);
+        let values = diagnostic_values_for_text(vec![diagnostic], &LineIndex::new("x"), "x");
+        let value = serde_json::to_value(&values[0]).expect("diagnostic JSON");
+
+        assert_eq!(value["tags"], serde_json::json!([1]));
+        assert_eq!(
+            value["codeDescription"]["href"],
+            "https://github.com/danxiaogu520/ParadoxCode/blob/main/docs/diagnostics.md#cardinality"
+        );
+
+        // Untagged diagnostics omit the field entirely.
+        let plain = Diagnostic::new(
+            DiagnosticCode::UnknownKey,
+            Severity::Error,
+            TextRange::new(0, 1).expect("range"),
+            "unknown key".to_owned(),
+        );
+        let values = diagnostic_values_for_text(vec![plain], &LineIndex::new("x"), "x");
+        let value = serde_json::to_value(&values[0]).expect("diagnostic JSON");
+        assert!(value.get("tags").is_none());
+        assert_eq!(
+            value["codeDescription"]["href"],
+            "https://github.com/danxiaogu520/ParadoxCode/blob/main/docs/diagnostics.md#unknownkey"
+        );
+    }
+
+    #[test]
+    fn publish_diagnostics_notification_carries_document_version() {
+        let notification =
+            diagnostics_notification("file:///tmp/a.txt", serde_json::json!([]), Some(7));
+        assert_eq!(notification["params"]["version"], serde_json::json!(7));
+        let versionless =
+            diagnostics_notification("file:///tmp/a.txt", serde_json::json!([]), None);
+        assert!(versionless["params"].get("version").is_none());
     }
 
     #[test]
