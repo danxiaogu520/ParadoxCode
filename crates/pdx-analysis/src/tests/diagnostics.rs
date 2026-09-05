@@ -293,6 +293,128 @@ fn dynamic_bare_parameter_validates_quoted_effect_payload_at_call_site() {
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 
+/// Fixture root hosting scripted-effect definitions whose parameters render
+/// into quoted script payloads at known sites.
+fn quoted_payload_host(
+    nonce: &str,
+    definitions: &str,
+) -> (pdx_engine::AnalysisHost, std::path::PathBuf) {
+    let root = std::env::temp_dir().join(format!("pdx-analysis-quoted-payload-{nonce}"));
+    let directory = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&directory).expect("definition directory");
+    std::fs::write(directory.join("00_payloads.txt"), definitions).expect("dynamic definitions");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+    (host, root)
+}
+
+#[test]
+fn quoted_payload_validates_at_render_site_context() {
+    let (mut host, root) = quoted_payload_host(
+        "site-context",
+        "pay_limit = { every_owned_province = { limit = { $PAY$ } } }\n",
+    );
+    let id = DocumentId::new("file:///tmp/events/quoted-payload-site-context.txt");
+    let text = concat!(
+        "country_event = { immediate = { pay_limit = { PAY = \"add_base_tax = 1\" } } ",
+        "option = { pay_limit = { PAY = \"always = yes\" } } }\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open call");
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    // `add_base_tax` is an effect; the parameter renders inside a `limit`
+    // block, whose render site is a trigger context, so the payload must be
+    // rejected there even though the definition's flat body context would
+    // have accepted it.
+    assert!(
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic.message.contains("add_base_tax")
+                && matches!(
+                    diagnostic.code,
+                    DiagnosticCode::UnknownKey | DiagnosticCode::InvalidValue
+                )
+        }),
+        "effect key inside a trigger render site must be flagged: {diagnostics:?}"
+    );
+    // The trigger-shaped payload stays clean at the same site.
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("always = yes")),
+        "valid trigger payload must pass: {diagnostics:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn quoted_payload_scope_authority_at_render_site() {
+    let (mut host, root) = quoted_payload_host(
+        "site-scope",
+        "prov_pay = { every_owned_province = { $PAY$ } }\n",
+    );
+    let id = DocumentId::new("file:///tmp/events/quoted-payload-site-scope.txt");
+    let text = concat!(
+        "country_event = { immediate = { prov_pay = { PAY = \"add_prestige = 1\" } } ",
+        "option = { prov_pay = { PAY = \"add_base_tax = 1\" } } }\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open call");
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    // The render site runs in the pushed province scope; a country-only
+    // effect is out of scope there, a province effect is not.
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("add_prestige")
+                && diagnostic.code == DiagnosticCode::WrongScope),
+        "country effect in a province render site must be scope-flagged: {diagnostics:?}"
+    );
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("add_base_tax")),
+        "province effect at the province render site must pass: {diagnostics:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn quoted_payload_multi_site_union_accepts_any_valid_render_site() {
+    let (mut host, root) = quoted_payload_host(
+        "site-union",
+        "dual_pay = { every_owned_province = { $PAY$ } if = { limit = { $PAY$ } } }\n",
+    );
+    let id = DocumentId::new("file:///tmp/events/quoted-payload-site-union.txt");
+    let text = concat!(
+        "country_event = { immediate = { dual_pay = { PAY = \"add_base_tax = 1\" } } ",
+        "option = { dual_pay = { PAY = \"zzz_unknown_key_xyz = 1\" } } }\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open call");
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    // `add_base_tax` fails the trigger render site but passes the effect
+    // site: any-site-passes must keep it silent.
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("add_base_tax")),
+        "a payload valid at one render site must not be flagged: {diagnostics:?}"
+    );
+    // A statement invalid at every render site is still reported.
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("zzz_unknown_key_xyz")),
+        "a payload invalid at every render site must be flagged: {diagnostics:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
 #[test]
 fn dynamic_definitions_preserve_literal_quoted_script_through_nested_calls() {
     let nonce = std::time::SystemTime::now()
