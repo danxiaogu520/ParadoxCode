@@ -41738,6 +41738,36 @@
         "source_file": "catalog.json",
         "value": "bool"
       }
+    },
+    {
+      "table": "aliases",
+      "logical_id": "effects:root:777",
+      "source_order": 13681,
+      "fields": {
+        "directives": "scope = province",
+        "documentation": "Spawns a hussars cavalry unit in the current province scope for the defined country scope. Uses the currently selected cavalry unit.",
+        "key": "alias[effect:hussars_cavalry]",
+        "line": "3087",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "scope[country]"
+      }
+    },
+    {
+      "table": "aliases",
+      "logical_id": "effects:root:778",
+      "source_order": 13682,
+      "fields": {
+        "directives": "scope = province",
+        "documentation": "Spawns a hussars cavalry unit in the current province scope for the defined country scope. Uses the currently selected cavalry unit.",
+        "key": "alias[effect:hussars_cavalry]",
+        "line": "3088",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "enum[country_tags]"
+      }
     }
   ]
 }

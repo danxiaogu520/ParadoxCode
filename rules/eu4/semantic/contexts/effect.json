@@ -15104,6 +15104,66 @@
     "line": 4044
   },
   {
+    "id": "effects:1455:alias:effect:hussars_cavalry",
+    "context": "effect",
+    "parent_path": [],
+    "key": {
+      "exact": "hussars_cavalry"
+    },
+    "operator": "=",
+    "value": {
+      "scope": "country"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "effects:1455:alias:effect:hussars_cavalry",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Spawns a hussars cavalry unit in the current province scope for the defined country scope. Uses the currently selected cavalry unit."
+    ],
+    "allowed_scopes": [
+      "province"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 4046
+  },
+  {
+    "id": "effects:1456:alias:effect:hussars_cavalry",
+    "context": "effect",
+    "parent_path": [],
+    "key": {
+      "exact": "hussars_cavalry"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "effects:1456:alias:effect:hussars_cavalry",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Spawns a hussars cavalry unit in the current province scope for the defined country scope. Uses the currently selected cavalry unit."
+    ],
+    "allowed_scopes": [
+      "province"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 4047
+  },
+  {
     "id": "effects:145:alias:effect:unfreeze_government_power",
     "context": "effect",
     "parent_path": [],
