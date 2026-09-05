@@ -1565,6 +1565,62 @@ fn dynamic_argument_values_follow_direct_and_nested_body_constraints() {
 }
 
 #[test]
+fn dynamic_affixed_value_arguments_complete_stripped_members() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-affixed-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&definitions).expect("definition directory");
+    std::fs::write(
+        definitions.join("00_affixed.txt"),
+        "spawn_reb_host = { spawn_rebels = { type = $RT$_rebels } }\n",
+    )
+    .expect("dynamic definitions");
+    let rebel_types = root.join("common/rebel_types");
+    std::fs::create_dir_all(&rebel_types).expect("rebel types directory");
+    std::fs::write(
+        rebel_types.join("00_test.txt"),
+        concat!("catholic_rebels = { }\n", "sunni_rebels = { }\n",),
+    )
+    .expect("rebel types");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    let id = DocumentId::new("file:///tmp/events/dynamic-affixed-value.txt");
+    let text = "country_event = { immediate = { spawn_reb_host = { RT =  } } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open call");
+    let position = u32::try_from(text.find("=  }").expect("empty value") + 2).expect("position");
+    let items = complete(&host.snapshot(), &id, position).items;
+    let labels = items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    // Members render as `<argument>_rebels`: candidates carry the bare name.
+    assert!(
+        labels.contains(&"catholic") && labels.contains(&"sunni"),
+        "stripped workspace members missing: {items:?}"
+    );
+    // The exact alias `religious_rebels` strips to `religious`.
+    assert!(
+        labels.contains(&"religious"),
+        "stripped exact alias missing: {items:?}"
+    );
+    assert!(
+        !labels.iter().any(|label| label.ends_with("_rebels")),
+        "candidates must be stripped of the render suffix: {items:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn dynamic_bare_parameter_infers_quoted_effect_completion_context() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

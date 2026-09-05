@@ -415,6 +415,66 @@ fn quoted_payload_multi_site_union_accepts_any_valid_render_site() {
     std::fs::remove_dir_all(root).expect("cleanup");
 }
 
+/// Host with scripted-effect definitions plus `common/rebel_types` members so
+/// value-position affixed sites can match against real workspace types.
+fn affixed_value_host(
+    nonce: &str,
+    definitions: &str,
+) -> (pdx_engine::AnalysisHost, std::path::PathBuf) {
+    let root = std::env::temp_dir().join(format!("pdx-analysis-affixed-value-{nonce}"));
+    let definitions_dir = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&definitions_dir).expect("definition directory");
+    std::fs::write(definitions_dir.join("00_affixed.txt"), definitions).expect("definitions");
+    let rebel_types = root.join("common/rebel_types");
+    std::fs::create_dir_all(&rebel_types).expect("rebel types directory");
+    std::fs::write(
+        rebel_types.join("00_test.txt"),
+        concat!("catholic_rebels = { }\n", "sunni_rebels = { }\n",),
+    )
+    .expect("rebel types");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+    (host, root)
+}
+
+#[test]
+fn affixed_value_argument_validates_by_splicing_at_the_render_site() {
+    let (mut host, root) = affixed_value_host(
+        "splice",
+        "spawn_reb_host = { spawn_rebels = { type = $RT$_rebels } }\n",
+    );
+    let id = DocumentId::new("file:///tmp/events/affixed-splice.txt");
+    let text = concat!(
+        "country_event = { immediate = { ",
+        "spawn_reb_host = { RT = catholic } ",
+        "spawn_reb_host = { RT = zzz } } }\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open call");
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    // `catholic` splices to `catholic_rebels`, a known rebel type: clean.
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("catholic")),
+        "a spliced workspace member must not be flagged: {diagnostics:?}"
+    );
+    // `zzz` splices to `zzz_rebels`, which no matcher accepts.
+    assert!(
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == DiagnosticCode::InvalidValue
+                && diagnostic.message.contains("renders as `zzz_rebels`")
+        }),
+        "an unsplicable affixed argument must be flagged with its rendered form: {diagnostics:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
 #[test]
 fn dynamic_definitions_preserve_literal_quoted_script_through_nested_calls() {
     let nonce = std::time::SystemTime::now()

@@ -891,3 +891,47 @@ fn dynamic_parameter_hovers_and_payload_arguments_are_diagnosable() {
 
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn affixed_value_parameter_hover_names_the_render_and_expected_domain() {
+    use std::fs;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-affixed-hover-{nonce}"));
+    let effects = root.join("common/scripted_effects");
+    fs::create_dir_all(&effects).expect("scripted effects directory");
+    let definitions_body = "spawn_reb_host = { spawn_rebels = { type = $RT$_rebels } }\n";
+    fs::write(effects.join("00_affixed.txt"), definitions_body).expect("definitions");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    let definitions = DocumentId::new("file:///tmp/common/scripted_effects/00_affixed.txt");
+    host.open_document(
+        definitions.clone(),
+        1,
+        definitions_body.to_owned(),
+        Some(effects.join("00_affixed.txt")),
+    )
+    .expect("open definitions");
+    let position = u32::try_from(definitions_body.find("$RT$").expect("parameter reference") + 1)
+        .expect("position");
+    let contents = hover(&host.snapshot(), &definitions, position)
+        .expect("affixed parameter hover")
+        .contents;
+    assert!(
+        contents.contains("Renders as `…_rebels`")
+            && contents.contains("symbol type `rebel_type`")
+            && contents.contains("`religious_rebels`"),
+        "affixed hover must name the render form and expected domain: {contents}"
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
