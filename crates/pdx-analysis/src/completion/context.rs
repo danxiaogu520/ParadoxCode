@@ -1,3 +1,4 @@
+use crate::dynamic_contracts::{ScopeContract, dynamic_contract, dynamic_kind_for_context};
 use crate::semantic::*;
 use crate::support::*;
 use crate::{
@@ -86,7 +87,15 @@ pub(crate) fn semantic_completion_context_with_cancellation(
         if position < block_range.start() || position > block_range.end() {
             continue;
         }
-        let scope = semantic_initial_scope(snapshot, input, &context, &root.key, root.key_range);
+        let mut scope =
+            semantic_initial_scope(snapshot, input, &context, &root.key, root.key_range);
+        seed_dynamic_body_scope(
+            snapshot,
+            input.path.as_ref(),
+            &context,
+            &root.key,
+            &mut scope,
+        );
         // A type descriptor with `skip_root_paths` exposes the children at that path as type
         // instances. The HIR and diagnostics paths already keep those instance keys out of the
         // semantic parent path; completion must do the same before traversing the first child.
@@ -143,6 +152,48 @@ pub(crate) fn semantic_completion_context_with_cancellation(
         .map(Some);
     }
     Ok(None)
+}
+
+/// A dynamic-definition body runs in its caller's scope, which is unknown at edit
+/// time — but the definition's own inferred contract pins the scopes its statements
+/// already require. Seeding `current` from a single-scope contract lets body
+/// completion filter candidates exactly like a call site; multi-scope,
+/// unconstrained, and unknown contracts stay unseeded.
+fn seed_dynamic_body_scope(
+    snapshot: &AnalysisSnapshot,
+    logical_path: Option<&LogicalPath>,
+    context: &str,
+    definition: &str,
+    scope: &mut ScopeContext,
+) {
+    if !scope.current.eq_ignore_ascii_case("any") {
+        return;
+    }
+    // Dynamic-definition files resolve their root context to the descriptor's body
+    // context (`effect`, `trigger`), so the kind must be recovered from the rules.
+    let Some(kind) = dynamic_kind_for_context(snapshot, context) else {
+        return;
+    };
+    // A root key that merely names the body context (`effect = { … }` in an
+    // unrelated file) must not seed: the document has to live under the
+    // descriptor's path for the root key to be a definition name.
+    let descriptor = snapshot
+        .rules()
+        .model()
+        .semantic
+        .type_descriptors
+        .get(kind.as_str());
+    if !descriptor.is_some_and(|descriptor| {
+        pdx_engine::hir::semantic_type_path_matches(descriptor, logical_path)
+    }) {
+        return;
+    }
+    let Some(ScopeContract::Scopes(scopes)) = dynamic_contract(snapshot, &kind, definition) else {
+        return;
+    };
+    if let [single] = scopes.as_slice() {
+        scope.current = pdx_engine::intern_shard_string(single);
+    }
 }
 
 /// Selects the file-root entry context for a path, when the document's type declares one.

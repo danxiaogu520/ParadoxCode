@@ -3976,3 +3976,119 @@ fn dynamic_key_position_parameter_respects_site_scope() {
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn dynamic_body_completion_seeds_scope_from_own_contract() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-body-seed-{nonce}"));
+    let definitions = root.join("common/scripted_effects/00_defs.txt");
+    let path = root.join("common/scripted_effects/00_open.txt");
+    std::fs::create_dir_all(definitions.parent().expect("parent")).expect("definition directory");
+    std::fs::write(
+        &definitions,
+        concat!(
+            "country_tool = { join_trade_league = yes }\n",
+            "dual_tool = { every_owned_province = { add_base_tax = 1 } }\n",
+        ),
+    )
+    .expect("dynamic definitions");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    let id = DocumentId::new("file:///tmp/common/scripted_effects/00_open.txt");
+    let text = "country_tool = {\n    join_trade_league = yes\n    \n}\n";
+    host.open_document(id.clone(), 1, text.to_owned(), Some(path))
+        .expect("open body");
+    let completion = complete(
+        &host.snapshot(),
+        &id,
+        u32::try_from(text.find("\n    \n}").expect("anchor") + 3).expect("position"),
+    );
+    let labels = completion
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"add_prestige"),
+        "country-contract body must offer country commands: {labels:?}"
+    );
+    assert!(
+        !labels
+            .iter()
+            .any(|label| label.eq_ignore_ascii_case("add_base_tax")),
+        "province commands must be filtered inside a country-contract body: {labels:?}"
+    );
+
+    let dual_text = "dual_tool = {\n    every_owned_province = { add_base_tax = 1 }\n    \n}\n";
+    host.close_document(&id).expect("close body");
+    host.open_document(id.clone(), 2, dual_text.to_owned(), None)
+        .expect("open dual body");
+    let completion = complete(
+        &host.snapshot(),
+        &id,
+        u32::try_from(dual_text.find("\n    \n}").expect("anchor") + 3).expect("position"),
+    );
+    let labels = completion
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"add_prestige") && labels.contains(&"add_base_tax"),
+        "a multi-scope contract must not seed the body scope: {labels:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn dynamic_trigger_body_completion_seeds_scope_from_own_contract() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-trigger-seed-{nonce}"));
+    let path = root.join("common/scripted_triggers/00_complete.txt");
+    std::fs::create_dir_all(path.parent().expect("parent")).expect("definition directory");
+    std::fs::write(&path, "country_gate = { num_of_cities = 1 }\n").expect("dynamic trigger");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan triggers");
+    let id = DocumentId::new("file:///tmp/common/scripted_triggers/00_complete.txt");
+    let text = "country_gate = {\n    num_of_cities = 1\n    \n}\n";
+    host.open_document(id.clone(), 1, text.to_owned(), Some(path))
+        .expect("open body");
+    let completion = complete(
+        &host.snapshot(),
+        &id,
+        u32::try_from(text.find("\n    \n}").expect("anchor") + 3).expect("position"),
+    );
+    let labels = completion
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"always"),
+        "any-scope triggers stay offered in a country-contract trigger body: {labels:?}"
+    );
+    assert!(
+        !labels
+            .iter()
+            .any(|label| label.eq_ignore_ascii_case("has_building")),
+        "province triggers must be filtered inside a country-contract trigger body: {labels:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
