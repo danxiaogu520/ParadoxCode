@@ -1438,7 +1438,9 @@ fn scripted_definition_completion_snippet_includes_parameters() {
             "scripted_effect",
             "optional_only"
         ),
-        "optional_only = {\n\t$0\n}"
+        // Every parameter is `[[optional]]`, so the scalar form runs the
+        // definition with those chunks omitted.
+        "optional_only = yes"
     );
     fs::remove_dir_all(root).expect("cleanup");
 }

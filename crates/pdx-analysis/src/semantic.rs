@@ -1617,7 +1617,11 @@ pub(crate) fn scripted_definition_snippet(
     let Some(summary) = dynamic_definition_summary(snapshot, kind_name, definition_name) else {
         return format!("{definition_name} = {{\n\t$0\n}}");
     };
-    if summary.parameters.is_empty() {
+    if summary
+        .parameters
+        .iter()
+        .all(|parameter| !parameter.required)
+    {
         return format!("{definition_name} = yes");
     }
     let inner_indent = "\t";
@@ -1842,24 +1846,29 @@ pub(crate) fn dynamic_invocation_shape_matches(
     let Some(value) = scalar else {
         return false;
     };
-    match summary.parameters.len() {
-        0 => {
-            let body_context = snapshot
-                .rules()
-                .model()
-                .semantic
-                .type_descriptors
-                .iter()
-                .find(|(kind, _)| kind.eq_ignore_ascii_case(type_name))
-                .and_then(|(_, descriptor)| descriptor.dynamic_definition.as_ref())
-                .map(|descriptor| descriptor.body_context.as_str());
-            if body_context.is_some_and(|context| context.eq_ignore_ascii_case("trigger")) {
-                value.eq_ignore_ascii_case("yes") || value.eq_ignore_ascii_case("no")
-            } else {
-                value.eq_ignore_ascii_case("yes")
-            }
-        }
-        _ => false,
+    if summary
+        .parameters
+        .iter()
+        .any(|parameter| parameter.required)
+    {
+        return false;
+    }
+    // Every parameter sits inside a `[[name] ... ]` conditional or is otherwise
+    // optional, so the scalar form runs the definition with those chunks
+    // omitted — exactly like a parameterless definition.
+    let body_context = snapshot
+        .rules()
+        .model()
+        .semantic
+        .type_descriptors
+        .iter()
+        .find(|(kind, _)| kind.eq_ignore_ascii_case(type_name))
+        .and_then(|(_, descriptor)| descriptor.dynamic_definition.as_ref())
+        .map(|descriptor| descriptor.body_context.as_str());
+    if body_context.is_some_and(|context| context.eq_ignore_ascii_case("trigger")) {
+        value.eq_ignore_ascii_case("yes") || value.eq_ignore_ascii_case("no")
+    } else {
+        value.eq_ignore_ascii_case("yes")
     }
 }
 

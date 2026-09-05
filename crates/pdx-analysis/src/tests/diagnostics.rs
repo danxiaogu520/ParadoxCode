@@ -1639,6 +1639,99 @@ fn dynamic_missing_required_parameter_is_reported_once() {
 }
 
 #[test]
+fn all_optional_dynamic_definition_accepts_scalar_invocation() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-optional-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&definitions).expect("definition directory");
+    // `cost` appears only inside a `[[cost] ... ]` conditional, so the
+    // definition runs like a parameterless one when invoked `= yes`.
+    std::fs::write(
+        definitions.join("00_optional.txt"),
+        concat!(
+            "rebuild = { [[cost] ROOT = { add_treasury = -$cost$ } ] add_prestige = 1 }\n",
+            "helper = { add_stability = $AMT$ }\n",
+        ),
+    )
+    .expect("dynamic definition");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definition");
+    let id = DocumentId::new("file:///tmp/events/optional.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        concat!(
+            "country_event = { immediate = { ",
+            "rebuild = yes ",
+            "helper = yes",
+            " } }\n",
+        )
+        .to_owned(),
+        None,
+    )
+    .expect("open call");
+
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        !results
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("rebuild")),
+        "all-optional definitions must accept the scalar form: {results:?}"
+    );
+    assert!(
+        results.iter().any(|diagnostic| {
+            diagnostic.code == DiagnosticCode::Cardinality
+                && diagnostic.message.contains("missing required parameter")
+        }),
+        "required parameters keep demanding a binding block: {results:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn special_unit_type_keys_spawn_units_in_province_scope() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-special-units-{nonce}"));
+    std::fs::create_dir_all(&root).expect("mod directory");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan mod");
+    let id = DocumentId::new("file:///tmp/events/special-units.txt");
+    let source = concat!(
+        "country_event = { immediate = { ",
+        "capital_scope = { hussars_cavalry = ROOT cossack_cavalry = ROOT }",
+        " } }\n",
+    );
+    host.open_document(id.clone(), 1, source.to_owned(), None)
+        .expect("open call");
+
+    let results = diagnostics(&host.snapshot(), &id);
+    assert!(
+        results
+            .iter()
+            .all(|diagnostic| !diagnostic.message.contains("hussars_cavalry")
+                && !diagnostic.message.contains("cossack_cavalry")),
+        "every special-unit type must be a known province-scope effect: {results:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn dynamic_rule_arguments_reject_block_bindings_and_use_last_duplicate_scalar() {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
