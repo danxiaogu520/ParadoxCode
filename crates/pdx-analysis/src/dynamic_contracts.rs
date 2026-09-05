@@ -226,8 +226,8 @@ pub(crate) fn dynamic_call_site_diagnostics(
             continue;
         }
         diagnostics.push(Diagnostic::new(
-            DiagnosticCode::DynamicCallScopeMismatch,
-            DiagnosticCode::DynamicCallScopeMismatch.severity(),
+            DiagnosticCode::WrongScope,
+            DiagnosticCode::WrongScope.severity(),
             property.key_range,
             format!(
                 "dynamic definition `{}` requires entry scope {} but is called in `{}` scope",

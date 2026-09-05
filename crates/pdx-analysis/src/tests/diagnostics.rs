@@ -198,7 +198,8 @@ fn scope_target_failures_use_distinct_categories() {
             && diagnostic.message.contains("invalid target")
     }));
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.code == DiagnosticCode::InvalidScopeCommand
+        diagnostic.code == DiagnosticCode::InvalidValue
+            && diagnostic.message.contains("invalid scope command target")
             && diagnostic.message.contains("NOWHERE")
     }));
     assert!(diagnostics.iter().any(|diagnostic| {
@@ -3957,9 +3958,14 @@ fn dynamic_call_sites_are_validated_against_entry_contracts() {
     .expect("open events");
     let snapshot = host.snapshot();
     let all = diagnostics(&snapshot, &document);
+    // Dynamic call-site scope mismatches fold into `WrongScope`; the entry-contract
+    // wording keeps them distinguishable from rule-driven scope findings.
     let mismatches: Vec<&Diagnostic> = all
         .iter()
-        .filter(|diagnostic| diagnostic.code == DiagnosticCode::DynamicCallScopeMismatch)
+        .filter(|diagnostic| {
+            diagnostic.code == DiagnosticCode::WrongScope
+                && diagnostic.message.contains("requires entry scope")
+        })
         .collect();
     assert_eq!(
         mismatches.len(),

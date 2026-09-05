@@ -358,7 +358,10 @@ fn dynamic_scope_mismatch_surfaces_at_the_call_site() {
     // instead of once per offending statement inside the expansion.
     let call_site = results
         .iter()
-        .filter(|diagnostic| diagnostic.code == DiagnosticCode::DynamicCallScopeMismatch)
+        .filter(|diagnostic| {
+            diagnostic.code == DiagnosticCode::WrongScope
+                && diagnostic.message.contains("requires entry scope")
+        })
         .collect::<Vec<_>>();
     assert_eq!(call_site.len(), 1, "{results:?}");
     let nested_call = source

@@ -989,13 +989,10 @@ fn validate_semantic_container(
                         .map(|rule| semantic_scope_value_match(snapshot, rule, value, scope))
                         .find(|result| !matches!(result, ScopeValueMatch::NotScopeRule))
                 });
+                // Unknown scope-command targets used to carry a dedicated
+                // `InvalidScopeCommand` code; the message keeps the wording,
+                // the code folds into `InvalidValue`.
                 let diagnostic_code = match scope_value.as_ref() {
-                    Some(ScopeValueMatch::Unknown)
-                        if property.key.eq_ignore_ascii_case("scope") =>
-                    {
-                        DiagnosticCode::InvalidScopeCommand
-                    }
-                    Some(ScopeValueMatch::Unknown) => DiagnosticCode::InvalidValue,
                     Some(ScopeValueMatch::Known {
                         compatible: false, ..
                     }) => DiagnosticCode::WrongScope,

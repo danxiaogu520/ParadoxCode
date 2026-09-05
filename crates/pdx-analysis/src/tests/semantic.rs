@@ -89,10 +89,7 @@ fn eu4_profile_supplies_known_scope_spellings() {
     assert!(
         diagnostics(&host.snapshot(), &id)
             .iter()
-            .all(|item| !matches!(
-                item.code,
-                DiagnosticCode::InvalidValue | DiagnosticCode::InvalidScopeCommand
-            ))
+            .all(|item| !matches!(item.code, DiagnosticCode::InvalidValue))
     );
 }
 
