@@ -66,6 +66,11 @@ pub(crate) struct DynamicParameterRow {
     /// One entry per usage site; each entry is the alternative matchers of
     /// the rule rows accepting the value at that site.
     pub(crate) sites: Vec<Vec<ValueMatcher>>,
+    /// Value-position sites whose token embeds the parameter between literal
+    /// affixes (`type = $RT$_rebels`): the argument is validated by splicing
+    /// it between the affixes and matching the rendered value, so the call
+    /// site constrains the bare argument without enumerating members.
+    pub(crate) affixed_sites: Vec<AffixedValueSite>,
     /// The parameter is rendered inside a quoted script payload.
     pub(crate) quoted_script: bool,
     /// The parameter participates in a dynamic key dispatch.
@@ -84,6 +89,18 @@ pub(crate) struct ForwardedParameter {
     pub(crate) kind: String,
     pub(crate) name: String,
     pub(crate) parameter: Option<String>,
+}
+
+/// One value-position render site whose token embeds the parameter between
+/// literal affixes (`type = $RT$_rebels`): the caller's bare argument is
+/// validated by splicing it between the affixes and matching the rendered
+/// value against the site's matchers, which keeps the check consistent with
+/// how the same matcher accepts a directly written value.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct AffixedValueSite {
+    pub(crate) prefix: String,
+    pub(crate) suffix: String,
+    pub(crate) matchers: Vec<ValueMatcher>,
 }
 
 /// Why a body statement can never run.
@@ -333,6 +350,7 @@ fn merge_parameter_rows(
             name: parameter.name.clone(),
             required: parameter.required,
             sites: usage.map_or_else(Vec::new, |usage| usage.sites.clone()),
+            affixed_sites: usage.map_or_else(Vec::new, |usage| usage.affixed_sites.clone()),
             quoted_script: usage.is_some_and(|usage| usage.quoted_script),
             used_in_key: usage.is_some_and(|usage| usage.used_in_key),
             forwarded_to: usage.map_or_else(Vec::new, |usage| usage.forwarded_to.clone()),
@@ -346,6 +364,7 @@ fn merge_parameter_rows(
                 name: name.clone(),
                 required: false,
                 sites: usage.sites.clone(),
+                affixed_sites: usage.affixed_sites.clone(),
                 quoted_script: usage.quoted_script,
                 used_in_key: usage.used_in_key,
                 forwarded_to: usage.forwarded_to.clone(),
@@ -377,6 +396,7 @@ impl ScopeFlow {
 #[derive(Default)]
 struct ParameterUsage {
     sites: Vec<Vec<ValueMatcher>>,
+    affixed_sites: Vec<AffixedValueSite>,
     quoted_script: bool,
     used_in_key: bool,
     forwarded_to: Vec<ForwardedParameter>,
@@ -721,13 +741,28 @@ impl<'a> Derivation<'a> {
             if payload_site {
                 usage.quoted_script = true;
             }
-            // Only whole-token parameters constrain the bare argument.
-            // Parameters embedded with literal affixes (`$school$_modifier`,
-            // `change_$stat$`) render to derived runtime names whose members
-            // the bare argument cannot satisfy, so their sites contribute no
-            // call-site constraint.
+            // Only whole-token parameters constrain the bare argument
+            // directly. Parameters embedded with literal affixes
+            // (`$RT$_rebels`) render to a derived runtime value: the site
+            // keeps the affixes so validation can splice the argument back
+            // in and match the rendered value against the same matchers
+            // that accept a directly written one. Sites whose matchers are
+            // all open reference types (`name = $X$_loyal` rendering a
+            // freshly generated modifier name) cannot prove a closed value
+            // domain and stay unconstrained.
             if is_bare_parameter(token, &name) && !matchers.is_empty() {
                 usage.sites.push(matchers.clone());
+            } else if !matchers.is_empty()
+                && matchers.iter().any(|matcher| {
+                    matches!(matcher, ValueMatcher::Exact(_) | ValueMatcher::Enum(_))
+                })
+                && let Some((prefix, suffix)) = literal_token_affixes(token, &name)
+            {
+                usage.affixed_sites.push(AffixedValueSite {
+                    prefix,
+                    suffix,
+                    matchers: matchers.clone(),
+                });
             }
         }
     }
@@ -851,6 +886,36 @@ fn is_bare_parameter(token: &TemplateToken, name: &str) -> bool {
         [TemplateFragment::Parameter { name: parameter, .. }]
             if parameter.eq_ignore_ascii_case(name)
     )
+}
+
+/// The literal affixes around the parameter's single occurrence, when every
+/// other fragment of the token is a literal: `$RT$_rebels` yields
+/// `("", "_rebels")`. Tokens embedding other parameters cannot attribute
+/// their affixes to this one and return `None`.
+fn literal_token_affixes(token: &TemplateToken, name: &str) -> Option<(String, String)> {
+    let mut prefix = String::new();
+    let mut suffix = String::new();
+    let mut seen = false;
+    for fragment in &token.fragments {
+        match fragment {
+            TemplateFragment::Literal(literal) => {
+                if seen {
+                    suffix.push_str(literal);
+                } else {
+                    prefix.push_str(literal);
+                }
+            }
+            TemplateFragment::Parameter {
+                name: parameter, ..
+            } => {
+                if seen || !parameter.eq_ignore_ascii_case(name) {
+                    return None;
+                }
+                seen = true;
+            }
+        }
+    }
+    seen.then_some((prefix, suffix))
 }
 
 fn token_parameters(token: &TemplateToken) -> impl Iterator<Item = &str> {

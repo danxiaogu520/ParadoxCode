@@ -2187,6 +2187,41 @@ fn validate_dynamic_argument_values(
                 .with_certainty(DiagnosticCertainty::Contextual),
             );
         }
+        // Affixed sites splice the bare argument between the token's literal
+        // affixes and match the rendered value, exactly how the engine
+        // substitutes the parameter before evaluating the row.
+        if let Some(rejected) = parameter.affixed_sites.iter().find(|site| {
+            let rendered = format!("{}{}{}", site.prefix, value, site.suffix);
+            !site
+                .matchers
+                .iter()
+                .any(|matcher| semantic_matcher_accepts(snapshot, matcher, &rendered, scope))
+        }) {
+            let expected = rejected
+                .matchers
+                .iter()
+                .map(|matcher| value_description(snapshot, matcher))
+                .collect::<Vec<_>>()
+                .join(" or ");
+            diagnostics.push(
+                Diagnostic::new(
+                    DiagnosticCode::InvalidValue,
+                    DiagnosticCode::InvalidValue.severity(),
+                    *value_range,
+                    format!(
+                        "argument `{}` for parameter `{}` of scripted `{}` renders as `{}{}{}` at its usage site, which does not match the value expected there",
+                        value,
+                        parameter.name,
+                        row.name,
+                        rejected.prefix,
+                        value,
+                        rejected.suffix,
+                    ),
+                )
+                .with_expected(expected)
+                .with_certainty(DiagnosticCertainty::Contextual),
+            );
+        }
         validate_forwarded_to_any_parameter(
             snapshot,
             row,

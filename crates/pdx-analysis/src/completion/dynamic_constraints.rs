@@ -9,9 +9,9 @@ use pdx_engine::hir::{
 use pdx_rules::{KeyMatcher, RuleShape, ValueMatcher};
 
 use crate::semantic::{
-    DynamicDefinitionIdentity, ResolvedDynamicDefinition, dynamic_definition_type,
+    DynamicDefinitionIdentity, ResolvedDynamicDefinition, dynamic_definition_type, enum_members,
     resolve_dynamic_definition, semantic_child_scope, semantic_rule_key_matches,
-    semantic_scope_allows, semantic_transition_destination,
+    semantic_scope_allows, semantic_transition_destination, workspace_member_index,
 };
 use crate::support::{ScopeContext, ScriptProperty};
 use crate::types::{CancellationToken, Cancelled};
@@ -639,11 +639,32 @@ impl<'a> ConstraintCollector<'a> {
                         }
                     }
                 }
-                SymbolicValue::Scalar(
-                    SymbolicToken::Concrete(_)
-                    | SymbolicToken::Rendered { .. }
-                    | SymbolicToken::Unknown,
-                ) => {}
+                SymbolicValue::Scalar(SymbolicToken::Rendered { prefix, suffix }) => {
+                    // The value is the parameter between literal affixes
+                    // (`type = $RT$_rebels`): candidates are the site's
+                    // enumerable members with the affixes stripped, so the
+                    // argument offers the name the caller actually types.
+                    let raw: Vec<ValueMatcher> = matching
+                        .iter()
+                        .filter(|rule| matches!(rule.shape, RuleShape::Leaf | RuleShape::LeafValue))
+                        .map(|rule| rule.value.clone())
+                        .collect();
+                    match affixed_value_matcher_domain(self.snapshot, &raw, prefix, suffix) {
+                        Some(domain) if !domain.is_empty() => {
+                            self.value_sites.push(DynamicValueConstraintSite {
+                                matchers: domain,
+                                scope: scope.clone(),
+                            });
+                        }
+                        // Members exist but none carries both affixes: the
+                        // site constrains, yet nothing can be offered.
+                        Some(_) => self.unenumerable_value_site = true,
+                        // Open reference domains cannot constrain the bare
+                        // argument (`name = $X$_loyal`): no site here.
+                        None => {}
+                    }
+                }
+                SymbolicValue::Scalar(SymbolicToken::Concrete(_) | SymbolicToken::Unknown) => {}
             }
         }
         Ok(())
@@ -826,4 +847,96 @@ fn is_completion_constraint(matcher: &ValueMatcher) -> bool {
             | ValueMatcher::Filepath
             | ValueMatcher::Opaque(_)
     )
+}
+
+/// Caps the stripped-member derivation so an open-ended site cannot turn one
+/// parameter into an unbounded candidate sweep.
+const MAX_AFFIXED_VALUE_MEMBERS: usize = 512;
+
+/// Derives the bare-argument candidates for a value-position render site
+/// (`type = $RT$_rebels`): enumerable matchers contribute their members with
+/// the literal affixes stripped, so `catholic_rebels` yields `catholic`.
+/// Returns `None` when the site cannot prove a closed value domain — every
+/// matcher an open reference type (`name = $X$_loyal` renders a freshly
+/// generated modifier name) — leaving the argument unconstrained. Otherwise
+/// open-world matchers (numbers, opaque strings) contribute nothing and a
+/// member without both affixes cannot have been rendered there and is
+/// dropped; the result holds exact matchers only and may be empty (the site
+/// constrains but nothing can be offered).
+fn affixed_value_matcher_domain(
+    snapshot: &AnalysisSnapshot,
+    matchers: &[ValueMatcher],
+    prefix: &str,
+    suffix: &str,
+) -> Option<Vec<ValueMatcher>> {
+    if !matchers
+        .iter()
+        .any(|matcher| matches!(matcher, ValueMatcher::Exact(_) | ValueMatcher::Enum(_)))
+    {
+        return None;
+    }
+    let mut members: Vec<String> = Vec::new();
+    for matcher in matchers {
+        match matcher {
+            ValueMatcher::Exact(value) => {
+                if let Some(stripped) = strip_value_affixes(value, prefix, suffix) {
+                    push_unique_member(&mut members, stripped);
+                }
+            }
+            ValueMatcher::Enum(name) => {
+                if let Some(static_members) = enum_members(snapshot, name) {
+                    for member in static_members {
+                        if let Some(stripped) = strip_value_affixes(member, prefix, suffix) {
+                            push_unique_member(&mut members, stripped);
+                        }
+                    }
+                }
+                // An enum name can double as a workspace kind; those members
+                // are accepted by the matcher too and stay derivable.
+                for member in workspace_member_index(snapshot, name).select("") {
+                    if let Some(stripped) = strip_value_affixes(&member, prefix, suffix) {
+                        push_unique_member(&mut members, stripped);
+                    }
+                }
+            }
+            ValueMatcher::Type(name) => {
+                for member in workspace_member_index(snapshot, name).select("") {
+                    if let Some(stripped) = strip_value_affixes(&member, prefix, suffix) {
+                        push_unique_member(&mut members, stripped);
+                    }
+                }
+            }
+            _ => continue,
+        }
+        if members.len() > MAX_AFFIXED_VALUE_MEMBERS {
+            return None;
+        }
+    }
+    Some(members.into_iter().map(ValueMatcher::Exact).collect())
+}
+
+/// Strips one pair of literal affixes from a rendered value, keeping the
+/// parameter's own (non-empty) contribution.
+fn strip_value_affixes(value: &str, prefix: &str, suffix: &str) -> Option<String> {
+    if value.len() <= prefix.len() + suffix.len() {
+        return None;
+    }
+    let suffix_start = value.len() - suffix.len();
+    if !value.is_char_boundary(prefix.len()) || !value.is_char_boundary(suffix_start) {
+        return None;
+    }
+    let head = &value[..prefix.len()];
+    let middle = &value[prefix.len()..suffix_start];
+    let tail = &value[suffix_start..];
+    (head.eq_ignore_ascii_case(prefix) && tail.eq_ignore_ascii_case(suffix))
+        .then(|| middle.to_owned())
+}
+
+fn push_unique_member(members: &mut Vec<String>, member: String) {
+    if !members
+        .iter()
+        .any(|known| known.eq_ignore_ascii_case(&member))
+    {
+        members.push(member);
+    }
 }

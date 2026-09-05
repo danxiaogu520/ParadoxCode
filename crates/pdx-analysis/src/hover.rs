@@ -304,7 +304,22 @@ fn dynamic_parameter_contract_lines(
         lines.push(format!(
             "- Inferred value constraints (per usage site): {rendered}"
         ));
-    } else if !parameter.quoted_script
+    }
+    for site in &parameter.affixed_sites {
+        let expected = site
+            .matchers
+            .iter()
+            .map(semantic_value_hover_label)
+            .collect::<Vec<_>>()
+            .join(" or ");
+        lines.push(format!(
+            "- Renders as `{}…{}` at its usage site, where the value must be {expected}",
+            site.prefix, site.suffix
+        ));
+    }
+    if sites.is_empty()
+        && parameter.affixed_sites.is_empty()
+        && !parameter.quoted_script
         && !parameter.used_in_key
         && parameter.forwarded_to.is_empty()
     {
