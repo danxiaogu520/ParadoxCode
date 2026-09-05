@@ -1,0 +1,13 @@
+// case: scope_target_failures
+// input:
+//   trigger = { target = NOWHERE scope = NOWHERE target = capital }
+//   
+diagnostics:
+- code=InvalidTarget severity=Error certainty=certain range=21..28
+  message: invalid target `NOWHERE`: scope expression is not recognised (rule fixture.semantic:1)
+- code=UnknownScope severity=Error certainty=certain range=37..44
+  message: unknown scope `NOWHERE`
+- code=InvalidScopeCommand severity=Error certainty=certain range=37..44
+  message: invalid scope command target `NOWHERE` (rule fixture.semantic:1)
+- code=TargetWrongScope severity=Error certainty=contextual range=54..61
+  message: target `capital` resolves to scope `province`, expected country (rule fixture.semantic:1)

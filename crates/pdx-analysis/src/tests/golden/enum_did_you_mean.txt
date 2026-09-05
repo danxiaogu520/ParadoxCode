@@ -1,0 +1,8 @@
+// case: enum_did_you_mean
+// input:
+//   trigger = { mode = histori }
+//   
+diagnostics:
+- code=InvalidValue severity=Error certainty=certain range=19..26
+  message: value of `mode` does not match the semantic rule (rule fixture.semantic:1)
+  fix: Did you mean 'historic'? [19..26] -> "\"historic\""
