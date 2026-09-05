@@ -2541,6 +2541,11 @@
       "case_sensitive": false
     },
     {
+      "kind_id": "effect:hussars_cavalry",
+      "resolution": "replace-by-symbol",
+      "case_sensitive": false
+    },
+    {
       "kind_id": "effect:if",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
