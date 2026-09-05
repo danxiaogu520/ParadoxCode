@@ -700,7 +700,7 @@ impl LspServer {
             background_reindex_due: None,
             ignored_diagnostic_codes: Arc::new(HashSet::new()),
             diagnostic_severity_overrides: Arc::new(BTreeMap::new()),
-            workspace_wide_diagnostics: true,
+            workspace_wide_diagnostics: crate::workspace::DEFAULT_WORKSPACE_WIDE_DIAGNOSTICS,
             workspace_diagnostics_pending: false,
             scan_pending: false,
             pending_cache_setup: PendingCacheSetup::default(),
