@@ -5,7 +5,28 @@ All notable changes to ParadoxCode are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.1] - 2026-09-05
+
+This release rebuilds the diagnostic system around a consolidated 16-code table with
+script-facing messages, and replaces the runtime macro-expansion machinery with
+first-class dynamic-definition rules derived from the workspace itself.
+
+### Added
+
+- Dynamic-definition analysis: scripted triggers/effects are compiled into first-class
+  rule rows at scan time. Call sites validate entry scopes and parameters, quoted
+  payloads are checked against the rows, branch-active parameters apply per
+  `if`/`else_if` branch, and a definition whose inferred entry contract is empty is
+  rejected at the definition.
+- Closed dynamic kinds reject unknown flags against an engine-set whitelist, and
+  completion offers the known flag names for them.
+- First-party EU4 rule data corrections: trigger/effect scopes corrected, boolean
+  containers added, explicit `any` scopes enforced rule-data-wide, and neighbor/culture
+  scope rows widened to match vanilla usage.
+- Parameter hovers show the dynamic-definition contract, and unquoted payload arguments
+  are flagged.
+- Development tooling: `pdx-flag-audit` for parser-based flag accounting, plus an LSP
+  wire-traffic trace mode for head-to-head comparisons.
 
 ### Changed
 
@@ -13,12 +34,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - The diagnostic code table is consolidated from 22 to 16 codes. Removed:
     `UnknownSymbol`, `AmbiguousSymbol`, `UnknownScope`, `InvalidTarget`,
     `TargetWrongScope`, `AnalysisIncomplete`, `UnknownBareValue`,
-    `InvalidScopeCommand` (folded into `InvalidValue`, message wording
-    kept), and `DynamicCallScopeMismatch` (folded into `WrongScope`,
-    message wording kept); `RuleWrongScope` renamed to `WrongScope`; added
-    `UnknownLocalisationKey`, `AmbiguousDefinition`, `InvalidDependency`.
-    Removed codes are not
-    aliased - configurations naming them fail fast at initialize. See
+    `InvalidScopeCommand` (folded into `InvalidValue`, message wording kept), and
+    `DynamicCallScopeMismatch` (folded into `WrongScope`, message wording kept);
+    `RuleWrongScope` renamed to `WrongScope`; added `UnknownLocalisationKey`,
+    `AmbiguousDefinition`, `InvalidDependency`. Removed codes are not aliased -
+    configurations naming them fail fast at initialize. See
     `docs/diagnostics.md` for the full migration table.
   - Duplicate definitions resolve later-wins and report one
     `AmbiguousDefinition` warning at the effective definition with a related
@@ -42,6 +62,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     did-you-mean fixes are preferred; `publishDiagnostics` carries the
     document version; the list-truncation marker anchors on the last
     retained diagnostic instead of (0,0).
+- "Macro" terminology is retired across code and user surfaces in favor of dynamic
+  definitions.
+
+### Fixed
+
+- Hover value-matcher labels no longer double-wrap in code spans.
+- Nested dynamic-rule derivation threads the parent path correctly.
+- Dispatch-key checks are context-aware for dynamic rules.
+- Completion no longer falls back to generic suggestions for non-enumerable parameter
+  values.
+- Thread-local snapshot caches are keyed by host identity, so concurrent hosts observe
+  their own snapshots.
+- Logical paths are derived from URIs for pathless overlays.
+
+### Removed
+
+- The runtime macro-expansion machinery: validation now runs against derived
+  dynamic-definition rows, and the baked scripted-definition rows are gone from the
+  EU4 rule data.
 
 ## [0.3.0] - 2026-09-02
 
