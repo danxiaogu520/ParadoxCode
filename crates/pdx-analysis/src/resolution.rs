@@ -853,16 +853,10 @@ pub(crate) fn resolve_symbol(
             Resolution::Ambiguous
         };
     }
-    let highest = candidates
-        .iter()
-        .map(|candidate| candidate.priority)
-        .max()
-        .unwrap_or(0);
-    candidates.retain(|candidate| candidate.priority == highest);
-    if candidates.len() == 1 {
-        Resolution::Unique(candidates.remove(0))
-    } else {
-        Resolution::Ambiguous
+    let mut ordered = retain_highest_and_order(candidates);
+    match ordered.pop() {
+        Some(winner) => Resolution::Unique(winner),
+        None => Resolution::Missing,
     }
 }
 
@@ -1151,25 +1145,7 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
     }
 
     pub(crate) fn resolve(&self, kind: &str, name: &str) -> Resolution {
-        let mut candidates = if self.overlay_definitions.is_empty() {
-            Vec::new()
-        } else {
-            self.overlay_definitions
-                .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
-                .cloned()
-                .unwrap_or_default()
-        };
-        candidates.extend(
-            self.snapshot
-                .index()
-                .definitions(kind, name)
-                .into_iter()
-                .filter(|definition| !self.overlay_files.contains(&definition.file_id))
-                .map(|definition| index_definition(self.snapshot, definition)),
-        );
-        if kind.eq_ignore_ascii_case("localisation") {
-            candidates = prefer_localisation_language_for_snapshot(self.snapshot, candidates);
-        }
+        let mut candidates = self.candidates(kind, name);
         if candidates.is_empty() {
             return Resolution::Missing;
         }
@@ -1193,18 +1169,91 @@ impl<'snapshot> DirectResolutionContext<'snapshot> {
                 Resolution::Ambiguous
             };
         }
-        let highest = candidates
-            .iter()
-            .map(|candidate| candidate.priority)
-            .max()
-            .unwrap_or(0);
-        candidates.retain(|candidate| candidate.priority == highest);
-        if candidates.len() == 1 {
-            Resolution::Unique(candidates.remove(0))
-        } else {
-            Resolution::Ambiguous
+        let mut ordered = retain_highest_and_order(candidates);
+        match ordered.pop() {
+            Some(winner) => Resolution::Unique(winner),
+            None => Resolution::Missing,
         }
     }
+
+    /// Collects every candidate for one symbol, applying the localisation
+    /// language preference.
+    fn candidates(&self, kind: &str, name: &str) -> Vec<ResolutionDefinition> {
+        let mut candidates = if self.overlay_definitions.is_empty() {
+            Vec::new()
+        } else {
+            self.overlay_definitions
+                .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
+                .cloned()
+                .unwrap_or_default()
+        };
+        candidates.extend(
+            self.snapshot
+                .index()
+                .definitions(kind, name)
+                .into_iter()
+                .filter(|definition| !self.overlay_files.contains(&definition.file_id))
+                .map(|definition| index_definition(self.snapshot, definition)),
+        );
+        if kind.eq_ignore_ascii_case("localisation") {
+            candidates = prefer_localisation_language_for_snapshot(self.snapshot, candidates);
+        }
+        candidates
+    }
+
+    /// Returns the load-ordered candidates whose priority can actually win, or
+    /// `None` for symbol kinds with merge or unique semantics where existence,
+    /// not ordering, is what analysis needs.
+    pub(crate) fn ordered_candidates(
+        &self,
+        kind: &str,
+        name: &str,
+    ) -> Option<Vec<ResolutionDefinition>> {
+        let candidates = self.candidates(kind, name);
+        let policy = self
+            .snapshot
+            .rules()
+            .model()
+            .symbol_descriptors
+            .iter()
+            .find(|descriptor| descriptor.kind_id.eq_ignore_ascii_case(kind))
+            .map_or(SymbolResolutionPolicy::ReplaceBySymbol, |descriptor| {
+                descriptor.resolution
+            });
+        if matches!(
+            policy,
+            SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique
+        ) {
+            return None;
+        }
+        Some(retain_highest_and_order(candidates))
+    }
+}
+
+/// Retains the highest-priority candidates and orders them oldest-first so the
+/// last entry is the effective definition under the game's
+/// later-definition-wins rule. Priorities order candidates across source
+/// roots; within one priority, file paths and in-file positions approximate
+/// the load order.
+pub(crate) fn retain_highest_and_order(
+    mut candidates: Vec<ResolutionDefinition>,
+) -> Vec<ResolutionDefinition> {
+    let highest = candidates
+        .iter()
+        .map(|candidate| candidate.priority)
+        .max()
+        .unwrap_or(0);
+    candidates.retain(|candidate| candidate.priority == highest);
+    candidates.sort_by(|left, right| {
+        symbol_location_sort_key(&left.location)
+            .cmp(&symbol_location_sort_key(&right.location))
+            .then_with(|| {
+                left.selection_range
+                    .start()
+                    .cmp(&right.selection_range.start())
+            })
+    });
+    candidates
 }
 
 pub(crate) fn definition_priority(snapshot: &AnalysisSnapshot, definition: &DefinitionInfo) -> u64 {
