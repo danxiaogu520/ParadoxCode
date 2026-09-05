@@ -227,6 +227,35 @@ static FIRST_PARTY_ARTIFACT: OnceLock<Result<ArtifactManifest, String>> = OnceLo
 /// Stable identity stored by EU4 rule artifacts and selected by the server.
 pub const GAME_ID: &str = "eu4";
 
+/// Symbol kinds whose same-name definitions EU4 resolves by name at load time
+/// (the later definition takes effect).
+///
+/// The workspace index also harvests "member" definitions whose names are
+/// structural keys repeated per instance (`maneuver` in every unit file,
+/// `graphical_culture` in every culture group). Those never conflict at load:
+/// the game reads each occurrence as its own field. Shadow warnings must stay
+/// limited to this list, which mirrors the game's replace-by-name tables.
+pub const RESOLVED_SYMBOL_KINDS: &[&str] = &[
+    "event",
+    "mission",
+    "mission_series",
+    "decision",
+    "scripted_trigger",
+    "scripted_effect",
+    "sprite",
+    "static_modifier",
+    "idea",
+    "idea_group",
+];
+
+/// Whether `kind` is a game-resolved symbol kind ([`RESOLVED_SYMBOL_KINDS`]).
+#[must_use]
+pub fn resolved_symbol_kind(kind: &str) -> bool {
+    RESOLVED_SYMBOL_KINDS
+        .iter()
+        .any(|candidate| candidate.eq_ignore_ascii_case(kind))
+}
+
 /// Data-only installation discovery facts for the supported EU4 profile.
 pub const INSTALL_DESCRIPTOR: GameInstallDescriptor = GameInstallDescriptor {
     game_id: GAME_ID,

@@ -63,6 +63,7 @@ fn parse_tree(
 ) -> MissionTree {
     let mut tree = MissionTree {
         id: scalar(parsed, key),
+        id_range: key.range(),
         slot: 1,
         generic: false,
         ai: None,
@@ -130,11 +131,14 @@ fn parse_mission(
 ) -> Mission {
     let mut mission = Mission {
         id: scalar(parsed, key),
+        id_range: key.range(),
         icon: None,
         mission_type: None,
         provinces_to_highlight: None,
         required: Vec::new(),
+        required_ranges: Vec::new(),
         position: None,
+        position_range: None,
         completed_by: None,
         trigger: None,
         effect: None,
@@ -154,13 +158,20 @@ fn parse_mission(
                 mission.provinces_to_highlight = as_block(v).map(|b| block(parsed, b));
             }
             "required_missions" if as_block(v).is_some() => {
-                mission.required = block_scalars(parsed, as_block(v).expect("checked above"));
+                let entries = block_scalars(parsed, as_block(v).expect("checked above"));
+                for (name, range) in entries {
+                    mission.required.push(name);
+                    mission.required_ranges.push(range);
+                }
             }
             "required_missions" => {
                 push_unknown(&mut mission.unknown, &name, value_text(parsed, v), warnings);
             }
             "position" => match parse_u32(parsed, v) {
-                Some(n) => mission.position = Some(n),
+                Some(n) => {
+                    mission.position = Some(n);
+                    mission.position_range = Some(v.range());
+                }
                 None => push_unknown(&mut mission.unknown, &name, value_text(parsed, v), warnings),
             },
             "completed_by" => mission.completed_by = Some(scalar(parsed, v)),
@@ -256,13 +267,13 @@ fn block(parsed: &ParsedFile, node: CstNode<'_>) -> Block {
     Block::new(value_text(parsed, node))
 }
 
-/// Scalars inside a block, in source order.
-fn block_scalars(parsed: &ParsedFile, block: CstNode<'_>) -> Vec<String> {
+/// Scalars inside a block with their token ranges, in source order.
+fn block_scalars(parsed: &ParsedFile, block: CstNode<'_>) -> Vec<(String, pdx_text::TextRange)> {
     block
         .children()
         .filter(|c| matches!(c.kind(), CstKind::BareValue | CstKind::QuotedString))
-        .map(|c| scalar(parsed, c))
-        .filter(|s| !s.is_empty())
+        .map(|c| (scalar(parsed, c), c.range()))
+        .filter(|(text, _)| !text.is_empty())
         .collect()
 }
 

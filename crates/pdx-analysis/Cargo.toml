@@ -17,12 +17,11 @@ pdx-rules = { path = "../pdx-rules" }
 pdx-parser = { path = "../pdx-parser" }
 pdx-text = { path = "../pdx-text" }
 pdx-engine = { path = "../pdx-engine" }
+pdx-game = { path = "../pdx-game" }
 
 [lints]
 workspace = true
 
-[dev-dependencies]
-pdx-game = { path = "../pdx-game" }
 
 [[bench]]
 name = "quoted_queries"

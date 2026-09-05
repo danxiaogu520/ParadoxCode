@@ -225,6 +225,23 @@ pub(crate) fn analyze_input_with_cancellation(
         input,
         cancellation,
     )?);
+    let mission = crate::mission::mission_diagnostics(snapshot, input, cancellation)?;
+    if !mission.is_empty() {
+        // The mission validator explains a dangling prerequisite with full
+        // context ("mission A requires unknown mission B") and underlines the
+        // exact prerequisite token; drop the generic bare-value complaint
+        // covering the same token so users see one diagnostic per fault.
+        let dependency_ranges: std::collections::HashSet<TextRange> = mission
+            .iter()
+            .filter(|diagnostic| diagnostic.code == DiagnosticCode::InvalidDependency)
+            .map(|diagnostic| diagnostic.range)
+            .collect();
+        diagnostics.values.retain(|diagnostic| {
+            !(diagnostic.code == DiagnosticCode::InvalidValue
+                && dependency_ranges.contains(&diagnostic.range))
+        });
+        diagnostics.values.extend(mission);
+    }
     for property in properties(input) {
         cancellation.checkpoint()?;
         if property.key.eq_ignore_ascii_case("scope")
@@ -305,6 +322,13 @@ pub(crate) fn analyze_input_with_cancellation(
     for definition in &semantic.definitions {
         cancellation.checkpoint()?;
         if definition.name.contains('$') {
+            continue;
+        }
+        // Shadowing is only meaningful for kinds the game resolves by name
+        // (later definition wins). The index also harvests member definitions
+        // named after structural keys (`maneuver`, `graphical_culture`, event
+        // flags) that repeat legally in every instance; those never conflict.
+        if !pdx_game::eu4::resolved_symbol_kind(&definition.kind) {
             continue;
         }
         // Only replacement-policy kinds can shadow; merge/unique kinds (such as

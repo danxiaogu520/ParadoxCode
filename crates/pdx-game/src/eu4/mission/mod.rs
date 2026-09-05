@@ -40,7 +40,7 @@ pub use model::{Block, Mission, MissionFile, MissionTree, RawField};
 pub use texture::{
     FRAME_SPRITE, TextureAssets, arrow_sprite_name, decode_dds, parse_gfx_sprites, png_data_url,
 };
-pub use validate::{Diagnostic, Severity, validate, validate_in};
+pub use validate::{Diagnostic, Severity, validate, validate_in, validate_with_universe_ids};
 pub use write::{
     BlockSpacing, Indent, WriteStyle, apply_tree_edit, detect_style, render_mission_block,
     render_tree,

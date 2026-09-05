@@ -12,6 +12,7 @@ mod hover;
 mod inlay;
 mod lints;
 mod localisation;
+mod mission;
 mod modifier_scope;
 mod navigation;
 mod quick_fix;

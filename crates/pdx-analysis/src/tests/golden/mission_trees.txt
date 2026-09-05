@@ -1,0 +1,80 @@
+// case: mission_trees
+// input:
+//   golden_main_tree = {
+//   	slot = 1
+//   	potential = { always = yes }
+//   	gm_root = {
+//   		icon = mission_conquest
+//   		trigger = { always = yes }
+//   		effect = { add_prestige = 1 }
+//   		position = 1
+//   	}
+//   	gm_second = {
+//   		icon = mission_conquest
+//   		trigger = { always = yes }
+//   		effect = { add_prestige = 1 }
+//   		position = 2
+//   		required_missions = { gm_root }
+//   	}
+//   	gm_zero = {
+//   		icon = mission_conquest
+//   		trigger = { always = yes }
+//   		effect = { add_prestige = 1 }
+//   		position = 0
+//   	}
+//   	gm_dup = {
+//   		icon = mission_conquest
+//   		trigger = { always = yes }
+//   		effect = { add_prestige = 1 }
+//   		position = 3
+//   	}
+//   	gm_dup = {
+//   		icon = mission_conquest
+//   		trigger = { always = yes }
+//   		effect = { add_prestige = 1 }
+//   		position = 4
+//   	}
+//   }
+//   golden_branch_tree = {
+//   	slot = 2
+//   	potential = { always = yes }
+//   	gb_far = {
+//   		icon = mission_conquest
+//   		trigger = { always = yes }
+//   		effect = { add_prestige = 1 }
+//   		position = 3
+//   		required_missions = { gm_root gm_external gm_ghost }
+//   	}
+//   }
+//   golden_cycle_tree = {
+//   	slot = 3
+//   	potential = { always = yes }
+//   	gt_c1 = {
+//   		icon = mission_conquest
+//   		trigger = { always = yes }
+//   		effect = { add_prestige = 1 }
+//   		position = 1
+//   		required_missions = { gt_c2 }
+//   	}
+//   	gt_c2 = {
+//   		icon = mission_conquest
+//   		trigger = { always = yes }
+//   		effect = { add_prestige = 1 }
+//   		position = 2
+//   		required_missions = { gt_c1 }
+//   	}
+//   }
+//   
+diagnostics:
+- code=InvalidValue severity=Warning certainty=certain range=446..447
+  message: mission `gm_zero` has position = 0; game columns start at 1
+- code=AmbiguousDefinition severity=Warning certainty=certain range=569..575
+  message: definition `gm_dup` shadows an earlier definition of the same name; the later definition takes effect
+- code=InvalidDependency severity=Warning certainty=certain range=888..895
+  message: mission `gb_far` requires `gm_root`, but the prerequisite is not on the row directly above or directly above in the same column
+- code=InvalidDependency severity=Error certainty=certain range=908..916
+  message: mission `gb_far` requires unknown mission `gm_ghost`
+- code=InvalidDependency severity=Error certainty=certain range=987..992
+  message: mission dependency cycle: gt_c1 -> gt_c2 -> gt_c1
+- code=InvalidDependency severity=Warning certainty=certain range=1123..1128
+  message: mission `gt_c1` requires `gt_c2`, but the prerequisite is not on the row directly above or directly above in the same column
