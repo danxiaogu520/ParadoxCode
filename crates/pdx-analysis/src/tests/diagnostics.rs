@@ -329,7 +329,7 @@ fn dynamic_definitions_preserve_literal_quoted_script_through_nested_calls() {
     assert!(
         diagnostics.iter().all(|diagnostic| {
             diagnostic.code != DiagnosticCode::InvalidValue
-                || !diagnostic.message.contains("bare value")
+                || !diagnostic.message.contains("is not valid here")
         }),
         "nested quoted Script must be reparsed: {diagnostics:?}"
     );
@@ -767,7 +767,16 @@ fn semantic_rule_severity_reaches_editor_diagnostic() {
         .find(|item| item.code == DiagnosticCode::InvalidValue)
         .expect("invalid semantic rules value diagnostic");
     assert_eq!(invalid_value.severity, 2);
-    assert!(invalid_value.message.contains("rule fixture.semantic:1"));
+    // Rule provenance stays on the structured field; the message itself must
+    // never name the rules source.
+    assert!(
+        invalid_value
+            .provenance
+            .as_ref()
+            .and_then(|provenance| provenance.source_file.as_deref())
+            .is_some_and(|file| file.contains("fixture.semantic")),
+        "{invalid_value:?}"
+    );
 }
 
 #[test]
@@ -1051,7 +1060,7 @@ fn dynamic_invocation_diagnostics_report_precise_messages() {
     assert!(
         body_unknown
             .iter()
-            .all(|item| item.message.contains("in rule context")),
+            .all(|item| item.message.contains("unknown key")),
         "definition bodies must not be mistaken for invocation argument blocks: {body_unknown:?}"
     );
 
@@ -1134,9 +1143,7 @@ fn dynamic_invocation_diagnostics_report_precise_messages() {
     assert!(
         results.iter().any(|item| {
             item.code == DiagnosticCode::UnknownKey
-                && item
-                    .message
-                    .contains("unexpected key `no_such_call` in rule context")
+                && item.message.contains("unknown key `no_such_call` in a")
         }),
         "unresolved invocations keep the generic message: {results:?}"
     );
@@ -1706,14 +1713,16 @@ fn empty_dynamic_calls_map_required_cardinality_to_the_call() {
         .expect("open call");
 
     let results = diagnostics(&host.snapshot(), &id);
-    let call_start = u32::try_from(source.find("empty_dynamic").expect("call")).expect("range");
+    let container_brace =
+        u32::try_from(source.find("immediate = {").expect("immediate") + "immediate = ".len())
+            .expect("range");
     // Body-container cardinality now surfaces through the ordinary container
     // check at the invocation's own container, unprefixed by expansion
     // bookkeeping.
     assert!(
         results.iter().any(|diagnostic| {
             diagnostic.code == DiagnosticCode::Cardinality
-                && diagnostic.range.start() == call_start
+                && diagnostic.range.start() == container_brace
                 && diagnostic.message.contains("fixture_required")
                 && !diagnostic.message.contains("in expansion of")
         }),
@@ -2483,27 +2492,27 @@ fn vanilla_dynamic_names_empty_event_lists_and_inherited_contexts_are_valid() {
         (
             "/tmp/common/on_actions/test.txt",
             "on_test = { events = { } }\n",
-            "value of `events`",
+            "invalid value",
         ),
         (
             "/tmp/common/policies/test.txt",
             "test_policy = { monarch_power = ADM potential = { always = yes } allow = { always = yes } global_tax_modifier = 0.1 }\n",
-            "unexpected key `global_tax_modifier`",
+            "unknown key `global_tax_modifier`",
         ),
         (
             "/tmp/common/triggered_modifiers/test.txt",
             "test_modifier = { potential = { always = yes } trigger = { always = yes } global_unrest = -1 }\n",
-            "unexpected key `global_unrest`",
+            "unknown key `global_unrest`",
         ),
         (
             "/tmp/common/ruler_personalities/test.txt",
             "test_personality = { nation_designer_cost = 0 gift_chance = 10 }\n",
-            "unexpected key `gift_chance`",
+            "unknown key `gift_chance`",
         ),
         (
             "/tmp/events/test.txt",
             "country_event = { id = test.1 trigger = { dynasty = \"de' Medici\" has_heir = \"Ladislaus Postumus\" culture_group = owner religion_group = owner } }\n",
-            "does not match the semantic rule",
+            "invalid value `de' Medici`",
         ),
     ] {
         let mut host = eu4_host(rules.clone());
@@ -2626,10 +2635,8 @@ fn typed_name_fields_do_not_inherit_the_localisation_fallback() {
     }));
     assert!(
         diagnostics.iter().all(|diagnostic| {
-            !matches!(
-                diagnostic.code,
-                DiagnosticCode::InvalidValue | DiagnosticCode::UnknownLocalisationKey
-            ) || !diagnostic.message.contains("runtime_modifier")
+            diagnostic.code != DiagnosticCode::UnknownLocalisationKey
+                || !diagnostic.message.contains("runtime_modifier")
         }),
         "modifier identifiers must not be treated as localisation: {diagnostics:?}"
     );

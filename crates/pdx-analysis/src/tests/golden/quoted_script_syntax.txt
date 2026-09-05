@@ -7,8 +7,9 @@
 //   
 diagnostics:
 - code=InvalidValue severity=Error certainty=certain range=32..37
-  message: value of `foo` does not match the semantic rule (rule fixture.semantic:4)
+  message: invalid value `maybe` for `foo`
+  expected: `yes` or `no`
 - code=UnknownKey severity=Error certainty=certain range=39..45
-  message: unexpected key `broken` in rule context `trigger`
+  message: unknown key `broken` in a `trigger` block
 - code=SyntaxError severity=Error certainty=certain range=48..50
   message: script block is missing `}`

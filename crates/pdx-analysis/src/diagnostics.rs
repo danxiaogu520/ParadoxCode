@@ -5,6 +5,10 @@ use crate::lints::{
     lint_conditional_siblings,
 };
 use crate::localisation::localisation_command_diagnostics;
+use crate::messages::{
+    backticked_list, did_you_mean, expected_from_rules, key_description, occurrence_word,
+    value_description, value_plural,
+};
 use crate::quoted_script::{QuotedScriptParse, QuotedScriptSession};
 use crate::resolution::*;
 use crate::semantic::*;
@@ -271,7 +275,17 @@ pub(crate) fn analyze_input_with_cancellation(
                 DiagnosticCode::InvalidValue,
                 DiagnosticCode::InvalidValue.severity(),
                 *range,
-                format!("unknown scope `{value}`"),
+                format!(
+                    "unknown scope `{value}`{}",
+                    did_you_mean(best_suggestion(
+                        value,
+                        snapshot
+                            .game_profile()
+                            .scope_names
+                            .iter()
+                            .map(String::as_str),
+                    ))
+                ),
             ));
         }
     }
@@ -306,14 +320,30 @@ pub(crate) fn analyze_input_with_cancellation(
                         DiagnosticCode::UnknownLocalisationKey,
                         DiagnosticCode::UnknownLocalisationKey.severity(),
                         reference.range,
-                        format!("unknown localisation key `{}`", reference.name),
+                        format!(
+                            "unknown localisation key `{}`{}",
+                            reference.name,
+                            did_you_mean(
+                                localisation_key_suggestion(snapshot, &reference.name).as_deref()
+                            )
+                        ),
                     )
                 } else {
                     Diagnostic::new(
                         DiagnosticCode::InvalidValue,
                         DiagnosticCode::InvalidValue.severity(),
                         reference.range,
-                        format!("unknown {} symbol `{}`", reference.kind, reference.name),
+                        format!(
+                            "unknown {} `{}`{}",
+                            reference.kind,
+                            reference.name,
+                            did_you_mean(best_suggestion(
+                                &reference.name,
+                                effective_workspace_member_names(snapshot, &reference.kind)
+                                    .iter()
+                                    .map(String::as_str)
+                            ))
+                        ),
                     )
                 })
             }
@@ -809,41 +839,89 @@ fn validate_semantic_container(
             // EU4 logical wrappers retain their parent context. Owner-local parameter keys are
             // likewise deferred until a call site supplies the concrete key spelling.
         } else if matching.is_empty() {
-            let message = match sibling_context_key_kind(
-                snapshot,
-                trigger_like,
-                effect_like,
-                parent_path,
-                property,
-            ) {
-                Some("an effect") => format!(
-                    "`{}` is an effect and cannot be used inside a trigger block",
-                    property.key
-                ),
-                Some("a trigger") => format!(
-                    "`{}` is a trigger and cannot be used inside an effect block; conditions belong in a `limit` block",
-                    property.key
-                ),
-                _ => dynamic_invocation_parameter_message(
+            let mut diagnostic = None;
+            if let Some(kind) =
+                sibling_context_key_kind(snapshot, trigger_like, effect_like, parent_path, property)
+            {
+                let message = if kind == "an effect" {
+                    format!(
+                        "`{}` is an effect and cannot be used inside a trigger block",
+                        property.key
+                    )
+                } else {
+                    format!(
+                        "`{}` is a trigger and cannot be used inside an effect block; conditions belong in a `limit` block",
+                        property.key
+                    )
+                };
+                diagnostic = Some(Diagnostic::new(
+                    DiagnosticCode::UnknownKey,
+                    DiagnosticCode::UnknownKey.severity(),
+                    property.key_range,
+                    message,
+                ));
+            }
+            if diagnostic.is_none() {
+                diagnostic = dynamic_invocation_parameter_message(
                     snapshot,
                     context,
                     parent_path,
                     hir,
                     property,
                 )
-                .unwrap_or_else(|| {
-                    format!(
-                        "unexpected key `{}` in rule context `{context}`",
-                        property.key
+                .map(|message| {
+                    Diagnostic::new(
+                        DiagnosticCode::UnknownKey,
+                        DiagnosticCode::UnknownKey.severity(),
+                        property.key_range,
+                        message,
                     )
-                }),
-            };
-            diagnostics.push(Diagnostic::new(
-                DiagnosticCode::UnknownKey,
-                DiagnosticCode::UnknownKey.severity(),
-                property.key_range,
-                message,
-            ));
+                });
+            }
+            let diagnostic = diagnostic.unwrap_or_else(|| {
+                // Sibling keys of the same container rule set make a useful
+                // correction vocabulary for a misspelled key.
+                let mut sibling_keys = Vec::new();
+                for rule in semantic_rules_for_container(snapshot, context, parent_path, scope) {
+                    if let KeyMatcher::Exact(key) = &rule.key
+                        && !sibling_keys
+                            .iter()
+                            .any(|seen: &String| seen.eq_ignore_ascii_case(key))
+                    {
+                        sibling_keys.push(key.clone());
+                    }
+                }
+                let suggestion =
+                    best_suggestion(&property.key, sibling_keys.iter().map(String::as_str));
+                let location = context.strip_prefix("type:").map_or_else(
+                    || {
+                        format!(
+                            "{} `{context}` block",
+                            crate::messages::article_for(context)
+                        )
+                    },
+                    |kind| format!("{} `{kind}` definition", crate::messages::article_for(kind)),
+                );
+                let mut diagnostic = Diagnostic::new(
+                    DiagnosticCode::UnknownKey,
+                    DiagnosticCode::UnknownKey.severity(),
+                    property.key_range,
+                    format!(
+                        "unknown key `{}` in {location}{}",
+                        property.key,
+                        did_you_mean(suggestion)
+                    ),
+                );
+                if let Some(candidate) = suggestion {
+                    diagnostic = diagnostic.with_fix(QuickFix::replace(
+                        format!("Did you mean '{candidate}'?"),
+                        property.key_range,
+                        (*candidate).to_owned(),
+                    ));
+                }
+                diagnostic
+            });
+            diagnostics.push(diagnostic);
         } else {
             let scoped_matching = matching
                 .iter()
@@ -851,18 +929,33 @@ fn validate_semantic_container(
                 .copied()
                 .collect::<Vec<_>>();
             if scoped_matching.is_empty() && !scope_diagnostics_deferred {
-                diagnostics.push(semantic_diagnostic(
+                let mut scopes: Vec<&str> = Vec::new();
+                for rule in matching.iter() {
+                    for allowed in &rule.allowed_scopes {
+                        if !scopes.iter().any(|seen| seen.eq_ignore_ascii_case(allowed)) {
+                            scopes.push(allowed.as_str());
+                        }
+                    }
+                }
+                let mut diagnostic = semantic_diagnostic(
                     DiagnosticCode::WrongScope,
                     semantic_rule_severity(matching.iter().copied(), DiagnosticCode::WrongScope),
                     property.key_range,
                     format!(
-                        "`{}` is not available in game scope `{}` ({})",
-                        property.key,
-                        scope.current,
-                        semantic_rule_provenance(matching[0])
+                        "`{}` is not available in scope `{}`",
+                        property.key, scope.current
                     ),
                     matching[0],
-                ));
+                );
+                if !scopes.is_empty() {
+                    let expected = if scopes.len() == 1 {
+                        format!("`{}`", scopes[0])
+                    } else {
+                        format!("one of {}", backticked_list(&scopes, 8))
+                    };
+                    diagnostic = diagnostic.with_expected(expected);
+                }
+                diagnostics.push(diagnostic);
             }
             let applicable = if scoped_matching.is_empty() {
                 &matching
@@ -912,33 +1005,59 @@ fn validate_semantic_container(
                     .scalar
                     .as_ref()
                     .map_or(property.key_range, |(_, range)| *range);
+                let value_text = property
+                    .scalar
+                    .as_ref()
+                    .map_or(String::new(), |(value, _)| (*value).to_string());
+                let scope_suggestion = || {
+                    best_suggestion(
+                        &value_text,
+                        // Scope registers are positional keywords, not spellings
+                        // a user is typoing toward; suggesting them is noise.
+                        snapshot
+                            .game_profile()
+                            .scope_names
+                            .iter()
+                            .map(String::as_str)
+                            .filter(|name| {
+                                !matches!(
+                                    name.to_ascii_lowercase().as_str(),
+                                    "root" | "this" | "from" | "prev"
+                                )
+                            }),
+                    )
+                };
                 let message = match scope_value.as_ref() {
                     Some(ScopeValueMatch::Unknown)
                         if property.key.eq_ignore_ascii_case("scope") =>
                     {
                         format!(
-                            "invalid scope command target `{}` ({})",
-                            property.scalar.as_ref().map_or("", |(value, _)| value),
-                            semantic_rule_provenance(applicable[0])
+                            "invalid scope command target `{value_text}`{}",
+                            did_you_mean(scope_suggestion())
                         )
                     }
                     Some(ScopeValueMatch::Unknown) => format!(
-                        "invalid target `{}`: scope expression is not recognised ({})",
-                        property.scalar.as_ref().map_or("", |(value, _)| value),
-                        semantic_rule_provenance(applicable[0])
+                        "invalid target `{value_text}`: scope expression is not recognised{}",
+                        did_you_mean(scope_suggestion())
                     ),
                     Some(ScopeValueMatch::Known {
                         actual, expected, ..
                     }) => format!(
-                        "target `{}` resolves to scope `{actual}`, expected {} ({})",
-                        property.scalar.as_ref().map_or("", |(value, _)| value),
-                        expected.as_deref().unwrap_or("any scope"),
-                        semantic_rule_provenance(applicable[0])
+                        "target `{value_text}` resolves to scope `{actual}`, expected {}",
+                        expected.as_deref().unwrap_or("any scope")
                     ),
                     _ => format!(
-                        "value of `{}` does not match the semantic rule ({})",
+                        "invalid value `{value_text}` for `{}`{}",
                         property.key,
-                        semantic_rule_provenance(applicable[0])
+                        did_you_mean(
+                            property
+                                .scalar
+                                .as_ref()
+                                .and_then(|(value, _)| {
+                                    enum_value_suggestion(snapshot, applicable, value)
+                                })
+                                .as_deref()
+                        )
                     ),
                 };
                 let certainty = match scope_value.as_ref() {
@@ -962,6 +1081,12 @@ fn validate_semantic_container(
                     source_file: Some(applicable[0].source_file.clone()),
                     source_line: Some(applicable[0].line),
                 });
+                if diagnostic_code == DiagnosticCode::InvalidValue
+                    && let Some(expected) =
+                        expected_from_rules(snapshot, applicable.iter().copied())
+                {
+                    diagnostic = diagnostic.with_expected(expected);
+                }
                 if diagnostic_code == DiagnosticCode::InvalidValue
                     && let Some((value, value_range)) = property.scalar.as_ref()
                     && let Some(candidate) = enum_value_suggestion(snapshot, applicable, value)
@@ -1034,11 +1159,11 @@ fn validate_semantic_container(
                     Severity::Warning,
                     property.key_range,
                     format!(
-                        "`{}` occurs {} times, but rule cardinality allows at most {} ({})",
+                        "`{}` appears {}, but at most {} {} allowed here",
                         property.key,
-                        count,
+                        occurrence_word(count),
                         max_occurs,
-                        semantic_rule_provenance(applicable[0])
+                        if max_occurs == 1 { "is" } else { "are" },
                     ),
                     applicable[0],
                 ));
@@ -1301,20 +1426,52 @@ fn validate_semantic_container(
             // values; the severity helper keeps bounded numeric overflows soft.
             let code = DiagnosticCode::InvalidValue;
             let severity = semantic_bare_value_severity(rules.iter().copied(), value);
-            let message =
-                format!("bare value `{value}` does not match the semantic rule value clause");
-            let diagnostic = rules.first().map_or_else(
-                || Diagnostic::new(code, severity, *value_range, message.clone()),
-                |rule| semantic_diagnostic(code, severity, *value_range, message.clone(), rule),
-            );
+            // A numeric value against bounded numeric rules is a range problem;
+            // anything else is an unknown member of the accepted set.
+            let numeric_overflow = value.parse::<f64>().is_ok()
+                && rules.iter().any(|rule| {
+                    matches!(rule.shape, RuleShape::LeafValue)
+                        && matches!(
+                            &rule.value,
+                            pdx_rules::ValueMatcher::Int { .. }
+                                | pdx_rules::ValueMatcher::Float { .. }
+                        )
+                });
+            let message = if numeric_overflow {
+                format!("value `{value}` is out of range")
+            } else {
+                format!("value `{value}` is not valid here")
+            };
+            let mut diagnostic = if let Some(rule) = rules.first() {
+                semantic_diagnostic(code, severity, *value_range, message, rule)
+            } else {
+                Diagnostic::new(code, severity, *value_range, message)
+            };
+            let leaf_rules = rules
+                .iter()
+                .filter(|rule| matches!(rule.shape, RuleShape::LeafValue))
+                .copied()
+                .collect::<Vec<_>>();
+            if let Some(expected) = expected_from_rules(snapshot, leaf_rules) {
+                diagnostic = diagnostic.with_expected(expected);
+            }
             diagnostics.push(diagnostic);
         }
     }
+    // "This block ..." cardinality findings anchor on the opening brace of the
+    // block itself: underlining a sibling property for a *missing* key invites
+    // the wrong fix, and a whole-block squiggle hides the actual content.
+    let block_anchor = if block_container {
+        TextRange::new(container_range.start(), container_range.start() + 1)
+            .unwrap_or(container_range)
+    } else {
+        container_range
+    };
     let empty_range = properties.first().map_or_else(
         || {
             bare_values
                 .first()
-                .map_or(container_range, |(_, range)| *range)
+                .map_or(block_anchor, |(_, range)| *range)
         },
         |property| property.key_range,
     );
@@ -1346,17 +1503,16 @@ fn validate_semantic_container(
                     .filter(|(value, _)| semantic_leaf_value_matches(snapshot, rule, value, scope))
                     .count();
                 let count = u32::try_from(count).unwrap_or(u32::MAX);
+                let plural = value_plural(snapshot, &rule.value);
                 if let Some(min_occurs) = semantic_min_occurs(rule)
                     && count < min_occurs
                 {
                     diagnostics.push(semantic_diagnostic(
                     DiagnosticCode::Cardinality,
                     semantic_min_cardinality_severity(rule),
-                    empty_range,
+                    block_anchor,
                     format!(
-                        "semantic rule value clause requires at least {min_occurs} value(s), but `{}` occurs {count} times ({})",
-                        semantic_value_matcher_label(&rule.value),
-                        semantic_rule_provenance(rule)
+                        "this list must contain at least {min_occurs} {plural}, but contains {count}",
                     ),
                     rule,
                 ));
@@ -1364,16 +1520,24 @@ fn validate_semantic_container(
                 if let Some(max_occurs) = rule.max_occurs
                     && count > max_occurs
                 {
+                    // Anchor the overflow on the first value past the quota so the
+                    // squiggle names the entry that should be removed.
+                    let overflow_range = bare_values
+                        .iter()
+                        .filter(|(value, _)| {
+                            semantic_leaf_value_matches(snapshot, rule, value, scope)
+                        })
+                        .nth(max_occurs as usize)
+                        .map_or(empty_range, |(_, range)| *range);
                     diagnostics.push(semantic_diagnostic(
-                    DiagnosticCode::Cardinality,
-                    Severity::Warning,
-                    bare_values.first().map_or(empty_range, |(_, range)| *range),
-                    format!(
-                        "semantic rule value clause allows at most {max_occurs} value(s), but found {count} ({})",
-                        semantic_rule_provenance(rule)
-                    ),
-                    rule,
-                ));
+                        DiagnosticCode::Cardinality,
+                        Severity::Warning,
+                        overflow_range,
+                        format!(
+                            "this list allows at most {max_occurs} {plural}, but contains {count}",
+                        ),
+                        rule,
+                    ));
                 }
                 continue;
             }
@@ -1387,17 +1551,34 @@ fn validate_semantic_container(
                 .count();
             let count = u32::try_from(count).unwrap_or(u32::MAX);
             if count < min_occurs {
+                let message =
+                    if min_occurs == 1 && count == 0 && matches!(rule.key, KeyMatcher::Exact(_)) {
+                        format!(
+                            "this block is missing required key {}",
+                            key_description(&rule.key)
+                        )
+                    } else {
+                        let subject = match &rule.key {
+                            KeyMatcher::Exact(value) => format!("`{value}`"),
+                            KeyMatcher::Type(kind) => format!("a `{kind}` name"),
+                            KeyMatcher::Enum(name) => format!("a key from `{name}`"),
+                            _ => "an entry".to_owned(),
+                        };
+                        format!(
+                            "this block requires at least {} {} of {}; it contains {}",
+                            min_occurs,
+                            if min_occurs == 1 { "entry" } else { "entries" },
+                            subject,
+                            occurrence_word(count),
+                        )
+                    };
                 diagnostics.push(semantic_diagnostic(
-                DiagnosticCode::Cardinality,
-                semantic_min_cardinality_severity(rule),
-                empty_range,
-                format!(
-                    "semantic rule requires at least {min_occurs} occurrence(s), but `{}` occurs {count} times ({})",
-                    semantic_matcher_label(&rule.key),
-                    semantic_rule_provenance(rule)
-                ),
-                rule,
-            ));
+                    DiagnosticCode::Cardinality,
+                    semantic_min_cardinality_severity(rule),
+                    block_anchor,
+                    message,
+                    rule,
+                ));
             }
         }
     }
@@ -1434,6 +1615,11 @@ fn enum_value_suggestion(
     candidates.sort_by_key(|candidate| candidate.to_ascii_lowercase());
     candidates.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
     best_suggestion(value, candidates.iter().map(String::as_str)).map(str::to_owned)
+}
+
+/// Finds a unique close indexed localisation key for a missing reference.
+fn localisation_key_suggestion(snapshot: &AnalysisSnapshot, name: &str) -> Option<String> {
+    best_suggestion(name, localisation_key_index(snapshot).iter()).map(str::to_owned)
 }
 
 fn property_contains_parameter_token(property: &ScriptProperty) -> bool {
@@ -1495,7 +1681,7 @@ fn validate_quoted_script(
                 DiagnosticCode::InvalidValue,
                 DiagnosticCode::InvalidValue.severity(),
                 range,
-                limit.message().to_owned(),
+                limit.message(),
             ));
             return Ok(());
         }
@@ -1978,7 +2164,7 @@ fn validate_dynamic_argument_values(
         }) {
             let expected = rejected
                 .iter()
-                .map(semantic_value_matcher_label)
+                .map(|matcher| value_description(snapshot, matcher))
                 .collect::<Vec<_>>()
                 .join(" or ");
             diagnostics.push(
@@ -1987,10 +2173,11 @@ fn validate_dynamic_argument_values(
                     DiagnosticCode::InvalidValue.severity(),
                     *value_range,
                     format!(
-                        "argument `{}` for parameter `{}` of scripted `{}` does not match its usage in the definition body (expected {expected})",
+                        "argument `{}` for parameter `{}` of scripted `{}` does not match its usage in the definition body",
                         value, parameter.name, row.name
                     ),
                 )
+                .with_expected(expected)
                 .with_certainty(DiagnosticCertainty::Contextual),
             );
         }

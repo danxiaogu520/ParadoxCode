@@ -8,4 +8,5 @@ diagnostics:
 - code=UnknownLocalisationKey severity=Warning certainty=certain range=64..65
   message: unknown localisation key `a`
 - code=WrongScope severity=Error certainty=certain range=66..78
-  message: `add_prestige` is not available in game scope `province` (rule semantic-rules.json:4143)
+  message: `add_prestige` is not available in scope `province`
+  expected: `country`

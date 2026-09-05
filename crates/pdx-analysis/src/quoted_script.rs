@@ -16,12 +16,22 @@ pub(crate) enum QuotedScriptLimit {
 }
 
 impl QuotedScriptLimit {
-    pub(crate) const fn message(self) -> &'static str {
+    pub(crate) fn message(self) -> String {
         match self {
-            Self::Depth => "quoted Script exceeds the semantic nesting depth limit",
-            Self::PayloadBytes => "quoted Script exceeds the semantic payload size limit",
-            Self::TotalBytes => "quoted Script exceeds the semantic query byte budget",
-            Self::Nodes => "quoted Script exceeds the semantic query node budget",
+            Self::Depth => {
+                format!("quoted script is nested more than {MAX_QUOTED_SCRIPT_DEPTH} levels deep")
+            }
+            Self::PayloadBytes => format!(
+                "quoted script is larger than {} KiB",
+                MAX_QUOTED_SCRIPT_BYTES / 1024
+            ),
+            Self::TotalBytes => format!(
+                "quoted script parsing budget of {} KiB per file is exhausted",
+                MAX_QUOTED_SCRIPT_TOTAL_BYTES / 1024
+            ),
+            Self::Nodes => format!(
+                "quoted script parsing budget of {MAX_QUOTED_SCRIPT_NODES} nodes per file is exhausted"
+            ),
         }
     }
 }

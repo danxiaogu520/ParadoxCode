@@ -3,19 +3,19 @@
 //   series = { mission_one = { potential = { always = yes } } }
 //   
 diagnostics:
+- code=Cardinality severity=Error certainty=certain range=9..10
+  message: this block is missing required key `potential`
+- code=Cardinality severity=Error certainty=certain range=9..10
+  message: this block is missing required key `slot`
 - code=UnknownLocalisationKey severity=Warning certainty=certain range=11..22
   message: unknown localisation key `mission_one_desc`
 - code=UnknownLocalisationKey severity=Warning certainty=certain range=11..22
   message: unknown localisation key `mission_one_title`
-- code=Cardinality severity=Error certainty=certain range=11..22
-  message: semantic rule requires at least 1 occurrence(s), but `potential` occurs 0 times (rule semantic-rules.json:5618)
-- code=Cardinality severity=Error certainty=certain range=11..22
-  message: semantic rule requires at least 1 occurrence(s), but `slot` occurs 0 times (rule semantic-rules.json:5632)
+- code=Cardinality severity=Error certainty=certain range=25..26
+  message: this block is missing required key `icon`
+- code=Cardinality severity=Error certainty=certain range=25..26
+  message: this block is missing required key `trigger`
+- code=Cardinality severity=Error certainty=certain range=25..26
+  message: this block is missing required key `effect`
 - code=UnknownKey severity=Error certainty=certain range=27..36
-  message: unexpected key `potential` in rule context `type:mission_series`
-- code=Cardinality severity=Error certainty=certain range=27..36
-  message: semantic rule requires at least 1 occurrence(s), but `icon` occurs 0 times (rule semantic-rules.json:5619)
-- code=Cardinality severity=Error certainty=certain range=27..36
-  message: semantic rule requires at least 1 occurrence(s), but `trigger` occurs 0 times (rule semantic-rules.json:5624)
-- code=Cardinality severity=Error certainty=certain range=27..36
-  message: semantic rule requires at least 1 occurrence(s), but `effect` occurs 0 times (rule semantic-rules.json:5625)
+  message: unknown key `potential` in a `mission_series` definition
