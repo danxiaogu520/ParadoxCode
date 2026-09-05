@@ -475,7 +475,13 @@ impl<'a> Derivation<'a> {
         // Structural trigger sub-blocks of effect containers (`limit` and
         // friends) validate in a different context against the pre-push
         // scope; the shadow walk skips them rather than mis-validating.
+        // Parameter usage inside them still matters: a bare `$P$` there is a
+        // quoted payload rendered at the sub-block's site, so the items are
+        // walked for usage only — no scalar sites, no findings.
         if is_structural_sub_block(&lowered) {
+            if let TemplateValue::Block { items, .. } = &property.value {
+                self.walk_structural_usage(items);
+            }
             return;
         }
         let wants_block = matches!(property.value, TemplateValue::Block { .. });
@@ -576,6 +582,37 @@ impl<'a> Derivation<'a> {
                 child_path(path, key)
             };
             self.walk_block_children(items, context, &child_path_vec, &matching, flow);
+        }
+    }
+
+    /// Walks a structural sub-block's items for parameter usage only: payload
+    /// parameters must be marked so their quoted arguments validate at the
+    /// sub-block's render site, and key renders must stay visible — but rows
+    /// there validate in a different context against the pre-push scope, so
+    /// no value sites or body findings are recorded from this walk.
+    fn walk_structural_usage(&mut self, items: &[TemplateItem]) {
+        for item in items {
+            match item {
+                TemplateItem::Property(property) => {
+                    if token_has_parameter(&property.key) {
+                        self.dynamic_dispatch = true;
+                        for name in token_parameters(&property.key) {
+                            self.parameter(name).used_in_key = true;
+                        }
+                    }
+                    if let TemplateValue::Block { items, .. } = &property.value {
+                        self.walk_structural_usage(items);
+                    }
+                }
+                TemplateItem::Conditional(conditional) => {
+                    self.walk_structural_usage(&conditional.items);
+                }
+                TemplateItem::BareValue(token) => {
+                    for name in token_parameters(token) {
+                        self.parameter(name).quoted_script = true;
+                    }
+                }
+            }
         }
     }
 

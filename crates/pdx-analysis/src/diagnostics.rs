@@ -2305,24 +2305,79 @@ fn validate_dynamic_quoted_payloads(
             }
             continue;
         }
-        validate_quoted_script(
-            ValidationState {
-                snapshot,
-                diagnostics: &mut *diagnostics,
-                cancellation,
-                quoted_scripts: &mut *quoted_scripts,
-            },
-            &row.context,
-            &[],
-            scope,
+        // Validate the payload exactly where the definition body splices it:
+        // per-render-site (context, parent_path, scope) from the same shared
+        // inference completion consumes. A statement failing at every render
+        // site is reported; one valid at any site passes.
+        let sites = crate::completion::infer_dynamic_quoted_payload_sites(
+            snapshot,
+            &row.kind,
+            &row.name,
+            invocation,
             argument,
-            quoted_script_depth,
-            // Scope authority for payload statements sits with the
-            // definition-site contract, not this call-site walk.
-            true,
+            scope,
+            cancellation,
         )?;
+        if sites.is_empty() {
+            // No inference available (unresolvable owner or exhausted
+            // budget): keep the definition-context floor with deferred scope
+            // checks.
+            validate_quoted_script(
+                ValidationState {
+                    snapshot,
+                    diagnostics: &mut *diagnostics,
+                    cancellation,
+                    quoted_scripts,
+                },
+                &row.context,
+                &[],
+                scope,
+                argument,
+                quoted_script_depth,
+                true,
+            )?;
+            continue;
+        }
+        let mut surviving: Option<Vec<Diagnostic>> = None;
+        for site in &sites {
+            let mut site_diagnostics = Vec::new();
+            validate_quoted_script(
+                ValidationState {
+                    snapshot,
+                    diagnostics: &mut site_diagnostics,
+                    cancellation,
+                    quoted_scripts,
+                },
+                &site.context,
+                &site.parent_path,
+                &site.scope,
+                argument,
+                quoted_script_depth,
+                false,
+            )?;
+            surviving = Some(match surviving {
+                None => site_diagnostics,
+                Some(previous) => previous
+                    .into_iter()
+                    .filter(|diagnostic| {
+                        site_diagnostics
+                            .iter()
+                            .any(|candidate| diagnostic_same(diagnostic, candidate))
+                    })
+                    .collect(),
+            });
+        }
+        diagnostics.extend(surviving.unwrap_or_default());
     }
     Ok(())
+}
+
+/// Site-union equality for payload validation across render sites: one
+/// finding slot is (code, range). Messages may embed the site's context name
+/// (`effect` vs `trigger` block), so they deliberately do not participate;
+/// the primary site's wording is the one reported.
+fn diagnostic_same(left: &Diagnostic, right: &Diagnostic) -> bool {
+    left.code == right.code && left.range == right.range
 }
 
 /// Resolves the derived dynamic row for one scripted invocation from the

@@ -141,20 +141,63 @@ fn infer_dynamic_argument_constraints(
     else {
         return Ok(DynamicArgumentConstraints::default());
     };
-    let Some(resolved) = resolve_dynamic_definition(snapshot, &owner_kind, &owner_name) else {
+    let bindings = invocation_bindings(invocation, Some(target));
+    infer_argument_constraints(
+        snapshot,
+        &owner_kind,
+        &owner_name,
+        &bindings,
+        &caller_scope,
+        cancellation,
+    )
+}
+
+/// Per-render-site (context, parent_path, scope) for one quoted payload
+/// argument, so diagnostics can validate the argument's script exactly where
+/// the definition body splices it. This is the same shared inference
+/// completion consumes; `target` is the argument being validated.
+pub(crate) fn infer_dynamic_quoted_payload_sites(
+    snapshot: &AnalysisSnapshot,
+    owner_kind: &str,
+    owner_name: &str,
+    invocation: &ScriptProperty,
+    target: &ScriptProperty,
+    caller_scope: &ScopeContext,
+    cancellation: &CancellationToken,
+) -> Result<Vec<DynamicQuotedScriptConstraintSite>, Cancelled> {
+    let bindings = invocation_bindings(invocation, Some(target));
+    infer_argument_constraints(
+        snapshot,
+        owner_kind,
+        owner_name,
+        &bindings,
+        caller_scope,
+        cancellation,
+    )
+    .map(|constraints| constraints.quoted_scripts)
+}
+
+fn infer_argument_constraints(
+    snapshot: &AnalysisSnapshot,
+    owner_kind: &str,
+    owner_name: &str,
+    bindings: &BTreeMap<String, SymbolicToken>,
+    caller_scope: &ScopeContext,
+    cancellation: &CancellationToken,
+) -> Result<DynamicArgumentConstraints, Cancelled> {
+    let Some(resolved) = resolve_dynamic_definition(snapshot, owner_kind, owner_name) else {
         return Ok(DynamicArgumentConstraints::default());
     };
     let Some(template) = resolved.summary.template.clone() else {
         return Ok(DynamicArgumentConstraints::default());
     };
-    let bindings = invocation_bindings(invocation, Some(target));
     let mut collector = ConstraintCollector::new(snapshot, cancellation);
     if !collector.budget.enter(&resolved) {
         return Ok(DynamicArgumentConstraints::default());
     }
     let result = (|| {
-        let container = collector.instantiate_items(&template.items, &bindings)?;
-        collector.collect_container(&container, &resolved.body_context, &[], &caller_scope)?;
+        let container = collector.instantiate_items(&template.items, bindings)?;
+        collector.collect_container(&container, &resolved.body_context, &[], caller_scope)?;
         Ok(if collector.exhausted {
             DynamicArgumentConstraints::default()
         } else {
@@ -516,6 +559,30 @@ impl<'a> ConstraintCollector<'a> {
                         // shape (numbers, opaque strings): the parameter is
                         // not free-form, but no item can be offered.
                         self.unenumerable_value_site = true;
+                    }
+                    // A quoted-script row whose whole value is the parameter
+                    // splices the caller's quoted text into that payload; the
+                    // render site is the row's destination, so the argument is
+                    // script at that site for completion and diagnostics alike.
+                    for rule in matching
+                        .iter()
+                        .copied()
+                        .filter(|rule| matches!(rule.shape, RuleShape::QuotedScript))
+                    {
+                        let (next_context, next_path) =
+                            semantic_transition_destination(rule, context, parent_path, key, false);
+                        let site = DynamicQuotedScriptConstraintSite {
+                            context: next_context.to_string(),
+                            parent_path: next_path,
+                            scope: semantic_child_scope(self.snapshot, scope, rule),
+                        };
+                        if !self.quoted_script_sites.iter().any(|known| {
+                            known.context.eq_ignore_ascii_case(&site.context)
+                                && known.parent_path == site.parent_path
+                                && known.scope == site.scope
+                        }) {
+                            self.quoted_script_sites.push(site);
+                        }
                     }
                 }
                 SymbolicValue::Block(children) => {
