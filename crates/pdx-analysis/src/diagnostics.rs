@@ -58,6 +58,12 @@ impl DiagnosticCollector {
                         left.fixes.push(fix);
                     }
                 }
+                for related in right.related.drain(..) {
+                    if !left.related.contains(&related) {
+                        left.related.push(related);
+                    }
+                }
+                left.notes.append(&mut right.notes);
                 true
             } else {
                 false
@@ -340,12 +346,14 @@ pub(crate) fn analyze_input_with_cancellation(
         // Candidates above were already reduced to one priority, so any earlier
         // sibling here comes from the same source root; cross-root overrides
         // (for example a mod replacing a vanilla definition) stay silent.
-        let has_earlier_sibling = ordered
+        let Some(index) = ordered
             .iter()
             .position(|candidate| candidate.location == definition.symbol.location)
-            .is_some_and(|index| index > 0);
-        if has_earlier_sibling {
-            diagnostics.push(Diagnostic::new(
+        else {
+            continue;
+        };
+        if index > 0 {
+            let mut diagnostic = Diagnostic::new(
                 DiagnosticCode::AmbiguousDefinition,
                 DiagnosticCode::AmbiguousDefinition.severity(),
                 definition.symbol.selection_range,
@@ -353,7 +361,21 @@ pub(crate) fn analyze_input_with_cancellation(
                     "definition `{}` shadows an earlier definition of the same name; the later definition takes effect",
                     definition.name
                 ),
-            ));
+            );
+            // Point at the definition being shadowed so one click separates a
+            // true collision from an intentional override.
+            if let Some(earlier) = index
+                .checked_sub(1)
+                .and_then(|earlier| ordered.get(earlier))
+            {
+                let mut location = earlier.location.clone();
+                location.range = earlier.selection_range;
+                diagnostic = diagnostic.with_related(RelatedLocation {
+                    location,
+                    message: format!("earlier definition of `{}`", definition.name),
+                });
+            }
+            diagnostics.push(diagnostic);
         }
     }
     let diagnostics = diagnostics.finish();

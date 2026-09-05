@@ -10,7 +10,7 @@ use lsp_types::{
 };
 use pdx_analysis::{
     CancellationToken, Cancelled, CompletionKind, Diagnostic, DiagnosticCode, Location,
-    RenameError, RenameFailure, Severity, diagnostics_with_cancellation,
+    RelatedLocation, RenameError, RenameFailure, Severity, diagnostics_with_cancellation,
 };
 use pdx_engine::{AnalysisSnapshot, DocumentError, DocumentId};
 use pdx_rules::RulesError;
@@ -220,6 +220,7 @@ pub(crate) fn diagnostic_values_with_ignored_and_overrides(
             .unwrap_or_default();
         diagnostic_values_for_text_with_ignored_and_overrides(
             diagnostics,
+            Some(snapshot),
             document.line_index(),
             document.text(),
             ignored,
@@ -237,6 +238,7 @@ pub(crate) fn diagnostic_values_for_text(
 ) -> Vec<LspDiagnostic> {
     diagnostic_values_for_text_with_ignored_and_overrides(
         diagnostics,
+        None,
         line_index,
         text,
         &HashSet::new(),
@@ -253,6 +255,7 @@ pub(crate) fn diagnostic_values_for_text_with_ignored(
 ) -> Vec<LspDiagnostic> {
     diagnostic_values_for_text_with_ignored_and_overrides(
         diagnostics,
+        None,
         line_index,
         text,
         ignored,
@@ -262,6 +265,7 @@ pub(crate) fn diagnostic_values_for_text_with_ignored(
 
 pub(crate) fn diagnostic_values_for_text_with_ignored_and_overrides(
     diagnostics: Vec<Diagnostic>,
+    snapshot: Option<&AnalysisSnapshot>,
     line_index: &LineIndex,
     text: &str,
     ignored: &HashSet<String>,
@@ -298,13 +302,25 @@ pub(crate) fn diagnostic_values_for_text_with_ignored_and_overrides(
                     })
                 })
                 .collect::<Vec<_>>();
+            // Notes and the violated constraint render as extra message
+            // lines; every editor shows them without extra machinery.
+            let mut message = diagnostic.message;
+            if let Some(expected) = diagnostic.expected.as_deref() {
+                message.push_str("\nexpected ");
+                message.push_str(expected);
+            }
+            for note in &diagnostic.notes {
+                message.push('\n');
+                message.push_str(note);
+            }
+            let related_information = related_information_for(snapshot, &diagnostic.related);
             let mut value = LspDiagnostic::new(
                 range_to_lsp(line_index, text, diagnostic.range),
                 severity,
                 Some(NumberOrString::String(diagnostic.code.as_str().to_owned())),
                 Some("pdx-analysis".to_owned()),
-                diagnostic.message,
-                None,
+                message,
+                related_information,
                 None,
             );
             // Certainty is current client-facing metadata; internal rule provenance never
@@ -331,6 +347,26 @@ pub(crate) fn diagnostic_values_for_text_with_ignored_and_overrides(
         ));
     }
     values
+}
+
+/// Converts related locations to LSP related information; unresolvable
+/// locations (no snapshot, or an indexed file without a URI) are dropped so
+/// the diagnostic still publishes.
+fn related_information_for(
+    snapshot: Option<&AnalysisSnapshot>,
+    related: &[RelatedLocation],
+) -> Option<Vec<lsp_types::DiagnosticRelatedInformation>> {
+    let snapshot = snapshot?;
+    let values = related
+        .iter()
+        .filter_map(|item| {
+            Some(lsp_types::DiagnosticRelatedInformation {
+                location: location_to_lsp(snapshot, &item.location)?,
+                message: item.message.clone(),
+            })
+        })
+        .collect::<Vec<_>>();
+    (values.len() == related.len()).then_some(values)
 }
 
 /// Applies workspace and source-level diagnostic suppressions before publication. Keeping this
@@ -712,8 +748,10 @@ mod tests {
     };
     use lsp_types::{CompletionItemKind, NumberOrString};
     use pdx_analysis::{
-        CompletionKind, Diagnostic, DiagnosticCode, DiagnosticProvenance, QuickFix, Severity,
+        CompletionKind, Diagnostic, DiagnosticCode, DiagnosticProvenance, Location, QuickFix,
+        RelatedLocation, Severity,
     };
+    use pdx_engine::DocumentId;
     use pdx_text::TextRange;
 
     /// The snapshot-request routing table must agree with the wire method names the
@@ -787,6 +825,39 @@ mod tests {
             completion_kind(CompletionKind::DynamicParameter),
             CompletionItemKind::VARIABLE
         );
+    }
+
+    #[test]
+    fn lsp_diagnostics_render_notes_expected_and_related_information() {
+        let diagnostic = Diagnostic::new(
+            DiagnosticCode::InvalidValue,
+            Severity::Error,
+            TextRange::new(0, 1).expect("range"),
+            "value is off".to_owned(),
+        )
+        .with_expected("a number between 1 and 5".to_owned())
+        .with_note("the game clamps this to the nearest column".to_owned())
+        .with_related(RelatedLocation {
+            location: Location {
+                document: Some(DocumentId::new("file:///tmp/missions/a.txt")),
+                file: None,
+                path: None,
+                range: TextRange::new(2, 6).expect("related range"),
+            },
+            message: "earlier definition".to_owned(),
+        });
+        let values = diagnostic_values_for_text(vec![diagnostic], &LineIndex::new("x"), "x");
+        let value = serde_json::to_value(&values[0]).expect("diagnostic JSON");
+
+        assert_eq!(
+            value["message"],
+            "value is off
+expected a number between 1 and 5
+the game clamps this to the nearest column"
+        );
+        // Without a snapshot the related location cannot resolve to a URI and
+        // is dropped instead of breaking publication.
+        assert!(value.get("relatedInformation").is_none());
     }
 
     #[test]
@@ -873,6 +944,7 @@ mod tests {
         ]);
         let values = diagnostic_values_for_text_with_ignored_and_overrides(
             diagnostics,
+            None,
             &LineIndex::new("xy"),
             "xy",
             &HashSet::new(),

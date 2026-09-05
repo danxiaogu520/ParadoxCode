@@ -199,6 +199,7 @@ fn workspace_validation_result(
             if publish_diagnostics && published_files < MAX_WORKSPACE_DIAGNOSTIC_PUBLICATIONS {
                 let values = diagnostic_values_for_text_with_ignored_and_overrides(
                     filtered,
+                    Some(&snapshot),
                     &line_index,
                     &source,
                     &HashSet::new(),
@@ -314,6 +315,7 @@ fn changed_files_validation_result(
         current_uris.push(uri.clone());
         let values = diagnostic_values_for_text_with_ignored_and_overrides(
             filtered,
+            Some(&snapshot),
             &line_index,
             &source,
             &HashSet::new(),
