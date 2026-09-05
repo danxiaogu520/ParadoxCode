@@ -6,4 +6,4 @@ diagnostics:
 - code=InvalidValue severity=Error certainty=certain range=19..26
   message: invalid value `histori` for `mode`; did you mean `historic`?
   expected: one of `dynamic`, `historic`
-  fix: Did you mean 'historic'? [19..26] -> "\"historic\""
+  fix*: Did you mean 'historic'? [19..26] -> "\"historic\""

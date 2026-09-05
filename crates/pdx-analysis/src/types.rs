@@ -349,6 +349,9 @@ pub struct QuickFix {
     pub range: TextRange,
     /// Replacement text, already escaped for the source language.
     pub new_text: String,
+    /// Whether this is the single confident resolution, mapped to the
+    /// protocol's preferred-action flag.
+    pub preferred: bool,
 }
 
 impl QuickFix {
@@ -359,6 +362,40 @@ impl QuickFix {
             title,
             range,
             new_text,
+            preferred: false,
+        }
+    }
+
+    /// Creates a replacement edit that is the confident resolution of its
+    /// diagnostic, such as a did-you-mean spelling correction.
+    #[must_use]
+    pub fn suggestion(title: String, range: TextRange, new_text: String) -> Self {
+        Self {
+            preferred: true,
+            ..Self::replace(title, range, new_text)
+        }
+    }
+}
+
+/// Editor rendering hints, mirroring the protocol's diagnostic tags.
+///
+/// Tags change presentation only (strikethrough, dimming); they never
+/// alter severity or suppress a finding.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DiagnosticTag {
+    /// The flagged source is redundant, such as an occurrence past a quota.
+    Unnecessary,
+    /// The flagged usage belongs to a deprecated declaration.
+    Deprecated,
+}
+
+impl DiagnosticTag {
+    /// Returns the stable wire number (LSP tag values).
+    #[must_use]
+    pub const fn as_u8(self) -> u8 {
+        match self {
+            Self::Unnecessary => 1,
+            Self::Deprecated => 2,
         }
     }
 }
@@ -397,6 +434,8 @@ pub struct Diagnostic {
     /// Locations that give the finding context, such as the earlier
     /// definition a later one shadows.
     pub related: Vec<RelatedLocation>,
+    /// Editor rendering hints (redundant or deprecated source).
+    pub tags: Vec<DiagnosticTag>,
     /// Optional internal rule/source provenance for explainability.
     pub provenance: Option<DiagnosticProvenance>,
     /// Safe source edits that directly address this diagnostic.
@@ -430,6 +469,7 @@ impl Diagnostic {
             notes: Vec::new(),
             expected: None,
             related: Vec::new(),
+            tags: Vec::new(),
             provenance: None,
             fixes: Vec::new(),
         }
@@ -460,6 +500,13 @@ impl Diagnostic {
     #[must_use]
     pub fn with_related(mut self, related: RelatedLocation) -> Self {
         self.related.push(related);
+        self
+    }
+
+    /// Attaches one editor rendering hint.
+    #[must_use]
+    pub fn with_tag(mut self, tag: DiagnosticTag) -> Self {
+        self.tags.push(tag);
         self
     }
 

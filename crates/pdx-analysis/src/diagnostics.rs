@@ -913,7 +913,7 @@ fn validate_semantic_container(
                     ),
                 );
                 if let Some(candidate) = suggestion {
-                    diagnostic = diagnostic.with_fix(QuickFix::replace(
+                    diagnostic = diagnostic.with_fix(QuickFix::suggestion(
                         format!("Did you mean '{candidate}'?"),
                         property.key_range,
                         (*candidate).to_owned(),
@@ -1095,11 +1095,14 @@ fn validate_semantic_container(
                         "\"{}\"",
                         candidate.replace('\\', "\\\\").replace('"', "\\\"")
                     );
-                    diagnostic = diagnostic.with_fix(QuickFix::replace(
+                    diagnostic = diagnostic.with_fix(QuickFix::suggestion(
                         format!("Did you mean '{candidate}'?"),
                         *value_range,
                         replacement,
                     ));
+                }
+                if applicable.iter().all(|rule| rule.deprecated) {
+                    diagnostic = diagnostic.with_tag(DiagnosticTag::Deprecated);
                 }
                 diagnostics.push(diagnostic);
             }
@@ -1154,19 +1157,22 @@ fn validate_semantic_container(
             if let Some(max_occurs) = max_occurs
                 && count > max_occurs
             {
-                diagnostics.push(semantic_diagnostic(
-                    DiagnosticCode::Cardinality,
-                    Severity::Warning,
-                    property.key_range,
-                    format!(
-                        "`{}` appears {}, but at most {} {} allowed here",
-                        property.key,
-                        occurrence_word(count),
-                        max_occurs,
-                        if max_occurs == 1 { "is" } else { "are" },
-                    ),
-                    applicable[0],
-                ));
+                diagnostics.push(
+                    semantic_diagnostic(
+                        DiagnosticCode::Cardinality,
+                        Severity::Warning,
+                        property.key_range,
+                        format!(
+                            "`{}` appears {}, but at most {} {} allowed here",
+                            property.key,
+                            occurrence_word(count),
+                            max_occurs,
+                            if max_occurs == 1 { "is" } else { "are" },
+                        ),
+                        applicable[0],
+                    )
+                    .with_tag(DiagnosticTag::Unnecessary),
+                );
             }
         }
         let cached_child_fact = cached_scope_fact_for_property(CachedScopeFactInput {
@@ -1529,7 +1535,8 @@ fn validate_semantic_container(
                         })
                         .nth(max_occurs as usize)
                         .map_or(empty_range, |(_, range)| *range);
-                    diagnostics.push(semantic_diagnostic(
+                    diagnostics.push(
+                        semantic_diagnostic(
                         DiagnosticCode::Cardinality,
                         Severity::Warning,
                         overflow_range,
@@ -1537,7 +1544,9 @@ fn validate_semantic_container(
                             "this list allows at most {max_occurs} {plural}, but contains {count}",
                         ),
                         rule,
-                    ));
+                    )
+                    .with_tag(DiagnosticTag::Unnecessary),
+                    );
                 }
                 continue;
             }

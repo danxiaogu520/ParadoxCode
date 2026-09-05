@@ -826,14 +826,14 @@ impl LspServer {
                 .into_iter()
                 .take(crate::MAX_WORKSPACE_DIAGNOSTIC_CLEARS)
             {
-                write_message(output, &diagnostics_notification(&uri, json!([])))?;
+                write_message(output, &diagnostics_notification(&uri, json!([]), None))?;
                 self.workspace_diagnostic_uris.remove(&uri);
             }
         }
         for publication in &result.publications {
             write_message(
                 output,
-                &diagnostics_notification(&publication.uri, publication.values.clone()),
+                &diagnostics_notification(&publication.uri, publication.values.clone(), None),
             )?;
             if publication
                 .values

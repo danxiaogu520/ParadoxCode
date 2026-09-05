@@ -60,9 +60,22 @@ fn render(name: &str, text: &str, items: &[Diagnostic]) -> String {
                 related.location.range.end(),
             ));
         }
+        if !diagnostic.tags.is_empty() {
+            let tags = diagnostic
+                .tags
+                .iter()
+                .map(|tag| match tag {
+                    crate::types::DiagnosticTag::Unnecessary => "unnecessary",
+                    crate::types::DiagnosticTag::Deprecated => "deprecated",
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            out.push_str(&format!("  tags: {tags}\n"));
+        }
         for fix in &diagnostic.fixes {
             out.push_str(&format!(
-                "  fix: {} [{}..{}] -> {}\n",
+                "  fix{}: {} [{}..{}] -> {}\n",
+                if fix.preferred { "*" } else { "" },
                 fix.title,
                 fix.range.start(),
                 fix.range.end(),

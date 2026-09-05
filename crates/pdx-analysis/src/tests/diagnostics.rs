@@ -709,7 +709,13 @@ fn invalid_enum_value_carries_one_unique_did_you_mean_fix() {
         &CancellationToken::new(),
     )
     .expect("quick-fix query");
-    assert_eq!(fixes, vec![fix.clone()]);
+    assert_eq!(
+        fixes
+            .iter()
+            .map(|code_fix| code_fix.fix.clone())
+            .collect::<Vec<_>>(),
+        vec![fix.clone()]
+    );
 }
 
 #[test]

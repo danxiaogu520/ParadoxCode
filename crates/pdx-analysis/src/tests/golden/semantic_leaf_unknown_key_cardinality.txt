@@ -10,3 +10,4 @@ diagnostics:
   message: unknown key `unknown` in a `trigger` block
 - code=Cardinality severity=Warning certainty=certain range=38..41
   message: `foo` appears twice, but at most 1 is allowed here
+  tags: unnecessary

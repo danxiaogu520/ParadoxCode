@@ -51,7 +51,10 @@ impl LspServer {
                 let pending_workspace_clears =
                     std::mem::take(&mut self.workspace_diagnostic_clear_queue);
                 for uri in pending_workspace_clears {
-                    write_message(&mut output, &diagnostics_notification(&uri, json!([])))?;
+                    write_message(
+                        &mut output,
+                        &diagnostics_notification(&uri, json!([]), None),
+                    )?;
                 }
                 self.spawn_pending_disk_changes(scope, &event_sender, &mut in_flight_disk_changes);
                 self.spawn_pending_scan(scope, &event_sender, &mut in_flight_scan, &mut output)?;
@@ -508,7 +511,11 @@ impl LspServer {
                         {
                             write_message(
                                 &mut output,
-                                &diagnostics_notification(&result.uri, values),
+                                &diagnostics_notification(
+                                    &result.uri,
+                                    values,
+                                    Some(result.version),
+                                ),
                             )?;
                         }
                     }
