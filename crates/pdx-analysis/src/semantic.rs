@@ -1197,25 +1197,7 @@ pub(crate) fn semantic_bare_value_severity<'a>(
             .map(Severity::from_rule_number)
             .unwrap_or(Severity::Error)
     } else {
-        DiagnosticCode::UnknownBareValue.severity()
-    }
-}
-
-/// Selects the diagnostic category for an unmatched bare value. Values outside an explicit
-/// numeric range are known values with a bounded violation; all other unmatched scalars are
-/// unknown bare values and therefore hard errors.
-pub(crate) fn semantic_bare_value_code<'a>(
-    rules: impl IntoIterator<Item = &'a pdx_rules::SemanticRule>,
-    value: &str,
-) -> DiagnosticCode {
-    let has_numeric_overflow = rules
-        .into_iter()
-        .filter(|rule| matches!(rule.shape, RuleShape::LeafValue))
-        .any(|rule| numeric_range_overflow(&rule.value, value));
-    if has_numeric_overflow {
-        DiagnosticCode::InvalidValue
-    } else {
-        DiagnosticCode::UnknownBareValue
+        DiagnosticCode::InvalidValue.severity()
     }
 }
 

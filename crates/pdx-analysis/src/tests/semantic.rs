@@ -78,7 +78,7 @@ fn identity_only_host_does_not_guess_eu4_semantics_from_game_id() {
     assert!(
         diagnostics(&snapshot, &id)
             .iter()
-            .any(|item| item.code == DiagnosticCode::UnknownScope)
+            .any(|item| item.code == DiagnosticCode::InvalidValue)
     );
 }
 
@@ -89,7 +89,10 @@ fn eu4_profile_supplies_known_scope_spellings() {
     assert!(
         diagnostics(&host.snapshot(), &id)
             .iter()
-            .all(|item| item.code != DiagnosticCode::UnknownScope)
+            .all(|item| !matches!(
+                item.code,
+                DiagnosticCode::InvalidValue | DiagnosticCode::InvalidScopeCommand
+            ))
     );
 }
 
@@ -222,7 +225,7 @@ fn area_scope_transition_keeps_province_trigger_valid() {
     );
     assert!(
         !results.iter().any(|item| {
-            item.code == DiagnosticCode::RuleWrongScope
+            item.code == DiagnosticCode::WrongScope
                 && item
                     .message
                     .contains("`country_or_non_sovereign_subject_holds`")
@@ -277,7 +280,7 @@ fn eu4_normal_type_selector_applies_mission_rules_to_custom_root_names() {
     );
     assert!(
         results.iter().any(|item| {
-            item.code == DiagnosticCode::UnknownBareValue && item.message.contains("potential")
+            item.code == DiagnosticCode::InvalidValue && item.message.contains("potential")
         }),
         "negative type_key_filter was not applied to <mission>: {results:?}"
     );

@@ -21,7 +21,12 @@ fn rename_updates_definition_and_resolved_references() {
     host.apply_document_changes(&id, 2, &[pdx_engine::TextChange::full(changed)])
         .expect("apply rename");
     assert!(diagnostics(&host.snapshot(), &id).iter().all(|item| {
-        item.code != DiagnosticCode::UnknownSymbol && item.code != DiagnosticCode::AmbiguousSymbol
+        !matches!(
+            item.code,
+            DiagnosticCode::InvalidValue
+                | DiagnosticCode::UnknownLocalisationKey
+                | DiagnosticCode::AmbiguousDefinition
+        )
     }));
 }
 

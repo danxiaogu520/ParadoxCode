@@ -36,7 +36,7 @@ fn unknown_tooltip_and_named_event_target_scopes_stay_conservative() {
     let results = diagnostics(&host.snapshot(), &id);
     assert!(
         results.iter().all(|item| {
-            item.code != DiagnosticCode::RuleWrongScope
+            item.code != DiagnosticCode::WrongScope
                 && !(item.code == DiagnosticCode::InvalidValue
                     && item.message.contains("set_capital"))
         }),
@@ -123,7 +123,8 @@ fn game_age_abilities_defined_in_the_current_file_validate_their_effects() {
         "an ability declared below `abilities` is a workspace definition: {diagnostics:?}"
     );
     let missing_symbols = diagnostics.iter().filter(|item| {
-        item.code == DiagnosticCode::UnknownSymbol && item.message.contains("`missing_loc`")
+        item.code == DiagnosticCode::UnknownLocalisationKey
+            && item.message.contains("`missing_loc`")
     });
     assert_eq!(
         missing_symbols.count(),
@@ -173,7 +174,8 @@ fn game_age_ability_in_an_initially_empty_index_is_a_definition() {
     );
     assert!(
         diagnostics.iter().any(|item| {
-            item.code == DiagnosticCode::UnknownSymbol && item.range.start() == missing_loc_start
+            item.code == DiagnosticCode::UnknownLocalisationKey
+                && item.range.start() == missing_loc_start
         }),
         "a newly defined ability must validate its nested effect: {diagnostics:?}"
     );
@@ -260,7 +262,7 @@ fn eu4_replace_scope_links_populate_from_intrinsics() {
     assert!(
         diagnostics(&host.snapshot(), &invalid_id)
             .iter()
-            .any(|item| item.code == DiagnosticCode::TargetWrongScope)
+            .any(|item| item.code == DiagnosticCode::WrongScope)
     );
     fs::remove_dir_all(root).expect("cleanup");
 }
@@ -371,10 +373,10 @@ fn dynamic_scope_mismatch_surfaces_at_the_call_site() {
         "dynamic definition `country_wrapper` requires entry scope country but is called in `province` scope"
     );
     assert!(
-        results.iter().all(
-            |diagnostic| !(diagnostic.code == DiagnosticCode::RuleWrongScope
-                && diagnostic.message.contains("fixture_country_only"))
-        ),
+        results
+            .iter()
+            .all(|diagnostic| !(diagnostic.code == DiagnosticCode::WrongScope
+                && diagnostic.message.contains("fixture_country_only"))),
         "the expansion walk no longer reports scope findings: {results:?}"
     );
     fs::remove_dir_all(root).expect("cleanup");

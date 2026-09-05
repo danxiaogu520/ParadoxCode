@@ -7,8 +7,8 @@
 //   } }
 //   
 diagnostics:
-- code=UnknownSymbol severity=Warning certainty=certain range=47..54
-  message: unknown localisation symbol `mle.1.a`
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=47..54
+  message: unknown localisation key `mle.1.a`
 - code=MissingLimit severity=Warning certainty=certain range=57..59
   message: `if` without `limit` executes its body unconditionally; the condition belongs in a `limit` block
 - code=Cardinality severity=Error certainty=certain range=62..82

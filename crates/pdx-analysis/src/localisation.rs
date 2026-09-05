@@ -278,7 +278,7 @@ pub(crate) fn localisation_command_diagnostics(
             }
             diagnostics.push(
                 Diagnostic::new(
-                    DiagnosticCode::UnknownSymbol,
+                    DiagnosticCode::InvalidValue,
                     Severity::Warning,
                     range,
                     format!("unknown localisation command `{command}`"),

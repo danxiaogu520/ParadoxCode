@@ -832,7 +832,7 @@ mod tests {
                 "hidden".to_owned(),
             ),
             Diagnostic::new(
-                DiagnosticCode::UnknownSymbol,
+                DiagnosticCode::InvalidValue,
                 Severity::Error,
                 TextRange::new(0, 1).expect("range"),
                 "visible".to_owned(),
@@ -847,7 +847,7 @@ mod tests {
         assert_eq!(values.len(), 1);
         assert_eq!(
             values[0].code,
-            Some(NumberOrString::String("UnknownSymbol".to_owned()))
+            Some(NumberOrString::String("InvalidValue".to_owned()))
         );
     }
 
@@ -855,7 +855,7 @@ mod tests {
     fn severity_overrides_remap_and_suppress_before_lsp_conversion() {
         let diagnostics = vec![
             Diagnostic::new(
-                DiagnosticCode::UnknownScope,
+                DiagnosticCode::WrongScope,
                 Severity::Error,
                 TextRange::new(0, 1).expect("range"),
                 "downgraded".to_owned(),
@@ -868,7 +868,7 @@ mod tests {
             ),
         ];
         let overrides = BTreeMap::from([
-            ("UnknownScope".to_owned(), Some(Severity::Warning)),
+            ("WrongScope".to_owned(), Some(Severity::Warning)),
             ("UnknownKey".to_owned(), None),
         ]);
         let values = diagnostic_values_for_text_with_ignored_and_overrides(
@@ -885,26 +885,26 @@ mod tests {
         );
         assert_eq!(
             values[0].code,
-            Some(NumberOrString::String("UnknownScope".to_owned()))
+            Some(NumberOrString::String("WrongScope".to_owned()))
         );
     }
 
     #[test]
     fn inline_cwtools_ignore_covers_adjacent_lines_and_known_codes_only() {
         let text =
-            "scope = nowhere\n😀 # cwtools-ignore UnknownScope UnknownKey # note\nother = value\n";
+            "scope = nowhere\n😀 # cwtools-ignore WrongScope UnknownKey # note\nother = value\n";
         let directive = u32::try_from(text.find("# cwtools-ignore").expect("directive"))
             .expect("directive offset");
         let below = u32::try_from(text.find("other").expect("below line")).expect("below offset");
         let diagnostics = vec![
             Diagnostic::new(
-                DiagnosticCode::UnknownScope,
+                DiagnosticCode::WrongScope,
                 Severity::Error,
                 TextRange::new(0, 5).expect("range"),
                 "above".to_owned(),
             ),
             Diagnostic::new(
-                DiagnosticCode::UnknownScope,
+                DiagnosticCode::WrongScope,
                 Severity::Error,
                 TextRange::new(directive, directive + 1).expect("range"),
                 "same".to_owned(),
@@ -916,7 +916,7 @@ mod tests {
                 "below".to_owned(),
             ),
             Diagnostic::new(
-                DiagnosticCode::UnknownSymbol,
+                DiagnosticCode::InvalidValue,
                 Severity::Error,
                 TextRange::new(below, below + 5).expect("range"),
                 "visible".to_owned(),
@@ -931,15 +931,15 @@ mod tests {
         assert_eq!(values.len(), 1);
         assert_eq!(
             values[0].code,
-            Some(NumberOrString::String("UnknownSymbol".to_owned()))
+            Some(NumberOrString::String("InvalidValue".to_owned()))
         );
     }
 
     #[test]
     fn inline_cwtools_ignore_does_not_match_partial_directive_words() {
-        let text = "scope = nowhere # cwtools-ignore-typo UnknownScope\n";
+        let text = "scope = nowhere # cwtools-ignore-typo WrongScope\n";
         let diagnostics = vec![Diagnostic::new(
-            DiagnosticCode::UnknownScope,
+            DiagnosticCode::WrongScope,
             Severity::Error,
             TextRange::new(0, 5).expect("range"),
             "visible".to_owned(),

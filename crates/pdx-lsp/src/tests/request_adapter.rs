@@ -68,7 +68,7 @@ fn text_diagnostics_analyzes_caller_supplied_files_without_opening_overlays() {
     assert!(
         files[0]["diagnostics"]
             .as_array()
-            .is_some_and(|items| items.iter().any(|item| item["code"] == "UnknownScope"))
+            .is_some_and(|items| items.iter().any(|item| item["code"] == "InvalidValue"))
     );
     assert_eq!(files[1]["path"], "events/valid.txt");
     assert!(files[1]["diagnostics"].is_array());
@@ -210,7 +210,7 @@ fn workspace_diagnostics_batches_indexed_disk_files_without_opening_overlays() {
     assert!(
         first["result"]["items"][0]["diagnostics"]
             .as_array()
-            .is_some_and(|items| items.iter().any(|item| item["code"] == "UnknownScope"))
+            .is_some_and(|items| items.iter().any(|item| item["code"] == "InvalidValue"))
     );
     let second = responses
         .iter()
@@ -529,13 +529,13 @@ fn memory_transport_delegates_phase5_requests_to_analysis() {
                 && value["params"]["uri"].as_str() == Some(uri.as_str())
                 && value["params"]["diagnostics"]
                     .as_array()
-                    .is_some_and(|items| items.iter().any(|item| item["code"] == "UnknownScope"))
+                    .is_some_and(|items| items.iter().any(|item| item["code"] == "InvalidValue"))
         })
         .expect("diagnostic notification");
     assert!(
         diagnostics["params"]["diagnostics"]
             .as_array()
-            .is_some_and(|items| { items.iter().any(|item| item["code"] == "UnknownScope") })
+            .is_some_and(|items| { items.iter().any(|item| item["code"] == "InvalidValue") })
     );
 
     let _: CompletionResponse = typed_result(&responses, 2);

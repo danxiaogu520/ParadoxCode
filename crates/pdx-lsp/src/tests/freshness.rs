@@ -70,7 +70,7 @@ fn rapid_changes_debounce_and_publish_only_the_latest_diagnostics() {
     assert!(
         published[0]["params"]["diagnostics"]
             .as_array()
-            .is_some_and(|items| items.iter().all(|item| item["code"] != "UnknownScope"))
+            .is_some_and(|items| items.iter().all(|item| item["code"] != "InvalidValue"))
     );
     let snapshot = server.snapshot();
     let document = snapshot
@@ -94,7 +94,7 @@ fn initialization_can_filter_selected_diagnostic_codes() {
             "params":{
                 "workspaceFolders":[{"uri":root_uri,"name":"test"}],
                 "capabilities":{},
-                "initializationOptions":{"ignoredErrorCodes":["UnknownScope"]}
+                "initializationOptions":{"ignoredErrorCodes":["InvalidValue"]}
             }
         }),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -119,7 +119,7 @@ fn initialization_can_filter_selected_diagnostic_codes() {
     assert!(
         published["params"]["diagnostics"]
             .as_array()
-            .is_some_and(|items| items.iter().all(|item| item["code"] != "UnknownScope")),
+            .is_some_and(|items| items.iter().all(|item| item["code"] != "InvalidValue")),
         "ignored diagnostic code was published: {}",
         published["params"]["diagnostics"]
     );
@@ -142,7 +142,7 @@ fn inline_cwtools_ignore_filters_selected_diagnostic_codes() {
         }),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{
-            "textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":"scope = nowhere # cwtools-ignore UnknownScope\n"}
+            "textDocument":{"uri":uri,"languageId":"eu4","version":1,"text":"scope = nowhere # cwtools-ignore InvalidValue\n"}
         }}),
         json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":{}}),
         json!({"jsonrpc":"2.0","method":"exit"}),
@@ -162,7 +162,7 @@ fn inline_cwtools_ignore_filters_selected_diagnostic_codes() {
     assert!(
         published["params"]["diagnostics"]
             .as_array()
-            .is_some_and(|items| items.iter().all(|item| item["code"] != "UnknownScope")),
+            .is_some_and(|items| items.iter().all(|item| item["code"] != "InvalidValue")),
         "inline ignored diagnostic code was published: {}",
         published["params"]["diagnostics"]
     );

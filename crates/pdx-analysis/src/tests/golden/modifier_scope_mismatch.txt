@@ -21,25 +21,25 @@
 //   }
 //   
 diagnostics:
-- code=UnknownSymbol severity=Warning certainty=certain range=52..66
-  message: unknown localisation symbol `test_event.1.t`
-- code=UnknownSymbol severity=Warning certainty=certain range=89..104
-  message: unknown localisation symbol `opt_bad_country`
-- code=RuleWrongScope severity=Error certainty=certain range=113..134
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=52..66
+  message: unknown localisation key `test_event.1.t`
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=89..104
+  message: unknown localisation key `opt_bad_country`
+- code=WrongScope severity=Error certainty=certain range=113..134
   message: `add_province_modifier` is not available in game scope `country` (rule semantic-rules.json:4813)
 - code=ModifierScopeMismatch severity=Information certainty=certain range=146..157
   message: modifier `country_mod` applies country-class attributes (global_tax_modifier, discipline) in province scope
-- code=UnknownSymbol severity=Warning certainty=certain range=203..219
-  message: unknown localisation symbol `opt_bad_province`
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=203..219
+  message: unknown localisation key `opt_bad_province`
 - code=ModifierScopeMismatch severity=Information certainty=certain range=260..272
   message: modifier `province_mod` applies unexpected province-class attributes (local_unrest, local_defensiveness) in country scope
-- code=UnknownSymbol severity=Warning certainty=certain range=318..324
-  message: unknown localisation symbol `opt_ok`
-- code=UnknownSymbol severity=Warning certainty=certain range=422..431
-  message: unknown localisation symbol `opt_mixed`
-- code=RuleWrongScope severity=Error certainty=certain range=440..471
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=318..324
+  message: unknown localisation key `opt_ok`
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=422..431
+  message: unknown localisation key `opt_mixed`
+- code=WrongScope severity=Error certainty=certain range=440..471
   message: `add_permanent_province_modifier` is not available in game scope `country` (rule semantic-rules.json:4820)
 - code=ModifierScopeMismatch severity=Information certainty=certain range=483..492
   message: modifier `mixed_mod` applies country-class attributes (global_tax_modifier) in province scope
-- code=UnknownSymbol severity=Warning certainty=certain range=537..553
-  message: unknown localisation symbol `opt_unit_country`
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=537..553
+  message: unknown localisation key `opt_unit_country`

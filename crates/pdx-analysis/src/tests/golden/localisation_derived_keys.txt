@@ -3,10 +3,10 @@
 //   series = { mission_one = { potential = { always = yes } } }
 //   
 diagnostics:
-- code=UnknownSymbol severity=Warning certainty=certain range=11..22
-  message: unknown localisation symbol `mission_one_desc`
-- code=UnknownSymbol severity=Warning certainty=certain range=11..22
-  message: unknown localisation symbol `mission_one_title`
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=11..22
+  message: unknown localisation key `mission_one_desc`
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=11..22
+  message: unknown localisation key `mission_one_title`
 - code=Cardinality severity=Error certainty=certain range=11..22
   message: semantic rule requires at least 1 occurrence(s), but `potential` occurs 0 times (rule semantic-rules.json:5618)
 - code=Cardinality severity=Error certainty=certain range=11..22
