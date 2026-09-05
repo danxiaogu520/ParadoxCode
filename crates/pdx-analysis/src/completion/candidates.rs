@@ -119,6 +119,53 @@ fn key_specificity(
     }
 }
 
+/// Filters dynamic-definition member names by their inferred entry contract
+/// against the scope active at the completion site, mirroring
+/// `dynamic_call_site_diagnostics`: only `Scopes` contracts filter, an `Empty`
+/// contract stays visible (its error is reported at the definition site), and
+/// an unknown caller scope (`any`) never filters.
+fn contract_filtered_dynamic_members(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    members: &[String],
+    scope: &ScopeContext,
+) -> Vec<String> {
+    let current = scope.current.as_ref();
+    if current.eq_ignore_ascii_case("any") || current.eq_ignore_ascii_case("invalid") {
+        return members.to_vec();
+    }
+    let report = crate::dynamic_contracts::dynamic_contract_report_view(snapshot);
+    let profile = snapshot.game_profile();
+    members
+        .iter()
+        .filter(|name| {
+            let Some(contract) = report.contract(kind, name) else {
+                return true;
+            };
+            !matches!(contract, crate::dynamic_contracts::ScopeContract::Scopes(_))
+                || contract.accepts(profile, current)
+        })
+        .cloned()
+        .collect()
+}
+
+/// Lists workspace members of a dynamic-definition kind filtered by entry
+/// contract, or the plain member list for every other kind.
+fn dynamic_members_for_scope(
+    snapshot: &AnalysisSnapshot,
+    member_cache: &mut CompletionMemberCache,
+    type_name: &str,
+    prefix: &str,
+    scope: &ScopeContext,
+) -> Vec<String> {
+    let members = member_cache.workspace_member_names(snapshot, type_name, prefix);
+    if dynamic_definition_type(snapshot, type_name) {
+        contract_filtered_dynamic_members(snapshot, type_name, members, scope)
+    } else {
+        members.to_vec()
+    }
+}
+
 fn rule_required_missing(
     snapshot: &AnalysisSnapshot,
     context: &SemanticCompletionContext,
@@ -323,13 +370,19 @@ pub(crate) fn add_semantic_key_items_ranked(
                 rule_rank_context(snapshot, context, &candidate, CompletionSpecificity::Exact),
             ),
             KeyMatcher::Type(type_name) => {
-                for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
+                for label in dynamic_members_for_scope(
+                    snapshot,
+                    member_cache,
+                    type_name,
+                    prefix,
+                    candidate.scope,
+                ) {
                     let insert_text = if !insert_assignment {
                         label.clone()
                     } else if dynamic_definition_type(snapshot, type_name) {
-                        scripted_definition_snippet(snapshot, type_name, label)
+                        scripted_definition_snippet(snapshot, type_name, &label)
                     } else {
-                        key_insert_text(rule, label, true)
+                        key_insert_text(rule, &label, true)
                     };
                     push_completion(
                         items,
@@ -410,7 +463,9 @@ pub(crate) fn add_semantic_key_items_ranked(
                 }
             }
             KeyMatcher::Dynamic(kind) => {
-                for label in member_cache.workspace_member_names(snapshot, kind, prefix) {
+                for label in
+                    dynamic_members_for_scope(snapshot, member_cache, kind, prefix, candidate.scope)
+                {
                     push_completion(
                         items,
                         CompletionItem {
@@ -419,7 +474,7 @@ pub(crate) fn add_semantic_key_items_ranked(
                             detail: kind.clone(),
                             documentation: documentation.clone(),
                             replacement_range,
-                            insert_text: key_insert_text(rule, label, insert_assignment),
+                            insert_text: key_insert_text(rule, &label, true),
                             sort_score: 0,
                             deprecated: rule.deprecated,
                             resolve_data: Some(format!("rule:{}", rule.id)),
@@ -852,10 +907,16 @@ pub(crate) fn add_semantic_value_items(
             // sets. Their constraints remain available to diagnostics and hover.
             ValueMatcher::Int { .. } | ValueMatcher::Float { .. } | ValueMatcher::Date => {}
             ValueMatcher::Type(type_name) => {
-                for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
+                for label in dynamic_members_for_scope(
+                    snapshot,
+                    member_cache,
+                    type_name,
+                    prefix,
+                    candidate.scope,
+                ) {
                     add_value_completion_ranked(
                         items,
-                        label,
+                        &label,
                         type_name,
                         documentation.clone(),
                         replacement_range,
@@ -944,10 +1005,12 @@ pub(crate) fn add_semantic_value_items(
                     }
                     continue;
                 }
-                for label in member_cache.workspace_member_names(snapshot, kind, prefix) {
+                for label in
+                    dynamic_members_for_scope(snapshot, member_cache, kind, prefix, candidate.scope)
+                {
                     add_value_completion_ranked(
                         items,
-                        label,
+                        &label,
                         kind,
                         documentation.clone(),
                         replacement_range,
@@ -1136,10 +1199,12 @@ fn add_inferred_matcher_items(
         // completion values.
         ValueMatcher::Int { .. } | ValueMatcher::Float { .. } | ValueMatcher::Date => {}
         ValueMatcher::Type(type_name) => {
-            for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
+            for label in
+                dynamic_members_for_scope(snapshot, member_cache, type_name, prefix, &context.scope)
+            {
                 add_value_completion_ranked(
                     items,
-                    label,
+                    &label,
                     type_name,
                     None,
                     replacement_range,
@@ -1195,10 +1260,12 @@ fn add_inferred_matcher_items(
             }
         }
         ValueMatcher::Dynamic(kind) => {
-            for label in member_cache.workspace_member_names(snapshot, kind, prefix) {
+            for label in
+                dynamic_members_for_scope(snapshot, member_cache, kind, prefix, &context.scope)
+            {
                 add_value_completion_ranked(
                     items,
-                    label,
+                    &label,
                     kind,
                     None,
                     replacement_range,

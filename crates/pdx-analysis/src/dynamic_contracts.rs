@@ -252,6 +252,16 @@ pub(crate) fn dynamic_contract(
     report.contract(kind, name).cloned()
 }
 
+/// Loads the workspace-wide contract report for read-only consumers such as
+/// completion filtering. The report is cached per revision; the fresh
+/// cancellation token matches the hover path (`dynamic_contract`).
+pub(crate) fn dynamic_contract_report_view(
+    snapshot: &AnalysisSnapshot,
+) -> std::sync::Arc<DynamicContractReport> {
+    let cancellation = CancellationToken::new();
+    uncancelled(dynamic_contract_report(snapshot, &cancellation))
+}
+
 /// One-line hover summary of a definition's inferred contract.
 pub(crate) fn contract_hover_line(snapshot: &AnalysisSnapshot, kind: &str, name: &str) -> String {
     let contract = dynamic_contract(snapshot, kind, name);
