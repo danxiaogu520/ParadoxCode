@@ -3583,3 +3583,215 @@ fn closed_flag_kinds_complete_indexed_overlay_and_engine_seeded_names() {
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn dynamic_definition_completion_filters_by_entry_contract_at_call_sites() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-contract-filter-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&definitions).expect("definition directory");
+    std::fs::write(
+        definitions.join("00_complete.txt"),
+        concat!(
+            "prov_only = { add_base_tax = 1 }\n",
+            "country_only = { join_trade_league = yes }\n",
+            "anywhere = { custom_tooltip = SOME_TIP }\n",
+            "broken = { add_base_tax = 1 join_trade_league = yes }\n",
+        ),
+    )
+    .expect("dynamic definitions");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    let province_id = DocumentId::new("file:///tmp/events/dynamic-contract-province.txt");
+    let province_text = "country_event = { immediate = { every_owned_province = {  } } }\n";
+    host.open_document(province_id.clone(), 1, province_text.to_owned(), None)
+        .expect("open province call");
+    let completion = complete(
+        &host.snapshot(),
+        &province_id,
+        u32::try_from(
+            province_text
+                .find("every_owned_province = { ")
+                .expect("anchor")
+                + 25,
+        )
+        .expect("position"),
+    );
+    let labels = completion
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"prov_only"),
+        "province contract offered: {labels:?}"
+    );
+    assert!(
+        labels.contains(&"anywhere"),
+        "unconstrained contract stays offered: {labels:?}"
+    );
+    assert!(
+        labels.contains(&"broken"),
+        "empty contract stays offered (reported at its definition site): {labels:?}"
+    );
+    assert!(
+        !labels
+            .iter()
+            .any(|label| label.eq_ignore_ascii_case("country_only")),
+        "country contract must be filtered in province scope: {labels:?}"
+    );
+    assert!(
+        !labels
+            .iter()
+            .any(|label| label.eq_ignore_ascii_case("join_trade_league")),
+        "static country effect stays filtered: {labels:?}"
+    );
+
+    let country_id = DocumentId::new("file:///tmp/events/dynamic-contract-country.txt");
+    let country_text = "country_event = { immediate = {  } }\n";
+    host.open_document(country_id.clone(), 1, country_text.to_owned(), None)
+        .expect("open country call");
+    let completion = complete(
+        &host.snapshot(),
+        &country_id,
+        u32::try_from(country_text.find("immediate = { ").expect("anchor") + 13).expect("position"),
+    );
+    let labels = completion
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"country_only"),
+        "country contract offered in country scope: {labels:?}"
+    );
+    assert!(
+        !labels
+            .iter()
+            .any(|label| label.eq_ignore_ascii_case("prov_only")),
+        "province contract must be filtered in country scope: {labels:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn dynamic_trigger_completion_filters_by_entry_contract() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-trigger-filter-{nonce}"));
+    let triggers = root.join("common/scripted_triggers");
+    std::fs::create_dir_all(&triggers).expect("trigger directory");
+    std::fs::write(
+        triggers.join("00_complete.txt"),
+        "country_check = { num_of_cities = 1 }\n",
+    )
+    .expect("dynamic trigger definition");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan triggers");
+
+    let province_id = DocumentId::new("file:///tmp/events/dynamic-trigger-province.txt");
+    let province_text =
+        "country_event = { trigger = { every_owned_province = { limit = {  } } } }\n";
+    host.open_document(province_id.clone(), 1, province_text.to_owned(), None)
+        .expect("open province trigger");
+    let completion = complete(
+        &host.snapshot(),
+        &province_id,
+        u32::try_from(province_text.find("limit = { ").expect("anchor") + 11).expect("position"),
+    );
+    let labels = completion
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        !labels
+            .iter()
+            .any(|label| label.eq_ignore_ascii_case("country_check")),
+        "country trigger contract must be filtered in province limit: {labels:?}"
+    );
+
+    let country_id = DocumentId::new("file:///tmp/events/dynamic-trigger-country.txt");
+    let country_text = "country_event = { trigger = {  } }\n";
+    host.open_document(country_id.clone(), 1, country_text.to_owned(), None)
+        .expect("open country trigger");
+    let completion = complete(
+        &host.snapshot(),
+        &country_id,
+        u32::try_from(country_text.find("trigger = { ").expect("anchor") + 12).expect("position"),
+    );
+    let labels = completion
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"country_check"),
+        "country trigger contract offered in country trigger scope: {labels:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn dynamic_definition_completion_keeps_all_contracts_under_unknown_scope() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-unknown-scope-{nonce}"));
+    let definitions = root.join("common/scripted_effects/00_defs.txt");
+    let path = root.join("common/scripted_effects/00_open.txt");
+    std::fs::create_dir_all(definitions.parent().expect("parent")).expect("definition directory");
+    std::fs::write(
+        &definitions,
+        concat!(
+            "prov_only = { add_base_tax = 1 }\n",
+            "country_only = { join_trade_league = yes }\n",
+        ),
+    )
+    .expect("dynamic definitions");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+    // A scripted-effect body has an unknown entry scope, so both contracts
+    // stay offered while editing inside it.
+    let id = DocumentId::new("file:///tmp/common/scripted_effects/00_open.txt");
+    let text = "wrapper = {  }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), Some(path))
+        .expect("open body");
+    let completion = complete(
+        &host.snapshot(),
+        &id,
+        u32::try_from(text.find("wrapper = { ").expect("anchor") + 12).expect("position"),
+    );
+    let labels = completion
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"prov_only") && labels.contains(&"country_only"),
+        "unknown caller scope must not filter dynamic contracts: {labels:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
