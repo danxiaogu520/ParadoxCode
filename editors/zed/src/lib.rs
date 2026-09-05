@@ -545,8 +545,8 @@ fn initialization_options_schema() -> serde_json::Value {
             },
             "workspaceWideDiagnostics": {
                 "type": "boolean",
-                "default": true,
-                "description": "Publish diagnostics for closed Current Mod files during workspace refreshes."
+                "default": false,
+                "description": "Publish diagnostics for closed Current Mod files during workspace refreshes. Costs a full-workspace validation pass; leave off for large mods."
             },
             "backgroundReindexIntervalMinutes": {
                 "type": "integer",

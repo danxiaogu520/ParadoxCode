@@ -17,7 +17,10 @@ use crate::{INVALID_PARAMS, REQUEST_CANCELLED};
 /// server's opt-in behavior so existing clients never acquire an unexpected periodic disk walk.
 pub(crate) const DEFAULT_BACKGROUND_REINDEX_INTERVAL_MINUTES: u64 = 0;
 pub(crate) const DEFAULT_BACKGROUND_REINDEX_IDLE_SECONDS: u64 = 15;
-pub(crate) const DEFAULT_WORKSPACE_WIDE_DIAGNOSTICS: bool = true;
+/// Whole-workspace validation costs thousands of CPU-seconds on large mods and starves
+/// interactive diagnostics while it churns, so it stays opt-in (matching the published VS Code
+/// default). Clients that want the full problems panel set `workspaceWideDiagnostics: true`.
+pub(crate) const DEFAULT_WORKSPACE_WIDE_DIAGNOSTICS: bool = false;
 const MAX_BACKGROUND_REINDEX_INTERVAL_MINUTES: u64 = 7 * 24 * 60;
 const MAX_BACKGROUND_REINDEX_IDLE_SECONDS: u64 = 24 * 60 * 60;
 pub(crate) const MAX_IGNORED_DIAGNOSTIC_CODES: usize = 256;

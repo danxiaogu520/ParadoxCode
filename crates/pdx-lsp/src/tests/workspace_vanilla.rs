@@ -18,21 +18,23 @@ fn background_reindex_options_are_bounded_and_default_to_opt_in() {
         .expect("default workspace roots");
     assert_eq!(defaults.background_reindex_interval_minutes, 0);
     assert_eq!(defaults.background_reindex_idle_seconds, 15);
-    assert!(defaults.workspace_wide_diagnostics);
+    // Whole-workspace validation is opt-in: it costs thousands of CPU-seconds
+    // on large mods and starves interactive diagnostics while it runs.
+    assert!(!defaults.workspace_wide_diagnostics);
 
     let configured = resolve_source_roots(
         Some(&root),
         Some(json!({
             "backgroundReindexIntervalMinutes": 2,
             "backgroundReindexIdleSeconds": 30,
-            "workspaceWideDiagnostics": false
+            "workspaceWideDiagnostics": true
         })),
         &pdx_engine::WorkspaceScanToken::new(),
     )
     .expect("configured workspace roots");
     assert_eq!(configured.background_reindex_interval_minutes, 2);
     assert_eq!(configured.background_reindex_idle_seconds, 30);
-    assert!(!configured.workspace_wide_diagnostics);
+    assert!(configured.workspace_wide_diagnostics);
 
     let advanced = resolve_source_roots(
         Some(&root),

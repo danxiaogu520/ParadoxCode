@@ -101,7 +101,8 @@ fn validate_workspace_returns_a_bounded_diagnostic_summary() {
             "method":"initialize",
             "params":{
                 "workspaceFolders":[{"uri":root_uri,"name":"test"}],
-                "capabilities":{}
+                "capabilities":{},
+                "initializationOptions":{"workspaceWideDiagnostics":true}
             }
         }),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -265,7 +266,8 @@ fn initial_ready_pass_publishes_closed_current_mod_diagnostics() {
             "method":"initialize",
             "params":{
                 "workspaceFolders":[{"uri":root_uri,"name":"test"}],
-                "capabilities":{}
+                "capabilities":{},
+                "initializationOptions":{"workspaceWideDiagnostics":true}
             }
         }),
         json!({"jsonrpc":"2.0","method":"initialized","params":{}}),
@@ -321,7 +323,8 @@ fn ready_pass_publishes_when_scan_completes_after_shutdown() {
                 "method":"initialize",
                 "params":{
                     "workspaceFolders":[{"uri":root_uri,"name":"test"}],
-                    "capabilities":{}
+                    "capabilities":{},
+                    "initializationOptions":{"workspaceWideDiagnostics":true}
                 }
             }),
             None,
@@ -410,7 +413,8 @@ fn scan_reschedule_during_shutdown_still_exits_cleanly() {
                 "method":"initialize",
                 "params":{
                     "workspaceFolders":[{"uri":root_uri,"name":"test"}],
-                    "capabilities":{"window":{"workDoneProgress":true}}
+                    "capabilities":{"window":{"workDoneProgress":true}},
+                    "initializationOptions":{"workspaceWideDiagnostics":true}
                 }
             }),
             None,
@@ -489,7 +493,8 @@ fn exhausted_initial_scan_retries_still_reach_ready() {
                 "method":"initialize",
                 "params":{
                     "workspaceFolders":[{"uri":root_uri,"name":"test"}],
-                    "capabilities":{}
+                    "capabilities":{},
+                    "initializationOptions":{"workspaceWideDiagnostics":true}
                 }
             }),
             None,
@@ -565,7 +570,8 @@ fn identical_overlay_revalidation_is_not_republished_after_scan_commit() {
                 "method":"initialize",
                 "params":{
                     "workspaceFolders":[{"uri":root_uri,"name":"test"}],
-                    "capabilities":{"window":{"workDoneProgress":true}}
+                    "capabilities":{"window":{"workDoneProgress":true}},
+                    "initializationOptions":{"workspaceWideDiagnostics":true}
                 }
             }),
             None,
@@ -690,7 +696,8 @@ fn watched_refresh_republishes_closed_file_diagnostics() {
                 "method":"initialize",
                 "params":{
                     "workspaceFolders":[{"uri":root_uri,"name":"test"}],
-                    "capabilities":{}
+                    "capabilities":{},
+                    "initializationOptions":{"workspaceWideDiagnostics":true}
                 }
             }),
             None,
@@ -787,7 +794,8 @@ fn deferred_exit_waits_for_the_ready_pass_queued_behind_a_disk_change() {
                 "method":"initialize",
                 "params":{
                     "workspaceFolders":[{"uri":root_uri,"name":"test"}],
-                    "capabilities":{"window":{"workDoneProgress":true}}
+                    "capabilities":{"window":{"workDoneProgress":true}},
+                    "initializationOptions":{"workspaceWideDiagnostics":true}
                 }
             }),
             None,
