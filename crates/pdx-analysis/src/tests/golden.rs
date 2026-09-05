@@ -530,6 +530,132 @@ fn golden_localisation_derived_keys() {
 }
 
 #[test]
+fn golden_mission_trees() {
+    let text = concat!(
+        "golden_main_tree = {\n",
+        "\tslot = 1\n",
+        "\tpotential = { always = yes }\n",
+        "\tgm_root = {\n",
+        "\t\ticon = mission_conquest\n",
+        "\t\ttrigger = { always = yes }\n",
+        "\t\teffect = { add_prestige = 1 }\n",
+        "\t\tposition = 1\n",
+        "\t}\n",
+        "\tgm_second = {\n",
+        "\t\ticon = mission_conquest\n",
+        "\t\ttrigger = { always = yes }\n",
+        "\t\teffect = { add_prestige = 1 }\n",
+        "\t\tposition = 2\n",
+        "\t\trequired_missions = { gm_root }\n",
+        "\t}\n",
+        "\tgm_zero = {\n",
+        "\t\ticon = mission_conquest\n",
+        "\t\ttrigger = { always = yes }\n",
+        "\t\teffect = { add_prestige = 1 }\n",
+        "\t\tposition = 0\n",
+        "\t}\n",
+        "\tgm_dup = {\n",
+        "\t\ticon = mission_conquest\n",
+        "\t\ttrigger = { always = yes }\n",
+        "\t\teffect = { add_prestige = 1 }\n",
+        "\t\tposition = 3\n",
+        "\t}\n",
+        "\tgm_dup = {\n",
+        "\t\ticon = mission_conquest\n",
+        "\t\ttrigger = { always = yes }\n",
+        "\t\teffect = { add_prestige = 1 }\n",
+        "\t\tposition = 4\n",
+        "\t}\n",
+        "}\n",
+        "golden_branch_tree = {\n",
+        "\tslot = 2\n",
+        "\tpotential = { always = yes }\n",
+        "\tgb_far = {\n",
+        "\t\ticon = mission_conquest\n",
+        "\t\ttrigger = { always = yes }\n",
+        "\t\teffect = { add_prestige = 1 }\n",
+        "\t\tposition = 3\n",
+        "\t\trequired_missions = { gm_root gm_external gm_ghost }\n",
+        "\t}\n",
+        "}\n",
+        "golden_cycle_tree = {\n",
+        "\tslot = 3\n",
+        "\tpotential = { always = yes }\n",
+        "\tgt_c1 = {\n",
+        "\t\ticon = mission_conquest\n",
+        "\t\ttrigger = { always = yes }\n",
+        "\t\teffect = { add_prestige = 1 }\n",
+        "\t\tposition = 1\n",
+        "\t\trequired_missions = { gt_c2 }\n",
+        "\t}\n",
+        "\tgt_c2 = {\n",
+        "\t\ticon = mission_conquest\n",
+        "\t\ttrigger = { always = yes }\n",
+        "\t\teffect = { add_prestige = 1 }\n",
+        "\t\tposition = 2\n",
+        "\t\trequired_missions = { gt_c1 }\n",
+        "\t}\n",
+        "}\n",
+    );
+    let root = temp_root("missions");
+    let missions_dir = root.join("missions");
+    let loc_dir = root.join("localisation");
+    let interface_dir = root.join("interface");
+    std::fs::create_dir_all(&missions_dir).expect("missions directory");
+    std::fs::create_dir_all(&loc_dir).expect("localisation directory");
+    std::fs::create_dir_all(&interface_dir).expect("interface directory");
+    // Mission icons are sprite references; declaring the sprite keeps the
+    // golden focused on the mission dependency family.
+    std::fs::write(
+        interface_dir.join("golden.gfx"),
+        "spriteTypes = { spriteType = { name = \"mission_conquest\" texturefile = \"gfx/none.dds\" } }\n",
+    )
+    .expect("write gfx sprite");
+    // A second mission file: cross-file prerequisites resolve through the
+    // workspace mission universe (EU4 1.35+ branching missions).
+    std::fs::write(
+        missions_dir.join("golden_other.txt"),
+        "golden_other_tree = {\n\
+         \tslot = 4\n\
+         \tpotential = { always = yes }\n\
+         \tgm_external = {\n\
+         \t\ticon = mission_conquest\n\
+         \t\ttrigger = { always = yes }\n\
+         \t\teffect = { add_prestige = 1 }\n\
+         \t\tposition = 1\n\
+         \t}\n\
+         }\n",
+    )
+    .expect("write other missions file");
+    // Every mission renders `{id}_title`/`{id}_desc`; providing them keeps the
+    // golden focused on the mission dependency family.
+    let mut loc = String::from("l_english:\n");
+    for id in [
+        "gm_root",
+        "gm_second",
+        "gm_zero",
+        "gm_dup",
+        "gb_far",
+        "gt_c1",
+        "gt_c2",
+    ] {
+        loc.push_str(&format!(" {id}_title:0 \"Title\"\n {id}_desc:0 \"Desc\"\n"));
+    }
+    std::fs::write(loc_dir.join("golden_missions_l_english.yml"), loc).expect("write localisation");
+    let mut host = first_party_host(&root);
+    let focus = DocumentId::new("file:///tmp/missions/golden_main.txt");
+    host.open_document(
+        focus.clone(),
+        1,
+        text.to_owned(),
+        Some(missions_dir.join("golden_main.txt")),
+    )
+    .expect("open golden mission file");
+    assert_golden("mission_trees", text, &analyze_text(&host, &focus));
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn golden_quoted_script_syntax() {
     let text = "trigger = { embedded = \"\n foo = maybe\n broken = {\n\" }\n";
     let (host, id) = quoted_script_snapshot(text);

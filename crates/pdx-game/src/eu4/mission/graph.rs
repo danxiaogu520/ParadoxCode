@@ -84,6 +84,8 @@ pub struct SpatialViolation {
     pub tree: usize,
     pub mission: usize,
     pub required: String,
+    /// Index into [`super::model::Mission::required`], for token-precise reporting.
+    pub required_index: usize,
 }
 
 /// Finds in-file dependency edges that violate the spatial legality rule.
@@ -102,7 +104,7 @@ pub fn spatial_violations(file: &MissionFile) -> Vec<SpatialViolation> {
     let mut violations = Vec::new();
     for loc in effective_layout(file) {
         let mission = &file.trees[loc.tree].missions[loc.mission];
-        for required in &mission.required {
+        for (required_index, required) in mission.required.iter().enumerate() {
             let Some(&prereq) = loc_of.get(required.as_str()) else {
                 continue; // Not in this file; cross-file refs are legal.
             };
@@ -111,6 +113,7 @@ pub fn spatial_violations(file: &MissionFile) -> Vec<SpatialViolation> {
                     tree: loc.tree,
                     mission: loc.mission,
                     required: required.clone(),
+                    required_index,
                 });
             }
         }
@@ -208,6 +211,7 @@ mod tests {
     fn tree(id: &str, slot: u32, missions: Vec<Mission>) -> MissionTree {
         MissionTree {
             id: id.into(),
+            id_range: TextRange::empty(0),
             slot,
             generic: false,
             ai: None,
@@ -223,11 +227,14 @@ mod tests {
     fn mission(id: &str, required: &[&str], position: Option<u32>) -> Mission {
         Mission {
             id: id.into(),
+            id_range: TextRange::empty(0),
             icon: None,
             mission_type: None,
             provinces_to_highlight: None,
             required: required.iter().map(|s| s.to_string()).collect(),
+            required_ranges: required.iter().map(|_| TextRange::empty(0)).collect(),
             position,
+            position_range: None,
             completed_by: None,
             trigger: None,
             effect: None,

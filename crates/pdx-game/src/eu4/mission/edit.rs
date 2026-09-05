@@ -84,6 +84,7 @@ impl MissionFile {
         }
         self.trees.push(MissionTree {
             id: id.to_owned(),
+            id_range: TextRange::empty(0),
             slot: 1,
             generic: false,
             ai: None,
@@ -137,11 +138,14 @@ impl MissionFile {
         }
         tree.missions.push(Mission {
             id: id.to_owned(),
+            id_range: TextRange::empty(0),
             icon: None,
             mission_type: None,
             provinces_to_highlight: None,
             required: Vec::new(),
+            required_ranges: Vec::new(),
             position: None,
+            position_range: None,
             completed_by: None,
             trigger: None,
             effect: None,

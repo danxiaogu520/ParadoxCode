@@ -16,6 +16,8 @@ pub struct MissionFile {
 pub struct MissionTree {
     /// Tree id (the top-level property key).
     pub id: String,
+    /// Byte range of the id token in the source file.
+    pub id_range: TextRange,
     /// In-game slot (column position, 1-based).
     pub slot: u32,
     /// Whether the tree is a generic tree (`generic = yes`).
@@ -41,6 +43,8 @@ pub struct MissionTree {
 pub struct Mission {
     /// Mission id (property key inside the tree).
     pub id: String,
+    /// Byte range of the id token in the source file.
+    pub id_range: TextRange,
     /// `icon = mission_...`
     pub icon: Option<String>,
     /// `type = conquest` etc.
@@ -49,8 +53,13 @@ pub struct Mission {
     pub provinces_to_highlight: Option<Block>,
     /// Prerequisite missions (`required_missions = { ... }`), in source order.
     pub required: Vec<String>,
+    /// Byte range of each prerequisite token inside `required_missions`,
+    /// parallel to [`Mission::required`].
+    pub required_ranges: Vec<TextRange>,
     /// `position = n` (in-game column). `None` when absent.
     pub position: Option<u32>,
+    /// Byte range of the written `position` value, when present.
+    pub position_range: Option<TextRange>,
     /// `completed_by = date`
     pub completed_by: Option<String>,
     /// `trigger` block, preserved verbatim.

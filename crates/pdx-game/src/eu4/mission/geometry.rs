@@ -236,6 +236,7 @@ mod tests {
     fn tree(id: &str, slot: u32, missions: Vec<Mission>) -> MissionTree {
         MissionTree {
             id: id.into(),
+            id_range: TextRange::empty(0),
             slot,
             generic: false,
             ai: None,
@@ -251,11 +252,14 @@ mod tests {
     fn mission(id: &str, required: &[&str], position: Option<u32>) -> Mission {
         Mission {
             id: id.into(),
+            id_range: TextRange::empty(0),
             icon: None,
             mission_type: None,
             provinces_to_highlight: None,
             required: required.iter().map(|s| s.to_string()).collect(),
+            required_ranges: required.iter().map(|_| TextRange::empty(0)).collect(),
             position,
+            position_range: None,
             completed_by: None,
             trigger: None,
             effect: None,
