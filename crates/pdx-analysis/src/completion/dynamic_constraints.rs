@@ -33,10 +33,25 @@ pub(crate) struct DynamicQuotedScriptConstraintSite {
     pub(crate) scope: ScopeContext,
 }
 
+/// One usage site where the completed parameter renders into a statement key:
+/// the argument value becomes a key (whole or inside literal affixes), so the
+/// candidate set is derived from the rule keys valid at that site. Both
+/// affixes empty means the parameter is the entire key (a wildcard dispatch —
+/// any command name of the site context is acceptable).
+#[derive(Clone, Debug)]
+pub(crate) struct DynamicKeyRenderSite {
+    pub(crate) prefix: String,
+    pub(crate) suffix: String,
+    pub(crate) context: String,
+    pub(crate) parent_path: Vec<std::sync::Arc<str>>,
+    pub(crate) scope: ScopeContext,
+}
+
 #[derive(Clone, Debug, Default)]
 struct DynamicArgumentConstraints {
     values: Vec<DynamicValueConstraintSite>,
     quoted_scripts: Vec<DynamicQuotedScriptConstraintSite>,
+    key_renders: Vec<DynamicKeyRenderSite>,
     /// True when at least one usage site constrains the parameter value to a
     /// non-enumerable shape (numbers, opaque strings, dynamic sets): no item
     /// can be offered, and callers must treat the value as constrained.
@@ -47,6 +62,14 @@ struct DynamicArgumentConstraints {
 enum SymbolicToken {
     Concrete(String),
     Target,
+    /// A mixed token whose single target parameter is surrounded by literal
+    /// (or concretely bound) text: the parameter renders into the middle of a
+    /// derived name, such as `change_$stat$` -> `change_adm`. Keys carrying
+    /// this shape constrain the argument through their rule rows' affixes.
+    Rendered {
+        prefix: String,
+        suffix: String,
+    },
     Unknown,
 }
 
@@ -73,6 +96,7 @@ struct SymbolicProperty {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct DynamicValueConstraints {
     pub(crate) sites: Vec<DynamicValueConstraintSite>,
+    pub(crate) key_renders: Vec<DynamicKeyRenderSite>,
     /// At least one usage site constrains the value to a non-enumerable
     /// shape, so nothing can be offered yet the value is not free-form.
     pub(crate) unenumerable: bool,
@@ -87,6 +111,7 @@ pub(crate) fn infer_dynamic_value_constraints(
     infer_dynamic_argument_constraints(snapshot, context, target, cancellation).map(|constraints| {
         DynamicValueConstraints {
             sites: constraints.values,
+            key_renders: constraints.key_renders,
             unenumerable: constraints.unenumerable,
         }
     })
@@ -136,6 +161,7 @@ fn infer_dynamic_argument_constraints(
             DynamicArgumentConstraints {
                 values: collector.value_sites.clone(),
                 quoted_scripts: collector.quoted_script_sites.clone(),
+                key_renders: collector.key_render_sites.clone(),
                 unenumerable: collector.unenumerable_value_site,
             }
         })
@@ -213,6 +239,7 @@ struct ConstraintCollector<'a> {
     exhausted: bool,
     value_sites: Vec<DynamicValueConstraintSite>,
     quoted_script_sites: Vec<DynamicQuotedScriptConstraintSite>,
+    key_render_sites: Vec<DynamicKeyRenderSite>,
     unenumerable_value_site: bool,
 }
 
@@ -225,6 +252,7 @@ impl<'a> ConstraintCollector<'a> {
             exhausted: false,
             value_sites: Vec::new(),
             quoted_script_sites: Vec::new(),
+            key_render_sites: Vec::new(),
             unenumerable_value_site: false,
         }
     }
@@ -303,6 +331,12 @@ impl<'a> ConstraintCollector<'a> {
             }
             return rendered;
         }
+        // A single target parameter surrounded by renderable text keeps its
+        // affixes: `change_$stat$` constrains the argument through every rule
+        // key matching `change_*`. Anything else needs fully concrete text.
+        if let Some(site) = self.render_target_affixes(token, bindings) {
+            return site;
+        }
         let mut value = String::new();
         for fragment in &token.fragments {
             match fragment {
@@ -323,6 +357,53 @@ impl<'a> ConstraintCollector<'a> {
         } else {
             SymbolicToken::Concrete(value)
         }
+    }
+
+    /// Renders a mixed token whose exactly-one target parameter is wrapped in
+    /// literal and concretely bound text, keeping the affixes around it.
+    /// Returns `None` for tokens without exactly one target parameter or with
+    /// any unrenderable fragment.
+    fn render_target_affixes(
+        &mut self,
+        token: &TemplateToken,
+        bindings: &BTreeMap<String, SymbolicToken>,
+    ) -> Option<SymbolicToken> {
+        let mut prefix = String::new();
+        let mut suffix = String::new();
+        let mut seen_target = false;
+        for fragment in &token.fragments {
+            match fragment {
+                TemplateFragment::Literal(literal) => {
+                    if seen_target {
+                        suffix.push_str(literal);
+                    } else {
+                        prefix.push_str(literal);
+                    }
+                }
+                TemplateFragment::Parameter { name, .. } => {
+                    match bindings.get(&name.to_ascii_lowercase()) {
+                        Some(SymbolicToken::Target) if !seen_target => seen_target = true,
+                        Some(SymbolicToken::Concrete(argument)) => {
+                            if seen_target {
+                                suffix.push_str(argument);
+                            } else {
+                                prefix.push_str(argument);
+                            }
+                        }
+                        _ => return None,
+                    }
+                }
+            }
+        }
+        if !seen_target {
+            return None;
+        }
+        let bytes = prefix.len() + suffix.len();
+        if !self.budget.charge_token_bytes(bytes) {
+            self.exhausted = true;
+            return Some(SymbolicToken::Unknown);
+        }
+        Some(SymbolicToken::Rendered { prefix, suffix })
     }
 
     fn collect_container(
@@ -358,6 +439,41 @@ impl<'a> ConstraintCollector<'a> {
             self.cancellation.checkpoint()?;
             if self.exhausted {
                 break;
+            }
+            // A key rendered from the target parameter dispatches dynamically:
+            // the argument becomes a key (whole or between literal affixes),
+            // so the site constrains candidates through the rule keys that
+            // accept the rendered shape.
+            if let SymbolicToken::Target | SymbolicToken::Rendered { .. } = &property.key {
+                let (prefix, suffix) = match &property.key {
+                    SymbolicToken::Rendered { prefix, suffix } => (prefix.clone(), suffix.clone()),
+                    SymbolicToken::Target => (String::new(), String::new()),
+                    SymbolicToken::Concrete(_) | SymbolicToken::Unknown => {
+                        unreachable!("guard above admits only target-rendered keys")
+                    }
+                };
+                let site = DynamicKeyRenderSite {
+                    prefix,
+                    suffix,
+                    context: context.to_owned(),
+                    parent_path: parent_path.to_vec(),
+                    scope: scope.clone(),
+                };
+                if !self.key_render_sites.iter().any(|known| {
+                    known.prefix.eq_ignore_ascii_case(&site.prefix)
+                        && known.suffix.eq_ignore_ascii_case(&site.suffix)
+                        && known.context.eq_ignore_ascii_case(&site.context)
+                        && known.parent_path.len() == site.parent_path.len()
+                        && known
+                            .parent_path
+                            .iter()
+                            .zip(&site.parent_path)
+                            .all(|(left, right)| left.eq_ignore_ascii_case(right))
+                        && known.scope == site.scope
+                }) {
+                    self.key_render_sites.push(site);
+                }
+                continue;
             }
             let SymbolicToken::Concrete(key) = &property.key else {
                 continue;
@@ -456,7 +572,11 @@ impl<'a> ConstraintCollector<'a> {
                         }
                     }
                 }
-                SymbolicValue::Scalar(SymbolicToken::Concrete(_) | SymbolicToken::Unknown) => {}
+                SymbolicValue::Scalar(
+                    SymbolicToken::Concrete(_)
+                    | SymbolicToken::Rendered { .. }
+                    | SymbolicToken::Unknown,
+                ) => {}
             }
         }
         Ok(())
@@ -605,14 +725,21 @@ fn symbolic_container_contains_target(container: &SymbolicContainer) -> bool {
     container
         .bare_values
         .iter()
-        .any(|value| matches!(value, SymbolicToken::Target))
+        .any(symbolic_token_contains_target)
         || container.properties.iter().any(|property| {
-            matches!(property.key, SymbolicToken::Target)
+            symbolic_token_contains_target(&property.key)
                 || match &property.value {
-                    SymbolicValue::Scalar(value) => matches!(value, SymbolicToken::Target),
+                    SymbolicValue::Scalar(value) => symbolic_token_contains_target(value),
                     SymbolicValue::Block(children) => symbolic_container_contains_target(children),
                 }
         })
+}
+
+fn symbolic_token_contains_target(token: &SymbolicToken) -> bool {
+    matches!(
+        token,
+        SymbolicToken::Target | SymbolicToken::Rendered { .. }
+    )
 }
 
 fn operator_matches(rule: &pdx_rules::SemanticRule, property: &SymbolicProperty) -> bool {

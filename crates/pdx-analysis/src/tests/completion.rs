@@ -3795,3 +3795,184 @@ fn dynamic_definition_completion_keeps_all_contracts_under_unknown_scope() {
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn dynamic_key_position_parameter_completes_command_names() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-key-cmd-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&definitions).expect("definition directory");
+    std::fs::write(
+        definitions.join("00_complete.txt"),
+        "dispatch = { $CMD$ = yes }\n",
+    )
+    .expect("dynamic definitions");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+    let id = DocumentId::new("file:///tmp/events/dynamic-key-cmd.txt");
+    let text = "country_event = { immediate = { dispatch = { CMD =  } } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open call");
+    let completion = complete(
+        &host.snapshot(),
+        &id,
+        u32::try_from(text.find("CMD = ").expect("anchor") + 6).expect("position"),
+    );
+    let labels = completion
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"add_prestige"),
+        "whole-key parameter must complete effect names: {labels:?}"
+    );
+    assert!(
+        !labels
+            .iter()
+            .any(|label| label.starts_with("all_") || label.starts_with("any_")),
+        "scope-link garbage must not leak into key-dispatched arguments: {labels:?}"
+    );
+    assert!(
+        !completion
+            .items
+            .iter()
+            .any(|item| item.detail == "scope link" || item.detail == "scope"),
+        "scope-expression candidates must not survive the fallback suppression: {:?}",
+        completion.items
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn dynamic_affixed_key_parameter_completes_stripped_key_members() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-key-affix-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&definitions).expect("definition directory");
+    std::fs::write(
+        definitions.join("00_complete.txt"),
+        concat!(
+            "stat_change = { change_$STAT$ = 1 add_$STAT$_power = 100 }\n",
+            "single_affix = { change_$STAT$ = 1 }\n",
+        ),
+    )
+    .expect("dynamic definitions");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    let id = DocumentId::new("file:///tmp/events/dynamic-key-affix.txt");
+    let text = "country_event = { immediate = { stat_change = { STAT =  } } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open call");
+    let completion = complete(
+        &host.snapshot(),
+        &id,
+        u32::try_from(text.find("STAT = ").expect("anchor") + 7).expect("position"),
+    );
+    let labels = completion
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    for expected in ["adm", "dip", "mil"] {
+        assert!(
+            labels.contains(&expected),
+            "affixed key sites must derive {expected}: {labels:?}"
+        );
+    }
+    // `change_heir_adm` matches the first affix, but `add_heir_adm_power` does
+    // not exist, so the intersection must drop it.
+    assert!(
+        !labels.iter().any(|label| label.contains("heir")),
+        "candidates failing one affixed site must be intersected away: {labels:?}"
+    );
+    assert!(
+        !labels.contains(&"yes"),
+        "affixed key sites offer rendered names only: {labels:?}"
+    );
+
+    let single_id = DocumentId::new("file:///tmp/events/dynamic-key-affix-single.txt");
+    let single_text = "country_event = { immediate = { single_affix = { STAT =  } } }\n";
+    host.open_document(single_id.clone(), 1, single_text.to_owned(), None)
+        .expect("open single call");
+    let completion = complete(
+        &host.snapshot(),
+        &single_id,
+        u32::try_from(single_text.find("STAT = ").expect("anchor") + 7).expect("position"),
+    );
+    let labels = completion
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"adm") && labels.iter().any(|label| label.contains("heir")),
+        "a single affixed site keeps every matching middle segment: {labels:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn dynamic_key_position_parameter_respects_site_scope() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-dynamic-key-scope-{nonce}"));
+    let definitions = root.join("common/scripted_effects");
+    std::fs::create_dir_all(&definitions).expect("definition directory");
+    std::fs::write(
+        definitions.join("00_complete.txt"),
+        "scoped_dispatch = { every_owned_province = { $CMD$ = yes } }\n",
+    )
+    .expect("dynamic definitions");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+    let id = DocumentId::new("file:///tmp/events/dynamic-key-scope.txt");
+    let text = "country_event = { immediate = { scoped_dispatch = { CMD =  } } }\n";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open call");
+    let completion = complete(
+        &host.snapshot(),
+        &id,
+        u32::try_from(text.find("CMD = ").expect("anchor") + 6).expect("position"),
+    );
+    let labels = completion
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"add_base_tax"),
+        "province-scoped key site must offer province commands: {labels:?}"
+    );
+    assert!(
+        !labels
+            .iter()
+            .any(|label| label.eq_ignore_ascii_case("add_prestige")),
+        "country commands must be filtered at a province key site: {labels:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}

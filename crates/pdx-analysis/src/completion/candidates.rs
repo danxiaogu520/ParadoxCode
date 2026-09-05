@@ -1092,7 +1092,7 @@ pub(crate) fn add_inferred_dynamic_value_items(
         cancellation,
     } = input;
     let constraints = infer_dynamic_value_constraints(snapshot, context, property, cancellation)?;
-    if constraints.sites.is_empty() {
+    if constraints.sites.is_empty() && constraints.key_renders.is_empty() {
         // A non-enumerable constraint (numbers, opaque strings) is still a
         // constraint: offer nothing rather than falling back to the generic
         // value items for this context.
@@ -1153,10 +1153,204 @@ pub(crate) fn add_inferred_dynamic_value_items(
             intersection = Some(site_items);
         }
     }
-    if let Some(intersection) = intersection {
-        items.extend(intersection.into_values());
+    let key_rendered = key_render_site_items(KeyRenderSiteInput {
+        snapshot,
+        context,
+        sites: &constraints.key_renders,
+        member_cache,
+        replacement_range,
+        prefix,
+    });
+    match (intersection, key_rendered) {
+        (Some(values), Some(keys)) => {
+            // The argument must satisfy both stories: keep value-site items
+            // whose name also renders to a valid key at every key site.
+            let names = keys.into_keys().collect::<std::collections::BTreeSet<_>>();
+            items.extend(
+                values
+                    .into_iter()
+                    .filter(|(key, _)| names.contains(&key.0))
+                    .map(|(_, item)| item),
+            );
+        }
+        (Some(values), None) => items.extend(values.into_values()),
+        (None, Some(keys)) => items.extend(keys.into_values()),
+        (None, None) => {}
     }
     Ok(true)
+}
+
+pub(crate) struct KeyRenderSiteInput<'a> {
+    pub(crate) snapshot: &'a AnalysisSnapshot,
+    pub(crate) context: &'a SemanticCompletionContext,
+    pub(crate) sites: &'a [super::dynamic_constraints::DynamicKeyRenderSite],
+    pub(crate) member_cache: &'a mut CompletionMemberCache,
+    pub(crate) replacement_range: TextRange,
+    pub(crate) prefix: &'a str,
+}
+
+/// Builds the candidate list implied by key-render sites: sites whose
+/// parameter is the whole key (empty affixes) accept every command name of
+/// their context and scope, while affixed sites constrain the argument to the
+/// middle segments of the rule keys matching their literal affixes. Affixed
+/// sites intersect case-insensitively; wildcard sites never narrow them.
+fn key_render_site_items(
+    input: KeyRenderSiteInput<'_>,
+) -> Option<BTreeMap<String, RankedCompletionItem>> {
+    let KeyRenderSiteInput {
+        snapshot,
+        context,
+        sites,
+        member_cache,
+        replacement_range,
+        prefix,
+    } = input;
+    let affixed = sites
+        .iter()
+        .filter(|site| !site.prefix.is_empty() || !site.suffix.is_empty())
+        .collect::<Vec<_>>();
+    if affixed.is_empty() {
+        // Wildcard dispatch: the argument is a whole key, so reuse the key
+        // completion of the first site's context and scope verbatim.
+        let site = sites.first()?;
+        let site_context = SemanticCompletionContext {
+            context: site.context.clone(),
+            parent_path: site.parent_path.clone(),
+            structural_containers: Vec::new(),
+            alternative_containers: Vec::new(),
+            existing_keys: Vec::new(),
+            dynamic_inferred: false,
+            scope: site.scope.clone(),
+            container_property: None,
+            property: None,
+            quoted_depth: context.quoted_depth,
+            embedded_value_context: context.embedded_value_context,
+            wrapper_container: false,
+            root_entry_container: false,
+        };
+        let mut site_items = Vec::new();
+        add_semantic_key_items_ranked(
+            snapshot,
+            &site_context,
+            member_cache,
+            &mut site_items,
+            replacement_range,
+            prefix,
+            false,
+        );
+        return Some(site_items.into_iter().fold(
+            BTreeMap::<String, RankedCompletionItem>::new(),
+            |mut known, item| {
+                let key = item.item.label.to_ascii_lowercase();
+                match known.entry(key) {
+                    std::collections::btree_map::Entry::Vacant(entry) => {
+                        entry.insert(item);
+                    }
+                    std::collections::btree_map::Entry::Occupied(mut entry)
+                        if item.rank < entry.get().rank =>
+                    {
+                        entry.insert(item);
+                    }
+                    std::collections::btree_map::Entry::Occupied(_) => {}
+                }
+                known
+            },
+        ));
+    }
+    let mut intersection: Option<BTreeMap<String, RankedCompletionItem>> = None;
+    for site in affixed {
+        let site_context = SemanticCompletionContext {
+            context: site.context.clone(),
+            parent_path: site.parent_path.clone(),
+            structural_containers: Vec::new(),
+            alternative_containers: Vec::new(),
+            existing_keys: Vec::new(),
+            dynamic_inferred: false,
+            scope: site.scope.clone(),
+            container_property: None,
+            property: None,
+            quoted_depth: context.quoted_depth,
+            embedded_value_context: context.embedded_value_context,
+            wrapper_container: false,
+            root_entry_container: false,
+        };
+        let pattern = format!("{}$param${}", site.prefix, site.suffix);
+        let mut site_items = Vec::new();
+        for candidate in semantic_rules_for_completion(snapshot, &site_context) {
+            let rule = candidate.rule;
+            if !semantic_scope_allows(rule, candidate.scope) {
+                continue;
+            }
+            // Only exact keys can confirm an affixed render; open matchers
+            // (enums, types, dynamic kinds) stay silent rather than inventing
+            // members the template never meant.
+            let KeyMatcher::Exact(label) = &rule.key else {
+                continue;
+            };
+            let Some(middle) = strip_key_affixes(label, &site.prefix, &site.suffix) else {
+                continue;
+            };
+            add_value_completion_ranked(
+                &mut site_items,
+                middle,
+                &pattern,
+                None,
+                replacement_range,
+                prefix,
+                false,
+                CompletionSchemaTier::DynamicInferred,
+                CompletionSpecificity::Exact,
+            );
+        }
+        let site_items = site_items.into_iter().fold(
+            BTreeMap::<String, RankedCompletionItem>::new(),
+            |mut known, item| {
+                let key = item.item.label.to_ascii_lowercase();
+                match known.entry(key) {
+                    std::collections::btree_map::Entry::Vacant(entry) => {
+                        entry.insert(item);
+                    }
+                    std::collections::btree_map::Entry::Occupied(mut entry)
+                        if item.rank < entry.get().rank =>
+                    {
+                        entry.insert(item);
+                    }
+                    std::collections::btree_map::Entry::Occupied(_) => {}
+                }
+                known
+            },
+        );
+        if let Some(known) = &mut intersection {
+            known.retain(|key, _| site_items.contains_key(key));
+        } else {
+            intersection = Some(site_items);
+        }
+    }
+    intersection
+}
+
+/// Extracts the middle segment of a rule key matching the site's literal
+/// affixes, or `None` when the key does not start with the prefix and end
+/// with the suffix (leaving a non-empty middle).
+fn strip_key_affixes<'label>(
+    label: &'label str,
+    prefix: &str,
+    suffix: &str,
+) -> Option<&'label str> {
+    if label.len() <= prefix.len() + suffix.len()
+        || !label.is_char_boundary(prefix.len())
+        || !label.is_char_boundary(label.len() - suffix.len())
+    {
+        return None;
+    }
+    let (head, rest) = label.split_at(prefix.len());
+    let middle_len = rest.len() - suffix.len();
+    let (middle, tail) = rest.split_at(middle_len);
+    if head.eq_ignore_ascii_case(prefix) && tail.eq_ignore_ascii_case(suffix) {
+        Some(middle)
+    } else {
+        None
+    }
 }
 
 fn add_inferred_matcher_items(
