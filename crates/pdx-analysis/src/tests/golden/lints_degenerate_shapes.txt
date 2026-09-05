@@ -1,0 +1,45 @@
+// case: lints_degenerate_shapes
+// input:
+//   country_event = { id = lint.1
+//     trigger = {
+//       NOT = { always = yes is_year = 1500 }
+//       OR = { has_country_flag = lint_flag }
+//       AND = { }
+//     }
+//     option = { name = lint.1.a
+//       if = { limit = { always = yes } add_prestige = 1
+//         else = { add_prestige = 4 }
+//       }
+//       else = { add_prestige = 2 }
+//       ai_chance = { factor = 0 }
+//     }
+//     option = { name = lint.1.b
+//       else = { add_prestige = 3 }
+//       has_country_flag = lint_flag
+//     }
+//   }
+//   country_event = { id = lint.2 trigger = { add_prestige = 1 } option = { name = lint.2.a } }
+//   
+diagnostics:
+- code=LogicalContainer severity=Warning certainty=certain range=48..51
+  message: `NOT` with multiple conditions is true only when none of them hold (an AND of NOTs); it is not "not all of them hold". Write `AND = { NOT = { ... } ... }` to state the intended reading
+- code=LogicalContainer severity=Warning certainty=certain range=90..92
+  message: `OR` with a single condition is equivalent to the condition itself; the wrapper can be removed
+- code=InvalidValue severity=Warning certainty=certain range=116..125
+  message: value of `has_country_flag` does not match the semantic rule (rule semantic-rules.json:7828)
+- code=LogicalContainer severity=Warning certainty=certain range=132..135
+  message: empty `AND` container is always true; drop the container or add conditions
+- code=UnknownSymbol severity=Warning certainty=certain range=166..174
+  message: unknown localisation symbol `lint.1.a`
+- code=ConstantCondition severity=Warning certainty=certain range=179..181
+  message: `limit` of this `if` is always true; the branch wrapper is redundant
+- code=UnknownSymbol severity=Warning certainty=certain range=355..363
+  message: unknown localisation symbol `lint.1.b`
+- code=OrphanElse severity=Error certainty=certain range=368..372
+  message: orphan `else`: it must directly follow an `if`/`else_if` block or be nested inside one
+- code=UnknownKey severity=Error certainty=certain range=400..416
+  message: `has_country_flag` is a trigger and cannot be used inside an effect block; conditions belong in a `limit` block
+- code=UnknownKey severity=Error certainty=certain range=477..489
+  message: `add_prestige` is an effect and cannot be used inside a trigger block
+- code=UnknownSymbol severity=Warning certainty=certain range=514..522
+  message: unknown localisation symbol `lint.2.a`

@@ -1,0 +1,14 @@
+// case: quoted_script_syntax
+// input:
+//   trigger = { embedded = "
+//    foo = maybe
+//    broken = {
+//   " }
+//   
+diagnostics:
+- code=InvalidValue severity=Error certainty=certain range=32..37
+  message: value of `foo` does not match the semantic rule (rule fixture.semantic:4)
+- code=UnknownKey severity=Error certainty=certain range=39..45
+  message: unexpected key `broken` in rule context `trigger`
+- code=SyntaxError severity=Error certainty=certain range=48..50
+  message: script block is missing `}`

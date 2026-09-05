@@ -1,0 +1,23 @@
+// case: missing_limit_and_empty_block
+// input:
+//   country_event = { id = mle.1 option = { name = mle.1.a
+//     if = { add_prestige = 1 }
+//     if = { limit = { always = yes } }
+//     if = { }
+//   } }
+//   
+diagnostics:
+- code=UnknownSymbol severity=Warning certainty=certain range=47..54
+  message: unknown localisation symbol `mle.1.a`
+- code=MissingLimit severity=Warning certainty=certain range=57..59
+  message: `if` without `limit` executes its body unconditionally; the condition belongs in a `limit` block
+- code=Cardinality severity=Error certainty=certain range=62..82
+  message: semantic rule requires at least 1 occurrence(s), but `limit` occurs 0 times (rule semantic-rules.json:6800)
+- code=ConstantCondition severity=Warning certainty=certain range=85..87
+  message: `limit` of this `if` is always true; the branch wrapper is redundant
+- code=MissingLimit severity=Warning certainty=certain range=121..123
+  message: `if` without `limit` executes its body unconditionally; the condition belongs in a `limit` block
+- code=EmptyBlock severity=Warning certainty=certain range=121..123
+  message: `if` block has an empty body
+- code=Cardinality severity=Error certainty=certain range=126..129
+  message: semantic rule requires at least 1 occurrence(s), but `limit` occurs 0 times (rule semantic-rules.json:6800)

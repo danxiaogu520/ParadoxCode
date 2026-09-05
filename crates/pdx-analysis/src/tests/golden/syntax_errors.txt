@@ -1,0 +1,10 @@
+// case: syntax_errors
+// input:
+//   trigger = {
+//     missing =
+//   
+diagnostics:
+- code=SyntaxError severity=Error certainty=certain range=10..24
+  message: script block is missing `}`
+- code=SyntaxError severity=Error certainty=certain range=24..24
+  message: property operator is missing a value

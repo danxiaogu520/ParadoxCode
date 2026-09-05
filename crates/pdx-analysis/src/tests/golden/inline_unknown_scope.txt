@@ -1,0 +1,11 @@
+// case: inline_unknown_scope
+// input:
+//   trigger = { unknown_key = yes scope = nowhere }
+//   
+diagnostics:
+- code=UnknownKey severity=Error certainty=certain range=12..23
+  message: unexpected key `unknown_key` in rule context `trigger`
+- code=UnknownKey severity=Error certainty=certain range=30..35
+  message: unexpected key `scope` in rule context `trigger`
+- code=UnknownScope severity=Error certainty=certain range=38..45
+  message: unknown scope `nowhere`

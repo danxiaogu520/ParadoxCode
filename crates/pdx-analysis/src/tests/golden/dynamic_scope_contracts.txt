@@ -1,0 +1,34 @@
+// case: dynamic_scope_contracts
+// input:
+//   clash = { add_prestige = 1 add_province_modifier = { name = clash_mod duration = 1 } }
+//   via_callee = { helper_province = yes add_prestige = 1 }
+//   helper_province = { change_province_name = "X" }
+//   fine = { add_prestige = 1 add_manpower = 1000 }
+//   dual_ok = { add_prestige = 1 add_core = FRA }
+//   scoped_ok = { any_country = { change_province_name = "Y" } }
+//   nested_ok = { if = { limit = { always = yes } add_prestige = 1 } }
+//   dynamic_dispatch = { $action$ = yes }
+//   root_opaque = { add_prestige = 1 ROOT = { change_province_name = "Z" } }
+//   this_opaque = { add_prestige = 1 THIS = { change_province_name = "W" } }
+//   or_union = { if = { limit = { OR = { is_capital = yes has_estate_privilege = some_priv } } add_prestige = 1 } }
+//   or_open = { if = { limit = { OR = { unknown_branch_key = yes is_capital = yes } } add_prestige = 1 } }
+//   
+diagnostics:
+- code=EmptyScopeContract severity=Error certainty=certain range=0..5
+  message: dynamic definition `clash` has an empty inferred entry scope: no scope satisfies every statement in its body
+- code=InvalidValue severity=Error certainty=certain range=60..69
+  message: value of `name` does not match the semantic rule (rule semantic-rules.json:4808)
+- code=EmptyScopeContract severity=Error certainty=certain range=87..97
+  message: dynamic definition `via_callee` has an empty inferred entry scope: no scope satisfies every statement in its body
+- code=InvalidValue severity=Warning certainty=certain range=233..237
+  message: value of `add_manpower` does not match the semantic rule (rule semantic-rules.json:4200)
+- code=InvalidTarget severity=Error certainty=certain range=280..283
+  message: invalid target `FRA`: scope expression is not recognised (rule semantic-rules.json:4952)
+- code=UnknownKey severity=Error certainty=certain range=300..311
+  message: `any_country` is a trigger and cannot be used inside an effect block; conditions belong in a `limit` block
+- code=ConstantCondition severity=Warning certainty=certain range=361..363
+  message: `limit` of this `if` is always true; the branch wrapper is redundant
+- code=InvalidValue severity=Error certainty=certain range=675..684
+  message: value of `has_estate_privilege` does not match the semantic rule (rule semantic-rules.json:7415)
+- code=UnknownKey severity=Error certainty=certain range=746..764
+  message: unexpected key `unknown_branch_key` in rule context `trigger`

@@ -1,0 +1,14 @@
+// case: dynamic_cycles
+// input:
+//   ping = { pong = yes }
+//   pong = { ping = yes }
+//   loop_self = { loop_self = yes }
+//   honest = { add_prestige = 1 }
+//   
+diagnostics:
+- code=DynamicDefinitionCycle severity=Error certainty=certain range=0..4
+  message: dynamic definition `ping` is part of a definition cycle: ping -> pong -> ping
+- code=DynamicDefinitionCycle severity=Error certainty=certain range=22..26
+  message: dynamic definition `pong` is part of a definition cycle: pong -> ping -> pong
+- code=DynamicDefinitionCycle severity=Error certainty=certain range=44..53
+  message: dynamic definition `loop_self` is part of a definition cycle: loop_self -> loop_self

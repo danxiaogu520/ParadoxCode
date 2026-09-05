@@ -1,0 +1,11 @@
+// case: semantic_leaf_unknown_key_cardinality
+// input:
+//   trigger = { foo = maybe unknown = yes foo = no }
+//   
+diagnostics:
+- code=InvalidValue severity=Error certainty=certain range=18..23
+  message: value of `foo` does not match the semantic rule (rule fixture.semantic:1)
+- code=UnknownKey severity=Error certainty=certain range=24..31
+  message: unexpected key `unknown` in rule context `trigger`
+- code=Cardinality severity=Warning certainty=certain range=38..41
+  message: `foo` occurs 2 times, but rule cardinality allows at most 1 (rule fixture.semantic:1)
