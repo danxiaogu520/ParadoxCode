@@ -31,11 +31,11 @@ diagnostics:
   message: unknown localisation key `call_site_test.2.t`
 - code=UnknownLocalisationKey severity=Warning certainty=certain range=242..262
   message: unknown localisation key `bad_province_dynamic`
-- code=DynamicCallScopeMismatch severity=Error certainty=certain range=271..286
+- code=WrongScope severity=Error certainty=certain range=271..286
   message: dynamic definition `province_helper` requires entry scope province but is called in `country` scope
 - code=UnknownLocalisationKey severity=Warning certainty=certain range=358..376
   message: unknown localisation key `call_site_test.5.t`
 - code=UnknownLocalisationKey severity=Warning certainty=certain range=399..418
   message: unknown localisation key `bad_country_dynamic`
-- code=DynamicCallScopeMismatch severity=Error certainty=certain range=427..441
+- code=WrongScope severity=Error certainty=certain range=427..441
   message: dynamic definition `country_helper` requires entry scope country but is called in `province` scope

@@ -108,10 +108,9 @@ pub enum DiagnosticCode {
     /// A semantic rule cardinality constraint was violated.
     Cardinality,
     /// A key or value is known to the semantic rule set but is used from the
-    /// wrong game scope.
+    /// wrong game scope, including a dynamic definition called outside its
+    /// inferred entry contract.
     WrongScope,
-    /// A scope-changing command is not valid in the current scope context.
-    InvalidScopeCommand,
     /// Recursive dynamic-definition expansion reached a definition already on the active stack.
     DynamicDefinitionCycle,
     /// A mission-tree dependency is illegal: missing target, a cycle, or a
@@ -133,9 +132,6 @@ pub enum DiagnosticCode {
     /// An effect applies a typed definition whose scope-attributed attributes
     /// cannot act in the effect's scope.
     ModifierScopeMismatch,
-    /// A dynamic definition is called in a scope its inferred entry contract
-    /// rejects.
-    DynamicCallScopeMismatch,
 }
 
 impl DiagnosticCode {
@@ -148,7 +144,6 @@ impl DiagnosticCode {
         Self::InvalidValue,
         Self::Cardinality,
         Self::WrongScope,
-        Self::InvalidScopeCommand,
         Self::DynamicDefinitionCycle,
         Self::InvalidDependency,
         Self::LogicalContainer,
@@ -158,7 +153,6 @@ impl DiagnosticCode {
         Self::OrphanElse,
         Self::EmptyScopeContract,
         Self::ModifierScopeMismatch,
-        Self::DynamicCallScopeMismatch,
     ];
 
     /// Parses a wire-facing diagnostic category.
@@ -181,7 +175,6 @@ impl DiagnosticCode {
             Self::InvalidValue => "InvalidValue",
             Self::Cardinality => "Cardinality",
             Self::WrongScope => "WrongScope",
-            Self::InvalidScopeCommand => "InvalidScopeCommand",
             Self::DynamicDefinitionCycle => "DynamicDefinitionCycle",
             Self::InvalidDependency => "InvalidDependency",
             Self::LogicalContainer => "LogicalContainer",
@@ -191,7 +184,6 @@ impl DiagnosticCode {
             Self::OrphanElse => "OrphanElse",
             Self::EmptyScopeContract => "EmptyScopeContract",
             Self::ModifierScopeMismatch => "ModifierScopeMismatch",
-            Self::DynamicCallScopeMismatch => "DynamicCallScopeMismatch",
         }
     }
 
@@ -201,7 +193,7 @@ impl DiagnosticCode {
         match self {
             // An unknown key is silently ignored by the game, so the authored line is
             // ineffective code; it is an error once the surrounding context is known.
-            Self::UnknownKey | Self::InvalidScopeCommand => Severity::Error,
+            Self::UnknownKey => Severity::Error,
             // The game renders a missing localisation key as its raw spelling, so a
             // missing key is a data-quality warning rather than a script error.
             Self::UnknownLocalisationKey => Severity::Warning,
@@ -226,7 +218,6 @@ impl DiagnosticCode {
             // scope; rejecting it at the definition follows the same Rust
             // principle as rejecting a recursive expansion.
             | Self::EmptyScopeContract
-            | Self::DynamicCallScopeMismatch
             | Self::OrphanElse => Severity::Error,
             // The game still loads cross-class modifier applications, so the
             // scope class of the applied attributes is recorded as information

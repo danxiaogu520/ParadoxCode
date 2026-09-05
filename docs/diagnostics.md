@@ -41,12 +41,12 @@ two.
 ## InvalidValue
 
 The value does not satisfy the constraint of its key: an enum member that
-does not exist, a number outside its bounds, an unknown scope target, an
-unrecognised list member. The `expected:` line states the constraint (for
-example `a whole number between 0 and 255` or `one of 'yes' or 'no'`), and
-a did-you-mean quick fix is attached when exactly one accepted value is
-close. Usage of a declaration the game data marks deprecated renders with
-strikethrough.
+does not exist, a number outside its bounds, an unknown scope or
+scope-command target, an unrecognised list member. The `expected:` line
+states the constraint (for example `a whole number between 0 and 255` or
+`one of 'yes' or 'no'`), and a did-you-mean quick fix is attached when
+exactly one accepted value is close. Usage of a declaration the game data
+marks deprecated renders with strikethrough.
 
 ## Cardinality
 
@@ -59,14 +59,11 @@ fix.
 ## WrongScope
 
 The key is valid, but not in the scope where it appears (for example a
-province-only effect used from country scope). The `expected:` line lists
-the scopes the key works from. Move the call into an appropriate scope
-block, or use a scope command to change the current scope first.
-
-## InvalidScopeCommand
-
-A `scope = <target>` command names a target that is not a recognised scope
-command. A did-you-mean suggestion is included for close scope names.
+province-only effect used from country scope, or a scripted trigger/effect
+called from a scope its entry contract rejects). The `expected:` line lists
+the scopes the key works from; for dynamic definitions it lists the entry
+contract. Move the call into an appropriate scope block, or use a scope
+command to change the current scope first.
 
 ## DynamicDefinitionCycle
 
@@ -119,14 +116,9 @@ body or drop the contract.
 A modifier is applied in a scope that cannot carry it (a province modifier
 on a country, for example). The `expected:` line lists the valid scopes.
 
-## DynamicCallScopeMismatch
-
-A scripted trigger/effect requires an entry scope that the call site does
-not provide. Enter the required scope before the call.
-
 # Migration from pre-refactor codes
 
-The old 22-code table was consolidated to 18. Old codes are gone: they are
+The old 22-code table was consolidated to 16. Old codes are gone: they are
 not aliases, and configurations that name them fail fast at initialize.
 
 | Old code | New behaviour |
@@ -139,6 +131,8 @@ not aliases, and configurations that name them fail fast at initialize.
 | `AnalysisIncomplete` | removed; analysis is bounded and always terminates |
 | `UnknownBareValue` | `InvalidValue` on the exact value token with an `expected:` constraint |
 | `RuleWrongScope` | renamed to `WrongScope` |
+| `InvalidScopeCommand` | folded into `InvalidValue`; the message still reads "invalid scope command target ..." |
+| `DynamicCallScopeMismatch` | folded into `WrongScope`; the message still names the entry contract |
 
 New codes: `UnknownLocalisationKey`, `AmbiguousDefinition`,
 `InvalidDependency`.

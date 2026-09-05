@@ -10,11 +10,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Diagnostics system refactor, message quality round:
-  - The diagnostic code table is consolidated from 22 to 18 codes. Removed:
+  - The diagnostic code table is consolidated from 22 to 16 codes. Removed:
     `UnknownSymbol`, `AmbiguousSymbol`, `UnknownScope`, `InvalidTarget`,
-    `TargetWrongScope`, `AnalysisIncomplete`, `UnknownBareValue`;
-    `RuleWrongScope` renamed to `WrongScope`; added `UnknownLocalisationKey`,
-    `AmbiguousDefinition`, `InvalidDependency`. Removed codes are not
+    `TargetWrongScope`, `AnalysisIncomplete`, `UnknownBareValue`,
+    `InvalidScopeCommand` (folded into `InvalidValue`, message wording
+    kept), and `DynamicCallScopeMismatch` (folded into `WrongScope`,
+    message wording kept); `RuleWrongScope` renamed to `WrongScope`; added
+    `UnknownLocalisationKey`, `AmbiguousDefinition`, `InvalidDependency`.
+    Removed codes are not
     aliased - configurations naming them fail fast at initialize. See
     `docs/diagnostics.md` for the full migration table.
   - Duplicate definitions resolve later-wins and report one
