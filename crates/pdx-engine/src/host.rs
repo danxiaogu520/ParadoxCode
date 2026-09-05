@@ -950,7 +950,10 @@ impl AnalysisHost {
             return false;
         }
         Arc::make_mut(&mut self.documents).insert(id, prepared.document);
-        self.advance_revision();
+        // Only the overlay document map changes here, so index-derived cache
+        // entries stay valid; a full advance would wipe them on every
+        // keystroke's parse commit and defeat the index cache domain.
+        self.advance_document_revision();
         true
     }
 
