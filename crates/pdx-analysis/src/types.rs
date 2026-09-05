@@ -388,10 +388,28 @@ pub struct Diagnostic {
     pub message: String,
     /// Confidence in the conclusion, independent of severity.
     pub certainty: DiagnosticCertainty,
+    /// Secondary explanation lines; protocol adapters append these to the
+    /// message as additional lines.
+    pub notes: Vec<String>,
+    /// The constraint the source violated, phrased for users and shared with
+    /// hover labels (for example "a country scope").
+    pub expected: Option<String>,
+    /// Locations that give the finding context, such as the earlier
+    /// definition a later one shadows.
+    pub related: Vec<RelatedLocation>,
     /// Optional internal rule/source provenance for explainability.
     pub provenance: Option<DiagnosticProvenance>,
     /// Safe source edits that directly address this diagnostic.
     pub fixes: Vec<QuickFix>,
+}
+
+/// One contextual location attached to a diagnostic.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RelatedLocation {
+    /// Where the related symbol or token lives.
+    pub location: Location,
+    /// Why the location matters, such as "earlier definition".
+    pub message: String,
 }
 
 impl Diagnostic {
@@ -409,6 +427,9 @@ impl Diagnostic {
             range,
             message,
             certainty: DiagnosticCertainty::Certain,
+            notes: Vec::new(),
+            expected: None,
+            related: Vec::new(),
             provenance: None,
             fixes: Vec::new(),
         }
@@ -418,6 +439,27 @@ impl Diagnostic {
     #[must_use]
     pub const fn with_certainty(mut self, certainty: DiagnosticCertainty) -> Self {
         self.certainty = certainty;
+        self
+    }
+
+    /// Appends one secondary explanation line.
+    #[must_use]
+    pub fn with_note(mut self, note: String) -> Self {
+        self.notes.push(note);
+        self
+    }
+
+    /// States the constraint the source violated.
+    #[must_use]
+    pub fn with_expected(mut self, expected: String) -> Self {
+        self.expected = Some(expected);
+        self
+    }
+
+    /// Attaches one contextual location.
+    #[must_use]
+    pub fn with_related(mut self, related: RelatedLocation) -> Self {
+        self.related.push(related);
         self
     }
 

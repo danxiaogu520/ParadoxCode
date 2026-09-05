@@ -235,6 +235,7 @@ impl SnapshotRequestContext {
                 "path": file.path,
                 "diagnostics": diagnostic_values_for_text_with_ignored_and_overrides(
                     diagnostics,
+                    Some(&self.snapshot),
                     &line_index,
                     &file.text,
                     &self.ignored_diagnostic_codes,
@@ -590,6 +591,7 @@ impl SnapshotRequestContext {
                     "logicalPath": file.logical_path.as_str(),
                     "diagnostics": diagnostic_values_for_text_with_ignored_and_overrides(
                         diagnostics,
+                        Some(&self.snapshot),
                         &line_index,
                         state.source(),
                         &self.ignored_diagnostic_codes,

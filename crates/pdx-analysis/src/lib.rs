@@ -47,9 +47,9 @@ pub use semantic_tokens::{
 pub use types::{
     AnalysisResult, CancellationToken, Cancelled, CompletionItem, CompletionKind, CompletionResult,
     Diagnostic, DiagnosticCertainty, DiagnosticCode, DiagnosticProvenance, FileAnalysis, Hover,
-    Location, PrepareRenameResult, QuickFix, ReferenceInfo, RenameError, RenameFailure,
-    ScopeInlayHint, SemanticToken, SemanticTokenType, Severity, Symbol, WorkspaceEditPlan,
-    WorkspaceSymbol, WorkspaceTextEdit,
+    Location, PrepareRenameResult, QuickFix, ReferenceInfo, RelatedLocation, RenameError,
+    RenameFailure, ScopeInlayHint, SemanticToken, SemanticTokenType, Severity, Symbol,
+    WorkspaceEditPlan, WorkspaceSymbol, WorkspaceTextEdit,
 };
 
 // These crate-visible re-exports keep the existing in-crate test and helper paths stable while

@@ -70,6 +70,7 @@ diagnostics:
   message: mission `gm_zero` has position = 0; game columns start at 1
 - code=AmbiguousDefinition severity=Warning certainty=certain range=569..575
   message: definition `gm_dup` shadows an earlier definition of the same name; the later definition takes effect
+  related: earlier definition of `gm_dup` @ file:///tmp/missions/golden_main.txt:452..458
 - code=InvalidDependency severity=Warning certainty=certain range=888..895
   message: mission `gb_far` requires `gm_root`, but the prerequisite is not on the row directly above or directly above in the same column
 - code=InvalidDependency severity=Error certainty=certain range=908..916

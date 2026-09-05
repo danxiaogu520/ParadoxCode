@@ -45,6 +45,21 @@ fn render(name: &str, text: &str, items: &[Diagnostic]) -> String {
             diagnostic.range.end(),
         ));
         out.push_str(&format!("  message: {}\n", diagnostic.message));
+        if let Some(expected) = diagnostic.expected.as_deref() {
+            out.push_str(&format!("  expected: {expected}\n"));
+        }
+        for note in &diagnostic.notes {
+            out.push_str(&format!("  note: {note}\n"));
+        }
+        for related in &diagnostic.related {
+            out.push_str(&format!(
+                "  related: {} @ {}:{}..{}\n",
+                related.message,
+                location_label(&related.location),
+                related.location.range.start(),
+                related.location.range.end(),
+            ));
+        }
         for fix in &diagnostic.fixes {
             out.push_str(&format!(
                 "  fix: {} [{}..{}] -> {}\n",
@@ -56,6 +71,18 @@ fn render(name: &str, text: &str, items: &[Diagnostic]) -> String {
         }
     }
     out
+}
+
+/// Stable one-line identity of a location: the document URI when open, the
+/// logical path when indexed, or `?` when neither is known.
+fn location_label(location: &crate::types::Location) -> String {
+    if let Some(document) = location.document.as_ref() {
+        return document.as_str().to_owned();
+    }
+    if let Some(path) = location.path.as_ref() {
+        return path.as_str().to_owned();
+    }
+    "?".to_owned()
 }
 
 fn escape(text: &str) -> String {
