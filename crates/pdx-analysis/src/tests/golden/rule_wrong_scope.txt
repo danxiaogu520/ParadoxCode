@@ -3,9 +3,9 @@
 //   province_event = { id = rws.1 title = rws.1.t option = { name = a add_prestige = 1 } }
 //   
 diagnostics:
-- code=UnknownSymbol severity=Warning certainty=certain range=38..45
-  message: unknown localisation symbol `rws.1.t`
-- code=UnknownSymbol severity=Warning certainty=certain range=64..65
-  message: unknown localisation symbol `a`
-- code=RuleWrongScope severity=Error certainty=certain range=66..78
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=38..45
+  message: unknown localisation key `rws.1.t`
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=64..65
+  message: unknown localisation key `a`
+- code=WrongScope severity=Error certainty=certain range=66..78
   message: `add_prestige` is not available in game scope `province` (rule semantic-rules.json:4143)

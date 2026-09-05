@@ -8,15 +8,12 @@ use crate::{
 fn diagnostic_ids_are_pascal_case_and_metadata_is_structured() {
     assert_eq!(DiagnosticCode::UnknownKey.as_str(), "UnknownKey");
     assert_eq!(
-        DiagnosticCode::UnknownBareValue.as_str(),
-        "UnknownBareValue"
+        DiagnosticCode::UnknownLocalisationKey.as_str(),
+        "UnknownLocalisationKey"
     );
-    assert_eq!(
-        DiagnosticCode::TargetWrongScope.as_str(),
-        "TargetWrongScope"
-    );
+    assert_eq!(DiagnosticCode::WrongScope.as_str(), "WrongScope");
     let diagnostic = Diagnostic::new(
-        DiagnosticCode::TargetWrongScope,
+        DiagnosticCode::WrongScope,
         Severity::Error,
         TextRange::new(2, 5).expect("range"),
         "target has the wrong scope".to_owned(),
@@ -99,7 +96,7 @@ fn scripted_localisation_names_feed_indexed_diagnostics_and_completion() {
         .iter()
         .find(|diagnostic| diagnostic.message.contains("MissingScripted"))
         .expect("unknown scripted localisation command");
-    assert_eq!(unknown.code, DiagnosticCode::UnknownSymbol);
+    assert_eq!(unknown.code, DiagnosticCode::InvalidValue);
     assert_eq!(unknown.severity, Severity::Warning);
     assert_eq!(
         unknown.range.start(),
@@ -197,15 +194,15 @@ fn scope_target_failures_use_distinct_categories() {
     .expect("open scope target fixture");
     let diagnostics = diagnostics(&host.snapshot(), &id);
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.code == DiagnosticCode::InvalidTarget && diagnostic.message.contains("NOWHERE")
+        diagnostic.code == DiagnosticCode::InvalidValue
+            && diagnostic.message.contains("invalid target")
     }));
     assert!(diagnostics.iter().any(|diagnostic| {
         diagnostic.code == DiagnosticCode::InvalidScopeCommand
             && diagnostic.message.contains("NOWHERE")
     }));
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.code == DiagnosticCode::TargetWrongScope
-            && diagnostic.message.contains("capital")
+        diagnostic.code == DiagnosticCode::WrongScope && diagnostic.message.contains("capital")
     }));
 }
 
@@ -594,7 +591,7 @@ fn semantic_diagnostics_do_not_materialize_the_full_workspace() {
     assert!(
         results
             .iter()
-            .any(|item| item.code == DiagnosticCode::UnknownSymbol)
+            .any(|item| item.code == DiagnosticCode::UnknownLocalisationKey)
     );
     crate::ALL_SEMANTICS_CALLS.with(|calls| {
         assert_eq!(
@@ -617,12 +614,12 @@ fn unknown_key_and_unknown_scope_are_independent_diagnostics() {
     assert!(
         diagnostics
             .iter()
-            .any(|item| item.code == DiagnosticCode::UnknownScope)
+            .any(|item| item.code == DiagnosticCode::InvalidValue)
     );
     assert_eq!(
         diagnostics
             .iter()
-            .filter(|item| item.code == DiagnosticCode::UnknownScope)
+            .filter(|item| item.code == DiagnosticCode::InvalidValue)
             .count(),
         1
     );
@@ -1648,11 +1645,11 @@ fn deeply_nested_dynamic_rule_chains_validate_without_expansion_budgets() {
 
     let results = diagnostics(&host.snapshot(), &id);
     // Row derivation has no node/depth budgets: a 35-deep chain validates the
-    // same as a shallow one, and no incomplete-analysis placeholder appears.
+    // same as a shallow one.
     assert!(
         !results
             .iter()
-            .any(|diagnostic| diagnostic.code == DiagnosticCode::AnalysisIncomplete),
+            .any(|diagnostic| diagnostic.message.contains("incomplete")),
         "{results:?}"
     );
     std::fs::remove_dir_all(root).expect("cleanup");
@@ -1867,7 +1864,7 @@ fn required_type_localisation_keys_report_missing_derived_keys() {
 
     let messages = diagnostics(&host.snapshot(), &id)
         .into_iter()
-        .filter(|diagnostic| diagnostic.code == DiagnosticCode::UnknownSymbol)
+        .filter(|diagnostic| diagnostic.code == DiagnosticCode::UnknownLocalisationKey)
         .map(|diagnostic| diagnostic.message)
         .collect::<Vec<_>>();
     assert!(
@@ -1915,7 +1912,7 @@ fn ancestor_personality_localisation_uses_vanilla_key_templates() {
     assert!(
         results
             .iter()
-            .all(|item| item.code != DiagnosticCode::UnknownSymbol),
+            .all(|item| item.code != DiagnosticCode::UnknownLocalisationKey),
         "ancestor localisation must use `$` and `desc_$` only: {results:?}"
     );
 }
@@ -1940,7 +1937,7 @@ fn mission_metadata_fields_do_not_derive_localisation_keys() {
 
     let messages = diagnostics(&host.snapshot(), &id)
         .into_iter()
-        .filter(|diagnostic| diagnostic.code == DiagnosticCode::UnknownSymbol)
+        .filter(|diagnostic| diagnostic.code == DiagnosticCode::UnknownLocalisationKey)
         .map(|diagnostic| diagnostic.message)
         .collect::<Vec<_>>();
     for key in [
@@ -2007,16 +2004,10 @@ fn localisation_symbols_prefer_the_english_definition_across_languages() {
 
     let results = diagnostics(&host.snapshot(), &script);
     assert!(
-        !results
-            .iter()
-            .any(|item| item.code == DiagnosticCode::AmbiguousSymbol),
-        "per-language variants of one key must not look ambiguous: {results:?}"
-    );
-    assert!(
-        !results
-            .iter()
-            .any(|item| item.code == DiagnosticCode::UnknownSymbol
-                && item.message.contains("shared_key")),
+        !results.iter().any(|item| {
+            item.code == DiagnosticCode::UnknownLocalisationKey
+                && item.message.contains("shared_key")
+        }),
         "the key exists in the workspace and must resolve: {results:?}"
     );
 }
@@ -2053,9 +2044,10 @@ fn duplicate_localisation_keys_do_not_produce_ambiguous_diagnostics() {
     let results = diagnostics(&host.snapshot(), &script);
     assert!(
         !results.iter().any(|item| {
-            item.code == DiagnosticCode::AmbiguousSymbol && item.message.contains("shared_key")
+            item.code == DiagnosticCode::UnknownLocalisationKey
+                && item.message.contains("shared_key")
         }),
-        "localisation overrides must not be reported as ambiguous: {results:?}"
+        "localisation overrides must resolve to a definition: {results:?}"
     );
 }
 
@@ -2430,7 +2422,10 @@ fn unresolved_dynamic_placeholders_do_not_become_symbol_errors() {
     let results = diagnostics(&host.snapshot(), &id);
     assert!(
         results.iter().all(|diagnostic| {
-            diagnostic.code != DiagnosticCode::UnknownSymbol || !diagnostic.message.contains('$')
+            !matches!(
+                diagnostic.code,
+                DiagnosticCode::InvalidValue | DiagnosticCode::UnknownLocalisationKey
+            ) || !diagnostic.message.contains('$')
         }),
         "unbound definition parameters cannot be resolved before invocation: {results:?}"
     );
@@ -2626,13 +2621,15 @@ fn typed_name_fields_do_not_inherit_the_localisation_fallback() {
 
     let diagnostics = diagnostics(&host.snapshot(), &id);
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.code == DiagnosticCode::UnknownSymbol
+        diagnostic.code == DiagnosticCode::UnknownLocalisationKey
             && diagnostic.message.contains("missing_option_loc")
     }));
     assert!(
         diagnostics.iter().all(|diagnostic| {
-            diagnostic.code != DiagnosticCode::UnknownSymbol
-                || !diagnostic.message.contains("runtime_modifier")
+            !matches!(
+                diagnostic.code,
+                DiagnosticCode::InvalidValue | DiagnosticCode::UnknownLocalisationKey
+            ) || !diagnostic.message.contains("runtime_modifier")
         }),
         "modifier identifiers must not be treated as localisation: {diagnostics:?}"
     );
@@ -2744,9 +2741,11 @@ fn severity_review_quoted_names_and_non_instance_scalars_are_not_localisation() 
         let results = diagnostics(&host.snapshot(), &id);
         assert!(
             results.iter().all(|diagnostic| {
-                diagnostic.code != DiagnosticCode::UnknownSymbol
-                    || (!diagnostic.message.contains(forbidden)
-                        && !diagnostic.message.contains("`Charles`"))
+                !matches!(
+                    diagnostic.code,
+                    DiagnosticCode::InvalidValue | DiagnosticCode::UnknownLocalisationKey
+                ) || (!diagnostic.message.contains(forbidden)
+                    && !diagnostic.message.contains("`Charles`"))
             }),
             "{path} retained literal-text false positives: {results:?}"
         );
@@ -2845,7 +2844,7 @@ fn severity_review_fallback_unknown_keys_and_unknown_bare_values_are_errors() {
     let bare = bare_diagnostics
         .iter()
         .find(|diagnostic| {
-            diagnostic.code == DiagnosticCode::UnknownBareValue
+            diagnostic.code == DiagnosticCode::InvalidValue
                 && diagnostic.message.contains("not_a_color_component")
         })
         .unwrap_or_else(|| panic!("unknown bare value must be reported: {bare_diagnostics:?}"));
@@ -3125,8 +3124,10 @@ fn common_alerts_and_units_display_use_path_specific_semantics() {
     let alert_diagnostics = diagnostics(&host.snapshot(), &alerts);
     assert!(
         alert_diagnostics.iter().all(|diagnostic| {
-            diagnostic.code != DiagnosticCode::UnknownKey
-                && diagnostic.code != DiagnosticCode::UnknownBareValue
+            !matches!(
+                diagnostic.code,
+                DiagnosticCode::UnknownKey | DiagnosticCode::InvalidValue
+            )
         }),
         "valid alert declarations must use the alerts rule contexts: {alert_diagnostics:?}"
     );
@@ -3144,8 +3145,10 @@ fn common_alerts_and_units_display_use_path_specific_semantics() {
     let unit_diagnostics = diagnostics(&host.snapshot(), &units);
     assert!(
         unit_diagnostics.iter().all(|diagnostic| {
-            diagnostic.code != DiagnosticCode::UnknownKey
-                && diagnostic.code != DiagnosticCode::UnknownBareValue
+            !matches!(
+                diagnostic.code,
+                DiagnosticCode::UnknownKey | DiagnosticCode::InvalidValue
+            )
         }),
         "unit display factors and trigger clauses must use the path-specific rules: {unit_diagnostics:?}"
     );
@@ -3161,8 +3164,10 @@ fn common_alerts_and_units_display_use_path_specific_semantics() {
     let lucky_diagnostics = diagnostics(&host.snapshot(), &lucky);
     assert!(
         lucky_diagnostics.iter().all(|diagnostic| {
-            diagnostic.code != DiagnosticCode::UnknownKey
-                && diagnostic.code != DiagnosticCode::UnknownBareValue
+            !matches!(
+                diagnostic.code,
+                DiagnosticCode::UnknownKey | DiagnosticCode::InvalidValue
+            )
         }),
         "lucky-country trigger blocks must use the trigger context: {lucky_diagnostics:?}"
     );

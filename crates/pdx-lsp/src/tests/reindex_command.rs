@@ -163,7 +163,7 @@ fn validate_workspace_filters_open_document_severity_overrides() {
                 "workspaceFolders":[{"uri":root_uri,"name":"test"}],
                 "capabilities":{},
                 "initializationOptions":{
-                    "diagnosticSeverityOverrides":{"UnknownScope":"warning"}
+                    "diagnosticSeverityOverrides":{"InvalidValue":"warning"}
                 }
             }
         }),
@@ -636,7 +636,7 @@ fn identical_overlay_revalidation_is_not_republished_after_scan_commit() {
     assert!(
         batches.last().is_some_and(|latest| latest
             .as_array()
-            .is_some_and(|items| { items.iter().all(|item| item["code"] != "UnknownScope") })),
+            .is_some_and(|items| { items.iter().all(|item| item["code"] != "InvalidValue") })),
         "the latest overlay text was not the published one: {batches:?}"
     );
     fs::remove_dir_all(root).expect("cleanup");

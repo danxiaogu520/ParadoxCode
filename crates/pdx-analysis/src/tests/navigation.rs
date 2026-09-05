@@ -7,7 +7,7 @@ fn unresolved_symbol_is_diagnosed_without_a_definition() {
     assert!(
         diagnostics
             .iter()
-            .any(|item| item.code == DiagnosticCode::UnknownSymbol)
+            .any(|item| item.code == DiagnosticCode::InvalidValue)
     );
     assert!(definition(&host.snapshot(), &id, 8).is_empty());
 }
@@ -154,7 +154,7 @@ fn ambiguous_symbol_is_never_diagnosed_and_never_picks_a_definition() {
     assert!(
         diagnostics(&snapshot, &id)
             .iter()
-            .all(|item| item.code != DiagnosticCode::AmbiguousSymbol)
+            .all(|item| item.code != DiagnosticCode::AmbiguousDefinition)
     );
     assert!(definition(&snapshot, &id, 80).is_empty());
     let reference = u32::try_from(

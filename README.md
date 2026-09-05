@@ -22,9 +22,9 @@ and Paradox Interactive are trademarks of their respective owners.
   analysis: parsing produces a loss-aware syntax tree, and unrecognized constructs lower to
   `Unknown*` nodes instead of crashing.
 - Syntax and semantic diagnostics driven by a validated first-party EU4 rules database.
-- Diagnostics expose stable PascalCase IDs such as `UnknownKey`, `UnknownBareValue`,
-  `UnknownScope`, and `TargetWrongScope`; severity is typed internally and LSP metadata carries
-  certainty without exposing internal rule provenance or legacy migration fields.
+- Diagnostics expose stable PascalCase IDs such as `UnknownKey`, `InvalidValue`,
+  `WrongScope`, and `UnknownLocalisationKey`; severity is typed internally and LSP metadata
+  carries certainty without exposing internal rule provenance or legacy migration fields.
 - Rule-backed diagnostics can expose bounded `textDocument/codeAction` quick fixes, including
   unique did-you-mean replacements for misspelled static enum values.
 - Scripted-localisation definitions are discovered from the EU4 profile's supported directory
@@ -291,7 +291,7 @@ through `workspace/didChangeConfiguration`):
 
 ```json
 {
-  "ignoredErrorCodes": ["UnknownScope", "UnknownBareValue"]
+  "ignoredErrorCodes": ["LogicalContainer", "ModifierScopeMismatch"]
 }
 ```
 
@@ -306,8 +306,8 @@ applied before publication limits and `validateWorkspace` aggregation:
 ```json
 {
   "diagnosticSeverityOverrides": {
-    "UnknownScope": "warning",
-    "AnalysisIncomplete": "info"
+    "WrongScope": "warning",
+    "UnknownLocalisationKey": "info"
   }
 }
 ```

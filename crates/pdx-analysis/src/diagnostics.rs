@@ -236,13 +236,17 @@ pub(crate) fn analyze_input_with_cancellation(
                 value,
                 &ScopeContext::new(snapshot.game_profile_handle()),
             )
-            && !diagnostics.values.iter().any(|diagnostic| {
-                diagnostic.code == DiagnosticCode::UnknownScope && diagnostic.range == *range
-            })
+            // The rule-driven scope-command check reports the same value with
+            // more context whenever a rule covers this key; only report here
+            // when the semantic walk said nothing at this range.
+            && !diagnostics
+                .values
+                .iter()
+                .any(|diagnostic| diagnostic.range == *range)
         {
             diagnostics.push(Diagnostic::new(
-                DiagnosticCode::UnknownScope,
-                DiagnosticCode::UnknownScope.severity(),
+                DiagnosticCode::InvalidValue,
+                DiagnosticCode::InvalidValue.severity(),
                 *range,
                 format!("unknown scope `{value}`"),
             ));
@@ -270,18 +274,26 @@ pub(crate) fn analyze_input_with_cancellation(
                         input,
                         reference.range,
                     ) => {}
-            Resolution::Missing => diagnostics.push(Diagnostic::new(
-                DiagnosticCode::UnknownSymbol,
-                // The game renders a missing localisation key as its raw spelling, so a
-                // missing key is a data-quality hint rather than a script error.
-                if reference.kind.eq_ignore_ascii_case("localisation") {
-                    Severity::Warning
+            Resolution::Missing => {
+                diagnostics.push(if reference.kind.eq_ignore_ascii_case("localisation") {
+                    // The game renders a missing localisation key as its raw spelling,
+                    // so a missing key is a data-quality warning rather than a script
+                    // error.
+                    Diagnostic::new(
+                        DiagnosticCode::UnknownLocalisationKey,
+                        DiagnosticCode::UnknownLocalisationKey.severity(),
+                        reference.range,
+                        format!("unknown localisation key `{}`", reference.name),
+                    )
                 } else {
-                    DiagnosticCode::UnknownSymbol.severity()
-                },
-                reference.range,
-                format!("unknown {} symbol `{}`", reference.kind, reference.name),
-            )),
+                    Diagnostic::new(
+                        DiagnosticCode::InvalidValue,
+                        DiagnosticCode::InvalidValue.severity(),
+                        reference.range,
+                        format!("unknown {} symbol `{}`", reference.kind, reference.name),
+                    )
+                })
+            }
             // Localisation is merged across languages and may be repeated by replace files.
             // Existence is enough for diagnostics; navigation retains the candidate set.
             // The game resolves same-name definitions deterministically by source priority,
@@ -539,7 +551,7 @@ pub(crate) fn semantic_rule_diagnostics(
             // unknown keys as errors; only scope availability remains uncertain until a more
             // specific root/context match is available.
             for diagnostic in &mut container_diagnostics {
-                if diagnostic.code == DiagnosticCode::RuleWrongScope {
+                if diagnostic.code == DiagnosticCode::WrongScope {
                     diagnostic.severity = diagnostic.severity.saturating_add(1);
                     diagnostic.certainty = DiagnosticCertainty::Inferred;
                 }
@@ -764,11 +776,8 @@ fn validate_semantic_container(
                 .collect::<Vec<_>>();
             if scoped_matching.is_empty() && !scope_diagnostics_deferred {
                 diagnostics.push(semantic_diagnostic(
-                    DiagnosticCode::RuleWrongScope,
-                    semantic_rule_severity(
-                        matching.iter().copied(),
-                        DiagnosticCode::RuleWrongScope,
-                    ),
+                    DiagnosticCode::WrongScope,
+                    semantic_rule_severity(matching.iter().copied(), DiagnosticCode::WrongScope),
                     property.key_range,
                     format!(
                         "`{}` is not available in game scope `{}` ({})",
@@ -817,10 +826,10 @@ fn validate_semantic_container(
                     {
                         DiagnosticCode::InvalidScopeCommand
                     }
-                    Some(ScopeValueMatch::Unknown) => DiagnosticCode::InvalidTarget,
+                    Some(ScopeValueMatch::Unknown) => DiagnosticCode::InvalidValue,
                     Some(ScopeValueMatch::Known {
                         compatible: false, ..
-                    }) => DiagnosticCode::TargetWrongScope,
+                    }) => DiagnosticCode::WrongScope,
                     _ => DiagnosticCode::InvalidValue,
                 };
                 let range = property
@@ -856,11 +865,12 @@ fn validate_semantic_container(
                         semantic_rule_provenance(applicable[0])
                     ),
                 };
-                let certainty = match diagnostic_code {
-                    DiagnosticCode::UnknownScope
-                    | DiagnosticCode::InvalidTarget
-                    | DiagnosticCode::InvalidScopeCommand => DiagnosticCertainty::Certain,
-                    DiagnosticCode::TargetWrongScope => DiagnosticCertainty::Contextual,
+                let certainty = match scope_value.as_ref() {
+                    // A resolved target whose scope disagrees with the rule depends
+                    // on the caller's runtime scope, so it stays contextual.
+                    Some(ScopeValueMatch::Known {
+                        compatible: false, ..
+                    }) => DiagnosticCertainty::Contextual,
                     _ => DiagnosticCertainty::Certain,
                 };
                 let mut diagnostic = Diagnostic::new(
@@ -1211,7 +1221,9 @@ fn validate_semantic_container(
             )
         });
         if matching.is_empty() && !parameterized_value {
-            let code = semantic_bare_value_code(rules.iter().copied(), value);
+            // Both numeric-range overflow and unrecognised scalars are invalid
+            // values; the severity helper keeps bounded numeric overflows soft.
+            let code = DiagnosticCode::InvalidValue;
             let severity = semantic_bare_value_severity(rules.iter().copied(), value);
             let message =
                 format!("bare value `{value}` does not match the semantic rule value clause");

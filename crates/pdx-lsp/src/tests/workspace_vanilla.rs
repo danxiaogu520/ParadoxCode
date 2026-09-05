@@ -42,8 +42,8 @@ fn background_reindex_options_are_bounded_and_default_to_opt_in() {
             "completionSourceLayers": ["currentMod", "dependencies"],
             "performanceProfile": "conservative",
             "diagnosticSeverityOverrides": {
-                "UnknownScope": "warning",
-                "AnalysisIncomplete": "off"
+                "WrongScope": "warning",
+                "ModifierScopeMismatch": "off"
             }
         })),
         &pdx_engine::WorkspaceScanToken::new(),
@@ -70,13 +70,13 @@ fn background_reindex_options_are_bounded_and_default_to_opt_in() {
         "conservative scans use the bounded worker profile"
     );
     assert_eq!(
-        advanced.diagnostic_severity_overrides.get("UnknownScope"),
+        advanced.diagnostic_severity_overrides.get("WrongScope"),
         Some(&Some(pdx_analysis::Severity::Warning))
     );
     assert_eq!(
         advanced
             .diagnostic_severity_overrides
-            .get("AnalysisIncomplete"),
+            .get("ModifierScopeMismatch"),
         Some(&None)
     );
 

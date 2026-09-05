@@ -96,30 +96,27 @@ pub enum DiagnosticCode {
     Syntax,
     /// A property key is not accepted by the current semantic context.
     UnknownKey,
-    /// A symbol reference has no definition candidate.
-    UnknownSymbol,
-    /// A symbol reference has more than one valid definition candidate.
-    AmbiguousSymbol,
-    /// An explicit scope expression is not recognised.
-    UnknownScope,
-    /// A scalar or block does not satisfy the selected semantic matcher.
+    /// A localisation key reference has no definition in the workspace or
+    /// vanilla index.
+    UnknownLocalisationKey,
+    /// A definition shadows an earlier definition of the same name; later
+    /// definitions win at load time.
+    AmbiguousDefinition,
+    /// A scalar or block does not satisfy the selected semantic matcher,
+    /// including unrecognised target and scope-name values.
     InvalidValue,
-    /// A bare scalar has no matching rule value, rather than merely having the wrong shape.
-    UnknownBareValue,
     /// A semantic rule cardinality constraint was violated.
     Cardinality,
-    /// A key or value is known to the semantic rule set but is used from the wrong game scope.
-    RuleWrongScope,
-    /// A target expression is syntactically valid but cannot be resolved to a target.
-    InvalidTarget,
-    /// A target resolves, but its scope is incompatible with the rule's expected scope.
-    TargetWrongScope,
+    /// A key or value is known to the semantic rule set but is used from the
+    /// wrong game scope.
+    WrongScope,
     /// A scope-changing command is not valid in the current scope context.
     InvalidScopeCommand,
     /// Recursive dynamic-definition expansion reached a definition already on the active stack.
     DynamicDefinitionCycle,
-    /// Dynamic-definition analysis exceeded a bounded work or size limit.
-    AnalysisIncomplete,
+    /// A mission-tree dependency is illegal: missing target, a cycle, or a
+    /// required mission whose `[slot, position]` cannot precede its dependent.
+    InvalidDependency,
     /// A boolean logic container (AND/OR/NOT) has a degenerate or misleading shape.
     LogicalContainer,
     /// A condition evaluates to a statically known truth value.
@@ -146,18 +143,14 @@ impl DiagnosticCode {
     pub const ALL: &'static [Self] = &[
         Self::Syntax,
         Self::UnknownKey,
-        Self::UnknownSymbol,
-        Self::AmbiguousSymbol,
-        Self::UnknownScope,
+        Self::UnknownLocalisationKey,
+        Self::AmbiguousDefinition,
         Self::InvalidValue,
-        Self::UnknownBareValue,
         Self::Cardinality,
-        Self::RuleWrongScope,
-        Self::InvalidTarget,
-        Self::TargetWrongScope,
+        Self::WrongScope,
         Self::InvalidScopeCommand,
         Self::DynamicDefinitionCycle,
-        Self::AnalysisIncomplete,
+        Self::InvalidDependency,
         Self::LogicalContainer,
         Self::ConstantCondition,
         Self::MissingLimit,
@@ -183,18 +176,14 @@ impl DiagnosticCode {
         match self {
             Self::Syntax => "SyntaxError",
             Self::UnknownKey => "UnknownKey",
-            Self::UnknownSymbol => "UnknownSymbol",
-            Self::AmbiguousSymbol => "AmbiguousSymbol",
-            Self::UnknownScope => "UnknownScope",
+            Self::UnknownLocalisationKey => "UnknownLocalisationKey",
+            Self::AmbiguousDefinition => "AmbiguousDefinition",
             Self::InvalidValue => "InvalidValue",
-            Self::UnknownBareValue => "UnknownBareValue",
             Self::Cardinality => "Cardinality",
-            Self::RuleWrongScope => "RuleWrongScope",
-            Self::InvalidTarget => "InvalidTarget",
-            Self::TargetWrongScope => "TargetWrongScope",
+            Self::WrongScope => "WrongScope",
             Self::InvalidScopeCommand => "InvalidScopeCommand",
             Self::DynamicDefinitionCycle => "DynamicDefinitionCycle",
-            Self::AnalysisIncomplete => "AnalysisIncomplete",
+            Self::InvalidDependency => "InvalidDependency",
             Self::LogicalContainer => "LogicalContainer",
             Self::ConstantCondition => "ConstantCondition",
             Self::MissingLimit => "MissingLimit",
@@ -212,14 +201,13 @@ impl DiagnosticCode {
         match self {
             // An unknown key is silently ignored by the game, so the authored line is
             // ineffective code; it is an error once the surrounding context is known.
-            Self::UnknownKey
-            | Self::UnknownBareValue
-            | Self::InvalidTarget
-            | Self::TargetWrongScope
-            | Self::InvalidScopeCommand => Severity::Error,
-            // Expansion limits are analysis-side work bounds; reaching one means this
-            // file was not fully validated, not that the file itself is wrong.
-            Self::AnalysisIncomplete => Severity::Information,
+            Self::UnknownKey | Self::InvalidScopeCommand => Severity::Error,
+            // The game renders a missing localisation key as its raw spelling, so a
+            // missing key is a data-quality warning rather than a script error.
+            Self::UnknownLocalisationKey => Severity::Warning,
+            // The game resolves same-name definitions deterministically by load
+            // priority, so a shadowing definition is a warning at the definition.
+            Self::AmbiguousDefinition => Severity::Warning,
             // Structural lints describe valid-but-misleading script shapes; the game
             // still loads them, so they stay below error severity except for control
             // flow that cannot match any branch chain.
@@ -228,13 +216,12 @@ impl DiagnosticCode {
             | Self::MissingLimit
             | Self::EmptyBlock => Severity::Warning,
             Self::Syntax
-            | Self::UnknownSymbol
-            | Self::AmbiguousSymbol
-            | Self::UnknownScope
             | Self::InvalidValue
             | Self::Cardinality
-            | Self::RuleWrongScope
+            | Self::WrongScope
             | Self::DynamicDefinitionCycle
+            // An illegal mission dependency never loads the way the author intends.
+            | Self::InvalidDependency
             // An empty contract means the definition is unusable in every
             // scope; rejecting it at the definition follows the same Rust
             // principle as rejecting a recursive expansion.
