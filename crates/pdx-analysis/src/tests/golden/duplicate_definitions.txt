@@ -1,0 +1,17 @@
+// case: duplicate_definitions
+// input:
+//   country_event = { id = dup.1 title = dup.1.t option = { name = dup.1.a } }
+//   country_event = { id = dup.1 title = dup.1.t option = { name = dup.1.b } }
+//   event = dup.1
+//   
+diagnostics:
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=37..44
+  message: unknown localisation key `dup.1.t`
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=63..70
+  message: unknown localisation key `dup.1.a`
+- code=AmbiguousDefinition severity=Warning certainty=certain range=98..103
+  message: definition `dup.1` shadows an earlier definition of the same name; the later definition takes effect
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=112..119
+  message: unknown localisation key `dup.1.t`
+- code=UnknownLocalisationKey severity=Warning certainty=certain range=138..145
+  message: unknown localisation key `dup.1.b`

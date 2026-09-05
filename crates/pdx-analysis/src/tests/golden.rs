@@ -257,6 +257,17 @@ fn golden_inline_unknown_scope() {
 }
 
 #[test]
+fn golden_duplicate_definitions() {
+    let text = concat!(
+        "country_event = { id = dup.1 title = dup.1.t option = { name = dup.1.a } }\n",
+        "country_event = { id = dup.1 title = dup.1.t option = { name = dup.1.b } }\n",
+        "event = dup.1\n",
+    );
+    let (host, id) = snapshot(text);
+    assert_golden("duplicate_definitions", text, &analyze_text(&host, &id));
+}
+
+#[test]
 fn golden_lints_degenerate_shapes() {
     let text = concat!(
         "country_event = { id = lint.1\n",

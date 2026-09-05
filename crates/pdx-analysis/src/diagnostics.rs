@@ -302,6 +302,36 @@ pub(crate) fn analyze_input_with_cancellation(
             Resolution::Unique(_) => {}
         }
     }
+    for definition in &semantic.definitions {
+        cancellation.checkpoint()?;
+        if definition.name.contains('$') {
+            continue;
+        }
+        // Only replacement-policy kinds can shadow; merge/unique kinds (such as
+        // localisation) legally repeat the same name.
+        let Some(ordered) = resolution.ordered_candidates(&definition.kind, &definition.name)
+        else {
+            continue;
+        };
+        // Candidates above were already reduced to one priority, so any earlier
+        // sibling here comes from the same source root; cross-root overrides
+        // (for example a mod replacing a vanilla definition) stay silent.
+        let has_earlier_sibling = ordered
+            .iter()
+            .position(|candidate| candidate.location == definition.symbol.location)
+            .is_some_and(|index| index > 0);
+        if has_earlier_sibling {
+            diagnostics.push(Diagnostic::new(
+                DiagnosticCode::AmbiguousDefinition,
+                DiagnosticCode::AmbiguousDefinition.severity(),
+                definition.symbol.selection_range,
+                format!(
+                    "definition `{}` shadows an earlier definition of the same name; the later definition takes effect",
+                    definition.name
+                ),
+            ));
+        }
+    }
     let diagnostics = diagnostics.finish();
     cancellation.checkpoint()?;
     Ok(FileAnalysis {

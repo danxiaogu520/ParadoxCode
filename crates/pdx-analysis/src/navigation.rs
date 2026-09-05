@@ -524,10 +524,27 @@ pub(crate) fn rename_target(
     let Some((kind, name)) = symbol_at(&all, document, position) else {
         return Err(RenameError::NoSymbol.into());
     };
-    let definition = match resolve_symbol(snapshot, &all, &kind, &name) {
-        Resolution::Unique(definition) => definition,
-        Resolution::Ambiguous => return Err(RenameError::Ambiguous.into()),
-        Resolution::Missing => return Err(RenameError::Unresolved.into()),
+    // Renaming one of several same-priority duplicates would strand the others
+    // under the old name, so duplicates stay unrenamable even though resolution
+    // itself now follows the later-definition-wins rule.
+    let mut candidates = symbol_candidates(snapshot, &all, &kind, &name);
+    let policy = symbol_resolution_policy(snapshot, &kind);
+    let definition = if matches!(
+        policy,
+        SymbolResolutionPolicy::Merge | SymbolResolutionPolicy::Unique
+    ) {
+        match candidates.len() {
+            0 => return Err(RenameError::Unresolved.into()),
+            1 => candidates.pop().expect("one candidate"),
+            _ => return Err(RenameError::Ambiguous.into()),
+        }
+    } else {
+        let mut ordered = retain_highest_and_order(candidates);
+        match ordered.len() {
+            0 => return Err(RenameError::Unresolved.into()),
+            1 => ordered.pop().expect("one candidate"),
+            _ => return Err(RenameError::Ambiguous.into()),
+        }
     };
     if !writable_location(snapshot, &definition.location) {
         return Err(RenameError::ReadOnly.into());

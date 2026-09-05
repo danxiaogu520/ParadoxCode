@@ -144,29 +144,42 @@ fn references_find_quoted_script_symbols_in_unopened_workspace_files() {
 }
 
 #[test]
-fn ambiguous_symbol_is_never_diagnosed_and_never_picks_a_definition() {
-    let (host, id) = snapshot(
-        "country_event = { id = duplicate.1 }\ncountry_event = { id = duplicate.1 }\nevent = duplicate.1\n",
-    );
+fn duplicate_definitions_resolve_last_and_warn_at_the_later_definition() {
+    let text = "country_event = { id = duplicate.1 }\ncountry_event = { id = duplicate.1 }\nevent = duplicate.1\n";
+    let (host, id) = snapshot(text);
     let snapshot = host.snapshot();
-    // The game resolves same-name definitions deterministically by source priority, so
-    // ambiguity is not diagnosed; navigation still refuses to pick one candidate.
-    assert!(
-        diagnostics(&snapshot, &id)
-            .iter()
-            .all(|item| item.code != DiagnosticCode::AmbiguousDefinition)
-    );
-    assert!(definition(&snapshot, &id, 80).is_empty());
+    // The game applies the later of two same-name definitions, so resolution
+    // follows later-definition-wins and the later definition warns that it
+    // shadows the earlier one.
+    let second_name =
+        u32::try_from("country_event = { id = duplicate.1 }\ncountry_event = { id = ".len())
+            .expect("second name offset");
+    let shadows: Vec<_> = diagnostics(&snapshot, &id)
+        .into_iter()
+        .filter(|item| item.code == DiagnosticCode::AmbiguousDefinition)
+        .collect();
+    assert_eq!(shadows.len(), 1, "only the later definition warns");
+    assert_eq!(shadows[0].range.start(), second_name);
+    assert!(shadows[0].message.contains("shadows an earlier definition"));
+    // Navigation from the reference lands on the later (effective) definition.
     let reference = u32::try_from(
         "country_event = { id = duplicate.1 }\ncountry_event = { id = duplicate.1 }\nevent = "
             .len()
             + 1,
     )
     .expect("reference offset");
-    let hover = hover(&snapshot, &id, reference).expect("ambiguous hover");
-    assert!(hover.contents.contains("ambiguous event symbol"));
-    assert!(hover.contents.contains("#### Candidates:\n\n- "));
-    assert!(hover.contents.contains("Candidates:"));
+    let locations = definition(&snapshot, &id, reference);
+    assert_eq!(
+        locations.len(),
+        1,
+        "later-wins picks exactly one: {locations:?}"
+    );
+    assert!(locations[0].range.start() >= second_name);
+    // Rename stays guarded: renaming one duplicate would strand the other.
+    assert_eq!(
+        prepare_rename(&snapshot, &id, reference).expect_err("ambiguous symbol"),
+        RenameError::Ambiguous
+    );
 }
 
 #[test]
