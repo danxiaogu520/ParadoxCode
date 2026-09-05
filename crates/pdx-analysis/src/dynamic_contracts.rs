@@ -615,7 +615,10 @@ fn is_dynamic_scope_link(lowered: &str, context: &str) -> bool {
 
 /// Resolves the dynamic-definition kind whose descriptor declares `context` as its
 /// body context (e.g. `effect` -> `scripted_effect`), from rule data only.
-fn dynamic_kind_for_context(snapshot: &AnalysisSnapshot, context: &str) -> Option<String> {
+pub(crate) fn dynamic_kind_for_context(
+    snapshot: &AnalysisSnapshot,
+    context: &str,
+) -> Option<String> {
     snapshot
         .rules()
         .model()
