@@ -17,18 +17,22 @@ diagnostics:
 - code=EmptyScopeContract severity=Error certainty=certain range=0..5
   message: dynamic definition `clash` has an empty inferred entry scope: no scope satisfies every statement in its body
 - code=InvalidValue severity=Error certainty=certain range=60..69
-  message: value of `name` does not match the semantic rule (rule semantic-rules.json:4808)
+  message: invalid value `clash_mod` for `name`
+  expected: an `event_modifier` name, or a `static_modifier` name
 - code=EmptyScopeContract severity=Error certainty=certain range=87..97
   message: dynamic definition `via_callee` has an empty inferred entry scope: no scope satisfies every statement in its body
 - code=InvalidValue severity=Warning certainty=certain range=233..237
-  message: value of `add_manpower` does not match the semantic rule (rule semantic-rules.json:4200)
+  message: invalid value `1000` for `add_manpower`
+  expected: a number between -999 and 999
 - code=InvalidValue severity=Error certainty=certain range=280..283
-  message: invalid target `FRA`: scope expression is not recognised (rule semantic-rules.json:4952)
+  message: invalid target `FRA`: scope expression is not recognised
+  expected: a `country` scope, one of `name`, `path`, `start_from_root`, or a `province` scope, or 1 more constraints
 - code=UnknownKey severity=Error certainty=certain range=300..311
   message: `any_country` is a trigger and cannot be used inside an effect block; conditions belong in a `limit` block
 - code=ConstantCondition severity=Warning certainty=certain range=361..363
   message: `limit` of this `if` is always true; the branch wrapper is redundant
 - code=InvalidValue severity=Error certainty=certain range=675..684
-  message: value of `has_estate_privilege` does not match the semantic rule (rule semantic-rules.json:7415)
+  message: invalid value `some_priv` for `has_estate_privilege`
+  expected: an `estate_privilege` name
 - code=UnknownKey severity=Error certainty=certain range=746..764
-  message: unexpected key `unknown_branch_key` in rule context `trigger`
+  message: unknown key `unknown_branch_key` in a `trigger` block

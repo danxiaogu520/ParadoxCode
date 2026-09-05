@@ -3,7 +3,8 @@
 //   terrain = { color = { 1 2 300 } }
 //   
 diagnostics:
-- code=Cardinality severity=Error certainty=certain range=22..23
-  message: semantic rule value clause requires at least 3 value(s), but `int` occurs 2 times (rule fixture.semantic:2)
+- code=Cardinality severity=Error certainty=certain range=20..21
+  message: this list must contain at least 3 whole numbers between 0 and 255, but contains 2
 - code=InvalidValue severity=Error certainty=certain range=26..29
-  message: bare value `300` does not match the semantic rule value clause
+  message: value `300` is out of range
+  expected: a whole number between 0 and 255

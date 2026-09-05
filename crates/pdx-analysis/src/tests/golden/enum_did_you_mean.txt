@@ -4,5 +4,6 @@
 //   
 diagnostics:
 - code=InvalidValue severity=Error certainty=certain range=19..26
-  message: value of `mode` does not match the semantic rule (rule fixture.semantic:1)
+  message: invalid value `histori` for `mode`; did you mean `historic`?
+  expected: one of `dynamic`, `historic`
   fix: Did you mean 'historic'? [19..26] -> "\"historic\""

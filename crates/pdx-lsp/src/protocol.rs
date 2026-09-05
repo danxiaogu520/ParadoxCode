@@ -336,12 +336,17 @@ pub(crate) fn diagnostic_values_for_text_with_ignored_and_overrides(
         })
         .collect::<Vec<_>>();
     if omitted > 0 {
+        // Anchor the marker on the last retained diagnostic instead of (0,0):
+        // a squiggle at the top of the file points at nothing.
+        let anchor = values
+            .last()
+            .map_or(LspRange::default(), |value| value.range);
         values.push(LspDiagnostic::new(
-            LspRange::default(),
+            anchor,
             Some(DiagnosticSeverity::INFORMATION),
             Some(NumberOrString::String("DiagnosticsTruncated".to_owned())),
             Some("pdx-lsp".to_owned()),
-            format!("{omitted} additional diagnostics were omitted"),
+            format!("{omitted} more diagnostics were omitted (showing the first {retained})"),
             None,
             None,
         ));

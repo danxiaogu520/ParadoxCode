@@ -1108,21 +1108,6 @@ pub(crate) fn semantic_value_matcher_label(matcher: &ValueMatcher) -> String {
     }
 }
 
-pub(crate) fn semantic_rule_provenance(rule: &pdx_rules::SemanticRule) -> String {
-    format!("rule {}:{}", rule.source_file, rule.line)
-}
-
-pub(crate) fn semantic_matcher_label(matcher: &KeyMatcher) -> String {
-    match matcher {
-        KeyMatcher::Exact(value) => value.clone(),
-        KeyMatcher::Type(value) => format!("<{value}>"),
-        KeyMatcher::Enum(value) => format!("enum[{value}]"),
-        KeyMatcher::AnyScalar => "scalar".to_owned(),
-        KeyMatcher::Date => "date".to_owned(),
-        KeyMatcher::Dynamic(value) => format!("value_set[{value}]"),
-    }
-}
-
 pub(crate) fn semantic_parent_path_matches(
     snapshot: &AnalysisSnapshot,
     expected: &[String],
@@ -2248,6 +2233,11 @@ impl LocalisationKeyIndex {
         self.offsets.len().saturating_sub(1)
     }
 
+    /// Iterates all indexed keys in sorted order, for did-you-mean candidates.
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &str> {
+        (0..self.len()).map(move |index| self.key(index))
+    }
+
     fn key(&self, index: usize) -> &str {
         &self.blob[self.offsets[index]..self.offsets[index + 1]]
     }
@@ -2915,6 +2905,22 @@ pub(crate) fn enum_member(snapshot: &AnalysisSnapshot, enum_name: &str, member: 
     // memo key (format! + two lowercase strings + a global cache probe) cost more than the
     // check itself now that `workspace_member` consults a per-revision membership set.
     enum_member_uncached(snapshot, enum_name, member)
+}
+
+/// Returns the declared members of a static enum, for human-readable
+/// constraint text. The lookup is case-insensitive to match value matching.
+pub(crate) fn enum_members<'a>(
+    snapshot: &'a AnalysisSnapshot,
+    enum_name: &str,
+) -> Option<&'a [String]> {
+    snapshot
+        .rules()
+        .model()
+        .semantic
+        .enum_values
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case(enum_name))
+        .map(|(_, values)| values.as_slice())
 }
 
 fn enum_member_uncached(snapshot: &AnalysisSnapshot, enum_name: &str, member: &str) -> bool {

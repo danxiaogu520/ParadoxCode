@@ -4,8 +4,8 @@
 //   
 diagnostics:
 - code=UnknownKey severity=Error certainty=certain range=12..23
-  message: unexpected key `unknown_key` in rule context `trigger`
+  message: unknown key `unknown_key` in a `trigger` block
 - code=UnknownKey severity=Error certainty=certain range=30..35
-  message: unexpected key `scope` in rule context `trigger`
+  message: unknown key `scope` in a `trigger` block
 - code=InvalidValue severity=Error certainty=certain range=38..45
   message: unknown scope `nowhere`

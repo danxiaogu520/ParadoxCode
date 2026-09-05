@@ -58,6 +58,28 @@ impl<'source> Parser<'source> {
         self.tree.node_range(index)
     }
 
+    /// Returns the source text of a byte range, for quoting the offending
+    /// token in a diagnostic message.
+    fn slice(&self, start: usize, end: usize) -> &str {
+        let end = end.min(self.source.len());
+        let start = start.min(end);
+        self.source
+            .get(start..end)
+            .filter(|text| !text.is_empty())
+            .unwrap_or("")
+    }
+
+    /// Truncates a quoted token so pathological input cannot flood the message.
+    fn snippet(&self, start: usize, end: usize) -> String {
+        let text = self.slice(start, end);
+        if text.chars().count() > 24 {
+            let prefix: String = text.chars().take(24).collect();
+            format!("{prefix}...")
+        } else {
+            text.to_owned()
+        }
+    }
+
     fn parse_container(&mut self, terminator: Option<u8>) {
         loop {
             self.skip_whitespace();
@@ -74,12 +96,13 @@ impl<'source> Parser<'source> {
             }
             if matches!(self.peek(), Some(b'}' | b']')) {
                 let start = self.position;
+                let delimiter = self.peek().unwrap_or(b'}') as char;
                 self.position += 1;
                 self.error(
                     SyntaxErrorKind::UnexpectedToken,
                     start,
                     self.position,
-                    "unexpected closing delimiter",
+                    format!("unexpected `{delimiter}`"),
                 );
                 let recovery = self.node(CstKind::Error, start, self.position, 0);
                 self.push(recovery);
@@ -127,7 +150,7 @@ impl<'source> Parser<'source> {
                         SyntaxErrorKind::UnexpectedToken,
                         start,
                         end,
-                        "unexpected token in script document",
+                        format!("unexpected character `{}`", self.snippet(start, end)),
                     );
                     let recovery = self.node(CstKind::Error, start, end, 0);
                     self.push(recovery);
@@ -165,7 +188,7 @@ impl<'source> Parser<'source> {
                 SyntaxErrorKind::UnexpectedToken,
                 operator_start,
                 end,
-                "invalid script operator",
+                format!("invalid operator `{}`", self.snippet(operator_start, end)),
             );
             self.node(CstKind::Error, operator_start, end, 0)
         };
@@ -175,11 +198,17 @@ impl<'source> Parser<'source> {
             || matches!(self.peek(), Some(b'#' | b'}' | b']'))
         {
             let at = self.position;
+            // Underline the key and operator that never received a value;
+            // a zero-width caret at the gap hides what is incomplete.
+            let key_range = self.node_range(key);
             self.error(
                 SyntaxErrorKind::MissingValue,
+                key_range.start() as usize,
                 at,
-                at,
-                "property operator is missing a value",
+                format!(
+                    "`{}` is missing a value",
+                    self.snippet(key_range.start() as usize, key_range.end() as usize)
+                ),
             );
             self.node(CstKind::Error, at, at, 0)
         } else {
@@ -221,7 +250,7 @@ impl<'source> Parser<'source> {
                 SyntaxErrorKind::UnexpectedToken,
                 start,
                 end,
-                "expected a script value",
+                format!("expected a value, found `{}`", self.snippet(start, end)),
             );
             return self.node(CstKind::Error, start, end, 0);
         };
@@ -457,7 +486,13 @@ impl<'source> Parser<'source> {
         self.source.as_bytes().get(self.position).copied()
     }
 
-    fn error(&mut self, kind: SyntaxErrorKind, start: usize, end: usize, message: &'static str) {
+    fn error(
+        &mut self,
+        kind: SyntaxErrorKind,
+        start: usize,
+        end: usize,
+        message: impl Into<String>,
+    ) {
         self.errors
             .push(SyntaxError::new(kind, super::range(start, end), message));
     }

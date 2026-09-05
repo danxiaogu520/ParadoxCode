@@ -54,9 +54,16 @@ pub(crate) fn best_suggestion<'a, I>(key: &str, candidates: I) -> Option<&'a str
 where
     I: IntoIterator<Item = &'a str>,
 {
+    // Candidate sets such as the workspace localisation index reach tens of
+    // thousands of entries; the length gate keeps the error path allocation-free
+    // for everything that cannot possibly fall within `MAX_DISTANCE`.
+    let key_len = key.chars().count();
     let mut best: Option<(&'a str, usize)> = None;
     let mut tied = false;
     for candidate in candidates {
+        if candidate.chars().count().abs_diff(key_len) > MAX_DISTANCE {
+            continue;
+        }
         if candidate.chars().count() < MIN_CANDIDATE_LEN {
             continue;
         }

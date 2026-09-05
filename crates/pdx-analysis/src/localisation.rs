@@ -281,7 +281,13 @@ pub(crate) fn localisation_command_diagnostics(
                     DiagnosticCode::InvalidValue,
                     Severity::Warning,
                     range,
-                    format!("unknown localisation command `{command}`"),
+                    format!(
+                        "unknown localisation command `{command}`{}",
+                        crate::messages::did_you_mean(crate::suggest::best_suggestion(
+                            &command,
+                            registry.names.iter().map(String::as_str),
+                        ))
+                    ),
                 )
                 .with_certainty(DiagnosticCertainty::Inferred),
             );

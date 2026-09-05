@@ -4,8 +4,9 @@
 //   
 diagnostics:
 - code=InvalidValue severity=Error certainty=certain range=21..28
-  message: invalid target `NOWHERE`: scope expression is not recognised (rule fixture.semantic:1)
+  message: invalid target `NOWHERE`: scope expression is not recognised
+  expected: a `country` scope
 - code=InvalidScopeCommand severity=Error certainty=certain range=37..44
-  message: invalid scope command target `NOWHERE` (rule fixture.semantic:1)
+  message: invalid scope command target `NOWHERE`
 - code=WrongScope severity=Error certainty=contextual range=54..61
-  message: target `capital` resolves to scope `province`, expected country (rule fixture.semantic:1)
+  message: target `capital` resolves to scope `province`, expected country

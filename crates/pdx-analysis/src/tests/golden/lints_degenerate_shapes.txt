@@ -26,7 +26,8 @@ diagnostics:
 - code=LogicalContainer severity=Warning certainty=certain range=90..92
   message: `OR` with a single condition is equivalent to the condition itself; the wrapper can be removed
 - code=InvalidValue severity=Warning certainty=certain range=116..125
-  message: value of `has_country_flag` does not match the semantic rule (rule semantic-rules.json:7828)
+  message: invalid value `lint_flag` for `has_country_flag`
+  expected: a `country_flag` name
 - code=LogicalContainer severity=Warning certainty=certain range=132..135
   message: empty `AND` container is always true; drop the container or add conditions
 - code=UnknownLocalisationKey severity=Warning certainty=certain range=166..174
