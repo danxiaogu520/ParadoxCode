@@ -57,6 +57,16 @@ pub(crate) fn dynamic_cycle_diagnostics(
     let Some(hir) = input.hir.as_deref() else {
         return Ok(Vec::new());
     };
+    // The report is a workspace-wide graph build. Files that define no dynamic
+    // definitions can never carry one of its messages, so they skip it entirely
+    // instead of paying the full build on every diagnostics pass.
+    if !hir
+        .definitions()
+        .iter()
+        .any(|definition| dynamic_definition_type(snapshot, &definition.kind))
+    {
+        return Ok(Vec::new());
+    }
     let report = dynamic_cycle_report(snapshot, cancellation)?;
     if report.entries.is_empty() {
         return Ok(Vec::new());
@@ -173,12 +183,20 @@ fn build_cycle_report(
         });
         templates.push(template);
     }
+    let mut index_of_map: rustc_hash::FxHashMap<(String, String), usize> =
+        rustc_hash::FxHashMap::default();
+    for (position, node) in nodes.iter().enumerate() {
+        index_of_map
+            .entry((
+                node.kind.to_ascii_lowercase(),
+                node.name.to_ascii_lowercase(),
+            ))
+            .or_insert(position);
+    }
     let index_of = |kind: &str, name: &str| -> Option<usize> {
-        let kind = kind.to_ascii_lowercase();
-        let name = name.to_ascii_lowercase();
-        nodes.iter().position(|node| {
-            node.kind.eq_ignore_ascii_case(&kind) && node.name.eq_ignore_ascii_case(&name)
-        })
+        index_of_map
+            .get(&(kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
+            .copied()
     };
 
     // Static edges: a property key that is one literal naming a same-kind definition.
@@ -233,10 +251,30 @@ fn build_cycle_report(
     Ok(report)
 }
 
+/// Call-site argument bindings keyed by lowercased `(kind, name)` definition.
+type CallSiteBindings = HashMap<(String, String), Vec<BTreeMap<String, String>>>;
+
+/// Stable fingerprint of the wanted-definition set. The cached index-side
+/// bindings are only valid for the exact set of definitions that use a
+/// parameter in key position, so the set identity is part of the cache key.
+fn wanted_fingerprint(wanted: &std::collections::HashSet<(String, String)>) -> u64 {
+    use std::hash::Hasher;
+    let mut keys: Vec<&(String, String)> = wanted.iter().collect();
+    keys.sort();
+    let mut hasher = rustc_hash::FxHasher::default();
+    for (kind, name) in keys {
+        hasher.write(kind.as_bytes());
+        hasher.write_u8(0);
+        hasher.write(name.as_bytes());
+        hasher.write_u8(0xFF);
+    }
+    hasher.finish()
+}
+
 fn collect_call_site_bindings(
     snapshot: &AnalysisSnapshot,
     nodes: &[DynamicNode],
-    bindings: &mut HashMap<(String, String), Vec<BTreeMap<String, String>>>,
+    bindings: &mut CallSiteBindings,
     cancellation: &CancellationToken,
 ) -> Result<(), Cancelled> {
     // Only definitions that use a parameter in key position need their call sites.
@@ -253,26 +291,78 @@ fn collect_call_site_bindings(
     if wanted.is_empty() {
         return Ok(());
     }
-    // Referencing sites are enumerated from index references and overlay HIR;
-    // each file is parsed at most once and searched for invocation properties.
-    let mut file_sites: Vec<(SourceFileId, String, String, TextRange)> = Vec::new();
-    for reference in snapshot.index().references_iter() {
-        if !dynamic_definition_type(snapshot, &reference.kind) {
-            continue;
+    // The file-backed half of the binding collection reparses every carrier
+    // file, which dominates the cycle-graph build. Its inputs are pure index
+    // state, so the result is cached in the index domain and survives the
+    // document revisions that every keystroke produces.
+    let revision = snapshot.revision();
+    let cache_key = format!(
+        "dynamic-cycle-index-bindings:{:016x}",
+        wanted_fingerprint(&wanted)
+    );
+    let cached = snapshot
+        .query_cache()
+        .get::<CallSiteBindings>(revision, &cache_key);
+    let index_bindings = match cached {
+        Some(cached) => cached,
+        None => {
+            let mut file_sites: Vec<(SourceFileId, String, String, TextRange)> = Vec::new();
+            for reference in snapshot.index().references_iter() {
+                if !dynamic_definition_type(snapshot, &reference.kind) {
+                    continue;
+                }
+                let key = (
+                    reference.kind.to_ascii_lowercase(),
+                    reference.name.to_ascii_lowercase(),
+                );
+                if wanted.contains(&key) {
+                    file_sites.push((
+                        reference.file_id,
+                        reference.kind.to_string(),
+                        reference.name.to_string(),
+                        reference.range,
+                    ));
+                }
+            }
+            let mut by_file: HashMap<SourceFileId, Vec<usize>> = HashMap::new();
+            for (index, (file, _, _, _)) in file_sites.iter().enumerate() {
+                by_file.entry(*file).or_default().push(index);
+            }
+            let mut fresh = CallSiteBindings::new();
+            for (file, indices) in by_file {
+                cancellation.checkpoint()?;
+                let Some(input) = input_for_source_file(snapshot, file) else {
+                    continue;
+                };
+                let properties = root_properties(&input);
+                for index in indices {
+                    let (_, kind, name, range) = &file_sites[index];
+                    if let Some(invocation) = find_property_by_key_range(&properties, *range) {
+                        fresh
+                            .entry((kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
+                            .or_default()
+                            .push(scalar_argument_bindings(invocation));
+                    }
+                }
+            }
+            let fresh = Arc::new(fresh);
+            snapshot.query_cache().insert(
+                revision,
+                pdx_engine::CacheDomain::Index,
+                cache_key,
+                Arc::clone(&fresh),
+            );
+            fresh
         }
-        let key = (
-            reference.kind.to_ascii_lowercase(),
-            reference.name.to_ascii_lowercase(),
-        );
-        if wanted.contains(&key) {
-            file_sites.push((
-                reference.file_id,
-                reference.kind.to_string(),
-                reference.name.to_string(),
-                reference.range,
-            ));
-        }
+    };
+    for (key, sites) in index_bindings.iter() {
+        bindings
+            .entry(key.clone())
+            .or_default()
+            .extend(sites.iter().cloned());
     }
+    // Overlay sites change with every edit, so they are always recomputed;
+    // only open documents participate, which keeps this half cheap.
     let mut overlay_sites: Vec<(DocumentId, String, String, TextRange)> = Vec::new();
     for document in snapshot
         .documents()
@@ -297,27 +387,6 @@ fn collect_call_site_bindings(
                     reference.name.clone(),
                     reference.range,
                 ));
-            }
-        }
-    }
-    // Group by carrier so each file/document is parsed once.
-    let mut by_file: HashMap<SourceFileId, Vec<usize>> = HashMap::new();
-    for (index, (file, _, _, _)) in file_sites.iter().enumerate() {
-        by_file.entry(*file).or_default().push(index);
-    }
-    for (file, indices) in by_file {
-        cancellation.checkpoint()?;
-        let Some(input) = input_for_source_file(snapshot, file) else {
-            continue;
-        };
-        let properties = root_properties(&input);
-        for index in indices {
-            let (_, kind, name, range) = &file_sites[index];
-            if let Some(invocation) = find_property_by_key_range(&properties, *range) {
-                bindings
-                    .entry((kind.to_ascii_lowercase(), name.to_ascii_lowercase()))
-                    .or_default()
-                    .push(scalar_argument_bindings(invocation));
             }
         }
     }
