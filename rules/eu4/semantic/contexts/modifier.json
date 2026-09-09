@@ -78,7 +78,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Gives reasons to accept vassalization."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -109,7 +111,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base fort maintenance cost."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -140,7 +144,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of free administrative policies."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -202,7 +208,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of free diplomatic policies."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -233,7 +241,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of free leaders (both land leaders and navy leaders pool)."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -264,7 +274,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of free navy leaders."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -295,7 +307,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of free military policies."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -326,7 +340,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of all free policies."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -357,7 +373,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base cost of galley ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -388,7 +406,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the power galley ships gain from unit pips."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -450,7 +470,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the rate of garrison growth in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -481,7 +503,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base garrison size in provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -512,7 +536,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base military power cost for recruiting Generals."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -605,7 +631,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the monthly rate of autonomy in owned provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -636,7 +664,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base yearly colonial growth gain."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -698,7 +728,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the trade power for a country in trade nodes that are not domestic."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -729,7 +761,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base garrison growth in provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -760,7 +794,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the monarch power cost of every action that costs monarch power."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -791,7 +827,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base missionary strength against heathen religions."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -822,7 +860,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base missionary strength against heretic religions."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -853,7 +893,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the rate of spread for institutions in all owned provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -884,7 +926,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the country's total manpower pool. 1 equals 1000 men."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -915,7 +959,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies a country's total manpower pool."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -946,7 +992,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base missionary strength against all religions."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1008,7 +1056,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost for using the ‘Naval Barrage’ action."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1039,7 +1089,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the maximum naval engagement width."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1070,7 +1122,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the trade power for a country in trade nodes that are domestic."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1163,7 +1217,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base trade power of owned provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1225,7 +1281,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base unit cost for all land units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1256,7 +1314,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base speed at which land units are recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1287,7 +1347,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to conversion resistance from centres of reformation in all provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1318,7 +1380,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to a country's maximum sailor pool."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1349,7 +1413,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies a country's maximum sailor pool."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1380,7 +1446,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base cost of all ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1411,7 +1479,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base recruitment speed of all ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1442,7 +1512,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of cossacks that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1473,7 +1545,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base repair speed (in port) of all ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1504,7 +1578,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the trade power ships grant when protecting trade."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1535,7 +1611,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base effectiveness of counter-espionage against enemy spies."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1566,7 +1644,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the supply limit of provinces"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1597,7 +1677,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the tariff income from colonial nations."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1628,7 +1710,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base tax income per year (i.e. 12 equals 1 extra per month)."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1659,7 +1743,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base tax income by a percentage."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1721,7 +1807,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base trade good size of owned provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1752,7 +1840,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the trade power in all trade nodes for a country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1814,7 +1904,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base unrest value."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1876,7 +1968,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base governing capacity."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1907,7 +2001,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base governing capacity."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -1969,7 +2065,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the rate at which harmonization occurs."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2000,7 +2098,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the military power cost for using harsh treatment."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2093,7 +2193,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base cost of heavy ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2124,7 +2226,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of marines allowed to be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2155,7 +2259,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the power heavy ships gain from unit pips."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2186,7 +2292,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base chance for an heir during the heir generation tick."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2217,7 +2325,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the yearly rate of horde unity.Does not appear or have an effect if a country's government does not use horde unity."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2248,7 +2358,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the attrition enemies take in a country's provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2279,7 +2391,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the speed of disembarkation by hostile troops into the province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -2310,7 +2424,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of fleet attrition experienced by hostile ships in sea zones adjacent to the province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -2341,7 +2457,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the monarch power cost of purchasable ideas."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2372,7 +2490,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the impact of imperial authority gains."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2403,7 +2523,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the rate of imperial authority gained per month."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2434,7 +2556,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds reasons for the country its applied to to vote for a reform of the Holy Roman Empire. This only has an effect on AI members of the HRE. The name of the modifier is confusing, because the modifier has nothing to do with religion at all and is also not a global modifier applied to the Emperor."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2465,7 +2589,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum number of building slots in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -2527,7 +2653,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the speed of the ‘Improve Relations’ diplomatic action."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2558,7 +2686,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base cost of infantry units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2589,7 +2719,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "added to infanty fire modifier, a pure multiplier to infantry damage during fire phase"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2620,7 +2752,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the power infantry gain from unit pips."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2651,7 +2785,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "added to infanty shock modifier, a pure multiplier to infantry damage during shock phase"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2682,7 +2818,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the administrative power cost for reducing inflation."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2713,7 +2851,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base yearly inflation reduction rate."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2744,7 +2884,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base yearly inflation value. Requires every province in a country to have the modifier to work however."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -2837,7 +2979,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of innovativeness gained."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2868,7 +3012,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the annual growth of all institutions in a province by the specified value. Is not scaled by province development level"
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -2899,7 +3045,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the rate of spread for institutions in owned provinces following the owner's religion."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2930,7 +3078,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base interest rate."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2961,7 +3111,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect banner regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3054,7 +3206,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect cossack regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3147,7 +3301,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of rajputs that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3178,7 +3334,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect mamluk regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3209,7 +3367,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect marine regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3240,7 +3400,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect qizilbash regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3271,7 +3433,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect revolutionary guard regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3302,7 +3466,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect streltsy regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3333,7 +3499,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the spy network cost to justify trade conflicts."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3364,7 +3532,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the attrition taken by land units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3395,7 +3565,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to a country's force limit."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3426,7 +3598,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies a country's force limit."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3457,7 +3631,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the maintenance cost of all land units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3488,7 +3664,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of revolutionary guards that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3550,7 +3728,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the land morale of land units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3581,7 +3761,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the military power cost for hiring leaders."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3612,7 +3794,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the minimum fire pip count a leader can be generated with."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3643,7 +3827,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the minimum maneuver pip count a leader can be generated with."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3674,7 +3860,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the minimum shock pip count a leader can be generated with."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3705,7 +3893,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the minimum fire pip count a leader can be generated with."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3736,7 +3926,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the minimum maneuver pip count a leader can be generated with."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3767,7 +3959,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the minimum shock pip count a leader can be generated with."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3798,7 +3992,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the minimum siege pip count a leader can be generated with."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3829,7 +4025,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the yearly rate of legitimacy.Does not appear or have an effect if a country's government does not use legitimacy."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3860,7 +4058,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the maximum amount of banners available."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3891,7 +4091,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the elector desire for the current country to become Emperor (if they are a valid choice)."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3922,7 +4124,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to subject liberty desire against their overlord."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3953,7 +4157,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the subject liberty desire from development against their overlord (Note: Tooltip is bugged as of 1.29. A modifier of -0.2 shows as \"-0.20%\" when it reduces it by 20%)."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3984,7 +4190,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base cost of light ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -4015,7 +4223,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the power light ships gain from unit pips."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -4046,7 +4256,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of banners that can be raised from a province. When it set in a static modifier it is applied multiplicatively, but in other cases it is additive."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -4232,7 +4444,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the autonomy rate in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -4263,7 +4477,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of constructing buildings in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -4294,7 +4510,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the construction speed of buildings in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -4325,7 +4543,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of upgrading a center of trade in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -4356,7 +4576,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the colonial growth in a colony province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -4387,7 +4609,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the placement chance in a colony province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -4418,7 +4642,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of coring in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -4449,7 +4675,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the culture conversion cost in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -4511,7 +4739,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the defensiveness of a province, impacting siege phase length."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -4573,7 +4803,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the monarch power cost for development in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -4635,7 +4867,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the movement speed of friendly units in or towards a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -4759,7 +4993,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the local governing capacity usage of the province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -4945,7 +5181,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base ADM skill that non-foreign heirs for Elective Monarchy can be generated with."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -4976,7 +5214,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base DIP skill that non-foreign heirs for Elective Monarchy can be generated with."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -5007,7 +5247,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base MIL skill that non-foreign heirs for Elective Monarchy can be generated with."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -5038,7 +5280,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base attrition for enemies in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5069,7 +5313,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the movement speed of enemy units in or towards a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5100,7 +5346,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the spread of institutions in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5131,7 +5379,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base manpower value. 1 equals 1000 men."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5162,7 +5412,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the manpower efficiency in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5193,7 +5445,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the missionary maintenance cost for converting a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5224,7 +5478,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifiers the cost of appointing a cardinal."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -5255,7 +5511,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the missionary strength in a province. 1 equals 100% strength."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5286,7 +5544,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the devastation rate in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5317,7 +5577,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the naval engagement width in a province. Only usable in sea provinces."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5379,7 +5641,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the production efficiency in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5441,7 +5705,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the recruitment cost of land units in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5472,7 +5738,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to conversion resistance from Centres of Reformation."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5503,7 +5771,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the religious unity contribution made by a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5534,7 +5804,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the sailors value for a province. 1 equals 1 sailor."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5565,7 +5837,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the rate of army tradition gained each year."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -5596,7 +5870,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the sailors efficiency of a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5627,7 +5903,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of ship recruitment in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5658,7 +5936,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the speed of ship repair in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5689,7 +5969,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the state maintenance cost for the state that a province belongs to."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5720,7 +6002,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the tax efficiency in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5751,7 +6035,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the unrest value in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5782,7 +6068,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base nationalism value in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -5813,7 +6101,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of loot taken at once during looting."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -5906,7 +6196,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the decay rate of army tradition."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -5968,7 +6260,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of manpower gained from provinces that follow the true faith of a country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -5999,7 +6293,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the rate at which manpower is recovered."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6030,7 +6326,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum value of absolutism. Internally absolutism bonuses do not scale above 100."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6061,7 +6359,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum attrition that can be experienced in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -6185,7 +6485,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum value of revolutionary zeal. Internally revolutionary zeal bonuses do not scale above 100."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6247,7 +6549,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the army tradition bonus when gained through battles."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6278,7 +6582,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows ships to perform slave raids."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6309,7 +6615,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Grants the abiliy to conduct slave raids against nations that share the same religion."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6340,7 +6648,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the recruitment of female generals."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6371,7 +6681,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the maintenance cost of all mercenary units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6402,7 +6714,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of the ‘Boost Mercantilism’ action."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6433,7 +6747,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base cost for mercenary units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6464,7 +6780,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the discipline of mercenary units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6495,7 +6813,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of manpower mercenary companies have."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6526,7 +6846,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base merchant count for a country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6557,7 +6879,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the yearly rate of meritocracy. Does not appear or have an effect if a country's government does not use meritocracy."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6588,7 +6912,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base cost of artillery units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6681,7 +7007,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of hiring an military advisor."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6712,7 +7040,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the monarch power cost of mil technologies. Generated automatically for all technology tables in common/technology.txt."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6743,7 +7073,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Sets the minimum autonomy level allowed in all owned provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6774,7 +7106,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the minimum autonomy experienced in territories."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6805,7 +7139,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds or subtracts the base minimum autonomy a province has."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -6836,7 +7172,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base missionary count for a country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6867,7 +7205,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of missionary maintenance while converting provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6898,7 +7238,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base ADM skill a ruler, heir and consort can be generated with. Does not affect rulers created with fixed = yes."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6929,7 +7271,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "added to artillery fire modifier, a pure multiplier to artillery damage during fire phase, also for ship cannons"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6960,7 +7304,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of hiring an administrative advisor."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -6991,7 +7337,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base DIP skill a ruler, heir and consort can be generated with. Does not affect rulers created with fixed = yes."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7022,7 +7370,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the average lifespan of a ruler."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7053,7 +7403,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base MIL skill a ruler, heir and consort can be generated with. Does not affect rulers created with fixed = yes."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7177,7 +7529,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the rate of fervor gained per month."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7270,7 +7624,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the rate of karma gained per month."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7301,7 +7657,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "added to artillery shock modifier, a pure multiplier to artillery damage during shock phase"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7394,7 +7752,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the rate of piety gained per month."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7425,7 +7785,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Increases the rate of piety gained per month when piety is above zero. Reduces the rate of piety gained per month when piety is below zero."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7549,7 +7911,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the monthly rate of splendor points."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7580,7 +7944,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the monthly gain in support for the heir of a country in a country that uses the ‘Elective Monarchy’ mechanics."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7642,7 +8008,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum levels of artillery on siege"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7673,7 +8041,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base movement speed for all land units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7766,7 +8136,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the bonus from assimilation in colonies. Native assimilation is bonus to goods produced depends on the native population."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7797,7 +8169,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the chance of native uprisings in a colony province."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7828,7 +8202,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the naval attrition taken by ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7859,7 +8235,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base navy tradition gained from protecting trade."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7890,7 +8268,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to a country's naval force limit."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7921,7 +8301,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies a country's naval force limit."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7952,7 +8334,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the naval maintenance for all ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -7983,7 +8367,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the power artillery gain from unit pips."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8014,7 +8400,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the naval morale of all ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8045,7 +8433,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base navy tradition gained from battles."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8076,7 +8466,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the yearly navy tradition rate."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8107,7 +8499,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the decay rate of navy tradition."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8138,7 +8532,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Removes the stability penalty that occurs when ruler dies."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8169,7 +8565,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum number of accepted cultures a country can have."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8262,7 +8660,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the bonus to a country's naval forcelimit to their overlord. Applied to the subject."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8293,7 +8693,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the combat bonus navies gain when sailing in coastal tiles that border their home nation."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8355,7 +8757,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the rate of papal influence gained per year."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8386,7 +8790,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifiers the papal influence gain from holding cardinals."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8417,7 +8823,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the additional trade power when a merchant present in a trade node."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8448,7 +8856,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of administrative policy slots."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8479,7 +8889,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base condottieri limit."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8510,7 +8922,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of diplomatic policy slots."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8541,7 +8955,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of military policy slots."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8572,7 +8988,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of all policy slots."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8603,7 +9021,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of power projection gained when using the ‘Insult’ diplomatic action."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8634,7 +9054,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base yearly rate of prestige."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8665,7 +9087,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base attrition in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -8696,7 +9120,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base rate of prestige decay."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8727,7 +9153,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the prestige bonus from combat."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8758,7 +9186,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the prestige gained through naval battles."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8789,7 +9219,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the prestige bonus gained per development when successfully converting a province to a state religion."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8820,7 +9252,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the effectiveness of privateers in a trade node."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8851,7 +9285,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base production income by a percentage."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8882,7 +9318,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the diplomatic power cost for promoting a culture."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -8944,7 +9382,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the trade power efficiency in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -8975,7 +9415,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the trade power in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -9006,7 +9448,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cooldown for the autonomy reduction and increase buttons."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9037,7 +9481,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the warscore cost for taking provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9068,7 +9514,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base colonisation range, used for exploration, colonisation and coring province that border sea."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9099,7 +9547,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of monarch power gained from razing."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9130,7 +9580,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the effectiveness of supported rebels in other countries."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9161,7 +9613,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the army morale recovery speed."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9192,7 +9646,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the morale recovery rate of ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9223,7 +9679,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the liberty desire subjects have against their overlord. Applied to the overlord."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9254,7 +9712,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the liberty desire subjects have against their overlord if on the same continent. Applied to the overlord."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9285,7 +9745,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost in Republican Tradition when re-electing candidates."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9316,7 +9778,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Changes the rate of government reform progress gain from autonomy."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9347,7 +9811,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of loot available in a province."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9378,7 +9844,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the recruitment speed of land units in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -9409,7 +9877,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of reinforcements when units are reinforced."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9440,7 +9910,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the rate at which units are reinforced with new men."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9471,7 +9943,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to this countries opinion towards other countries with heathen religions."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9502,7 +9976,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to this countries opinion towards other countries with heretic religions."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9533,7 +10009,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifiers this countries opinion of countries whose primary culture is the same."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9564,7 +10042,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies this countries opinion of countries whose primary culture is in the same culture group but do not share the same primary culture."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9595,7 +10075,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to this countries opinion towards other countries with the same religion."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9626,7 +10108,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base religious unity value for a country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9657,7 +10141,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the yearly rate of republican tradition.Does not appear or have an effect if a country's government does not use republican tradition."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9688,7 +10174,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the bonus damage artillery inflict when in the backrow during combat."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9719,7 +10207,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the morale damage taken by units in reserves (i.e. not in battle, but engaged with another unit)"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9750,7 +10240,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base fort maintenance cost for forts in provinces that border rivals."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9781,7 +10273,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the diplomatic power cost to change rivals."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9812,7 +10306,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the sailor maintenance for all ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9843,7 +10339,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the sailor recovery rate for all ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9874,7 +10372,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the advisor cost for advisors that share the same culture as the country's court they're in."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9905,7 +10405,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Event-modifier-only flag (used as yes): when added to an event modifier, it disappears if the country changes religion (or syncretic religion)."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9967,7 +10469,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the durability of all ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9998,7 +10502,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the propagation of trade power from ships protecting trade."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10029,7 +10535,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the number of ships required to fully blockade the province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -10060,7 +10568,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the recruitment speed of ships in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -10091,7 +10601,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the shock damage done by land units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10122,7 +10634,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the shock damage taken by land units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10153,7 +10667,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the siege ability that affects siege phase length. Reverse concept of defensiveness."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10184,7 +10700,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the bonus siege status by blockaded."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10215,7 +10733,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the allowed forcelimit of special units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10246,7 +10766,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base effectiveness of spies against enemies."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10277,7 +10799,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the administrative power cost of raising stability."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10308,7 +10832,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the stability cost to declare war. Default is 0 with a casus belli and no truce."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10339,7 +10865,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the governing capacity usage of states."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10370,7 +10898,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Disallows the country to use the 'Introduce New Heir' interaction."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10401,7 +10931,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the monarch power cost of adm technologies. Generated automatically for all technology tables in common/technology.txt."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10463,7 +10995,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the maintenance cost for states."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10525,7 +11059,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the morale damage taken during battle by losing ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10556,7 +11092,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base supply limit of a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -10587,7 +11125,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the supply limit efficiency of a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -10618,7 +11158,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the yearly tax income of a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -10649,7 +11191,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the monarch power cost of all technologies."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10680,7 +11224,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base tolerance for heathens within a country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10711,7 +11257,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base tolerance for heretics within a country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10835,7 +11383,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base tolerance for the true faith within a country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10866,7 +11416,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the governing capacity usage of trade companies."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10897,7 +11449,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of purchasing a trade company investment in a state."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10928,7 +11482,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies a country's trade income. (Maximum is 200%)"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -10959,7 +11515,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the trade good size in a province"
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -10990,7 +11548,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the goods produced efficiency in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -11021,7 +11581,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the trade range used to determine if a country can place a merchant in a trade node."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11052,7 +11614,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the bonus to trade power used for steering when determining which outgoing node trade is steered to. If you have a merchant present, it also slightly increases the outgoing value."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11083,7 +11647,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the efficiency of blockades against enemies."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11114,7 +11680,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base trade value in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -11145,7 +11713,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base trade value in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -11176,7 +11746,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Gives reasons to transfer trade."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11207,7 +11779,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base cost of transport ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11238,7 +11812,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the power transport ships gain from unit pips."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11269,7 +11845,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the income from treasure fleets sent by colonial nations."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11331,7 +11909,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost in diplomatic power of making unjustified demands in a peace deal."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11362,7 +11942,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the local unrest in all provinces of the catholic religion"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11393,7 +11975,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the bonus to a country's forcelimit from their subjects."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11424,7 +12008,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies all building costs."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11455,7 +12041,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the bonus to a country's income from their subjects."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11486,7 +12074,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the monthly war exhaustion rate."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11517,7 +12107,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the diplomatic power cost for reducing war exhaustion."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11548,7 +12140,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the military power cost for raising war taxes."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11579,7 +12173,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the war score costs for peace terms while in war against countries of a different religion."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11610,7 +12206,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the yearly base rate of absolutism."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11641,7 +12239,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the rate of army professionalism gained each year."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11703,7 +12303,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the yearly rate of corruption."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11765,7 +12367,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies all building construction times."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11796,7 +12400,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the rate of harmony gained per year."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11827,7 +12433,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the yearly decay rate of Karma towards 0."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11858,7 +12466,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the yearly base rate of revolutionary zeal."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11889,7 +12499,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base separatism value of provinces when conquered."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11920,7 +12532,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the opinion of OTHER countries with heretic religions towards this country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -11951,7 +12565,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the opinion of OTHER countries with heathen religions towards this country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12042,7 +12658,9 @@
     "alternative_id": "modifiers:449:alias:modifier:treasure_fleet_income",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the income from treasure fleets sent by colonial nations."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12104,7 +12722,9 @@
     "alternative_id": "modifiers:450:alias:modifier:global_naval_barrage_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost for using the ‘Naval Barrage’ action."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12135,7 +12755,9 @@
     "alternative_id": "modifiers:451:alias:modifier:monthly_support_heir_gain",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the monthly gain in support for the heir of a country in a country that uses the ‘Elective Monarchy’ mechanics."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12166,7 +12788,9 @@
     "alternative_id": "modifiers:452:alias:modifier:local_missionary_maintenance_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the missionary maintenance cost for converting a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -12197,7 +12821,9 @@
     "alternative_id": "modifiers:453:alias:modifier:missionary_maintenance_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of missionary maintenance while converting provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12228,7 +12854,9 @@
     "alternative_id": "modifiers:454:alias:modifier:establish_order_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost for using the ‘Establish Order’ action."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12259,7 +12887,9 @@
     "alternative_id": "modifiers:455:alias:modifier:trade_company_investment_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of purchasing a trade company investment in a state."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12290,7 +12920,9 @@
     "alternative_id": "modifiers:456:alias:modifier:expel_minorities_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of using the ‘Expel Minorities’ action."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12321,7 +12953,9 @@
     "alternative_id": "modifiers:457:alias:modifier:naval_tradition_from_trade",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base navy tradition gained from protecting trade."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12352,7 +12986,9 @@
     "alternative_id": "modifiers:458:alias:modifier:admiral_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of hiring an admiral."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12383,7 +13019,9 @@
     "alternative_id": "modifiers:459:alias:modifier:global_supply_limit_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the supply limit of provinces"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12414,7 +13052,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the randomized stats a republican candidate may receive during elections."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12445,7 +13085,9 @@
     "alternative_id": "modifiers:460:alias:modifier:center_of_trade_upgrade_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of upgrading a center of trade in a province."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12476,7 +13118,9 @@
     "alternative_id": "modifiers:461:alias:modifier:local_center_of_trade_upgrade_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of upgrading a center of trade in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -12507,7 +13151,9 @@
     "alternative_id": "modifiers:462:alias:modifier:possible_policy",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of all policy slots."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12538,7 +13184,9 @@
     "alternative_id": "modifiers:463:alias:modifier:power_projection_from_insults",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of power projection gained when using the ‘Insult’ diplomatic action."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12569,7 +13217,9 @@
     "alternative_id": "modifiers:464:alias:modifier:local_religious_unity_contribution",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the religious unity contribution made by a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -12600,7 +13250,9 @@
     "alternative_id": "modifiers:465:alias:modifier:country_admin_power",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the monthly administrative power a country generates."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12631,7 +13283,9 @@
     "alternative_id": "modifiers:466:alias:modifier:country_diplomatic_power",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the monthly diplomatic power a country generates."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12662,7 +13316,9 @@
     "alternative_id": "modifiers:467:alias:modifier:country_military_power",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the monthly military power a country generates."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12693,7 +13349,9 @@
     "alternative_id": "modifiers:468:alias:modifier:stability_cost_to_declare_war",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the stability cost to declare war. Default is 0 with a casus belli and no truce."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12724,7 +13382,9 @@
     "alternative_id": "modifiers:469:alias:modifier:global_heathen_missionary_strength",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base missionary strength against heathen religions."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12755,7 +13415,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the chance for ship capture during naval battles."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12786,7 +13448,9 @@
     "alternative_id": "modifiers:470:alias:modifier:mercenary_manpower",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of manpower mercenary companies have."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12817,7 +13481,9 @@
     "alternative_id": "modifiers:471:alias:modifier:governing_capacity_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base governing capacity."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12848,7 +13514,9 @@
     "alternative_id": "modifiers:472:alias:modifier:manpower_in_true_faith_provinces",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of manpower gained from provinces that follow the true faith of a country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -13105,7 +13773,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the bonus trade power inland nodes receive from trade power sources."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -13463,7 +14133,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the ratio required to negate the insufficient support penalty."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -13824,7 +14496,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base cost of cavalry units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -13855,7 +14529,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base core creation cost, diplo-annexation costs and the impact of province development on overextension and warscore cost."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14216,7 +14892,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the effectiveness of cavalry flanking."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14471,7 +15149,9 @@
     "alternative_id": "modifiers:517:alias:modifier:yearly_patriarch_authority",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the amount of yearly patriarch authority gained."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14502,7 +15182,9 @@
     "alternative_id": "modifiers:518:alias:modifier:yearly_karma_decay",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the yearly decay rate of Karma towards 0."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14533,7 +15215,9 @@
     "alternative_id": "modifiers:519:alias:modifier:available_province_loot",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of loot available in a province."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14564,7 +15248,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the power cavalry gain from unit pips."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14595,7 +15281,9 @@
     "alternative_id": "modifiers:520:alias:modifier:appoint_cardinal_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifiers the cost of appointing a cardinal."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14626,7 +15314,9 @@
     "alternative_id": "modifiers:521:alias:modifier:curia_treasury_contribution",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of treasury contribution to the Curia."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14657,7 +15347,9 @@
     "alternative_id": "modifiers:522:alias:modifier:curia_powers_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the papal influence cost of the curia actions."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14688,7 +15380,9 @@
     "alternative_id": "modifiers:523:alias:modifier:imperial_reform_catholic_approval",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds reasons for the country its applied to to vote for a reform of the Holy Roman Empire. This only has an effect on AI members of the HRE. The name of the modifier is confusing, because the modifier has nothing to do with religion at all and is also not a global modifier applied to the Emperor."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14719,7 +15413,9 @@
     "alternative_id": "modifiers:524:alias:modifier:unrest_catholic_provinces",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the local unrest in all provinces of the catholic religion"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14750,7 +15446,9 @@
     "alternative_id": "modifiers:525:alias:modifier:infantry_fire",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "added to infanty fire modifier, a pure multiplier to infantry damage during fire phase"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14781,7 +15479,9 @@
     "alternative_id": "modifiers:526:alias:modifier:infantry_shock",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "added to infanty shock modifier, a pure multiplier to infantry damage during shock phase"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14812,7 +15512,9 @@
     "alternative_id": "modifiers:527:alias:modifier:cavalry_fire",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "added to cavalry fire modifier, a pure multiplier to cavalry damage during fire phase"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14843,7 +15545,9 @@
     "alternative_id": "modifiers:528:alias:modifier:cavalry_shock",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "added to cavalry shock modifier, a pure multiplier to cavalry damage during shock phase"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14874,7 +15578,9 @@
     "alternative_id": "modifiers:529:alias:modifier:artillery_fire",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "added to artillery fire modifier, a pure multiplier to artillery damage during fire phase, also for ship cannons"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14905,7 +15611,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "added to cavalry fire modifier, a pure multiplier to cavalry damage during fire phase"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14936,7 +15644,9 @@
     "alternative_id": "modifiers:530:alias:modifier:artillery_fire",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "added to artillery fire modifier, a pure multiplier to artillery damage during fire phase, also for ship cannons"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14967,7 +15677,9 @@
     "alternative_id": "modifiers:531:alias:modifier:artillery_shock",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "added to artillery shock modifier, a pure multiplier to artillery damage during shock phase"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14998,7 +15710,9 @@
     "alternative_id": "modifiers:532:alias:modifier:max_revolutionary_zeal",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum value of revolutionary zeal. Internally revolutionary zeal bonuses do not scale above 100."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15029,7 +15743,9 @@
     "alternative_id": "modifiers:533:alias:modifier:yearly_revolutionary_zeal",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the yearly base rate of revolutionary zeal."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15060,7 +15776,9 @@
     "alternative_id": "modifiers:534:alias:modifier:flagship_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of building a flagship."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15091,7 +15809,9 @@
     "alternative_id": "modifiers:535:alias:modifier:monthly_piety_accelerator",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Increases the rate of piety gained per month when piety is above zero. Reduces the rate of piety gained per month when piety is below zero."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15122,7 +15842,9 @@
     "alternative_id": "modifiers:536:alias:modifier:blockade_force_required",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the number of ships required to fully blockade the province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -15153,7 +15875,9 @@
     "alternative_id": "modifiers:537:alias:modifier:hostile_disembark_speed",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the speed of disembarkation by hostile troops into the province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -15184,7 +15908,9 @@
     "alternative_id": "modifiers:538:alias:modifier:local_governing_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the local governing capacity usage of the province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -15215,7 +15941,9 @@
     "alternative_id": "modifiers:539:alias:modifier:hostile_fleet_attrition",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of fleet attrition experienced by hostile ships in sea zones adjacent to the province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -15246,7 +15974,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "added to cavalry shock modifier, a pure multiplier to cavalry damage during shock phase"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15277,7 +16007,9 @@
     "alternative_id": "modifiers:540:alias:modifier:governing_capacity",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base governing capacity."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15308,7 +16040,9 @@
     "alternative_id": "modifiers:541:alias:modifier:governing_capacity",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base governing capacity."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15339,7 +16073,9 @@
     "alternative_id": "modifiers:542:alias:modifier:allowed_marine_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of marines allowed to be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15370,7 +16106,9 @@
     "alternative_id": "modifiers:543:alias:modifier:local_heir_adm",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base ADM skill that non-foreign heirs for Elective Monarchy can be generated with."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15401,7 +16139,9 @@
     "alternative_id": "modifiers:544:alias:modifier:local_heir_dip",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base DIP skill that non-foreign heirs for Elective Monarchy can be generated with."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15432,7 +16172,9 @@
     "alternative_id": "modifiers:545:alias:modifier:local_heir_mil",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base MIL skill that non-foreign heirs for Elective Monarchy can be generated with."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15458,7 +16200,9 @@
     "alternative_id": "modifiers:546:alias:modifier:cb_on_religious_enemies",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Acts a visible script flag. Can be checked in triggers with cb_on_religious_enemies = yes"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15484,7 +16228,9 @@
     "alternative_id": "modifiers:547:alias:modifier:may_perform_slave_raid",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows ships to perform slave raids."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15510,7 +16256,9 @@
     "alternative_id": "modifiers:548:alias:modifier:may_perform_slave_raid_on_same_religion",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Grants the abiliy to conduct slave raids against nations that share the same religion."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15541,7 +16289,9 @@
     "alternative_id": "modifiers:549:alias:modifier:state_governing_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the governing capacity usage of states."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15603,7 +16353,9 @@
     "alternative_id": "modifiers:550:alias:modifier:disengagement_chance",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the chance of disengagement for ships during battle."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15629,7 +16381,9 @@
     "alternative_id": "modifiers:551:alias:modifier:block_introduce_heir",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Disallows the country to use the 'Introduce New Heir' interaction."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15655,7 +16409,9 @@
     "alternative_id": "modifiers:552:alias:modifier:may_recruit_female_generals",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the recruitment of female generals."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15681,7 +16437,9 @@
     "alternative_id": "modifiers:553:alias:modifier:is_revolutionary_guard_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect revolutionary guard regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15712,7 +16470,9 @@
     "alternative_id": "modifiers:554:alias:modifier:special_unit_forcelimit",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the allowed forcelimit of special units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15743,7 +16503,9 @@
     "alternative_id": "modifiers:555:alias:modifier:global_religious_conversion_resistance",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to conversion resistance from centres of reformation in all provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15774,7 +16536,9 @@
     "alternative_id": "modifiers:556:alias:modifier:legitimate_subject_elector",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the elector desire for the current country to become Emperor (if they are a valid choice)."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15805,7 +16569,9 @@
     "alternative_id": "modifiers:557:alias:modifier:mercantilism_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of the ‘Boost Mercantilism’ action."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15831,7 +16597,9 @@
     "alternative_id": "modifiers:558:alias:modifier:secondary_religion",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Event-modifier-only flag (used as yes): when added to an event modifier, it disappears if the country changes religion (or syncretic religion)."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15862,7 +16630,9 @@
     "alternative_id": "modifiers:559:alias:modifier:monarch_lifespan",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the average lifespan of a ruler."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15893,7 +16663,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Acts a visible script flag. Can be checked in triggers with cb_on_religious_enemies = yes"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15924,7 +16696,9 @@
     "alternative_id": "modifiers:560:alias:modifier:accept_vassalization_reasons",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Gives reasons to accept vassalization."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15955,7 +16729,9 @@
     "alternative_id": "modifiers:561:alias:modifier:institution_growth",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the annual growth of all institutions in a province by the specified value. Is not scaled by province development level"
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -15986,7 +16762,9 @@
     "alternative_id": "modifiers:562:alias:modifier:trade_company_governing_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the governing capacity usage of trade companies."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16017,7 +16795,9 @@
     "alternative_id": "modifiers:563:alias:modifier:expand_administration_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of the ‘Expand Administration’ action."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16048,7 +16828,9 @@
     "alternative_id": "modifiers:564:alias:modifier:transfer_trade_power_reasons",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Gives reasons to transfer trade."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16079,7 +16861,9 @@
     "alternative_id": "modifiers:565:alias:modifier:relation_with_heretics",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to this countries opinion towards other countries with heretic religions."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16110,7 +16894,9 @@
     "alternative_id": "modifiers:566:alias:modifier:relation_with_heathens",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to this countries opinion towards other countries with heathen religions."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16136,7 +16922,9 @@
     "alternative_id": "modifiers:567:alias:modifier:no_stability_loss_on_monarch_death",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Removes the stability penalty that occurs when ruler dies."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16167,7 +16955,9 @@
     "alternative_id": "modifiers:568:alias:modifier:relation_with_same_religion",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to this countries opinion towards other countries with the same religion."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16198,7 +16988,9 @@
     "alternative_id": "modifiers:569:alias:modifier:overlord_naval_forcelimit_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the bonus to a country's naval forcelimit to their overlord. Applied to the subject."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16229,7 +17021,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of upgrading a center of trade in a province."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16260,7 +17054,9 @@
     "alternative_id": "modifiers:570:alias:modifier:free_land_leader_pool",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of free land leaders."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16291,7 +17087,9 @@
     "alternative_id": "modifiers:571:alias:modifier:free_navy_leader_pool",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of free navy leaders."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16322,7 +17120,9 @@
     "alternative_id": "modifiers:572:alias:modifier:relation_with_same_culture",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifiers this countries opinion of countries whose primary culture is the same."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16353,7 +17153,9 @@
     "alternative_id": "modifiers:573:alias:modifier:relation_with_same_culture_group",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies this countries opinion of countries whose primary culture is in the same culture group but do not share the same primary culture."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16379,7 +17181,9 @@
     "alternative_id": "modifiers:574:alias:modifier:is_marine_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect marine regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16405,7 +17209,9 @@
     "alternative_id": "modifiers:575:alias:modifier:is_banner_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect banner regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16431,7 +17237,9 @@
     "alternative_id": "modifiers:576:alias:modifier:is_streltsy_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect streltsy regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16457,7 +17265,9 @@
     "alternative_id": "modifiers:577:alias:modifier:is_cossack_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect cossack regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16548,7 +17358,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the effectiveness of church power gains."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16903,7 +17715,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the duration of claims. (not used in vanilla)"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16994,7 +17808,9 @@
     "alternative_id": "modifiers:592:alias:modifier:local_religious_conversion_resistance",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to conversion resistance from Centres of Reformation."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -17256,7 +18072,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base colonial placement chance for colonists, which is the chance that additional settlers will be spawned while the colonist is present."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -17287,7 +18105,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of hiring an admiral."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -17645,7 +18465,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base colonist count for a country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -18006,7 +18828,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base core creation cost."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -18367,7 +19191,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the rate at which the cores of a country will decay when under the ownership of a different country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -18716,7 +19542,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the monthly administrative power a country generates."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -18894,7 +19722,9 @@
     "alternative_id": "modifiers:645:alias:modifier:free_maintenance_on_expl_conq",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Removes maintenance cost for explorers and conquisadors."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -18952,7 +19782,9 @@
     "alternative_id": "modifiers:647:alias:modifier:can_bypass_forts",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows units to ignore fort zones of control."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -19043,7 +19875,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the monthly diplomatic power a country generates."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -19221,7 +20055,9 @@
     "alternative_id": "modifiers:655:alias:modifier:cb_on_primitives",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows claims to be fabricated on overseas provinces in colonial regions."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -19372,7 +20208,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the monthly military power a country generates."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -19719,7 +20557,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the diplomatic power cost for culture conversion in provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20060,7 +20900,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the papal influence cost of the curia actions."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20213,7 +21055,9 @@
     "alternative_id": "modifiers:684:alias:modifier:reduced_trade_penalty_on_non_main_tradenode",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the trade power penalty from collecting in your non-main trade nodes."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20310,7 +21154,9 @@
     "alternative_id": "modifiers:687:alias:modifier:special_unit_cost_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the recruitment cost of special units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20341,7 +21187,9 @@
     "alternative_id": "modifiers:688:alias:modifier:monarch_power_tribute",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the yearly monarch power tribute a tributary pays to its overlord."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20372,7 +21220,9 @@
     "alternative_id": "modifiers:689:alias:modifier:tributary_conversion_cost_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of the mandate that is required to turn a tributary into a vassal, which is unlocked via the final reform of the mandate."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20403,7 +21253,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of treasury contribution to the Curia."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20434,7 +21286,9 @@
     "alternative_id": "modifiers:690:alias:modifier:global_allowed_num_of_manufactories",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the number of allowed manufactories in every owned province."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20460,7 +21314,9 @@
     "alternative_id": "modifiers:691:alias:modifier:can_claim_states",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows to fabricate claims on areas instead of provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20488,7 +21344,9 @@
     "alternative_id": "modifiers:692:alias:modifier:free_concentrate_development",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows a country to concentrate development without the cost."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20519,7 +21377,9 @@
     "alternative_id": "modifiers:693:alias:modifier:expand_infrastructure_cost_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the adm and government reform progress cost for expanding infrastructure."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20550,7 +21410,9 @@
     "alternative_id": "modifiers:694:alias:modifier:max_absolutism_effect",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the maximum effect of absolutism on modifiers."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20581,7 +21443,9 @@
     "alternative_id": "modifiers:695:alias:modifier:chance_to_inherit",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the chance to inherit a personal union when ruler dies."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20612,7 +21476,9 @@
     "alternative_id": "modifiers:696:alias:modifier:culture_conversion_time",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the speed for culture conversion in provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20643,7 +21509,9 @@
     "alternative_id": "modifiers:697:alias:modifier:local_culture_conversion_time",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the speed for culture conversion cost in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -20674,7 +21542,9 @@
     "alternative_id": "modifiers:698:alias:modifier:same_religion_advisor_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the advisor cost for advisors that share the same religion as the country's court they're in."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20705,7 +21575,9 @@
     "alternative_id": "modifiers:699:alias:modifier:artillery_barrage_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost for using 'Artillery Barrage' action during sieges."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20736,7 +21608,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the siege defensiveness that affects siege phase length."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20767,7 +21641,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base cost of advisors."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20798,7 +21674,9 @@
     "alternative_id": "modifiers:700:alias:modifier:great_project_upgrade_time",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the time needed to upgrade a great project."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20829,7 +21707,9 @@
     "alternative_id": "modifiers:701:alias:modifier:local_great_project_upgrade_time",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the time needed to upgrade a great project in a province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -20860,7 +21740,9 @@
     "alternative_id": "modifiers:702:alias:modifier:warscore_from_battles_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifiers the amount of war score a country gain from land and naval battles."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20891,7 +21773,9 @@
     "alternative_id": "modifiers:703:alias:modifier:yearly_innovativeness",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the yearly rate of innovativeness."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20919,7 +21803,9 @@
     "alternative_id": "modifiers:704:alias:modifier:enable_forced_march",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows to use Force March regardless of current tech level."
+    ],
     "allowed_scopes": [
       "unit"
     ],
@@ -20950,7 +21836,9 @@
     "alternative_id": "modifiers:705:alias:modifier:reverse_relation_with_same_religion",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the opinion of OTHER countries with the same religion towards this country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -20981,7 +21869,9 @@
     "alternative_id": "modifiers:706:alias:modifier:janissary_cost_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the military power cost for recruiting Janissary units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21012,7 +21902,9 @@
     "alternative_id": "modifiers:707:alias:modifier:yearly_government_power",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the yearly rate of power for governments with mechanics."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21043,7 +21935,9 @@
     "alternative_id": "modifiers:708:alias:modifier:number_of_cannons_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the number of cannons for all ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21074,7 +21968,9 @@
     "alternative_id": "modifiers:709:alias:modifier:hull_size_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the hull size of all ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21105,7 +22001,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the development cost for provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21136,7 +22034,9 @@
     "alternative_id": "modifiers:710:alias:modifier:max_flagships",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the number of flagships a country can have at the same time."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21167,7 +22067,9 @@
     "alternative_id": "modifiers:711:alias:modifier:heavy_ship_number_of_cannons_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the number of cannons for heavy ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21229,7 +22131,9 @@
     "alternative_id": "modifiers:713:alias:modifier:light_ship_number_of_cannons_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the number of cannons for light ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21291,7 +22195,9 @@
     "alternative_id": "modifiers:715:alias:modifier:galley_number_of_cannons_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the number of cannons for galley ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21353,7 +22259,9 @@
     "alternative_id": "modifiers:717:alias:modifier:transport_number_of_cannons_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the number of cannons for transport ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21415,7 +22323,9 @@
     "alternative_id": "modifiers:719:alias:modifier:loyalty_change_on_revoked",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the estate loyalty hit when a privilege is revoked."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21477,7 +22387,9 @@
     "alternative_id": "modifiers:720:alias:modifier:estate_interaction_cooldown_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cooldown of the estate interactions like Seizing Land."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21508,7 +22420,9 @@
     "alternative_id": "modifiers:721:alias:modifier:all_estate_possible_privileges",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the number of possible privilege slots on all estates in the country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21536,7 +22450,9 @@
     "alternative_id": "modifiers:722:alias:modifier:allow_mercenary_drill",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows mercenaries the ability to drill. Also works in unit scope."
+    ],
     "allowed_scopes": [
       "unit"
     ],
@@ -21567,7 +22483,9 @@
     "alternative_id": "modifiers:723:alias:modifier:merc_leader_army_tradition",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the army tradition a leader of a merc company is spawned with."
+    ],
     "allowed_scopes": [
       "unit"
     ],
@@ -21595,7 +22513,9 @@
     "alternative_id": "modifiers:724:alias:modifier:merc_independent_from_trade_range",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows a country to recruit merc companies which have their home in provinces which are outside your trade range."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21623,7 +22543,9 @@
     "alternative_id": "modifiers:725:alias:modifier:allow_mercenaries_to_split",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allow mercenaries to split (as of 1.37, only works using split hotkey). They are supposed to be able to merge with regiments of their own company, but as of 1.37, this functionality is broken. Using the hotkey to create a new unit also creates empty 0-stacks that cannot be readjusted."
+    ],
     "allowed_scopes": [
       "unit"
     ],
@@ -21654,7 +22576,9 @@
     "alternative_id": "modifiers:726:alias:modifier:centralize_state_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the adm and government reform progress cost for centralizing a state."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21685,7 +22609,9 @@
     "alternative_id": "modifiers:727:alias:modifier:local_centralize_state_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the adm and government reform progress cost for centralizing a state in the province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -21716,7 +22642,9 @@
     "alternative_id": "modifiers:728:alias:modifier:land_morale_constant",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the land morale of land units."
+    ],
     "allowed_scopes": [
       "unit"
     ],
@@ -21747,7 +22675,9 @@
     "alternative_id": "modifiers:729:alias:modifier:naval_morale_constant",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the naval morale of all ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21778,7 +22708,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the yearly rate of devotion.Does not appear or have an effect if a country's government does not use devotion."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21809,7 +22741,9 @@
     "alternative_id": "modifiers:730:alias:modifier:max_general_shock",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the max amounts of shock pips a leader can have."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21840,7 +22774,9 @@
     "alternative_id": "modifiers:731:alias:modifier:max_general_fire",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the max amounts of fire pips a leader can have."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21871,7 +22807,9 @@
     "alternative_id": "modifiers:732:alias:modifier:max_general_maneuver",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the max amounts of maneuver pips a leader can have."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21902,7 +22840,9 @@
     "alternative_id": "modifiers:733:alias:modifier:max_general_siege",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the max amounts of siege pips a leader can have."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21933,7 +22873,9 @@
     "alternative_id": "modifiers:734:alias:modifier:max_admiral_shock",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the max amounts of shock pips a leader can have."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21964,7 +22906,9 @@
     "alternative_id": "modifiers:735:alias:modifier:max_admiral_fire",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the max amounts of fire pips a leader can have."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -21995,7 +22939,9 @@
     "alternative_id": "modifiers:736:alias:modifier:max_admiral_maneuver",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the max amounts of maneuver pips a leader can have."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22026,7 +22972,9 @@
     "alternative_id": "modifiers:737:alias:modifier:max_admiral_siege",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the max amounts of siege pips a leader can have."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22057,7 +23005,9 @@
     "alternative_id": "modifiers:738:alias:modifier:coast_raid_range",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the amounts of sea tiles a country can raid in."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22088,7 +23038,9 @@
     "alternative_id": "modifiers:739:alias:modifier:development_cost_in_primary_culture",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the development cost for provinces of primary culture."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22119,7 +23071,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of hiring an diplomatic advisor."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22150,7 +23104,9 @@
     "alternative_id": "modifiers:740:alias:modifier:reduced_trade_penalty_on_non_main_tradenode",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the trade power penalty from collecting in your non-main trade nodes."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22181,7 +23137,9 @@
     "alternative_id": "modifiers:741:alias:modifier:colony_cost_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the colonial maintenance cost for a country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22212,7 +23170,9 @@
     "alternative_id": "modifiers:742:alias:modifier:local_colony_cost_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the colonial maintenance cost in a colony province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -22243,7 +23203,9 @@
     "alternative_id": "modifiers:743:alias:modifier:spy_action_cost_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the spy network costs of all spy actions."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22274,7 +23236,9 @@
     "alternative_id": "modifiers:744:alias:modifier:placed_merchant_power_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the additional trade power when a merchant present in a trade node."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22305,7 +23269,9 @@
     "alternative_id": "modifiers:745:alias:modifier:reduced_liberty_desire_on_other_continent",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the liberty desire subjects have against their overlord if on the other continent. Applied to the overlord."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22336,7 +23302,9 @@
     "alternative_id": "modifiers:746:alias:modifier:overextension_impact_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the impact of conquered provinces in regards to the overextension."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22367,7 +23335,9 @@
     "alternative_id": "modifiers:747:alias:modifier:artillery_level_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies how much an artillery unit contributes towards a siege. E.g. 0.2 would mean a 20% bonus, so 5 artillery would count for 6."
+    ],
     "allowed_scopes": [
       "unit"
     ],
@@ -22398,7 +23368,9 @@
     "alternative_id": "modifiers:748:alias:modifier:local_tolerance_of_heretics",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base tolerance for heretics within the province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -22429,7 +23401,9 @@
     "alternative_id": "modifiers:749:alias:modifier:local_tolerance_of_heathens",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the base tolerance for heathens within the province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -22460,7 +23434,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the monarch power cost of dip technologies. Generated automatically for all technology tables in common/technology.txt."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22491,7 +23467,9 @@
     "alternative_id": "modifiers:750:alias:modifier:garrison_damage",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the damage the garrison deals when the fort gets assaulted or when a country use the sortie to fight the hostile army."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22522,7 +23500,9 @@
     "alternative_id": "modifiers:751:alias:modifier:local_garrison_damage",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the damage the local garrison deals when the fort gets assaulted or when a country use the sortie to fight the hostile army."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -22553,7 +23533,9 @@
     "alternative_id": "modifiers:752:alias:modifier:assault_fort_cost_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the military cost to assault forts."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22584,7 +23566,9 @@
     "alternative_id": "modifiers:753:alias:modifier:local_assault_fort_cost_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the military cost to assault the fort of the province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -22615,7 +23599,9 @@
     "alternative_id": "modifiers:754:alias:modifier:assault_fort_ability",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the damage the troops deal to the garrison when assaulting a fort."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22646,7 +23632,9 @@
     "alternative_id": "modifiers:755:alias:modifier:local_assault_fort_ability",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the damage the troops deal to the garrison when assaulting a fort of the province."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -22677,7 +23665,9 @@
     "alternative_id": "modifiers:756:alias:modifier:vassal_manpower_bonus",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the bonus to a country's manpower from their subjects."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22708,7 +23698,9 @@
     "alternative_id": "modifiers:757:alias:modifier:vassal_sailors_bonus",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the bonus to a country's sailors from their subjects."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22739,7 +23731,9 @@
     "alternative_id": "modifiers:758:alias:modifier:vassal_naval_forcelimit_bonus",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the bonus to a country's naval forcelimit from their subjects."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22770,7 +23764,9 @@
     "alternative_id": "modifiers:759:alias:modifier:annexation_relations_impact",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the impact of the relations applied to all subjects when their overlord is annexing a subject. Applied to the overlord."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22801,7 +23797,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the diplomatic power cost for annexation."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22829,7 +23827,9 @@
     "alternative_id": "modifiers:760:alias:modifier:can_revoke_parliament_seats",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows a country to remove seats from a province."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22860,7 +23860,9 @@
     "alternative_id": "modifiers:761:alias:modifier:parliament_backing_chance",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies how many seats will back an issue in general."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22891,7 +23893,9 @@
     "alternative_id": "modifiers:762:alias:modifier:parliament_effect_duration",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the years for the effect duration of passed issue."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22922,7 +23926,9 @@
     "alternative_id": "modifiers:763:alias:modifier:parliament_debate_duration",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the years of debate duration for an issue."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22953,7 +23959,9 @@
     "alternative_id": "modifiers:764:alias:modifier:parliament_chance_of_decision",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the chance for the debate to be ended after debate duration."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22984,7 +23992,9 @@
     "alternative_id": "modifiers:765:alias:modifier:num_of_parliament_issues",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum number of issues a country can pick from."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23015,7 +24025,9 @@
     "alternative_id": "modifiers:766:alias:modifier:max_possible_parliament_seats",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Defines the minimum amount of seats needed"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23043,7 +24055,9 @@
     "alternative_id": "modifiers:767:alias:modifier:can_recruit_cawa",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Cawa units. Doesn't work properly in 1.35.3"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23071,7 +24085,9 @@
     "alternative_id": "modifiers:768:alias:modifier:can_recruit_cossacks",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Cossack units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23099,7 +24115,9 @@
     "alternative_id": "modifiers:769:alias:modifier:can_recruit_rajputs",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Rajput units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23130,7 +24148,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to a country's diplomatic reputation."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23158,7 +24178,9 @@
     "alternative_id": "modifiers:770:alias:modifier:can_recruit_revolutionary_guards",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Revolutionary Guard units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23189,7 +24211,9 @@
     "alternative_id": "modifiers:771:alias:modifier:naval_morale_damage",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the morale damage done by naval units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23220,7 +24244,9 @@
     "alternative_id": "modifiers:772:alias:modifier:naval_morale_damage_received",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the morale damage taken by naval units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23248,7 +24274,9 @@
     "alternative_id": "modifiers:773:alias:modifier:no_claim_cost_increasement",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Removes the additional cost for fabricating a claim if a country already have a claim on the target country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23276,7 +24304,9 @@
     "alternative_id": "modifiers:774:alias:modifier:has_tercio",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Tercio units. It also requires the province to have the \"local_has_tercio = yes\" modifier."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23304,7 +24334,9 @@
     "alternative_id": "modifiers:775:alias:modifier:has_musketeer",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Musketeer units. It also requires the province to have the \"local_has_musketeers = yes\" modifier."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23332,7 +24364,9 @@
     "alternative_id": "modifiers:776:alias:modifier:has_samurai",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Samurai units. It also requires the province to have the \"local_has_samurai = yes\" modifier."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23360,7 +24394,9 @@
     "alternative_id": "modifiers:777:alias:modifier:has_geobukseon",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Geobukseon ships. It also requires the province to have the \"local_has_geobukseon = yes\" modifier."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23388,7 +24424,9 @@
     "alternative_id": "modifiers:778:alias:modifier:has_man_of_war",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Man of War ships. It also requires the province to have the \"local_has_man_of_war = yes\" modifier."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23416,7 +24454,9 @@
     "alternative_id": "modifiers:779:alias:modifier:has_galleon",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Galleon ships. It also requires the province to have the \"local_has_galleon = yes\" modifier."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23447,7 +24487,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum number of free diplomatic relations."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23475,7 +24517,9 @@
     "alternative_id": "modifiers:780:alias:modifier:has_galleass",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Galleass ships. It also requires the province to have the \"local_has_galleass = yes\" modifier."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23503,7 +24547,9 @@
     "alternative_id": "modifiers:781:alias:modifier:has_caravel",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Caravel ships. It also requires the province to have the \"local_has_caravel = yes\" modifier."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23531,7 +24577,9 @@
     "alternative_id": "modifiers:782:alias:modifier:has_voc_indiamen",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of VOC Indiaman ships. It also requires the province to have the \"local_has_voc_indiamen = yes\" modifier."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23559,7 +24607,9 @@
     "alternative_id": "modifiers:783:alias:modifier:has_streltsy",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Streltsy units. It also requires the province to have the \"local_has_streltsy = yes\" modifier."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23587,7 +24637,9 @@
     "alternative_id": "modifiers:784:alias:modifier:local_has_tercio",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows Tercio units to be raised in owned provinces."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -23615,7 +24667,9 @@
     "alternative_id": "modifiers:785:alias:modifier:local_has_musketeers",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows Musketeer units to be raised in owned provinces."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -23643,7 +24697,9 @@
     "alternative_id": "modifiers:786:alias:modifier:local_has_samurai",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows Samurai units to be raised in owned provinces."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -23671,7 +24727,9 @@
     "alternative_id": "modifiers:787:alias:modifier:local_has_geobukseon",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows Geobukseon ships to be raised in owned provinces."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -23699,7 +24757,9 @@
     "alternative_id": "modifiers:788:alias:modifier:local_has_man_of_war",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows Man of War ships to be raised in owned provinces."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -23727,7 +24787,9 @@
     "alternative_id": "modifiers:789:alias:modifier:local_has_galleon",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows Galleon ships to be raised in owned provinces."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -23758,7 +24820,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to a country's diplomat count."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23786,7 +24850,9 @@
     "alternative_id": "modifiers:790:alias:modifier:local_has_galleass",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows Galleass ships to be raised in owned provinces."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -23814,7 +24880,9 @@
     "alternative_id": "modifiers:791:alias:modifier:local_has_caravel",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows Caravel ships to be raised in owned provinces."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -23842,7 +24910,9 @@
     "alternative_id": "modifiers:792:alias:modifier:local_has_voc_indiamen",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows VOC Indiaman ships to be raised in owned provinces."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -23870,7 +24940,9 @@
     "alternative_id": "modifiers:793:alias:modifier:local_has_streltsy",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows Streltsy units to be raised in owned provinces."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -23901,7 +24973,9 @@
     "alternative_id": "modifiers:794:alias:modifier:allowed_tercio_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of tercios that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23932,7 +25006,9 @@
     "alternative_id": "modifiers:795:alias:modifier:allowed_musketeer_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of musketeers that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23963,7 +25039,9 @@
     "alternative_id": "modifiers:796:alias:modifier:allowed_samurai_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of samurai that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -23994,7 +25072,9 @@
     "alternative_id": "modifiers:797:alias:modifier:allowed_geobukseon_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of geobukseon that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24025,7 +25105,9 @@
     "alternative_id": "modifiers:798:alias:modifier:allowed_man_of_war_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of men of war that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24056,7 +25138,9 @@
     "alternative_id": "modifiers:799:alias:modifier:allowed_galleon_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of galleons that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24087,7 +25171,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the discipline of land units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24118,7 +25204,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the pool size for advisors."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24149,7 +25237,9 @@
     "alternative_id": "modifiers:800:alias:modifier:allowed_galleass_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of galleasses that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24180,7 +25270,9 @@
     "alternative_id": "modifiers:801:alias:modifier:allowed_caravel_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of caravels that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24211,7 +25303,9 @@
     "alternative_id": "modifiers:802:alias:modifier:allowed_voc_indiamen_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of VOC indiamen that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24242,7 +25336,9 @@
     "alternative_id": "modifiers:803:alias:modifier:allowed_streltsy_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of streltsy that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24273,7 +25369,9 @@
     "alternative_id": "modifiers:804:alias:modifier:amount_of_tercio",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of Tercio units available."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24304,7 +25402,9 @@
     "alternative_id": "modifiers:805:alias:modifier:amount_of_musketeers",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of Musketeer units available."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24335,7 +25435,9 @@
     "alternative_id": "modifiers:806:alias:modifier:amount_of_samurai",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of Samurai units available."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24366,7 +25468,9 @@
     "alternative_id": "modifiers:807:alias:modifier:amount_of_geobukseon",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of Geobukseon ships available."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24397,7 +25501,9 @@
     "alternative_id": "modifiers:808:alias:modifier:amount_of_man_of_war",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of Man of War ships available."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24428,7 +25534,9 @@
     "alternative_id": "modifiers:809:alias:modifier:amount_of_galleon",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of Galleon ships available."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24459,7 +25567,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the relations impact applied to a country when discovered committing an espionage action."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24490,7 +25600,9 @@
     "alternative_id": "modifiers:810:alias:modifier:amount_of_galleass",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of Galleas ships available."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24521,7 +25633,9 @@
     "alternative_id": "modifiers:811:alias:modifier:amount_of_caravel",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of Caravel ships available."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24552,7 +25666,9 @@
     "alternative_id": "modifiers:812:alias:modifier:amount_of_voc_indiamen",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of VOC Indiaman ships available."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24583,7 +25699,9 @@
     "alternative_id": "modifiers:813:alias:modifier:amount_of_streltsy",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of Streltsy units available."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24609,7 +25727,9 @@
     "alternative_id": "modifiers:814:alias:modifier:can_recruit_janissaries",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Janissary units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24635,7 +25755,9 @@
     "alternative_id": "modifiers:815:alias:modifier:allow_janissaries_from_own_faith",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows to recruit Janissary units in true faith provinces as well as heathen provinces."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24661,7 +25783,9 @@
     "alternative_id": "modifiers:816:alias:modifier:is_tercio_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect tercio regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24687,7 +25811,9 @@
     "alternative_id": "modifiers:817:alias:modifier:is_musketeer_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect musketeer regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24713,7 +25839,9 @@
     "alternative_id": "modifiers:818:alias:modifier:is_samurai_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect samurai regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24739,7 +25867,9 @@
     "alternative_id": "modifiers:819:alias:modifier:is_geobukseon_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect geobukseon ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24770,7 +25900,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the chance of disengagement for ships during battle."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24796,7 +25928,9 @@
     "alternative_id": "modifiers:820:alias:modifier:is_man_of_war_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect man of war ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24822,7 +25956,9 @@
     "alternative_id": "modifiers:821:alias:modifier:is_galleon_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect galleon ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24848,7 +25984,9 @@
     "alternative_id": "modifiers:822:alias:modifier:is_galleass_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect galleass ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24874,7 +26012,9 @@
     "alternative_id": "modifiers:823:alias:modifier:is_caravel_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect caravel ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24900,7 +26040,9 @@
     "alternative_id": "modifiers:824:alias:modifier:is_voc_indiamen_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect voc indiaman ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24931,7 +26073,9 @@
     "alternative_id": "modifiers:825:alias:modifier:allowed_cossack_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of cossacks that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24988,7 +26132,9 @@
     "alternative_id": "modifiers:827:alias:modifier:allowed_rajput_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of rajputs that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25045,7 +26191,9 @@
     "alternative_id": "modifiers:829:alias:modifier:ship_trade_power_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the trade power of ships. Only works properly with unit scope."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25076,7 +26224,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the army drill decay rate per year."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25102,7 +26252,9 @@
     "alternative_id": "modifiers:830:alias:modifier:can_transport_units",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows non-transport ships to transport land units. Only works properly with unit scope."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25166,7 +26318,9 @@
     "alternative_id": "modifiers:832:alias:modifier:overextension_impact_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the impact of conquered provinces in regards to the overextension."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25197,7 +26351,9 @@
     "alternative_id": "modifiers:833:alias:modifier:same_religion_advisor_cost",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the advisor cost for advisors that share the same religion as the country's court they're in."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25228,7 +26384,9 @@
     "alternative_id": "modifiers:834:alias:modifier:allowed_rev_guard_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of revolutionary guards that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25254,7 +26412,9 @@
     "alternative_id": "modifiers:835:alias:modifier:has_marines",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Marine units. Basically it's always yes."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25280,7 +26440,9 @@
     "alternative_id": "modifiers:836:alias:modifier:local_has_qizilbash",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows Qizilbash units to be raised in owned provinces."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -25306,7 +26468,9 @@
     "alternative_id": "modifiers:837:alias:modifier:local_has_mamluks",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows Mamluk units to be raised in owned provinces."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -25368,7 +26532,9 @@
     "alternative_id": "modifiers:839:alias:modifier:allowed_qizilbash_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of qizilbash that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25399,7 +26565,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the army drill gains while drilling"
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25430,7 +26598,9 @@
     "alternative_id": "modifiers:840:alias:modifier:amount_of_qizilbash",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of Qizilbash units available."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25461,7 +26631,9 @@
     "alternative_id": "modifiers:841:alias:modifier:allowed_mamluks_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of mamluks that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25492,7 +26664,9 @@
     "alternative_id": "modifiers:842:alias:modifier:amount_of_mamluks",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of Mamluk units available."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25518,7 +26692,9 @@
     "alternative_id": "modifiers:843:alias:modifier:has_qizilbash",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Qizilbash units. It also requires the province to have the \"local_has_qizilbash = yes\" modifier."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25544,7 +26720,9 @@
     "alternative_id": "modifiers:844:alias:modifier:has_mamluks",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Allows the usage of Mamluk units. It also requires the province to have the \"local_has_mamluks = yes\" modifier."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25575,7 +26753,9 @@
     "alternative_id": "modifiers:845:alias:modifier:allowed_qizilbash_fraction",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the amount of qizilbash that can be recruited."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25601,7 +26781,9 @@
     "alternative_id": "modifiers:846:alias:modifier:is_qizilbash_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect qizilbash regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25627,7 +26809,9 @@
     "alternative_id": "modifiers:847:alias:modifier:is_mamluks_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "When added to an event modifier, the event modifier will only affect mamluk regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25720,7 +26904,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the duration of an election cycle for the current nation. Negative values shorten the duration, positive values add to it."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25751,7 +26937,9 @@
     "alternative_id": "modifiers:850:alias:modifier:reverse_relation_with_heretic_religion",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the opinion of OTHER countries with heretic religions towards this country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25782,7 +26970,9 @@
     "alternative_id": "modifiers:851:alias:modifier:reverse_relation_with_heathen_religion",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the opinion of OTHER countries with heathen religions towards this country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25813,7 +27003,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the effectiveness of embargoing another country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25844,7 +27036,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the ducat cost for embracing an institution."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25875,7 +27069,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of coring provinces for enemies that have your cores."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25906,7 +27102,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the war score cost for the Enforce Religion peace term."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25937,7 +27135,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies diplomat, merchant, and colonist travel time during actions."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25968,7 +27168,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the total size of aggressive expansion gained during actions that confer it."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25999,7 +27201,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost for using the ‘Establish Order’ action."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26030,7 +27234,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of the ‘Expand Administration’ action."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26061,7 +27267,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of using the ‘Expel Minorities’ action."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26092,7 +27300,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies spy network cost for fabricating claim."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26123,7 +27333,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the base chance rate for female advisors."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26154,7 +27366,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the fire damage done by land units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26185,7 +27399,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the fire damage taken by land units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26216,7 +27432,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the cost of building a flagship."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26247,7 +27465,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the maximum amount of free land leaders."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26278,7 +27498,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds to the fort level in a province, determining how difficult it is to siege."
+    ],
     "allowed_scopes": [
       "province"
     ],
