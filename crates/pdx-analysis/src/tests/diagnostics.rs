@@ -4338,3 +4338,120 @@ fn overlay_without_physical_path_routes_dynamic_definition_directories() {
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn quoted_payload_inside_if_limit_lints_multi_condition_not() {
+    // C4a re-derivation: `complex_dynamic_effect`-style bodies splice a bare
+    // payload parameter inside `if = { limit = { $PARAM$ } }` — a structural
+    // sub-block of the definition body. The payload must validate as trigger
+    // script at that render site, so a multi-condition `NOT` carries the
+    // AND-of-NOTs lint (the two WoC mission catches).
+    let (mut host, root) = quoted_payload_host(
+        "cde-lint",
+        "cde = { if = { limit = { $first_limit$ } custom_tooltip = cde_tt } }\n",
+    );
+    let id = DocumentId::new("file:///tmp/events/quoted-payload-cde-lint.txt");
+    let text = concat!(
+        "country_event = { immediate = { cde = { first_limit = ",
+        "\"NOT = { has_gold = 5 monthly_mil = 10 }\" } } }\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open call");
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        diagnostics.iter().any(
+            |diagnostic| diagnostic.code == DiagnosticCode::LogicalContainer
+                && diagnostic.message.contains("AND of NOTs")
+        ),
+        "multi-condition NOT inside a structural if/limit render site must be linted: {diagnostics:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn quoted_payload_in_mission_effect_lints_multi_condition_not() {
+    // Same scenario as the event test, but the invocation sits inside a
+    // mission entry's `effect` block — the shape of the two WoC vanilla
+    // catches.
+    let (mut host, root) = quoted_payload_host(
+        "cde-mission",
+        "cde = { if = { limit = { $first_limit$ } custom_tooltip = cde_tt } }\n",
+    );
+    let id = DocumentId::new("file:///tmp/missions/quoted-payload-cde-mission.txt");
+    let text = concat!(
+        "probe_series = {\n",
+        "    slot = 3\n",
+        "    potential = { always = yes }\n",
+        "    azt_probe = {\n",
+        "        icon = mission_generic\n",
+        "        position = 1\n",
+        "        trigger = { always = yes }\n",
+        "        effect = {\n",
+        "            cde = { first_limit = \"NOT = { has_gold = 5 monthly_mil = 10 }\" }\n",
+        "        }\n",
+        "    }\n",
+        "}\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open call");
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        diagnostics.iter().any(
+            |diagnostic| diagnostic.code == DiagnosticCode::LogicalContainer
+                && diagnostic.message.contains("AND of NOTs")
+        ),
+        "multi-condition NOT payload in a mission effect must be linted: {diagnostics:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn quoted_payload_under_rendered_key_validates_at_its_real_site() {
+    // `select_biggest_country_of_scope_type`-style bodies splice a payload
+    // inside a block whose key is itself rendered from a parameter
+    // (`$trigger_scope$ = { $limit$ }`). Dropping the subtree made the
+    // payload fall back to the definition's flat effect context, flagging
+    // every trigger in it (six false UnknownKey in vanilla
+    // events/Governments.txt); the structural descent validates the payload
+    // at its trigger-context render sites instead.
+    let (mut host, root) = quoted_payload_host(
+        "rendered-key",
+        concat!(
+            "pick_scope = {\n",
+            "    if = {\n",
+            "        limit = { $trigger_scope$ = { $limit$ } }\n",
+            "        $effect_scope$ = { limit = { $limit$ } add_stability = 1 }\n",
+            "    }\n",
+            "}\n",
+        ),
+    );
+    let id = DocumentId::new("file:///tmp/events/quoted-payload-rendered-key.txt");
+    let text = concat!(
+        "country_event = { immediate = { pick_scope = {\n",
+        "    trigger_scope = any_owned_country\n",
+        "    effect_scope = random_owned_country\n",
+        "    limit = \"NOT = { has_gold = 5 monthly_mil = 10 }\"\n",
+        "} } }\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open call");
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    // The trigger payload is valid at its trigger-context render sites: no
+    // effect-context false positives, and the AND-of-NOTs lint still fires.
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::UnknownKey
+                && (diagnostic.message.contains("NOT")
+                    || diagnostic.message.contains("monthly_mil"))),
+        "trigger payload under a rendered key must not hit the effect-context floor: {diagnostics:?}"
+    );
+    assert!(
+        diagnostics.iter().any(
+            |diagnostic| diagnostic.code == DiagnosticCode::LogicalContainer
+                && diagnostic.message.contains("AND of NOTs")
+        ),
+        "payload under a rendered key still lints: {diagnostics:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
