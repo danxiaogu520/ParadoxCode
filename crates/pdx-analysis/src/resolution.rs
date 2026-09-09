@@ -1092,7 +1092,7 @@ pub fn localisation_values_by_key<'a>(
         else {
             continue;
         };
-        if let Some(preview) = crate::hover::localisation_preview(snapshot, &definition) {
+        if let Some(preview) = crate::localisation::localisation_preview(snapshot, &definition) {
             resolved.insert(key.to_owned(), preview);
         }
     }

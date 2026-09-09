@@ -55,10 +55,10 @@ fn pattern_rule_hint_rejects_unmatched_keys() {
 #[test]
 fn truncate_hover_text_appends_single_ellipsis() {
     let long = "x".repeat(600);
-    let truncated = crate::hover::truncate_hover_text(&long);
+    let truncated = crate::support::truncate_hover_text(&long);
     assert_eq!(truncated.chars().count(), 241);
     assert!(truncated.ends_with('…'));
-    assert_eq!(crate::hover::truncate_hover_text("short"), "short");
+    assert_eq!(crate::support::truncate_hover_text("short"), "short");
 }
 
 #[test]
@@ -76,7 +76,7 @@ fn find_cst_node_is_depth_bounded() {
     }
     let parsed = pdx_parser::parse(pdx_parser::FileFormat::Script, &text);
     assert!(
-        crate::hover::find_cst_node(
+        crate::localisation::find_cst_node(
             parsed.root(),
             pdx_parser::CstKind::Error,
             pdx_text::TextRange::empty(0)
