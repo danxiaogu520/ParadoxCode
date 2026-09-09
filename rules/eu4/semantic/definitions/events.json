@@ -15,7 +15,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "If yes, the event has no MTTH and only occurs when triggered from another source (an event or an on_action pulse)."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -41,7 +43,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Unique non-negative integer event id; must not be replicated in any other event file."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -67,7 +71,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Localisation key for the event title."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -93,7 +99,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Localisation key or trigger-conditional desc block for the event description."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -121,7 +129,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Event picture name, defined in interface/eventpictures.gfx."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -149,7 +159,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Event picture name, defined in interface/eventpictures.gfx."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -177,7 +189,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Event picture name, defined in interface/eventpictures.gfx."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -203,7 +217,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Localisation key for the event title."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -229,7 +245,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Localisation key or trigger-conditional desc block for the event description."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -257,7 +275,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Highlights and refocuses the camera to the given province when the option is taken."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -285,7 +305,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Highlights and refocuses the camera to the given province when the option is taken."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -313,7 +335,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Highlights and refocuses the camera to the given province when the option is taken."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -341,7 +365,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Highlights and refocuses the camera to the given province when the option is taken."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -369,7 +395,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Highlights and refocuses the camera to the given province when the option is taken."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -397,7 +425,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Highlights and refocuses the camera to the given province when the option is taken."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -425,7 +455,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Conditions that must all be true for the event (or, inside an option, for that option) to be available."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -453,7 +485,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Localisation key or trigger-conditional desc block for the event description."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -479,7 +513,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Localisation key or trigger-conditional desc block for the event description."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -505,7 +541,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Event picture name, defined in interface/eventpictures.gfx."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -533,7 +571,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Conditions that must all be true for the event (or, inside an option, for that option) to be available."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -561,7 +601,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Event picture name, defined in interface/eventpictures.gfx."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -587,7 +629,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Event picture name, defined in interface/eventpictures.gfx."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -615,7 +659,9 @@
     "alternative_id": null,
     "severity": 2,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "If yes, the event runs in the background without popping up for the player."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -697,7 +743,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "If yes, the event has no MTTH and only occurs when triggered from another source (an event or an on_action pulse)."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -725,7 +773,9 @@
     "alternative_id": null,
     "severity": 2,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "If yes, the event has no MTTH and only occurs when triggered from another source (an event or an on_action pulse)."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -755,7 +805,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base mean time to happen in days (months = <int> is the alternative)."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -781,7 +833,9 @@
     "alternative_id": null,
     "severity": 3,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -807,7 +861,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "If yes, after this event fires it will never fire again for any country, even when triggered directly in code."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -866,7 +922,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -922,7 +980,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -979,7 +1039,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Conditions that must all be true for the event (or, inside an option, for that option) to be available."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1005,7 +1067,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Effects executed immediately on the event firing, before any option is chosen."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1033,7 +1097,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Localisation key for the option text."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1061,7 +1127,9 @@
     "alternative_id": null,
     "severity": 2,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Localisation key for the option text."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1091,7 +1159,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Highlights and refocuses the camera to the given province when the option is taken."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1121,7 +1191,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Highlights and refocuses the camera to the given province when the option is taken."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1151,7 +1223,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Highlights and refocuses the camera to the given province when the option is taken."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1181,7 +1255,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Highlights and refocuses the camera to the given province when the option is taken."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1207,7 +1283,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1237,7 +1315,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Highlights and refocuses the camera to the given province when the option is taken."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1265,7 +1345,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Conditions that must all be true for the event (or, inside an option, for that option) to be available."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1299,7 +1381,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1327,7 +1411,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Relative weight for the AI choosing this option; factors are relative, by convention specified out of 100."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1387,7 +1473,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds a highlight to the option (a status effect shown in the option tooltip)."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1413,7 +1501,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "A selectable choice; points to its localisation text and holds effects, availability triggers, ai_chance, highlight and goto."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1439,7 +1529,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Effects executed after an option has been chosen, without repeating them in every option."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1467,7 +1559,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "If yes, the event runs in the background without popping up for the player."
+    ],
     "allowed_scopes": [
       "any"
     ],

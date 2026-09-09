@@ -13,7 +13,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Customizes highlighted provinces to supplement the Allow section and fill missing tooltips."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48,7 +50,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Conditions for the decision to be enactable once visible; the green tick in the UI."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -83,7 +87,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Effects executed immediately after the decision is enacted."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -125,7 +131,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -151,7 +159,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI instructions for when to use the decision; optional."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -191,7 +201,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "How highly the AI prioritises enacting this decision; a factor around 400 appears to be high priority."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -364,7 +376,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Conditions for the decision to be visible in the decisions panel; even the AI cannot use it when they are unmet."
+    ],
     "allowed_scopes": [
       "any"
     ],
