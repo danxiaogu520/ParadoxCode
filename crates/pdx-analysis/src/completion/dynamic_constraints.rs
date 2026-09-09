@@ -21,7 +21,7 @@ use pdx_rules::{KeyMatcher, ValueMatcher};
 use crate::dynamic_rules::{
     DynamicAffixSegment, DynamicAffixedSiteRow, DynamicForwardSiteRow, DynamicForwardValue,
     DynamicKeyRenderSiteRow, DynamicQuotedSiteRow, DynamicRuleRow, DynamicScopeStep,
-    DynamicSiteGuard, DynamicValueSiteRow, dynamic_rule_row,
+    DynamicSiteGuard, DynamicSiteZone, DynamicValueSiteRow, dynamic_rule_row,
 };
 use crate::semantic::{
     enum_members, semantic_rule_key_matches, semantic_scope_allows, workspace_member_index,
@@ -337,14 +337,42 @@ impl<'a> RowReplayer<'a> {
         else {
             return;
         };
+        // RenderedKey subtrees ($SCOPE$ = { ... }) stay diagnostics-only
+        // (arbitration B): the pre-replay completion walker never descended
+        // them, so replaying their rows would change completion item sets.
         let sites: Vec<SiteRef<'_>> = parameter
             .value_sites
             .iter()
+            .filter(|site| site.zone != DynamicSiteZone::RenderedKey)
             .map(SiteRef::Value)
-            .chain(parameter.affixed_value_sites.iter().map(SiteRef::Affixed))
-            .chain(parameter.key_render_sites.iter().map(SiteRef::KeyRender))
-            .chain(parameter.quoted_sites.iter().map(SiteRef::Quoted))
-            .chain(parameter.forward_sites.iter().map(SiteRef::Forward))
+            .chain(
+                parameter
+                    .affixed_value_sites
+                    .iter()
+                    .filter(|site| site.zone != DynamicSiteZone::RenderedKey)
+                    .map(SiteRef::Affixed),
+            )
+            .chain(
+                parameter
+                    .key_render_sites
+                    .iter()
+                    .filter(|site| site.zone != DynamicSiteZone::RenderedKey)
+                    .map(SiteRef::KeyRender),
+            )
+            .chain(
+                parameter
+                    .quoted_sites
+                    .iter()
+                    .filter(|site| site.zone != DynamicSiteZone::RenderedKey)
+                    .map(SiteRef::Quoted),
+            )
+            .chain(
+                parameter
+                    .forward_sites
+                    .iter()
+                    .filter(|site| site.zone != DynamicSiteZone::RenderedKey)
+                    .map(SiteRef::Forward),
+            )
             .collect();
         let mut surviving: HashSet<u64> = HashSet::new();
         let mut folded: Vec<ChainReplay> = Vec::with_capacity(sites.len());

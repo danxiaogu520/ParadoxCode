@@ -116,11 +116,16 @@ pub(crate) struct AffixedValueSite {
 /// rows are always replayed; Structural rows sit inside `limit`-style
 /// sub-blocks that validate in a different context against the pre-push
 /// scope — the staged arbitration moves them from skipped to validated
-/// consumer-side, one consumer at a time.
+/// consumer-side, one consumer at a time. RenderedKey rows sit inside a
+/// block whose key is itself rendered from a parameter (`$SCOPE$ = { … }`):
+/// diagnostics descends them structurally (the C1 dispatch-walker behavior
+/// quoted-payload validation relies on), completion drops the whole subtree
+/// (arbitration B).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum DynamicSiteZone {
     Normal,
     Structural,
+    RenderedKey,
 }
 
 /// The scope effect one block statement has on its subtree, replayed by
@@ -272,6 +277,9 @@ pub(crate) struct DynamicForwardSiteRow {
     /// Ordered replay steps (see [`DynamicValueSiteRow::chain`]).
     pub(crate) chain: Vec<DynamicScopeStep>,
     pub(crate) guards: Vec<DynamicSiteGuard>,
+    /// Body region the call sits in; RenderedKey forward edges are not
+    /// replayed by completion (arbitration B).
+    pub(crate) zone: DynamicSiteZone,
     /// Fan-out groups whose failure activates this row (see
     /// [`DynamicValueSiteRow::fallback_groups`]).
     pub(crate) fallback_groups: Vec<u64>,
@@ -1164,10 +1172,14 @@ impl<'a> SiteDerivation<'a> {
 
     fn walk_property(&mut self, property: &TemplateProperty, position: &SitePosition) {
         if token_has_parameter(&property.key) {
-            // The rendered key is unknowable at definition time and nothing
-            // derives from its subtree (mirroring the symbolic walker's
-            // `continue`); each parameter records its render site so callers
-            // still constrain key-shaped arguments.
+            // The rendered key is unknowable at definition time, so no rule
+            // rows resolve for the statement itself; each parameter records
+            // its render site so callers still constrain key-shaped
+            // arguments. The subtree is still walked structurally (context
+            // and path transparent, RenderedKey zone): diagnostics validates
+            // payloads spliced inside such blocks at their real sites — the
+            // C1 dispatch-walker behavior — while completion drops the whole
+            // subtree (arbitration B).
             for name in token_parameters(&property.key) {
                 let Some((prefix, suffix)) = token_affix_segments(&property.key, name) else {
                     continue;
@@ -1185,6 +1197,13 @@ impl<'a> SiteDerivation<'a> {
                         prefix_segments: prefix,
                         suffix_segments: suffix,
                     });
+            }
+            if let TemplateValue::Block { items, .. } = &property.value {
+                let inner = SitePosition {
+                    zone: DynamicSiteZone::RenderedKey,
+                    ..position.clone()
+                };
+                self.walk_items(items, &inner);
             }
             return;
         }
@@ -1384,6 +1403,7 @@ impl<'a> SiteDerivation<'a> {
                         context: position.context.clone(),
                         chain: position.chain.clone(),
                         guards: position.guards.clone(),
+                        zone: position.zone,
                         fallback_groups: position.fallback_groups.clone(),
                     });
             }
