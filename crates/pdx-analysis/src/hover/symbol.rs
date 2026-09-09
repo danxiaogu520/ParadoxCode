@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use super::dynamic::dynamic_signature_hover;
 use super::render::{HoverModel, code_span};
-use crate::localisation::{localisation_preview, symbol_localisation_preview};
+use crate::localisation::{localisation_previews_for_name, symbol_localisation_preview};
 use crate::resolution::{symbol_candidates_for_hover, symbol_resolution_policy};
 use crate::semantic::dynamic_definition_summary;
 use crate::support::{root_for_path, same_location};
@@ -16,6 +16,11 @@ use pdx_text::TextRange;
 
 /// Maximum number of candidate paths rendered before the list is truncated.
 const MAX_HOVER_CANDIDATES: usize = 8;
+
+/// Maximum languages rendered in one localisation preview; further languages
+/// collapse into a count line so a vanilla key defined in every shipped
+/// language cannot flood the tooltip.
+const MAX_PREVIEW_LANGUAGES: usize = 4;
 
 /// Computes the structured hover for a symbol use or definition.
 ///
@@ -81,11 +86,11 @@ pub(crate) fn hover_for_symbol(
                         .join("\n")
                 ));
             }
-            if let Some((language, value)) =
-                symbol_localisation_preview(snapshot, kind, name, definition, cancellation)?
-            {
+            let previews =
+                symbol_localisation_preview(snapshot, kind, name, definition, cancellation)?;
+            if !previews.is_empty() {
                 model.has_localisation_preview = true;
-                model.push_section(localisation_preview_section(language, &value));
+                model.push_section(localisation_preview_section(&previews));
             }
             if let Some(summary) = dynamic_definition_summary(snapshot, kind, name) {
                 let mut signature = dynamic_signature_hover(&summary);
@@ -101,23 +106,18 @@ pub(crate) fn hover_for_symbol(
             // Ambiguous symbols still deserve a preview when any candidate carries localisation
             // text; that is exactly the case where the user most wants to see the translations.
             if kind.eq_ignore_ascii_case("localisation") {
-                for candidate in &candidates {
-                    if let Some((language, value)) = localisation_preview(snapshot, candidate) {
-                        if value.is_empty() {
-                            continue;
-                        }
-                        model.has_localisation_preview = true;
-                        model.push_section(localisation_preview_section(language, &value));
-                        break;
-                    }
+                let previews = localisation_previews_for_name(snapshot, name, cancellation)?;
+                if !previews.is_empty() {
+                    model.has_localisation_preview = true;
+                    model.push_section(localisation_preview_section(&previews));
                 }
             } else {
                 for candidate in &candidates {
-                    if let Some((language, value)) =
-                        symbol_localisation_preview(snapshot, kind, name, candidate, cancellation)?
-                    {
+                    let previews =
+                        symbol_localisation_preview(snapshot, kind, name, candidate, cancellation)?;
+                    if !previews.is_empty() {
                         model.has_localisation_preview = true;
-                        model.push_section(localisation_preview_section(language, &value));
+                        model.push_section(localisation_preview_section(&previews));
                         break;
                     }
                 }
@@ -144,15 +144,26 @@ pub(crate) fn hover_for_symbol(
     Ok(model)
 }
 
-/// Formats the shared localisation-preview section for one resolved (language, value) pair.
-fn localisation_preview_section(language: Option<String>, value: &str) -> String {
-    format!(
-        "#### Localisation preview\n\n- Localisation{}: \"{}\"",
-        language
-            .as_deref()
-            .map_or_else(String::new, |language| format!(" ({language})")),
-        value
-    )
+/// Formats the localisation-preview section, one line per language in
+/// parallel (first resolution per language), capped with a count line.
+fn localisation_preview_section(previews: &[(Option<String>, String)]) -> String {
+    let shown = previews.len().min(MAX_PREVIEW_LANGUAGES);
+    let mut lines = previews[..shown]
+        .iter()
+        .map(|(language, value)| {
+            format!(
+                "- Localisation{}: \"{}\"",
+                language
+                    .as_deref()
+                    .map_or_else(String::new, |language| format!(" ({language})")),
+                value
+            )
+        })
+        .collect::<Vec<_>>();
+    if previews.len() > shown {
+        lines.push(format!("- … and {} more languages", previews.len() - shown));
+    }
+    format!("#### Localisation preview\n\n{}", lines.join("\n"))
 }
 
 pub(crate) fn symbol_location_path(location: &Location) -> String {

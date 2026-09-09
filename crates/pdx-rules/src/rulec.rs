@@ -1334,7 +1334,7 @@ mod tests {
         assert_eq!(startup.from, "any");
         assert!(!startup.documentation.is_empty());
         assert_eq!(source_model.semantic.type_descriptors.len(), 152);
-        assert_eq!(source_model.semantic.localisation_bindings.len(), 187);
+        assert_eq!(source_model.semantic.localisation_bindings.len(), 188);
         assert_eq!(source_model.profile.scan_roots.len(), 126);
         for (key, expected_scopes) in [
             ("is_janissary_modifier", &["country"][..]),

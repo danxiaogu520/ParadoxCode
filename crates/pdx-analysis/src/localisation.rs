@@ -544,24 +544,57 @@ pub(crate) fn localisation_preview(
     Some((language, value))
 }
 
-/// Finds the first non-empty localisation attached to a non-localisation symbol definition.
+/// Finds every language a localisation key resolves to, one preview per
+/// language in candidate order (first definition per language wins). The
+/// hover renders them in parallel instead of the historical first-found
+/// value.
+pub(crate) fn localisation_previews_for_name(
+    snapshot: &AnalysisSnapshot,
+    name: &str,
+    cancellation: &CancellationToken,
+) -> Result<Vec<(Option<String>, String)>, Cancelled> {
+    let mut previews = Vec::new();
+    for candidate in symbol_candidates_for_hover(snapshot, "localisation", name, cancellation)? {
+        if let Some(preview) = localisation_preview(snapshot, &candidate)
+            && !preview.1.is_empty()
+            && !previews
+                .iter()
+                .any(|(language, _): &(Option<String>, String)| {
+                    language.as_deref().is_some_and(|known| {
+                        preview
+                            .0
+                            .as_deref()
+                            .is_some_and(|current| known.eq_ignore_ascii_case(current))
+                    })
+                })
+        {
+            previews.push(preview);
+        }
+    }
+    Ok(previews)
+}
+
+/// Finds the localisation previews for a non-localisation symbol definition.
 ///
 /// Type-instance localisation mappings are indexed as ordinary localisation references at the
 /// instance's source range.  Looking those references up from the resolved definition lets a
 /// hover over `event = foo.1` (or another typed symbol use) show the same preview as hovering its
 /// generated localisation key. Type descriptors may also use the implicit same-name convention
-/// without a localisation-binding row. Cache-only roots retain required references; optional
-/// templates are conservatively tried from the rule data and only shown when an actual key
-/// resolves.
+/// without a localisation-binding row. Finally, the per-family generated templates
+/// (`$_title`, `$.t`, `building_$`, …) are tried for every definition — the
+/// coverage matrix — and only shown when the generated key actually resolves;
+/// this closes, among others, events without an explicit `title` (the engine
+/// falls back to `<id>.t`, verified against vanilla) and mod-authored
+/// definitions whose family convention needs no in-file reference at all.
 pub(crate) fn symbol_localisation_preview(
     snapshot: &AnalysisSnapshot,
     kind: &str,
     symbol_name: &str,
     definition: &ResolutionDefinition,
     cancellation: &CancellationToken,
-) -> Result<Option<(Option<String>, String)>, Cancelled> {
+) -> Result<Vec<(Option<String>, String)>, Cancelled> {
     if kind.eq_ignore_ascii_case("localisation") {
-        return Ok(localisation_preview(snapshot, definition));
+        return localisation_previews_for_name(snapshot, symbol_name, cancellation);
     }
     let semantic = &snapshot.rules().model().semantic;
     let has_binding = semantic
@@ -573,13 +606,12 @@ pub(crate) fn symbol_localisation_preview(
         .keys()
         .any(|type_name| type_name.eq_ignore_ascii_case(kind));
     if !has_binding && !is_type_definition {
-        return Ok(None);
+        return Ok(Vec::new());
     }
 
     let full_range = definition.location.range;
     let selection_range = definition.selection_range;
     let mut references = Vec::<(String, TextRange)>::new();
-    let mut cache_only = false;
     if let Some(document) = definition.location.document.as_ref() {
         if let Some(input) = input_for_document(snapshot, document) {
             references.extend(localisation_references_for_hover(
@@ -596,7 +628,6 @@ pub(crate) fn symbol_localisation_preview(
                 cancellation,
             )?);
         } else {
-            cache_only = true;
             references.extend(
                 snapshot
                     .index()
@@ -618,44 +649,34 @@ pub(crate) fn symbol_localisation_preview(
     references.dedup();
     for (name, _) in references {
         cancellation.checkpoint()?;
-        for candidate in symbol_candidates_for_hover(snapshot, "localisation", &name, cancellation)?
-        {
-            if let Some(preview) = localisation_preview(snapshot, &candidate) {
-                return Ok(Some(preview));
-            }
+        let previews = localisation_previews_for_name(snapshot, &name, cancellation)?;
+        if !previews.is_empty() {
+            return Ok(previews);
         }
     }
     if is_type_definition {
         cancellation.checkpoint()?;
-        for candidate in
-            symbol_candidates_for_hover(snapshot, "localisation", symbol_name, cancellation)?
-        {
-            if let Some(preview) = localisation_preview(snapshot, &candidate) {
-                return Ok(Some(preview));
-            }
+        let previews = localisation_previews_for_name(snapshot, symbol_name, cancellation)?;
+        if !previews.is_empty() {
+            return Ok(previews);
         }
     }
-    if cache_only && !symbol_name.contains('.') {
-        for binding in semantic
-            .localisation_bindings
-            .iter()
-            .filter(|binding| binding.type_name.eq_ignore_ascii_case(kind))
-        {
-            let Some(template) = binding.template.as_deref() else {
-                continue;
-            };
-            let name = template.replace('$', symbol_name);
-            cancellation.checkpoint()?;
-            for candidate in
-                symbol_candidates_for_hover(snapshot, "localisation", &name, cancellation)?
-            {
-                if let Some(preview) = localisation_preview(snapshot, &candidate) {
-                    return Ok(Some(preview));
-                }
-            }
+    for binding in semantic
+        .localisation_bindings
+        .iter()
+        .filter(|binding| binding.type_name.eq_ignore_ascii_case(kind))
+    {
+        let Some(template) = binding.template.as_deref() else {
+            continue;
+        };
+        let name = template.replace('$', symbol_name);
+        cancellation.checkpoint()?;
+        let previews = localisation_previews_for_name(snapshot, &name, cancellation)?;
+        if !previews.is_empty() {
+            return Ok(previews);
         }
     }
-    Ok(None)
+    Ok(Vec::new())
 }
 
 fn localisation_references_for_hover(

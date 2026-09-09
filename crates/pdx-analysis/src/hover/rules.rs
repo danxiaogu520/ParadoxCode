@@ -51,8 +51,12 @@ pub(crate) fn semantic_rule_hover_at(
     if candidates.is_empty() {
         return Ok(None);
     }
-    let mut model = HoverModel::new(format!("### PDX property {}", code_span(word)));
-    model.extend_sections(semantic_rule_hover_for_candidates(snapshot, &candidates));
+    let mut model = HoverModel::new(semantic_rule_hover_title(word, &candidates, ""));
+    model.extend_sections(semantic_rule_hover_for_candidates(
+        snapshot,
+        word,
+        &candidates,
+    ));
     Ok(Some(model))
 }
 
@@ -101,7 +105,7 @@ pub(crate) fn semantic_value_hover_at(
         semantic_scope_allows(candidate.rule, candidate.scope)
             && semantic_property_matches(snapshot, candidate.rule, property, candidate.scope)
     });
-    let mut model = HoverModel::new(format!("### PDX value {}", code_span(word)));
+    let mut model = HoverModel::new(semantic_rule_hover_title(word, &candidates, " value"));
     model.push_section(format!(
         "- property: `{}`\n- value: `{}`\n- validation: `{}`",
         property.key,
@@ -112,16 +116,77 @@ pub(crate) fn semantic_value_hover_at(
             "does not match"
         },
     ));
-    model.extend_sections(semantic_rule_hover_for_candidates(snapshot, &candidates));
+    model.extend_sections(semantic_rule_hover_for_candidates(
+        snapshot,
+        word,
+        &candidates,
+    ));
     Ok(Some(model))
+}
+
+/// Hover title in the symbol-hover pattern: the rule-context category (or
+/// nothing when candidates disagree or carry no context). `suffix` marks
+/// value-position hovers (`### Effect value \`my_flag\``).
+fn semantic_rule_hover_title(
+    word: &str,
+    candidates: &[SemanticCompletionRule<'_, '_>],
+    suffix: &str,
+) -> String {
+    let Some(shared) = shared_rule_context(candidates) else {
+        return format!("### {}", code_span(word));
+    };
+    format!(
+        "### {}{suffix} {}",
+        semantic_context_category(&shared),
+        code_span(word)
+    )
+}
+
+/// The one context every candidate agrees on, when they agree.
+fn shared_rule_context(candidates: &[SemanticCompletionRule<'_, '_>]) -> Option<String> {
+    let first = candidates.first()?.rule.context.clone();
+    candidates
+        .iter()
+        .all(|candidate| candidate.rule.context.eq_ignore_ascii_case(&first))
+        .then_some(first)
+}
+
+/// Display category for a rule context: the three command namespaces keep
+/// their canonical names; everything else humanizes the context identifier
+/// (compound `root:` contexts use their tail segment). Callers that cannot
+/// establish a category fall back to the bare symbol-hover title.
+pub(crate) fn semantic_context_category(context: &str) -> String {
+    let context = context.strip_prefix("root:").unwrap_or(context);
+    match context {
+        "trigger" => "Trigger".to_owned(),
+        "effect" => "Effect".to_owned(),
+        "modifier" => "Modifier".to_owned(),
+        other => {
+            let mut name = other.replace('_', " ");
+            let mut characters = name.chars();
+            match characters.next() {
+                Some(first) => {
+                    name = first.to_uppercase().collect::<String>() + characters.as_str();
+                    name
+                }
+                None => name,
+            }
+        }
+    }
 }
 
 /// Renders the hover sections for every distinct meaning of the matched candidates.
 ///
 /// Sections are returned unrendered so callers embed them into their own hover model; the
 /// candidate slice is never empty at the call sites (both hover entry points gate on it).
+///
+/// Candidates split into value types (rendered under `#### Allowed value types`,
+/// renamed from "Possible meanings" because the entries describe accepted value
+/// shapes) and scope links (block keys that re-target the scope — not value
+/// types), whose transitions render in the ambient `#### Scope` table instead.
 pub(crate) fn semantic_rule_hover_for_candidates(
     snapshot: &AnalysisSnapshot,
+    word: &str,
     candidates: &[SemanticCompletionRule<'_, '_>],
 ) -> Vec<String> {
     // Stable rule ids and source provenance identify declarations, not necessarily distinct
@@ -138,9 +203,14 @@ pub(crate) fn semantic_rule_hover_for_candidates(
         }
     }
     let candidates = unique_candidates.as_slice();
-    if candidates.len() > 1 {
-        let shared_documentation = shared_semantic_hover_documentation(candidates);
-        let summaries = candidates
+    let (value_typed, scope_links): (Vec<_>, Vec<_>) = candidates
+        .iter()
+        .partition(|candidate| !is_scope_link_rule(candidate.rule));
+
+    let mut sections = Vec::new();
+    if value_typed.len() > 1 {
+        let shared_documentation = shared_semantic_hover_documentation(&value_typed);
+        let summaries = value_typed
             .iter()
             .map(|candidate| {
                 semantic_hover_candidate_summary(
@@ -151,35 +221,58 @@ pub(crate) fn semantic_rule_hover_for_candidates(
             })
             .collect::<Vec<_>>()
             .join("\n\n");
-        let mut sections = vec![format!(
-            "#### Possible meanings ({})\n\n{summaries}",
-            candidates.len()
-        )];
+        sections.push(format!(
+            "#### Allowed value types ({})\n\n{summaries}",
+            value_typed.len()
+        ));
         if let Some(documentation) = shared_documentation {
             sections.push(format!(
                 "#### Documentation\n\n{}",
                 truncate_documentation(&documentation)
             ));
         }
-        return sections;
+    } else if let Some(candidate) = value_typed.first() {
+        sections.push(semantic_hover_candidate_details(snapshot, candidate).join("\n"));
+        let cardinality = semantic_hover_cardinality_details(candidate.rule);
+        if !cardinality.is_empty() {
+            sections.push(format!("#### Constraints\n\n{}", cardinality.join("\n")));
+        }
+        if !candidate.rule.documentation.is_empty() {
+            sections.push(format!(
+                "#### Documentation\n\n{}",
+                truncate_documentation(&candidate.rule.documentation)
+            ));
+        }
+    } else if let Some(candidate) = scope_links.first() {
+        // A pure scope link has no value shape to describe; its scope
+        // requirements stay visible as details and its transition renders in
+        // the Scope table below.
+        let details = semantic_hover_scope_link_details(candidate);
+        if !details.is_empty() {
+            sections.push(details.join("\n"));
+        }
+        let cardinality = semantic_hover_cardinality_details(candidate.rule);
+        if !cardinality.is_empty() {
+            sections.push(format!("#### Constraints\n\n{}", cardinality.join("\n")));
+        }
+        if !candidate.rule.documentation.is_empty() {
+            sections.push(format!(
+                "#### Documentation\n\n{}",
+                truncate_documentation(&candidate.rule.documentation)
+            ));
+        }
     }
-
-    let Some(candidate) = candidates.first() else {
-        return Vec::new();
-    };
-    let rule = candidate.rule;
-    let mut sections = vec![semantic_hover_candidate_details(snapshot, candidate).join("\n")];
-    let cardinality = semantic_hover_cardinality_details(rule);
-    if !cardinality.is_empty() {
-        sections.push(format!("#### Constraints\n\n{}", cardinality.join("\n")));
-    }
-    if !rule.documentation.is_empty() {
-        sections.push(format!(
-            "#### Documentation\n\n{}",
-            truncate_documentation(&rule.documentation)
-        ));
+    if let Some(scope) = ambient_scope_section(snapshot, word, candidates, &scope_links) {
+        sections.push(scope);
     }
     sections
+}
+
+/// A block rule that re-targets the scope (`owner = { … }`): its hover entry
+/// is a scope transition, not a value type.
+fn is_scope_link_rule(rule: &pdx_rules::SemanticRule) -> bool {
+    matches!(rule.shape, RuleShape::Node)
+        && (rule.push_scope.is_some() || !rule.replace_scope.is_empty())
 }
 
 fn semantic_hover_candidate_summary(
@@ -208,20 +301,7 @@ fn semantic_hover_candidate_details(
         semantic_rule_hover_value_label(rule)
     )];
     if !rule.allowed_scopes.is_empty() {
-        let allowed = rule
-            .allowed_scopes
-            .iter()
-            .map(|scope| format!("`{scope}`"))
-            .collect::<Vec<_>>()
-            .join(", ");
-        if semantic_scope_allows(rule, candidate.scope) {
-            details.push(format!("- valid scopes: {allowed}"));
-        } else {
-            details.push(format!(
-                "- unavailable in current scope `{}`; valid scopes: {allowed}",
-                candidate.scope.current
-            ));
-        }
+        details.push(semantic_hover_scope_line(candidate));
     }
     if (rule.push_scope.is_some() || !rule.replace_scope.is_empty()) && {
         let child_scope = semantic_child_scope(snapshot, candidate.scope, rule);
@@ -230,6 +310,9 @@ fn semantic_hover_candidate_details(
             .current
             .eq_ignore_ascii_case(&child_scope.current)
     } {
+        // Non-link blocks can still carry a scope transition (transparent
+        // wrappers re-target registers); value-shaped candidates keep the
+        // inline line because the Scope table only lists scope links.
         let child_scope = semantic_child_scope(snapshot, candidate.scope, rule);
         details.push(format!(
             "- scope transition: `{}` → `{}`",
@@ -237,6 +320,81 @@ fn semantic_hover_candidate_details(
         ));
     }
     details
+}
+
+/// The `valid scopes` line, or the unavailable variant when the ambient
+/// scope is not among them.
+fn semantic_hover_scope_line(candidate: &SemanticCompletionRule<'_, '_>) -> String {
+    let allowed = candidate
+        .rule
+        .allowed_scopes
+        .iter()
+        .map(|scope| format!("`{scope}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    if semantic_scope_allows(candidate.rule, candidate.scope) {
+        format!("- valid scopes: {allowed}")
+    } else {
+        format!(
+            "- unavailable in current scope `{}`; valid scopes: {allowed}",
+            candidate.scope.current
+        )
+    }
+}
+
+fn semantic_hover_scope_link_details(candidate: &SemanticCompletionRule<'_, '_>) -> Vec<String> {
+    candidate
+        .rule
+        .allowed_scopes
+        .is_empty()
+        .then(Vec::new)
+        .unwrap_or_else(|| vec![semantic_hover_scope_line(candidate)])
+}
+
+/// The ambient scope table: where the hovered statement sits (current scope
+/// and the root/prev/from registers) and where each scope-link candidate
+/// re-targets. Skipped entirely when nothing beyond an unknown scope is
+/// known, so degraded contexts do not grow noise lines.
+fn ambient_scope_section(
+    snapshot: &AnalysisSnapshot,
+    word: &str,
+    candidates: &[&SemanticCompletionRule<'_, '_>],
+    scope_links: &[&SemanticCompletionRule<'_, '_>],
+) -> Option<String> {
+    let scope = &candidates.first()?.scope;
+    // `any` registers are unknown placeholders (an untracked root, an unused
+    // FROM); rendering them would only add noise lines.
+    let known = |value: &str| !value.eq_ignore_ascii_case("any");
+    let mut lines = vec![format!("- here: `{}`", scope.current)];
+    if known(&scope.root) && !scope.root.eq_ignore_ascii_case(&scope.current) {
+        lines.push(format!("- root: `{}`", scope.root));
+    }
+    if let Some(previous) = scope.previous.last().filter(|value| known(value)) {
+        lines.push(format!("- prev: `{previous}`"));
+    }
+    if let Some(from) = scope.from.last().filter(|value| known(value)) {
+        lines.push(format!("- from: `{from}`"));
+    }
+    for candidate in scope_links {
+        let child_scope = semantic_child_scope(snapshot, candidate.scope, candidate.rule);
+        let mut line = format!("- `{}` enters `{}`", word, child_scope.current);
+        if !candidate.rule.allowed_scopes.is_empty() {
+            let allowed = candidate
+                .rule
+                .allowed_scopes
+                .iter()
+                .map(|scope| format!("`{scope}`"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            line.push_str(&format!(" (from {allowed})"));
+        }
+        lines.push(line);
+    }
+    let ambient_known = known(&scope.current)
+        || scope.previous.iter().any(|value| known(value))
+        || scope.from.iter().any(|value| known(value));
+    (ambient_known || !scope_links.is_empty())
+        .then(|| format!("#### Scope\n\n{}", lines.join("\n")))
 }
 
 fn semantic_hover_cardinality_details(rule: &pdx_rules::SemanticRule) -> Vec<String> {
@@ -367,6 +525,48 @@ fn semantic_rule_documentation_uncached(snapshot: &AnalysisSnapshot, key: &str) 
             || !rule.allowed_scopes.is_empty()
     })?;
     semantic_rule_documentation_for_rule(rule)
+}
+
+/// The display category for a known key's rule family, when its exact-key
+/// rules agree on one context. Memoized per revision alongside the
+/// documentation lookup because it scans the same rule list.
+pub(crate) fn semantic_rule_key_category(snapshot: &AnalysisSnapshot, key: &str) -> Option<String> {
+    let revision = snapshot.revision();
+    let cache_key = format!("hover-rule-category:{}", key.to_ascii_lowercase());
+    if let Some(cached) = snapshot
+        .query_cache()
+        .get::<Option<String>>(revision, &cache_key)
+    {
+        return (*cached).clone();
+    }
+    let mut contexts = snapshot
+        .rules()
+        .model()
+        .semantic
+        .rules
+        .iter()
+        .filter(|rule| match &rule.key {
+            KeyMatcher::Exact(expected) => expected.eq_ignore_ascii_case(key),
+            _ => false,
+        })
+        .map(|rule| rule.context.clone())
+        .collect::<Vec<_>>();
+    contexts.sort();
+    contexts.dedup();
+    let category = (contexts.len() == 1)
+        .then(|| {
+            contexts
+                .first()
+                .map(|context| semantic_context_category(context))
+        })
+        .flatten();
+    snapshot.query_cache().insert(
+        revision,
+        pdx_engine::CacheDomain::Index,
+        cache_key,
+        std::sync::Arc::new(category.clone()),
+    );
+    category
 }
 
 /// Renders first-party documentation lines, truncating the total so a pathological declaration
