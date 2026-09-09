@@ -92,6 +92,13 @@ pub fn complete_with_cancellation(
         .is_some_and(|context| semantic_root_entry_uses_bare_values(snapshot, context))
     {
         false
+    } else if semantic_context.as_ref().is_some_and(|context| {
+        context.property.is_none() && context.embedded_value_context.is_none()
+    }) {
+        // The value branch below requires a property; without one it is a no-op, so the
+        // line heuristic can only misfire here (a single-line block's last `=` sits after
+        // its `{` even when the cursor starts a new statement).
+        false
     } else {
         semantic_context
             .as_ref()

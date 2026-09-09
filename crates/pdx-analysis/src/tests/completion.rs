@@ -4146,3 +4146,66 @@ fn dynamic_trigger_body_completion_seeds_scope_from_own_contract() {
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn single_line_block_trailing_whitespace_completes_statement_keys() {
+    let text = "country_event = { option = { add_prestige = 1  } }\n";
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/single-line-statement.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open");
+    let position =
+        u32::try_from(text.find("1  }").expect("trailing whitespace") + 2).expect("position");
+    let items = complete(&host.snapshot(), &id, position).items;
+    assert!(
+        items.iter().any(|item| item.label == "add_prestige"),
+        "whitespace after a complete statement inside a single-line block must complete keys: {:?}",
+        items
+            .iter()
+            .map(|item| item.label.as_str())
+            .take(30)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn same_line_second_statement_completion_filters_by_prefix() {
+    let text = "country_event = { option = { add_prestige = 1 add_pr } }\n";
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/events/same-line-continuation.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open");
+    let position =
+        u32::try_from(text.find("add_pr }").expect("continuation prefix") + 6).expect("position");
+    let items = complete(&host.snapshot(), &id, position).items;
+    assert!(
+        items.iter().any(|item| item.label == "add_prestige"),
+        "a same-line second statement must complete prefix-matched keys: {:?}",
+        items
+            .iter()
+            .map(|item| item.label.as_str())
+            .take(30)
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !items.iter().any(|item| item.label == "random_list"),
+        "keys outside the continuation prefix must stay filtered out: {:?}",
+        items
+            .iter()
+            .map(|item| item.label.as_str())
+            .take(30)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn value_position_with_prefix_still_completes_values() {
+    let (host, id) = semantic_snapshot("trigger = { foo = ye }\n");
+    let position = u32::try_from("trigger = { foo = ye".len()).expect("position");
+    let items = complete(&host.snapshot(), &id, position).items;
+    assert!(
+        items.iter().any(|item| item.label == "yes")
+            && !items.iter().any(|item| item.label == "no"),
+        "a genuine value position with a typed prefix must keep completing values: {items:?}"
+    );
+}
