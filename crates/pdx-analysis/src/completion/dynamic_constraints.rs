@@ -20,8 +20,8 @@ use pdx_rules::{KeyMatcher, ValueMatcher};
 
 use crate::dynamic_rules::{
     DynamicAffixSegment, DynamicAffixedSiteRow, DynamicForwardSiteRow, DynamicForwardValue,
-    DynamicKeyRenderSiteRow, DynamicQuotedSiteRow, DynamicRuleRow, DynamicScopeStep,
-    DynamicSiteGuard, DynamicSiteZone, DynamicValueSiteRow, dynamic_rule_row,
+    DynamicKeyRenderSiteRow, DynamicParameterRow, DynamicQuotedSiteRow, DynamicRuleRow,
+    DynamicScopeStep, DynamicSiteGuard, DynamicSiteZone, DynamicValueSiteRow, dynamic_rule_row,
 };
 use crate::semantic::{
     enum_members, semantic_rule_key_matches, semantic_scope_allows, workspace_member_index,
@@ -55,6 +55,64 @@ pub(crate) struct DynamicKeyRenderSite {
     pub(crate) suffix: String,
     pub(crate) context: String,
     pub(crate) parent_path: Vec<std::sync::Arc<str>>,
+    pub(crate) scope: ScopeContext,
+}
+
+/// One affixed value-position render site replayed for display: the rendered
+/// literal affixes plus the site's full scope-filtered matchers, with no
+/// domain stripping — completion derives candidates from them, hover labels
+/// them directly.
+#[derive(Clone, Debug)]
+pub(crate) struct DynamicAffixedConstraintSite {
+    pub(crate) prefix: String,
+    pub(crate) suffix: String,
+    pub(crate) matchers: Vec<ValueMatcher>,
+    pub(crate) scope: ScopeContext,
+}
+
+/// Audience-neutral replay output: every site that survived chain replay,
+/// scope filtering, and (per policy) guard pruning, keeping full matcher
+/// alternatives. Completion projects candidate sets from these; hover renders
+/// contract lines from them. The two consumers thereby share one derivation.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct ReplayedSites {
+    pub(crate) values: Vec<DynamicValueConstraintSite>,
+    pub(crate) affixed: Vec<DynamicAffixedConstraintSite>,
+    pub(crate) key_renders: Vec<DynamicKeyRenderSite>,
+    pub(crate) quoted_scripts: Vec<DynamicQuotedScriptConstraintSite>,
+}
+
+#[derive(Clone, Copy)]
+struct ReplayOptions {
+    /// Keep rows recorded inside `$param$ = { … }` rendered-key subtrees.
+    /// Completion drops them (arbitration B); hovers keep them, matching the
+    /// pre-replay walk that showed their usage.
+    include_rendered_key: bool,
+    /// Prune `[[param]]` conditional branches by the caller's bindings.
+    /// Definition-side hovers have no invocation and show every branch.
+    prune_guards: bool,
+}
+
+impl ReplayOptions {
+    const COMPLETION: Self = Self {
+        include_rendered_key: false,
+        prune_guards: true,
+    };
+    const HOVER_DEFINITION: Self = Self {
+        include_rendered_key: true,
+        prune_guards: false,
+    };
+    const HOVER_CALLER: Self = Self {
+        include_rendered_key: true,
+        prune_guards: true,
+    };
+}
+
+/// The live invocation a call-site parameter hover sits in: the invocation
+/// statement, the hovered argument, and the caller's scope there.
+pub(crate) struct HoverCaller<'a> {
+    pub(crate) invocation: &'a ScriptProperty,
+    pub(crate) target: &'a ScriptProperty,
     pub(crate) scope: ScopeContext,
 }
 
@@ -167,22 +225,116 @@ fn infer_argument_constraints(
     else {
         return DynamicArgumentConstraints::default();
     };
+    let replayed = replay_sites(
+        snapshot,
+        &row,
+        &target_parameter,
+        bindings,
+        caller_scope,
+        ReplayOptions::COMPLETION,
+    );
+    project_completion_constraints(snapshot, replayed)
+}
+
+/// Runs the two-pass row replay for one parameter under a consumer policy.
+fn replay_sites(
+    snapshot: &AnalysisSnapshot,
+    row: &DynamicRuleRow,
+    target_parameter: &str,
+    bindings: &BTreeMap<String, BoundArgument>,
+    entry_scope: &ScopeContext,
+    options: ReplayOptions,
+) -> ReplayedSites {
     let mut replayer = RowReplayer {
         snapshot,
         bindings: bindings.clone(),
         visited: Vec::new(),
-        values: Vec::new(),
-        quoted_scripts: Vec::new(),
-        key_renders: Vec::new(),
-        unenumerable: false,
+        options,
+        replayed: ReplayedSites::default(),
     };
-    replayer.replay_parameter(&row, &target_parameter, caller_scope);
-    DynamicArgumentConstraints {
-        values: replayer.values,
-        quoted_scripts: replayer.quoted_scripts,
-        key_renders: replayer.key_renders,
-        unenumerable: replayer.unenumerable,
+    replayer.replay_parameter(row, target_parameter, entry_scope);
+    replayer.replayed
+}
+
+/// Projects replayed sites into completion's candidate constraints: only
+/// enumerable matchers offer items, affixed sites contribute their stripped
+/// member domain, and any site left without items marks the value as
+/// constrained-but-unenumerable.
+fn project_completion_constraints(
+    snapshot: &AnalysisSnapshot,
+    replayed: ReplayedSites,
+) -> DynamicArgumentConstraints {
+    let mut constraints = DynamicArgumentConstraints::default();
+    for site in replayed.values {
+        let matchers: Vec<ValueMatcher> = site
+            .matchers
+            .iter()
+            .filter(|matcher| is_completion_constraint(matcher))
+            .cloned()
+            .collect();
+        if !matchers.is_empty() {
+            constraints.values.push(DynamicValueConstraintSite {
+                matchers,
+                scope: site.scope,
+            });
+        } else {
+            // Every constraint at this site is a non-enumerable shape
+            // (numbers, opaque strings): the parameter is not free-form, but
+            // no item can be offered.
+            constraints.unenumerable = true;
+        }
     }
+    for site in replayed.affixed {
+        match affixed_value_matcher_domain(snapshot, &site.matchers, &site.prefix, &site.suffix) {
+            Some(domain) if !domain.is_empty() => {
+                constraints.values.push(DynamicValueConstraintSite {
+                    matchers: domain,
+                    scope: site.scope,
+                })
+            }
+            // Members exist but none carries both affixes: the site
+            // constrains, yet nothing can be offered.
+            Some(_) => constraints.unenumerable = true,
+            // Open reference domains cannot constrain the bare argument.
+            None => {}
+        }
+    }
+    constraints.key_renders = replayed.key_renders;
+    constraints.quoted_scripts = replayed.quoted_scripts;
+    constraints
+}
+
+/// Replays one parameter's usage sites for hover display: the same rows and
+/// replay machinery completion consumes, with hover's policy — full matcher
+/// alternatives (no enumerable-only filter, no domain stripping), rows inside
+/// rendered-key subtrees included, and at a live call site conditional
+/// branches pruned by the invocation's actual bindings. A definition-side
+/// hover passes no caller and sees the union of branches under an any-scope.
+pub(crate) fn replay_parameter_sites_for_hover(
+    snapshot: &AnalysisSnapshot,
+    row: &DynamicRuleRow,
+    parameter: &DynamicParameterRow,
+    caller: Option<&HoverCaller<'_>>,
+) -> ReplayedSites {
+    let entry_scope = caller.map_or_else(
+        || ScopeContext::new(snapshot.game_profile_handle()),
+        |caller| caller.scope.clone(),
+    );
+    let bindings = caller.map_or_else(BTreeMap::new, |caller| {
+        invocation_bindings(caller.invocation, Some(caller.target))
+    });
+    replay_sites(
+        snapshot,
+        row,
+        &parameter.name,
+        &bindings,
+        &entry_scope,
+        if caller.is_some() {
+            ReplayOptions::HOVER_CALLER
+        } else {
+            ReplayOptions::HOVER_DEFINITION
+        },
+    )
 }
 
 pub(crate) fn dynamic_parameter_owner(
@@ -300,7 +452,7 @@ struct ChainReplay {
 }
 
 /// Replays one parameter's site rows (and its forwarding edges) into
-/// caller-side constraint sites.
+/// audience-neutral replayed sites.
 struct RowReplayer<'a> {
     snapshot: &'a AnalysisSnapshot,
     bindings: BTreeMap<String, BoundArgument>,
@@ -308,10 +460,8 @@ struct RowReplayer<'a> {
     /// repeats no rows (genuine definition cycles are also rejected at the
     /// definition site).
     visited: Vec<(String, String)>,
-    values: Vec<DynamicValueConstraintSite>,
-    quoted_scripts: Vec<DynamicQuotedScriptConstraintSite>,
-    key_renders: Vec<DynamicKeyRenderSite>,
-    unenumerable: bool,
+    options: ReplayOptions,
+    replayed: ReplayedSites,
 }
 
 impl<'a> RowReplayer<'a> {
@@ -337,40 +487,44 @@ impl<'a> RowReplayer<'a> {
         else {
             return;
         };
-        // RenderedKey subtrees ($SCOPE$ = { ... }) stay diagnostics-only
-        // (arbitration B): the pre-replay completion walker never descended
-        // them, so replaying their rows would change completion item sets.
+        // RenderedKey subtrees ($SCOPE$ = { ... }) stay diagnostics-only for
+        // completion (arbitration B): the pre-replay completion walker never
+        // descended them, so replaying their rows would change completion
+        // item sets. Hover's informational view keeps them.
+        let keep = |zone: DynamicSiteZone| {
+            self.options.include_rendered_key || zone != DynamicSiteZone::RenderedKey
+        };
         let sites: Vec<SiteRef<'_>> = parameter
             .value_sites
             .iter()
-            .filter(|site| site.zone != DynamicSiteZone::RenderedKey)
+            .filter(|site| keep(site.zone))
             .map(SiteRef::Value)
             .chain(
                 parameter
                     .affixed_value_sites
                     .iter()
-                    .filter(|site| site.zone != DynamicSiteZone::RenderedKey)
+                    .filter(|site| keep(site.zone))
                     .map(SiteRef::Affixed),
             )
             .chain(
                 parameter
                     .key_render_sites
                     .iter()
-                    .filter(|site| site.zone != DynamicSiteZone::RenderedKey)
+                    .filter(|site| keep(site.zone))
                     .map(SiteRef::KeyRender),
             )
             .chain(
                 parameter
                     .quoted_sites
                     .iter()
-                    .filter(|site| site.zone != DynamicSiteZone::RenderedKey)
+                    .filter(|site| keep(site.zone))
                     .map(SiteRef::Quoted),
             )
             .chain(
                 parameter
                     .forward_sites
                     .iter()
-                    .filter(|site| site.zone != DynamicSiteZone::RenderedKey)
+                    .filter(|site| keep(site.zone))
                     .map(SiteRef::Forward),
             )
             .collect();
@@ -407,7 +561,12 @@ impl<'a> RowReplayer<'a> {
 
     /// A conditional branch is active when its guard parameter is bound
     /// (any value, block included) — or unbound, for a negated guard.
+    /// Definition-side hovers have no invocation to bind against and keep
+    /// every branch instead.
     fn guards_active(&self, guards: &[DynamicSiteGuard]) -> bool {
+        if !self.options.prune_guards {
+            return true;
+        }
         guards.iter().all(|guard| {
             let present = self.bindings.contains_key(&guard.name);
             present != guard.negated
@@ -449,7 +608,7 @@ impl<'a> RowReplayer<'a> {
     }
 
     fn emit_value_site(&mut self, site: &DynamicValueSiteRow, scope: &ScopeContext) {
-        let mut raw: Vec<ValueMatcher> = site
+        let mut matchers: Vec<ValueMatcher> = site
             .matchers
             .iter()
             .zip(&site.matcher_scopes)
@@ -461,26 +620,15 @@ impl<'a> RowReplayer<'a> {
             })
             .map(|(matcher, _)| matcher.clone())
             .collect();
-        raw.sort_by_key(|matcher| format!("{matcher:?}"));
-        raw.dedup();
-        let mut matchers: Vec<ValueMatcher> = raw
-            .iter()
-            .filter(|matcher| is_completion_constraint(matcher))
-            .cloned()
-            .collect();
         matchers.sort_by_key(|matcher| format!("{matcher:?}"));
         matchers.dedup();
-        if !matchers.is_empty() {
-            self.values.push(DynamicValueConstraintSite {
-                matchers,
-                scope: scope.clone(),
-            });
-        } else if !raw.is_empty() {
-            // Every constraint at this site is a non-enumerable shape
-            // (numbers, opaque strings): the parameter is not free-form, but
-            // no item can be offered.
-            self.unenumerable = true;
+        if matchers.is_empty() {
+            return;
         }
+        self.replayed.values.push(DynamicValueConstraintSite {
+            matchers,
+            scope: scope.clone(),
+        });
     }
 
     fn emit_affixed_site(&mut self, site: &DynamicAffixedSiteRow, scope: &ScopeContext) {
@@ -489,7 +637,7 @@ impl<'a> RowReplayer<'a> {
         else {
             return;
         };
-        let raw: Vec<ValueMatcher> = site
+        let matchers: Vec<ValueMatcher> = site
             .matchers
             .iter()
             .zip(&site.matcher_scopes)
@@ -501,19 +649,15 @@ impl<'a> RowReplayer<'a> {
             })
             .map(|(matcher, _)| matcher.clone())
             .collect();
-        match affixed_value_matcher_domain(self.snapshot, &raw, &prefix, &suffix) {
-            Some(domain) if !domain.is_empty() => {
-                self.values.push(DynamicValueConstraintSite {
-                    matchers: domain,
-                    scope: scope.clone(),
-                });
-            }
-            // Members exist but none carries both affixes: the site
-            // constrains, yet nothing can be offered.
-            Some(_) => self.unenumerable = true,
-            // Open reference domains cannot constrain the bare argument.
-            None => {}
+        if matchers.is_empty() {
+            return;
         }
+        self.replayed.affixed.push(DynamicAffixedConstraintSite {
+            prefix,
+            suffix,
+            matchers,
+            scope: scope.clone(),
+        });
     }
 
     fn emit_key_render_site(&mut self, site: &DynamicKeyRenderSiteRow, scope: &ScopeContext) {
@@ -522,7 +666,7 @@ impl<'a> RowReplayer<'a> {
         else {
             return;
         };
-        if self.key_renders.iter().any(|known| {
+        if self.replayed.key_renders.iter().any(|known| {
             known.prefix.eq_ignore_ascii_case(&prefix)
                 && known.suffix.eq_ignore_ascii_case(&suffix)
                 && known.context.eq_ignore_ascii_case(&site.context)
@@ -536,7 +680,7 @@ impl<'a> RowReplayer<'a> {
         }) {
             return;
         }
-        self.key_renders.push(DynamicKeyRenderSite {
+        self.replayed.key_renders.push(DynamicKeyRenderSite {
             prefix,
             suffix,
             context: site.context.clone(),
@@ -546,18 +690,20 @@ impl<'a> RowReplayer<'a> {
     }
 
     fn emit_quoted_site(&mut self, site: &DynamicQuotedSiteRow, scope: &ScopeContext) {
-        if self.quoted_scripts.iter().any(|known| {
+        if self.replayed.quoted_scripts.iter().any(|known| {
             known.context.eq_ignore_ascii_case(&site.context)
                 && known.parent_path == site.parent_path
                 && known.scope == *scope
         }) {
             return;
         }
-        self.quoted_scripts.push(DynamicQuotedScriptConstraintSite {
-            context: site.context.clone(),
-            parent_path: site.parent_path.clone(),
-            scope: scope.clone(),
-        });
+        self.replayed
+            .quoted_scripts
+            .push(DynamicQuotedScriptConstraintSite {
+                context: site.context.clone(),
+                parent_path: site.parent_path.clone(),
+                scope: scope.clone(),
+            });
     }
 
     /// Follows one forwarding edge into the callee's rows: the callee enters

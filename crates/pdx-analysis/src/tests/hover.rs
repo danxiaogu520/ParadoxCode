@@ -935,3 +935,102 @@ fn affixed_value_parameter_hover_names_the_render_and_expected_domain() {
     );
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn dynamic_parameter_hover_replays_bindings_aware_sites() {
+    use std::fs;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-hover-replay-{nonce}"));
+    let effects = root.join("common/scripted_effects");
+    fs::create_dir_all(&effects).expect("scripted effects directory");
+    let definitions_body = concat!(
+        "pick = {\n",
+        "    [[MODE] add_stability = $AMT$ ]\n",
+        "    [[!MODE] add_prestige = $AMT$ ]\n",
+        "}\n",
+    );
+    fs::write(effects.join("00_replay.txt"), definitions_body).expect("definitions");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    let definitions = DocumentId::new("file:///tmp/common/scripted_effects/00_replay.txt");
+    host.open_document(
+        definitions.clone(),
+        1,
+        definitions_body.to_owned(),
+        Some(effects.join("00_replay.txt")),
+    )
+    .expect("open definitions");
+
+    // Definition-side hover has no invocation: both conditional branches stay.
+    let definition_position =
+        u32::try_from(definitions_body.find("$AMT$").expect("parameter reference") + 1)
+            .expect("position");
+    let definition_hover = hover(&host.snapshot(), &definitions, definition_position)
+        .expect("definition-site parameter hover");
+    let constraints = definition_hover
+        .contents
+        .split("Inferred value constraints (per usage site): ")
+        .nth(1)
+        .expect("constraints line");
+    assert!(
+        constraints.contains("; "),
+        "definition-site hover shows every branch: {}",
+        definition_hover.contents
+    );
+
+    // A call site without MODE activates only the negated branch.
+    let id = DocumentId::new("file:///tmp/events/hover-replay.txt");
+    let unbound = "country_event = { id = replay.1 immediate = { pick = { AMT = 1 } } }\n";
+    host.open_document(id.clone(), 1, unbound.to_owned(), None)
+        .expect("open call site");
+    let unbound_hover = hover(
+        &host.snapshot(),
+        &id,
+        u32::try_from(unbound.find("AMT").expect("argument key") + 1).expect("position"),
+    )
+    .expect("call-site hover");
+    let unbound_constraints = unbound_hover
+        .contents
+        .split("Inferred value constraints (per usage site): ")
+        .nth(1)
+        .expect("constraints line");
+    assert!(
+        !unbound_constraints.contains("; "),
+        "unbound call-site hover prunes the inactive branch: {}",
+        unbound_hover.contents
+    );
+    assert_ne!(
+        constraints, unbound_constraints,
+        "definition-side union and pruned call-site views differ"
+    );
+
+    // Binding MODE activates the other branch.
+    let bound = "country_event = { id = replay.2 immediate = { pick = { MODE = yes AMT = 2 } } }\n";
+    let bound_id = DocumentId::new("file:///tmp/events/hover-replay-2.txt");
+    host.open_document(bound_id.clone(), 1, bound.to_owned(), None)
+        .expect("open bound call site");
+    let bound_hover = hover(
+        &host.snapshot(),
+        &bound_id,
+        u32::try_from(bound.find("AMT").expect("argument key") + 1).expect("position"),
+    )
+    .expect("bound call-site hover");
+    assert_ne!(
+        unbound_hover.contents, bound_hover.contents,
+        "binding the guard parameter changes the replayed branch: {}",
+        bound_hover.contents
+    );
+
+    fs::remove_dir_all(root).expect("cleanup");
+}
