@@ -29,9 +29,17 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # Pinned to engines.vscode; vsce rejects @types/vscode newer than the
+      # engine range. Move both together when raising the minimum VS Code.
+      - dependency-name: "@types/vscode"
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # The only pinned ref is the MSRV job's toolchain, which tracks
+      # rust-version in Cargo.toml, not upstream action releases.
+      - dependency-name: dtolnay/rust-toolchain
