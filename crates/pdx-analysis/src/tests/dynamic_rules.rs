@@ -1,7 +1,16 @@
 use super::support::*;
 use crate::dynamic_contracts::ScopeContract;
-use crate::dynamic_rules::{DynamicBodyFindingKind, dynamic_rule_row};
+use crate::dynamic_rules::{
+    DynamicBodyFindingKind, DynamicScopeTransition, DynamicSiteZone, dynamic_rule_row,
+};
 use pdx_rules::ValueMatcher;
+
+fn province_push() -> DynamicScopeTransition {
+    DynamicScopeTransition {
+        push: Some("province".to_owned()),
+        replaces: Vec::new(),
+    }
+}
 
 /// Opens one scripted-effects file as a current-mod workspace and returns the
 /// snapshot to derive dynamic rule rows from.
@@ -187,4 +196,162 @@ fn dynamic_rows_mark_cycle_participants() {
         let row = dynamic_rule_row(&snapshot, "scripted_effect", name).expect("row");
         assert!(row.cyclic, "{name} must be marked cyclic");
     }
+}
+
+#[test]
+fn site_rows_record_value_site_position_transitions_and_scopes() {
+    // `capital` pushes province and switches to a fresh effect namespace, so
+    // the replay inputs must carry the push and the site must sit at the
+    // child context with an empty parent path.
+    let host = definitions_snapshot("take_core = { capital = { add_core = $PROV$ } }\n");
+    let snapshot = host.snapshot();
+    let row = dynamic_rule_row(&snapshot, "scripted_effect", "take_core").expect("row");
+
+    let prov = row
+        .parameters
+        .iter()
+        .find(|parameter| parameter.name == "PROV")
+        .expect("PROV");
+    assert_eq!(prov.value_sites.len(), 1);
+    let site = &prov.value_sites[0];
+    assert_eq!(site.zone, DynamicSiteZone::Normal);
+    assert_eq!(site.context, "effect");
+    assert!(site.parent_path.is_empty());
+    assert_eq!(site.transitions, vec![province_push()]);
+    assert_eq!(site.operator.as_deref(), Some("="));
+    // Every alternative stays with its own allowed scopes; consumer policy
+    // prunes, the row never does.
+    assert_eq!(
+        site.matchers,
+        vec![
+            ValueMatcher::Scope(Some("country".to_owned())),
+            ValueMatcher::Enum("country_tags".to_owned()),
+            ValueMatcher::Scope(Some("province".to_owned())),
+            ValueMatcher::Type("province_id".to_owned()),
+        ]
+    );
+    assert_eq!(
+        site.matcher_scopes,
+        vec![
+            vec!["country".to_owned(), "province".to_owned()],
+            vec!["country".to_owned(), "province".to_owned()],
+            vec!["country".to_owned(), "province".to_owned()],
+            vec!["country".to_owned(), "province".to_owned()],
+        ]
+    );
+}
+
+#[test]
+fn site_rows_mark_structural_sub_blocks_and_keep_them_out_of_legacy_sites() {
+    // `limit` validates in trigger context against the pre-push scope: the
+    // legacy walk records no scalar sites there, while the site rows record
+    // them with the Structural zone so the staged arbitration can move them
+    // into validation without re-derivation.
+    let host = definitions_snapshot(
+        "sweep = { every_owned_province = { limit = { owned_by = $WHO$ } add_core = $PROV$ } }\n",
+    );
+    let snapshot = host.snapshot();
+    let row = dynamic_rule_row(&snapshot, "scripted_effect", "sweep").expect("row");
+
+    let who = row
+        .parameters
+        .iter()
+        .find(|parameter| parameter.name == "WHO")
+        .expect("WHO");
+    assert!(who.sites.is_empty());
+    assert_eq!(who.value_sites.len(), 1);
+    let site = &who.value_sites[0];
+    assert_eq!(site.zone, DynamicSiteZone::Structural);
+    assert_eq!(site.context, "trigger");
+    assert!(site.parent_path.is_empty());
+    assert_eq!(site.transitions, vec![province_push()]);
+
+    let prov = row
+        .parameters
+        .iter()
+        .find(|parameter| parameter.name == "PROV")
+        .expect("PROV");
+    assert_eq!(prov.value_sites.len(), 1);
+    assert_eq!(prov.value_sites[0].zone, DynamicSiteZone::Normal);
+    assert_eq!(prov.value_sites[0].context, "effect");
+}
+
+#[test]
+fn site_rows_record_key_render_affixes() {
+    let host = definitions_snapshot("dispatcher = { $CMD$ = yes set_$KIND$_policy = 1 }\n");
+    let snapshot = host.snapshot();
+    let row = dynamic_rule_row(&snapshot, "scripted_effect", "dispatcher").expect("row");
+
+    assert!(row.dispatches_dynamically);
+    let cmd = row
+        .parameters
+        .iter()
+        .find(|parameter| parameter.name == "CMD")
+        .expect("CMD");
+    assert_eq!(cmd.key_render_sites.len(), 1);
+    let site = &cmd.key_render_sites[0];
+    assert_eq!((site.prefix.as_str(), site.suffix.as_str()), ("", ""));
+    assert_eq!(site.zone, DynamicSiteZone::Normal);
+    assert_eq!(site.context, "effect");
+    assert!(site.parent_path.is_empty());
+    assert!(site.transitions.is_empty());
+
+    let kind = row
+        .parameters
+        .iter()
+        .find(|parameter| parameter.name == "KIND")
+        .expect("KIND");
+    assert_eq!(kind.key_render_sites.len(), 1);
+    let site = &kind.key_render_sites[0];
+    assert_eq!(
+        (site.prefix.as_str(), site.suffix.as_str()),
+        ("set_", "_policy")
+    );
+}
+
+#[test]
+fn site_rows_record_bare_payload_quoted_sites() {
+    let host = definitions_snapshot("injector = { $PAYLOAD$ add_stability = 1 }\n");
+    let snapshot = host.snapshot();
+    let row = dynamic_rule_row(&snapshot, "scripted_effect", "injector").expect("row");
+
+    let payload = row
+        .parameters
+        .iter()
+        .find(|parameter| parameter.name == "PAYLOAD")
+        .expect("PAYLOAD");
+    assert!(payload.quoted_script);
+    assert_eq!(payload.quoted_sites.len(), 1);
+    let site = &payload.quoted_sites[0];
+    assert_eq!(site.zone, DynamicSiteZone::Normal);
+    assert_eq!(site.context, "effect");
+    assert!(site.parent_path.is_empty());
+    assert!(site.transitions.is_empty());
+}
+
+#[test]
+fn site_rows_stop_at_nested_dynamic_calls_with_forwarding_edges() {
+    // The callee's own rows carry its parameter sites; the caller's parameter
+    // records only the forwarding edge, never the callee's derived sites.
+    let host = definitions_snapshot(
+        "helper = { add_stability = $AMT$ }\nwrapper = { helper = { AMT = $A$ } }\n",
+    );
+    let snapshot = host.snapshot();
+    let row = dynamic_rule_row(&snapshot, "scripted_effect", "wrapper").expect("row");
+
+    let a = row
+        .parameters
+        .iter()
+        .find(|parameter| parameter.name == "A")
+        .expect("A");
+    assert!(a.value_sites.is_empty());
+    assert!(a.affixed_value_sites.is_empty());
+    assert_eq!(
+        a.forwarded_to,
+        vec![crate::dynamic_rules::ForwardedParameter {
+            kind: "scripted_effect".to_owned(),
+            name: "helper".to_owned(),
+            parameter: Some("AMT".to_owned()),
+        }]
+    );
 }

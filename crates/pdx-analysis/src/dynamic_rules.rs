@@ -45,7 +45,7 @@ use crate::dynamic_contracts::{ScopeContract, dynamic_contract};
 use crate::dynamic_cycles::dynamic_cycle_report;
 use crate::semantic::{
     dynamic_definition_type, probe_query_cache, resolve_dynamic_definition,
-    semantic_rule_key_matches, semantic_rules_for_container_key,
+    semantic_rule_key_matches, semantic_rules_for_container_key, semantic_transition_destination,
 };
 use crate::types::{CancellationToken, Cancelled, uncancelled};
 
@@ -81,6 +81,12 @@ pub(crate) struct DynamicParameterRow {
     /// key (`callee = { $WHICH$ = $THIS$ }`), so the binding may land on any
     /// of the callee's parameters.
     pub(crate) forwarded_to: Vec<ForwardedParameter>,
+    /// Per-site facts that callers replay against a live invocation; the
+    /// single derivation completion consumes (staged switchover 2026-09).
+    pub(crate) value_sites: Vec<DynamicValueSiteRow>,
+    pub(crate) affixed_value_sites: Vec<DynamicAffixedSiteRow>,
+    pub(crate) key_render_sites: Vec<DynamicKeyRenderSiteRow>,
+    pub(crate) quoted_sites: Vec<DynamicQuotedSiteRow>,
 }
 
 /// One forwarding edge from an owner parameter into a nested call.
@@ -101,6 +107,108 @@ pub(crate) struct AffixedValueSite {
     pub(crate) prefix: String,
     pub(crate) suffix: String,
     pub(crate) matchers: Vec<ValueMatcher>,
+}
+
+/// Which region of the definition body a site row was derived from. Normal
+/// rows are always replayed; Structural rows sit inside `limit`-style
+/// sub-blocks that validate in a different context against the pre-push
+/// scope — the staged arbitration moves them from skipped to validated
+/// consumer-side, one consumer at a time.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum DynamicSiteZone {
+    Normal,
+    Structural,
+}
+
+/// The scope effect one block statement has on its subtree, replayed by
+/// consumers onto the live caller scope (`semantic_child_scope` semantics):
+/// `push` enters the pushed scope, `replaces` rewrites scope registers with
+/// value expressions that resolve register-relative against the caller.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct DynamicScopeTransition {
+    pub(crate) push: Option<String>,
+    pub(crate) replaces: Vec<(String, String)>,
+}
+
+impl DynamicScopeTransition {
+    fn from_rule(rule: &pdx_rules::SemanticRule) -> Self {
+        Self {
+            push: rule.push_scope.clone(),
+            replaces: rule.replace_scope.clone(),
+        }
+    }
+
+    fn is_identity(&self) -> bool {
+        self.push.is_none() && self.replaces.is_empty()
+    }
+}
+
+/// One scalar usage of a parameter (`add_stability = $AMT$`): the argument
+/// must satisfy one matcher alternative, filtered by the alternative's own
+/// allowed scopes against the replayed caller scope. Matchers keep every
+/// alternative; consumer-side policy (completion's enumerable-only filter,
+/// diagnostics' full validation) prunes differently without re-derivation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct DynamicValueSiteRow {
+    /// Definition-side range of the whole statement carrying the site.
+    pub(crate) statement_range: TextRange,
+    pub(crate) zone: DynamicSiteZone,
+    /// Semantic context the site validates in.
+    pub(crate) context: String,
+    /// Parent rule path at the site.
+    pub(crate) parent_path: Vec<Arc<str>>,
+    /// Scope transitions from the definition entry to this site.
+    pub(crate) transitions: Vec<DynamicScopeTransition>,
+    /// One matcher per alternative rule row, in row order.
+    pub(crate) matchers: Vec<ValueMatcher>,
+    /// Parallel to `matchers`: the alternative's `allowed_scopes` (empty
+    /// means unrestricted).
+    pub(crate) matcher_scopes: Vec<Vec<String>>,
+    /// The statement's operator, for operator-sensitive replays.
+    pub(crate) operator: Option<String>,
+}
+
+/// One affixed scalar usage (`type = $RT$_rebels`): the argument is validated
+/// by splicing it between the affixes and matching the rendered value, so the
+/// row keeps the affixes plus the un-stripped matcher alternatives.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct DynamicAffixedSiteRow {
+    pub(crate) statement_range: TextRange,
+    pub(crate) zone: DynamicSiteZone,
+    pub(crate) context: String,
+    pub(crate) parent_path: Vec<Arc<str>>,
+    pub(crate) transitions: Vec<DynamicScopeTransition>,
+    pub(crate) prefix: String,
+    pub(crate) suffix: String,
+    /// One matcher per alternative rule row, in row order (member-domain
+    /// stripping stays consumer-side).
+    pub(crate) matchers: Vec<ValueMatcher>,
+    pub(crate) matcher_scopes: Vec<Vec<String>>,
+}
+
+/// One key-position render (`$CMD$ = yes`, `set_$KIND$_policy = 1`): the
+/// argument becomes a statement key (whole or between literal affixes).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct DynamicKeyRenderSiteRow {
+    pub(crate) statement_range: TextRange,
+    pub(crate) zone: DynamicSiteZone,
+    pub(crate) context: String,
+    pub(crate) parent_path: Vec<Arc<str>>,
+    pub(crate) transitions: Vec<DynamicScopeTransition>,
+    pub(crate) prefix: String,
+    pub(crate) suffix: String,
+}
+
+/// One script-payload usage: a bare `$PAYLOAD$` item, or a quoted-script row
+/// whose whole value is the parameter. The caller's quoted argument validates
+/// as script at the replayed (context, path) site.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct DynamicQuotedSiteRow {
+    pub(crate) statement_range: TextRange,
+    pub(crate) zone: DynamicSiteZone,
+    pub(crate) context: String,
+    pub(crate) parent_path: Vec<Arc<str>>,
+    pub(crate) transitions: Vec<DynamicScopeTransition>,
 }
 
 /// Why a body statement can never run.
@@ -312,10 +420,18 @@ fn build_dynamic_rule_report(
             }
         };
         let mut derivation = Derivation::new(snapshot, profile);
+        let mut sites = SiteDerivation::new(snapshot, profile);
         if let Some(template) = resolved.summary.template.as_ref() {
             derivation.walk_items(&template.items, &resolved.body_context, &[], entry_flow);
+            let entry = SitePosition {
+                context: resolved.body_context.clone(),
+                path: Vec::new(),
+                transitions: Vec::new(),
+                zone: DynamicSiteZone::Normal,
+            };
+            sites.walk_items(&template.items, &entry);
         }
-        let parameters = merge_parameter_rows(&resolved.summary.parameters, &derivation);
+        let parameters = merge_parameter_rows(&resolved.summary.parameters, &derivation, &sites);
         let row = DynamicRuleRow {
             kind: resolved.summary.kind.clone(),
             name: resolved.summary.name.clone(),
@@ -338,6 +454,7 @@ fn build_dynamic_rule_report(
 fn merge_parameter_rows(
     signature: &[DynamicParameterSignature],
     derivation: &Derivation<'_>,
+    sites: &SiteDerivation<'_>,
 ) -> Vec<DynamicParameterRow> {
     let mut rows = Vec::with_capacity(signature.len());
     let mut seen: BTreeSet<String> = BTreeSet::new();
@@ -346,6 +463,7 @@ fn merge_parameter_rows(
         let usage = derivation
             .parameters
             .get(&parameter.name.to_ascii_lowercase());
+        let site_usage = sites.usage(&parameter.name);
         rows.push(DynamicParameterRow {
             name: parameter.name.clone(),
             required: parameter.required,
@@ -354,12 +472,19 @@ fn merge_parameter_rows(
             quoted_script: usage.is_some_and(|usage| usage.quoted_script),
             used_in_key: usage.is_some_and(|usage| usage.used_in_key),
             forwarded_to: usage.map_or_else(Vec::new, |usage| usage.forwarded_to.clone()),
+            value_sites: site_usage.map_or_else(Vec::new, |usage| usage.value_sites.clone()),
+            affixed_value_sites: site_usage
+                .map_or_else(Vec::new, |usage| usage.affixed_value_sites.clone()),
+            key_render_sites: site_usage
+                .map_or_else(Vec::new, |usage| usage.key_render_sites.clone()),
+            quoted_sites: site_usage.map_or_else(Vec::new, |usage| usage.quoted_sites.clone()),
         });
     }
     // Usage the signature missed (guarded template-only forms) still rows as
     // optional so completion and call-site checks can see it.
     for (name, usage) in &derivation.parameters {
         if seen.insert(name.clone()) {
+            let site_usage = sites.usage(name);
             rows.push(DynamicParameterRow {
                 name: name.clone(),
                 required: false,
@@ -368,6 +493,12 @@ fn merge_parameter_rows(
                 quoted_script: usage.quoted_script,
                 used_in_key: usage.used_in_key,
                 forwarded_to: usage.forwarded_to.clone(),
+                value_sites: site_usage.map_or_else(Vec::new, |usage| usage.value_sites.clone()),
+                affixed_value_sites: site_usage
+                    .map_or_else(Vec::new, |usage| usage.affixed_value_sites.clone()),
+                key_render_sites: site_usage
+                    .map_or_else(Vec::new, |usage| usage.key_render_sites.clone()),
+                quoted_sites: site_usage.map_or_else(Vec::new, |usage| usage.quoted_sites.clone()),
             });
         }
     }
@@ -803,6 +934,388 @@ impl<'a> Derivation<'a> {
             .entry(name.to_ascii_lowercase())
             .or_default()
     }
+}
+
+/// Records where every parameter flows inside one definition body as facts a
+/// caller replays against a live invocation — the single derivation that both
+/// completion and diagnostics consume (C4-1 switchover, staged 2026-09). The
+/// walk mirrors the symbolic per-query instantiation it replaces: same rule
+/// matching, same shape arms, same destinations — but once per revision
+/// instead of once per query, with nested dynamic calls left to the callee's
+/// own rows (`forwarded_to` edges carry the binding).
+struct SiteDerivation<'a> {
+    snapshot: &'a AnalysisSnapshot,
+    profile: &'a GameProfile,
+    parameters: BTreeMap<String, SiteParameterUsage>,
+    /// Container visits charged per definition so pathological alternation
+    /// degrades to partial rows instead of unbounded work.
+    visits: usize,
+}
+
+/// Hard ceiling on container visits per definition; far above any vanilla
+/// definition's alternation fan-out.
+const MAX_SITE_WALKS: usize = 8192;
+
+#[derive(Default)]
+struct SiteParameterUsage {
+    value_sites: Vec<DynamicValueSiteRow>,
+    affixed_value_sites: Vec<DynamicAffixedSiteRow>,
+    key_render_sites: Vec<DynamicKeyRenderSiteRow>,
+    quoted_sites: Vec<DynamicQuotedSiteRow>,
+}
+
+impl<'a> SiteDerivation<'a> {
+    fn new(snapshot: &'a AnalysisSnapshot, profile: &'a GameProfile) -> Self {
+        Self {
+            snapshot,
+            profile,
+            parameters: BTreeMap::new(),
+            visits: 0,
+        }
+    }
+
+    fn usage(&self, name: &str) -> Option<&SiteParameterUsage> {
+        self.parameters.get(&name.to_ascii_lowercase())
+    }
+
+    fn usage_mut(&mut self, name: &str) -> &mut SiteParameterUsage {
+        self.parameters
+            .entry(name.to_ascii_lowercase())
+            .or_default()
+    }
+
+    fn walk_items(&mut self, items: &[TemplateItem], position: &SitePosition) {
+        if self.visits >= MAX_SITE_WALKS {
+            return;
+        }
+        self.visits += 1;
+        for item in items {
+            match item {
+                TemplateItem::Property(property) => {
+                    self.walk_property(property, position);
+                }
+                TemplateItem::Conditional(conditional) => {
+                    self.walk_items(&conditional.items, position);
+                }
+                TemplateItem::BareValue(token) => {
+                    // A bare `$PAYLOAD$` injects the caller's script fragment
+                    // at this container's position.
+                    for name in token_parameters(token) {
+                        self.usage_mut(name)
+                            .quoted_sites
+                            .push(DynamicQuotedSiteRow {
+                                statement_range: token.range,
+                                zone: position.zone,
+                                context: position.context.clone(),
+                                parent_path: position.path.clone(),
+                                transitions: position.transitions.clone(),
+                            });
+                    }
+                }
+            }
+        }
+    }
+
+    fn walk_property(&mut self, property: &TemplateProperty, position: &SitePosition) {
+        if token_has_parameter(&property.key) {
+            // The rendered key is unknowable at definition time and nothing
+            // derives from its subtree (mirroring the symbolic walker's
+            // `continue`); each parameter records its render site so callers
+            // still constrain key-shaped arguments.
+            for name in token_parameters(&property.key) {
+                let (prefix, suffix) = if is_bare_parameter(&property.key, name) {
+                    (String::new(), String::new())
+                } else {
+                    match literal_token_affixes(&property.key, name) {
+                        Some(affixes) => affixes,
+                        None => continue,
+                    }
+                };
+                self.usage_mut(name)
+                    .key_render_sites
+                    .push(DynamicKeyRenderSiteRow {
+                        statement_range: property.range,
+                        zone: position.zone,
+                        context: position.context.clone(),
+                        parent_path: position.path.clone(),
+                        transitions: position.transitions.clone(),
+                        prefix,
+                        suffix,
+                    });
+            }
+            return;
+        }
+        let Some(key) = single_literal(&property.key).map(str::trim) else {
+            return;
+        };
+        if key.is_empty() {
+            return;
+        }
+        // A nested dynamic call's argument block is parameter assignments;
+        // the callee's own rows carry its parameter sites and the
+        // `forwarded_to` edges carry the binding, so the subtree is not
+        // re-derived here.
+        if dynamic_kind_for_context(self.snapshot, &position.context)
+            .and_then(|kind| resolve_dynamic_definition(self.snapshot, &kind, key))
+            .is_some()
+        {
+            return;
+        }
+        // Shape is an arm-level filter here (a scalar consumes Leaf rows and
+        // QuotedScript rows, a block consumes Node rows), matching the
+        // symbolic walker rather than the legacy walk's up-front shape gate.
+        let matching: Vec<&pdx_rules::SemanticRule> =
+            semantic_rules_for_container_key(self.snapshot, &position.context, &position.path, key)
+                .into_iter()
+                .filter(|rule| {
+                    semantic_rule_key_matches(self.snapshot, rule, &position.path, key)
+                        && rule_operator_matches(rule, property.operator.as_deref())
+                })
+                .collect();
+        match &property.value {
+            TemplateValue::Scalar(token) => {
+                self.record_scalar_sites(property, token, &matching, position, key);
+            }
+            TemplateValue::Block { items, .. } => {
+                self.walk_block(key, items, &matching, position);
+            }
+        }
+    }
+
+    fn record_scalar_sites(
+        &mut self,
+        property: &TemplateProperty,
+        token: &TemplateToken,
+        matching: &[&pdx_rules::SemanticRule],
+        position: &SitePosition,
+        key: &str,
+    ) {
+        let leaf: Vec<&pdx_rules::SemanticRule> = matching
+            .iter()
+            .copied()
+            .filter(|rule| matches!(rule.shape, RuleShape::Leaf | RuleShape::LeafValue))
+            .collect();
+        let quoted_payload: Vec<&pdx_rules::SemanticRule> = matching
+            .iter()
+            .copied()
+            .filter(|rule| matches!(rule.shape, RuleShape::QuotedScript))
+            .collect();
+        for name in token_parameters(token) {
+            let bare = is_bare_parameter(token, name);
+            if bare && !leaf.is_empty() {
+                // Every alternative stays in the row; consumer policy prunes
+                // (completion keeps enumerable members, diagnostics keeps
+                // all matchers) so the two can never drift again.
+                self.usage_mut(name).value_sites.push(DynamicValueSiteRow {
+                    statement_range: property.range,
+                    zone: position.zone,
+                    context: position.context.clone(),
+                    parent_path: position.path.clone(),
+                    transitions: position.transitions.clone(),
+                    matchers: leaf.iter().map(|rule| rule.value.clone()).collect(),
+                    matcher_scopes: leaf
+                        .iter()
+                        .map(|rule| rule.allowed_scopes.clone())
+                        .collect(),
+                    operator: property.operator.clone(),
+                });
+            } else if !leaf.is_empty()
+                && leaf.iter().any(|rule| {
+                    matches!(rule.value, ValueMatcher::Exact(_) | ValueMatcher::Enum(_))
+                })
+                && let Some((prefix, suffix)) = literal_token_affixes(token, name)
+            {
+                self.usage_mut(name)
+                    .affixed_value_sites
+                    .push(DynamicAffixedSiteRow {
+                        statement_range: property.range,
+                        zone: position.zone,
+                        context: position.context.clone(),
+                        parent_path: position.path.clone(),
+                        transitions: position.transitions.clone(),
+                        prefix,
+                        suffix,
+                        matchers: leaf.iter().map(|rule| rule.value.clone()).collect(),
+                        matcher_scopes: leaf
+                            .iter()
+                            .map(|rule| rule.allowed_scopes.clone())
+                            .collect(),
+                    });
+            }
+            if bare {
+                // A quoted-script row whose whole value is the parameter
+                // splices the caller's quoted text into that payload; the
+                // render site is the row's destination.
+                for rule in &quoted_payload {
+                    let (next_context, next_path) = semantic_transition_destination(
+                        rule,
+                        &position.context,
+                        &position.path,
+                        key,
+                        false,
+                    );
+                    let mut next_transitions = position.transitions.clone();
+                    let transition = DynamicScopeTransition::from_rule(rule);
+                    if !transition.is_identity() {
+                        next_transitions.push(transition);
+                    }
+                    self.usage_mut(name)
+                        .quoted_sites
+                        .push(DynamicQuotedSiteRow {
+                            statement_range: property.range,
+                            zone: position.zone,
+                            context: next_context.to_string(),
+                            parent_path: next_path,
+                            transitions: next_transitions,
+                        });
+                }
+            }
+        }
+    }
+
+    fn walk_block(
+        &mut self,
+        key: &str,
+        items: &[TemplateItem],
+        matching: &[&pdx_rules::SemanticRule],
+        position: &SitePosition,
+    ) {
+        let structural = is_structural_sub_block(&key.to_ascii_lowercase());
+        let transparent_wrapper = position.context.eq_ignore_ascii_case("trigger")
+            && self.profile.is_transparent_scope_wrapper(key);
+        // One destination per distinct (context, path, transition): rule
+        // alternatives usually agree, and disagreement fans the subtree out
+        // once per alternative exactly like the symbolic walker's scopes.
+        let mut destinations = SiteDestinations::default();
+        for rule in matching
+            .iter()
+            .copied()
+            .filter(|rule| matches!(rule.shape, RuleShape::Node))
+        {
+            let (next_context, next_path) = semantic_transition_destination(
+                rule,
+                &position.context,
+                &position.path,
+                key,
+                transparent_wrapper,
+            );
+            destinations.push(next_context, next_path, rule);
+        }
+        let destinations = destinations.entries;
+        if destinations.is_empty() {
+            // Unknown or non-scope statement: the block is structural and its
+            // children keep the enclosing position extended by the key
+            // (transparent wrappers stay invisible to the path).
+            let extended = SitePosition {
+                path: if transparent_wrapper {
+                    position.path.clone()
+                } else {
+                    child_path(&position.path, key)
+                },
+                zone: if structural {
+                    DynamicSiteZone::Structural
+                } else {
+                    position.zone
+                },
+                ..position.clone()
+            };
+            self.walk_items(items, &extended);
+            return;
+        }
+        for destination in destinations {
+            let mut next_transitions = position.transitions.clone();
+            if !destination.transition.is_identity() {
+                next_transitions.push(destination.transition.clone());
+            }
+            // A child-context switch starts a fresh rule namespace and leaves
+            // any structural sub-block behind; a structural key (`limit`)
+            // marks its own subtree whatever the rows say.
+            let zone = if structural {
+                DynamicSiteZone::Structural
+            } else if destination.switched_context {
+                DynamicSiteZone::Normal
+            } else {
+                position.zone
+            };
+            let next = SitePosition {
+                context: destination.context.to_string(),
+                path: destination.path,
+                transitions: next_transitions,
+                zone,
+            };
+            self.walk_items(items, &next);
+        }
+    }
+}
+
+/// Walk position threaded through the site derivation: the caller-side
+/// container a replayed site validates in, and how to get there.
+#[derive(Clone)]
+struct SitePosition {
+    context: String,
+    path: Vec<Arc<str>>,
+    transitions: Vec<DynamicScopeTransition>,
+    zone: DynamicSiteZone,
+}
+
+/// One distinct block destination of a statement's Node alternatives.
+struct SiteDestination {
+    context: Arc<str>,
+    path: Vec<Arc<str>>,
+    transition: DynamicScopeTransition,
+    switched_context: bool,
+}
+
+/// Deduplicated (context, path, transition) destinations.
+#[derive(Default)]
+struct SiteDestinations {
+    entries: Vec<SiteDestination>,
+}
+
+impl SiteDestinations {
+    fn push(&mut self, context: Arc<str>, path: Vec<Arc<str>>, rule: &pdx_rules::SemanticRule) {
+        let transition = DynamicScopeTransition::from_rule(rule);
+        if self.entries.iter().any(|known| {
+            known.context.eq_ignore_ascii_case(&context)
+                && known.path == path
+                && transition_equivalent(&known.transition, &transition)
+        }) {
+            return;
+        }
+        let switched_context = rule.child_context.is_some();
+        self.entries.push(SiteDestination {
+            context,
+            path,
+            transition,
+            switched_context,
+        });
+    }
+
+    fn into_vec(self) -> Vec<SiteDestination> {
+        self.entries
+    }
+}
+
+fn transition_equivalent(left: &DynamicScopeTransition, right: &DynamicScopeTransition) -> bool {
+    let push_eq = match (left.push.as_deref(), right.push.as_deref()) {
+        (None, None) => true,
+        (Some(left), Some(right)) => left.eq_ignore_ascii_case(right),
+        _ => false,
+    };
+    push_eq
+        && left.replaces.len() == right.replaces.len()
+        && left.replaces.iter().all(|(register, value)| {
+            right.replaces.iter().any(|(other_register, other_value)| {
+                register.eq_ignore_ascii_case(other_register)
+                    && value.eq_ignore_ascii_case(other_value)
+            })
+        })
+}
+
+fn rule_operator_matches(rule: &pdx_rules::SemanticRule, operator: Option<&str>) -> bool {
+    rule.operator
+        .as_deref()
+        .is_none_or(|expected| operator == Some(expected))
 }
 
 /// The parent path of a block property's children.
