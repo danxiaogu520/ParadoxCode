@@ -43,7 +43,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -135,7 +137,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -161,7 +165,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -187,7 +193,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -220,7 +228,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -246,7 +256,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -312,7 +324,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -354,7 +368,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -380,7 +396,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -415,7 +433,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -485,7 +505,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -935,7 +957,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1033,7 +1057,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1059,7 +1085,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1150,7 +1178,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1294,7 +1324,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1329,7 +1361,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1364,7 +1398,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1423,7 +1459,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1449,7 +1487,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1597,7 +1637,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1735,7 +1777,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1770,7 +1814,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1805,7 +1851,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1895,7 +1943,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -1921,7 +1971,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -2320,7 +2372,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -3004,7 +3058,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -3030,7 +3086,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -3058,7 +3116,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -3203,7 +3263,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -3271,7 +3333,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -3297,7 +3361,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -3362,7 +3428,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -3894,7 +3962,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -3932,7 +4002,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -3970,7 +4042,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -4005,7 +4079,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -4034,7 +4110,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -4130,7 +4208,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -4164,7 +4244,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -4192,7 +4274,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -4365,7 +4449,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -4393,7 +4479,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -4484,7 +4572,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -4566,7 +4656,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -4646,7 +4738,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -4731,7 +4825,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -5639,7 +5735,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -5747,7 +5845,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -6331,7 +6431,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -8997,7 +9099,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -9413,7 +9517,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -11842,7 +11948,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -11901,7 +12009,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -11927,7 +12037,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -12085,7 +12197,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -14090,7 +14204,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -14247,7 +14363,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -14919,7 +15037,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -14947,7 +15067,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -15063,7 +15185,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -15149,7 +15273,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -15177,7 +15303,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -15581,7 +15709,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -15607,7 +15737,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -15837,7 +15969,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -16256,7 +16390,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -16282,7 +16418,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -16315,7 +16453,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -16341,7 +16481,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -16455,7 +16597,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -16928,7 +17072,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -17052,7 +17198,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -17176,7 +17324,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -17267,7 +17417,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -17335,7 +17487,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -17972,7 +18126,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -18005,7 +18161,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -18031,7 +18189,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block for options: factor = base relative weight."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -18111,7 +18271,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -18153,7 +18315,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -18221,7 +18385,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -18282,7 +18448,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -18317,7 +18485,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -18371,7 +18541,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -18397,7 +18569,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -18430,7 +18604,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -18456,7 +18632,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -18482,7 +18660,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -18890,7 +19070,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -18928,7 +19110,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -19130,7 +19314,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -19159,7 +19345,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block for options: factor = base relative weight."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -22967,7 +23155,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -23028,7 +23218,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -23063,7 +23255,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -23098,7 +23292,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -23440,7 +23636,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -27478,7 +27676,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -27985,7 +28185,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -28015,7 +28217,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -28148,7 +28352,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -28178,7 +28384,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -28343,7 +28551,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -28373,7 +28583,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -28608,7 +28820,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -28637,7 +28851,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -28851,7 +29067,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29216,7 +29434,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -29245,7 +29465,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30043,7 +30265,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30377,7 +30601,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30406,7 +30632,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30589,7 +30817,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30923,7 +31153,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -30952,7 +31184,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -31135,7 +31369,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -31447,7 +31683,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -31654,7 +31892,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -31696,7 +31936,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -31813,7 +32055,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -31977,7 +32221,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -32011,7 +32257,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -32039,7 +32287,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -32135,7 +32385,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -32161,7 +32413,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -32217,7 +32471,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -32297,7 +32553,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -32334,7 +32592,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -32468,7 +32728,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -32581,7 +32843,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -32607,7 +32871,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -33893,7 +34159,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -34341,7 +34609,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -34541,7 +34811,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -34839,7 +35111,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -34964,7 +35238,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -35083,7 +35359,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -35153,7 +35431,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -36463,7 +36743,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -39457,7 +39739,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -39492,7 +39776,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -39534,7 +39820,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -39612,7 +39900,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -39647,7 +39937,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -40243,7 +40535,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -40282,7 +40576,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -40328,7 +40624,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -40398,7 +40696,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -40424,7 +40724,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -40494,7 +40796,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -40529,7 +40833,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -40599,7 +40905,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -40686,7 +40994,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -40754,7 +41064,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -40780,7 +41092,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -41931,7 +42245,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -41968,7 +42284,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -42068,7 +42386,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -42168,7 +42488,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -42266,7 +42588,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -43265,7 +43589,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -43335,7 +43661,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -44786,7 +45114,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -44852,7 +45182,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -44882,7 +45214,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46121,7 +46455,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46160,7 +46496,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46199,7 +46537,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46244,7 +46584,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46274,7 +46616,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46377,7 +46721,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46416,7 +46762,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46455,7 +46803,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46500,7 +46850,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46530,7 +46882,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46633,7 +46987,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46672,7 +47028,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46711,7 +47069,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46756,7 +47116,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46786,7 +47148,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46889,7 +47253,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46928,7 +47294,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46967,7 +47335,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47012,7 +47382,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47042,7 +47414,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47145,7 +47519,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47184,7 +47560,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47223,7 +47601,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47268,7 +47648,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47298,7 +47680,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47401,7 +47785,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47440,7 +47826,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47479,7 +47867,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47524,7 +47914,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47554,7 +47946,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47657,7 +48051,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47696,7 +48092,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47735,7 +48133,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47780,7 +48180,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47810,7 +48212,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47913,7 +48317,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47952,7 +48358,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47991,7 +48399,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48036,7 +48446,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48066,7 +48478,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48169,7 +48583,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48208,7 +48624,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48247,7 +48665,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48292,7 +48712,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48322,7 +48744,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48503,7 +48927,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48533,7 +48959,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48569,7 +48997,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48606,7 +49036,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48637,7 +49069,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48697,7 +49131,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49047,7 +49483,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49085,7 +49523,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49123,7 +49563,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49167,7 +49609,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49196,7 +49640,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49323,7 +49769,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49349,7 +49797,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49458,7 +49908,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49667,7 +50119,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49732,7 +50186,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49844,7 +50300,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49870,7 +50328,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -50160,7 +50620,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -50195,7 +50657,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -50230,7 +50694,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -50265,7 +50731,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -50307,7 +50775,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -50333,7 +50803,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "AI weighting block: factor = base weight, modifier blocks adjust it."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -50798,7 +51270,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -53163,7 +53637,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -53193,7 +53669,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -53406,7 +53884,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -53436,7 +53916,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -53801,7 +54283,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of effects executed by the containing entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -57757,7 +58241,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -58489,7 +58975,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions evaluated once; gate the entry's visibility."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -58915,7 +59403,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of modifiers applied while the containing entry is active."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -58992,7 +59482,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -59142,7 +59634,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -59290,7 +59784,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -59494,7 +59990,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Trigger conditions checked when using the entry."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -59666,7 +60164,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -59725,7 +60225,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -59784,7 +60286,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -60502,7 +61006,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -60653,7 +61159,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Block of trigger conditions; all must hold for the containing entry to apply."
+    ],
     "allowed_scopes": [
       "any"
     ],

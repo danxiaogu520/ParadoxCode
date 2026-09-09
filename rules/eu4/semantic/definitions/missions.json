@@ -568,7 +568,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Base weight multiplier in the enclosing weight/AI block."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -662,7 +664,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Mission column; by default columns 1 (leftmost) to 5 (rightmost), extendable via countrymissionsview.gui."
+    ],
     "allowed_scopes": [
       "any"
     ],
