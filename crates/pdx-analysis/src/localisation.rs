@@ -336,6 +336,42 @@ pub(crate) fn localisation_command_fragment(
     Some((range, prefix))
 }
 
+/// The `$NAME$` fragment at a position inside a localisation value. The inner
+/// text is either a nested localisation key reference or a placeholder the
+/// displaying context binds (`$WHO$`, `$VAL$` — vanilla binds these in the
+/// engine, not in script). Returns the full fragment including both `$`
+/// delimiters and the inner name; `$$` escapes and fragment bodies with
+/// whitespace or command syntax are rejected.
+pub(crate) fn localisation_key_reference_fragment(
+    input: &ParsedInput,
+    position: TextSize,
+) -> Option<(TextRange, String)> {
+    if input.format != FileFormat::Localisation {
+        return None;
+    }
+    let offset = usize::try_from(position).ok()?.min(input.source.len());
+    if !input.source.is_char_boundary(offset) {
+        return None;
+    }
+    let open = input.source[..offset].rfind('$')?;
+    if input.source[open + 1..offset].contains('$') {
+        return None;
+    }
+    let close = offset + input.source[offset..].find('$')?;
+    let name = input.source.get(open + 1..close)?;
+    if name.is_empty() || name.len() > 128 {
+        return None;
+    }
+    if !name
+        .chars()
+        .all(|character| character.is_ascii_alphanumeric() || character == '_' || character == '.')
+    {
+        return None;
+    }
+    let range = TextRange::new(u32::try_from(open).ok()?, u32::try_from(close + 1).ok()?)?;
+    Some((range, name.to_owned()))
+}
+
 /// Completes static and workspace-defined localisation commands.
 pub(crate) fn localisation_command_completion(
     snapshot: &AnalysisSnapshot,

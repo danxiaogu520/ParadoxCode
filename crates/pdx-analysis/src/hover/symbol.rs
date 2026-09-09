@@ -127,11 +127,16 @@ pub(crate) fn hover_for_symbol(
                 .iter()
                 .take(shown)
                 .map(|candidate| {
-                    format!(
+                    let mut line = format!(
                         "- {}: `{}`",
                         symbol_source_root(snapshot, &candidate.location),
                         symbol_location_path(&candidate.location),
-                    )
+                    );
+                    if let Some(position) = symbol_location_position(snapshot, &candidate.location)
+                    {
+                        line.push_str(&format!(" {position}"));
+                    }
+                    line
                 })
                 .collect::<Vec<_>>();
             if candidates.len() > shown {
@@ -171,6 +176,30 @@ pub(crate) fn symbol_location_path(location: &Location) -> String {
         || "<open document>".to_owned(),
         |path| path.as_str().to_owned(),
     )
+}
+
+/// One-based `L<line>:C<column>` for a candidate's definition start, so
+/// ambiguous-symbol lists with several sites in one file stay tellable
+/// apart. Returns `None` when the backing source is not loadable.
+pub(crate) fn symbol_location_position(
+    snapshot: &AnalysisSnapshot,
+    location: &Location,
+) -> Option<String> {
+    let input = location
+        .document
+        .as_ref()
+        .and_then(|document| crate::support::input_for_document(snapshot, document))
+        .or_else(|| {
+            location
+                .file
+                .and_then(|file| crate::support::input_for_source_file(snapshot, file))
+        })?;
+    let start = usize::try_from(location.range.start()).ok()?;
+    let prefix = &input.source[..start.min(input.source.len())];
+    let line = prefix.bytes().filter(|byte| *byte == b'\n').count() + 1;
+    let last_line_start = prefix.rfind('\n').map_or(0, |index| index + 1);
+    let column = prefix[last_line_start..].chars().count() + 1;
+    Some(format!("L{line}:C{column}"))
 }
 
 pub(crate) fn symbol_source_root(snapshot: &AnalysisSnapshot, location: &Location) -> String {

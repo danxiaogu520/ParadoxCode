@@ -1123,3 +1123,67 @@ fn event_hover_falls_back_to_the_generated_title_key() {
     );
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+fn localisation_variable_fragment_hover_resolves_keys_and_names_placeholders() {
+    let mut host = eu4_host(pdx_game::eu4::bootstrap_rules());
+    let id = DocumentId::new("file:///tmp/localisation/fragments.yml");
+    let text = concat!(
+        "l_english:\n",
+        " my_key:0 \"Resolve $nested_key$ here\"\n",
+        " nested_key:0 \"Nested text\"\n",
+        " other:0 \"$WHO$ will decide\"\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open localisation");
+    let snapshot = host.snapshot();
+
+    let nested = u32::try_from(text.find("$nested_key$").expect("fragment") + 2).expect("position");
+    let nested_hover = hover(&snapshot, &id, nested).expect("nested key hover");
+    assert!(
+        nested_hover
+            .contents
+            .contains("### localisation `nested_key`")
+            && nested_hover
+                .contents
+                .contains("Localisation (l_english): \"Nested text\""),
+        "resolvable fragment hovers as its key: {}",
+        nested_hover.contents
+    );
+
+    let placeholder = u32::try_from(text.find("$WHO$").expect("fragment") + 2).expect("position");
+    let placeholder_hover = hover(&snapshot, &id, placeholder).expect("placeholder hover");
+    assert!(
+        placeholder_hover.contents.contains("### `WHO`")
+            && placeholder_hover
+                .contents
+                .contains("Localisation variable placeholder"),
+        "unresolvable fragment names itself a placeholder: {}",
+        placeholder_hover.contents
+    );
+}
+
+#[test]
+fn ambiguous_dynamic_set_candidates_carry_positions() {
+    let (host, id) = snapshot(concat!(
+        "country_event = { id = p.1 immediate = { ",
+        "set_variable = { which = my_stab_var value = 1 } ",
+        "change_variable = { which = my_stab_var value = 2 } ",
+        "} }\n",
+    ));
+    let text = "country_event = { id = p.1 immediate = { set_variable = { which = my_stab_var value = 1 } change_variable = { which = my_stab_var value = 2 } } }\n";
+    let position =
+        u32::try_from(text.find("my_stab_var").expect("variable") + 1).expect("position");
+    let hover = hover(&host.snapshot(), &id, position).expect("variable hover");
+    assert!(
+        hover.contents.contains("### variable `my_stab_var`"),
+        "variable values hover through the dynamic set: {}",
+        hover.contents
+    );
+    let first = hover.contents.match_indices("L1:C").count();
+    assert!(
+        first >= 2,
+        "ambiguous sites stay distinguishable by position: {}",
+        hover.contents
+    );
+}

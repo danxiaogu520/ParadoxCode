@@ -12,7 +12,7 @@ pub(crate) use rules::semantic_pattern_rule_hint;
 pub(crate) use symbol::known_keys;
 
 use self::render::{HoverModel, code_span};
-use crate::resolution::{local_parameter_target, semantic_data};
+use crate::resolution::{local_parameter_target, semantic_data, symbol_candidates_for_hover};
 use crate::support::{ParsedInput, contains, input_for_document, word_range};
 use crate::types::{CancellationToken, Cancelled, Hover, uncancelled};
 use pdx_engine::{AnalysisSnapshot, DocumentId};
@@ -97,6 +97,41 @@ pub fn hover_with_cancellation(
         return Ok(Some(model.into_hover_with_range(reference.name_range)));
     }
     let range = word_range(&input.source, position);
+    if input.format == pdx_parser::FileFormat::Localisation
+        && let Some((fragment_range, name)) =
+            crate::localisation::localisation_key_reference_fragment(&input, position)
+    {
+        // A `$NAME$` inside a localisation value: a nested key reference
+        // when the name resolves as one, a scripted localisation when the
+        // name matches, otherwise a placeholder bound by whatever displays
+        // the text.
+        let resolves_as_key =
+            !symbol_candidates_for_hover(snapshot, "localisation", &name, cancellation)?.is_empty();
+        let scripted = !resolves_as_key
+            && crate::localisation::scripted_localisation_names_with_cancellation(
+                snapshot,
+                cancellation,
+            )?
+            .iter()
+            .any(|scripted| scripted.eq_ignore_ascii_case(&name));
+        if resolves_as_key || scripted {
+            let kind = if resolves_as_key {
+                "localisation"
+            } else {
+                "defined_text"
+            };
+            let model =
+                symbol::hover_for_symbol(snapshot, kind, &name, fragment_range, cancellation)?;
+            return Ok(Some(model.into_hover_with_range(fragment_range)));
+        }
+        let mut model = HoverModel::new(format!("### {}", code_span(&name)));
+        model.push_section(
+            "- Localisation variable placeholder: filled in by whatever displays this text \
+             (a referencing context or the engine)"
+                .to_owned(),
+        );
+        return Ok(Some(model.into_hover_with_range(fragment_range)));
+    }
     let Some(word) = input
         .source_text(range)
         .map(|word| word.trim_matches('"').to_owned())
