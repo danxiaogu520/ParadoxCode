@@ -9,8 +9,8 @@ use pdx_engine::hir::{
 };
 use pdx_engine::intern_shard_string;
 use pdx_engine::{
-    AnalysisSnapshot, DocumentId, DocumentSource, DynamicDefinitionSummary,
-    DynamicParameterSignature, FlagWriteIndex, FlagWriteMembership, SourceFileId, SourceRootKind,
+    AnalysisSnapshot, DocumentSource, DynamicDefinitionSummary, DynamicParameterSignature,
+    FlagWriteIndex, FlagWriteMembership, SourceFileId, SourceRootKind,
 };
 use pdx_rules::{GameProfile, KeyMatcher, RuleShape, ValueMatcher};
 use pdx_text::{LogicalPath, TextRange};
@@ -1229,8 +1229,26 @@ pub(crate) fn semantic_child_scope(
     parent: &ScopeContext,
     rule: &pdx_rules::SemanticRule,
 ) -> ScopeContext {
+    apply_scope_effect(
+        snapshot,
+        parent,
+        rule.push_scope.as_deref(),
+        &rule.replace_scope,
+    )
+}
+
+/// Applies one statement's scope effect to a scope: the shared body behind
+/// [`semantic_child_scope`] and the replay of derived
+/// [`DynamicScopeTransition`](crate::dynamic_rules::DynamicScopeTransition)
+/// chains, so live validation and row replay cannot drift.
+pub(crate) fn apply_scope_effect(
+    snapshot: &AnalysisSnapshot,
+    parent: &ScopeContext,
+    push_scope: Option<&str>,
+    replace_scope: &[(String, String)],
+) -> ScopeContext {
     let mut child = parent.clone();
-    if let Some(push_scope) = &rule.push_scope {
+    if let Some(push_scope) = push_scope {
         child.previous.insert(0, child.current.clone());
         if push_scope.eq_ignore_ascii_case("any") {
             child.current = intern_shard_string("any");
@@ -1238,7 +1256,7 @@ pub(crate) fn semantic_child_scope(
             child.current = intern_shard_string(push_scope);
         }
     }
-    for (register, value) in &rule.replace_scope {
+    for (register, value) in replace_scope {
         let value = resolve_scope_expression_context(snapshot, &child, value);
         let register = register.to_ascii_lowercase().replace('_', "");
         match register.as_str() {
@@ -1459,23 +1477,8 @@ pub(crate) fn dynamic_definition_summary(
     resolve_dynamic_definition(snapshot, owner_kind, owner_name).map(|resolved| resolved.summary)
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum DynamicDefinitionIdentity {
-    Overlay {
-        document: DocumentId,
-        version: Option<i64>,
-        definition_range: TextRange,
-    },
-    File {
-        file: SourceFileId,
-        revision: u64,
-        definition_range: TextRange,
-    },
-}
-
 #[derive(Clone, Debug)]
 pub(crate) struct ResolvedDynamicDefinition {
-    pub(crate) identity: DynamicDefinitionIdentity,
     pub(crate) summary: DynamicDefinitionSummary,
     pub(crate) body_context: String,
 }
@@ -1536,11 +1539,6 @@ fn resolve_dynamic_definition_uncached(
                 && definition.name.eq_ignore_ascii_case(owner_name)
         }) {
             overlay_candidates.push(ResolvedDynamicDefinition {
-                identity: DynamicDefinitionIdentity::Overlay {
-                    document: document.id().clone(),
-                    version: document.version(),
-                    definition_range: definition.range,
-                },
                 summary: dynamic_summary_in_hir(
                     &hir,
                     &definition.kind,
@@ -1573,13 +1571,7 @@ fn resolve_dynamic_definition_uncached(
         .index()
         .active_dynamic_definition(owner_kind, owner_name)
         .cloned()?;
-    let state = snapshot.file_state(definition.file_id);
     Some(ResolvedDynamicDefinition {
-        identity: DynamicDefinitionIdentity::File {
-            file: definition.file_id,
-            revision: state.map_or(0, pdx_engine::FileState::revision),
-            definition_range: definition.range,
-        },
         summary,
         body_context,
     })

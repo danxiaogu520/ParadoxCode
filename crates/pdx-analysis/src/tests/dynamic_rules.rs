@@ -1,7 +1,8 @@
 use super::support::*;
 use crate::dynamic_contracts::ScopeContract;
 use crate::dynamic_rules::{
-    DynamicBodyFindingKind, DynamicScopeTransition, DynamicSiteZone, dynamic_rule_row,
+    DynamicAffixSegment, DynamicBodyFindingKind, DynamicScopeStep, DynamicScopeTransition,
+    DynamicSiteGate, DynamicSiteZone, dynamic_rule_row,
 };
 use pdx_rules::ValueMatcher;
 
@@ -10,6 +11,17 @@ fn province_push() -> DynamicScopeTransition {
         push: Some("province".to_owned()),
         replaces: Vec::new(),
     }
+}
+
+fn gate(scopes: &[&str], group: u64) -> DynamicScopeStep {
+    DynamicScopeStep::Gate(DynamicSiteGate {
+        allowed_scopes: scopes.iter().map(|scope| (*scope).to_owned()).collect(),
+        group: Some(group),
+    })
+}
+
+fn lit(literal: &str) -> DynamicAffixSegment {
+    DynamicAffixSegment::Literal(literal.to_owned())
 }
 
 /// Opens one scripted-effects file as a current-mod workspace and returns the
@@ -201,8 +213,11 @@ fn dynamic_rows_mark_cycle_participants() {
 #[test]
 fn site_rows_record_value_site_position_transitions_and_scopes() {
     // `capital` pushes province and switches to a fresh effect namespace, so
-    // the replay inputs must carry the push and the site must sit at the
-    // child context with an empty parent path.
+    // the row's chain carries the fan-out's gate before the push and the
+    // site sits at the child context with an empty parent path. The fan-out
+    // is gated, so a fallback twin is walked too, but the structural path
+    // `capital.add_core` resolves no leaf rows and the twin stays empty —
+    // exactly the sites the symbolic walker's structural descent saw.
     let host = definitions_snapshot("take_core = { capital = { add_core = $PROV$ } }\n");
     let snapshot = host.snapshot();
     let row = dynamic_rule_row(&snapshot, "scripted_effect", "take_core").expect("row");
@@ -217,7 +232,13 @@ fn site_rows_record_value_site_position_transitions_and_scopes() {
     assert_eq!(site.zone, DynamicSiteZone::Normal);
     assert_eq!(site.context, "effect");
     assert!(site.parent_path.is_empty());
-    assert_eq!(site.transitions, vec![province_push()]);
+    assert_eq!(
+        site.chain,
+        vec![
+            gate(&["country"], 0),
+            DynamicScopeStep::Transition(province_push())
+        ]
+    );
     assert_eq!(site.operator.as_deref(), Some("="));
     // Every alternative stays with its own allowed scopes; consumer policy
     // prunes, the row never does.
@@ -239,6 +260,7 @@ fn site_rows_record_value_site_position_transitions_and_scopes() {
             vec!["country".to_owned(), "province".to_owned()],
         ]
     );
+    assert!(site.fallback_groups.is_empty());
 }
 
 #[test]
@@ -259,12 +281,33 @@ fn site_rows_mark_structural_sub_blocks_and_keep_them_out_of_legacy_sites() {
         .find(|parameter| parameter.name == "WHO")
         .expect("WHO");
     assert!(who.sites.is_empty());
-    assert_eq!(who.value_sites.len(), 1);
-    let site = &who.value_sites[0];
-    assert_eq!(site.zone, DynamicSiteZone::Structural);
-    assert_eq!(site.context, "trigger");
-    assert!(site.parent_path.is_empty());
-    assert_eq!(site.transitions, vec![province_push()]);
+    assert_eq!(who.value_sites.len(), 2);
+    let branch = who
+        .value_sites
+        .iter()
+        .find(|site| site.fallback_groups.is_empty())
+        .expect("branch row");
+    assert_eq!(branch.zone, DynamicSiteZone::Structural);
+    assert_eq!(branch.context, "trigger");
+    assert!(branch.parent_path.is_empty());
+    assert_eq!(
+        branch.chain,
+        vec![
+            gate(&["country", "province"], 0),
+            DynamicScopeStep::Transition(province_push()),
+            gate(&[], 1),
+        ]
+    );
+    // The scope-excluded twin reaches `limit` through its own fan-out group.
+    let fallback = who
+        .value_sites
+        .iter()
+        .find(|site| !site.fallback_groups.is_empty())
+        .expect("fallback twin");
+    assert_eq!(fallback.zone, DynamicSiteZone::Structural);
+    assert_eq!(fallback.context, "trigger");
+    assert_eq!(fallback.chain, vec![gate(&[], 2)]);
+    assert_eq!(fallback.fallback_groups, vec![0]);
 
     let prov = row
         .parameters
@@ -290,11 +333,12 @@ fn site_rows_record_key_render_affixes() {
         .expect("CMD");
     assert_eq!(cmd.key_render_sites.len(), 1);
     let site = &cmd.key_render_sites[0];
-    assert_eq!((site.prefix.as_str(), site.suffix.as_str()), ("", ""));
+    assert!(site.prefix_segments.is_empty() && site.suffix_segments.is_empty());
     assert_eq!(site.zone, DynamicSiteZone::Normal);
     assert_eq!(site.context, "effect");
     assert!(site.parent_path.is_empty());
-    assert!(site.transitions.is_empty());
+    assert!(site.chain.is_empty());
+    assert!(site.guards.is_empty());
 
     let kind = row
         .parameters
@@ -304,8 +348,11 @@ fn site_rows_record_key_render_affixes() {
     assert_eq!(kind.key_render_sites.len(), 1);
     let site = &kind.key_render_sites[0];
     assert_eq!(
-        (site.prefix.as_str(), site.suffix.as_str()),
-        ("set_", "_policy")
+        (
+            site.prefix_segments.as_slice(),
+            site.suffix_segments.as_slice()
+        ),
+        ([lit("set_")].as_slice(), [lit("_policy")].as_slice())
     );
 }
 
@@ -326,7 +373,7 @@ fn site_rows_record_bare_payload_quoted_sites() {
     assert_eq!(site.zone, DynamicSiteZone::Normal);
     assert_eq!(site.context, "effect");
     assert!(site.parent_path.is_empty());
-    assert!(site.transitions.is_empty());
+    assert!(site.chain.is_empty());
 }
 
 #[test]
@@ -353,5 +400,51 @@ fn site_rows_stop_at_nested_dynamic_calls_with_forwarding_edges() {
             name: "helper".to_owned(),
             parameter: Some("AMT".to_owned()),
         }]
+    );
+    // The forward row carries the call statement's replay inputs so the
+    // consumer can fold into the callee's entry scope.
+    assert_eq!(a.forward_sites.len(), 1);
+    let forward = &a.forward_sites[0];
+    assert_eq!(
+        (forward.kind.as_str(), forward.name.as_str()),
+        ("scripted_effect", "helper")
+    );
+    assert_eq!(forward.parameter.as_deref(), Some("AMT"));
+    assert_eq!(forward.context, "effect");
+    assert!(forward.chain.is_empty());
+    assert!(forward.guards.is_empty());
+}
+
+#[test]
+fn site_rows_stamp_conditional_guards() {
+    // Sites inside a `[[PARAM]]` branch record the guard so consumers prune
+    // them when the invocation leaves the parameter unbound.
+    let host = definitions_snapshot(
+        "guarded = { add_stability = $AMT$ [[SCALE] add_manpower = $EXTRA$ ] }\n",
+    );
+    let snapshot = host.snapshot();
+    let row = dynamic_rule_row(&snapshot, "scripted_effect", "guarded").expect("row");
+
+    let amount = row
+        .parameters
+        .iter()
+        .find(|parameter| parameter.name == "AMT")
+        .expect("AMT");
+    assert_eq!(amount.value_sites.len(), 1);
+    assert!(amount.value_sites[0].guards.is_empty());
+
+    let extra = row
+        .parameters
+        .iter()
+        .find(|parameter| parameter.name == "EXTRA")
+        .expect("EXTRA");
+    assert_eq!(extra.value_sites.len(), 1);
+    assert_eq!(
+        extra.value_sites[0]
+            .guards
+            .iter()
+            .map(|guard| (guard.name.as_str(), guard.negated))
+            .collect::<Vec<_>>(),
+        vec![("scale", false)]
     );
 }

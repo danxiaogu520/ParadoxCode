@@ -87,6 +87,9 @@ pub(crate) struct DynamicParameterRow {
     pub(crate) affixed_value_sites: Vec<DynamicAffixedSiteRow>,
     pub(crate) key_render_sites: Vec<DynamicKeyRenderSiteRow>,
     pub(crate) quoted_sites: Vec<DynamicQuotedSiteRow>,
+    /// Replay inputs for arguments forwarded into nested dynamic calls; the
+    /// callee's own parameter rows carry the sites themselves.
+    pub(crate) forward_sites: Vec<DynamicForwardSiteRow>,
 }
 
 /// One forwarding edge from an owner parameter into a nested call.
@@ -141,6 +144,17 @@ impl DynamicScopeTransition {
     fn is_identity(&self) -> bool {
         self.push.is_none() && self.replaces.is_empty()
     }
+
+    /// Applies this transition to a live scope — the row-side twin of
+    /// `semantic_child_scope`, sharing its body through
+    /// `apply_scope_effect`.
+    pub(crate) fn apply(
+        &self,
+        snapshot: &AnalysisSnapshot,
+        scope: &crate::support::ScopeContext,
+    ) -> crate::support::ScopeContext {
+        crate::semantic::apply_scope_effect(snapshot, scope, self.push.as_deref(), &self.replaces)
+    }
 }
 
 /// One scalar usage of a parameter (`add_stability = $AMT$`): the argument
@@ -157,8 +171,17 @@ pub(crate) struct DynamicValueSiteRow {
     pub(crate) context: String,
     /// Parent rule path at the site.
     pub(crate) parent_path: Vec<Arc<str>>,
-    /// Scope transitions from the definition entry to this site.
-    pub(crate) transitions: Vec<DynamicScopeTransition>,
+    /// Ordered replay steps from the definition entry to this site: scope
+    /// transitions interleaved with the gates each gated descent checked at
+    /// the point it was crossed (see [`DynamicScopeStep`]).
+    pub(crate) chain: Vec<DynamicScopeStep>,
+    /// Enclosing `[[param]]` conditionals, innermost last: the site is active
+    /// for an invocation whose bindings include every `(name, negated)` guard.
+    pub(crate) guards: Vec<DynamicSiteGuard>,
+    /// Fan-out groups whose failure (no branch admitting the replayed
+    /// scope) activates this row; empty for rows recorded on ordinary
+    /// branches.
+    pub(crate) fallback_groups: Vec<u64>,
     /// One matcher per alternative rule row, in row order.
     pub(crate) matchers: Vec<ValueMatcher>,
     /// Parallel to `matchers`: the alternative's `allowed_scopes` (empty
@@ -168,18 +191,24 @@ pub(crate) struct DynamicValueSiteRow {
     pub(crate) operator: Option<String>,
 }
 
-/// One affixed scalar usage (`type = $RT$_rebels`): the argument is validated
-/// by splicing it between the affixes and matching the rendered value, so the
-/// row keeps the affixes plus the un-stripped matcher alternatives.
+/// One affixed scalar usage (`type = $RT$_rebels`, `school = hanafii_$S$`):
+/// the argument is validated by splicing it between the affixes and matching
+/// the rendered value, so the row keeps the affix segments plus the
+/// un-stripped matcher alternatives. Affix segments may reference other
+/// parameters; a consumer renders them with the caller's bindings and drops
+/// the site when a referenced parameter is not concretely bound.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct DynamicAffixedSiteRow {
     pub(crate) statement_range: TextRange,
     pub(crate) zone: DynamicSiteZone,
     pub(crate) context: String,
     pub(crate) parent_path: Vec<Arc<str>>,
-    pub(crate) transitions: Vec<DynamicScopeTransition>,
-    pub(crate) prefix: String,
-    pub(crate) suffix: String,
+    /// Ordered replay steps (see [`DynamicValueSiteRow::chain`]).
+    pub(crate) chain: Vec<DynamicScopeStep>,
+    pub(crate) guards: Vec<DynamicSiteGuard>,
+    pub(crate) fallback_groups: Vec<u64>,
+    pub(crate) prefix_segments: Vec<DynamicAffixSegment>,
+    pub(crate) suffix_segments: Vec<DynamicAffixSegment>,
     /// One matcher per alternative rule row, in row order (member-domain
     /// stripping stays consumer-side).
     pub(crate) matchers: Vec<ValueMatcher>,
@@ -187,28 +216,121 @@ pub(crate) struct DynamicAffixedSiteRow {
 }
 
 /// One key-position render (`$CMD$ = yes`, `set_$KIND$_policy = 1`): the
-/// argument becomes a statement key (whole or between literal affixes).
+/// argument becomes a statement key (whole or between affix segments).
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct DynamicKeyRenderSiteRow {
     pub(crate) statement_range: TextRange,
     pub(crate) zone: DynamicSiteZone,
     pub(crate) context: String,
     pub(crate) parent_path: Vec<Arc<str>>,
-    pub(crate) transitions: Vec<DynamicScopeTransition>,
-    pub(crate) prefix: String,
-    pub(crate) suffix: String,
+    /// Ordered replay steps (see [`DynamicValueSiteRow::chain`]).
+    pub(crate) chain: Vec<DynamicScopeStep>,
+    pub(crate) guards: Vec<DynamicSiteGuard>,
+    pub(crate) fallback_groups: Vec<u64>,
+    pub(crate) prefix_segments: Vec<DynamicAffixSegment>,
+    pub(crate) suffix_segments: Vec<DynamicAffixSegment>,
 }
 
-/// One script-payload usage: a bare `$PAYLOAD$` item, or a quoted-script row
-/// whose whole value is the parameter. The caller's quoted argument validates
-/// as script at the replayed (context, path) site.
+/// One script-payload usage: a bare `$PAYLOAD$` item, or one alternative of
+/// a quoted-script row whose whole value is the parameter. The caller's
+/// quoted argument validates as script at the replayed (context, path) site;
+/// one row per rule alternative, the alternative's own `allowed_scopes`
+/// riding the chain as the last gate.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct DynamicQuotedSiteRow {
     pub(crate) statement_range: TextRange,
     pub(crate) zone: DynamicSiteZone,
     pub(crate) context: String,
     pub(crate) parent_path: Vec<Arc<str>>,
-    pub(crate) transitions: Vec<DynamicScopeTransition>,
+    /// Ordered replay steps (see [`DynamicValueSiteRow::chain`]); the
+    /// alternative's own gate is the final `Gate` step, ungrouped.
+    pub(crate) chain: Vec<DynamicScopeStep>,
+    pub(crate) guards: Vec<DynamicSiteGuard>,
+    pub(crate) fallback_groups: Vec<u64>,
+}
+
+/// One forwarding edge into a nested dynamic call, with the replay inputs for
+/// the call statement itself: consumers replay `chain` onto the caller's
+/// live scope to get the callee's entry scope, translate `bindings` into the
+/// callee's parameter bindings (parameter segments render with the caller's
+/// bindings), then replay the callee parameter's own rows from there. The
+/// callee parameter key is `None` when rendered from a `$param$` key, in
+/// which case no replay can name the target parameter. Dynamic-definition
+/// `Type` rule rows are generated scope-unrestricted from `replace-by-symbol`
+/// descriptors, so the callee resolves at any admitted scope; the chain still
+/// carries the enclosing descents' gates like any other row.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct DynamicForwardSiteRow {
+    pub(crate) statement_range: TextRange,
+    pub(crate) kind: String,
+    pub(crate) name: String,
+    pub(crate) parameter: Option<String>,
+    /// Every scalar argument of the call, for the callee's own conditional
+    /// pruning and affix rendering.
+    pub(crate) bindings: Vec<DynamicForwardBinding>,
+    pub(crate) context: String,
+    /// Ordered replay steps (see [`DynamicValueSiteRow::chain`]).
+    pub(crate) chain: Vec<DynamicScopeStep>,
+    pub(crate) guards: Vec<DynamicSiteGuard>,
+    /// Fan-out groups whose failure activates this row (see
+    /// [`DynamicValueSiteRow::fallback_groups`]).
+    pub(crate) fallback_groups: Vec<u64>,
+}
+
+/// One scalar argument binding of a forwarded call. `Opaque` marks a
+/// block-valued argument: present (so callee guards on it prune correctly)
+/// but not renderable.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct DynamicForwardBinding {
+    pub(crate) name: String,
+    pub(crate) value: DynamicForwardValue,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DynamicForwardValue {
+    Segments(Vec<DynamicAffixSegment>),
+    Opaque,
+}
+
+/// A `[[param]]` / `[[!param]]` conditional enclosing a site: active when
+/// the invocation binds `name` and `negated` is false, or the inverse.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct DynamicSiteGuard {
+    pub(crate) name: String,
+    pub(crate) negated: bool,
+}
+
+/// One block-descent scope gate: the union of `allowed_scopes` over the Node
+/// alternatives collapsed into one destination, tagged with the fan-out
+/// `group` it belongs to. A replayed caller scope must be compatible with at
+/// least one listed scope at every accumulated level; when every branch of a
+/// group fails its gate, rows recorded under that group's fallback branch
+/// (see `fallback_groups`) activate instead — the row-side twin of the
+/// symbolic walker descending a scope-excluded container structurally.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct DynamicSiteGate {
+    pub(crate) allowed_scopes: Vec<String>,
+    pub(crate) group: Option<u64>,
+}
+
+/// One ordered replay step on a site row's chain: the scope evolves through
+/// `Transition` steps, while `Gate` steps check the scope current at the
+/// point the gated descent was crossed — the row-side twin of the symbolic
+/// walker checking each container's `allowed_scopes` as it descended. A
+/// statement's own gate precedes its transition (its `allowed_scopes`
+/// constrain where the statement runs, not where its body lands).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DynamicScopeStep {
+    Transition(DynamicScopeTransition),
+    Gate(DynamicSiteGate),
+}
+
+/// A literal or parameter segment of a token's affixes around the target
+/// parameter.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DynamicAffixSegment {
+    Literal(String),
+    Parameter(String),
 }
 
 /// Why a body statement can never run.
@@ -426,8 +548,10 @@ fn build_dynamic_rule_report(
             let entry = SitePosition {
                 context: resolved.body_context.clone(),
                 path: Vec::new(),
-                transitions: Vec::new(),
+                chain: Vec::new(),
                 zone: DynamicSiteZone::Normal,
+                guards: Vec::new(),
+                fallback_groups: Vec::new(),
             };
             sites.walk_items(&template.items, &entry);
         }
@@ -478,6 +602,7 @@ fn merge_parameter_rows(
             key_render_sites: site_usage
                 .map_or_else(Vec::new, |usage| usage.key_render_sites.clone()),
             quoted_sites: site_usage.map_or_else(Vec::new, |usage| usage.quoted_sites.clone()),
+            forward_sites: site_usage.map_or_else(Vec::new, |usage| usage.forward_sites.clone()),
         });
     }
     // Usage the signature missed (guarded template-only forms) still rows as
@@ -499,6 +624,8 @@ fn merge_parameter_rows(
                 key_render_sites: site_usage
                     .map_or_else(Vec::new, |usage| usage.key_render_sites.clone()),
                 quoted_sites: site_usage.map_or_else(Vec::new, |usage| usage.quoted_sites.clone()),
+                forward_sites: site_usage
+                    .map_or_else(Vec::new, |usage| usage.forward_sites.clone()),
             });
         }
     }
@@ -950,6 +1077,8 @@ struct SiteDerivation<'a> {
     /// Container visits charged per definition so pathological alternation
     /// degrades to partial rows instead of unbounded work.
     visits: usize,
+    /// Monotonic id source for gated fan-out groups.
+    group_counter: u64,
 }
 
 /// Hard ceiling on container visits per definition; far above any vanilla
@@ -962,6 +1091,7 @@ struct SiteParameterUsage {
     affixed_value_sites: Vec<DynamicAffixedSiteRow>,
     key_render_sites: Vec<DynamicKeyRenderSiteRow>,
     quoted_sites: Vec<DynamicQuotedSiteRow>,
+    forward_sites: Vec<DynamicForwardSiteRow>,
 }
 
 impl<'a> SiteDerivation<'a> {
@@ -971,7 +1101,14 @@ impl<'a> SiteDerivation<'a> {
             profile,
             parameters: BTreeMap::new(),
             visits: 0,
+            group_counter: 0,
         }
+    }
+
+    fn next_group(&mut self) -> u64 {
+        let group = self.group_counter;
+        self.group_counter += 1;
+        group
     }
 
     fn usage(&self, name: &str) -> Option<&SiteParameterUsage> {
@@ -995,7 +1132,14 @@ impl<'a> SiteDerivation<'a> {
                     self.walk_property(property, position);
                 }
                 TemplateItem::Conditional(conditional) => {
-                    self.walk_items(&conditional.items, position);
+                    // Both branches stay in the rows; consumers prune by the
+                    // caller's actual bindings through the accumulated guard.
+                    let mut inner = position.clone();
+                    inner.guards.push(DynamicSiteGuard {
+                        name: conditional.name.to_ascii_lowercase(),
+                        negated: conditional.negated,
+                    });
+                    self.walk_items(&conditional.items, &inner);
                 }
                 TemplateItem::BareValue(token) => {
                     // A bare `$PAYLOAD$` injects the caller's script fragment
@@ -1008,7 +1152,9 @@ impl<'a> SiteDerivation<'a> {
                                 zone: position.zone,
                                 context: position.context.clone(),
                                 parent_path: position.path.clone(),
-                                transitions: position.transitions.clone(),
+                                chain: position.chain.clone(),
+                                guards: position.guards.clone(),
+                                fallback_groups: position.fallback_groups.clone(),
                             });
                     }
                 }
@@ -1023,13 +1169,8 @@ impl<'a> SiteDerivation<'a> {
             // `continue`); each parameter records its render site so callers
             // still constrain key-shaped arguments.
             for name in token_parameters(&property.key) {
-                let (prefix, suffix) = if is_bare_parameter(&property.key, name) {
-                    (String::new(), String::new())
-                } else {
-                    match literal_token_affixes(&property.key, name) {
-                        Some(affixes) => affixes,
-                        None => continue,
-                    }
+                let Some((prefix, suffix)) = token_affix_segments(&property.key, name) else {
+                    continue;
                 };
                 self.usage_mut(name)
                     .key_render_sites
@@ -1038,9 +1179,11 @@ impl<'a> SiteDerivation<'a> {
                         zone: position.zone,
                         context: position.context.clone(),
                         parent_path: position.path.clone(),
-                        transitions: position.transitions.clone(),
-                        prefix,
-                        suffix,
+                        chain: position.chain.clone(),
+                        guards: position.guards.clone(),
+                        fallback_groups: position.fallback_groups.clone(),
+                        prefix_segments: prefix,
+                        suffix_segments: suffix,
                     });
             }
             return;
@@ -1052,13 +1195,14 @@ impl<'a> SiteDerivation<'a> {
             return;
         }
         // A nested dynamic call's argument block is parameter assignments;
-        // the callee's own rows carry its parameter sites and the
-        // `forwarded_to` edges carry the binding, so the subtree is not
-        // re-derived here.
-        if dynamic_kind_for_context(self.snapshot, &position.context)
-            .and_then(|kind| resolve_dynamic_definition(self.snapshot, &kind, key))
-            .is_some()
+        // the callee's own rows carry its parameter sites, so the subtree is
+        // not re-derived here — but each forwarded argument records the call
+        // statement's replay inputs so consumers can fold into the callee.
+        if let Some(kind) = dynamic_kind_for_context(self.snapshot, &position.context)
+            && resolve_dynamic_definition(self.snapshot, &kind, key).is_some()
+            && let TemplateValue::Block { items, .. } = &property.value
         {
+            self.record_forward_sites(&kind, key, items, property, position);
             return;
         }
         // Shape is an arm-level filter here (a scalar consumes Leaf rows and
@@ -1111,7 +1255,9 @@ impl<'a> SiteDerivation<'a> {
                     zone: position.zone,
                     context: position.context.clone(),
                     parent_path: position.path.clone(),
-                    transitions: position.transitions.clone(),
+                    chain: position.chain.clone(),
+                    guards: position.guards.clone(),
+                    fallback_groups: position.fallback_groups.clone(),
                     matchers: leaf.iter().map(|rule| rule.value.clone()).collect(),
                     matcher_scopes: leaf
                         .iter()
@@ -1123,7 +1269,7 @@ impl<'a> SiteDerivation<'a> {
                 && leaf.iter().any(|rule| {
                     matches!(rule.value, ValueMatcher::Exact(_) | ValueMatcher::Enum(_))
                 })
-                && let Some((prefix, suffix)) = literal_token_affixes(token, name)
+                && let Some((prefix_segments, suffix_segments)) = token_affix_segments(token, name)
             {
                 self.usage_mut(name)
                     .affixed_value_sites
@@ -1132,9 +1278,11 @@ impl<'a> SiteDerivation<'a> {
                         zone: position.zone,
                         context: position.context.clone(),
                         parent_path: position.path.clone(),
-                        transitions: position.transitions.clone(),
-                        prefix,
-                        suffix,
+                        chain: position.chain.clone(),
+                        guards: position.guards.clone(),
+                        fallback_groups: position.fallback_groups.clone(),
+                        prefix_segments,
+                        suffix_segments,
                         matchers: leaf.iter().map(|rule| rule.value.clone()).collect(),
                         matcher_scopes: leaf
                             .iter()
@@ -1144,8 +1292,9 @@ impl<'a> SiteDerivation<'a> {
             }
             if bare {
                 // A quoted-script row whose whole value is the parameter
-                // splices the caller's quoted text into that payload; the
-                // render site is the row's destination.
+                // splices the caller's quoted text into that payload; one
+                // row per alternative so consumers can gate each by the
+                // alternative's own allowed scopes.
                 for rule in &quoted_payload {
                     let (next_context, next_path) = semantic_transition_destination(
                         rule,
@@ -1154,10 +1303,16 @@ impl<'a> SiteDerivation<'a> {
                         key,
                         false,
                     );
-                    let mut next_transitions = position.transitions.clone();
+                    // The alternative's own gate precedes its transition and
+                    // is ungrouped (it never fans out).
+                    let mut chain = position.chain.clone();
+                    chain.push(DynamicScopeStep::Gate(DynamicSiteGate {
+                        allowed_scopes: rule.allowed_scopes.clone(),
+                        group: None,
+                    }));
                     let transition = DynamicScopeTransition::from_rule(rule);
                     if !transition.is_identity() {
-                        next_transitions.push(transition);
+                        chain.push(DynamicScopeStep::Transition(transition));
                     }
                     self.usage_mut(name)
                         .quoted_sites
@@ -1166,9 +1321,71 @@ impl<'a> SiteDerivation<'a> {
                             zone: position.zone,
                             context: next_context.to_string(),
                             parent_path: next_path,
-                            transitions: next_transitions,
+                            chain,
+                            guards: position.guards.clone(),
+                            fallback_groups: position.fallback_groups.clone(),
                         });
                 }
+            }
+        }
+    }
+
+    /// Records one forward row per scalar-bound argument of a nested dynamic
+    /// call (`callee = { PARAM = $OWNER$ }`): the callee parameter key is
+    /// `None` when rendered from a `$param$` key. All scalar arguments of
+    /// the call are recorded as bindings so consumers can rebuild the
+    /// callee's own parameter bindings.
+    fn record_forward_sites(
+        &mut self,
+        callee_kind: &str,
+        callee_name: &str,
+        items: &[TemplateItem],
+        property: &TemplateProperty,
+        position: &SitePosition,
+    ) {
+        let mut bindings = Vec::new();
+        for item in items {
+            let TemplateItem::Property(argument) = item else {
+                continue;
+            };
+            let Some(parameter_key) = single_literal(&argument.key)
+                .map(str::trim)
+                .filter(|key| !key.is_empty())
+            else {
+                continue;
+            };
+            let value = match &argument.value {
+                TemplateValue::Scalar(token) => {
+                    DynamicForwardValue::Segments(token_segments(token))
+                }
+                TemplateValue::Block { .. } => DynamicForwardValue::Opaque,
+            };
+            bindings.push(DynamicForwardBinding {
+                name: parameter_key.to_owned(),
+                value,
+            });
+        }
+        for binding in &bindings {
+            let DynamicForwardValue::Segments(segments) = &binding.value else {
+                continue;
+            };
+            for segment in segments {
+                let DynamicAffixSegment::Parameter(name) = segment else {
+                    continue;
+                };
+                self.usage_mut(name)
+                    .forward_sites
+                    .push(DynamicForwardSiteRow {
+                        statement_range: property.range,
+                        kind: callee_kind.to_owned(),
+                        name: callee_name.to_owned(),
+                        parameter: Some(binding.name.clone()),
+                        bindings: bindings.clone(),
+                        context: position.context.clone(),
+                        chain: position.chain.clone(),
+                        guards: position.guards.clone(),
+                        fallback_groups: position.fallback_groups.clone(),
+                    });
             }
         }
     }
@@ -1186,6 +1403,7 @@ impl<'a> SiteDerivation<'a> {
         // One destination per distinct (context, path, transition): rule
         // alternatives usually agree, and disagreement fans the subtree out
         // once per alternative exactly like the symbolic walker's scopes.
+        let group = self.next_group();
         let mut destinations = SiteDestinations::default();
         for rule in matching
             .iter()
@@ -1222,10 +1440,17 @@ impl<'a> SiteDerivation<'a> {
             self.walk_items(items, &extended);
             return;
         }
-        for destination in destinations {
-            let mut next_transitions = position.transitions.clone();
+        for destination in &destinations {
+            // The statement's gate precedes its transition and always rides
+            // the chain — even when unrestricted (empty scopes), it is the
+            // branch's witness that its fan-out group survived a replay.
+            let mut chain = position.chain.clone();
+            chain.push(DynamicScopeStep::Gate(DynamicSiteGate {
+                allowed_scopes: destination.gate_scopes.clone(),
+                group: Some(group),
+            }));
             if !destination.transition.is_identity() {
-                next_transitions.push(destination.transition.clone());
+                chain.push(DynamicScopeStep::Transition(destination.transition.clone()));
             }
             // A child-context switch starts a fresh rule namespace and leaves
             // any structural sub-block behind; a structural key (`limit`)
@@ -1239,12 +1464,44 @@ impl<'a> SiteDerivation<'a> {
             };
             let next = SitePosition {
                 context: destination.context.to_string(),
-                path: destination.path,
-                transitions: next_transitions,
+                path: destination.path.clone(),
+                chain,
                 zone,
+                guards: position.guards.clone(),
+                fallback_groups: position.fallback_groups.clone(),
             };
             self.walk_items(items, &next);
         }
+        // The scope-excluded twin: when no branch of `group` admits the
+        // caller's replayed scope, the symbolic walker knew nothing of this
+        // container's rule rows and descended structurally — same context
+        // and scope, path extended by the key, no transition. Sites recorded
+        // on this branch activate only in that case; an unrestricted
+        // destination always admits, so its fallback can never arm and no
+        // twin is recorded.
+        if destinations
+            .iter()
+            .any(|destination| destination.gate_scopes.is_empty())
+        {
+            return;
+        }
+        let mut fallback_groups = position.fallback_groups.clone();
+        fallback_groups.push(group);
+        let extended = SitePosition {
+            path: if transparent_wrapper {
+                position.path.clone()
+            } else {
+                child_path(&position.path, key)
+            },
+            zone: if structural {
+                DynamicSiteZone::Structural
+            } else {
+                position.zone
+            },
+            fallback_groups,
+            ..position.clone()
+        };
+        self.walk_items(items, &extended);
     }
 }
 
@@ -1254,8 +1511,10 @@ impl<'a> SiteDerivation<'a> {
 struct SitePosition {
     context: String,
     path: Vec<Arc<str>>,
-    transitions: Vec<DynamicScopeTransition>,
+    chain: Vec<DynamicScopeStep>,
     zone: DynamicSiteZone,
+    guards: Vec<DynamicSiteGuard>,
+    fallback_groups: Vec<u64>,
 }
 
 /// One distinct block destination of a statement's Node alternatives.
@@ -1264,6 +1523,9 @@ struct SiteDestination {
     path: Vec<Arc<str>>,
     transition: DynamicScopeTransition,
     switched_context: bool,
+    /// Union of the allowed scopes over every alternative collapsed into
+    /// this destination; empty means some alternative was unrestricted.
+    gate_scopes: Vec<String>,
 }
 
 /// Deduplicated (context, path, transition) destinations.
@@ -1275,11 +1537,26 @@ struct SiteDestinations {
 impl SiteDestinations {
     fn push(&mut self, context: Arc<str>, path: Vec<Arc<str>>, rule: &pdx_rules::SemanticRule) {
         let transition = DynamicScopeTransition::from_rule(rule);
-        if self.entries.iter().any(|known| {
+        if let Some(known) = self.entries.iter_mut().find(|known| {
             known.context.eq_ignore_ascii_case(&context)
                 && known.path == path
                 && transition_equivalent(&known.transition, &transition)
         }) {
+            // Alternatives sharing a destination keep the union of their
+            // scopes so a consumer's gate accepts whichever alternative the
+            // replayed scope admits.
+            if known.gate_scopes.is_empty() {
+                return;
+            }
+            if rule.allowed_scopes.is_empty() {
+                known.gate_scopes.clear();
+            } else {
+                for scope in &rule.allowed_scopes {
+                    if !known.gate_scopes.contains(scope) {
+                        known.gate_scopes.push(scope.clone());
+                    }
+                }
+            }
             return;
         }
         let switched_context = rule.child_context.is_some();
@@ -1288,11 +1565,8 @@ impl SiteDestinations {
             path,
             transition,
             switched_context,
+            gate_scopes: rule.allowed_scopes.clone(),
         });
-    }
-
-    fn into_vec(self) -> Vec<SiteDestination> {
-        self.entries
     }
 }
 
@@ -1312,10 +1586,62 @@ fn transition_equivalent(left: &DynamicScopeTransition, right: &DynamicScopeTran
         })
 }
 
+/// Every fragment of a token as a segment sequence, for forwarded-argument
+/// values consumers render whole.
+fn token_segments(token: &TemplateToken) -> Vec<DynamicAffixSegment> {
+    token
+        .fragments
+        .iter()
+        .map(|fragment| match fragment {
+            TemplateFragment::Literal(literal) => DynamicAffixSegment::Literal(literal.clone()),
+            TemplateFragment::Parameter { name, .. } => {
+                DynamicAffixSegment::Parameter(name.clone())
+            }
+        })
+        .collect()
+}
+
 fn rule_operator_matches(rule: &pdx_rules::SemanticRule, operator: Option<&str>) -> bool {
     rule.operator
         .as_deref()
         .is_none_or(|expected| operator == Some(expected))
+}
+
+/// The segments around the parameter's single occurrence in the token, when
+/// it appears exactly once: `$RT$_rebels` yields `([], [Literal("_rebels")])`,
+/// `set_$KIND$_$MODE$` yields `([Literal("set_")], [Literal("_"), Parameter
+/// ("MODE")])`. Consumers render parameter segments with the caller's
+/// bindings and drop the site when one is not concretely bound. `None` when
+/// the parameter is absent or appears more than once.
+fn token_affix_segments(
+    token: &TemplateToken,
+    name: &str,
+) -> Option<(Vec<DynamicAffixSegment>, Vec<DynamicAffixSegment>)> {
+    let mut prefix = Vec::new();
+    let mut suffix = Vec::new();
+    let mut seen = false;
+    for fragment in &token.fragments {
+        match fragment {
+            TemplateFragment::Literal(literal) => {
+                (if seen { &mut suffix } else { &mut prefix })
+                    .push(DynamicAffixSegment::Literal(literal.clone()));
+            }
+            TemplateFragment::Parameter {
+                name: parameter, ..
+            } => {
+                if parameter.eq_ignore_ascii_case(name) {
+                    if seen {
+                        return None;
+                    }
+                    seen = true;
+                } else {
+                    (if seen { &mut suffix } else { &mut prefix })
+                        .push(DynamicAffixSegment::Parameter(parameter.clone()));
+                }
+            }
+        }
+    }
+    seen.then_some((prefix, suffix))
 }
 
 /// The parent path of a block property's children.
