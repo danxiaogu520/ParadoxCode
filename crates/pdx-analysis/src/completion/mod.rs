@@ -14,8 +14,8 @@ mod support;
 pub(crate) use candidates::*;
 pub(crate) use context::*;
 pub(crate) use dynamic_constraints::{
-    dynamic_parameter_owner, infer_dynamic_quoted_payload_sites,
-    infer_dynamic_quoted_script_constraints,
+    HoverCaller, ReplayedSites, dynamic_parameter_owner, infer_dynamic_quoted_payload_sites,
+    infer_dynamic_quoted_script_constraints, replay_parameter_sites_for_hover,
 };
 pub(crate) use support::*;
 

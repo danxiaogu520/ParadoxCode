@@ -2,7 +2,13 @@
 
 use super::render::{HoverModel, code_span};
 use super::rules::semantic_value_hover_label;
-use crate::completion::{dynamic_parameter_owner, semantic_completion_context_with_cancellation};
+use crate::completion::{
+    HoverCaller, dynamic_parameter_owner, replay_parameter_sites_for_hover,
+    semantic_completion_context_with_cancellation,
+};
+use crate::dynamic_rules::{
+    DynamicParameterRow, DynamicRuleRow, dynamic_rule_row, dynamic_rule_row_by_name,
+};
 use crate::support::{ParsedInput, contains};
 use crate::types::{CancellationToken, Cancelled};
 use pdx_engine::AnalysisSnapshot;
@@ -31,7 +37,7 @@ pub(crate) fn dynamic_invocation_parameter_hover(
     let Some(invocation) = context.container_property.as_ref() else {
         return Ok(None);
     };
-    let Some((owner_kind, owner_name, _)) =
+    let Some((owner_kind, owner_name, caller_scope)) =
         dynamic_parameter_owner(snapshot, &context, property, invocation)
     else {
         return Ok(None);
@@ -60,9 +66,16 @@ pub(crate) fn dynamic_invocation_parameter_hover(
             "optional"
         },
     );
-    if let Some(contract) =
-        dynamic_parameter_contract_lines(snapshot, Some(&owner_kind), &owner_name, &property.key)
-    {
+    if let Some(contract) = parameter_contract_lines(
+        snapshot,
+        &row,
+        parameter,
+        Some(&HoverCaller {
+            invocation,
+            target: property,
+            scope: caller_scope,
+        }),
+    ) {
         section.push('\n');
         section.push_str(&contract);
     }
@@ -70,10 +83,10 @@ pub(crate) fn dynamic_invocation_parameter_hover(
     Ok(Some(model))
 }
 
-/// Shared contract lines for a dynamic parameter: payload nature, dispatch,
-/// forwarding edges, and the value constraints its usage sites imply
-/// (following forwarding edges into nested calls). Constraint labels are
-/// self-contained code spans and must not be wrapped again.
+/// Shared contract lines for a dynamic parameter at its definition site:
+/// resolves the row by kind (or name alone when the caller does not know the
+/// kind) and replays the parameter's usage-site rows under an any-scope,
+/// showing every conditional branch.
 pub(crate) fn dynamic_parameter_contract_lines(
     snapshot: &AnalysisSnapshot,
     owner_kind: Option<&str>,
@@ -81,12 +94,27 @@ pub(crate) fn dynamic_parameter_contract_lines(
     parameter_name: &str,
 ) -> Option<String> {
     let row = owner_kind
-        .and_then(|kind| crate::dynamic_rules::dynamic_rule_row(snapshot, kind, owner_name))
-        .or_else(|| crate::dynamic_rules::dynamic_rule_row_by_name(snapshot, owner_name))?;
+        .and_then(|kind| dynamic_rule_row(snapshot, kind, owner_name))
+        .or_else(|| dynamic_rule_row_by_name(snapshot, owner_name))?;
     let parameter = row
         .parameters
         .iter()
         .find(|parameter| parameter.name.eq_ignore_ascii_case(parameter_name))?;
+    parameter_contract_lines(snapshot, &row, parameter, None)
+}
+
+/// Contract lines for one dynamic parameter, rendered from the same replayed
+/// site rows completion consumes: payload nature, dispatch, forwarding
+/// edges, and the value constraints the definition's usage sites imply.
+/// Constraint labels are self-contained code spans and must not be wrapped
+/// again.
+fn parameter_contract_lines(
+    snapshot: &AnalysisSnapshot,
+    row: &DynamicRuleRow,
+    parameter: &DynamicParameterRow,
+    caller: Option<&HoverCaller<'_>>,
+) -> Option<String> {
+    let replayed = replay_parameter_sites_for_hover(snapshot, row, parameter, caller);
     let mut lines = Vec::new();
     if parameter.quoted_script {
         lines.push(
@@ -96,6 +124,11 @@ pub(crate) fn dynamic_parameter_contract_lines(
     if parameter.used_in_key {
         lines.push("- Dispatch: rendered as a statement key in the body".to_owned());
     }
+    for (prefix, suffix) in key_render_forms(&replayed) {
+        lines.push(format!(
+            "- Renders as statement key `{prefix}…{suffix}` in the body"
+        ));
+    }
     for edge in &parameter.forwarded_to {
         let target = match &edge.parameter {
             Some(name) => format!("`{}` (parameter `{}`)", edge.name, name),
@@ -103,13 +136,12 @@ pub(crate) fn dynamic_parameter_contract_lines(
         };
         lines.push(format!("- Forwarded to scripted {target}"));
     }
-    let sites =
-        crate::diagnostics::effective_parameter_sites(snapshot, &row, parameter, &mut Vec::new());
-    if !sites.is_empty() {
-        let rendered = sites
+    if !replayed.values.is_empty() {
+        let rendered = replayed
+            .values
             .iter()
-            .map(|matchers| {
-                matchers
+            .map(|site| {
+                site.matchers
                     .iter()
                     .map(semantic_value_hover_label)
                     .collect::<Vec<_>>()
@@ -121,7 +153,7 @@ pub(crate) fn dynamic_parameter_contract_lines(
             "- Inferred value constraints (per usage site): {rendered}"
         ));
     }
-    for site in &parameter.affixed_sites {
+    for site in &replayed.affixed {
         let expected = site
             .matchers
             .iter()
@@ -133,15 +165,35 @@ pub(crate) fn dynamic_parameter_contract_lines(
             site.prefix, site.suffix
         ));
     }
-    if sites.is_empty()
-        && parameter.affixed_sites.is_empty()
+    if replayed.values.is_empty()
+        && replayed.affixed.is_empty()
+        && replayed.key_renders.is_empty()
+        && replayed.quoted_scripts.is_empty()
+        && parameter.forwarded_to.is_empty()
         && !parameter.quoted_script
         && !parameter.used_in_key
-        && parameter.forwarded_to.is_empty()
     {
         lines.push("- Inferred value constraints: none".to_owned());
     }
     (!lines.is_empty()).then(|| lines.join("\n"))
+}
+
+/// Distinct literal affix pairs of replayed key-render sites (`set_$KIND$_policy`
+/// yields `set_…_policy`); wildcard renders (both affixes empty) are covered by
+/// the generic dispatch line.
+fn key_render_forms(replayed: &crate::completion::ReplayedSites) -> Vec<(String, String)> {
+    let mut forms = Vec::new();
+    for site in &replayed.key_renders {
+        if site.prefix.is_empty() && site.suffix.is_empty() {
+            continue;
+        }
+        if !forms.iter().any(|(prefix, suffix): &(String, String)| {
+            prefix.eq_ignore_ascii_case(&site.prefix) && suffix.eq_ignore_ascii_case(&site.suffix)
+        }) {
+            forms.push((site.prefix.clone(), site.suffix.clone()));
+        }
+    }
+    forms
 }
 
 /// Renders the `#### Callable signature` section for a dynamic definition symbol hover.
