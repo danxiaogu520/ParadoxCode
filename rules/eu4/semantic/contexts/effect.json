@@ -39,7 +39,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Refers to the country that controls the current province scope."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -143,7 +145,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Refers to the country that owns the current province scope."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -169,7 +173,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Scopes to the country that has the current province as tribal land."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -2392,7 +2398,9 @@
     "alternative_id": "effects:1064:alias:effect:define_exiled_ruler",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Defines a new exiled ruler, saving them to the unique string. Works similarly to define_ruler and accepts the same arguments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2486,7 +2494,9 @@
     "alternative_id": "effects:1067:alias:effect:add_to_trade_company",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds province to scopes trade company. Will remove state first if it exists."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -2514,7 +2524,9 @@
     "alternative_id": "effects:1068:alias:effect:add_to_trade_company",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds province to scopes trade company. Will remove state first if it exists."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -2542,7 +2554,9 @@
     "alternative_id": "effects:1069:alias:effect:add_to_trade_company",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds province to scopes trade company. Will remove state first if it exists."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -2846,7 +2860,9 @@
     "alternative_id": "effects:1078:alias:effect:add_trade_company_investment",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds a trade company investment in the provinces area. Investment keys are found in common/tradecompany_investments."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -2874,7 +2890,9 @@
     "alternative_id": "effects:1079:alias:effect:free_vassal",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Frees a vassal from the current scope."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2935,7 +2953,9 @@
     "alternative_id": "effects:1080:alias:effect:free_vassal",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Frees a vassal from the current scope."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2966,7 +2986,9 @@
     "alternative_id": "effects:1081:alias:effect:change_innovativeness",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds innovativeness to the current scope. Range [-100.0, 100.0] capped to [0.0, 100.0]."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3096,7 +3118,9 @@
     "alternative_id": "effects:1085:alias:effect:change_government_reform_progress",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds reform progress to the current scope."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3124,7 +3148,9 @@
     "alternative_id": "effects:1086:alias:effect:set_capital",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Changes the capital of the scoped country to the selected province ID."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3152,7 +3178,9 @@
     "alternative_id": "effects:1087:alias:effect:set_capital",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Changes the capital of the scoped country to the selected province ID."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3180,7 +3208,9 @@
     "alternative_id": "effects:1088:alias:effect:add_government_reform",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "If Dharma is active, enacts a government reform, replacing any existing reform at the same tier. If Dharma is not active, changes to the legacy government type that this reform has listed as its legacy_equivalent."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3208,7 +3238,9 @@
     "alternative_id": "effects:1089:alias:effect:add_government_reform",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "If Dharma is active, enacts a government reform, replacing any existing reform at the same tier. If Dharma is not active, changes to the legacy government type that this reform has listed as its legacy_equivalent."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3297,7 +3329,9 @@
     "alternative_id": "effects:1091:alias:effect:rajput_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a rajput infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -3325,7 +3359,9 @@
     "alternative_id": "effects:1092:alias:effect:rajput_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a rajput infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -3353,7 +3389,9 @@
     "alternative_id": "effects:1093:alias:effect:remove_government_reform",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "If Dharma is active, removes a government reform. If this reform was not in the highest achieved reform tier, the country can pick a new reform for free. No effect if Dharma isn't active."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3381,7 +3419,9 @@
     "alternative_id": "effects:1094:alias:effect:remove_government_reform",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "If Dharma is active, removes a government reform. If this reform was not in the highest achieved reform tier, the country can pick a new reform for free. No effect if Dharma isn't active."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3630,7 +3670,9 @@
     "alternative_id": "effects:1100:alias:effect:swap_non_generic_missions",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Reloads the mission tree. Useful for flag-based mission trees."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3658,7 +3700,9 @@
     "alternative_id": "effects:1101:alias:effect:complete_mission",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Marks a mission as completed. Mission rewards are not given when using this effect. It will count towards any missions that require it, and it will count as completed in the mission_completed trigger."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3686,7 +3730,9 @@
     "alternative_id": "effects:1102:alias:effect:clear_exiled_ruler",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Clears a saved exiled ruler. Can use this after using the saved exiled ruler in an effect."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3717,7 +3763,9 @@
     "alternative_id": "effects:1103:alias:effect:lose_reforms",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Removes government reforms from the current scope."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3803,7 +3851,9 @@
     "alternative_id": "effects:1106:alias:effect:set_religious_school",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Changes the current scope's religious school. Religious Schools are found in common/religions/00_religions.txt."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3831,7 +3881,9 @@
     "alternative_id": "effects:1107:alias:effect:adopt_reform_progress",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adopts the government reform progress from the target country scope. Used when the Papal States is released."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3859,7 +3911,9 @@
     "alternative_id": "effects:1108:alias:effect:adopt_reform_progress",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adopts the government reform progress from the target country scope. Used when the Papal States is released."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3975,7 +4029,9 @@
     "alternative_id": "effects:1111:alias:effect:create_flagship",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a flagship unit for the current scope in the defined province scope. Types light_ship, galley, heavy_ship and transport. Requires the province scope to have a port."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -4439,7 +4495,9 @@
     "alternative_id": "effects:1126:alias:effect:add_rival",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Makes the defined scope a rival of the current scope."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -4467,7 +4525,9 @@
     "alternative_id": "effects:1127:alias:effect:add_rival",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Makes the defined scope a rival of the current scope."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -4495,7 +4555,9 @@
     "alternative_id": "effects:1128:alias:effect:remove_rival",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Removes the defined scope as a rival of the current scope."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -4523,7 +4585,9 @@
     "alternative_id": "effects:1129:alias:effect:remove_rival",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Removes the defined scope as a rival of the current scope."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -4586,7 +4650,9 @@
     "alternative_id": "effects:1130:alias:effect:force_remove_rival",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Removes the defined scope as a rival of the current scope. That country cannot be picked as a rival again for the next 15 years."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -4614,7 +4680,9 @@
     "alternative_id": "effects:1131:alias:effect:force_remove_rival",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Removes the defined scope as a rival of the current scope. That country cannot be picked as a rival again for the next 15 years."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -9724,7 +9792,9 @@
     "alternative_id": "effects:1289:alias:effect:carolean_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a carolean infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -9782,7 +9852,9 @@
     "alternative_id": "effects:1290:alias:effect:carolean_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a carolean infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -10958,7 +11030,9 @@
     "alternative_id": "effects:1325:alias:effect:janissary_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a janissary infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -10986,7 +11060,9 @@
     "alternative_id": "effects:1326:alias:effect:janissary_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a janissary infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -11014,7 +11090,9 @@
     "alternative_id": "effects:1327:alias:effect:revolutionary_guard_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a revolutionary infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -11042,7 +11120,9 @@
     "alternative_id": "effects:1328:alias:effect:revolutionary_guard_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a revolutionary infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -11070,7 +11150,9 @@
     "alternative_id": "effects:1329:alias:effect:revolutionary_guard_cavalry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a revolutionary cavalry unit in the current province scope for the defined country scope. Uses the currently selected cavalry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -11128,7 +11210,9 @@
     "alternative_id": "effects:1330:alias:effect:revolutionary_guard_cavalry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a revolutionary cavalry unit in the current province scope for the defined country scope. Uses the currently selected cavalry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -11156,7 +11240,9 @@
     "alternative_id": "effects:1331:alias:effect:revolutionary_guard_artillery",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a revolutionary artillery unit in the current province scope for the defined country scope. Uses the currently selected artillery unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -11184,7 +11270,9 @@
     "alternative_id": "effects:1332:alias:effect:revolutionary_guard_artillery",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a revolutionary artillery unit in the current province scope for the defined country scope. Uses the currently selected artillery unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -11819,7 +11907,9 @@
     "alternative_id": "effects:1357:alias:effect:hire_advisor",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Scopes to the unit's current location."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -11849,7 +11939,9 @@
     "alternative_id": "effects:1357:alias:effect:hire_advisor",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Scopes to the unit's current location."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -13442,7 +13534,9 @@
     "alternative_id": "effects:1402:alias:effect:tercio_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a tercio infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13470,7 +13564,9 @@
     "alternative_id": "effects:1403:alias:effect:tercio_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a tercio infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13498,7 +13594,9 @@
     "alternative_id": "effects:1404:alias:effect:musketeer_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a musketeer infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13526,7 +13624,9 @@
     "alternative_id": "effects:1405:alias:effect:musketeer_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a musketeer infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13554,7 +13654,9 @@
     "alternative_id": "effects:1406:alias:effect:samurai_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a samurai infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13582,7 +13684,9 @@
     "alternative_id": "effects:1407:alias:effect:samurai_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a samurai infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13610,7 +13714,9 @@
     "alternative_id": "effects:1408:alias:effect:geobukseon_galley",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a geobukseon galley ship unit in the current province scope for the defined country scope. Uses the defined scope's current galley ship unit. Requires the current province scope to have a port."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13638,7 +13744,9 @@
     "alternative_id": "effects:1409:alias:effect:geobukseon_galley",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a geobukseon galley ship unit in the current province scope for the defined country scope. Uses the defined scope's current galley ship unit. Requires the current province scope to have a port."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13698,7 +13806,9 @@
     "alternative_id": "effects:1410:alias:effect:man_of_war_heavy",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a man of war heavy ship unit in the current province scope for the defined country scope. Uses the defined scope's current heavy ship unit. Requires the current province scope to have a port."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13726,7 +13836,9 @@
     "alternative_id": "effects:1411:alias:effect:man_of_war_heavy",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a man of war heavy ship unit in the current province scope for the defined country scope. Uses the defined scope's current heavy ship unit. Requires the current province scope to have a port."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13754,7 +13866,9 @@
     "alternative_id": "effects:1412:alias:effect:man_of_war_light",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a man of war light ship unit in the current province scope for the defined country scope. Uses the defined scope's current light ship unit. Requires the current province scope to have a port."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13782,7 +13896,9 @@
     "alternative_id": "effects:1413:alias:effect:man_of_war_light",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a man of war light ship unit in the current province scope for the defined country scope. Uses the defined scope's current light ship unit. Requires the current province scope to have a port."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13810,7 +13926,9 @@
     "alternative_id": "effects:1414:alias:effect:galleon_heavy",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a galleon heavy ship unit in the current province scope for the defined country scope. Uses the defined scope's current heavy ship unit. Requires the current province scope to have a port."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13838,7 +13956,9 @@
     "alternative_id": "effects:1415:alias:effect:galleon_heavy",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a galleon heavy ship unit in the current province scope for the defined country scope. Uses the defined scope's current heavy ship unit. Requires the current province scope to have a port."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13866,7 +13986,9 @@
     "alternative_id": "effects:1416:alias:effect:galleass_galley",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a galleass galley ship unit in the current province scope for the defined country scope. Uses the defined scope's current galley ship unit. Requires the current province scope to have a port."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13894,7 +14016,9 @@
     "alternative_id": "effects:1417:alias:effect:galleass_galley",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a galleass galley ship unit in the current province scope for the defined country scope. Uses the defined scope's current galley ship unit. Requires the current province scope to have a port."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13922,7 +14046,9 @@
     "alternative_id": "effects:1418:alias:effect:caravel_light",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a caravel light ship unit in the current province scope for the defined country scope. Uses the defined scope's current light ship unit. Requires the current province scope to have a port."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13950,7 +14076,9 @@
     "alternative_id": "effects:1419:alias:effect:caravel_light",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a caravel light ship unit in the current province scope for the defined country scope. Uses the defined scope's current light ship unit. Requires the current province scope to have a port."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -14008,7 +14136,9 @@
     "alternative_id": "effects:1420:alias:effect:voc_indiamen_light",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a voc indiamen light ship unit in the current province scope for the defined country scope. Uses the defined scope's current light ship unit. Requires the current province scope to have a port."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -14036,7 +14166,9 @@
     "alternative_id": "effects:1421:alias:effect:voc_indiamen_light",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a voc indiamen light ship unit in the current province scope for the defined country scope. Uses the defined scope's current light ship unit. Requires the current province scope to have a port."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -14187,7 +14319,9 @@
     "alternative_id": "effects:1426:alias:effect:create_unit_forcelimit_percentage",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Builds the defined units as a percentage of the owner's forcelimit in capital of the current country scope."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14542,7 +14676,9 @@
     "alternative_id": "effects:1437:alias:effect:qizilbash_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a qizilbash infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -14570,7 +14706,9 @@
     "alternative_id": "effects:1438:alias:effect:qizilbash_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a qizilbash infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -14598,7 +14736,9 @@
     "alternative_id": "effects:1439:alias:effect:qizilbash_cavalry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a qizilbash cavalry unit in the current province scope for the defined country scope. Uses the currently selected cavalry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -14658,7 +14798,9 @@
     "alternative_id": "effects:1440:alias:effect:qizilbash_cavalry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a qizilbash cavalry unit in the current province scope for the defined country scope. Uses the currently selected cavalry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -14686,7 +14828,9 @@
     "alternative_id": "effects:1441:alias:effect:mamluks_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a mamluks infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -14714,7 +14858,9 @@
     "alternative_id": "effects:1442:alias:effect:mamluks_infantry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a mamluks infantry unit in the current province scope for the defined country scope. Uses the currently selected infantry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -14742,7 +14888,9 @@
     "alternative_id": "effects:1443:alias:effect:mamluks_cavalry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a mamluks cavalry unit in the current province scope for the defined country scope. Uses the currently selected cavalry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -14770,7 +14918,9 @@
     "alternative_id": "effects:1444:alias:effect:mamluks_cavalry",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Spawns a mamluks cavalry unit in the current province scope for the defined country scope. Uses the currently selected cavalry unit."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -14798,7 +14948,9 @@
     "alternative_id": "effects:1445:alias:effect:force_create_marriage",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Creates a royal marriage between the current scope and the defined scope. Allows the creation of royal marriages between nations and religions disallowing it."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14826,7 +14978,9 @@
     "alternative_id": "effects:1446:alias:effect:force_create_marriage",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Creates a royal marriage between the current scope and the defined scope. Allows the creation of royal marriages between nations and religions disallowing it."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15007,7 +15161,9 @@
     "alternative_id": "effects:1451:alias:effect:add_accepted_culture_or_dip_power",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Adds a new accepted culture to the current scope. In contrast to the standalone effect, this variant requires the culture to be specified by name. The dip reward will only be granted if the country has zero remaining promoted culture slots."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15035,7 +15191,9 @@
     "alternative_id": "effects:1452:alias:effect:set_state_edict",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Enacts the specified edict in the state of the current province scope. Will cause a crash if the province scope is not in a state; it must be used in combination with the is_state = yes trigger."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -19141,7 +19299,9 @@
     "alternative_id": "effects:268:alias:effect:define_advisor",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Scopes to the unit's current location."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -19171,7 +19331,9 @@
     "alternative_id": "effects:268:alias:effect:define_advisor",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Scopes to the unit's current location."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -38903,7 +39065,9 @@
     "alternative_id": "effects:846:alias:effect:remove_province_triggered_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Removes a province triggered modifier from the current province scope."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -44728,7 +44892,9 @@
     "alternative_id": "scope_links:130:alias:effect:area",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -44784,7 +44950,9 @@
     "alternative_id": "scope_links:134:alias:effect:province_group",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -44840,7 +45008,9 @@
     "alternative_id": "scope_links:138:alias:effect:region",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -44896,7 +45066,9 @@
     "alternative_id": "scope_links:17:alias:effect:<area.used>",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -44980,7 +45152,9 @@
     "alternative_id": "scope_links:146:alias:effect:every_ally",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45036,7 +45210,9 @@
     "alternative_id": "scope_links:150:alias:effect:every_coalition_member",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45092,7 +45268,9 @@
     "alternative_id": "scope_links:154:alias:effect:every_coalition_member",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45148,7 +45326,9 @@
     "alternative_id": "scope_links:158:alias:effect:every_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45236,7 +45416,9 @@
     "alternative_id": "scope_links:162:alias:effect:every_country_including_inactive",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45292,7 +45474,9 @@
     "alternative_id": "scope_links:166:alias:effect:every_elector",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45348,7 +45532,9 @@
     "alternative_id": "scope_links:170:alias:effect:every_enemy_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45439,7 +45625,9 @@
     "alternative_id": "scope_links:174:alias:effect:every_known_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45495,7 +45683,9 @@
     "alternative_id": "scope_links:178:alias:effect:every_local_enemy",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45579,7 +45769,9 @@
     "alternative_id": "scope_links:182:alias:effect:every_neighbor_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45635,7 +45827,9 @@
     "alternative_id": "scope_links:186:alias:effect:every_rival_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45691,7 +45885,9 @@
     "alternative_id": "scope_links:190:alias:effect:every_subject_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45747,7 +45943,9 @@
     "alternative_id": "scope_links:194:alias:effect:random_ally",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45803,7 +46001,9 @@
     "alternative_id": "scope_links:198:alias:effect:random_coalition_member",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45859,7 +46059,9 @@
     "alternative_id": "scope_links:21:alias:effect:<province_group.used>",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45887,7 +46089,9 @@
     "alternative_id": "scope_links:202:alias:effect:random_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45943,7 +46147,9 @@
     "alternative_id": "scope_links:206:alias:effect:random_elector",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -45999,7 +46205,9 @@
     "alternative_id": "scope_links:210:alias:effect:random_enemy_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46055,7 +46263,9 @@
     "alternative_id": "scope_links:214:alias:effect:random_known_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46111,7 +46321,9 @@
     "alternative_id": "scope_links:218:alias:effect:random_local_enemy",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46195,7 +46407,9 @@
     "alternative_id": "scope_links:222:alias:effect:random_neighbor_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46251,7 +46465,9 @@
     "alternative_id": "scope_links:226:alias:effect:random_rival_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46307,7 +46523,9 @@
     "alternative_id": "scope_links:230:alias:effect:random_subject_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46363,7 +46581,9 @@
     "alternative_id": "scope_links:234:alias:effect:every_core_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46419,7 +46639,9 @@
     "alternative_id": "scope_links:238:alias:effect:every_heretic_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46475,7 +46697,9 @@
     "alternative_id": "scope_links:27:alias:effect:<region>",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46503,7 +46727,9 @@
     "alternative_id": "scope_links:242:alias:effect:every_owned_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46560,7 +46786,9 @@
     "alternative_id": "scope_links:246:alias:effect:every_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46616,7 +46844,9 @@
     "alternative_id": "scope_links:250:alias:effect:random_core_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46672,7 +46902,9 @@
     "alternative_id": "scope_links:254:alias:effect:random_heretic_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46728,7 +46960,9 @@
     "alternative_id": "scope_links:258:alias:effect:random_owned_area",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46816,7 +47050,9 @@
     "alternative_id": "scope_links:264:alias:effect:random_owned_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -46939,7 +47175,9 @@
     "alternative_id": "scope_links:268:alias:effect:every_trade_node",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47030,7 +47268,9 @@
     "alternative_id": "scope_links:272:alias:effect:random_active_trade_node",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47086,7 +47326,9 @@
     "alternative_id": "scope_links:276:alias:effect:every_empty_neighbor_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47142,7 +47384,9 @@
     "alternative_id": "scope_links:280:alias:effect:every_neighbor_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47227,7 +47471,9 @@
     "alternative_id": "scope_links:284:alias:effect:every_province_in_state",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47283,7 +47529,9 @@
     "alternative_id": "scope_links:288:alias:effect:random_empty_neighbor_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47339,7 +47587,9 @@
     "alternative_id": "scope_links:292:alias:effect:random_neighbor_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47395,7 +47645,9 @@
     "alternative_id": "scope_links:296:alias:effect:random_province_in_state",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47451,7 +47703,9 @@
     "alternative_id": "scope_links:300:alias:effect:random_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47479,7 +47733,9 @@
     "alternative_id": "scope_links:33:alias:effect:<superregion>",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47535,7 +47791,9 @@
     "alternative_id": "scope_links:304:alias:effect:every_core_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47591,7 +47849,9 @@
     "alternative_id": "scope_links:308:alias:effect:random_core_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47647,7 +47907,9 @@
     "alternative_id": "scope_links:312:alias:effect:every_privateering_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47703,7 +47965,9 @@
     "alternative_id": "scope_links:316:alias:effect:random_privateering_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47759,7 +48023,9 @@
     "alternative_id": "scope_links:320:alias:effect:every_trade_node_member_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47847,7 +48113,9 @@
     "alternative_id": "scope_links:324:alias:effect:random_trade_node_member_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47903,7 +48171,9 @@
     "alternative_id": "scope_links:328:alias:effect:every_trade_node_member_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47994,7 +48264,9 @@
     "alternative_id": "scope_links:332:alias:effect:random_trade_node_member_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48106,7 +48378,9 @@
     "alternative_id": "scope_links:39:alias:effect:<continent>",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48255,7 +48529,9 @@
     "alternative_id": "scope_links:43:alias:effect:<colonial_region>",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48309,7 +48585,9 @@
     "alternative_id": null,
     "severity": 3,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48337,7 +48615,9 @@
     "alternative_id": "scope_links:474:alias:effect:every_active_trade_node",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48391,7 +48671,9 @@
     "alternative_id": "scope_links:478:alias:effect:random_trade_node",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48417,7 +48699,9 @@
     "alternative_id": "scope_links:478:alias:effect:random_trade_node",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Scopes to one random trade node."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -48443,7 +48727,9 @@
     "alternative_id": "scope_links:484:alias:effect:home_trade_node_effect_scope",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Scopes to the trade node where the country has its main trading port."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -48471,7 +48757,9 @@
     "alternative_id": "scope_links:518:alias:effect:every_federation_member",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48527,7 +48815,9 @@
     "alternative_id": "scope_links:522:alias:effect:every_tribal_land_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48583,7 +48873,9 @@
     "alternative_id": "scope_links:534:alias:effect:random_hired_mercenary_company",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48609,7 +48901,9 @@
     "alternative_id": "scope_links:534:alias:effect:random_hired_mercenary_company",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Scopes to a random hired mercenary company. Optional parameters: template = <string>, is_foreign_company = yes, hired_for_months = <int>, has_company_manpower = <int>."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -48661,7 +48955,9 @@
     "alternative_id": "scope_links:548:alias:effect:location",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Scopes to the unit's current location."
+    ],
     "allowed_scopes": [
       "mercenary_company",
       "unit"
@@ -48898,7 +49194,9 @@
     "alternative_id": "scope_links:584:alias:effect:<trade_company>",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -48954,7 +49252,9 @@
     "alternative_id": "scope_links:592:alias:effect:every_capital_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49010,7 +49310,9 @@
     "alternative_id": "scope_links:596:alias:effect:random_capital_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49094,7 +49396,9 @@
     "alternative_id": "scope_links:604:alias:effect:every_claimed_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49150,7 +49454,9 @@
     "alternative_id": "scope_links:608:alias:effect:random_claimed_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49206,7 +49512,9 @@
     "alternative_id": "scope_links:616:alias:effect:every_war_enemy_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49262,7 +49570,9 @@
     "alternative_id": "scope_links:620:alias:effect:random_war_enemy_country",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49318,7 +49628,9 @@
     "alternative_id": "scope_links:624:alias:effect:random_area_province",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49458,7 +49770,9 @@
     "alternative_id": "scope_links:78:alias:effect:if",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49484,7 +49798,9 @@
     "alternative_id": "scope_links:78:alias:effect:if",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Executes the enclosed block only when the trigger conditions are met; enables if/else_if/else branching."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49512,7 +49828,9 @@
     "alternative_id": "scope_links:82:alias:effect:else_if",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49538,7 +49856,9 @@
     "alternative_id": "scope_links:82:alias:effect:else_if",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Follows an if or another else_if block; executes when its triggers are met and no previous branch ran."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49564,7 +49884,9 @@
     "alternative_id": "scope_links:84:alias:effect:else",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Follows if/else_if; executes when no previous branch ran."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -49592,7 +49914,9 @@
     "alternative_id": "scope_links:88:alias:effect:while",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],

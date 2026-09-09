@@ -187,7 +187,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Refers to the country that controls the province in scope."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -291,7 +293,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Refers to the country that owns the province in scope."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -317,7 +321,9 @@
     "alternative_id": null,
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Scopes to the country that has the current province as tribal land."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -2165,7 +2171,9 @@
     "alternative_id": "scope_links:462:alias:trigger:if",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -2191,7 +2199,9 @@
     "alternative_id": "scope_links:462:alias:trigger:if",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Executes the enclosed block only when the trigger conditions are met; enables if/else_if/else branching."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -2219,7 +2229,9 @@
     "alternative_id": "scope_links:466:alias:trigger:else_if",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Restricts a scope or iterator statement to targets matching the enclosed triggers."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -2245,7 +2257,9 @@
     "alternative_id": "scope_links:466:alias:trigger:else_if",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Follows an if or another else_if block; executes when its triggers are met and no previous branch ran."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -2271,7 +2285,9 @@
     "alternative_id": "scope_links:468:alias:trigger:else",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Follows if/else_if; executes when no previous branch ran."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -2297,7 +2313,9 @@
     "alternative_id": "scope_links:470:alias:trigger:any_active_trade_node",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Scopes to a trade node (province) that meets the triggers. Returns true if a merchant is placed, even without explicit triggers. Iterator: any_ / every_ / random_ variants."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -2643,7 +2661,9 @@
     "alternative_id": "scope_links:496:alias:trigger:num_of_provinces_owned_or_owned_by_non_sovereign_subjects_with",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if there are at least X provinces that fulfill the declared conditions owned by the country and its non-tributary subjects."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3160,7 +3180,9 @@
     "alternative_id": "scope_links:536:alias:trigger:any_hired_mercenary_company",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Scopes to a hired mercenary company. Optional parameters: template = <string>, is_foreign_company = yes, hired_for_months = <int>, has_company_manpower = <int>."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -3244,7 +3266,9 @@
     "alternative_id": "scope_links:542:alias:trigger:location",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Scopes to the unit's current location."
+    ],
     "allowed_scopes": [
       "mercenary_company",
       "unit"
@@ -3271,7 +3295,9 @@
     "alternative_id": "scope_links:544:alias:trigger:any_great_power",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Scopes to one great power among all great powers in the world including the ROOT country."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -3297,7 +3323,9 @@
     "alternative_id": "scope_links:546:alias:trigger:any_other_great_power",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Scopes to one great power among all great powers in the world except the ROOT country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -12931,7 +12959,9 @@
     "alternative_id": "triggers:1264:alias:trigger:current_bribe",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the seat in the province wants bribe X. Bribes are found in common/parliament_bribes."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -12959,7 +12989,9 @@
     "alternative_id": "triggers:1265:alias:trigger:exiled_same_dynasty_as_current",
     "severity": 2,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if an exiled ruler has the same dynasty as the current one."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -13287,7 +13319,9 @@
     "alternative_id": "triggers:1275:alias:trigger:total_losses_in_won_wars",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country specified by loser has lost at least the amount of troops specified by casualties in wars lost against the country specified by winner. Both have to be primary targets."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -13318,7 +13352,9 @@
     "alternative_id": "triggers:1276:alias:trigger:province_has_center_of_trade_of_level",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province has a center of trade of at least this level."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13346,7 +13382,9 @@
     "alternative_id": "triggers:1277:rule:trigger:province_has_center_of_trade_of_level",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province has a center of trade of at least this level."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13377,7 +13415,9 @@
     "alternative_id": "triggers:1277:alias:trigger:num_of_centers_of_trade",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X centers of trade."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -13522,7 +13562,9 @@
     "alternative_id": "triggers:1281:alias:trigger:has_state_edict",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the state has X edict enabled."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13654,7 +13696,9 @@
     "alternative_id": "triggers:1286:alias:trigger:has_monsoon",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province has monsoon X."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -13685,7 +13729,9 @@
     "alternative_id": "triggers:1287:alias:trigger:innovativeness",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the countries has at least X innovativeness."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -13744,7 +13790,9 @@
     "alternative_id": "triggers:1289:alias:trigger:num_of_trade_companies",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X trade companies."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -13802,7 +13850,9 @@
     "alternative_id": "triggers:1290:alias:trigger:have_had_reform",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has previously had the specific government reform."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -13854,7 +13904,9 @@
     "alternative_id": "triggers:1292:alias:trigger:can_migrate",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country can migrate to another province. Doesn't return true if the timer is still counting down."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -13918,7 +13970,9 @@
     "alternative_id": "triggers:1294:alias:trigger:government_reform_progress",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has x or more reform progress saved up."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -14185,7 +14239,9 @@
     "alternative_id": "triggers:1301:alias:trigger:has_trade_company_investment_in_area",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the specified investor has the specified trade company investment in the area."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -14301,7 +14357,9 @@
     "alternative_id": "triggers:1305:alias:trigger:has_trade_company_investment_in_area",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the specified investor has the specified trade company investment in the area."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -14567,7 +14625,9 @@
     "alternative_id": "triggers:1314:alias:trigger:has_mission",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has the specified mission."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15108,7 +15168,9 @@
     "alternative_id": "triggers:1330:alias:trigger:has_leaders",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X amount of generals. Used to exclude heirs and monarchs from the count. Also supports type = admiral."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15139,7 +15201,9 @@
     "alternative_id": "triggers:1331:alias:trigger:num_of_janissaries",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X Janissaries."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15280,7 +15344,9 @@
     "alternative_id": "triggers:1336:alias:trigger:mission_completed",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has completed mission X."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15308,7 +15374,9 @@
     "alternative_id": "triggers:1337:alias:trigger:country_or_non_sovereign_subject_holds",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province is part of the specified country or its non-tributary subjects."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -15336,7 +15404,9 @@
     "alternative_id": "triggers:1338:alias:trigger:country_or_non_sovereign_subject_holds",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province is part of the specified country or its non-tributary subjects."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -15367,7 +15437,9 @@
     "alternative_id": "triggers:1339:alias:trigger:grown_by_states",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country's total number of states (not areas) has grown by the specified amount. The states don't have to be fully owned and the provinces don't need full cores."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15459,7 +15531,9 @@
     "alternative_id": "triggers:1341:alias:trigger:num_of_foreign_hre_provinces",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if there are at least X provinces owned by non-member states or subjects of non-member states."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -15518,7 +15592,9 @@
     "alternative_id": "triggers:1343:alias:trigger:is_capital_of",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province the capital of the specified country."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -15546,7 +15622,9 @@
     "alternative_id": "triggers:1344:alias:trigger:is_capital_of",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province the capital of the specified country."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -15577,7 +15655,9 @@
     "alternative_id": "triggers:1345:alias:trigger:num_of_rajput",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X rajput regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15636,7 +15716,9 @@
     "alternative_id": "triggers:1347:alias:trigger:is_reform_available",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the specified government reform is available to the current country scope."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15813,7 +15895,9 @@
     "alternative_id": "triggers:1352:alias:trigger:has_latent_trade_goods",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province has the specified latent trade good."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -15959,7 +16043,9 @@
     "alternative_id": "triggers:1357:alias:trigger:reform_level",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has reached at least X levels of government reforms."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -15987,7 +16073,9 @@
     "alternative_id": "triggers:1358:alias:trigger:trade_company_region",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province is in the trade company region."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -16015,7 +16103,9 @@
     "alternative_id": "triggers:1359:alias:trigger:trade_company_region",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province is in the trade company region."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -16104,7 +16194,9 @@
     "alternative_id": "triggers:1361:alias:trigger:province_is_on_an_island",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province is on an island."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -16274,7 +16366,9 @@
     "alternative_id": "triggers:1367:alias:trigger:native_policy",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if country has the specified native policy."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -16595,7 +16689,9 @@
     "alternative_id": "triggers:1377:alias:trigger:province_getting_expelled_minority",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province is getting minorities."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -18268,7 +18364,9 @@
     "alternative_id": "triggers:1427:alias:trigger:has_pasha",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province has a pasha."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -18395,7 +18493,9 @@
     "alternative_id": "triggers:1430:alias:trigger:has_supply_depot",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province has a supply depot built by X."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -18423,7 +18523,9 @@
     "alternative_id": "triggers:1431:alias:trigger:has_supply_depot",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province has a supply depot built by X."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -18482,7 +18584,9 @@
     "alternative_id": "triggers:1434:alias:trigger:num_of_captured_ships_with_boarding_doctrine",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has captured at least X ships while having the 'Ship Boarding' naval doctrine."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -18752,7 +18856,9 @@
     "alternative_id": "triggers:1442:alias:trigger:is_all_concessions_in_council_taken",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if all concessions in the Council of Trent have been taken."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -18841,7 +18947,9 @@
     "alternative_id": "triggers:1445:alias:trigger:humiliated_by",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the current country scope has been humiliated by the specified country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -18869,7 +18977,9 @@
     "alternative_id": "triggers:1446:alias:trigger:humiliated_by",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the current country scope has been humiliated by the specified country."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24005,7 +24115,9 @@
     "alternative_id": "triggers:1599:alias:trigger:num_of_revolutionary_guard",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X revolutionary guard units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24185,7 +24297,9 @@
     "alternative_id": "triggers:1603:alias:trigger:num_of_special_units",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X special regiments of <type>. Accepts all special units listed on the wiki."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -24578,7 +24692,9 @@
     "alternative_id": "triggers:1615:alias:trigger:has_owner_secondary_religion",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province has the secondary religion of its owner."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -24968,7 +25084,9 @@
     "alternative_id": "triggers:1627:alias:trigger:has_protecting_trade_share_in_trade_node",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has a certain percentage of the trade in a given node through protecting trade."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -25027,7 +25145,9 @@
     "alternative_id": "triggers:1629:alias:trigger:has_protecting_trade_share_in_trade_node",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has a certain percentage of the trade in a given node through protecting trade."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -25089,7 +25209,9 @@
     "alternative_id": "triggers:1630:alias:trigger:num_of_pashas",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X pashas."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25117,7 +25239,9 @@
     "alternative_id": "triggers:1631:alias:trigger:transfers_trade_power_to",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country transfers trade power to country X."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25145,7 +25269,9 @@
     "alternative_id": "triggers:1632:alias:trigger:transfers_trade_power_to",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country transfers trade power to country X."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -25616,7 +25742,9 @@
     "alternative_id": "triggers:1647:alias:trigger:empire_of_china_num_reforms_passed",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the Emperor of China has passed at least X reforms."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -25644,7 +25772,9 @@
     "alternative_id": "triggers:1648:alias:trigger:empire_of_china_has_active_decree",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the Emperor of China has an active reform, or the specified X reform."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -25670,7 +25800,9 @@
     "alternative_id": "triggers:1649:alias:trigger:empire_of_china_has_active_decree",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the Emperor of China has an active reform, or the specified X reform."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -25732,7 +25864,9 @@
     "alternative_id": "triggers:1650:alias:trigger:num_of_times_expanded_infrastructure",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the province has had its infrastructure expanded at least X times."
+    ],
     "allowed_scopes": [
       "province"
     ],
@@ -26119,7 +26253,9 @@
     "alternative_id": "triggers:1662:alias:trigger:has_unembraced_institution",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has not embraced the specified institution."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26145,7 +26281,9 @@
     "alternative_id": "triggers:1663:alias:trigger:has_unembraced_institution",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has not embraced the specified institution."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26236,7 +26374,9 @@
     "alternative_id": "triggers:1666:alias:trigger:num_of_tercio",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X tercio regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26298,7 +26438,9 @@
     "alternative_id": "triggers:1668:alias:trigger:num_of_samurai",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X samurai regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26329,7 +26471,9 @@
     "alternative_id": "triggers:1669:alias:trigger:num_of_geobukseon",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X geobukseon units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26391,7 +26535,9 @@
     "alternative_id": "triggers:1670:alias:trigger:num_of_man_of_war",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X man of war heavy ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26422,7 +26568,9 @@
     "alternative_id": "triggers:1671:alias:trigger:num_of_galleon",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X galleon ship units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26453,7 +26601,9 @@
     "alternative_id": "triggers:1672:alias:trigger:num_of_galleass",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X galleass ship units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26484,7 +26634,9 @@
     "alternative_id": "triggers:1673:alias:trigger:num_of_caravel",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X caravel ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26515,7 +26667,9 @@
     "alternative_id": "triggers:1674:alias:trigger:num_of_voc_indiamen",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X voc indiamen units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26725,7 +26879,9 @@
     "alternative_id": "triggers:1680:alias:trigger:num_of_qizilbash",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X qizilbash regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26756,7 +26912,9 @@
     "alternative_id": "triggers:1681:alias:trigger:num_of_mamluks",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X mamluks regiments."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -26787,7 +26945,9 @@
     "alternative_id": "triggers:1682:alias:trigger:monthly_trade_income",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has a monthly trade income of at least X."
+    ],
     "allowed_scopes": [
       "country"
     ],
