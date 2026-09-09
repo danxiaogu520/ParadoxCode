@@ -67,7 +67,7 @@ Required:
 
 Options:
   --vanilla-cache PATH       Vanilla .pdxindex (also PDX_DIAGNOSTIC_VANILLA_CACHE)
-  --server PATH              pdx-ls executable (auto-detected from target/{debug,release})
+  --server PATH              pdx-ls executable (explicit path must exist; auto-detected from target/{debug,release} only when omitted)
   --workspace PATH           LSP workspace root (default: parent of --mod)
   --output DIR               report directory (default: ${DEFAULT_OUTPUT_DIR})
   --timeout-ms N             overall server timeout (default: ${DEFAULT_TIMEOUT_MS})
@@ -348,18 +348,27 @@ function resolveOptions(raw) {
 }
 
 function resolveServer(explicit) {
-  const candidates = [];
-  if (explicit) candidates.push(resolve(explicit));
+  // An explicit --server path pins the binary under test; a typo'd or
+  // unresolvable path must fail loudly instead of silently measuring a
+  // stale target/{debug,release} build (cost a full evening of phantom
+  // baseline diffs on 2026-09-10).
+  if (explicit) {
+    const candidate = resolve(explicit);
+    if (!existsSync(candidate) || !statSync(candidate).isFile()) {
+      throw new CliUsageError(
+        `--server executable was not found: ${candidate} ` +
+          '(pass an existing path, or omit --server to auto-detect target/{debug,release})',
+      );
+    }
+    return candidate;
+  }
   const executableName = process.platform === 'win32' ? 'pdx-ls.exe' : 'pdx-ls';
-  candidates.push(
+  const candidates = [
     join(REPOSITORY_ROOT, 'target', 'debug', executableName),
     join(REPOSITORY_ROOT, 'target', 'release', executableName),
-  );
+  ];
   for (const candidate of candidates) {
     if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
-  }
-  if (explicit) {
-    throw new CliUsageError(`pdx-ls executable was not found: ${explicit}`);
   }
   return 'pdx-ls';
 }
