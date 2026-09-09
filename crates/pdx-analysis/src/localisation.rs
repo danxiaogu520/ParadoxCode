@@ -10,11 +10,18 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use pdx_engine::{AnalysisSnapshot, DocumentSource};
-use pdx_parser::{CstKind, FileFormat};
+use pdx_parser::{CstKind, CstNode, FileFormat};
 use pdx_rules::KeyMatcher;
 use pdx_text::{TextRange, TextSize};
 
-use crate::support::{ParsedContent, ParsedInput, input_for_document, word_range};
+use crate::resolution::{
+    ResolutionDefinition, semantic_data_with_cancellation, symbol_candidates_for_hover,
+    text_range_within,
+};
+use crate::support::{
+    ParsedContent, ParsedInput, input_for_document, input_for_source_file, truncate_hover_text,
+    word_range,
+};
 use crate::types::{
     CancellationToken, Cancelled, CompletionItem, CompletionKind, CompletionResult, Diagnostic,
     DiagnosticCertainty, DiagnosticCode, Severity,
@@ -475,6 +482,236 @@ fn escaped_at(source: &str, offset: usize) -> bool {
         index -= 1;
     }
     slashes % 2 == 1
+}
+
+/// Renders the preview value of a localisation definition, preferring the snapshot cache and
+/// falling back to a bounded CST lookup in the backing file.
+pub(crate) fn localisation_preview(
+    snapshot: &AnalysisSnapshot,
+    definition: &ResolutionDefinition,
+) -> Option<(Option<String>, String)> {
+    if let Some(file) = definition.location.file
+        && let Some(preview) = snapshot.localisation_preview(file, definition.location.range)
+    {
+        return Some((preview.language.clone(), preview.value.clone()));
+    }
+    let input = definition
+        .location
+        .document
+        .as_ref()
+        .and_then(|document| input_for_document(snapshot, document))
+        .or_else(|| {
+            definition
+                .location
+                .file
+                .and_then(|file| input_for_source_file(snapshot, file))
+        })?;
+    let ParsedContent::Text(parsed) = &input.parsed;
+    let entry = find_cst_node(
+        parsed.root(),
+        CstKind::LocalisationEntry,
+        definition.location.range,
+    )?;
+    let value_node = entry.children().find(|child| {
+        matches!(
+            child.kind(),
+            CstKind::LocalisationString | CstKind::UnquotedValue
+        )
+    })?;
+    let raw = parsed.text(value_node.range())?.trim();
+    let value = raw
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+        .unwrap_or(raw);
+    let value = truncate_hover_text(value);
+    if value.is_empty() {
+        return None;
+    }
+    let mut language = None;
+    for node in parsed.root().children() {
+        if node.range().start() > entry.range().start() {
+            break;
+        }
+        if node.kind() == CstKind::LanguageHeader
+            && let Some(value) = node
+                .children()
+                .find(|child| child.kind() == CstKind::LocalisationKey)
+                .and_then(|child| parsed.text(child.range()))
+        {
+            language = Some(value.trim().to_owned());
+        }
+    }
+    Some((language, value))
+}
+
+/// Finds the first non-empty localisation attached to a non-localisation symbol definition.
+///
+/// Type-instance localisation mappings are indexed as ordinary localisation references at the
+/// instance's source range.  Looking those references up from the resolved definition lets a
+/// hover over `event = foo.1` (or another typed symbol use) show the same preview as hovering its
+/// generated localisation key. Type descriptors may also use the implicit same-name convention
+/// without a localisation-binding row. Cache-only roots retain required references; optional
+/// templates are conservatively tried from the rule data and only shown when an actual key
+/// resolves.
+pub(crate) fn symbol_localisation_preview(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    symbol_name: &str,
+    definition: &ResolutionDefinition,
+    cancellation: &CancellationToken,
+) -> Result<Option<(Option<String>, String)>, Cancelled> {
+    if kind.eq_ignore_ascii_case("localisation") {
+        return Ok(localisation_preview(snapshot, definition));
+    }
+    let semantic = &snapshot.rules().model().semantic;
+    let has_binding = semantic
+        .localisation_bindings
+        .iter()
+        .any(|binding| binding.type_name.eq_ignore_ascii_case(kind));
+    let is_type_definition = semantic
+        .type_descriptors
+        .keys()
+        .any(|type_name| type_name.eq_ignore_ascii_case(kind));
+    if !has_binding && !is_type_definition {
+        return Ok(None);
+    }
+
+    let full_range = definition.location.range;
+    let selection_range = definition.selection_range;
+    let mut references = Vec::<(String, TextRange)>::new();
+    let mut cache_only = false;
+    if let Some(document) = definition.location.document.as_ref() {
+        if let Some(input) = input_for_document(snapshot, document) {
+            references.extend(localisation_references_for_hover(
+                snapshot,
+                &input,
+                cancellation,
+            )?);
+        }
+    } else if let Some(file) = definition.location.file {
+        if let Some(input) = input_for_source_file(snapshot, file) {
+            references.extend(localisation_references_for_hover(
+                snapshot,
+                &input,
+                cancellation,
+            )?);
+        } else {
+            cache_only = true;
+            references.extend(
+                snapshot
+                    .index()
+                    .references(file)
+                    .iter()
+                    .filter(|reference| reference.kind.eq_ignore_ascii_case("localisation"))
+                    .map(|reference| (reference.name.to_string(), reference.range)),
+            );
+        }
+    }
+    references.retain(|(_, range)| text_range_within(*range, full_range));
+    references.sort_by_key(|(_, range)| {
+        (
+            if *range == selection_range { 0 } else { 1 },
+            range.start(),
+            range.end(),
+        )
+    });
+    references.dedup();
+    for (name, _) in references {
+        cancellation.checkpoint()?;
+        for candidate in symbol_candidates_for_hover(snapshot, "localisation", &name, cancellation)?
+        {
+            if let Some(preview) = localisation_preview(snapshot, &candidate) {
+                return Ok(Some(preview));
+            }
+        }
+    }
+    if is_type_definition {
+        cancellation.checkpoint()?;
+        for candidate in
+            symbol_candidates_for_hover(snapshot, "localisation", symbol_name, cancellation)?
+        {
+            if let Some(preview) = localisation_preview(snapshot, &candidate) {
+                return Ok(Some(preview));
+            }
+        }
+    }
+    if cache_only && !symbol_name.contains('.') {
+        for binding in semantic
+            .localisation_bindings
+            .iter()
+            .filter(|binding| binding.type_name.eq_ignore_ascii_case(kind))
+        {
+            let Some(template) = binding.template.as_deref() else {
+                continue;
+            };
+            let name = template.replace('$', symbol_name);
+            cancellation.checkpoint()?;
+            for candidate in
+                symbol_candidates_for_hover(snapshot, "localisation", &name, cancellation)?
+            {
+                if let Some(preview) = localisation_preview(snapshot, &candidate) {
+                    return Ok(Some(preview));
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn localisation_references_for_hover(
+    snapshot: &AnalysisSnapshot,
+    input: &ParsedInput,
+    cancellation: &CancellationToken,
+) -> Result<Vec<(String, TextRange)>, Cancelled> {
+    let derived = input
+        .hir
+        .as_deref()
+        .zip(input.path.as_ref())
+        .map(|(hir, path)| {
+            pdx_engine::hir::derived_localisation_references_for_hover(hir, path, snapshot.rules())
+        })
+        .unwrap_or_default();
+    let semantic = semantic_data_with_cancellation(snapshot, input, cancellation)?;
+    let mut references = semantic
+        .references
+        .into_iter()
+        .filter(|reference| reference.kind.eq_ignore_ascii_case("localisation"))
+        .map(|reference| (reference.name, reference.range))
+        .collect::<Vec<_>>();
+    references.extend(
+        derived
+            .into_iter()
+            .map(|reference| (reference.name, reference.range)),
+    );
+    Ok(references)
+}
+
+pub(crate) fn find_cst_node(
+    node: CstNode<'_>,
+    kind: CstKind,
+    range: TextRange,
+) -> Option<CstNode<'_>> {
+    find_cst_node_bounded(node, kind, range, MAX_CST_SEARCH_DEPTH)
+}
+
+/// Nesting bound for CST lookups; localisation files are flat, so this only guards against
+/// pathological or corrupted trees, mirroring the bounded-scan rule for workspace scanning.
+const MAX_CST_SEARCH_DEPTH: usize = 64;
+
+fn find_cst_node_bounded(
+    node: CstNode<'_>,
+    kind: CstKind,
+    range: TextRange,
+    depth: usize,
+) -> Option<CstNode<'_>> {
+    if node.kind() == kind && node.range() == range {
+        return Some(node);
+    }
+    if depth == 0 {
+        return None;
+    }
+    node.children()
+        .find_map(|child| find_cst_node_bounded(child, kind, range, depth - 1))
 }
 
 #[cfg(test)]

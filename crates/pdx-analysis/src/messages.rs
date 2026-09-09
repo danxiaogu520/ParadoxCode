@@ -15,6 +15,52 @@ use crate::semantic::enum_members;
 /// How many list members are shown before the "... and N more" tail.
 const LIST_LIMIT: usize = 8;
 
+/// Numeric bounds extracted from a matcher, shared by diagnostics phrases and hover labels.
+///
+/// Both consumers speak about the same bound shape; only the wording differs. Extracting the
+/// shape once keeps the two voices from drifting on which side of a range is inclusive.
+pub(crate) enum NumericBounds {
+    Both(String, String),
+    AtLeast(String),
+    AtMost(String),
+    Unbounded,
+}
+
+/// Extracts the bound shape of a numeric matcher.
+pub(crate) fn numeric_bounds<T: std::fmt::Display>(
+    min: Option<T>,
+    max: Option<T>,
+) -> NumericBounds {
+    match (min, max) {
+        (Some(min), Some(max)) => NumericBounds::Both(min.to_string(), max.to_string()),
+        (Some(min), None) => NumericBounds::AtLeast(min.to_string()),
+        (None, Some(max)) => NumericBounds::AtMost(max.to_string()),
+        (None, None) => NumericBounds::Unbounded,
+    }
+}
+
+impl NumericBounds {
+    /// Noun-phrase voice used after a diagnostics noun: " between a and b".
+    pub(crate) fn phrase_suffix(self) -> String {
+        match self {
+            Self::Both(min, max) => format!(" between {min} and {max}"),
+            Self::AtLeast(min) => format!(" of at least {min}"),
+            Self::AtMost(max) => format!(" of at most {max}"),
+            Self::Unbounded => String::new(),
+        }
+    }
+
+    /// Label voice used by hover value labels: " in [a, b]".
+    pub(crate) fn label_suffix(self) -> String {
+        match self {
+            Self::Both(min, max) => format!(" in [{min}, {max}]"),
+            Self::AtLeast(min) => format!(" >= {min}"),
+            Self::AtMost(max) => format!(" <= {max}"),
+            Self::Unbounded => String::new(),
+        }
+    }
+}
+
 /// Renders a deduplicated backticked list, truncating long enumerations.
 ///
 /// `a, b, c` becomes `` `a`, `b`, `c` ``; a list past the limit keeps the
@@ -70,24 +116,14 @@ pub(crate) fn value_description(snapshot: &AnalysisSnapshot, matcher: &ValueMatc
         ValueMatcher::AnyScalar | ValueMatcher::DynamicSet(_) => "any value".to_owned(),
         ValueMatcher::Exact(value) => format!("`{value}`"),
         ValueMatcher::Bool => "`yes` or `no`".to_owned(),
-        ValueMatcher::Int { min, max } => {
-            let noun = "a whole number";
-            match (min, max) {
-                (Some(min), Some(max)) => format!("{noun} between {min} and {max}"),
-                (Some(min), None) => format!("{noun} of at least {min}"),
-                (None, Some(max)) => format!("{noun} of at most {max}"),
-                (None, None) => noun.to_owned(),
-            }
-        }
-        ValueMatcher::Float { min, max } => {
-            let noun = "a number";
-            match (min.as_deref(), max.as_deref()) {
-                (Some(min), Some(max)) => format!("{noun} between {min} and {max}"),
-                (Some(min), None) => format!("{noun} of at least {min}"),
-                (None, Some(max)) => format!("{noun} of at most {max}"),
-                (None, None) => noun.to_owned(),
-            }
-        }
+        ValueMatcher::Int { min, max } => format!(
+            "a whole number{}",
+            numeric_bounds(min.as_ref(), max.as_ref()).phrase_suffix()
+        ),
+        ValueMatcher::Float { min, max } => format!(
+            "a number{}",
+            numeric_bounds(min.as_deref(), max.as_deref()).phrase_suffix()
+        ),
         ValueMatcher::Date => "a date, such as 1444.11.11".to_owned(),
         ValueMatcher::Type(kind) => format!("{} `{kind}` name", article_for(kind)),
         ValueMatcher::Enum(name) => enum_members(snapshot, name).map_or_else(
@@ -115,18 +151,14 @@ pub(crate) fn value_plural(snapshot: &AnalysisSnapshot, matcher: &ValueMatcher) 
         ValueMatcher::AnyScalar | ValueMatcher::DynamicSet(_) => "values".to_owned(),
         ValueMatcher::Exact(value) => format!("`{value}` values"),
         ValueMatcher::Bool => "`yes`/`no` values".to_owned(),
-        ValueMatcher::Int { min, max } => match (min, max) {
-            (Some(min), Some(max)) => format!("whole numbers between {min} and {max}"),
-            (Some(min), None) => format!("whole numbers of at least {min}"),
-            (None, Some(max)) => format!("whole numbers of at most {max}"),
-            (None, None) => "whole numbers".to_owned(),
-        },
-        ValueMatcher::Float { min, max } => match (min.as_deref(), max.as_deref()) {
-            (Some(min), Some(max)) => format!("numbers between {min} and {max}"),
-            (Some(min), None) => format!("numbers of at least {min}"),
-            (None, Some(max)) => format!("numbers of at most {max}"),
-            (None, None) => "numbers".to_owned(),
-        },
+        ValueMatcher::Int { min, max } => format!(
+            "whole numbers{}",
+            numeric_bounds(min.as_ref(), max.as_ref()).phrase_suffix()
+        ),
+        ValueMatcher::Float { min, max } => format!(
+            "numbers{}",
+            numeric_bounds(min.as_deref(), max.as_deref()).phrase_suffix()
+        ),
         ValueMatcher::Date => "dates".to_owned(),
         ValueMatcher::Type(kind) => format!("`{kind}` names"),
         ValueMatcher::Enum(name) => enum_members(snapshot, name).map_or_else(

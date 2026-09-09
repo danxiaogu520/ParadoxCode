@@ -366,6 +366,26 @@ pub struct SemanticRule {
     pub line: u32,
 }
 
+impl SemanticRule {
+    /// Structural equivalence for presenting repeated first-party declarations.
+    ///
+    /// The first-party source lowers one declaration to many rows (one per enum member or
+    /// alias); those rows differ only in declaration provenance — `id`, `alternative_id`,
+    /// `source_file`, and `line`. This method compares through the derived `PartialEq` after
+    /// erasing those fields, so any field added to the struct joins the comparison
+    /// automatically. Call sites that must distinguish declarations compare `id` directly.
+    pub fn semantic_equivalent(&self, other: &Self) -> bool {
+        let erase_provenance = |mut rule: Self| {
+            rule.id.clear();
+            rule.alternative_id = None;
+            rule.source_file.clear();
+            rule.line = 0;
+            rule
+        };
+        erase_provenance(self.clone()) == erase_provenance(other.clone())
+    }
+}
+
 /// Initial scope-register metadata for one semantic type root.
 ///
 /// A type root may enter the game with different values in the `ROOT`, `THIS`, and `FROM`
@@ -484,5 +504,52 @@ impl RulesModel {
             .iter()
             .filter(|category| category.matcher.matches(path))
             .max_by_key(|category| category.matcher.specificity())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rule(id: &str) -> SemanticRule {
+        SemanticRule {
+            id: id.to_owned(),
+            context: "trigger".to_owned(),
+            parent_path: Vec::new(),
+            key: KeyMatcher::Exact("foo".to_owned()),
+            operator: None,
+            value: ValueMatcher::Bool,
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: false,
+            max_occurs: None,
+            source_file: "semantic/trigger.json".to_owned(),
+            line: 1,
+        }
+    }
+
+    #[test]
+    fn semantic_equivalent_ignores_declaration_provenance() {
+        let mut repeated = rule("trigger:foo:12");
+        repeated.alternative_id = Some("alias_a".to_owned());
+        repeated.source_file = "semantic/trigger_generated.json".to_owned();
+        repeated.line = 47;
+        assert!(rule("trigger:foo:1").semantic_equivalent(&repeated));
+    }
+
+    #[test]
+    fn semantic_equivalent_compares_constraining_fields() {
+        let mut wider_scope = rule("trigger:foo:1");
+        wider_scope.allowed_scopes = vec!["country".to_owned()];
+        assert!(!rule("trigger:foo:2").semantic_equivalent(&wider_scope));
     }
 }

@@ -502,6 +502,26 @@ pub(crate) fn same_location(left: &Location, right: &Location) -> bool {
         && left.path == right.path
         && left.range == right.range
 }
+
+/// Caps a hover text at 240 characters so pathological content cannot produce an unbounded
+/// tooltip. Consumed by hover documentation lines and localisation previews alike.
+pub(crate) fn truncate_hover_text(value: &str) -> String {
+    const MAX_CHARS: usize = 240;
+    let mut truncated = String::new();
+    let mut overflow = false;
+    for (index, character) in value.chars().enumerate() {
+        if index == MAX_CHARS {
+            overflow = true;
+            break;
+        }
+        truncated.push(character);
+    }
+    if overflow {
+        truncated.push('…');
+    }
+    truncated
+}
+
 pub(crate) fn root_for_path<'a>(
     snapshot: &'a AnalysisSnapshot,
     path: &Path,
