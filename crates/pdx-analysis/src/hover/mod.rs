@@ -166,7 +166,7 @@ pub fn hover_with_cancellation(
             .iter()
             .any(|key| key.eq_ignore_ascii_case(&word))
         {
-            let mut model = HoverModel::new(format!("### PDX property {}", code_span(&word)));
+            let mut model = HoverModel::new(known_key_hover_title(snapshot, &word));
             if let Some(details) = rules::semantic_rule_documentation(snapshot, &word) {
                 model.push_section(details);
             }
@@ -175,7 +175,7 @@ pub fn hover_with_cancellation(
         // The key may still be covered by a non-exact first-party matcher (type member, enum
         // member, date, or dynamic set). Surface that provenance instead of returning nothing.
         if let Some(hint) = semantic_pattern_rule_hint(snapshot, &word) {
-            let mut model = HoverModel::new(format!("### PDX property {}", code_span(&word)));
+            let mut model = HoverModel::new(format!("### {}", code_span(&word)));
             model.push_section(hint);
             return Ok(Some(model.into_hover_with_range(range)));
         }
@@ -191,4 +191,14 @@ pub(crate) fn is_property_key_at(input: &ParsedInput, position: TextSize) -> boo
             .iter()
             .any(|property| contains(property.key_range, position))
     })
+}
+
+/// Title for the known-key fallback hover: the category of the rule family
+/// covering the key, or the bare symbol-hover pattern when no category is
+/// established (mixed contexts or none).
+fn known_key_hover_title(snapshot: &AnalysisSnapshot, word: &str) -> String {
+    rules::semantic_rule_key_category(snapshot, word).map_or_else(
+        || format!("### {}", code_span(word)),
+        |category| format!("### {category} {}", code_span(word)),
+    )
 }

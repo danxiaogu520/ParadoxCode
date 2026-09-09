@@ -347,7 +347,10 @@ fn memory_transport_hover_returns_semantic_value_and_null_for_unknown_text() {
     let contents = semantic_hover["result"]["contents"]["value"]
         .as_str()
         .expect("semantic hover markdown");
-    assert!(contents.contains("PDX property `cost`"));
+    assert!(
+        contents.contains("`cost`") && contents.starts_with("### "),
+        "category-titled hover: {contents}"
+    );
     assert!(contents.contains("- value:"));
     assert!(!contents.contains("Provenance"));
     let unknown_hover = responses

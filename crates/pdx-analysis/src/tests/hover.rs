@@ -39,7 +39,7 @@ fn semantic_hover_descends_into_quoted_script_with_mapped_range() {
 
     let hover = hover(&snapshot, &id, start + 1).expect("quoted semantic hover");
 
-    assert!(hover.contents.contains("PDX property `foo`"), "{hover:?}");
+    assert!(hover.contents.contains("### Trigger `foo`"), "{hover:?}");
     assert_eq!(
         hover.range,
         Some(TextRange::new(start, start + 3).expect("range"))
@@ -123,7 +123,8 @@ fn semantic_hover_explains_scope_transition() {
     let position =
         u32::try_from(text.find("capital_scope").expect("scope link") + 1).expect("position");
     let hover = hover(&host.snapshot(), &id, position).expect("scope hover");
-    assert!(hover.contents.contains("scope transition:"));
+    assert!(hover.contents.contains("#### Scope\n\n- here: `country`"));
+    assert!(hover.contents.contains("`capital_scope` enters `province`"));
     assert!(!hover.contents.contains("scope registers:"));
     assert!(!hover.contents.contains("scope registers after:"));
     assert!(!hover.contents.contains("child context:"));
@@ -153,7 +154,12 @@ fn decision_hover_skips_type_instance_wrapper() {
     let position =
         u32::try_from(text.find("potential").expect("potential key") + 1).expect("position");
     let result = hover(&host.snapshot(), &id, position).expect("decision semantic hover");
-    assert!(result.contents.contains("### PDX property `potential`"));
+    assert!(
+        result.contents.contains("### Decision `potential`")
+            && result.contents.contains("`potential` enters `country`"),
+        "{}",
+        result.contents
+    );
     assert!(result.contents.contains("- at least 1"), "{result:?}");
 }
 
@@ -219,7 +225,7 @@ fn semantic_hover_keeps_multiple_matching_rule_meanings() {
         .expect("open ambiguous rule fixture");
     let position = u32::try_from(text.find("choice").expect("choice") + 1).expect("position");
     let hover = hover(&host.snapshot(), &id, position).expect("ambiguous rule hover");
-    assert!(hover.contents.contains("#### Possible meanings (2)"));
+    assert!(hover.contents.contains("#### Allowed value types (2)"));
     assert!(!hover.contents.contains("##### Candidate 1"));
     assert!(hover.contents.contains("value: bool (`yes` / `no`)"));
     assert!(hover.contents.contains("value: integer in [1, 3]"));
@@ -236,7 +242,7 @@ fn semantic_hover_collapses_repeated_first_party_rule_rows() {
         u32::try_from(text.find("events").expect("events key") + 1).expect("hover position");
     let hover = hover(&host.snapshot(), &id, position).expect("repeated-rule hover");
     assert_eq!(hover.contents.matches("- value:").count(), 1);
-    assert!(!hover.contents.contains("Possible meanings"));
+    assert!(!hover.contents.contains("Allowed value types"));
 }
 
 #[test]
@@ -1032,5 +1038,88 @@ fn dynamic_parameter_hover_replays_bindings_aware_sites() {
         bound_hover.contents
     );
 
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn localisation_hover_renders_every_language_in_parallel() {
+    let mut host = eu4_host(pdx_game::eu4::bootstrap_rules());
+    let id = DocumentId::new("file:///tmp/localisation/parallel.yml");
+    let text = concat!(
+        "l_english:\n",
+        "shared_name:0 \"English text\"\n",
+        "l_french:\n",
+        "shared_name:0 \"Texte français\"\n",
+        "l_german:\n",
+        "shared_name:0 \"Deutscher Text\"\n",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open localisation");
+    let position =
+        u32::try_from(text.find("shared_name").expect("localisation key") + 2).expect("position");
+    let hover = hover(&host.snapshot(), &id, position).expect("localisation hover");
+    assert!(
+        hover
+            .contents
+            .contains("Localisation (l_english): \"English text\"")
+            && hover
+                .contents
+                .contains("Localisation (l_french): \"Texte français\"")
+            && hover
+                .contents
+                .contains("Localisation (l_german): \"Deutscher Text\""),
+        "every language renders in parallel: {}",
+        hover.contents
+    );
+}
+
+#[test]
+fn event_hover_falls_back_to_the_generated_title_key() {
+    use std::fs;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-event-title-{nonce}"));
+    let events = root.join("events");
+    let localisation = root.join("localisation");
+    fs::create_dir_all(&events).expect("events directory");
+    fs::create_dir_all(localisation.join("l_english")).expect("localisation directory");
+    fs::write(
+        events.join("hover_events.txt"),
+        "country_event = { id = plain.1 immediate = { } }\n",
+    )
+    .expect("event without title");
+    fs::write(
+        localisation.join("l_english/plain_l_english.yml"),
+        "l_english:\n plain.1.t:0 \"Generated Title\"\n",
+    )
+    .expect("generated title key");
+
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan definitions");
+
+    let id = DocumentId::new("file:///tmp/events/hover_events.txt");
+    host.open_document(
+        id.clone(),
+        1,
+        "country_event = { id = plain.1 immediate = { } }\n".to_owned(),
+        Some(events.join("hover_events.txt")),
+    )
+    .expect("open event");
+    let text = "country_event = { id = plain.1 immediate = { } }\n";
+    let position = u32::try_from(text.find("plain.1").expect("event id") + 2).expect("position");
+    let hover = hover(&host.snapshot(), &id, position).expect("event hover");
+    assert!(
+        hover.contents.contains("Generated Title"),
+        "title-less event previews its generated <id>.t key: {}",
+        hover.contents
+    );
     fs::remove_dir_all(root).expect("cleanup");
 }

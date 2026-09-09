@@ -4,6 +4,11 @@
       "field": "title",
       "template": null,
       "explicit_field": "title"
+    },
+    {
+      "field": "title_default",
+      "template": "$.t",
+      "optional": true
     }
   ],
   "decision": [

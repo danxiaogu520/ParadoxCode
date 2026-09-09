@@ -1279,12 +1279,8 @@ fn semantic_rules_drive_value_completion_and_hover() {
     assert!(result.items.iter().any(|item| item.label == "yes"));
     let property = u32::try_from("trigger = { ".len() + 1).expect("offset");
     let property_hover = hover(&snapshot, &id, property).expect("semantic hover");
-    assert!(property_hover.contents.contains("PDX property `foo`"));
-    assert!(
-        property_hover
-            .contents
-            .starts_with("### PDX property `foo`")
-    );
+    assert!(property_hover.contents.contains("### Trigger `foo`"));
+    assert!(property_hover.contents.starts_with("### Trigger `foo`"));
     assert!(
         property_hover
             .contents
@@ -1298,8 +1294,8 @@ fn semantic_rules_drive_value_completion_and_hover() {
     let value_position = u32::try_from("trigger = { foo = yes".find("yes").expect("value") + 1)
         .expect("value offset");
     let value_hover = hover(&snapshot, &id, value_position).expect("value hover");
-    assert!(value_hover.contents.contains("PDX value `yes`"));
-    assert!(value_hover.contents.starts_with("### PDX value `yes`"));
+    assert!(value_hover.contents.contains("### Trigger value `yes`"));
+    assert!(value_hover.contents.starts_with("### Trigger value `yes`"));
     assert!(value_hover.contents.contains("- validation: `accepted`"));
     assert!(value_hover.contents.contains("validation: `accepted`"));
 
