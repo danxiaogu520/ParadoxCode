@@ -361,18 +361,12 @@ impl<'a> ScopeFactLowering<'a> {
         if !buckets.exact.is_empty() || !buckets.enums.is_empty() {
             return false;
         }
-        if !matches!(rule.key, KeyMatcher::AnyScalar | KeyMatcher::Date) {
-            return false;
-        }
-        // Only a genuine child-context switch reroutes the entry body. Rules
-        // that merely extend the structural path (e.g. `series` wrappers in
-        // mission files) must keep the default descent, which anchors nested
-        // mission entries at the file root.
-        if rule
-            .child_context
-            .as_deref()
-            .is_none_or(|child| child.eq_ignore_ascii_case(context))
-        {
+        // Only a wildcard-matched rule with a genuine child-context switch reroutes
+        // the entry body; rules that merely extend the structural path (e.g. `series`
+        // wrappers in mission files) keep the default descent, which anchors nested
+        // mission entries at the file root. The policy lives in `entry_wrapper_reroutes`
+        // so the diagnostics walk cannot drift from this lowering.
+        if !pdx_rules::entry_wrapper_reroutes(rule, context) {
             return false;
         }
         let (next_context, next_path) = transition_destination(
@@ -422,8 +416,7 @@ impl<'a> ScopeFactLowering<'a> {
                     state: state.clone(),
                     transition: None,
                 });
-                let transparent = context.eq_ignore_ascii_case("trigger")
-                    && profile.is_transparent_scope_wrapper(&property.key);
+                let transparent = profile.is_transparent_wrapper_key(context, &property.key);
                 let Some(rule) = statically_selected_transition_with_memo(
                     &matching,
                     properties,

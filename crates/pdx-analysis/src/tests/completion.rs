@@ -4237,3 +4237,59 @@ fn export_to_variable_completes_numeric_trigger_value_references() {
             .collect::<Vec<_>>()
     );
 }
+
+#[test]
+fn country_history_nested_effect_block_completes_inherited_effect_keys() {
+    let path = "/tmp/history/countries/ZZZ - Test.txt";
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new(format!("file://{path}"));
+    let text = "if = {\n\tlimit = { always = yes }\n\tif = {\n\t\t\n\t}\n}\n";
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(std::path::PathBuf::from(path)),
+    )
+    .expect("open country history");
+    let snapshot = host.snapshot();
+    let position =
+        u32::try_from(text.find("\n\t\t\n").expect("empty inner if body") + 3).expect("position");
+    let result = complete(&snapshot, &id, position);
+    let labels = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"add_core"),
+        "country history inherits effect, so ordinary effect keys must complete inside a nested `if`: {labels:?}"
+    );
+}
+
+#[test]
+fn incident_option_wrapper_completion_offers_trigger_keys() {
+    let path = "/tmp/common/imperial_incidents/00_completion.txt";
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new(format!("file://{path}"));
+    let text = "incident_completion = {\n\tevent = test.1\n\tdefault_option = 0\n\toption = {\n\t\tOR = {\n\t\t\t\n\t\t}\n\t}\n}\n";
+    host.open_document(
+        id.clone(),
+        1,
+        text.to_owned(),
+        Some(std::path::PathBuf::from(path)),
+    )
+    .expect("open incident");
+    let snapshot = host.snapshot();
+    let position =
+        u32::try_from(text.find("\n\t\t\t\n").expect("empty OR body") + 4).expect("position");
+    let result = complete(&snapshot, &id, position);
+    let labels = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"always") || labels.contains(&"is_part_of_hre"),
+        "incident options inherit trigger, so trigger keys must complete inside transparent wrappers: {labels:?}"
+    );
+}
