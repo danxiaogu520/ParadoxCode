@@ -55452,5 +55452,38 @@
     "max_occurs": 1,
     "source_file": "wiki-triggers",
     "line": 0
+  },
+  {
+    "id": "triggers:1684:alias:trigger:militarized_society",
+    "context": "trigger",
+    "parent_path": [],
+    "key": {
+      "exact": "militarized_society"
+    },
+    "operator": "=",
+    "value": {
+      "int": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "triggers:1684:alias:trigger:militarized_society",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Returns true if the country has at least X militarization of society."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990003
   }
 ]
