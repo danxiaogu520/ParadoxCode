@@ -643,6 +643,7 @@ pub(crate) fn semantic_type_property_is_invalid<'a>(
                 KeyMatcher::Exact(_)
                 | KeyMatcher::AnyScalar
                 | KeyMatcher::Date
+                | KeyMatcher::Int { .. }
                 | KeyMatcher::Enum(_) => {}
             }
         }

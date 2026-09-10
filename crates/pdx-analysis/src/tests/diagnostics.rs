@@ -3468,17 +3468,16 @@ fn common_alerts_and_units_display_use_path_specific_semantics() {
 
 #[test]
 fn lucky_country_blocks_accept_scalar_triggers() {
-    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
-    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
-        SourceRootId::new(1),
-        SourceRootKind::CurrentMod,
-        std::path::PathBuf::from("/tmp"),
-    )]));
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let mut host = luck_test_host(nonce);
     let lucky = DocumentId::new("file:///tmp/common/historial_lucky.txt");
     host.open_document(
         lucky.clone(),
         1,
-        "RUS = { always = yes }\nPRU = { is_year = 1700 always = no }\n".to_owned(),
+        "CAS = { always = yes }\nBUR = { is_year = 1700 always = no }\n".to_owned(),
         Some(std::path::PathBuf::from("/tmp/common/historial_lucky.txt")),
     )
     .expect("open historial lucky");
@@ -4711,5 +4710,143 @@ fn sibling_variable_arithmetic_effects_accept_variable_value_references() {
     assert!(
         diagnostics.is_empty(),
         "arithmetic value sites must accept variable references: {diagnostics:?}"
+    );
+}
+
+fn luck_test_host(nonce: u128) -> AnalysisHost {
+    let root = std::env::temp_dir().join(format!("pdx-analysis-luck-{nonce}"));
+    let tags = root.join("common/country_tags");
+    std::fs::create_dir_all(&tags).expect("country tags directory");
+    std::fs::write(
+        tags.join("00_tags.txt"),
+        "CAS = { major = yes }\nBUR = { major = yes }\n",
+    )
+    .expect("country tag definitions");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan country tags");
+    host
+}
+
+#[test]
+fn luck_entries_validate_their_country_tag_keys() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let mut host = luck_test_host(nonce);
+    let path = "/tmp/common/historial_lucky.txt";
+    let text = "CAS = {\n\talways = yes\n}\nXXZ = {\n\talways = yes\n}\n".to_owned();
+    let id = DocumentId::new(format!("file://{path}"));
+    host.open_document(
+        id.clone(),
+        1,
+        text.clone(),
+        Some(std::path::PathBuf::from(path)),
+    )
+    .expect("open luck");
+    let diags = diagnostics(&host.snapshot(), &id);
+    let xxz = diags
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.range.start()
+                == u32::try_from(text.find("XXZ").expect("xxz offset")).expect("offset")
+        })
+        .expect("unknown tag entry must be reported");
+    assert_eq!(xxz.code, DiagnosticCode::UnknownKey);
+    assert!(
+        xxz.message.contains("country_tag"),
+        "message should name the expected entry kind: {}",
+        xxz.message
+    );
+    let cas = text.find("CAS").expect("cas offset");
+    assert!(
+        !diags.iter().any(|diagnostic| {
+            diagnostic.range.start() >= u32::try_from(cas).expect("offset")
+                && diagnostic.range.end()
+                    <= u32::try_from(text.find("XXZ").expect("xxz")).expect("offset")
+        }),
+        "a defined tag entry with a valid trigger body must stay clean: {diags:?}"
+    );
+}
+
+#[test]
+fn continent_and_superregion_entries_accept_arbitrary_definition_names() {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        std::path::PathBuf::from("/tmp"),
+    )]));
+
+    // `map/continent.txt` and `map/superregion.txt` describe entry bodies through
+    // bare-value rows (province and region lists); their path-[] rules never speak
+    // for the entry keys, so definition names must stay unjudged.
+    let continent = DocumentId::new("file:///tmp/map/continent.txt");
+    host.open_document(
+        continent.clone(),
+        1,
+        "europe = {\n\t130 131\n}\ncustom_continent = {\n\t200\n}\n".to_owned(),
+        Some(std::path::PathBuf::from("/tmp/map/continent.txt")),
+    )
+    .expect("open continent");
+    let superregion = DocumentId::new("file:///tmp/map/superregion.txt");
+    host.open_document(
+        superregion.clone(),
+        1,
+        "india_superregion = { india_region east_indies_region }\n".to_owned(),
+        Some(std::path::PathBuf::from("/tmp/map/superregion.txt")),
+    )
+    .expect("open superregion");
+    let snapshot = host.snapshot();
+    for (label, id) in [("continent", &continent), ("superregion", &superregion)] {
+        let diags = diagnostics(&snapshot, id);
+        assert!(
+            !diags
+                .iter()
+                .any(|diagnostic| diagnostic.code == DiagnosticCode::UnknownKey),
+            "{label} definition names must stay unjudged: {diags:?}"
+        );
+    }
+}
+
+#[test]
+fn government_ranks_entries_require_integer_keys() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let mut host = luck_test_host(nonce);
+    let path = "/tmp/common/government_ranks/00_government_ranks.txt";
+    let text = "2 = {\n\tdiplomats = 1\n}\nabc = {\n\tdiplomats = 1\n}\n".to_owned();
+    let id = DocumentId::new(format!("file://{path}"));
+    host.open_document(
+        id.clone(),
+        1,
+        text.clone(),
+        Some(std::path::PathBuf::from(path)),
+    )
+    .expect("open government ranks");
+    let diags = diagnostics(&host.snapshot(), &id);
+    let abc = diags
+        .iter()
+        .find(|diagnostic| {
+            diagnostic.range.start()
+                == u32::try_from(text.find("abc").expect("abc offset")).expect("offset")
+        })
+        .expect("non-integer rank entry must be reported");
+    assert_eq!(abc.code, DiagnosticCode::UnknownKey);
+    let two = text.find("2 =").expect("two offset");
+    assert!(
+        !diags.iter().any(|diagnostic| {
+            diagnostic.range.start() >= u32::try_from(two).expect("offset")
+                && diagnostic.range.end()
+                    <= u32::try_from(text.find("abc").expect("abc")).expect("offset")
+        }),
+        "an integer rank entry with a modifier body must stay clean: {diags:?}"
     );
 }

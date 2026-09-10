@@ -654,6 +654,7 @@ pub(crate) fn semantic_pattern_rule_hint(
             KeyMatcher::Type(_) => "a workspace member of its declared type",
             KeyMatcher::Enum(_) => "a member of a first-party enum",
             KeyMatcher::Date => "a campaign date",
+            KeyMatcher::Int { .. } => "an integer key",
         };
         if semantic_key_matches(snapshot, &rule.key, word) {
             families.insert(family);

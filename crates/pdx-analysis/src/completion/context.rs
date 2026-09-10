@@ -75,7 +75,8 @@ pub(crate) fn semantic_completion_context_with_cancellation(
     cancellation.checkpoint()?;
     let mut quoted_scripts = QuotedScriptSession::new(cancellation);
     let ParsedContent::Text(parsed) = &input.parsed;
-    for root in script_properties(input, parsed.root()) {
+    let roots = script_properties(input, parsed.root());
+    for root in &roots {
         let Some(context) = semantic_root_context(snapshot, &root.key, input.path.as_ref()) else {
             continue;
         };
@@ -112,7 +113,7 @@ pub(crate) fn semantic_completion_context_with_cancellation(
                 dynamic_inferred: false,
                 container_property: None,
                 skip_type_instance,
-                properties: root.block,
+                properties: root.block.clone(),
                 scope,
                 position,
                 quoted_depth: 0,
@@ -150,6 +151,51 @@ pub(crate) fn semantic_completion_context_with_cancellation(
             &mut quoted_scripts,
         )
         .map(Some);
+    }
+    // Wildcard-only type contexts with a data-typed entry-key vocabulary keep that
+    // vocabulary in path-[] rules (for example the country-tag entries of
+    // `historial_lucky.txt`), so a root gap there must still complete those keys.
+    // Named-key contexts (their path-[] rules describe entry bodies) and bare-value
+    // contexts like `map/continent.txt` (their path-[] rows describe entry-body
+    // scalars) are excluded through the shared rule-set predicates.
+    if let Some(first) = roots.first()
+        && let Some(context) = semantic_root_context(snapshot, &first.key, input.path.as_ref())
+    {
+        let expanded = snapshot.game_profile().expanded_rule_contexts(&context);
+        if !snapshot.rules().declares_named_entry_keys(&expanded)
+            && snapshot.rules().declares_entry_key_vocabulary(&expanded)
+        {
+            let mut scope =
+                semantic_initial_scope(snapshot, input, &context, &first.key, first.key_range);
+            seed_dynamic_body_scope(
+                snapshot,
+                input.path.as_ref(),
+                &context,
+                &first.key,
+                &mut scope,
+            );
+            return semantic_completion_container(
+                snapshot,
+                SemanticCompletionContainerInput {
+                    hir: input.hir.as_deref(),
+                    context,
+                    parent_path: Vec::new(),
+                    structural_containers: Vec::new(),
+                    alternative_containers: Vec::new(),
+                    dynamic_inferred: false,
+                    container_property: None,
+                    skip_type_instance: false,
+                    properties: roots.clone(),
+                    scope,
+                    position,
+                    quoted_depth: 0,
+                    embedded_value_context: None,
+                    root_entry_container: true,
+                },
+                &mut quoted_scripts,
+            )
+            .map(Some);
+        }
     }
     Ok(None)
 }

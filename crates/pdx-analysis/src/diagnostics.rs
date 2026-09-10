@@ -576,16 +576,29 @@ pub(crate) fn semantic_rule_diagnostics(
                 property.bare_values.iter().collect();
             // Definition-style type contexts may declare a wrapper rule for the entry
             // key itself whose child_context describes the entry body (e.g. `root:luck`'s
-            // any_scalar country blocks validating as trigger clauses). The wrapper only
-            // speaks for the entry when the context offers nothing but wildcard matchers:
-            // a context that also names keys (`root:imperial_incident`'s `event`,
-            // `can_stop`, ...) describes the entry body itself, and its wildcard rules
-            // target entry children. Structural wrapper rules without a child-context
-            // switch keep the file context, matching the engine descent.
+            // country-tag blocks validating as trigger clauses). The wrapper only
+            // speaks for the entry when the context offers nothing but wildcard or
+            // data-typed matchers: a context that also names keys
+            // (`root:imperial_incident`'s `event`, `can_stop`, ...) describes the
+            // entry body itself, and its wildcard rules target entry children.
+            // Structural wrapper rules without a child-context switch keep the file
+            // context, matching the engine descent. The predicate is shared with HIR
+            // lowering so both walks gate reroutes on the same rule set.
+            let lookup_contexts = snapshot.game_profile().expanded_rule_contexts(&context);
             let context_is_wildcard_only =
+                !snapshot.rules().declares_named_entry_keys(&lookup_contexts);
+            let entry_key_vocabulary =
                 semantic_rules_for_container(snapshot, &context, &[], &scope)
-                    .iter()
-                    .all(|rule| !matches!(rule.key, KeyMatcher::Exact(_) | KeyMatcher::Enum(_)));
+                    .into_iter()
+                    .filter(|rule| {
+                        rule.parent_path.is_empty()
+                            && !matches!(rule.shape, RuleShape::LeafValue)
+                            && matches!(
+                                rule.key,
+                                KeyMatcher::Type(_) | KeyMatcher::Int { .. } | KeyMatcher::Date
+                            )
+                    })
+                    .collect::<Vec<_>>();
             let wrapper_matching =
                 semantic_rules_for_container_key(snapshot, &context, &[], &property.key)
                     .into_iter()
@@ -594,6 +607,46 @@ pub(crate) fn semantic_rule_diagnostics(
                             && semantic_rule_key_matches(snapshot, rule, &[], &property.key)
                     })
                     .collect::<Vec<_>>();
+            // Only a context whose data-typed path-[] rules speak for the entry keys
+            // (`root:luck`'s `country_tag`, `root:government_ranks`' rank `int`) may
+            // reject a key. Bare-value rows (`root:continent`'s province lists) share
+            // the container root but describe entry-body scalars, so contexts without
+            // a key vocabulary leave definition names unjudged.
+            if context_is_wildcard_only
+                && !entry_key_vocabulary.is_empty()
+                && wrapper_matching.is_empty()
+            {
+                // The context's data-typed rules describe entry keys exhaustively,
+                // so a key matching none of them is unknown.
+                let expected = entry_key_vocabulary
+                    .iter()
+                    .map(|rule| crate::messages::key_description(&rule.key))
+                    .collect::<std::collections::BTreeSet<_>>();
+                let location = context.strip_prefix("type:").map_or_else(
+                    || {
+                        format!(
+                            "{} `{context}` block",
+                            crate::messages::article_for(context.as_str())
+                        )
+                    },
+                    |kind| format!("{} `{kind}` definition", crate::messages::article_for(kind)),
+                );
+                let expected_list: Vec<String> = expected.into_iter().collect();
+                let expected = if expected_list.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        ": expected {}",
+                        crate::messages::join_phrases(&expected_list)
+                    )
+                };
+                container_diagnostics.push(Diagnostic::new(
+                    DiagnosticCode::UnknownKey,
+                    DiagnosticCode::UnknownKey.severity(),
+                    property.key_range,
+                    format!("unknown key `{}` in {location}{expected}", property.key),
+                ));
+            }
             let wrapper_transition = semantic_selected_transition(SemanticTransitionInput {
                 snapshot,
                 matching: &wrapper_matching,

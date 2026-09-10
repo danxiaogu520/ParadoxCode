@@ -180,7 +180,8 @@ struct TransitionBuckets<'rule> {
     /// Enum rules with their member lists resolved once.
     enums: Vec<(&'rule [String], &'rule SemanticRule, u32)>,
     any_scalar: Vec<(&'rule SemanticRule, u32)>,
-    date: Vec<(&'rule SemanticRule, u32)>,
+    /// Keys accepted by parsing the key text (dates, range-checked integers).
+    parsed: Vec<(&'rule SemanticRule, u32)>,
     weak: Vec<(&'rule SemanticRule, u32)>,
 }
 
@@ -190,7 +191,7 @@ impl<'rule> TransitionBuckets<'rule> {
             rustc_hash::FxHashMap::default();
         let mut enums = Vec::new();
         let mut any_scalar = Vec::new();
-        let mut date = Vec::new();
+        let mut parsed = Vec::new();
         let mut weak = Vec::new();
         for (position, rule) in candidates.iter().copied().enumerate() {
             let position = position as u32;
@@ -219,7 +220,7 @@ impl<'rule> TransitionBuckets<'rule> {
                     }
                 }
                 KeyMatcher::AnyScalar => any_scalar.push((rule, position)),
-                KeyMatcher::Date => date.push((rule, position)),
+                KeyMatcher::Date | KeyMatcher::Int { .. } => parsed.push((rule, position)),
                 KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) => weak.push((rule, position)),
             }
         }
@@ -228,7 +229,7 @@ impl<'rule> TransitionBuckets<'rule> {
             exact,
             enums,
             any_scalar,
-            date,
+            parsed,
             weak,
         }
     }
@@ -264,7 +265,7 @@ impl<'rule> TransitionBuckets<'rule> {
                 positions.push(*position);
             }
         }
-        for (rule, position) in &self.date {
+        for (rule, position) in &self.parsed {
             if rule.key.matches(key, |_, _| false, |_, _| false)
                 && scope_allows(profile, state, rule)
             {
@@ -370,12 +371,16 @@ impl<'a> ScopeFactLowering<'a> {
             return false;
         };
         // Entry-key wrappers are only authoritative when the context provides
-        // nothing but wildcard matchers (`root:luck`'s lone `any_scalar` rule:
-        // the entry key is a tag and its body is a trigger clause). A context
-        // that also declares named keys (`root:imperial_incident`'s `event`,
-        // `can_stop`, ...) describes the entry body itself; its wildcard rules
-        // then target entry children, and rerouting would strand those keys.
-        if !buckets.exact.is_empty() || !buckets.enums.is_empty() {
+        // nothing but wildcard or data-typed matchers (`root:luck`'s lone
+        // tag-keyed rule: the entry key is a country and its body is a trigger
+        // clause). A context that also declares named keys
+        // (`root:imperial_incident`'s `event`, `can_stop`, ...) describes the
+        // entry body itself; its wildcard rules then target entry children, and
+        // rerouting would strand those keys. The predicate lives in
+        // `RuleSet::declares_named_entry_keys` so the diagnostics walk cannot
+        // drift from this lowering.
+        let lookup_contexts = self.profile.expanded_rule_contexts(context);
+        if self.rules.declares_named_entry_keys(&lookup_contexts) {
             return false;
         }
         // Only a wildcard-matched rule with a genuine child-context switch reroutes
@@ -470,7 +475,8 @@ struct ChildMatchBuckets<'rule> {
     exact: rustc_hash::FxHashSet<Box<str>>,
     enum_members: Vec<&'rule [String]>,
     any_scalar: bool,
-    date: Vec<&'rule SemanticRule>,
+    /// Keys accepted by parsing the key text (dates, range-checked integers).
+    parsed: Vec<&'rule SemanticRule>,
     dynamic: bool,
 }
 
@@ -484,7 +490,7 @@ impl<'rule> ChildMatchBuckets<'rule> {
         let mut exact = rustc_hash::FxHashSet::default();
         let mut enum_members = Vec::new();
         let mut any_scalar = false;
-        let mut date = Vec::new();
+        let mut parsed = Vec::new();
         let mut dynamic = false;
         for lookup_context in &rule_lookup_contexts(profile, context) {
             for rule in rules
@@ -510,7 +516,7 @@ impl<'rule> ChildMatchBuckets<'rule> {
                         }
                     }
                     KeyMatcher::AnyScalar => any_scalar = true,
-                    KeyMatcher::Date => date.push(rule),
+                    KeyMatcher::Date | KeyMatcher::Int { .. } => parsed.push(rule),
                     KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) => dynamic = true,
                 }
             }
@@ -519,7 +525,7 @@ impl<'rule> ChildMatchBuckets<'rule> {
             exact,
             enum_members,
             any_scalar,
-            date,
+            parsed,
             dynamic,
         }
     }
@@ -543,7 +549,7 @@ impl<'rule> ChildMatchBuckets<'rule> {
                 return true;
             }
         }
-        for rule in &self.date {
+        for rule in &self.parsed {
             if rule.key.matches(key, |_, _| false, |_, _| false) {
                 return true;
             }
@@ -712,11 +718,13 @@ pub(crate) fn child_key_may_match(
                     }
                 }
                 KeyMatcher::AnyScalar => return !key.is_empty(),
-                KeyMatcher::Date if rule.key.matches(key, |_, _| false, |_, _| false) => {
+                KeyMatcher::Date | KeyMatcher::Int { .. }
+                    if rule.key.matches(key, |_, _| false, |_, _| false) =>
+                {
                     return true;
                 }
                 KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) => dynamic_matcher = true,
-                KeyMatcher::Exact(_) | KeyMatcher::Date => {}
+                KeyMatcher::Exact(_) | KeyMatcher::Date | KeyMatcher::Int { .. } => {}
             }
         }
     }

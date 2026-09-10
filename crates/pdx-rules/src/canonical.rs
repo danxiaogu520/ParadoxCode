@@ -372,6 +372,11 @@ fn put_semantic_key(bytes: &mut Vec<u8>, matcher: &KeyMatcher) {
             put_str(bytes, value);
         }
         KeyMatcher::AnyScalar => put_str(bytes, "any"),
+        KeyMatcher::Int { min, max } => {
+            put_str(bytes, "int");
+            put_opt_str(bytes, min.map(|value| value.to_string()).as_deref());
+            put_opt_str(bytes, max.map(|value| value.to_string()).as_deref());
+        }
         KeyMatcher::Date => put_str(bytes, "date"),
         KeyMatcher::Dynamic(value) => {
             put_str(bytes, "dynamic");

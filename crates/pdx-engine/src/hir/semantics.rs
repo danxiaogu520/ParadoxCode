@@ -1192,7 +1192,9 @@ fn semantic_reference_key_matches(rules: &RuleSet, matcher: &KeyMatcher, key: &s
             .get(enum_name)
             .is_some_and(|values| values.iter().any(|value| value.eq_ignore_ascii_case(key))),
         KeyMatcher::AnyScalar => !key.is_empty(),
-        KeyMatcher::Date => matcher.matches(key, |_, _| false, |_, _| false),
+        KeyMatcher::Date | KeyMatcher::Int { .. } => {
+            matcher.matches(key, |_, _| false, |_, _| false)
+        }
         KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) => false,
     }
 }

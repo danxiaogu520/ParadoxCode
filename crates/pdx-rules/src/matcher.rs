@@ -118,6 +118,9 @@ pub enum KeyMatcher {
     Enum(String),
     /// Matches any non-empty scalar key.
     AnyScalar,
+    /// Matches an integer key, optionally constrained by an inclusive range
+    /// (for example the rank numbers in `government_ranks`).
+    Int { min: Option<i64>, max: Option<i64> },
     /// Matches a campaign date key such as `1444.11.11`.
     Date,
     /// Matches a key that declares a dynamic value set.
@@ -138,6 +141,9 @@ impl KeyMatcher {
             Self::Type(type_name) => type_members(type_name, key),
             Self::Enum(enum_name) => enum_members(enum_name, key),
             Self::AnyScalar => !key.is_empty(),
+            Self::Int { min, max } => key.parse::<i64>().is_ok_and(|value| {
+                min.is_none_or(|bound| value >= bound) && max.is_none_or(|bound| value <= bound)
+            }),
             Self::Date => is_eu4_date(key),
             Self::Dynamic(_) => !key.is_empty(),
         }
@@ -266,4 +272,39 @@ fn is_eu4_date(value: &str) -> bool {
         }
     }
     trailing <= 2
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn int_matches(min: Option<i64>, max: Option<i64>, key: &str) -> bool {
+        KeyMatcher::Int { min, max }.matches(key, |_, _| false, |_, _| false)
+    }
+
+    #[test]
+    fn int_key_enforces_inclusive_bounds() {
+        assert!(int_matches(Some(1), Some(10), "1"));
+        assert!(int_matches(Some(1), Some(10), "10"));
+        assert!(!int_matches(Some(1), Some(10), "0"));
+        assert!(!int_matches(Some(1), Some(10), "11"));
+        assert!(!int_matches(Some(1), Some(10), "-1"));
+    }
+
+    #[test]
+    fn int_key_accepts_open_ranges() {
+        assert!(int_matches(None, None, "-42"));
+        assert!(int_matches(Some(3), None, "9000"));
+        assert!(!int_matches(Some(3), None, "2"));
+        assert!(int_matches(None, Some(0), "-1"));
+        assert!(!int_matches(None, Some(0), "1"));
+    }
+
+    #[test]
+    fn int_key_rejects_non_integers() {
+        assert!(!int_matches(None, None, "abc"));
+        assert!(!int_matches(None, None, "2.5"));
+        assert!(!int_matches(None, None, "1444.11.11"));
+        assert!(!int_matches(None, None, ""));
+    }
 }

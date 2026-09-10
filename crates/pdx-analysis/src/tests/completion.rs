@@ -4293,3 +4293,45 @@ fn incident_option_wrapper_completion_offers_trigger_keys() {
         "incident options inherit trigger, so trigger keys must complete inside transparent wrappers: {labels:?}"
     );
 }
+
+#[test]
+fn luck_root_completion_offers_workspace_country_tags() {
+    use std::path::PathBuf;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("pdx-analysis-luck-completion-{nonce}"));
+    let tags = root.join("common/country_tags");
+    std::fs::create_dir_all(&tags).expect("country tags directory");
+    std::fs::write(
+        tags.join("00_tags.txt"),
+        "CAS = { major = yes }\nBUR = { major = yes }\n",
+    )
+    .expect("country tag definitions");
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan country tags");
+
+    let path = "common/historial_lucky.txt";
+    let text = "CAS = {\n\talways = yes\n}\n\n";
+    let id = DocumentId::new("file:///tmp/common/historial_lucky-completion.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), Some(PathBuf::from(path)))
+        .expect("open luck document");
+    let position = u32::try_from(text.len() - 1).expect("position");
+    let result = complete(&host.snapshot(), &id, position);
+    let labels = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        labels.contains(&"BUR"),
+        "luck entry keys complete from workspace country tags: {labels:?}"
+    );
+}

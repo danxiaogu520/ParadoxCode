@@ -193,12 +193,13 @@ pub(crate) fn key_description(matcher: &KeyMatcher) -> String {
         KeyMatcher::Exact(value) => format!("`{value}`"),
         KeyMatcher::Type(kind) => format!("a `{kind}` name"),
         KeyMatcher::Enum(_) => "an accepted key".to_owned(),
+        KeyMatcher::Int { .. } => "an integer key".to_owned(),
         KeyMatcher::AnyScalar | KeyMatcher::Dynamic(_) | KeyMatcher::Date => "a key".to_owned(),
     }
 }
 
 /// Joins phrases as "`a`, `b`, or `c`".
-fn join_phrases(phrases: &[String]) -> String {
+pub(crate) fn join_phrases(phrases: &[String]) -> String {
     match phrases.split_last() {
         Some((last, head)) if !head.is_empty() => format!("{}, or {last}", head.join(", ")),
         Some((only, _)) => only.clone(),

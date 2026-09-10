@@ -205,7 +205,9 @@ fn key_specificity(
         }
         KeyMatcher::Type(_) => CompletionSpecificity::Type,
         KeyMatcher::Dynamic(_) => CompletionSpecificity::Dynamic,
-        KeyMatcher::Date | KeyMatcher::AnyScalar => CompletionSpecificity::Fallback,
+        KeyMatcher::Date | KeyMatcher::Int { .. } | KeyMatcher::AnyScalar => {
+            CompletionSpecificity::Fallback
+        }
     }
 }
 
@@ -581,7 +583,7 @@ pub(crate) fn add_semantic_key_items_ranked(
             }
             // Open-ended keys accept arbitrary spellings and carry no member information. Date
             // keys are validated as a shape, but a fixed sample date is not a useful candidate.
-            KeyMatcher::AnyScalar | KeyMatcher::Date => {}
+            KeyMatcher::AnyScalar | KeyMatcher::Date | KeyMatcher::Int { .. } => {}
         }
     }
 }
