@@ -1,6 +1,8 @@
 use crate::canonical::{RuleHash, canonical_hash};
 use crate::matcher::KeyMatcher;
-use crate::model::{FileCategory, RulesModel, SemanticModel, SemanticRule, TypeRootScope};
+use crate::model::{
+    FileCategory, RuleShape, RulesModel, SemanticModel, SemanticRule, TypeRootScope,
+};
 use crate::{CURRENT_SCHEMA_VERSION, sqlite};
 use pdx_text::LogicalPath;
 
@@ -412,6 +414,47 @@ impl RuleSet {
         self.root_context_types.contains(type_name.as_ref())
     }
 
+    /// Whether any rule across `lookup_contexts` names a concrete entry key at the
+    /// container root.
+    ///
+    /// A context without named keys (`root:luck`'s lone tag-keyed wrapper) lets its
+    /// wildcard or data-typed rules speak for the entry body itself; a context that
+    /// also declares `Exact`/`Enum` keys describes the entry body through them, and
+    /// its wildcard rules target entry children instead. Shared by the diagnostics
+    /// walk and HIR lowering so both gate entry reroutes on the same rule set.
+    #[must_use]
+    pub fn declares_named_entry_keys(&self, lookup_contexts: &[String]) -> bool {
+        lookup_contexts.iter().any(|context| {
+            self.semantic_rules_for_context(context).any(|rule| {
+                rule.parent_path.is_empty()
+                    && matches!(rule.key, KeyMatcher::Exact(_) | KeyMatcher::Enum(_))
+            })
+        })
+    }
+
+    /// Whether any rule across `lookup_contexts` speaks for the entry keys themselves.
+    ///
+    /// A data-typed key matcher (`root:luck`'s `country_tag`, `root:government_ranks`'
+    /// rank `int`) on a block rule at the container root is an entry-key vocabulary:
+    /// keys outside the vocabulary are unknown. Bare-value rows (`root:continent`'s
+    /// province list) also sit at the container root with wildcard keys, but they
+    /// describe the entry body's scalars and say nothing about the entry key, so
+    /// `LeafValue` shapes are excluded. Shared by the diagnostics walk and completion
+    /// so both gate entry-key enforcement on the same rule set.
+    #[must_use]
+    pub fn declares_entry_key_vocabulary(&self, lookup_contexts: &[String]) -> bool {
+        lookup_contexts.iter().any(|context| {
+            self.semantic_rules_for_context(context).any(|rule| {
+                rule.parent_path.is_empty()
+                    && !matches!(rule.shape, RuleShape::LeafValue)
+                    && matches!(
+                        rule.key,
+                        KeyMatcher::Type(_) | KeyMatcher::Int { .. } | KeyMatcher::Date
+                    )
+            })
+        })
+    }
+
     /// Returns the trimmed body context of a type's enabled dynamic definition, if any.
     ///
     /// The result may be an empty string (enabled but blank context); callers keep
@@ -640,5 +683,128 @@ fn normalized_ascii_query(value: &str) -> std::borrow::Cow<'_, str> {
         std::borrow::Cow::Owned(value.to_ascii_lowercase())
     } else {
         std::borrow::Cow::Borrowed(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{RuleShape, SemanticRule, ValueMatcher};
+
+    fn context_rule(context: &str, key: KeyMatcher, parent_path: &[&str]) -> SemanticRule {
+        SemanticRule {
+            id: format!("{context}:1"),
+            context: context.to_owned(),
+            parent_path: parent_path
+                .iter()
+                .map(|segment| (*segment).to_owned())
+                .collect(),
+            key,
+            operator: None,
+            value: ValueMatcher::Bool,
+            shape: RuleShape::Node,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: false,
+            max_occurs: None,
+            source_file: "semantic/test.json".to_owned(),
+            line: 1,
+        }
+    }
+
+    fn rule_set(rules: Vec<SemanticRule>) -> RuleSet {
+        let mut model = RulesModel::default();
+        model.semantic.rules = rules;
+        RuleSet::from_model(model)
+    }
+
+    #[test]
+    fn named_entry_keys_are_detected_at_the_container_root_only() {
+        let set = rule_set(vec![
+            context_rule(
+                "root:on_action",
+                KeyMatcher::Exact("events".to_owned()),
+                &[],
+            ),
+            context_rule(
+                "root:on_action",
+                KeyMatcher::Exact("trigger".to_owned()),
+                &["events"],
+            ),
+        ]);
+        assert!(set.declares_named_entry_keys(&["root:on_action".to_owned()]));
+
+        let set = rule_set(vec![context_rule(
+            "root:on_action",
+            KeyMatcher::Enum("event_names".to_owned()),
+            &[],
+        )]);
+        assert!(set.declares_named_entry_keys(&["root:on_action".to_owned()]));
+    }
+
+    #[test]
+    fn data_typed_entry_keys_stay_wildcard_only() {
+        let set = rule_set(vec![
+            context_rule("root:luck", KeyMatcher::Type("country_tag".to_owned()), &[]),
+            context_rule(
+                "root:government_ranks",
+                KeyMatcher::Int {
+                    min: Some(1),
+                    max: Some(10),
+                },
+                &[],
+            ),
+            context_rule(
+                "root:luck",
+                KeyMatcher::Exact("always".to_owned()),
+                &["always"],
+            ),
+        ]);
+        assert!(!set.declares_named_entry_keys(&["type:luck".to_owned(), "root:luck".to_owned()]),);
+        assert!(!set.declares_named_entry_keys(&[
+            "type:government_ranks".to_owned(),
+            "root:government_ranks".to_owned()
+        ]));
+    }
+
+    #[test]
+    fn entry_key_vocabulary_requires_typed_block_rows() {
+        // `root:luck`'s typed wrapper and `root:government_ranks`' rank range speak
+        // for the entry keys themselves.
+        let set = rule_set(vec![
+            context_rule("root:luck", KeyMatcher::Type("country_tag".to_owned()), &[]),
+            context_rule(
+                "root:government_ranks",
+                KeyMatcher::Int {
+                    min: Some(1),
+                    max: Some(10),
+                },
+                &[],
+            ),
+        ]);
+        assert!(set.declares_entry_key_vocabulary(&["root:luck".to_owned()]),);
+        assert!(set.declares_entry_key_vocabulary(&["root:government_ranks".to_owned()]));
+    }
+
+    #[test]
+    fn bare_value_rows_do_not_form_an_entry_key_vocabulary() {
+        // `root:continent`'s province rows share the container root with wildcard
+        // keys, but their LeafValue shape describes entry-body scalars, not keys.
+        let mut continent_row = context_rule(
+            "root:continent",
+            KeyMatcher::Type("province_id".to_owned()),
+            &[],
+        );
+        continent_row.shape = RuleShape::LeafValue;
+        let set = rule_set(vec![continent_row]);
+        assert!(!set.declares_entry_key_vocabulary(&["root:continent".to_owned()]));
     }
 }

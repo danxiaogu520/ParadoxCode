@@ -276,17 +276,20 @@ impl TypeDescriptor {
 /// Whether `rule` may reroute a wildcard-only entry container's body into its child
 /// context.
 ///
-/// The entry key of such a container is a free-form name (`root:luck`'s country tag), so
-/// only a wildcard-matched rule with a genuine child-context switch may speak for the
-/// entry body. Shared by the diagnostics walk and HIR lowering so both reroute the same
+/// The entry key of such a container is a free-form or data-typed name (`root:luck`'s
+/// country tag, `root:government_ranks`' rank number), so only a wildcard- or
+/// typed-matched rule with a genuine child-context switch may speak for the entry
+/// body. Shared by the diagnostics walk and HIR lowering so both reroute the same
 /// entries.
 #[must_use]
 pub fn entry_wrapper_reroutes(rule: &SemanticRule, context: &str) -> bool {
-    matches!(rule.key, KeyMatcher::AnyScalar | KeyMatcher::Date)
-        && rule
-            .child_context
-            .as_deref()
-            .is_some_and(|child| !child.eq_ignore_ascii_case(context))
+    matches!(
+        rule.key,
+        KeyMatcher::AnyScalar | KeyMatcher::Date | KeyMatcher::Type(_) | KeyMatcher::Int { .. }
+    ) && rule
+        .child_context
+        .as_deref()
+        .is_some_and(|child| !child.eq_ignore_ascii_case(context))
 }
 
 /// One type-instance to localisation-key mapping from the first-party rule source.
@@ -597,5 +600,40 @@ mod tests {
         let mut wider_scope = rule("trigger:foo:1");
         wider_scope.allowed_scopes = vec!["country".to_owned()];
         assert!(!rule("trigger:foo:2").semantic_equivalent(&wider_scope));
+    }
+
+    #[test]
+    fn entry_wrapper_reroutes_accepts_data_typed_entry_keys() {
+        let mut wrapper = rule("root:luck:1");
+        wrapper.context = "root:luck".to_owned();
+        wrapper.child_context = Some("trigger".to_owned());
+        for key in [
+            KeyMatcher::AnyScalar,
+            KeyMatcher::Date,
+            KeyMatcher::Type("country_tag".to_owned()),
+            KeyMatcher::Int {
+                min: Some(1),
+                max: Some(10),
+            },
+        ] {
+            wrapper.key = key;
+            assert!(entry_wrapper_reroutes(&wrapper, "root:luck"));
+        }
+    }
+
+    #[test]
+    fn entry_wrapper_reroutes_rejects_named_or_context_free_rules() {
+        let mut wrapper = rule("root:luck:1");
+        wrapper.context = "root:luck".to_owned();
+        wrapper.child_context = Some("trigger".to_owned());
+        wrapper.key = KeyMatcher::Exact("events".to_owned());
+        assert!(!entry_wrapper_reroutes(&wrapper, "root:luck"));
+
+        wrapper.key = KeyMatcher::Type("country_tag".to_owned());
+        wrapper.child_context = None;
+        assert!(!entry_wrapper_reroutes(&wrapper, "root:luck"));
+
+        wrapper.child_context = Some("root:luck".to_owned());
+        assert!(!entry_wrapper_reroutes(&wrapper, "root:luck"));
     }
 }

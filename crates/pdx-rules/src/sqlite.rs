@@ -412,14 +412,24 @@ fn write_connection(connection: &mut Connection, rules: &RuleSet) -> Result<(), 
     Ok(())
 }
 
-fn semantic_key_columns(matcher: &KeyMatcher) -> (&'static str, Option<&str>) {
+fn semantic_key_columns(matcher: &KeyMatcher) -> (&'static str, Option<String>) {
     match matcher {
-        KeyMatcher::Exact(value) => ("exact", Some(value)),
-        KeyMatcher::Type(value) => ("type", Some(value)),
-        KeyMatcher::Enum(value) => ("enum", Some(value)),
+        KeyMatcher::Exact(value) => ("exact", Some(value.clone())),
+        KeyMatcher::Type(value) => ("type", Some(value.clone())),
+        KeyMatcher::Enum(value) => ("enum", Some(value.clone())),
         KeyMatcher::AnyScalar => ("any", None),
+        // Bounds ride in the value column as `min..max` because the artifact
+        // schema has no key-range columns; empty halves mean unbounded.
+        KeyMatcher::Int { min, max } => (
+            "int",
+            Some(format!(
+                "{}..{}",
+                min.map(|value| value.to_string()).unwrap_or_default(),
+                max.map(|value| value.to_string()).unwrap_or_default()
+            )),
+        ),
         KeyMatcher::Date => ("date", None),
-        KeyMatcher::Dynamic(value) => ("dynamic", Some(value)),
+        KeyMatcher::Dynamic(value) => ("dynamic", Some(value.clone())),
     }
 }
 
@@ -877,6 +887,22 @@ fn decode_semantic_key(kind: &str, value: Option<&str>) -> Result<KeyMatcher, Ru
         "type" => KeyMatcher::Type(value.unwrap_or_default().to_owned()),
         "enum" => KeyMatcher::Enum(value.unwrap_or_default().to_owned()),
         "any" => KeyMatcher::AnyScalar,
+        "int" => {
+            let (min, max) = value
+                .unwrap_or_default()
+                .split_once("..")
+                .unwrap_or(("", ""));
+            KeyMatcher::Int {
+                min: (!min.is_empty())
+                    .then(|| min.parse::<i64>())
+                    .transpose()
+                    .map_err(|_| RulesError::InvalidRuleShape("int key min".to_owned()))?,
+                max: (!max.is_empty())
+                    .then(|| max.parse::<i64>())
+                    .transpose()
+                    .map_err(|_| RulesError::InvalidRuleShape("int key max".to_owned()))?,
+            }
+        }
         "date" => KeyMatcher::Date,
         "dynamic" => KeyMatcher::Dynamic(value.unwrap_or_default().to_owned()),
         other => return Err(RulesError::InvalidRuleShape(other.to_owned())),

@@ -26950,7 +26950,12 @@
     "id": "common/governments_and_reforms:584:rule:root:government_ranks:int[1..10]",
     "context": "root:government_ranks",
     "parent_path": [],
-    "key": "any_scalar",
+    "key": {
+      "int": {
+        "min": 1,
+        "max": 10
+      }
+    },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
@@ -66590,7 +66595,9 @@
     "id": "common/historial_lucky:1:rule:root:luck:country",
     "context": "root:luck",
     "parent_path": [],
-    "key": "any_scalar",
+    "key": {
+      "type": "country_tag"
+    },
     "operator": "=",
     "value": "any_scalar",
     "shape": "node",
@@ -66600,13 +66607,22 @@
     "required": false,
     "deprecated": false,
     "documentation": [
-      "Country-priority blocks in historial_lucky.txt contain trigger clauses."
+      "Country-priority blocks in historial_lucky.txt contain trigger clauses; the entry key is the candidate country's tag and the trigger is evaluated in that country's scope."
     ],
     "allowed_scopes": [
       "any"
     ],
     "push_scope": null,
-    "replace_scope": [],
+    "replace_scope": [
+      [
+        "root",
+        "country"
+      ],
+      [
+        "this",
+        "country"
+      ]
+    ],
     "min_occurs": 0,
     "strict_min": true,
     "max_occurs": null,
