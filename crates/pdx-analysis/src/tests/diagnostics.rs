@@ -4569,3 +4569,147 @@ fn effect_context_export_to_variable_accepts_numeric_trigger_value_references() 
         "effect-context export_to_variable must accept numeric trigger_value references: {diagnostics:?}"
     );
 }
+
+#[test]
+fn wiki_variable_arithmetic_effects_validate_in_documented_shapes() {
+    // round/sqrt/random/modulo_variable were absent from the imported rule data even
+    // though the wiki documents them (round_variable since 1.37). These rows mirror the
+    // wiki shapes, including the second `which = <var>` that may replace `value`.
+    let (host, id) = first_party_snapshot(
+        "country_event = {
+	id = wiki_vars.1
+	immediate = {
+		set_variable = { which = wv_round value = 7 }
+		round_variable = { which = wv_round value = 0 }
+		sqrt_variable = { which = wv_round }
+		random_variable = { which = wv_rand value = 10 }
+		random_variable = { which = wv_rand which = wv_round }
+		modulo_variable = { which = wv_round value = 3 }
+		modulo_variable = { which = wv_round which = wv_rand }
+	}
+	option = { trigger = { always = yes } }
+}
+",
+    );
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        diagnostics.is_empty(),
+        "wiki-documented variable arithmetic effects must validate: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn export_to_variable_accepts_wiki_bare_export_values() {
+    // The Exportable Values tables carry bare spellings (monarch_age, base_tax, …) that
+    // never made it into the imported enum; the enum now carries the wiki union.
+    let (host, id) = first_party_snapshot(
+        "trigger = {
+	variable_arithmetic_trigger = {
+		export_to_variable = { which = wv_a value = monarch_age }
+		export_to_variable = { which = wv_b value = war_exhaustion }
+		export_to_variable = { which = wv_c value = base_tax }
+		export_to_variable = { which = wv_d value = navy_tradition }
+		export_to_variable = { which = wv_e value = ruler_age }
+	}
+}
+",
+    );
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code != DiagnosticCode::InvalidValue),
+        "bare wiki export spellings must validate cleanly: {diagnostics:?}"
+    );
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue
+                && diagnostic.message.contains("ruler_age")),
+        "the retired `ruler_age` spelling must be rejected in favour of `monarch_age`: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn variable_arithmetic_declared_variables_cover_check_variable_without_enum() {
+    // Vanilla's BYZ pronoia triggers (`BYZ_reached_pronia_slot_limit`) declare
+    // `variable_name = <name>` under export_to_variable and read the variables
+    // back through check_variable's double `which`. The names resolve through the
+    // dynamic variable set, so made-up names declared in-document must validate
+    // without any enum spelling.
+    let (host, id) = first_party_snapshot(
+        "my_pronoia_check = {
+	variable_arithmetic_trigger = {
+		export_to_variable = {
+			variable_name = wv_current_amount
+			value = modifier:num_of_pronoiars
+		}
+		export_to_variable = {
+			variable_name = wv_max_amount
+			value = modifier:pronoia_amount_check_influence
+		}
+		check_variable = {
+			which = wv_current_amount
+			which = wv_max_amount
+		}
+	}
+}
+",
+    );
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        diagnostics.is_empty(),
+        "in-document variable declarations must cover later which references: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn sibling_variable_arithmetic_effects_accept_variable_value_references() {
+    // Vanilla's recruit_foreign_general AI acceptance (00_diplomatic_actions.txt)
+    // exports OpinionOfFROM/ArmyTradtionOfFROM and feeds them back as `value =`
+    // operands at divide/multiply_variable. Those value sites resolve through the
+    // dynamic variable set — not through enum spellings — so the operand may be
+    // any variable reference, mirroring set_variable.
+    let (host, id) = first_party_snapshot(
+        "country_event = {
+	id = issue_34.5
+	immediate = {
+		export_to_variable = {
+			which = ArmyTradtionOfFROM
+			value = army_tradition
+			who = FROM
+		}
+		export_to_variable = {
+			which = OpinionOfFROM
+			value = opinion
+			who = FROM
+		}
+		divide_variable = {
+			which = OpinionOfFROM
+			value = 200
+		}
+		multiply_variable = {
+			which = ArmyTradtionOfFROM
+			value = OpinionOfFROM
+		}
+		subtract_variable = {
+			which = current_amount_of_pronoiars
+			value = max_amount_of_pronoiars
+		}
+		change_variable = {
+			which = ArmyTradtionOfFROM
+			value = OpinionOfFROM
+		}
+	}
+	option = {
+		trigger = { always = yes }
+	}
+}
+",
+    );
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        diagnostics.is_empty(),
+        "arithmetic value sites must accept variable references: {diagnostics:?}"
+    );
+}

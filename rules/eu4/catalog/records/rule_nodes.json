@@ -112450,20 +112450,6 @@
     },
     {
       "table": "rule_nodes",
-      "logical_id": "triggers:triggers:root:82:1",
-      "source_order": 12104,
-      "fields": {
-        "directives": "cardinality = 0..2",
-        "key": "which",
-        "line": "371",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "enum[variable_name]"
-      }
-    },
-    {
-      "table": "rule_nodes",
       "logical_id": "triggers:triggers:root:82:2",
       "source_order": 12105,
       "fields": {

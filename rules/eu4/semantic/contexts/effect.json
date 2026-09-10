@@ -30367,6 +30367,471 @@
     "line": 4537
   },
   {
+    "id": "effects:wv1:alias:effect:round_variable",
+    "context": "effect",
+    "parent_path": [],
+    "key": {
+      "exact": "round_variable"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": "effects:wv1:alias:effect:round_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Added in 1.37. Rounds a variable in place; `value` picks the mode."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990101
+  },
+  {
+    "id": "effects:wv2:rule:effect:which",
+    "context": "effect",
+    "parent_path": [
+      "round_variable"
+    ],
+    "key": {
+      "exact": "which"
+    },
+    "operator": "=",
+    "value": {
+      "dynamic": "variable"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "effects:wv1:alias:effect:round_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990102
+  },
+  {
+    "id": "effects:wv3:rule:effect:value",
+    "context": "effect",
+    "parent_path": [
+      "round_variable"
+    ],
+    "key": {
+      "exact": "value"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "effects:wv1:alias:effect:round_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Below 0 rounds down, 0 rounds to nearest, above 0 rounds up."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990103
+  },
+  {
+    "id": "effects:wv4:alias:effect:sqrt_variable",
+    "context": "effect",
+    "parent_path": [],
+    "key": {
+      "exact": "sqrt_variable"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": "effects:wv4:alias:effect:sqrt_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Replaces a variable with its square root."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990104
+  },
+  {
+    "id": "effects:wv5:rule:effect:which",
+    "context": "effect",
+    "parent_path": [
+      "sqrt_variable"
+    ],
+    "key": {
+      "exact": "which"
+    },
+    "operator": "=",
+    "value": {
+      "dynamic": "variable"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "effects:wv4:alias:effect:sqrt_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990105
+  },
+  {
+    "id": "effects:wv6:alias:effect:random_variable",
+    "context": "effect",
+    "parent_path": [],
+    "key": {
+      "exact": "random_variable"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": "effects:wv6:alias:effect:random_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Sets a variable to a random float between 0 and `value` (or a second `which = <var>`)."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990106
+  },
+  {
+    "id": "effects:wv7:rule:effect:which",
+    "context": "effect",
+    "parent_path": [
+      "random_variable"
+    ],
+    "key": {
+      "exact": "which"
+    },
+    "operator": "=",
+    "value": {
+      "dynamic_set": "variable"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "effects:wv6:alias:effect:random_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "A second `which = <var>` may replace `value`: random between 0 and that variable."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 2,
+    "source_file": "semantic-rules.json",
+    "line": 990107
+  },
+  {
+    "id": "effects:wv8:rule:effect:value",
+    "context": "effect",
+    "parent_path": [
+      "random_variable"
+    ],
+    "key": {
+      "exact": "value"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "effects:wv6:alias:effect:random_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990108
+  },
+  {
+    "id": "effects:wv9:alias:effect:modulo_variable",
+    "context": "effect",
+    "parent_path": [],
+    "key": {
+      "exact": "modulo_variable"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": null,
+    "alternative_id": "effects:wv9:alias:effect:modulo_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Sets a variable to the remainder of dividing it by `value` (or a second `which = <var>`)."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990109
+  },
+  {
+    "id": "effects:wv10:rule:effect:which",
+    "context": "effect",
+    "parent_path": [
+      "modulo_variable"
+    ],
+    "key": {
+      "exact": "which"
+    },
+    "operator": "=",
+    "value": {
+      "dynamic": "variable"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "effects:wv9:alias:effect:modulo_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "A second `which = <var>` may replace `value`: modulo by that variable."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 2,
+    "source_file": "semantic-rules.json",
+    "line": 990110
+  },
+  {
+    "id": "effects:wv11:rule:effect:value",
+    "context": "effect",
+    "parent_path": [
+      "modulo_variable"
+    ],
+    "key": {
+      "exact": "value"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "effects:wv9:alias:effect:modulo_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990111
+  },
+  {
+    "id": "effects:wv12:rule:effect:value",
+    "context": "effect",
+    "parent_path": [
+      "multiply_variable"
+    ],
+    "key": {
+      "exact": "value"
+    },
+    "operator": "=",
+    "value": {
+      "dynamic": "variable"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "effects:19:alias:effect:multiply_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "The operand may also be read from another variable (`value = <var>`); vanilla seeds `ai_value` this way in `recruit_foreign_general` (00_diplomatic_actions.txt)."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990112
+  },
+  {
+    "id": "effects:wv13:rule:effect:value",
+    "context": "effect",
+    "parent_path": [
+      "divide_variable"
+    ],
+    "key": {
+      "exact": "value"
+    },
+    "operator": "=",
+    "value": {
+      "dynamic": "variable"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "effects:29:alias:effect:divide_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "The operand may also be read from another variable (`value = <var>`); vanilla seeds `ai_value` this way in `recruit_foreign_general` (00_diplomatic_actions.txt)."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990113
+  },
+  {
+    "id": "effects:wv14:rule:effect:value",
+    "context": "effect",
+    "parent_path": [
+      "subtract_variable"
+    ],
+    "key": {
+      "exact": "value"
+    },
+    "operator": "=",
+    "value": {
+      "dynamic": "variable"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "effects:46:alias:effect:subtract_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "The operand may also be read from another variable (`value = <var>`); vanilla seeds `ai_value` this way in `recruit_foreign_general` (00_diplomatic_actions.txt)."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990114
+  },
+  {
+    "id": "effects:wv15:rule:effect:value",
+    "context": "effect",
+    "parent_path": [
+      "change_variable"
+    ],
+    "key": {
+      "exact": "value"
+    },
+    "operator": "=",
+    "value": {
+      "dynamic": "variable"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "effects:39:alias:effect:change_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "The operand may also be read from another variable (`value = <var>`); vanilla seeds `ai_value` this way in `recruit_foreign_general` (00_diplomatic_actions.txt)."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990115
+  },
+  {
     "id": "effects:590:alias:effect:set_ruler_culture",
     "context": "effect",
     "parent_path": [],
@@ -40905,36 +41370,6 @@
     "line": 4881
   },
   {
-    "id": "effects:8:rule:effect:value",
-    "context": "effect",
-    "parent_path": [
-      "export_to_variable"
-    ],
-    "key": {
-      "exact": "value"
-    },
-    "operator": "=",
-    "value": {
-      "exact": "modifier:"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": "effects:14:alias:effect:export_to_variable",
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [
-      "any"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 4882
-  },
-  {
     "id": "effects:900:alias:effect:remove_reform_center",
     "context": "effect",
     "parent_path": [],
@@ -44330,34 +44765,6 @@
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 4992
-  },
-  {
-    "id": "effects:9:leaf-value:effect:<modifier>",
-    "context": "effect",
-    "parent_path": [
-      "export_to_variable"
-    ],
-    "key": "any_scalar",
-    "operator": null,
-    "value": {
-      "type": "modifier"
-    },
-    "shape": "leaf_value",
-    "child_context": null,
-    "alternative_id": "effects:14:alias:effect:export_to_variable",
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [
-      "any"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 4993
   },
   {
     "id": "scope_links:100:rule:effect:advisor_events_mil",

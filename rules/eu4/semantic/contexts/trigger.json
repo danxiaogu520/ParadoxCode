@@ -6440,36 +6440,6 @@
     "line": 6939
   },
   {
-    "id": "triggers:106:rule:trigger:which",
-    "context": "trigger",
-    "parent_path": [
-      "check_variable"
-    ],
-    "key": {
-      "exact": "which"
-    },
-    "operator": "=",
-    "value": {
-      "enum": "variable_name"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": "triggers:109:alias:trigger:check_variable",
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [
-      "any"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 2,
-    "source_file": "semantic-rules.json",
-    "line": 6940
-  },
-  {
     "id": "triggers:1070:rule:trigger:modifier",
     "context": "trigger",
     "parent_path": [

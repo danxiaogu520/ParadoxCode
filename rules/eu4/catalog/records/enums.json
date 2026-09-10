@@ -593,19 +593,6 @@
     },
     {
       "table": "enums",
-      "logical_id": "enums:enums:root:0:11",
-      "source_order": 8700,
-      "fields": {
-        "child_count": "1",
-        "key": "enum[variable_name]",
-        "line": "227",
-        "operator": "=",
-        "shape": "block",
-        "source_file": "catalog.json"
-      }
-    },
-    {
-      "table": "enums",
       "logical_id": "enums:enums:root:0:12",
       "source_order": 8702,
       "fields": {

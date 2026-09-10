@@ -15,10 +15,38 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   include an int, float, or bool operand — vanilla's multi-form aliases
   (`land_forcelimit`, `diplomatic_reputation`, …) resolve through their numeric rows,
   while token-returning triggers (`primary_culture`) and unknown names stay rejected.
-  The open rule applies at all three `export_to_variable` value sites (effect context,
-  `variable_arithmetic_trigger`, and `new_diplomatic_actions` AI acceptance), keeps the
-  whitelist enum as an alternative, and completion offers the qualifying
-  `trigger_value:` spellings. Vanilla diagnostics are unchanged (1320/48/1063).
+  The open rule covers the `export_to_variable` value sites (effect context,
+  `variable_arithmetic_trigger`, and `new_diplomatic_actions` AI acceptance);
+  completion offers the qualifying `trigger_value:` spellings. The imported enum
+  now keeps only its bare keywords — the 34 hardcoded `trigger_value:*` and 6
+  `modifier:*` entries were removed as redundant (`modifier:` values remain open
+  through the dynamic-value prefix bypass). The four sibling variable effects
+  (`set_variable` and friends) stay literal-plus-variable only: the wiki documents
+  `trigger_value:` exclusively for `export_to_variable`, and vanilla uses it there
+  and nowhere else. Vanilla diagnostics are unchanged (1320/48/1063).
+- The wiki's Variables page is now fully covered: the four arithmetic effects
+  `round_variable` (new in 1.37), `sqrt_variable`, `random_variable`, and
+  `modulo_variable` validate in their documented shapes (including the second
+  `which = <var>` that substitutes for `value`), and the `export_to_variable`
+  bare-value enum carries the wiki's Exportable Values union — 34 documented
+  spellings (`war_exhaustion`, `base_tax`, `monarch_age`, …) that previously
+  flagged as invalid now validate, while the undocumented `ruler_adm`/`ruler_age`/
+  `ruler_dip`/`ruler_mil` variants are rejected in favour of `ADM`/`DIP`/`MIL`
+  and `monarch_age`. Vanilla diagnostics are unchanged (1320/48/1063).
+- The remaining imported whitelist patches around the variable model are gone,
+  replaced by principled rows. The arithmetic siblings (`multiply_variable`,
+  `divide_variable`, `subtract_variable`, `change_variable`) now accept
+  `value = <var>` through the dynamic variable set, as `set_variable` already
+  did — vanilla's `recruit_foreign_general` AI acceptance feeds
+  `OpinionOfFROM`/`ArmyTradtionOfFROM` back in exactly that shape — so those
+  hardcoded names, together with the pronoia pair, left the enum: they are
+  variable references, not export spellings. The `"0"`/`"1"` constants came out
+  the same way, with the AI-acceptance `value` site gaining an integer row
+  (mirroring `peace_treaties`) for vanilla's `value = 1` seeds. The
+  `check_variable` `which` enum fallback and the two dead `modifier:` export
+  rows were dropped alongside the `variable_name` enum they referenced — the
+  dynamic variable set and the dynamic-value prefix bypass already cover every
+  vanilla site. Vanilla diagnostics are unchanged (1320/48/1063).
 
 ## [0.3.1] - 2026-09-05
 
