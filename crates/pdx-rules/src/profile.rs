@@ -655,6 +655,24 @@ impl GameProfile {
         })
     }
 
+    /// Returns whether `key` is transparent in `context`: its block keeps the parent's
+    /// semantic container without extending the structural path.
+    ///
+    /// Covers logical wrappers (`AND`/`OR`/`NOT`) in trigger-like contexts and
+    /// runtime-named scope expressions (`event_target:…`) in trigger- or effect-like
+    /// contexts, where "like" includes contexts that inherit them. This is the single
+    /// definition shared by diagnostics, completion, and HIR lowering; keeping it in one
+    /// place prevents the three walks from disagreeing about which keys are pass-through.
+    #[must_use]
+    pub fn is_transparent_wrapper_key(&self, context: &str, key: &str) -> bool {
+        let trigger_like = context.eq_ignore_ascii_case("trigger")
+            || self.semantic_context_inherits(context, "trigger");
+        let effect_like = context.eq_ignore_ascii_case("effect")
+            || self.semantic_context_inherits(context, "effect");
+        (trigger_like && self.is_transparent_scope_wrapper(key))
+            || ((trigger_like || effect_like) && self.is_dynamic_scope_expression(key))
+    }
+
     /// Returns whether a scalar is a runtime value reference such as `variable:name`.
     #[must_use]
     pub fn is_dynamic_value_reference(&self, value: &str) -> bool {

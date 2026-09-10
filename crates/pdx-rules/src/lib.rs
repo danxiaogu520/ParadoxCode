@@ -19,7 +19,7 @@ pub use model::{
     DynamicDefinitionDescriptor, DynamicDefinitionUsage, FileCategory, FileResolutionPolicy,
     LocalisationBinding, LocalisationBindingCondition, ParserKind, RuleRecord, RuleShape,
     RulesModel, SemanticModel, SemanticRule, SymbolDescriptor, SymbolResolutionPolicy,
-    TypeDescriptor, TypeRootScope,
+    TypeDescriptor, TypeRootScope, entry_wrapper_reroutes,
 };
 pub use profile::{
     GameProfile, ProfileConditionalDefinitionRule, ProfileContainerDefinitionRule,

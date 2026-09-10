@@ -243,6 +243,52 @@ pub struct TypeDescriptor {
     pub dynamic_definition: Option<DynamicDefinitionDescriptor>,
 }
 
+impl TypeDescriptor {
+    /// Whether the type's instances appear directly under the file root when the root
+    /// key is (or every key is, for `"any"`) listed in `skip_root_paths`.
+    ///
+    /// Shared by the diagnostics walk and the completion walk so both descend into
+    /// instance bodies at the same depth.
+    #[must_use]
+    pub fn skips_root_key(&self, root_key: &str) -> bool {
+        self.skip_root_paths.iter().any(|path| {
+            path.first().is_some_and(|head| {
+                head.eq_ignore_ascii_case("any") || head.eq_ignore_ascii_case(root_key)
+            })
+        })
+    }
+
+    /// Whether `child_key` names one instance of this type rather than a field of the
+    /// wrapper container, according to `type_key_filter`.
+    #[must_use]
+    pub fn accepts_instance_key(&self, child_key: &str) -> bool {
+        self.type_key_filter
+            .as_ref()
+            .is_none_or(|(values, negate)| {
+                values
+                    .iter()
+                    .any(|value| value.eq_ignore_ascii_case(child_key))
+                    != *negate
+            })
+    }
+}
+
+/// Whether `rule` may reroute a wildcard-only entry container's body into its child
+/// context.
+///
+/// The entry key of such a container is a free-form name (`root:luck`'s country tag), so
+/// only a wildcard-matched rule with a genuine child-context switch may speak for the
+/// entry body. Shared by the diagnostics walk and HIR lowering so both reroute the same
+/// entries.
+#[must_use]
+pub fn entry_wrapper_reroutes(rule: &SemanticRule, context: &str) -> bool {
+    matches!(rule.key, KeyMatcher::AnyScalar | KeyMatcher::Date)
+        && rule
+            .child_context
+            .as_deref()
+            .is_some_and(|child| !child.eq_ignore_ascii_case(context))
+}
+
 /// One type-instance to localisation-key mapping from the first-party rule source.
 ///
 /// A template contains exactly one `$` placeholder, which is replaced by the concrete

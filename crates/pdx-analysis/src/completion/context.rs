@@ -336,10 +336,9 @@ fn semantic_completion_container(
                 quoted_scripts,
             );
         }
-        let transparent_wrapper = context.eq_ignore_ascii_case("trigger")
-            && snapshot
-                .game_profile()
-                .is_transparent_scope_wrapper(&property.key);
+        let transparent_wrapper = snapshot
+            .game_profile()
+            .is_transparent_wrapper_key(&context, &property.key);
         // Transition rules for this property come from the current container *and* the
         // structural containers. After a scope link such as `if` moves to its target, the
         // block's `parent_path` is reset, but clause rules like `limit` (parent_path
@@ -638,13 +637,7 @@ fn semantic_completion_skips_type_instances(
         .semantic
         .type_descriptors
         .get(type_name)
-        .is_some_and(|descriptor| {
-            descriptor.skip_root_paths.iter().any(|path| {
-                path.first().is_some_and(|head| {
-                    head.eq_ignore_ascii_case("any") || head.eq_ignore_ascii_case(root_key)
-                })
-            })
-        })
+        .is_some_and(|descriptor| descriptor.skips_root_key(root_key))
 }
 
 fn semantic_completion_is_type_instance_child(
@@ -664,15 +657,7 @@ fn semantic_completion_is_type_instance_child(
     else {
         return false;
     };
-    descriptor
-        .type_key_filter
-        .as_ref()
-        .is_none_or(|(values, negate)| {
-            values
-                .iter()
-                .any(|value| value.eq_ignore_ascii_case(child_key))
-                != *negate
-        })
+    descriptor.accepts_instance_key(child_key)
 }
 
 fn script_line_value_context(source: &str, position: TextSize) -> bool {
@@ -768,28 +753,4 @@ pub(crate) fn completion_structural_containers(
     } else {
         vec![(current.context.clone(), structural_path)]
     }
-}
-
-pub(crate) fn semantic_rules_for_container<'a>(
-    snapshot: &'a AnalysisSnapshot,
-    context: &str,
-    parent_path: &[std::sync::Arc<str>],
-    _scope: &ScopeContext,
-) -> Vec<&'a pdx_rules::SemanticRule> {
-    let mut candidates = snapshot
-        .rules()
-        .semantic_rules_for_context(context)
-        .collect::<Vec<_>>();
-    if let Some(type_name) = context.strip_prefix("type:") {
-        candidates.extend(
-            snapshot
-                .rules()
-                .semantic_rules_for_context(&format!("root:{type_name}")),
-        );
-        candidates.sort_by(|left, right| left.id.cmp(&right.id));
-    }
-    candidates
-        .into_iter()
-        .filter(|rule| semantic_parent_path_matches(snapshot, &rule.parent_path, parent_path))
-        .collect()
 }

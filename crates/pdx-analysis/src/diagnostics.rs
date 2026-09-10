@@ -23,7 +23,7 @@ use pdx_engine::{
     AnalysisSnapshot, DocumentId, DocumentSource, DynamicDefinitionSummary, SourceFileId,
 };
 use pdx_parser::{FileFormat, SyntaxError};
-use pdx_rules::{KeyMatcher, RuleShape};
+use pdx_rules::{KeyMatcher, RuleShape, entry_wrapper_reroutes};
 use pdx_text::TextRange;
 
 /// Single finalization point for diagnostics emitted by syntax, semantic, and reference passes.
@@ -540,27 +540,11 @@ pub(crate) fn semantic_rule_diagnostics(
                 .semantic
                 .type_descriptors
                 .get(type_name)
-                .is_some_and(|descriptor| {
-                    descriptor.skip_root_paths.iter().any(|path| {
-                        path.first().is_some_and(|key| {
-                            key.eq_ignore_ascii_case("any")
-                                || key.eq_ignore_ascii_case(&property.key)
-                        })
-                    })
-                })
+                .is_some_and(|descriptor| descriptor.skips_root_key(&property.key))
         {
             for child in &property.block {
                 let descriptor = &snapshot.rules().model().semantic.type_descriptors[type_name];
-                if descriptor
-                    .type_key_filter
-                    .as_ref()
-                    .is_some_and(|(values, negate)| {
-                        values
-                            .iter()
-                            .any(|value| value.eq_ignore_ascii_case(&child.key))
-                            == *negate
-                    })
-                {
+                if !descriptor.accepts_instance_key(&child.key) {
                     continue;
                 }
                 let child_scope =
@@ -624,11 +608,7 @@ pub(crate) fn semantic_rule_diagnostics(
             let mut body_scope = scope;
             if let Some(rule) = wrapper_transition
                 && context_is_wildcard_only
-                && matches!(rule.key, KeyMatcher::AnyScalar | KeyMatcher::Date)
-                && rule
-                    .child_context
-                    .as_deref()
-                    .is_some_and(|child| !child.eq_ignore_ascii_case(&body_context))
+                && entry_wrapper_reroutes(rule, &body_context)
             {
                 body_scope = semantic_child_scope(snapshot, &body_scope, rule);
                 body_context = rule.child_context.clone().unwrap_or(body_context);
@@ -810,10 +790,7 @@ fn validate_semantic_container(
                 1
             }
         };
-        let transparent_wrapper = (trigger_like
-            && profile.is_transparent_scope_wrapper(&property.key))
-            || ((trigger_like || effect_like)
-                && profile.is_dynamic_scope_expression(&property.key));
+        let transparent_wrapper = profile.is_transparent_wrapper_key(context, &property.key);
         if trigger_like && is_boolean_container_key(&property.key) {
             lint_boolean_container(property, diagnostics);
         }
