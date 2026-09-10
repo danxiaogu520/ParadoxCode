@@ -96,7 +96,6 @@ fn context_rule_view(snapshot: &AnalysisSnapshot, context: &str) -> Arc<ContextR
         return cached;
     }
     let rules = snapshot.rules();
-    let mut merged = false;
     let mut all: Vec<usize> = Vec::new();
     let mut exact: rustc_hash::FxHashMap<Box<str>, Vec<usize>> = rustc_hash::FxHashMap::default();
     let mut non_exact: Vec<usize> = Vec::new();
@@ -115,16 +114,11 @@ fn context_rule_view(snapshot: &AnalysisSnapshot, context: &str) -> Arc<ContextR
             }
         }
     };
-    push_source(context);
-    for inherited in snapshot.game_profile().inherited_semantic_contexts(context) {
-        push_source(inherited);
-        merged = true;
+    let expanded = snapshot.game_profile().expanded_rule_contexts(context);
+    for source in &expanded {
+        push_source(source);
     }
-    if let Some(type_name) = context.strip_prefix("type:") {
-        let root_context = format!("root:{type_name}");
-        push_source(&root_context);
-        merged = true;
-    }
+    let merged = expanded.len() > 1;
     let dedup = |indices: &mut Vec<usize>| {
         // Rule indices ascend in rule-id order, so adjacent near-duplicate ids collapse here.
         let mut write = 0;

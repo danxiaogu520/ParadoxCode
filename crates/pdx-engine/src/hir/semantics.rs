@@ -1156,25 +1156,16 @@ fn semantic_typed_references(
 }
 
 fn semantic_reference_contexts(profile: Option<&GameProfile>, actual: &str) -> Vec<String> {
-    let mut contexts = vec![actual.to_owned()];
-    if let Some(type_name) = actual.strip_prefix("type:") {
-        contexts.push(format!("root:{type_name}"));
-    }
-    let mut index = 0;
-    while let Some(context) = contexts.get(index).cloned() {
-        if let Some(profile) = profile {
-            for ancestor in profile.inherited_semantic_contexts(&context) {
-                if !contexts
-                    .iter()
-                    .any(|candidate| candidate.eq_ignore_ascii_case(ancestor))
-                {
-                    contexts.push(ancestor.clone());
-                }
+    match profile {
+        Some(profile) => profile.expanded_rule_contexts(actual),
+        None => {
+            let mut contexts = vec![actual.to_owned()];
+            if let Some(type_name) = actual.strip_prefix("type:") {
+                contexts.push(format!("root:{type_name}"));
             }
+            contexts
         }
-        index += 1;
     }
-    contexts
 }
 
 fn semantic_reference_context_matches(

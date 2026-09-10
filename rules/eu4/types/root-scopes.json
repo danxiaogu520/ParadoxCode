@@ -3,6 +3,18 @@
     "country_event": "country",
     "province_event": "province"
   },
+  "country_history": {
+    "*": {
+      "root": "country",
+      "documentation": ["Country history files execute their field blocks in the country's scope; ROOT and THIS are the country."]
+    }
+  },
+  "province_history": {
+    "*": {
+      "root": "province",
+      "documentation": ["Province history files execute their field blocks in the province's scope; ROOT and THIS are the province."]
+    }
+  },
   "on_action": {
     "consort_on_shipwreck": "country",
     "heir_on_shipwreck": "country",

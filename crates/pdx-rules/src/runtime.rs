@@ -493,12 +493,18 @@ impl RuleSet {
                     .find(|(candidate, _)| candidate.eq_ignore_ascii_case(type_name))
                     .map(|(_, scopes)| scopes)
             })?;
-        scopes.get(root_key).or_else(|| {
-            scopes
-                .iter()
-                .find(|(candidate, _)| candidate.eq_ignore_ascii_case(root_key))
-                .map(|(_, scope)| scope)
-        })
+        // A `*` entry declares the type's default registers for root keys that
+        // are not statically known, such as history files whose fields (or tag
+        // wrappers) sit directly at the file root.
+        scopes
+            .get(root_key)
+            .or_else(|| {
+                scopes
+                    .iter()
+                    .find(|(candidate, _)| candidate.eq_ignore_ascii_case(root_key))
+                    .map(|(_, scope)| scope)
+            })
+            .or_else(|| scopes.get("*"))
     }
 
     /// Returns the matching file category.
