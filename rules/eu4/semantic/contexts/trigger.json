@@ -26426,11 +26426,11 @@
     "line": 7598
   },
   {
-    "id": "triggers:1667:alias:trigger:num_of_musketeer",
+    "id": "triggers:1667:alias:trigger:num_of_musketeers",
     "context": "trigger",
     "parent_path": [],
     "key": {
-      "exact": "num_of_musketeer"
+      "exact": "num_of_musketeers"
     },
     "operator": "=",
     "value": {
@@ -26441,10 +26441,12 @@
     },
     "shape": "leaf",
     "child_context": null,
-    "alternative_id": "triggers:1667:alias:trigger:num_of_musketeer",
+    "alternative_id": "triggers:1667:alias:trigger:num_of_musketeers",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Returns true if the country has at least X musketeers units."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -27386,36 +27388,6 @@
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 7629
-  },
-  {
-    "id": "triggers:17:alias:trigger:active_major_mission",
-    "context": "trigger",
-    "parent_path": [],
-    "key": {
-      "exact": "active_major_mission"
-    },
-    "operator": "=",
-    "value": {
-      "type": "mission"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": "triggers:17:alias:trigger:active_major_mission",
-    "severity": null,
-    "required": false,
-    "documentation": [
-      "Returns true if X is the current mission of the country."
-    ],
-    "allowed_scopes": [
-      "country"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 7630
   },
   {
     "id": "triggers:180:alias:trigger:defensive_war_with",
@@ -29577,24 +29549,24 @@
     "line": 7701
   },
   {
-    "id": "triggers:244:rule:trigger:discounted",
+    "id": "triggers:244:rule:trigger:is_discounted",
     "context": "trigger",
     "parent_path": [
       "employed_advisor"
     ],
     "key": {
-      "exact": "discounted"
+      "exact": "is_discounted"
     },
     "operator": "=",
-    "value": {
-      "exact": "yes"
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": "triggers:246:alias:trigger:employed_advisor",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Optional. Whether the advisor must be (or must not be) discounted."
+    ],
     "allowed_scopes": [
       "any"
     ],
@@ -47660,9 +47632,9 @@
     },
     "operator": "=",
     "value": {
-      "int": {
-        "min": 0,
-        "max": 100
+      "float": {
+        "min": null,
+        "max": null
       }
     },
     "shape": "leaf",
@@ -51537,99 +51509,6 @@
     "line": 8428
   },
   {
-    "id": "triggers:902:alias:trigger:num_of_protectorates",
-    "context": "trigger",
-    "parent_path": [],
-    "key": {
-      "exact": "num_of_protectorates"
-    },
-    "operator": "=",
-    "value": {
-      "int": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": "triggers:902:alias:trigger:num_of_protectorates",
-    "severity": null,
-    "required": false,
-    "documentation": [
-      "Returns true if the country has at least X protectorates, or at least as many protectorates as the specified country."
-    ],
-    "allowed_scopes": [
-      "country"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 8429
-  },
-  {
-    "id": "triggers:903:alias:trigger:num_of_protectorates",
-    "context": "trigger",
-    "parent_path": [],
-    "key": {
-      "exact": "num_of_protectorates"
-    },
-    "operator": "=",
-    "value": {
-      "scope": "country"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": "triggers:903:alias:trigger:num_of_protectorates",
-    "severity": null,
-    "required": false,
-    "documentation": [
-      "Returns true if the country has at least X protectorates, or at least as many protectorates as the specified country."
-    ],
-    "allowed_scopes": [
-      "country"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 8430
-  },
-  {
-    "id": "triggers:904:alias:trigger:num_of_protectorates",
-    "context": "trigger",
-    "parent_path": [],
-    "key": {
-      "exact": "num_of_protectorates"
-    },
-    "operator": "=",
-    "value": {
-      "enum": "country_tags"
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": "triggers:904:alias:trigger:num_of_protectorates",
-    "severity": null,
-    "required": false,
-    "documentation": [
-      "Returns true if the country has at least X protectorates, or at least as many protectorates as the specified country."
-    ],
-    "allowed_scopes": [
-      "country"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 1,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 8431
-  },
-  {
     "id": "triggers:905:alias:trigger:num_of_provinces_in_states",
     "context": "trigger",
     "parent_path": [],
@@ -55145,19 +55024,14 @@
       "exact": "has_administration_efficiency_value"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": "0",
-        "max": "1"
-      }
-    },
-    "shape": "leaf",
+    "value": "any_scalar",
+    "shape": "node",
     "child_context": null,
     "alternative_id": null,
     "severity": null,
     "required": false,
     "documentation": [
-      "Returns true if the country has at least as high administration efficiency value."
+      "Returns true if the country has at least as high administrative efficiency as specified."
     ],
     "allowed_scopes": [
       "country"
@@ -55303,10 +55177,8 @@
       "exact": "is_or_was_tag"
     },
     "operator": "=",
-    "value": {
-      "enum": "country_tags"
-    },
-    "shape": "leaf",
+    "value": "any_scalar",
+    "shape": "node",
     "child_context": null,
     "alternative_id": null,
     "severity": null,
@@ -55511,5 +55383,104 @@
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 8549
+  },
+  {
+    "id": "eu4:trigger:has_administration_efficiency_value:value",
+    "context": "trigger",
+    "parent_path": [
+      "has_administration_efficiency_value"
+    ],
+    "key": {
+      "exact": "value"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": "0",
+        "max": "1"
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:trigger:has_administration_efficiency_value",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "The administration efficiency value to compare against, as a fraction."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "wiki-triggers",
+    "line": 0
+  },
+  {
+    "id": "eu4:trigger:is_or_was_tag:tag",
+    "context": "trigger",
+    "parent_path": [
+      "is_or_was_tag"
+    ],
+    "key": {
+      "exact": "tag"
+    },
+    "operator": "=",
+    "value": {
+      "enum": "country_tags"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:trigger:is_or_was_tag",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "The country tag to check for."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "wiki-triggers",
+    "line": 0
+  },
+  {
+    "id": "eu4:trigger:rebel_progress_at_least:rebel_type",
+    "context": "trigger",
+    "parent_path": [
+      "rebel_progress_at_least"
+    ],
+    "key": {
+      "exact": "rebel_type"
+    },
+    "operator": "=",
+    "value": {
+      "type": "rebel_type"
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "triggers:1586:alias:trigger:rebel_progress_at_least",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "The rebel faction to check. Defaults to any faction if unspecified."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "wiki-triggers",
+    "line": 0
   }
 ]

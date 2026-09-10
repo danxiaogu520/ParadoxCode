@@ -4088,8 +4088,8 @@ fn modifier_scope_mismatch_reports_cross_scope_modifier_applications() {
         4,
         "exactly the four cross-scope applications are reported: {all:?}"
     );
-    // The country application of a unit-class modifier stays compatible and
-    // contributes no diagnostic.
+    // The country application of a formerly unit-class (now country-class)
+    // modifier stays compatible and contributes no diagnostic.
 
     // Locate the `name` value range; searching for the bare name would first
     // hit the `province_mod` prefix inside `add_province_modifier`.
@@ -4134,8 +4134,9 @@ fn modifier_scope_mismatch_reports_cross_scope_modifier_applications() {
     assert!(mixed_case.message.contains("global_tax_modifier"));
     assert!(!mixed_case.message.contains("local_unrest"));
 
-    // Unit-class attributes in a province application are unexpected and also
-    // reported at information severity; only the second `unit_mod` application
+    // Formerly unit-class attributes are country-class now; in a province
+    // application they are accepted (the game propagates them) and reported
+    // at information severity; only the second `unit_mod` application
     // (opt_unit_province) reports.
     let first_unit = events.find("= unit_mod ").expect("first unit_mod");
     let second_unit = events[first_unit + 1..]
@@ -4152,7 +4153,7 @@ fn modifier_scope_mismatch_reports_cross_scope_modifier_applications() {
     assert_eq!(unit_case.severity, Severity::Information);
     assert_eq!(
         unit_case.message,
-        "modifier `unit_mod` applies unexpected unit-class attributes (land_morale_constant) \
+        "modifier `unit_mod` applies country-class attributes (land_morale_constant) \
          in province scope"
     );
 

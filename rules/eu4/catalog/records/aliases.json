@@ -10020,21 +10020,6 @@
     },
     {
       "table": "aliases",
-      "logical_id": "effects:root:64",
-      "source_order": 7159,
-      "fields": {
-        "directives": "scope = country",
-        "documentation": "Adds tribal allegiance to the current scope. No effect if not a government using tribal_federation_mechanic.",
-        "key": "alias[effect:add_tribal_allegiance]",
-        "line": "374",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "int"
-      }
-    },
-    {
-      "table": "aliases",
       "logical_id": "effects:root:640",
       "source_order": 8255,
       "fields": {
@@ -14362,7 +14347,7 @@
       "fields": {
         "directives": "scope = country",
         "documentation": "Not functional",
-        "key": "alias[modifier:may_convert_territories]",
+        "key": "alias[modifier:may_not_convert_territories]",
         "line": "1122",
         "operator": "=",
         "shape": "scalar",
@@ -15288,7 +15273,7 @@
       "source_order": 11185,
       "fields": {
         "directives": "scope = country",
-        "key": "alias[modifier:heavy_ship_hull_size]",
+        "key": "alias[modifier:heavy_ship_hull_size_modifier]",
         "line": "1335",
         "operator": "=",
         "shape": "scalar",
@@ -15316,7 +15301,7 @@
       "source_order": 11187,
       "fields": {
         "directives": "scope = country",
-        "key": "alias[modifier:light_ship_hull_size]",
+        "key": "alias[modifier:light_ship_hull_size_modifier]",
         "line": "1343",
         "operator": "=",
         "shape": "scalar",
@@ -15359,7 +15344,7 @@
       "source_order": 11189,
       "fields": {
         "directives": "scope = country",
-        "key": "alias[modifier:galley_hullsize]",
+        "key": "alias[modifier:galley_hull_size_modifier]",
         "line": "1351",
         "operator": "=",
         "shape": "scalar",
@@ -15387,7 +15372,7 @@
       "source_order": 11191,
       "fields": {
         "directives": "scope = country",
-        "key": "alias[modifier:transport_hullsize]",
+        "key": "alias[modifier:transport_hull_size_modifier]",
         "line": "1359",
         "operator": "=",
         "shape": "scalar",
@@ -27118,7 +27103,7 @@
       "source_order": 13664,
       "fields": {
         "directives": "scope = country",
-        "key": "alias[trigger:num_of_musketeer]",
+        "key": "alias[trigger:num_of_musketeers]",
         "line": "5854",
         "operator": "=",
         "shape": "scalar",
@@ -27439,21 +27424,6 @@
         "shape": "scalar",
         "source_file": "catalog.json",
         "value": "enum[culture_new_variables]"
-      }
-    },
-    {
-      "table": "aliases",
-      "logical_id": "triggers:root:14",
-      "source_order": 12014,
-      "fields": {
-        "directives": "scope = country",
-        "documentation": "Returns true if X is the current mission of the country.",
-        "key": "alias[trigger:active_major_mission]",
-        "line": "64",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "<mission>"
       }
     },
     {
@@ -37526,51 +37496,6 @@
         "shape": "scalar",
         "source_file": "catalog.json",
         "value": "int"
-      }
-    },
-    {
-      "table": "aliases",
-      "logical_id": "triggers:root:746",
-      "source_order": 12899,
-      "fields": {
-        "directives": "scope = country",
-        "documentation": "Returns true if the country has at least X protectorates, or at least as many protectorates as the specified country.",
-        "key": "alias[trigger:num_of_protectorates]",
-        "line": "3268",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "int"
-      }
-    },
-    {
-      "table": "aliases",
-      "logical_id": "triggers:root:747",
-      "source_order": 12900,
-      "fields": {
-        "directives": "scope = country",
-        "documentation": "Returns true if the country has at least X protectorates, or at least as many protectorates as the specified country.",
-        "key": "alias[trigger:num_of_protectorates]",
-        "line": "3272",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "scope[country]"
-      }
-    },
-    {
-      "table": "aliases",
-      "logical_id": "triggers:root:748",
-      "source_order": 12901,
-      "fields": {
-        "directives": "scope = country",
-        "documentation": "Returns true if the country has at least X protectorates, or at least as many protectorates as the specified country.",
-        "key": "alias[trigger:num_of_protectorates]",
-        "line": "3276",
-        "operator": "=",
-        "shape": "scalar",
-        "source_file": "catalog.json",
-        "value": "enum[country_tags]"
       }
     },
     {

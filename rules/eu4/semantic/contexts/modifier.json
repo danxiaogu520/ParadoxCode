@@ -1144,12 +1144,7 @@
       "exact": "allow_client_states"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -1862,12 +1857,7 @@
       "exact": "allow_free_estate_privilege_revocation"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -2120,12 +2110,7 @@
       "exact": "has_banners"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -2151,12 +2136,7 @@
       "exact": "has_carolean"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -3100,12 +3080,7 @@
       "exact": "is_banner_modifier"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -3133,12 +3108,7 @@
       "exact": "is_carolean_modifier"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -3164,12 +3134,7 @@
       "exact": "is_cawa_modifier"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -3195,12 +3160,7 @@
       "exact": "is_cossack_modifier"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -3228,12 +3188,7 @@
       "exact": "is_hussars_modifier"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -3323,12 +3278,7 @@
       "exact": "is_mamluks_modifier"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -3356,12 +3306,7 @@
       "exact": "is_marine_modifier"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -3389,12 +3334,7 @@
       "exact": "is_qizilbash_modifier"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -3422,12 +3362,7 @@
       "exact": "is_revolutionary_guard_modifier"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -3455,12 +3390,7 @@
       "exact": "is_streltsy_modifier"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -5077,12 +5007,7 @@
       "exact": "local_has_carolean"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -5139,12 +5064,7 @@
       "exact": "local_has_banners"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -6571,12 +6491,7 @@
       "exact": "may_perform_slave_raid"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -6604,12 +6519,7 @@
       "exact": "may_perform_slave_raid_on_same_religion"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -6637,12 +6547,7 @@
       "exact": "may_recruit_female_generals"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -8521,12 +8426,7 @@
       "exact": "no_stability_loss_on_monarch_death"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -10887,12 +10787,7 @@
       "exact": "block_introduce_heir"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -11279,12 +11174,7 @@
       "exact": "block_slave_raid"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -12680,12 +12570,7 @@
       "exact": "can_recruit_hussars"
     },
     "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
+    "value": "bool",
     "shape": "leaf",
     "child_context": null,
     "alternative_id": null,
@@ -18917,7 +18802,7 @@
     },
     "operator": "=",
     "value": {
-      "int": {
+      "float": {
         "min": null,
         "max": null
       }
@@ -20010,11 +19895,11 @@
     "line": 6248
   },
   {
-    "id": "modifiers:654:alias:modifier:may_convert_territories",
+    "id": "modifiers:654:alias:modifier:may_not_convert_territories",
     "context": "modifier",
     "parent_path": [],
     "key": {
-      "exact": "may_convert_territories"
+      "exact": "may_not_convert_territories"
     },
     "operator": "=",
     "value": {
@@ -20022,11 +19907,11 @@
     },
     "shape": "leaf",
     "child_context": null,
-    "alternative_id": "modifiers:654:alias:modifier:may_convert_territories",
+    "alternative_id": "modifiers:654:alias:modifier:may_not_convert_territories",
     "severity": null,
     "required": false,
     "documentation": [
-      "Not functional"
+      "Forbids a country to convert territory provinces with missionaries."
     ],
     "allowed_scopes": [
       "country"
@@ -21807,7 +21692,7 @@
       "Allows to use Force March regardless of current tech level."
     ],
     "allowed_scopes": [
-      "unit"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -22082,11 +21967,11 @@
     "line": 6313
   },
   {
-    "id": "modifiers:712:alias:modifier:heavy_ship_hull_size",
+    "id": "modifiers:712:alias:modifier:heavy_ship_hull_size_modifier",
     "context": "modifier",
     "parent_path": [],
     "key": {
-      "exact": "heavy_ship_hull_size"
+      "exact": "heavy_ship_hull_size_modifier"
     },
     "operator": "=",
     "value": {
@@ -22097,10 +21982,12 @@
     },
     "shape": "leaf",
     "child_context": null,
-    "alternative_id": "modifiers:712:alias:modifier:heavy_ship_hull_size",
+    "alternative_id": "modifiers:712:alias:modifier:heavy_ship_hull_size_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the hull size of heavy ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22146,11 +22033,11 @@
     "line": 6315
   },
   {
-    "id": "modifiers:714:alias:modifier:light_ship_hull_size",
+    "id": "modifiers:714:alias:modifier:light_ship_hull_size_modifier",
     "context": "modifier",
     "parent_path": [],
     "key": {
-      "exact": "light_ship_hull_size"
+      "exact": "light_ship_hull_size_modifier"
     },
     "operator": "=",
     "value": {
@@ -22161,10 +22048,12 @@
     },
     "shape": "leaf",
     "child_context": null,
-    "alternative_id": "modifiers:714:alias:modifier:light_ship_hull_size",
+    "alternative_id": "modifiers:714:alias:modifier:light_ship_hull_size_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the hull size of light ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22210,11 +22099,11 @@
     "line": 6317
   },
   {
-    "id": "modifiers:716:alias:modifier:galley_hullsize",
+    "id": "modifiers:716:alias:modifier:galley_hull_size_modifier",
     "context": "modifier",
     "parent_path": [],
     "key": {
-      "exact": "galley_hullsize"
+      "exact": "galley_hull_size_modifier"
     },
     "operator": "=",
     "value": {
@@ -22225,10 +22114,12 @@
     },
     "shape": "leaf",
     "child_context": null,
-    "alternative_id": "modifiers:716:alias:modifier:galley_hullsize",
+    "alternative_id": "modifiers:716:alias:modifier:galley_hull_size_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the hull size of galley ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22274,11 +22165,11 @@
     "line": 6319
   },
   {
-    "id": "modifiers:718:alias:modifier:transport_hullsize",
+    "id": "modifiers:718:alias:modifier:transport_hull_size_modifier",
     "context": "modifier",
     "parent_path": [],
     "key": {
-      "exact": "transport_hullsize"
+      "exact": "transport_hull_size_modifier"
     },
     "operator": "=",
     "value": {
@@ -22289,10 +22180,12 @@
     },
     "shape": "leaf",
     "child_context": null,
-    "alternative_id": "modifiers:718:alias:modifier:transport_hullsize",
+    "alternative_id": "modifiers:718:alias:modifier:transport_hull_size_modifier",
     "severity": null,
     "required": false,
-    "documentation": [],
+    "documentation": [
+      "Modifies the hull size of transport ships."
+    ],
     "allowed_scopes": [
       "country"
     ],
@@ -22454,7 +22347,7 @@
       "Allows mercenaries the ability to drill. Also works in unit scope."
     ],
     "allowed_scopes": [
-      "unit"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -22487,7 +22380,7 @@
       "Modifies the army tradition a leader of a merc company is spawned with."
     ],
     "allowed_scopes": [
-      "unit"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -22547,7 +22440,7 @@
       "Allow mercenaries to split (as of 1.37, only works using split hotkey). They are supposed to be able to merge with regiments of their own company, but as of 1.37, this functionality is broken. Using the hotkey to create a new unit also creates empty 0-stacks that cannot be readjusted."
     ],
     "allowed_scopes": [
-      "unit"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -22646,7 +22539,7 @@
       "Adds to the land morale of land units."
     ],
     "allowed_scopes": [
-      "unit"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -23339,7 +23232,7 @@
       "Modifies how much an artillery unit contributes towards a siege. E.g. 0.2 would mean a 20% bonus, so 5 artillery would count for 6."
     ],
     "allowed_scopes": [
-      "unit"
+      "country"
     ],
     "push_scope": null,
     "replace_scope": [],
@@ -26522,7 +26415,7 @@
     },
     "operator": "=",
     "value": {
-      "int": {
+      "float": {
         "min": null,
         "max": null
       }
@@ -27734,5 +27627,401 @@
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 7003
+  },
+  {
+    "id": "eu4:modifier:hull_size",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "hull_size"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Adds to the hull size of all ships."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "wiki-modifier-list",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:engagement_cost",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "engagement_cost"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Adds to the engagement width occupied by a ship."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "wiki-modifier-list",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:engagement_cost_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "engagement_cost_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies the engagement width occupied by a ship."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "wiki-modifier-list",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:global_naval_engagement",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "global_naval_engagement"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Adds to the maximum naval engagement width."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "wiki-modifier-list",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:number_of_cannons",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "number_of_cannons"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Adds to the number of cannons for all ships."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "wiki-modifier-list",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:ship_trade_power",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "ship_trade_power"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Adds to the trade power of ships. Only works properly with unit scope."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "wiki-modifier-list",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:flagship_landing_penalty",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "flagship_landing_penalty"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies the disembarkment penalty for the flagship."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "wiki-modifier-list",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:native_advancement_cost",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "native_advancement_cost"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies the monarch power cost of native advancements."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "wiki-modifier-list",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:special_unit_manpower_cost_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "special_unit_manpower_cost_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies the manpower/sailors cost for recruitment of special units."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "wiki-modifier-list",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:<estate>_influence_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "<estate>_influence_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:<estate>_influence_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies the influence of the specified estate."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "wiki-modifier-list",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:<estate>_loyalty_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "<estate>_loyalty_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:<estate>_loyalty_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies the loyalty of the specified estate."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "wiki-modifier-list",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:<estate>_privilege_slots",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "<estate>_privilege_slots"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:<estate>_privilege_slots",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Adds to the number of privilege slots of the specified estate."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "wiki-modifier-list",
+    "line": 0
   }
 ]
