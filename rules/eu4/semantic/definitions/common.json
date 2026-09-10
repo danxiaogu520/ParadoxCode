@@ -12851,6 +12851,42 @@
     "line": 465
   },
   {
+    "id": "common/diplomatic_actions_new:fp1:rule:root:new_diplomatic_action:value",
+    "context": "root:new_diplomatic_action",
+    "parent_path": [
+      "ai_acceptance",
+      "add_entry",
+      "export_to_variable"
+    ],
+    "key": {
+      "exact": "value"
+    },
+    "operator": "=",
+    "value": {
+      "typed_prefix": {
+        "prefix": "trigger_value:",
+        "context": "trigger",
+        "operand": "numeric_or_bool"
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990003
+  },
+  {
     "id": "common/diplomatic_actions_new:31:rule:root:new_diplomatic_action:who",
     "context": "root:new_diplomatic_action",
     "parent_path": [

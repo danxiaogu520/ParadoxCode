@@ -5,6 +5,21 @@ All notable changes to ParadoxCode are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `export_to_variable = { value = trigger_value:<trigger> }` no longer flags every
+  spelling outside the 34-entry imported whitelist (#34). A new typed-prefix value
+  matcher accepts `trigger_value:` followed by any known trigger whose compare forms
+  include an int, float, or bool operand — vanilla's multi-form aliases
+  (`land_forcelimit`, `diplomatic_reputation`, …) resolve through their numeric rows,
+  while token-returning triggers (`primary_culture`) and unknown names stay rejected.
+  The open rule applies at all three `export_to_variable` value sites (effect context,
+  `variable_arithmetic_trigger`, and `new_diplomatic_actions` AI acceptance), keeps the
+  whitelist enum as an alternative, and completion offers the qualifying
+  `trigger_value:` spellings. Vanilla diagnostics are unchanged (1320/48/1063).
+
 ## [0.3.1] - 2026-09-05
 
 This release rebuilds the diagnostic system around a consolidated 16-code table with

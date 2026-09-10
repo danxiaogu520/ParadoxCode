@@ -1,4 +1,4 @@
-use crate::matcher::{KeyMatcher, ValueMatcher};
+use crate::matcher::{KeyMatcher, TypedPrefixOperand, ValueMatcher};
 use crate::model::RulesModel;
 use crate::runtime::RulesError;
 use sha2::{Digest, Sha256};
@@ -420,6 +420,18 @@ fn put_semantic_value(bytes: &mut Vec<u8>, matcher: &ValueMatcher) {
         ValueMatcher::DynamicSet(value) => {
             put_str(bytes, "dynamic-set");
             put_str(bytes, value);
+        }
+        ValueMatcher::TypedPrefix {
+            prefix,
+            context,
+            operand,
+        } => {
+            put_str(bytes, "typed-prefix");
+            put_str(bytes, prefix);
+            put_str(bytes, context);
+            match operand {
+                TypedPrefixOperand::NumericOrBool => put_str(bytes, "numeric-or-bool"),
+            }
         }
         ValueMatcher::Opaque(value) => {
             put_str(bytes, "opaque");

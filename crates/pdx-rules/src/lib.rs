@@ -14,7 +14,7 @@ mod runtime;
 mod sqlite;
 
 pub use canonical::RuleHash;
-pub use matcher::{FileMatcher, KeyMatcher, ValueMatcher};
+pub use matcher::{FileMatcher, KeyMatcher, TypedPrefixOperand, ValueMatcher};
 pub use model::{
     DynamicDefinitionDescriptor, DynamicDefinitionUsage, FileCategory, FileResolutionPolicy,
     LocalisationBinding, LocalisationBindingCondition, ParserKind, RuleRecord, RuleShape,
