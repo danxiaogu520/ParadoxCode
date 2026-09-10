@@ -138,6 +138,11 @@ pub(crate) fn value_description(snapshot: &AnalysisSnapshot, matcher: &ValueMatc
         ValueMatcher::Localisation => "a localisation key".to_owned(),
         ValueMatcher::Filepath => "a file path".to_owned(),
         ValueMatcher::Dynamic(kind) => format!("{} `{kind}` name", article_for(kind)),
+        ValueMatcher::TypedPrefix {
+            prefix, context, ..
+        } => {
+            format!("`{prefix}` followed by a numeric or boolean {context} name")
+        }
         ValueMatcher::Opaque(value) => format!("`{value}`"),
     }
 }
@@ -173,6 +178,11 @@ pub(crate) fn value_plural(snapshot: &AnalysisSnapshot, matcher: &ValueMatcher) 
         ValueMatcher::Localisation => "localisation keys".to_owned(),
         ValueMatcher::Filepath => "file paths".to_owned(),
         ValueMatcher::Dynamic(kind) => format!("`{kind}` names"),
+        ValueMatcher::TypedPrefix {
+            prefix, context, ..
+        } => {
+            format!("`{prefix}` references to numeric or boolean {context} names")
+        }
         ValueMatcher::Opaque(value) => format!("`{value}` values"),
     }
 }

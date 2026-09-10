@@ -10899,6 +10899,43 @@
     "line": 7087
   },
   {
+    "id": "triggers:fp1:rule:trigger:value",
+    "context": "trigger",
+    "parent_path": [
+      "variable_arithmetic_trigger",
+      "export_to_variable"
+    ],
+    "key": {
+      "exact": "value"
+    },
+    "operator": "=",
+    "value": {
+      "typed_prefix": {
+        "prefix": "trigger_value:",
+        "context": "trigger",
+        "operand": "numeric_or_bool"
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "triggers:1227:alias:trigger:variable_arithmetic_trigger",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Accepts `trigger_value:<trigger>` for any trigger that evaluates to a number; boolean triggers export 0 or 1."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990002
+  },
+  {
     "id": "triggers:1203:rule:trigger:who",
     "context": "trigger",
     "parent_path": [

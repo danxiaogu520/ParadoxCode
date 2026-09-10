@@ -4209,3 +4209,27 @@ fn value_position_with_prefix_still_completes_values() {
         "a genuine value position with a typed prefix must keep completing values: {items:?}"
     );
 }
+
+#[test]
+fn export_to_variable_completes_numeric_trigger_value_references() {
+    let text = "trigger = {\n\tvariable_arithmetic_trigger = {\n\t\texport_to_variable = {\n\t\t\twhich = guards\n\t\t\tvalue = trigger_value:num_of_rev\n\t\t}\n\t\t}\n}\n";
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/common/events/test.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open");
+    let position = u32::try_from(text.find("num_of_rev").expect("prefix") + "num_of_rev".len())
+        .expect("completion position");
+    let completion = complete(&host.snapshot(), &id, position);
+    assert!(
+        completion
+            .items
+            .iter()
+            .any(|item| item.label == "trigger_value:num_of_revolutionary_guard"),
+        "typed-prefix value completion must offer numeric triggers: {:?}",
+        completion
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>()
+    );
+}

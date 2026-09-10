@@ -4455,3 +4455,116 @@ fn quoted_payload_under_rendered_key_validates_at_its_real_site() {
     );
     std::fs::remove_dir_all(root).expect("cleanup");
 }
+
+/// A single-document snapshot backed by the full first-party rule source, for tests that
+/// exercise shipped rule rows rather than fixtures.
+fn first_party_snapshot(text: &str) -> (AnalysisHost, DocumentId) {
+    let mut host = eu4_host(pdx_game::eu4::first_party_rules().expect("first-party rules"));
+    let id = DocumentId::new("file:///tmp/common/events/test.txt");
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open");
+    (host, id)
+}
+
+#[test]
+fn export_to_variable_accepts_numeric_and_boolean_trigger_value_references() {
+    // The issue-34 shape: `value = trigger_value:<trigger>` under `variable_arithmetic_trigger`.
+    // The whitelist enum keeps covering its 34 spellings; the typed-prefix rule additionally
+    // accepts any trigger alias with a numeric or boolean compare form (here: the int-only
+    // `num_of_revolutionary_guard`, the multi-form `land_forcelimit`, and the bare
+    // `modifier:` spelling, which stays open through the runtime-value prefix).
+    let (host, id) = first_party_snapshot(
+        "trigger = {
+	variable_arithmetic_trigger = {
+		export_to_variable = {
+			which = aet_guards
+			value = trigger_value:num_of_revolutionary_guard
+		}
+		export_to_variable = {
+			which = aet_limit
+			value = trigger_value:land_forcelimit
+		}
+		export_to_variable = {
+			which = aet_modifier
+			value = modifier:allowed_rev_guard_fraction
+		}
+	}
+}
+",
+    );
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue),
+        "trigger_value references to numeric triggers must validate: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn export_to_variable_rejects_non_numeric_trigger_value_references() {
+    let (host, id) = first_party_snapshot(
+        "trigger = {
+	variable_arithmetic_trigger = {
+		export_to_variable = {
+			which = guard_culture
+			value = trigger_value:primary_culture
+		}
+	}
+}
+",
+    );
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    let invalid = diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue)
+        .expect("token-returning triggers stay rejected under trigger_value:");
+    assert!(
+        invalid.message.contains("trigger_value:"),
+        "the message should name the accepted prefix spelling: {invalid:?}"
+    );
+}
+
+#[test]
+fn export_to_variable_rejects_unknown_trigger_value_references() {
+    let (host, id) = first_party_snapshot(
+        "trigger = {
+	variable_arithmetic_trigger = {
+		export_to_variable = {
+			which = guards
+			value = trigger_value:no_such_trigger
+		}
+	}
+}
+",
+    );
+    assert!(
+        diagnostics(&host.snapshot(), &id)
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue),
+        "unknown trigger names stay rejected under trigger_value:"
+    );
+}
+
+#[test]
+fn effect_context_export_to_variable_accepts_numeric_trigger_value_references() {
+    let (host, id) = first_party_snapshot(
+        "country_event = {
+	id = issue_34.1
+	immediate = {
+		export_to_variable = {
+			which = guard_count
+			value = trigger_value:num_of_revolutionary_guard
+		}
+	}
+}
+",
+    );
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::InvalidValue),
+        "effect-context export_to_variable must accept numeric trigger_value references: {diagnostics:?}"
+    );
+}

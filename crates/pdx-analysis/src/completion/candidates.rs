@@ -29,6 +29,7 @@ pub(crate) struct SemanticCompletionRule<'rule, 'path> {
 pub(crate) struct CompletionMemberCache {
     pub(crate) workspace: BTreeMap<(String, String), Vec<String>>,
     pub(crate) enums: BTreeMap<(String, String), Vec<String>>,
+    typed_prefixes: BTreeMap<String, Vec<String>>,
 }
 
 impl CompletionMemberCache {
@@ -71,6 +72,95 @@ impl CompletionMemberCache {
             self.enums.insert(cache_key.clone(), names);
         }
         self.enums.get(&cache_key).map_or(&[], Vec::as_slice)
+    }
+
+    /// Names resolvable by one typed-prefix matcher: top-level exact-key rules of `context`
+    /// whose own value matcher passes the operand filter.
+    fn typed_prefix_member_names(
+        &mut self,
+        snapshot: &AnalysisSnapshot,
+        context: &str,
+        operand: pdx_rules::TypedPrefixOperand,
+    ) -> &[String] {
+        let cache_key = format!(
+            "{}|{}",
+            context.to_ascii_lowercase(),
+            semantic_typed_prefix_operand_tag(operand)
+        );
+        if !self.typed_prefixes.contains_key(&cache_key) {
+            let rules = snapshot.rules();
+            let mut names: Vec<String> = rules
+                .semantic_rule_indices_for_context(context)
+                .filter_map(|index| rules.semantic_rule_at(index))
+                .filter(|rule| {
+                    rule.parent_path.is_empty()
+                        && matches!(rule.key, KeyMatcher::Exact(_))
+                        && typed_prefix_operand_allows(operand, &rule.value)
+                })
+                .filter_map(|rule| match &rule.key {
+                    KeyMatcher::Exact(name) => Some(name.clone()),
+                    _ => None,
+                })
+                .collect();
+            names.sort_by_key(|name| name.to_ascii_lowercase());
+            names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+            self.typed_prefixes.insert(cache_key.clone(), names);
+        }
+        self.typed_prefixes
+            .get(&cache_key)
+            .map_or(&[], Vec::as_slice)
+    }
+}
+
+/// Stable tag for one typed-prefix operand filter, used as a completion cache key fragment.
+fn semantic_typed_prefix_operand_tag(operand: pdx_rules::TypedPrefixOperand) -> &'static str {
+    match operand {
+        pdx_rules::TypedPrefixOperand::NumericOrBool => "numeric_or_bool",
+    }
+}
+
+/// Offers the `matcher_prefix<name>` spellings a typed-prefix matcher accepts, such as
+/// `trigger_value:<numeric trigger>`.
+#[expect(clippy::too_many_arguments)]
+fn add_typed_prefix_value_items(
+    snapshot: &AnalysisSnapshot,
+    member_cache: &mut CompletionMemberCache,
+    items: &mut Vec<RankedCompletionItem>,
+    matcher_prefix: &str,
+    context: &str,
+    operand: pdx_rules::TypedPrefixOperand,
+    documentation: Option<String>,
+    replacement_range: TextRange,
+    query_prefix: &str,
+    deprecated: bool,
+    schema_tier: CompletionSchemaTier,
+) {
+    for name in member_cache.typed_prefix_member_names(snapshot, context, operand) {
+        let label = format!("{matcher_prefix}{name}");
+        if !completion_matches(&label, query_prefix) {
+            continue;
+        }
+        push_completion(
+            items,
+            CompletionItem {
+                label: label.clone(),
+                kind: CompletionKind::Value,
+                detail: format!("{matcher_prefix}{context}"),
+                documentation: documentation.clone(),
+                replacement_range,
+                insert_text: label,
+                sort_score: 0,
+                deprecated,
+                resolve_data: None,
+            },
+            query_prefix,
+            CompletionRankContext::new(
+                schema_tier,
+                CompletionSpecificity::Value,
+                false,
+                deprecated,
+            ),
+        );
     }
 }
 
@@ -746,6 +836,23 @@ fn add_leaf_value_member_items(
                 );
             }
         }
+        ValueMatcher::TypedPrefix {
+            prefix: matcher_prefix,
+            context,
+            operand,
+        } => add_typed_prefix_value_items(
+            snapshot,
+            member_cache,
+            items,
+            matcher_prefix,
+            context,
+            *operand,
+            documentation.clone(),
+            replacement_range,
+            prefix,
+            rule.deprecated,
+            schema_tier,
+        ),
         ValueMatcher::Localisation => {
             for label in member_cache.workspace_member_names(snapshot, "localisation", prefix) {
                 add_localisation_value_completion_ranked(
@@ -941,6 +1048,23 @@ pub(crate) fn add_semantic_value_items(
                     );
                 }
             }
+            ValueMatcher::TypedPrefix {
+                prefix: matcher_prefix,
+                context,
+                operand,
+            } => add_typed_prefix_value_items(
+                snapshot,
+                member_cache,
+                items,
+                matcher_prefix,
+                context,
+                *operand,
+                documentation.clone(),
+                replacement_range,
+                prefix,
+                rule.deprecated,
+                candidate.schema_tier,
+            ),
             ValueMatcher::Scope(expected) => {
                 for (label, detail) in
                     scope_expression_candidates(snapshot, context, expected.as_deref())
@@ -1423,6 +1547,9 @@ fn add_inferred_matcher_items(
                 );
             }
         }
+        // Inferred matchers are synthesized from scripted usage sites, which never mint
+        // typed-prefix references; first-party rules reach them through the schema tiers above.
+        ValueMatcher::TypedPrefix { .. } => {}
         ValueMatcher::Scope(expected) => {
             for (label, detail) in
                 scope_expression_candidates(snapshot, context, expected.as_deref())

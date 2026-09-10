@@ -37544,6 +37544,42 @@
     "line": 4771
   },
   {
+    "id": "effects:fp1:rule:effect:value",
+    "context": "effect",
+    "parent_path": [
+      "export_to_variable"
+    ],
+    "key": {
+      "exact": "value"
+    },
+    "operator": "=",
+    "value": {
+      "typed_prefix": {
+        "prefix": "trigger_value:",
+        "context": "trigger",
+        "operand": "numeric_or_bool"
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "effects:14:alias:effect:export_to_variable",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Accepts `trigger_value:<trigger>` for any trigger that evaluates to a number; boolean triggers export 0 or 1."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 1,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 990001
+  },
+  {
     "id": "effects:800:alias:effect:hre_inheritable",
     "context": "effect",
     "parent_path": [],

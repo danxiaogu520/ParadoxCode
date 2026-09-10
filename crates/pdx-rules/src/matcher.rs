@@ -144,6 +144,15 @@ impl KeyMatcher {
     }
 }
 
+/// Operand shape accepted on the alias rows a typed-prefix reference resolves to.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TypedPrefixOperand {
+    /// The referenced alias rows must accept an int, float, or bool operand, such as
+    /// `trigger_value:<numeric trigger>`.
+    NumericOrBool,
+}
+
 /// A value matcher compiled from a first-party field declaration.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -177,6 +186,18 @@ pub enum ValueMatcher {
     Dynamic(String),
     /// Accepts any non-empty value while defining a dynamic value set.
     DynamicSet(String),
+    /// Accepts `prefix<name>` where `name` resolves to a top-level alias row of `context`
+    /// whose operand matches. The generic matcher below only checks the literal prefix and
+    /// a non-empty name; the alias resolution runs in the analysis layer, which owns the
+    /// compiled rule set.
+    TypedPrefix {
+        /// Literal prefix including its trailing colon.
+        prefix: String,
+        /// Rule context whose top-level alias rows resolve the name.
+        context: String,
+        /// Operand shapes accepted on the resolved alias rows.
+        operand: TypedPrefixOperand,
+    },
     /// Retains a semantic matcher that has not been implemented yet.
     Opaque(String),
 }
@@ -213,6 +234,14 @@ impl ValueMatcher {
             Self::Type(type_name) => type_members(type_name, value),
             Self::Enum(enum_name) => enum_members(enum_name, value),
             Self::Scope(scope) => scopes(scope.as_deref(), value),
+            // The typed-prefix alias resolution needs the compiled rule set; this generic
+            // path only rejects a missing prefix or an empty referenced name.
+            Self::TypedPrefix { prefix, .. } => {
+                value
+                    .get(..prefix.len())
+                    .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+                    && !value[prefix.len()..].is_empty()
+            }
             // The game falls back to rendering the raw spelling, so an empty string is valid.
             Self::Localisation => true,
             Self::Filepath | Self::Dynamic(_) | Self::DynamicSet(_) => !value.is_empty(),

@@ -1,6 +1,6 @@
 use crate::CURRENT_SCHEMA_VERSION;
 use crate::GameProfile;
-use crate::matcher::{FileMatcher, KeyMatcher, ValueMatcher};
+use crate::matcher::{FileMatcher, KeyMatcher, TypedPrefixOperand, ValueMatcher};
 use crate::model::{
     DynamicDefinitionDescriptor, DynamicDefinitionUsage, FileCategory, FileResolutionPolicy,
     LocalisationBinding, LocalisationBindingCondition, ParserKind, RuleRecord, RuleShape,
@@ -445,6 +445,21 @@ fn semantic_value_columns(
         ValueMatcher::Filepath => ("filepath", None, None, None),
         ValueMatcher::Dynamic(value) => ("dynamic", Some(value), None, None),
         ValueMatcher::DynamicSet(value) => ("dynamic-set", Some(value), None, None),
+        // Typed-prefix matchers pack their three fields into the generic text columns:
+        // `value_arg` carries the literal prefix, `value_min` the context, `value_max` the
+        // operand tag.
+        ValueMatcher::TypedPrefix {
+            prefix,
+            context,
+            operand,
+        } => match operand {
+            TypedPrefixOperand::NumericOrBool => (
+                "typed-prefix",
+                Some(prefix.as_str()),
+                Some(context.to_string()),
+                Some("numeric_or_bool".to_owned()),
+            ),
+        },
         ValueMatcher::Opaque(value) => ("opaque", Some(value), None, None),
     }
 }
@@ -898,6 +913,16 @@ fn decode_semantic_value(
         "filepath" => ValueMatcher::Filepath,
         "dynamic" => ValueMatcher::Dynamic(arg.unwrap_or_default().to_owned()),
         "dynamic-set" => ValueMatcher::DynamicSet(arg.unwrap_or_default().to_owned()),
+        "typed-prefix" => ValueMatcher::TypedPrefix {
+            prefix: arg.unwrap_or_default().to_owned(),
+            context: min.unwrap_or_default().to_owned(),
+            operand: match max {
+                Some("numeric_or_bool") | None => TypedPrefixOperand::NumericOrBool,
+                Some(other) => {
+                    return Err(RulesError::InvalidRuleShape(other.to_owned()));
+                }
+            },
+        },
         "opaque" => ValueMatcher::Opaque(arg.unwrap_or_default().to_owned()),
         other => return Err(RulesError::InvalidRuleShape(other.to_owned())),
     })

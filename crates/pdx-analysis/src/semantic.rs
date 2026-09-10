@@ -1078,6 +1078,11 @@ pub(crate) fn semantic_matcher_accepts(
     match matcher {
         ValueMatcher::Dynamic(kind) => semantic_dynamic_value_matches(snapshot, kind, value, scope),
         ValueMatcher::DynamicSet(_) => !value.is_empty(),
+        ValueMatcher::TypedPrefix {
+            prefix,
+            context,
+            operand,
+        } => typed_prefix_value_matches(snapshot, prefix, context, *operand, value),
         matcher => matcher.matches(
             value,
             |type_name, member| workspace_member(snapshot, type_name, member),
@@ -1104,6 +1109,7 @@ pub(crate) fn semantic_value_matcher_label(matcher: &ValueMatcher) -> String {
         ValueMatcher::Filepath => "filepath".to_owned(),
         ValueMatcher::Dynamic(value) => format!("value[{value}]"),
         ValueMatcher::DynamicSet(value) => format!("value_set[{value}]"),
+        ValueMatcher::TypedPrefix { prefix, .. } => format!("prefix[{prefix}]"),
         ValueMatcher::Opaque(value) => value.clone(),
     }
 }
@@ -1715,6 +1721,14 @@ pub(crate) fn semantic_property_matches(
     if let ValueMatcher::DynamicSet(_) = &rule.value {
         return !value.is_empty();
     }
+    if let ValueMatcher::TypedPrefix {
+        prefix,
+        context,
+        operand,
+    } = &rule.value
+    {
+        return typed_prefix_value_matches(snapshot, prefix, context, *operand, value);
+    }
     rule.value.matches(
         value,
         |type_name, member| workspace_member(snapshot, type_name, member),
@@ -1732,6 +1746,54 @@ pub(crate) fn semantic_property_matches(
                 resolve_scope_member(snapshot, value, scope_context),
                 ScopeResolution::Dynamic | ScopeResolution::Unresolved
             ))
+}
+
+/// Resolves a typed-prefix reference such as `trigger_value:<trigger>` against the top-level
+/// alias rows of one rule context.
+///
+/// The engine evaluates the referenced trigger at runtime, so acceptance is open within the
+/// documented operand family: any alias row whose own value matcher accepts a numeric or
+/// boolean operand satisfies the reference. Rows with enum, scope, or block operands name
+/// token-returning triggers whose exported value is meaningless, and stay rejected.
+pub(crate) fn typed_prefix_value_matches(
+    snapshot: &AnalysisSnapshot,
+    prefix: &str,
+    context: &str,
+    operand: pdx_rules::TypedPrefixOperand,
+    value: &str,
+) -> bool {
+    let Some(name) = value
+        .get(..prefix.len())
+        .filter(|head| head.eq_ignore_ascii_case(prefix))
+        .map(|_| &value[prefix.len()..])
+    else {
+        return false;
+    };
+    if name.is_empty() {
+        return false;
+    }
+    let rules = snapshot.rules();
+    rules
+        .semantic_exact_rules_for_context_key(context, name)
+        .filter_map(|index| rules.semantic_rule_at(index))
+        .any(|rule| {
+            rule.parent_path.is_empty() && typed_prefix_operand_allows(operand, &rule.value)
+        })
+}
+
+/// Returns whether one alias-row operand satisfies a typed-prefix operand filter.
+pub(crate) fn typed_prefix_operand_allows(
+    operand: pdx_rules::TypedPrefixOperand,
+    matcher: &ValueMatcher,
+) -> bool {
+    match operand {
+        pdx_rules::TypedPrefixOperand::NumericOrBool => {
+            matches!(
+                matcher,
+                ValueMatcher::Int { .. } | ValueMatcher::Float { .. } | ValueMatcher::Bool
+            )
+        }
+    }
 }
 
 /// Classification used by diagnostics when a rule's value matcher is scope-based.

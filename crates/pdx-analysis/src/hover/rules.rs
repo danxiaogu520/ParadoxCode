@@ -467,6 +467,11 @@ pub(crate) fn semantic_value_hover_label(matcher: &ValueMatcher) -> String {
         ValueMatcher::Filepath => "filepath".to_owned(),
         ValueMatcher::Dynamic(value) => format!("dynamic value `{value}`"),
         ValueMatcher::DynamicSet(value) => format!("dynamic value set `{value}`"),
+        ValueMatcher::TypedPrefix {
+            prefix, context, ..
+        } => {
+            format!("`{prefix}` + numeric or bool `{context}`")
+        }
         ValueMatcher::Opaque(value) => format!("opaque `{value}`"),
     }
 }
