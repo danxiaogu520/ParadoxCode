@@ -63,13 +63,7 @@ pub(super) fn lower_scope_facts(
             .semantic
             .type_descriptors
             .get(type_name)
-            .is_some_and(|descriptor| {
-                descriptor.skip_root_paths.iter().any(|path| {
-                    path.first().is_some_and(|key| {
-                        key.eq_ignore_ascii_case("any") || key.eq_ignore_ascii_case(&property.key)
-                    })
-                })
-            });
+            .is_some_and(|descriptor| descriptor.skips_root_key(&property.key));
         if !skip_root {
             // Definition-style types may declare a wrapper rule for the entry key
             // itself (e.g. `root:luck`'s any_scalar country blocks whose bodies are
@@ -129,16 +123,19 @@ pub(crate) fn property_children(properties: &[HirProperty]) -> Vec<Vec<usize>> {
 /// The path and shape filters do not depend on the property being visited,
 /// so they run once per distinct pair instead of once per property; effect
 /// and trigger contexts carry nearly two thousand rules each.
+///
+/// `profile` supplies the context expansion (self, `root:{type}`, inherited
+/// contexts); `None` keeps the pre-inheritance lookup (self plus `root:{type}`)
+/// for synthetic tests without a profile.
 fn transition_candidates<'rule>(
     rules: &'rule RuleSet,
+    profile: Option<&GameProfile>,
     context: &str,
     parent_path: &[String],
 ) -> Vec<&'rule SemanticRule> {
-    let root_context = context
-        .strip_prefix("type:")
-        .map(|type_name| format!("root:{type_name}"));
+    let lookup_contexts = rule_lookup_contexts(profile, context);
     let mut candidates = Vec::new();
-    for lookup_context in std::iter::once(context).chain(root_context.as_deref()) {
+    for lookup_context in &lookup_contexts {
         for rule in rules.semantic_rules_for_context(lookup_context) {
             if paths_equal(&rule.parent_path, parent_path)
                 && matches!(rule.shape, RuleShape::Node | RuleShape::ValueClause)
@@ -148,6 +145,24 @@ fn transition_candidates<'rule>(
         }
     }
     candidates
+}
+
+/// Every rule context whose rules govern `context` for container lookups.
+///
+/// Production lowering passes the profile so inherited contexts merge exactly like
+/// the analysis-layer `ContextRuleView`; without one the pre-inheritance pair
+/// (context plus its `root:{type}` sibling) applies.
+fn rule_lookup_contexts(profile: Option<&GameProfile>, context: &str) -> Vec<String> {
+    match profile {
+        Some(profile) => profile.expanded_rule_contexts(context),
+        None => {
+            let mut contexts = vec![context.to_owned()];
+            if let Some(type_name) = context.strip_prefix("type:") {
+                contexts.push(format!("root:{type_name}"));
+            }
+            contexts
+        }
+    }
 }
 
 /// Matcher-classified transition rules for one (context, parent path).
@@ -302,7 +317,7 @@ impl<'a> ScopeFactLowering<'a> {
         }
         let buckets = std::rc::Rc::new(TransitionBuckets::build(
             self.rules,
-            transition_candidates(self.rules, context, parent_path),
+            transition_candidates(self.rules, Some(self.profile), context, parent_path),
         ));
         self.transition_buckets.insert(
             (context.to_owned(), parent_path.to_vec()),
@@ -334,6 +349,7 @@ impl<'a> ScopeFactLowering<'a> {
                 properties,
                 property_children,
                 rules,
+                profile,
                 child_matches,
                 ..
             } = self;
@@ -343,6 +359,7 @@ impl<'a> ScopeFactLowering<'a> {
                 property_children,
                 parent_index,
                 rules,
+                Some(profile),
                 context,
                 &[],
                 false,
@@ -423,6 +440,7 @@ impl<'a> ScopeFactLowering<'a> {
                     property_children,
                     property_index,
                     rules,
+                    Some(profile),
                     context,
                     parent_path,
                     transparent,
@@ -457,16 +475,18 @@ struct ChildMatchBuckets<'rule> {
 }
 
 impl<'rule> ChildMatchBuckets<'rule> {
-    fn build(rules: &'rule RuleSet, context: &str, parent_path: &[String]) -> Self {
-        let root_context = context
-            .strip_prefix("type:")
-            .map(|type_name| format!("root:{type_name}"));
+    fn build(
+        rules: &'rule RuleSet,
+        profile: Option<&GameProfile>,
+        context: &str,
+        parent_path: &[String],
+    ) -> Self {
         let mut exact = rustc_hash::FxHashSet::default();
         let mut enum_members = Vec::new();
         let mut any_scalar = false;
         let mut date = Vec::new();
         let mut dynamic = false;
-        for lookup_context in std::iter::once(context).chain(root_context.as_deref()) {
+        for lookup_context in &rule_lookup_contexts(profile, context) {
             for rule in rules
                 .semantic_rules_for_context(lookup_context)
                 .filter(|rule| {
@@ -539,13 +559,19 @@ type ChildMatchMemo<'rule> =
 fn child_match_buckets_for<'rule>(
     memo: &mut ChildMatchMemo<'rule>,
     rules: &'rule RuleSet,
+    profile: Option<&GameProfile>,
     context: &str,
     parent_path: &[String],
 ) -> std::rc::Rc<ChildMatchBuckets<'rule>> {
     if let Some(buckets) = memo.get(&(context.to_owned(), parent_path.to_vec())) {
         return std::rc::Rc::clone(buckets);
     }
-    let buckets = std::rc::Rc::new(ChildMatchBuckets::build(rules, context, parent_path));
+    let buckets = std::rc::Rc::new(ChildMatchBuckets::build(
+        rules,
+        profile,
+        context,
+        parent_path,
+    ));
     memo.insert(
         (context.to_owned(), parent_path.to_vec()),
         std::rc::Rc::clone(&buckets),
@@ -576,6 +602,7 @@ pub(crate) fn statically_selected_transition<'rule>(
         input.property_children,
         input.property_index,
         input.rules,
+        None,
         input.context,
         input.parent_path,
         input.transparent,
@@ -595,6 +622,7 @@ fn statically_selected_transition_with_memo<'rule>(
     property_children: &[Vec<usize>],
     property_index: usize,
     rules: &'rule RuleSet,
+    profile: Option<&GameProfile>,
     context: &str,
     parent_path: &[String],
     transparent: bool,
@@ -612,7 +640,8 @@ fn statically_selected_transition_with_memo<'rule>(
     'candidates: for candidate in matching.iter().copied() {
         let (child_context, child_path) =
             transition_destination(candidate, context, parent_path, &property.key, transparent);
-        let buckets = child_match_buckets_for(child_matches, rules, &child_context, &child_path);
+        let buckets =
+            child_match_buckets_for(child_matches, rules, profile, &child_context, &child_path);
         for &child_index in children {
             let key = &properties[child_index].key;
             if !buckets.may_match(key, &key.to_ascii_lowercase()) {

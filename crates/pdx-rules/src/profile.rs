@@ -607,6 +607,34 @@ impl GameProfile {
             .map_or(&[], |(_, inherited)| inherited.as_slice())
     }
 
+    /// Returns every rule context whose rules govern `context`: the context itself, its
+    /// `root:{type}` sibling for type contexts, and every directly or transitively
+    /// inherited context.
+    ///
+    /// This is the single expansion shared by analysis rule views, HIR lowering lookups,
+    /// and reference typing. Order is deterministic (self first, then breadth-first),
+    /// and duplicates fold case-insensitively.
+    #[must_use]
+    pub fn expanded_rule_contexts(&self, context: &str) -> Vec<String> {
+        let mut contexts = vec![context.to_owned()];
+        if let Some(type_name) = context.strip_prefix("type:") {
+            contexts.push(format!("root:{type_name}"));
+        }
+        let mut index = 0;
+        while let Some(candidate) = contexts.get(index).cloned() {
+            for inherited in self.inherited_semantic_contexts(&candidate) {
+                if !contexts
+                    .iter()
+                    .any(|known| known.eq_ignore_ascii_case(inherited))
+                {
+                    contexts.push(inherited.clone());
+                }
+            }
+            index += 1;
+        }
+        contexts
+    }
+
     /// Returns root-entry completion metadata using case-insensitive context matching.
     #[must_use]
     pub fn root_entry_spec(&self, context: &str) -> Option<&ProfileRootEntrySpec> {

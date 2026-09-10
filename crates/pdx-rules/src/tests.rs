@@ -326,6 +326,33 @@ fn type_root_scope_lookup_is_case_insensitive() {
 }
 
 #[test]
+fn type_root_scope_lookup_falls_back_to_wildcard_entry() {
+    let mut model = RulesModel::default();
+    model.semantic.type_root_scopes.insert(
+        "country_history".to_owned(),
+        BTreeMap::from([(
+            "*".to_owned(),
+            TypeRootScope {
+                root: "country".to_owned(),
+                this: "country".to_owned(),
+                from: "any".to_owned(),
+                documentation: Vec::new(),
+            },
+        )]),
+    );
+    let rules = RuleSet::from_model(model);
+    // History root keys are arbitrary field or wrapper keys, so the type's
+    // `*` registers must serve any unmatched key.
+    for key in ["if", "FRA", "government"] {
+        assert_eq!(
+            rules.type_root_scope("country_history", key),
+            Some("country"),
+            "key {key} should resolve through the wildcard registers"
+        );
+    }
+}
+
+#[test]
 fn type_root_scope_registers_apply_legacy_and_structured_defaults() {
     let legacy: TypeRootScope = serde_json::from_str("\"country\"").expect("legacy scope");
     assert_eq!(
