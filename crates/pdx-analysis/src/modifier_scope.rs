@@ -3,18 +3,18 @@
 //! Some effects apply a workspace definition — for EU4, `add_country_modifier`
 //! and `add_province_modifier` apply an `event_modifier` — and every attribute
 //! inside that definition's body is itself scope-attributed by the semantic
-//! rules. Modifier attributes partition into exactly three mutually exclusive
-//! classes — country, province, and unit — with no unattributed class among
-//! known keys. This check reads the effect's own rule scope, the typed `name`
-//! child rule, the retained attribute keys of the referenced definition, and
-//! the attribute scope rows, entirely from rule data, and reports cross-class
-//! applications on the `name` value:
+//! rules. Modifier attributes partition into exactly two mutually exclusive
+//! classes — country and province — with no unattributed class among known
+//! keys. (The historical unit class was folded into country: unit-class
+//! attributes were always accepted silently in country applications, so the
+//! distinction carried no signal.) This check reads the effect's own rule
+//! scope, the typed `name` child rule, the retained attribute keys of the
+//! referenced definition, and the attribute scope rows, entirely from rule
+//! data, and reports cross-class applications on the `name` value:
 //!
-//! - a country application accepts unit-class attributes silently (the game
-//!   propagates them to the country's units) and reports province-class ones;
+//! - a country application reports province-class attributes;
 //! - a province application accepts country-class attributes — reported at
-//!   information severity — and reports unit-class ones;
-//! - a unit application accepts only unit-class attributes.
+//!   information severity.
 //!
 //! Every report is information severity: the game still loads cross-class
 //! applications, so the message records the class mismatch instead of
@@ -134,12 +134,11 @@ fn report_application(
     else {
         return;
     };
-    let (mut country, mut province, mut unit) = (Vec::new(), Vec::new(), Vec::new());
+    let (mut country, mut province) = (Vec::new(), Vec::new());
     for key in &attribute_keys {
         match attribute_scope(snapshot, &attribute_context, key) {
             AttributeScope::Country => country.push(key.clone()),
             AttributeScope::Province => province.push(key.clone()),
-            AttributeScope::Unit => unit.push(key.clone()),
             AttributeScope::Other | AttributeScope::Unknown => {}
         }
     }
@@ -163,13 +162,8 @@ fn report_application(
     match application.as_str() {
         "province" => {
             report("country", &country, true);
-            report("unit", &unit, false);
         }
         "country" => {
-            report("province", &province, false);
-        }
-        "unit" => {
-            report("country", &country, false);
             report("province", &province, false);
         }
         _ => {}
@@ -282,7 +276,6 @@ fn definition_attribute_keys(
 enum AttributeScope {
     Country,
     Province,
-    Unit,
     Other,
     Unknown,
 }
@@ -305,8 +298,6 @@ fn attribute_scope(snapshot: &AnalysisSnapshot, context: &str, key: &str) -> Att
         AttributeScope::Country
     } else if scope.eq_ignore_ascii_case("province") {
         AttributeScope::Province
-    } else if scope.eq_ignore_ascii_case("unit") {
-        AttributeScope::Unit
     } else {
         AttributeScope::Other
     }

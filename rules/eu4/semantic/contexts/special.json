@@ -2374,9 +2374,9 @@
     ],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": 0,
     "strict_min": true,
-    "max_occurs": 1,
+    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 5634
   },

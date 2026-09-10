@@ -831,7 +831,7 @@
     "shape": "node",
     "child_context": null,
     "alternative_id": null,
-    "severity": 3,
+    "severity": null,
     "required": false,
     "documentation": [
       "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks."
@@ -843,9 +843,37 @@
     "replace_scope": [],
     "min_occurs": 0,
     "strict_min": true,
-    "max_occurs": 0,
+    "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5022
+  },
+  {
+    "id": "events/events:52:rule:root:event:mean_time_to_happen",
+    "context": "root:event",
+    "parent_path": [],
+    "key": {
+      "exact": "mean_time_to_happen"
+    },
+    "operator": "=",
+    "value": "any_scalar",
+    "shape": "node",
+    "child_context": "modifier_rule",
+    "alternative_id": null,
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks."
+    ],
+    "allowed_scopes": [
+      "any"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "semantic-rules.json",
+    "line": 5025
   },
   {
     "id": "events/events:49:rule:root:event:fire_only_once",
@@ -909,34 +937,6 @@
     "line": 5024
   },
   {
-    "id": "events/events:52:rule:root:event:mean_time_to_happen",
-    "context": "root:event",
-    "parent_path": [],
-    "key": {
-      "exact": "mean_time_to_happen"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "node",
-    "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [
-      "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks."
-    ],
-    "allowed_scopes": [
-      "any"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": null,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5025
-  },
-  {
     "id": "events/events:54:rule:root:event:enum[days_months_years]",
     "context": "root:event",
     "parent_path": [
@@ -965,34 +965,6 @@
     "max_occurs": 1,
     "source_file": "semantic-rules.json",
     "line": 5026
-  },
-  {
-    "id": "events/events:56:rule:root:event:mean_time_to_happen",
-    "context": "root:event",
-    "parent_path": [],
-    "key": {
-      "exact": "mean_time_to_happen"
-    },
-    "operator": "=",
-    "value": "any_scalar",
-    "shape": "node",
-    "child_context": "modifier_rule",
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [
-      "How frequently the event fires when triggers are met; the base is defined in days or months and adjusted by modifier blocks."
-    ],
-    "allowed_scopes": [
-      "any"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5027
   },
   {
     "id": "events/events:58:rule:root:event:is_mtth_scaled_to_size",

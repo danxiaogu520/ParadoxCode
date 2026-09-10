@@ -110570,7 +110570,7 @@
       "source_order": 12242,
       "fields": {
         "directives": "cardinality = 0..1",
-        "key": "discounted",
+        "key": "is_discounted",
         "line": "876",
         "operator": "=",
         "shape": "scalar",

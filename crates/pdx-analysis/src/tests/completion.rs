@@ -1239,7 +1239,7 @@ fn decision_wrapper_body_without_instance_offers_no_key_candidates() {
 }
 
 #[test]
-fn empty_ambiguous_block_completion_unions_possible_rule_destinations() {
+fn empty_mtth_block_completion_unions_scalar_and_alias_destinations() {
     let text = concat!(
         "country_event = {\n",
         "  mean_time_to_happen = {\n",
@@ -1258,12 +1258,16 @@ fn empty_ambiguous_block_completion_unions_possible_rule_destinations() {
         .saturating_add(4);
     let context = semantic_completion_context(&snapshot, &input, position)
         .expect("semantic completion context");
+    // The mean_time_to_happen duplicate was removed, but the dual destination
+    // is intentional: scalars arrive via the root:event path and `modifier`
+    // via the modifier_rule alias branch.
     assert!(
         context
             .alternative_containers
             .iter()
             .any(|container| container.context == "modifier_rule"),
-        "the conflicting modifier destination must remain available"
+        "the modifier_rule alias destination must remain available: {:?}",
+        context.alternative_containers
     );
     let completion = complete(&snapshot, &id, position);
     assert!(completion.items.iter().any(|item| item.label == "days"));

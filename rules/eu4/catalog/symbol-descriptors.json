@@ -1256,11 +1256,6 @@
       "case_sensitive": false
     },
     {
-      "kind_id": "effect:add_tribal_allegiance",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
       "kind_id": "effect:add_truce_with",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
@@ -5046,7 +5041,7 @@
       "case_sensitive": false
     },
     {
-      "kind_id": "modifier:galley_hullsize",
+      "kind_id": "modifier:galley_hull_size_modifier",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },
@@ -5226,7 +5221,7 @@
       "case_sensitive": false
     },
     {
-      "kind_id": "modifier:heavy_ship_hull_size",
+      "kind_id": "modifier:heavy_ship_hull_size_modifier",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },
@@ -5436,7 +5431,7 @@
       "case_sensitive": false
     },
     {
-      "kind_id": "modifier:light_ship_hull_size",
+      "kind_id": "modifier:light_ship_hull_size_modifier",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },
@@ -5786,7 +5781,7 @@
       "case_sensitive": false
     },
     {
-      "kind_id": "modifier:may_convert_territories",
+      "kind_id": "modifier:may_not_convert_territories",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },
@@ -6316,7 +6311,7 @@
       "case_sensitive": false
     },
     {
-      "kind_id": "modifier:transport_hullsize",
+      "kind_id": "modifier:transport_hull_size_modifier",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },
@@ -8372,11 +8367,6 @@
     },
     {
       "kind_id": "trigger:active_imperial_incident",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
-      "kind_id": "trigger:active_major_mission",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },
@@ -12041,7 +12031,7 @@
       "case_sensitive": false
     },
     {
-      "kind_id": "trigger:num_of_musketeer",
+      "kind_id": "trigger:num_of_musketeers",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },
@@ -12087,11 +12077,6 @@
     },
     {
       "kind_id": "trigger:num_of_powerful_estates",
-      "resolution": "replace-by-symbol",
-      "case_sensitive": false
-    },
-    {
-      "kind_id": "trigger:num_of_protectorates",
       "resolution": "replace-by-symbol",
       "case_sensitive": false
     },
