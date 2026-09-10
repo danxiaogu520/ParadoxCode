@@ -7,6 +7,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Four vanilla constructs recorded in the patchnotes' Usermodding sections now
+  validate: the `militarized_society` trigger (int, country) used by 12 vanilla
+  files, the `add_militarised_society` (float, country) and `back_current_issue`
+  (bool, province) effects, and the 1.37 state-edict on_action hooks
+  `on_state_edict_enacted`/`on_state_edict_revoked` (root-keys 256→258 with
+  root=province, from=country scope registers). The revoked hook uses the
+  vanilla name; the patchnote's `on_state_edict_removed` spelling is not
+  shipped. Vanilla diagnostics are unchanged (1320/48/1063).
+
+### Changed
+
+- The `government_attributes` enum (132 hardcoded entries) is gone, replaced by
+  a TypeDescriptor that harvests `custom_attributes = {}` children from
+  `common/government_reforms`. EU4's government attributes are defined where
+  they are consumed, so workspace definitions now drive both completion and
+  enum validation for `has_government_attribute`/`has_government_attribute_short_desc`
+  — mods see exactly the attributes they (or vanilla: 149 distinct keys)
+  define. The 52 wiki-only spellings that vanilla never defines leave
+  completion; legacy flat reform flags keep passing through the any_scalar
+  row. Vanilla diagnostics are unchanged (1320/48/1063, per-diagnostic diff
+  empty).
+
 ### Fixed
 
 - `export_to_variable = { value = trigger_value:<trigger> }` no longer flags every

@@ -41693,6 +41693,51 @@
         "source_file": "catalog.json",
         "value": "enum[country_tags]"
       }
+    },
+    {
+      "table": "aliases",
+      "logical_id": "triggers:root:1350",
+      "source_order": 13683,
+      "fields": {
+        "directives": "scope = country",
+        "documentation": "Returns true if the country has at least X militarization of society.",
+        "key": "alias[trigger:militarized_society]",
+        "line": "5907",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "int"
+      }
+    },
+    {
+      "table": "aliases",
+      "logical_id": "effects:root:779",
+      "source_order": 13684,
+      "fields": {
+        "directives": "scope = country",
+        "documentation": "Adds militarization of society to the current scope. Can also subtract. No effect if the government does not use the Prussian monarchy militarization mechanic.",
+        "key": "alias[effect:add_militarised_society]",
+        "line": "4448",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "float"
+      }
+    },
+    {
+      "table": "aliases",
+      "logical_id": "effects:root:780",
+      "source_order": 13685,
+      "fields": {
+        "directives": "scope = province",
+        "documentation": "Backs or blocks the current issue in Parliament, if the current province scope has a seat. No effect if the owner of the province does not have a government using has_parliament.",
+        "key": "alias[effect:back_current_issue]",
+        "line": "4449",
+        "operator": "=",
+        "shape": "scalar",
+        "source_file": "catalog.json",
+        "value": "bool"
+      }
     }
   ]
 }

@@ -649,6 +649,24 @@
     "starts_with": null,
     "type_key_filter": null
   },
+  "government_attributes": {
+    "name": "government_attributes",
+    "path": "game/common/government_reforms",
+    "path_file": null,
+    "path_extension": null,
+    "path_strict": false,
+    "type_per_file": false,
+    "skip_root_paths": [
+      [
+        "any",
+        "custom_attributes"
+      ]
+    ],
+    "name_field": null,
+    "name_from_file": false,
+    "starts_with": null,
+    "type_key_filter": null
+  },
   "government_mechanic_interaction": {
     "name": "government_mechanic_interaction",
     "path": "game/common/government_mechanics",

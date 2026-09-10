@@ -744,6 +744,20 @@
     },
     "on_slacken_start": "country",
     "on_slacken_stop": "country",
+    "on_state_edict_enacted": {
+      "root": "province",
+      "from": "country",
+      "documentation": [
+        "ROOT is a province of the state where the edict was enacted; FROM is the country that enacted it."
+      ]
+    },
+    "on_state_edict_revoked": {
+      "root": "province",
+      "from": "country",
+      "documentation": [
+        "ROOT is a province of the state where the edict was revoked; FROM is the country that revoked it."
+      ]
+    },
     "on_startup": {
       "root": "country",
       "documentation": ["ROOT is the country. Prefer a scripted effect for complex startup logic so the on_action remains easy to overview."]

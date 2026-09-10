@@ -260,6 +260,8 @@
     "on_slacken_start",
     "on_slacken_stop",
     "on_startup",
+    "on_state_edict_enacted",
+    "on_state_edict_revoked",
     "on_streltsy_raised",
     "on_successive_emperor",
     "on_tech_taken",
