@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/pdx-codec",
     "crates/pdx-text",
     "crates/pdx-parser",
     "crates/pdx-rules",
