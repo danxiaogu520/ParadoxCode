@@ -973,6 +973,9 @@
     "test:contract": "npm run compile && node scripts/codec-ts-test.mjs && node scripts/extension-contract.mjs && node scripts/package-contract.mjs",
     "test:package": "vsce package --out ../../target/paradoxcode-vscode-contract.vsix",
     "test:host": "npm run compile && node scripts/host-test.mjs",
+    "diagnose": "node scripts/diagnose-current-mod.mjs",
+    "perf:lsp": "node scripts/performance/lsp-e2e.mjs",
+    "perf:compare": "node scripts/performance/head-to-head.mjs",
     "package": "npm run compile && vsce package"
   },
   "dependencies": {

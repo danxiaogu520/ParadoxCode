@@ -253,7 +253,7 @@ script below. It opens each relevant file through the real `pdc` transport and w
 JSON and Markdown reports under `diagnostic-reports/`:
 
 ```bash
-node scripts/diagnose-current-mod.mjs \
+node editors/vscode/scripts/diagnose-current-mod.mjs \
   --mod /path/to/current-mod \
   --vanilla-cache /path/to/vanilla.pdcindex
 ```

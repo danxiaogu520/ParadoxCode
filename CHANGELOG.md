@@ -48,6 +48,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   are inlined into CI and `node scripts/diagnose-current-mod.mjs` respectively; the one-off
   `scripts/audit-quoted-scripts.mjs` is deleted (its capability ships in the analyzer). The
   `flag-audit` rule-data bin is now documented alongside `bake`.
+- The Node dev-tooling scripts move under `editors/vscode/scripts/` so the repository keeps a
+  single Node home (rust-analyzer keeps its TypeScript under `editors/code`):
+  `diagnose-current-mod.mjs`, `lib/`, and `performance/` relocate unchanged in behavior, gain
+  `npm run diagnose` / `perf:lsp` / `perf:compare` entries, and stay outside the packaged VSIX
+  via the existing `files` allowlist. The top-level `scripts/` directory is gone.
 
 ### Removed
 
