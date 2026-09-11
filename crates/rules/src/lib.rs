@@ -14,7 +14,7 @@ mod runtime;
 mod sqlite;
 
 pub use canonical::RuleHash;
-pub use matcher::{FileMatcher, KeyMatcher, TypedPrefixOperand, ValueMatcher};
+pub use matcher::{FileMatcher, KeyMatcher, TemplateParameter, TypedPrefixOperand, ValueMatcher};
 pub use model::{
     DynamicDefinitionDescriptor, DynamicDefinitionUsage, FileCategory, FileResolutionPolicy,
     LocalisationBinding, LocalisationBindingCondition, ParserKind, RuleRecord, RuleShape,
@@ -31,7 +31,7 @@ pub use profile::{
 pub use runtime::{RuleSet, RulesError};
 
 /// The first runtime schema version reserved for the generated rule database.
-pub const CURRENT_SCHEMA_VERSION: u32 = 25;
+pub const CURRENT_SCHEMA_VERSION: u32 = 26;
 
 #[cfg(test)]
 mod tests;

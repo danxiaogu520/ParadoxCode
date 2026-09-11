@@ -604,6 +604,64 @@ pub fn compile(
     Ok(artifact_manifest)
 }
 
+/// Validates one rule's key matcher against source invariants.
+///
+/// Exact keys must not contain `<...>` placeholder spellings: those describe a
+/// parameterized family, which only a `template` matcher can express — an exact
+/// placeholder never matches a real key. Template parameters must resolve
+/// through exactly one member domain, and a stripped prefix must be non-empty.
+fn validate_key_matcher(rule: &crate::SemanticRule) -> Result<(), CompileError> {
+    match &rule.key {
+        crate::KeyMatcher::Exact(key) => {
+            if key.contains('<') || key.contains('>') {
+                return Err(CompileError::Validation(format!(
+                    "semantic rule {} declares an exact key `{}` containing a `<...>` placeholder; declare a template matcher for parameterized key families",
+                    rule.id, key
+                )));
+            }
+        }
+        crate::KeyMatcher::Template {
+            prefix,
+            parameter,
+            suffix,
+        } => {
+            match (&parameter.type_name, &parameter.enum_name) {
+                (Some(_), Some(_)) => {
+                    return Err(CompileError::Validation(format!(
+                        "semantic rule {} declares a template parameter with both a type and an enum domain",
+                        rule.id
+                    )));
+                }
+                (None, None) => {
+                    return Err(CompileError::Validation(format!(
+                        "semantic rule {} declares a template parameter without a type or enum domain",
+                        rule.id
+                    )));
+                }
+                _ => {}
+            }
+            if prefix.is_empty() && suffix.is_empty() {
+                return Err(CompileError::Validation(format!(
+                    "semantic rule {} declares a template matcher without a prefix or suffix; use a type or enum matcher instead",
+                    rule.id
+                )));
+            }
+            if parameter
+                .strip_prefix
+                .as_deref()
+                .is_some_and(|prefix| prefix.is_empty())
+            {
+                return Err(CompileError::Validation(format!(
+                    "semantic rule {} declares a template parameter with an empty strip prefix",
+                    rule.id
+                )));
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
     if !model.profile.game_id.trim().is_empty() && model.profile.game_id != model.game_id {
         return Err(CompileError::Validation(format!(
@@ -633,6 +691,7 @@ fn validate_model(model: &RulesModel) -> Result<(), CompileError> {
                 rule.id
             )));
         }
+        validate_key_matcher(rule)?;
         if rule
             .severity
             .is_some_and(|severity| !(1..=3).contains(&severity))
@@ -1114,6 +1173,118 @@ mod tests {
         assert!(validate_model(&model).is_err());
     }
 
+    fn validated_rule(key: KeyMatcher) -> RulesModel {
+        let rule = SemanticRule {
+            id: "template-probe".to_owned(),
+            context: "modifier".to_owned(),
+            parent_path: Vec::new(),
+            key,
+            operator: None,
+            value: ValueMatcher::AnyScalar,
+            shape: RuleShape::Leaf,
+            child_context: None,
+            alternative_id: None,
+            severity: None,
+            required: false,
+            deprecated: false,
+            documentation: Vec::new(),
+            allowed_scopes: Vec::new(),
+            push_scope: None,
+            replace_scope: Vec::new(),
+            min_occurs: None,
+            strict_min: false,
+            max_occurs: None,
+            source_file: "semantic-rules.json".to_owned(),
+            line: 1,
+        };
+        let mut model = RulesModel {
+            game_id: "eu4".to_owned(),
+            ..RulesModel::default()
+        };
+        model.semantic.rules = vec![rule];
+        model
+    }
+
+    #[test]
+    fn validation_rejects_placeholder_spellings_in_exact_keys() {
+        let model = validated_rule(KeyMatcher::Exact(
+            "monthly_<government_mechanic_power>".to_owned(),
+        ));
+        let error = validate_model(&model).expect_err("an exact placeholder key must not compile");
+        assert!(error.to_string().contains("placeholder"));
+    }
+
+    #[test]
+    fn validation_rejects_template_matchers_without_one_member_domain() {
+        for parameter in [
+            crate::TemplateParameter {
+                type_name: Some("estate".to_owned()),
+                enum_name: Some("estate_all".to_owned()),
+                strip_prefix: None,
+            },
+            crate::TemplateParameter {
+                type_name: None,
+                enum_name: None,
+                strip_prefix: None,
+            },
+        ] {
+            let model = validated_rule(KeyMatcher::Template {
+                prefix: "monthly_".to_owned(),
+                parameter,
+                suffix: String::new(),
+            });
+            assert!(
+                validate_model(&model).is_err(),
+                "a template parameter must declare exactly one domain"
+            );
+        }
+    }
+
+    #[test]
+    fn validation_rejects_degenerate_template_affixes_and_strip_prefixes() {
+        let domain = || crate::TemplateParameter {
+            type_name: Some("estate".to_owned()),
+            enum_name: None,
+            strip_prefix: None,
+        };
+        let bare = || KeyMatcher::Template {
+            prefix: String::new(),
+            parameter: domain(),
+            suffix: String::new(),
+        };
+        assert!(
+            validate_model(&validated_rule(bare())).is_err(),
+            "a template without affixes must use a plain type matcher"
+        );
+        let stripped = KeyMatcher::Template {
+            prefix: String::new(),
+            parameter: crate::TemplateParameter {
+                type_name: Some("estate".to_owned()),
+                enum_name: None,
+                strip_prefix: Some(String::new()),
+            },
+            suffix: "_loyalty_modifier".to_owned(),
+        };
+        assert!(
+            validate_model(&validated_rule(stripped)).is_err(),
+            "an empty strip prefix is a source error"
+        );
+    }
+
+    #[test]
+    fn validation_accepts_well_formed_template_matchers() {
+        let template = KeyMatcher::Template {
+            prefix: String::new(),
+            parameter: crate::TemplateParameter {
+                type_name: Some("estate".to_owned()),
+                enum_name: None,
+                strip_prefix: Some("estate_".to_owned()),
+            },
+            suffix: "_loyalty_modifier".to_owned(),
+        };
+        assert!(validate_model(&validated_rule(template)).is_ok());
+    }
+
     #[test]
     fn semantic_source_requires_explicit_scope_and_normalizes_any() {
         fn base() -> SemanticRule {
@@ -1288,7 +1459,7 @@ mod tests {
         assert_eq!(source_model.file_categories.len(), 124);
         assert_eq!(source_model.symbol_descriptors.len(), 2663);
         assert_eq!(source_model.records.len(), 12_971);
-        assert_eq!(source_model.semantic.rules.len(), 8_339);
+        assert_eq!(source_model.semantic.rules.len(), 8_357);
         assert_eq!(source_model.semantic.enum_values.len(), 70);
         assert_eq!(source_model.semantic.type_root_keys.len(), 7);
         assert_eq!(source_model.semantic.type_root_scopes.len(), 4);
@@ -1338,7 +1509,7 @@ mod tests {
         assert_eq!(source_model.profile.scan_roots.len(), 126);
         for (key, expected_scopes) in [
             ("is_janissary_modifier", &["country"][..]),
-            ("monthly_asha_vahishta", &["country"][..]),
+            ("monthly_splendor", &["country"][..]),
             ("local_center_of_trade_upgrade_cost", &["province"][..]),
             ("enable_forced_march", &["country"][..]),
         ] {
@@ -1373,6 +1544,43 @@ mod tests {
             ["country"],
             "the vanilla export enum keys are country-class, closing the two-class modifier partition"
         );
+        // The engine-parameterized families are template rows: the concrete power
+        // instances were removed in favour of workspace-member matching, and the
+        // per-member cardinality must stay unbounded so one block may grant
+        // several different estates'/powers' modifiers.
+        let monthly_power_template = source_model
+            .semantic
+            .rules
+            .iter()
+            .find(|rule| {
+                rule.id == "modifiers:685:alias:modifier:monthly_<government_mechanic_power>"
+            })
+            .expect("monthly power template rule");
+        assert_eq!(monthly_power_template.allowed_scopes, ["country"]);
+        assert!(monthly_power_template.max_occurs.is_none());
+        assert!(monthly_power_template.min_occurs.is_none_or(|min| min == 0));
+        let KeyMatcher::Template {
+            prefix,
+            parameter,
+            suffix,
+        } = &monthly_power_template.key
+        else {
+            panic!("monthly power family must use a template key matcher");
+        };
+        assert_eq!((prefix.as_str(), suffix.as_str()), ("monthly_", ""));
+        assert_eq!(parameter.type_domain(), Some("government_mechanic_power"));
+        assert_eq!(parameter.strip_prefix, None);
+        let estate_loyalty = source_model
+            .semantic
+            .rules
+            .iter()
+            .find(|rule| rule.id == "eu4:modifier:<estate>_loyalty_modifier")
+            .expect("estate loyalty template rule");
+        let KeyMatcher::Template { parameter, .. } = &estate_loyalty.key else {
+            panic!("estate family must use a template key matcher");
+        };
+        assert_eq!(parameter.type_domain(), Some("estate"));
+        assert_eq!(parameter.strip_prefix.as_deref(), Some("estate_"));
         let top_level_exact = |context: &str, key: &str| {
             source_model
                 .semantic

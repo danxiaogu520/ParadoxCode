@@ -1193,7 +1193,7 @@ fn semantic_reference_key_matches(rules: &RuleSet, matcher: &KeyMatcher, key: &s
         KeyMatcher::Date | KeyMatcher::Int { .. } => {
             matcher.matches(key, |_, _| false, |_, _| false)
         }
-        KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) => false,
+        KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) | KeyMatcher::Template { .. } => false,
     }
 }
 

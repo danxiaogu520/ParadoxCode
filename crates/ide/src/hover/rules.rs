@@ -650,6 +650,7 @@ pub(crate) fn semantic_pattern_rule_hint(
         let family = match &rule.key {
             KeyMatcher::Exact(_) | KeyMatcher::AnyScalar | KeyMatcher::Dynamic(_) => continue,
             KeyMatcher::Type(_) => "a workspace member of its declared type",
+            KeyMatcher::Template { .. } => "a member of its declared template domain",
             KeyMatcher::Enum(_) => "a member of a first-party enum",
             KeyMatcher::Date => "a campaign date",
             KeyMatcher::Int { .. } => "an integer key",

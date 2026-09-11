@@ -106,6 +106,96 @@ fn directory_prefix_matches(candidate: &str, prefix: &str, case_sensitive: bool)
                 && candidate.as_bytes().get(prefix.len()) == Some(&b'/')
     }
 }
+/// Named member domain resolving the parameter segment of a template key.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TemplateParameter {
+    /// Workspace-indexed type whose members instantiate the parameter.
+    #[serde(rename = "type")]
+    pub type_name: Option<String>,
+    /// Named static enum whose members instantiate the parameter.
+    #[serde(rename = "enum")]
+    pub enum_name: Option<String>,
+    /// Prefix removed from a member before it is spliced into the key.
+    ///
+    /// Some domains name their members with a redundant prefix the key family
+    /// drops: estates are `estate_nobles` while the modifier families spell
+    /// `nobles_loyalty_modifier`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strip_prefix: Option<String>,
+}
+
+impl TemplateParameter {
+    /// The workspace type domain, when the parameter resolves through one.
+    #[must_use]
+    pub fn type_domain(&self) -> Option<&str> {
+        self.type_name.as_deref()
+    }
+
+    /// The static enum domain, when the parameter resolves through one.
+    #[must_use]
+    pub fn enum_domain(&self) -> Option<&str> {
+        self.enum_name.as_deref()
+    }
+
+    /// The key spelling of one domain member: the declared prefix removed when
+    /// the member carries it, the member verbatim otherwise.
+    #[must_use]
+    pub fn splice_member<'member>(&self, member: &'member str) -> &'member str {
+        match self.strip_prefix.as_deref() {
+            Some(prefix)
+                if !prefix.is_empty()
+                    && member
+                        .get(..prefix.len())
+                        .is_some_and(|head| head.eq_ignore_ascii_case(prefix)) =>
+            {
+                &member[prefix.len()..]
+            }
+            _ => member,
+        }
+    }
+
+    /// Tests the parameter spelling from a key against the declared domain.
+    ///
+    /// With `strip_prefix` set to `P`, the engine derives the key spelling by
+    /// removing `P` from the member, so `P + spelling` and a bare `spelling`
+    /// (members that never carried the prefix) are both accepted — unless the
+    /// spelling itself starts with `P`, which would double-count the prefix.
+    fn matches(
+        &self,
+        spelling: &str,
+        type_members: impl Fn(&str, &str) -> bool,
+        enum_members: impl Fn(&str, &str) -> bool,
+    ) -> bool {
+        let is_member = |name: &str| match (&self.type_name, &self.enum_name) {
+            (Some(type_name), _) => type_members(type_name, name),
+            (None, Some(enum_name)) => enum_members(enum_name, name),
+            (None, None) => false,
+        };
+        if let Some(prefix) = self.strip_prefix.as_deref()
+            && !prefix.is_empty()
+            && strip_prefix_ascii_ci(spelling, prefix).is_some()
+        {
+            // The spelling already carries the prefix the engine removes once;
+            // every acceptance path would double-count it.
+            return false;
+        }
+        if is_member(spelling) {
+            return true;
+        }
+        let Some(prefix) = self.strip_prefix.as_deref() else {
+            return false;
+        };
+        if prefix.is_empty() || spelling.is_empty() {
+            return false;
+        }
+        let mut prefixed = String::with_capacity(prefix.len() + spelling.len());
+        prefixed.push_str(prefix);
+        prefixed.push_str(spelling);
+        is_member(&prefixed)
+    }
+}
+
 /// A key matcher compiled from a first-party field declaration.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -116,6 +206,18 @@ pub enum KeyMatcher {
     Type(String),
     /// Matches a member of a named static enum.
     Enum(String),
+    /// Matches `<prefix><member><suffix>` where `member` resolves through a
+    /// named workspace type or static enum, for example the parameterized
+    /// modifier families `monthly_<government_mechanic_power>` and
+    /// `<estate>_loyalty_modifier`.
+    Template {
+        /// Literal key prefix before the parameter segment.
+        prefix: String,
+        /// Named member domain for the parameter segment.
+        parameter: TemplateParameter,
+        /// Literal key suffix after the parameter segment.
+        suffix: String,
+    },
     /// Matches any non-empty scalar key.
     AnyScalar,
     /// Matches an integer key, optionally constrained by an inclusive range
@@ -140,6 +242,19 @@ impl KeyMatcher {
             Self::Exact(expected) => expected.eq_ignore_ascii_case(key),
             Self::Type(type_name) => type_members(type_name, key),
             Self::Enum(enum_name) => enum_members(enum_name, key),
+            Self::Template {
+                prefix,
+                parameter,
+                suffix,
+            } => {
+                let Some(after_prefix) = strip_prefix_ascii_ci(key, prefix) else {
+                    return false;
+                };
+                let Some(spelling) = strip_suffix_ascii_ci(after_prefix, suffix) else {
+                    return false;
+                };
+                !spelling.is_empty() && parameter.matches(spelling, type_members, enum_members)
+            }
             Self::AnyScalar => !key.is_empty(),
             Self::Int { min, max } => key.parse::<i64>().is_ok_and(|value| {
                 min.is_none_or(|bound| value >= bound) && max.is_none_or(|bound| value <= bound)
@@ -148,6 +263,27 @@ impl KeyMatcher {
             Self::Dynamic(_) => !key.is_empty(),
         }
     }
+}
+
+/// Removes a case-insensitive ASCII prefix, leaving the remainder.
+fn strip_prefix_ascii_ci<'key>(key: &'key str, prefix: &str) -> Option<&'key str> {
+    if prefix.is_empty() {
+        return Some(key);
+    }
+    key.get(..prefix.len())
+        .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+        .then(|| &key[prefix.len()..])
+}
+
+/// Removes a case-insensitive ASCII suffix, leaving the remainder.
+fn strip_suffix_ascii_ci<'key>(key: &'key str, suffix: &str) -> Option<&'key str> {
+    if suffix.is_empty() {
+        return Some(key);
+    }
+    let boundary = key.len().checked_sub(suffix.len())?;
+    key.get(boundary..)
+        .is_some_and(|tail| tail.eq_ignore_ascii_case(suffix))
+        .then(|| &key[..boundary])
 }
 
 /// Operand shape accepted on the alias rows a typed-prefix reference resolves to.
@@ -280,6 +416,124 @@ mod tests {
 
     fn int_matches(min: Option<i64>, max: Option<i64>, key: &str) -> bool {
         KeyMatcher::Int { min, max }.matches(key, |_, _| false, |_, _| false)
+    }
+
+    fn estate_template(suffix: &str) -> KeyMatcher {
+        KeyMatcher::Template {
+            prefix: String::new(),
+            parameter: TemplateParameter {
+                type_name: Some("estate".to_owned()),
+                enum_name: None,
+                strip_prefix: Some("estate_".to_owned()),
+            },
+            suffix: suffix.to_owned(),
+        }
+    }
+
+    fn template_matches(matcher: &KeyMatcher, key: &str) -> bool {
+        matcher.matches(
+            key,
+            |type_name, member| {
+                type_name == "estate" && member.eq_ignore_ascii_case("estate_nobles")
+            },
+            |_, _| false,
+        )
+    }
+
+    #[test]
+    fn template_matches_workspace_members_with_stripped_prefix() {
+        let matcher = estate_template("_loyalty_modifier");
+        assert!(template_matches(&matcher, "nobles_loyalty_modifier"));
+        assert!(template_matches(&matcher, "NOBLES_LOYALTY_MODIFIER"));
+        assert!(!template_matches(&matcher, "burghers_loyalty_modifier"));
+        assert!(!template_matches(&matcher, "nobles_loyalty_modifier_extra"));
+        assert!(!template_matches(&matcher, "_loyalty_modifier"));
+        assert!(!template_matches(&matcher, "nobles_"));
+    }
+
+    #[test]
+    fn template_rejects_spellings_that_double_count_the_strip_prefix() {
+        let matcher = estate_template("_loyalty_modifier");
+        // `estate_nobles_loyalty_modifier` would reconstruct `estate_estate_nobles`;
+        // the engine derives the key from the prefix-stripped estate name.
+        assert!(!template_matches(
+            &matcher,
+            "estate_nobles_loyalty_modifier"
+        ));
+    }
+
+    #[test]
+    fn template_accepts_members_without_the_strip_prefix() {
+        // A mod estate defined as `nobles` (no `estate_` prefix) spells the same key.
+        let matcher = estate_template("_loyalty_modifier");
+        assert!(template_matches(&matcher, "nobles_loyalty_modifier",));
+    }
+
+    #[test]
+    fn template_matches_prefixed_power_family() {
+        let matcher = KeyMatcher::Template {
+            prefix: "monthly_".to_owned(),
+            parameter: TemplateParameter {
+                type_name: Some("government_mechanic_power".to_owned()),
+                enum_name: None,
+                strip_prefix: None,
+            },
+            suffix: String::new(),
+        };
+        let matches = |key: &str| {
+            matcher.matches(
+                key,
+                |type_name, member| {
+                    type_name == "government_mechanic_power"
+                        && member.eq_ignore_ascii_case("russian_modernization")
+                },
+                |_, _| false,
+            )
+        };
+        assert!(matches("monthly_russian_modernization"));
+        assert!(matches("Monthly_Russian_Modernization"));
+        assert!(!matches("monthly_reform_progress"));
+        assert!(!matches("monthly_"));
+    }
+
+    #[test]
+    fn template_matches_static_enum_domain() {
+        let matcher = KeyMatcher::Template {
+            prefix: String::new(),
+            parameter: TemplateParameter {
+                type_name: None,
+                enum_name: Some("estate_all".to_owned()),
+                strip_prefix: None,
+            },
+            suffix: "_bonus".to_owned(),
+        };
+        let matches = |key: &str| {
+            matcher.matches(
+                key,
+                |_, _| false,
+                |enum_name, member| enum_name == "estate_all" && member == "all",
+            )
+        };
+        assert!(matches("all_bonus"));
+        assert!(!matches("any_bonus"));
+    }
+
+    #[test]
+    fn template_parameter_splices_member_spellings() {
+        let parameter = TemplateParameter {
+            type_name: Some("estate".to_owned()),
+            enum_name: None,
+            strip_prefix: Some("estate_".to_owned()),
+        };
+        assert_eq!(parameter.splice_member("estate_nobles"), "nobles");
+        assert_eq!(parameter.splice_member("ESTATE_NOBLES"), "NOBLES");
+        assert_eq!(parameter.splice_member("my_guild"), "my_guild");
+        let plain = TemplateParameter {
+            type_name: Some("government_mechanic_power".to_owned()),
+            enum_name: None,
+            strip_prefix: None,
+        };
+        assert_eq!(plain.splice_member("blood"), "blood");
     }
 
     #[test]

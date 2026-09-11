@@ -876,6 +876,113 @@ fn quoted_script_completion_survives_incomplete_payload_syntax() {
 }
 
 #[test]
+fn template_modifier_rules_complete_workspace_member_spellings() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ide-template-completion-{nonce}"));
+    let estates = root.join("common/estates");
+    let mechanics = root.join("common/government_mechanics");
+    std::fs::create_dir_all(&estates).expect("estates directory");
+    std::fs::create_dir_all(&mechanics).expect("mechanics directory");
+    std::fs::write(
+        estates.join("00_test.txt"),
+        "estate_my_guild = { icon = 1 }
+",
+    )
+    .expect("estate source");
+    std::fs::write(
+        mechanics.join("00_test.txt"),
+        "guild_mechanic = { powers = { guild_power = { max = 100 } } }
+",
+    )
+    .expect("mechanic source");
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots()
+        .expect("scan estates and mechanic powers");
+
+    let probe = DocumentId::new("file:///tmp/common/church_aspects/probe-completion.txt");
+    let probe_text = "guild_aspect = { cost = 1 modifier = { globa";
+    host.open_document(probe.clone(), 1, probe_text.to_owned(), None)
+        .expect("open probe site");
+    let probe_result = complete(
+        &host.snapshot(),
+        &probe,
+        u32::try_from(probe_text.find("globa").expect("probe key") + 1).expect("position"),
+    );
+    let probe_offered: Vec<&str> = probe_result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect();
+    assert!(
+        !probe_offered.is_empty(),
+        "exact-key modifier completion must work here; offered: {probe_offered:?}"
+    );
+
+    let id = DocumentId::new("file:///tmp/common/church_aspects/guild-completion.txt");
+    let text = "guild_aspect = { cost = 1 modifier = { my_guild_";
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open aspect completion site");
+    let snapshot = host.snapshot();
+    let result = complete(
+        &snapshot,
+        &id,
+        u32::try_from(text.find("my_guild_").expect("guild key") + 1).expect("position"),
+    );
+    let offered: Vec<&str> = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect();
+    for expected in [
+        "my_guild_loyalty_modifier",
+        "my_guild_influence_modifier",
+        "my_guild_privilege_slots",
+        "my_guild_loyalty_equilibrium",
+    ] {
+        assert!(
+            offered.contains(&expected),
+            "expected template spelling {expected}; offered: {offered:?}"
+        );
+    }
+    assert!(
+        result
+            .items
+            .iter()
+            .all(|item| { !item.label.contains('<') && !item.label.contains('>') }),
+        "placeholder literals must never be offered: {offered:?}"
+    );
+
+    let power_id = DocumentId::new("file:///tmp/common/church_aspects/power-completion.txt");
+    let text = "guild_aspect = { cost = 1 modifier = { monthly_";
+    host.open_document(power_id.clone(), 1, text.to_owned(), None)
+        .expect("open power completion site");
+    let snapshot = host.snapshot();
+    let result = complete(
+        &snapshot,
+        &power_id,
+        u32::try_from(text.find("monthly_").expect("power key") + 1).expect("position"),
+    );
+    let offered: Vec<&str> = result
+        .items
+        .iter()
+        .map(|item| item.label.as_str())
+        .collect();
+    assert!(
+        offered.contains(&"monthly_guild_power"),
+        "expected workspace power spelling; offered: {offered:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn incomplete_input_has_syntax_diagnostics_and_completion() {
     let text = "country_event = { id = test.1\n  mt";
     let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));

@@ -66,6 +66,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   its user-facing behavior is documented by `docs/diagnostics.md` and the crate docs, and
   the code comments no longer cite the design sections.
 
+### Added
+
+- Template key matchers for parameterized rule families: `KeyMatcher::Template` splices a
+  workspace type or static-enum member between literal affixes, with an optional member-prefix
+  strip (estate members `estate_nobles` spell keys `nobles_…`). Completion expands the template
+  into concrete spellings, unknown-key suggestions include them, and the rule compiler rejects
+  `<...>` placeholders in exact keys so a dead placeholder row cannot return (rules artifact
+  schema 26; caches regenerate).
+
+### Fixed
+
+- The five engine-parameterized modifier families actually validate now. They were exact-key
+  rows with literal spellings such as `<estate>_loyalty_modifier` that never match a real key,
+  so every concrete spelling (`nobles_loyalty_modifier = 0.1`,
+  `monthly_divine_authority = 1`, `<power>_gain_modifier`, …) was an unknown-key false
+  positive while completion offered the placeholder literals. The rows now resolve through the
+  workspace `estate`/`government_mechanic_power` domains — mod-added estates and mechanic powers
+  included — `<estate>_loyalty_equilibrium` joins the family, the six redundant hardcoded power
+  instances (`monthly_arabic_trade_influence_power`, `monthly_asha_vahishta`, `monthly_blood`,
+  `monthly_militarized_society`, `monthly_persian_influence`, `monthly_russian_modernization`)
+  are deleted in favour of the template, and the 23 special estate modifiers declared by
+  `common/estates_preload` (religion-scoped, exclusive, and piety variants such as
+  `brahmins_hindu_loyalty_modifier` and `nobles_exclusive_influence_modifier`) gain first-party
+  rows.
+
 ## [0.3.2] - 2026-09-11
 
 This release reworks hover into a first-class presentation surface, deepens dynamic-definition

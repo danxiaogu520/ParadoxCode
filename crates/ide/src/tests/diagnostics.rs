@@ -2842,8 +2842,8 @@ fn vanilla_dates_filtered_sprite_roots_and_runtime_tags_do_not_false_positive() 
         ),
         (
             "/tmp/common/church_aspects/test.txt",
-            "test_aspect = { cost = 1 modifier = { monthly_asha_vahishta = 0.5 } }\n",
-            "monthly_asha_vahishta",
+            "test_aspect = { cost = 1 modifier = { monthly_church_power = 0.5 } }\n",
+            "monthly_church_power",
         ),
     ] {
         let mut host = eu4_host(rules.clone());
@@ -2863,6 +2863,88 @@ fn vanilla_dates_filtered_sprite_roots_and_runtime_tags_do_not_false_positive() 
             "{path} retained `{forbidden}`: {results:?}"
         );
     }
+}
+
+#[test]
+fn template_modifier_families_resolve_workspace_estates_and_powers() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ide-template-modifiers-{nonce}"));
+    let estates = root.join("common/estates");
+    let mechanics = root.join("common/government_mechanics");
+    std::fs::create_dir_all(&estates).expect("estates directory");
+    std::fs::create_dir_all(&mechanics).expect("mechanics directory");
+    std::fs::write(
+        estates.join("00_test.txt"),
+        "estate_my_guild = { icon = 1 }
+",
+    )
+    .expect("estate source");
+    std::fs::write(
+        mechanics.join("00_test.txt"),
+        "guild_mechanic = { powers = { guild_power = { max = 100 } } }
+",
+    )
+    .expect("mechanic source");
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots()
+        .expect("scan estates and mechanic powers");
+
+    let id = DocumentId::new("file:///tmp/common/church_aspects/guild.txt");
+    let text = concat!(
+        "guild_aspect = { cost = 1 modifier = {
+",
+        "  my_guild_loyalty_modifier = 0.1
+",
+        "  my_guild_loyalty_equilibrium = 0.1
+",
+        "  my_guild_privilege_slots = 1
+",
+        "  monthly_guild_power = 1
+",
+        "  guild_power_gain_modifier = 0.1 } }
+",
+    );
+    host.open_document(id.clone(), 1, text.to_owned(), None)
+        .expect("open guild aspect");
+
+    let diagnostics = diagnostics(&host.snapshot(), &id);
+    for key in [
+        "my_guild_loyalty_modifier",
+        "my_guild_loyalty_equilibrium",
+        "my_guild_privilege_slots",
+        "monthly_guild_power",
+        "guild_power_gain_modifier",
+    ] {
+        assert!(
+            diagnostics
+                .iter()
+                .all(|diagnostic| !diagnostic.message.contains(key)),
+            "workspace-backed template modifier {key} must not be flagged: {diagnostics:?}"
+        );
+    }
+
+    let bad = DocumentId::new("file:///tmp/common/church_aspects/stranger.txt");
+    let text = "stranger_aspect = { cost = 1 modifier = { stranger_loyalty_modifier = 0.1 } }
+";
+    host.open_document(bad.clone(), 1, text.to_owned(), None)
+        .expect("open unknown-estate aspect");
+    let diagnostics = crate::diagnostics(&host.snapshot(), &bad);
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == DiagnosticCode::UnknownKey
+                && diagnostic.message.contains("stranger_loyalty_modifier")),
+        "an estate name outside the workspace domain must stay an unknown key: {diagnostics:?}"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
 }
 
 #[test]

@@ -221,7 +221,9 @@ impl<'rule> TransitionBuckets<'rule> {
                 }
                 KeyMatcher::AnyScalar => any_scalar.push((rule, position)),
                 KeyMatcher::Date | KeyMatcher::Int { .. } => parsed.push((rule, position)),
-                KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) => weak.push((rule, position)),
+                KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) | KeyMatcher::Template { .. } => {
+                    weak.push((rule, position))
+                }
             }
         }
         Self {
@@ -517,7 +519,9 @@ impl<'rule> ChildMatchBuckets<'rule> {
                     }
                     KeyMatcher::AnyScalar => any_scalar = true,
                     KeyMatcher::Date | KeyMatcher::Int { .. } => parsed.push(rule),
-                    KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) => dynamic = true,
+                    KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) | KeyMatcher::Template { .. } => {
+                        dynamic = true
+                    }
                 }
             }
         }
@@ -723,7 +727,9 @@ pub(crate) fn child_key_may_match(
                 {
                     return true;
                 }
-                KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) => dynamic_matcher = true,
+                KeyMatcher::Type(_) | KeyMatcher::Dynamic(_) | KeyMatcher::Template { .. } => {
+                    dynamic_matcher = true
+                }
                 KeyMatcher::Exact(_) | KeyMatcher::Date | KeyMatcher::Int { .. } => {}
             }
         }

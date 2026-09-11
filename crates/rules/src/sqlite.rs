@@ -430,6 +430,31 @@ fn semantic_key_columns(matcher: &KeyMatcher) -> (&'static str, Option<String>) 
         ),
         KeyMatcher::Date => ("date", None),
         KeyMatcher::Dynamic(value) => ("dynamic", Some(value.clone())),
+        // The five template fields ride in the value column joined by unit separators,
+        // following the `int` packing precedent; empty halves mean absent.
+        KeyMatcher::Template {
+            prefix,
+            parameter,
+            suffix,
+        } => {
+            let kind = if parameter.type_name.is_some() {
+                "type"
+            } else {
+                "enum"
+            };
+            let domain = parameter
+                .type_name
+                .as_deref()
+                .or(parameter.enum_name.as_deref())
+                .unwrap_or_default();
+            (
+                "template",
+                Some(format!(
+                    "{prefix}\x1F{kind}\x1F{domain}\x1F{}\x1F{suffix}",
+                    parameter.strip_prefix.as_deref().unwrap_or_default()
+                )),
+            )
+        }
     }
 }
 
@@ -905,6 +930,32 @@ fn decode_semantic_key(kind: &str, value: Option<&str>) -> Result<KeyMatcher, Ru
         }
         "date" => KeyMatcher::Date,
         "dynamic" => KeyMatcher::Dynamic(value.unwrap_or_default().to_owned()),
+        "template" => {
+            let fields = value.unwrap_or_default().split('\x1F').collect::<Vec<_>>();
+            if fields.len() != 5 {
+                return Err(RulesError::InvalidRuleShape(
+                    "template key field count".to_owned(),
+                ));
+            }
+            let [prefix, kind, domain, strip, suffix] =
+                [fields[0], fields[1], fields[2], fields[3], fields[4]];
+            let (type_name, enum_name) = match kind {
+                "type" => (Some(domain.to_owned()), None),
+                "enum" => (None, Some(domain.to_owned())),
+                other => {
+                    return Err(RulesError::InvalidRuleShape(other.to_owned()));
+                }
+            };
+            KeyMatcher::Template {
+                prefix: prefix.to_owned(),
+                parameter: crate::TemplateParameter {
+                    type_name,
+                    enum_name,
+                    strip_prefix: (!strip.is_empty()).then(|| strip.to_owned()),
+                },
+                suffix: suffix.to_owned(),
+            }
+        }
         other => return Err(RulesError::InvalidRuleShape(other.to_owned())),
     })
 }

@@ -382,6 +382,32 @@ fn put_semantic_key(bytes: &mut Vec<u8>, matcher: &KeyMatcher) {
             put_str(bytes, "dynamic");
             put_str(bytes, value);
         }
+        KeyMatcher::Template {
+            prefix,
+            parameter,
+            suffix,
+        } => {
+            put_str(bytes, "template");
+            put_str(bytes, prefix);
+            put_str(
+                bytes,
+                if parameter.type_name.is_some() {
+                    "type"
+                } else {
+                    "enum"
+                },
+            );
+            put_str(
+                bytes,
+                parameter
+                    .type_name
+                    .as_deref()
+                    .or(parameter.enum_name.as_deref())
+                    .unwrap_or_default(),
+            );
+            put_opt_str(bytes, parameter.strip_prefix.as_deref());
+            put_str(bytes, suffix);
+        }
     }
 }
 

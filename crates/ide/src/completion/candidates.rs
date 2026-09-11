@@ -200,12 +200,60 @@ fn key_specificity(
         KeyMatcher::Type(type_name) if dynamic_definition_type(snapshot, type_name) => {
             CompletionSpecificity::DynamicDefinition
         }
-        KeyMatcher::Type(_) => CompletionSpecificity::Type,
+        KeyMatcher::Type(_) | KeyMatcher::Template { .. } => CompletionSpecificity::Type,
         KeyMatcher::Dynamic(_) => CompletionSpecificity::Dynamic,
         KeyMatcher::Date | KeyMatcher::Int { .. } | KeyMatcher::AnyScalar => {
             CompletionSpecificity::Fallback
         }
     }
+}
+
+/// Offers one concrete spelling of a template key rule: the member spliced
+/// between the rule's literal affixes (for example `nobles` +
+/// `_loyalty_modifier`). The query prefix still filters the synthesized label.
+#[expect(clippy::too_many_arguments)]
+fn add_template_key_item(
+    member: &str,
+    parameter: &rules::TemplateParameter,
+    key_prefix: &str,
+    key_suffix: &str,
+    detail: &str,
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    candidate: &SemanticCompletionRule<'_, '_>,
+    items: &mut Vec<RankedCompletionItem>,
+    replacement_range: TextRange,
+    query_prefix: &str,
+    insert_assignment: bool,
+    documentation: &Option<String>,
+) {
+    let spelling = parameter.splice_member(member);
+    if spelling.is_empty() {
+        return;
+    }
+    let label = format!("{key_prefix}{spelling}{key_suffix}");
+    let rule = candidate.rule;
+    push_completion(
+        items,
+        CompletionItem {
+            insert_text: key_insert_text(rule, &label, insert_assignment),
+            label,
+            kind: key_completion_kind(snapshot, rule),
+            detail: detail.to_owned(),
+            documentation: documentation.clone(),
+            replacement_range,
+            sort_score: 0,
+            deprecated: rule.deprecated,
+            resolve_data: Some(format!("rule:{}", rule.id)),
+        },
+        query_prefix,
+        rule_rank_context(
+            snapshot,
+            context,
+            candidate,
+            key_specificity(snapshot, rule),
+        ),
+    );
 }
 
 /// Filters dynamic-definition member names by their inferred entry contract
@@ -576,6 +624,57 @@ pub(crate) fn add_semantic_key_items_ranked(
                             CompletionSpecificity::Dynamic,
                         ),
                     );
+                }
+            }
+            KeyMatcher::Template {
+                prefix: key_prefix,
+                parameter,
+                suffix: key_suffix,
+            } => {
+                // Expand the template over its member domain so the concrete
+                // spellings (`nobles_loyalty_modifier`, `monthly_blood`) are
+                // offered; members splice with their declared prefix removed.
+                let detail = parameter
+                    .type_domain()
+                    .or(parameter.enum_domain())
+                    .unwrap_or_default()
+                    .to_owned();
+                if let Some(type_name) = parameter.type_domain() {
+                    for label in member_cache.workspace_member_names(snapshot, type_name, "") {
+                        add_template_key_item(
+                            label,
+                            parameter,
+                            key_prefix,
+                            key_suffix,
+                            &detail,
+                            snapshot,
+                            context,
+                            &candidate,
+                            items,
+                            replacement_range,
+                            prefix,
+                            insert_assignment,
+                            &documentation,
+                        );
+                    }
+                } else if let Some(enum_name) = parameter.enum_domain() {
+                    for label in member_cache.enum_member_names(snapshot, enum_name, "") {
+                        add_template_key_item(
+                            label,
+                            parameter,
+                            key_prefix,
+                            key_suffix,
+                            &detail,
+                            snapshot,
+                            context,
+                            &candidate,
+                            items,
+                            replacement_range,
+                            prefix,
+                            insert_assignment,
+                            &documentation,
+                        );
+                    }
                 }
             }
             // Open-ended keys accept arbitrary spellings and carry no member information. Date
