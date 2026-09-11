@@ -116,6 +116,59 @@ body or drop the contract.
 A modifier is applied in a scope that cannot carry it (a province modifier
 on a country, for example). The `expected:` line lists the valid scopes.
 
+## LocalisationNotTranscoded
+
+The file sits on the game read path (`localisation/…/replace/…`) but contains
+readable CJK text: without the escape triples the EU4dll patch expects, the
+game renders mojibake. Transcode the file (`ParadoxCode: Transcode localisation
+file`) or keep readable sources in the master tree outside `replace/`. Files
+under other `localisation/` directories are master copies by convention and
+are never flagged. A decoded `pdxloc://` view suppresses this code: readable
+text is the point of that view, and saving re-encodes the shard behind it.
+
+## LocalisationMixedEncoding
+
+The file mixes readable CJK with EU4dll escape triples, or carries stray
+escape markers too sparse to be a transcoded file. Neither encode nor decode
+is a safe transformation, so none is applied — resolve the file by hand (or
+restore it from paratranz, the single source of truth for correct content).
+The error anchors on the first marker or CJK character, whichever comes first.
+
+## LocalisationBrokenEscapeSequence
+
+The file is a transcoded file overall (three or more intact escape triples, no
+readable CJK) but contains orphan escape markers: a `0x10`–`0x13` marker whose
+two payload bytes are missing or damaged. Decoding passes orphans through
+untouched, so the character after the marker in a decoded view is wrong. Each
+orphan is flagged individually; fix the triple or delete the stray marker.
+
+## LocalisationUnencodableCodePoint
+
+A character in the file cannot survive the EU4 transcoder: code points in
+U+0100–U+0FFF are silently mangled into triples (and back incorrectly), and
+code points beyond the BMP are destroyed. Re-transcoding the file would
+corrupt these characters, so they are flagged per character. The check is
+profile-aware: in script (`.txt`) files the 27 CP1252-mapped Latin letters
+(ä, é, ß, …) stay single bytes and are allowed; in localisation (`.yml`) files
+they are refused.
+
+## LocalisationEscapeRefused
+
+Emitted by the VS Code extension's save gate, never by the server: you edited
+a file that classifies as escaped (or mixed) in a context where the save would
+double-encode or corrupt it, and the write was refused. The document on disk
+is untouched. Decode the file first (open the decoded view) or fix the mixed
+content by hand.
+
+## ScriptLegacyEscapeVariant
+
+The script file decodes correctly, but its escape triples belong to a
+historical EU4dll escape-set variant rather than the canonical paratranz set:
+a decode → re-encode round trip does not reproduce the bytes. Nothing is
+broken today; the hint tells you that the next save through ParadoxCode
+normalizes the triples to the canonical set (content is preserved either way,
+and paratranz remains the judge of correctness).
+
 # Migration from pre-refactor codes
 
 The old 22-code table was consolidated to 16. Old codes are gone: they are
@@ -136,3 +189,8 @@ not aliases, and configurations that name them fail fast at initialize.
 
 New codes: `UnknownLocalisationKey`, `AmbiguousDefinition`,
 `InvalidDependency`.
+
+The EU4dll transcode pipeline later added `LocalisationNotTranscoded`,
+`LocalisationMixedEncoding`, `LocalisationBrokenEscapeSequence`,
+`LocalisationUnencodableCodePoint`, `LocalisationEscapeRefused` (extension
+save gate only), and `ScriptLegacyEscapeVariant`.

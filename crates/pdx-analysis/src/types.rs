@@ -132,6 +132,28 @@ pub enum DiagnosticCode {
     /// An effect applies a typed definition whose scope-attributed attributes
     /// cannot act in the effect's scope.
     ModifierScopeMismatch,
+    /// A localisation file on the game read path (a `replace/` release tree)
+    /// contains readable CJK text instead of EU4dll escape triples; the game
+    /// will render mojibake. See `docs/eu4-cjk-localisation-design.md` §5.3.
+    LocalisationNotTranscoded,
+    /// A file mixes readable CJK with escape triples (or carries stray escape
+    /// markers); both transcoder directions are refused and the file needs a
+    /// manual fix. See `docs/eu4-cjk-localisation-design.md` §5.3.
+    LocalisationMixedEncoding,
+    /// A save was refused because the editor buffer already contains escape
+    /// sequences (pasting transcoded text into a readable view would encode
+    /// twice). Published by the extension's save gate, not the server.
+    LocalisationEscapeRefused,
+    /// Readable text contains a code point the EU4 transcoder cannot
+    /// round-trip (`U+0100..=U+0FFF` and supplementary-plane characters).
+    /// See `docs/eu4-cjk-localisation-design.md` §2.5.
+    LocalisationUnencodableCodePoint,
+    /// An escaped file contains orphan escape markers that were passed through
+    /// undecoded — the surrounding triple is damaged.
+    LocalisationBrokenEscapeSequence,
+    /// An escaped script file decodes correctly but was written with a
+    /// historical escape-set variant; re-saving normalizes the triples.
+    ScriptLegacyEscapeVariant,
 }
 
 impl DiagnosticCode {
@@ -153,6 +175,12 @@ impl DiagnosticCode {
         Self::OrphanElse,
         Self::EmptyScopeContract,
         Self::ModifierScopeMismatch,
+        Self::LocalisationNotTranscoded,
+        Self::LocalisationMixedEncoding,
+        Self::LocalisationEscapeRefused,
+        Self::LocalisationUnencodableCodePoint,
+        Self::LocalisationBrokenEscapeSequence,
+        Self::ScriptLegacyEscapeVariant,
     ];
 
     /// Parses a wire-facing diagnostic category.
@@ -184,6 +212,12 @@ impl DiagnosticCode {
             Self::OrphanElse => "OrphanElse",
             Self::EmptyScopeContract => "EmptyScopeContract",
             Self::ModifierScopeMismatch => "ModifierScopeMismatch",
+            Self::LocalisationNotTranscoded => "LocalisationNotTranscoded",
+            Self::LocalisationMixedEncoding => "LocalisationMixedEncoding",
+            Self::LocalisationEscapeRefused => "LocalisationEscapeRefused",
+            Self::LocalisationUnencodableCodePoint => "LocalisationUnencodableCodePoint",
+            Self::LocalisationBrokenEscapeSequence => "LocalisationBrokenEscapeSequence",
+            Self::ScriptLegacyEscapeVariant => "ScriptLegacyEscapeVariant",
         }
     }
 
@@ -223,6 +257,23 @@ impl DiagnosticCode {
             // scope class of the applied attributes is recorded as information
             // rather than rejected.
             Self::ModifierScopeMismatch => Severity::Information,
+            // The game renders the readable text as mojibake, but the master
+            // tree convention keeps readable sources on purpose; only files on
+            // the release path are flagged, and the file still loads.
+            Self::LocalisationNotTranscoded => Severity::Warning,
+            // A half-transcoded file produces broken text no matter which
+            // direction the tooling picks, so it must block.
+            Self::LocalisationMixedEncoding => Severity::Error,
+            // The save gate refusal is enforced client-side; the severity here
+            // is the registry default for filtering/override purposes.
+            Self::LocalisationEscapeRefused => Severity::Error,
+            // The text is valid today but will fail the next encode.
+            Self::LocalisationUnencodableCodePoint => Severity::Warning,
+            // Damaged triples decode leniently; the surrounding value still
+            // renders, so this is a warning at the orphan marker.
+            Self::LocalisationBrokenEscapeSequence => Severity::Warning,
+            // Decoding is correct and re-saving only normalizes; pure FYI.
+            Self::ScriptLegacyEscapeVariant => Severity::Hint,
         }
     }
 }

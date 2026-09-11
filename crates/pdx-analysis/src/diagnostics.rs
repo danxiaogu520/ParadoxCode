@@ -235,6 +235,12 @@ pub(crate) fn analyze_input_with_cancellation(
         input,
         cancellation,
     )?);
+    diagnostics
+        .values
+        .extend(crate::transcode::transcode_diagnostics(
+            input,
+            cancellation,
+        )?);
     let mission = crate::mission::mission_diagnostics(snapshot, input, cancellation)?;
     if !mission.is_empty() {
         // The mission validator explains a dangling prerequisite with full
