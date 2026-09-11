@@ -1,0 +1,31 @@
+# typos configuration (https://github.com/crate-ci/typos), pinned in CI.
+#
+# The EU4 rules data, golden fixtures, and the EDG-KTP transcode corpus quote
+# Paradox's own spellings verbatim (`manuever`, `historial_lucky.txt`, ...);
+# correcting them would break matching against the game, so those trees are
+# excluded and the handful of game strings referenced from real code are
+# allowlisted below instead.
+[files]
+extend-exclude = [
+    "rules/",
+    "crates/ide/src/tests/golden/",
+    "crates/transcode/tests/corpus/",
+]
+
+[default.extend-words]
+# EU4 script names, game asset file names, Windows command flags, and test
+# fixtures for the typo-correction algorithm; quoted verbatim on purpose.
+ArmyTradtionOfFROM = "ArmyTradtionOfFROM"
+COMISSION = "COMISSION"
+FO = "FO"
+Postumus = "Postumus"
+Tradtion = "Tradtion"
+ba = "ba"
+caf = "caf"
+histori = "histori"
+hsa = "hsa"
+historial = "historial"
+manuever = "manuever"
+naem = "naem"
+namee = "namee"
+verticall = "verticall"

@@ -8,7 +8,8 @@ on:
 # One run per ref; superseded runs are cancelled. Following rust-analyzer, every
 # job runs on every PR and push: no path filtering, no skip bookkeeping. The
 # fast lint jobs (rustfmt, clippy, rustdoc) return within minutes and never wait
-# behind the test suite.
+# behind the test suite, and the `conclusion` job aggregates them into a single
+# status check for branch protection.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -17,8 +18,19 @@ permissions:
   contents: read
   pull-requests: read
 
+# rust-analyzer-style hardening: no incremental artifacts in CI, bounded retries
+# for flaky network, and short backtraces for failing tests.
 env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
+  CI: 1
+  RUST_BACKTRACE: short
+  RUSTUP_MAX_RETRIES: 10
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   rustfmt:
@@ -44,7 +56,10 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - name: Install Rust Problem Matcher
+        run: echo "::add-matcher::.github/rust.json"
+      # dbg!/todo! never ship: an LSP server has no room for debug leftovers.
+      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings -D clippy::dbg_macro -D clippy::todo
 
   rustdoc:
     name: Rustdoc
@@ -58,18 +73,38 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
 
-  test:
-    name: Rust tests (Linux)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+  rust:
+    name: Rust tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      # Report every failing OS instead of cancelling the healthy legs; the
+      # cancel-if-matrix-failed job below cancels the whole run instead.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Install Rust Problem Matcher
+        run: echo "::add-matcher::.github/rust.json"
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
       # PR/push CI keeps the fast correctness path. The optimized benchmark
       # suite runs in the scheduled/manual performance workflow.
       - run: cargo check --locked --workspace --all-features
-      - run: cargo test --locked --workspace --all-features
+      # nextest runs unit and integration tests; doc tests need libtest (the
+      # workspace currently has none — this step keeps them covered if added).
+      - run: cargo nextest run --locked --workspace --all-features --no-fail-fast --hide-progress-bar
+      - run: cargo test --locked --workspace --all-features --doc
+      - name: Install cargo-machete
+        if: matrix.os == 'ubuntu-latest'
+        uses: taiki-e/install-action@cargo-machete
+      - name: Check for unused dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo machete
 
   msrv:
     name: Minimum supported Rust 1.98
@@ -83,20 +118,6 @@ jobs:
           key: msrv-1.98
       - run: cargo check --locked --workspace --all-features
 
-  windows:
-    name: Rust quality gates (Windows)
-    runs-on: windows-latest
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo check --locked --workspace --all-features
-      - run: cargo test --locked --workspace --all-targets --all-features
-      - run: cargo clippy --locked --workspace --all-features -- -D warnings
-
   windows-release:
     name: Windows release build
     runs-on: windows-latest
@@ -106,7 +127,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       # Keep the optimized build on a separate runner so it overlaps with the
-      # Windows test and lint job instead of extending its critical path.
+      # matrix test legs instead of extending their critical path.
       - run: cargo build --locked --release -p pdc --bin pdc
 
   vscode:
@@ -178,3 +199,62 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@cargo-deny
       - run: cargo deny check advisories licenses bans sources
+
+  typo-check:
+    name: Typo Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FORCE_COLOR: 1
+      TYPOS_VERSION: v1.50.0
+    steps:
+      - name: Download typos
+        run: |
+          curl -LsSf "https://github.com/crate-ci/typos/releases/download/${TYPOS_VERSION}/typos-${TYPOS_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+            | tar zxf - -C "${CARGO_HOME:-~/.cargo}/bin"
+      - uses: actions/checkout@v7
+      # Game-data spellings (see _typos.toml) are allowlisted; everything else
+      # must be spelled correctly.
+      - name: Check for typos
+        run: typos
+
+  cancel-if-matrix-failed:
+    name: Cancel the run when a matrix leg failed
+    needs: rust
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Cancel parallel jobs
+        run: |
+          if jq --exit-status 'all(.result == "success" or .result == "skipped")' <<< '${{ toJson(needs) }}'; then
+            exit 0
+          fi
+          curl -L -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/cancel"
+
+  # Single required check for branch protection: `!cancelled()` runs even when
+  # a dependency failed or was skipped, and the jq gate turns that into a red X.
+  conclusion:
+    name: Conclusion
+    needs:
+      - rustfmt
+      - clippy
+      - rustdoc
+      - rust
+      - msrv
+      - windows-release
+      - vscode
+      - fuzz
+      - release
+      - dependencies
+      - typo-check
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conclusion
+        run: |
+          jq -C <<< '${{ toJson(needs) }}'
+          jq --exit-status 'all(.result == "success" or .result == "skipped")' <<< '${{ toJson(needs) }}'

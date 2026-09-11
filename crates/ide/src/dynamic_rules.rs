@@ -758,7 +758,7 @@ impl<'a> Derivation<'a> {
         }
         // Structural trigger sub-blocks of effect containers (`limit` and
         // friends) validate in a different context against the pre-push
-        // scope; the shadow walk skips them rather than mis-validating.
+        // scope; the shadow walk skips them rather than producing wrong verdicts.
         // Parameter usage inside them still matters: a bare `$P$` there is a
         // quoted payload rendered at the sub-block's site, so the items are
         // walked for usage only — no scalar sites, no findings.
