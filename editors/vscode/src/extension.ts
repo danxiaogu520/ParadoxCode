@@ -70,7 +70,7 @@ const statusBar = vscode.window.createStatusBarItem(
 );
 statusBar.name = 'ParadoxCode Language Server';
 statusBar.command = 'paradoxcode.openOutput';
-statusBar.text = 'ParadoxCode ○';
+statusBar.text = 'ParadoxCode $(debug-disconnect)';
 statusBar.tooltip = 'ParadoxCode: server not running';
 
 let client: LanguageClient | undefined;
@@ -812,19 +812,21 @@ function createClient({ command, source }: ServerResolution): LanguageClient {
 function updateStatus(state: State): void {
     switch (state) {
         case State.Running:
-            statusBar.text = serverReady ? 'ParadoxCode ●' : 'ParadoxCode ◐';
+            statusBar.text = serverReady
+                ? 'ParadoxCode $(check)'
+                : 'ParadoxCode $(sync~spin)';
             statusBar.tooltip = serverReady
                 ? 'ParadoxCode: pdc ready (click to open output)'
                 : 'ParadoxCode: pdc running; indexes are loading…';
             void vscode.commands.executeCommand('setContext', 'paradoxcodeServerRunning', true);
             break;
         case State.Starting:
-            statusBar.text = 'ParadoxCode ◐';
+            statusBar.text = 'ParadoxCode $(sync~spin)';
             statusBar.tooltip = 'ParadoxCode: pdc starting…';
             void vscode.commands.executeCommand('setContext', 'paradoxcodeServerRunning', false);
             break;
         default:
-            statusBar.text = 'ParadoxCode ○';
+            statusBar.text = 'ParadoxCode $(debug-disconnect)';
             statusBar.tooltip = 'ParadoxCode: pdc not running (click to open output)';
             void vscode.commands.executeCommand('setContext', 'paradoxcodeServerRunning', false);
     }
@@ -854,7 +856,7 @@ async function resolveOrInstallServer(context: vscode.ExtensionContext): Promise
 
     const options = installOptions(context);
     log.appendLine(`pdc was not found; installing the matching ${options.version} release automatically`);
-    statusBar.text = 'ParadoxCode ↓';
+    statusBar.text = 'ParadoxCode $(cloud-download~spin)';
     statusBar.tooltip = 'ParadoxCode: installing the language server…';
     try {
         const binary = await vscode.window.withProgress(

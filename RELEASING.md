@@ -18,9 +18,9 @@ prerequisites before pushing it.
    all carry the intended version.
 2. Run `cargo tools gates`. Do not tag if any group fails.
 3. Package the VSIX with `npm --prefix editors/vscode run package`, install it into a clean VS Code
-   profile, trust an EU4 Mod workspace, and open an EU4 file. Verify that `ParadoxCode ●` appears
-   without configuring the server, completion/diagnostics work, and the output reports a
-   checksum-verified automatic installation.
+   profile, trust an EU4 Mod workspace, and open an EU4 file. Verify that the ParadoxCode status
+   item shows its check mark without configuring the server, completion/diagnostics work, and the
+   output reports a checksum-verified automatic installation.
 4. Review the generated VSIX contents and confirm no Vanilla files, local caches, credentials, or
    development artifacts are present.
 

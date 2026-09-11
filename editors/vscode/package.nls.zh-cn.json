@@ -9,7 +9,7 @@
   "walkthrough.openMod.title": "打开 Mod 文件夹",
   "walkthrough.openMod.description": "用[打开文件夹](command:workbench.action.files.openFolder)打开包含 Mod 的 common、events、decisions、history、missions 或 localisation 目录的文件夹。不需要先创建项目配置文件。",
   "walkthrough.prepareServer.title": "等待 ParadoxCode 准备 pdc",
-  "walkthrough.prepareServer.description": "扩展会自动下载并校验匹配版本的 ParadoxCode 服务器。等待状态栏出现 ParadoxCode ●。如果一直是 ○，可重试[安装或更新服务器](command:paradoxcode.installServer)，或查看[输出](command:paradoxcode.openOutput)。",
+  "walkthrough.prepareServer.description": "扩展会自动下载并校验匹配版本的 ParadoxCode 服务器。等待状态栏的 ParadoxCode 项出现对勾（服务器就绪）。如果一直显示断开的插头图标，可重试[安装或更新服务器](command:paradoxcode.installServer)，或查看[输出](command:paradoxcode.openOutput)。",
   "walkthrough.vanillaData.title": "启用 Vanilla 符号",
   "walkthrough.vanillaData.description": "ParadoxCode 会在后台建立本机 Vanilla 索引，让补全、悬停和跳转能够看到原版内容。扩展会先自动寻找 EU4；如果找不到，请点击[选择 EU4 安装目录并建立 Vanilla 数据](command:paradoxcode.selectGameDirectory)，选择包含 eu4.exe 以及 common、events、missions、decisions、localisation 的目录。服务器会校验目录并自动重试，不需要再填写配置文件。",
   "walkthrough.checkDiagnostics.title": "查看第一次诊断",
