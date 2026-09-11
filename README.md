@@ -139,9 +139,10 @@ Run the quality gates explicitly (or diagnose one group: `core`, `vscode`, `rele
 every pull request:
 
 ```bash
-bash scripts/check-quality-gates.sh
+cargo tools gates
 ```
 
+The alias comes from `.cargo/config.toml`; the long spelling is `cargo run -p tools -- gates`.
 The pull-request CI uses the `core-fast` group, which keeps correctness checks but excludes
 benchmark targets. The optimized benchmark suite is retained under the `perf` group and runs in
 the scheduled/manual Performance workflow. CI also runs the editor, fuzz, and dependency jobs on
@@ -252,7 +253,7 @@ script below. It opens each relevant file through the real `pdc` transport and w
 JSON and Markdown reports under `diagnostic-reports/`:
 
 ```bash
-bash scripts/diagnose-current-mod.sh \
+node scripts/diagnose-current-mod.mjs \
   --mod /path/to/current-mod \
   --vanilla-cache /path/to/vanilla.pdcindex
 ```

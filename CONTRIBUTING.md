@@ -28,7 +28,8 @@ EU4 profile), never in the generic engine, LSP layer, or editor extensions.
 - Rust **1.98 or newer** (see `.github/workflows/ci.yml` for the enforced MSRV).
 - Node.js **24 LTS** for the VS Code extension.
 - Git. There are no commit hooks; run the quality gates before pushing and let CI verify
-  the rest (`bash scripts/check-quality-gates.sh` with no arguments runs the full suite).
+  the rest (`cargo tools gates` with no arguments runs the full suite; the alias lives in
+  `.cargo/config.toml`).
 
 ## Building and testing
 
@@ -41,17 +42,17 @@ cargo clippy --locked --workspace --all-targets -- -D warnings
 Run the complete quality gates explicitly:
 
 ```bash
-bash scripts/check-quality-gates.sh
+cargo tools gates
 ```
 
 or a single group to diagnose a failure: `core`, `core-fast`, `perf`, `vscode`, `release`,
-`fuzz`.
+`fuzz` (the long spelling without the cargo alias is `cargo run -p tools -- gates <group>`).
 
 Pull-request CI uses `core-fast` and leaves the optimized benchmark suite to the scheduled/manual
 `perf` workflow. Run the latter explicitly when changing performance-sensitive code:
 
 ```bash
-bash scripts/check-quality-gates.sh perf
+cargo tools gates perf
 ```
 
 CI runs the editor, fuzz, and dependency jobs on every pull request. Fuzz is limited to
@@ -68,8 +69,17 @@ cargo run -p rules --bin bake -- build \
   --manifest target/rules/manifest.json
 ```
 
+Cross-check scripted flag names against a real game installation with `flag-audit`: it
+derives the flag key table from the rule sources (`--source`), parses every script file
+under the game directory (`--game`), and reports written/read/engine-seeded flags — the
+inputs behind the unknown-flag diagnostic:
+
+```bash
+cargo run -p rules --bin flag-audit -- --source rules/eu4 --game /path/to/eu4
+```
+
 A whole-Current-Mod diagnostic pass against a local Vanilla index is available through
-`scripts/diagnose-current-mod.sh` (see the README for usage). Generated reports land in the
+`node scripts/diagnose-current-mod.mjs` (see the README for usage). Generated reports land in the
 ignored `diagnostic-reports/` directory and must not be committed.
 
 ## Repository layout

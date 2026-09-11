@@ -12,11 +12,11 @@
 
 <!--
 List exactly what you ran and its result. Examples:
-- `bash scripts/check-quality-gates.sh core` — passed
+- `cargo tools gates core` — passed
 - `cargo test -p ide rename` — passed
 -->
 
-- [ ] Local quality gates passed (`bash scripts/check-quality-gates.sh`).
+- [ ] Local quality gates passed (`cargo tools gates`).
 - [ ] New behavior is covered by tests or fixtures in this PR.
 - [ ] CI is expected to pass for the touched groups (core / vscode / release).
 

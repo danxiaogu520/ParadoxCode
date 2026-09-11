@@ -41,11 +41,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `postcard`, and `zstd`; `index` drops `postcard`, `rustc-hash`, `serde`, `serde_json`, and
   `transcode`; `pdc` drops `hir`, `sha2`, and `toml`; the fuzz workspace drops `engine`
   (all verified by cargo-machete and a full rebuild).
+- **Breaking (tooling entry points):** the shell-script layer is gone. `tools gates` runs the
+  local quality gates in Rust (`cargo tools gates [core|core-fast|perf|vscode|release|fuzz|all]`,
+  aliased through `.cargo/config.toml` in rust-analyzer style) and replaces
+  `scripts/check-quality-gates.sh`; `scripts/check-release.sh` and `scripts/diagnose-current-mod.sh`
+  are inlined into CI and `node scripts/diagnose-current-mod.mjs` respectively; the one-off
+  `scripts/audit-quoted-scripts.mjs` is deleted (its capability ships in the analyzer). The
+  `flag-audit` rule-data bin is now documented alongside `bake`.
 
 ### Removed
 
 - The versioned Git pre-commit hook and `scripts/install-git-hooks.sh`. Quality gates run in
-  CI on every pull request; run `scripts/check-quality-gates.sh` locally when needed.
+  CI on every pull request; run `cargo tools gates` locally when needed.
 
 ## [0.3.2] - 2026-09-11
 

@@ -97,8 +97,10 @@ cargo test --locked --workspace --all-targets
 显式运行质量门禁套件，或只诊断某个分组（`core`、`vscode`、`release`、`fuzz`、`core-fast`、`perf`）。仓库不使用提交钩子；CI 会在每个 pull request 上运行同样的门禁：
 
 ```bash
-bash scripts/check-quality-gates.sh
+cargo tools gates
 ```
+
+别名定义在 `.cargo/config.toml`；完整写法是 `cargo run -p tools -- gates`。
 
 Pull Request CI 使用 `core-fast` 分组：保留正确性检查，但不编译或运行 benchmark 目标。
 优化后的 benchmark 套件仍保留在 `perf` 分组中，由定时或手动触发的 Performance workflow 运行。
@@ -141,7 +143,7 @@ effect、trigger、modifier、on_action 以及 event、decision、mission、hist
 使用下面的开发脚本，对照该 Vanilla 缓存对完整 Current Mod 做一次可重复的诊断遍历。它会通过真实的 `pdc` 传输逐文件打开相关资源，并把 JSON 与 Markdown 报告写入被忽略的 `diagnostic-reports/` 目录：
 
 ```bash
-bash scripts/diagnose-current-mod.sh \
+node scripts/diagnose-current-mod.mjs \
   --mod /path/to/current-mod \
   --vanilla-cache /path/to/vanilla.pdcindex
 ```
