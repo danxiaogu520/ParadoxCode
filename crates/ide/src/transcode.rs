@@ -1,5 +1,4 @@
-//! Transcode diagnostics for the EU4dll double-byte patch ecosystem
-//! (`docs/eu4-cjk-localisation-design.md` §5–§6).
+//! Transcode diagnostics for the EU4dll double-byte patch ecosystem.
 //!
 //! The server sees documents as text (disk bytes were already read through the
 //! UTF-8/CP1252 layer), so these checks classify the document text and report:

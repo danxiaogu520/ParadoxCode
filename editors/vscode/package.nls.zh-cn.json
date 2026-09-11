@@ -70,6 +70,6 @@
   "commands.localisation.openDecoded.title": "以中文（解码）视图打开",
   "commands.localisation.revealOriginal.title": "打开原始转码文件",
   "commands.localisation.transcodeFile.title": "转码本地化文件",
-  "configuration.localisation.transparentEncoding.description": "启用 `pdcloc://` 透明读写视图：本地化 yml（以及匹配下方 glob 的脚本文件）以可读中文打开，保存时自动重新编码为磁盘上的 EU4dll 转义形态。详见 `docs/eu4-cjk-localisation-design.md`。",
+  "configuration.localisation.transparentEncoding.description": "启用 `pdcloc://` 透明读写视图：本地化 yml（以及匹配下方 glob 的脚本文件）以可读中文打开，保存时自动重新编码为磁盘上的 EU4dll 转义形态。",
   "configuration.localisation.transparentScriptGlobs.description": "有资格进入解码视图的脚本文件 glob（相对工作区，paratranz `latin1eu4` 档，例如 `history/countries/*.txt`）。默认：`history/**`。"
 }

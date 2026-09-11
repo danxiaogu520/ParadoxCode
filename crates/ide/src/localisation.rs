@@ -585,9 +585,8 @@ pub(crate) fn localisation_preview(
 /// Finds every language a localisation key resolves to, one preview per
 /// language. Candidates arrive sorted by priority descending then read order
 /// ascending, so per language the effective value is the *latest* definition
-/// of the highest layer — the game's later-load override semantics
-/// (`docs/eu4-cjk-localisation-design.md` §7.2). The hover renders the
-/// languages in parallel instead of a single first-found value.
+/// of the highest layer — the game's later-load override semantics. The hover
+/// renders the languages in parallel instead of a single first-found value.
 pub(crate) fn localisation_previews_for_name(
     snapshot: &AnalysisSnapshot,
     name: &str,

@@ -11,7 +11,7 @@
 //! * [`Profile::Script`] — game script txt (`paratranz` "latin1eu4"): raw single-byte
 //!   stream without BOM; the 27 CP1252-mapped characters (ä, é, €, …) stay single bytes.
 //!
-//! Guarantees (see `docs/eu4-cjk-localisation-design.md`):
+//! Guarantees:
 //!
 //! * Decoding is **universal**: escape markers are self-describing, so streams produced
 //!   by the canonical 23-value set, the EU4dll 29-value superset, and historical

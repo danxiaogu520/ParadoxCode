@@ -134,11 +134,11 @@ pub enum DiagnosticCode {
     ModifierScopeMismatch,
     /// A localisation file on the game read path (a `replace/` release tree)
     /// contains readable CJK text instead of EU4dll escape triples; the game
-    /// will render mojibake. See `docs/eu4-cjk-localisation-design.md` §5.3.
+    /// will render mojibake.
     LocalisationNotTranscoded,
     /// A file mixes readable CJK with escape triples (or carries stray escape
     /// markers); both transcoder directions are refused and the file needs a
-    /// manual fix. See `docs/eu4-cjk-localisation-design.md` §5.3.
+    /// manual fix.
     LocalisationMixedEncoding,
     /// A save was refused because the editor buffer already contains escape
     /// sequences (pasting transcoded text into a readable view would encode
@@ -146,7 +146,6 @@ pub enum DiagnosticCode {
     LocalisationEscapeRefused,
     /// Readable text contains a code point the EU4 transcoder cannot
     /// round-trip (`U+0100..=U+0FFF` and supplementary-plane characters).
-    /// See `docs/eu4-cjk-localisation-design.md` §2.5.
     LocalisationUnencodableCodePoint,
     /// An escaped file contains orphan escape markers that were passed through
     /// undecoded — the surrounding triple is damaged.

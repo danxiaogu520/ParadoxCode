@@ -58,6 +58,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - The versioned Git pre-commit hook and `scripts/install-git-hooks.sh`. Quality gates run in
   CI on every pull request; run `cargo tools gates` locally when needed.
+- The EU4 CJK localisation planning documents (`docs/eu4-cjk-localisation-requirements.md`,
+  `docs/eu4-cjk-localisation-design.md`). The feature shipped and is verified end-to-end;
+  its user-facing behavior is documented by `docs/diagnostics.md` and the crate docs, and
+  the code comments no longer cite the design sections.
 
 ## [0.3.2] - 2026-09-11
 

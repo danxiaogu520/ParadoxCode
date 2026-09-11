@@ -1,5 +1,4 @@
-// Transparent localisation read/write for EU4dll-transcoded files
-// (`docs/eu4-cjk-localisation-design.md` §4).
+// Transparent localisation read/write for EU4dll-transcoded files.
 //
 // The `pdcloc://` scheme mirrors a `file://` URI over the same real path:
 // readFile decodes EU4dll escape triples to readable CJK text, writeFile
