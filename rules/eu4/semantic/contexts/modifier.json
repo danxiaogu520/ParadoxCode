@@ -7608,37 +7608,6 @@
     "line": 5869
   },
   {
-    "id": "modifiers:311:rule:root:modifiers:monthly_militarized_society",
-    "context": "modifier",
-    "parent_path": [],
-    "key": {
-      "exact": "monthly_militarized_society"
-    },
-    "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [
-      "country"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5870
-  },
-  {
     "id": "modifiers:312:rule:root:modifiers:monthly_piety",
     "context": "modifier",
     "parent_path": [],
@@ -20959,7 +20928,13 @@
     "context": "modifier",
     "parent_path": [],
     "key": {
-      "exact": "monthly_<government_mechanic_power>"
+      "template": {
+        "prefix": "monthly_",
+        "parameter": {
+          "type": "government_mechanic_power"
+        },
+        "suffix": ""
+      }
     },
     "operator": "=",
     "value": {
@@ -20981,9 +20956,9 @@
     ],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": 0,
     "strict_min": true,
-    "max_occurs": 1,
+    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 6283
   },
@@ -20992,7 +20967,13 @@
     "context": "modifier",
     "parent_path": [],
     "key": {
-      "exact": "<government_mechanic_power>_gain_modifier"
+      "template": {
+        "prefix": "",
+        "parameter": {
+          "type": "government_mechanic_power"
+        },
+        "suffix": "_gain_modifier"
+      }
     },
     "operator": "=",
     "value": {
@@ -21014,9 +20995,9 @@
     ],
     "push_scope": null,
     "replace_scope": [],
-    "min_occurs": 1,
+    "min_occurs": 0,
     "strict_min": true,
-    "max_occurs": 1,
+    "max_occurs": null,
     "source_file": "semantic-rules.json",
     "line": 6284
   },
@@ -27437,164 +27418,6 @@
     "line": 6485
   },
   {
-    "id": "eu4:modifier:monthly_arabic_trade_influence_power",
-    "context": "modifier",
-    "parent_path": [],
-    "key": {
-      "exact": "monthly_arabic_trade_influence_power"
-    },
-    "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [
-      "country"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 6064
-  },
-  {
-    "id": "eu4:modifier:monthly_blood",
-    "context": "modifier",
-    "parent_path": [],
-    "key": {
-      "exact": "monthly_blood"
-    },
-    "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [
-      "country"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 6065
-  },
-  {
-    "id": "eu4:modifier:monthly_persian_influence",
-    "context": "modifier",
-    "parent_path": [],
-    "key": {
-      "exact": "monthly_persian_influence"
-    },
-    "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [
-      "country"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 6066
-  },
-  {
-    "id": "eu4:modifier:monthly_russian_modernization",
-    "context": "modifier",
-    "parent_path": [],
-    "key": {
-      "exact": "monthly_russian_modernization"
-    },
-    "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "documentation": [],
-    "allowed_scopes": [
-      "country"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 6067
-  },
-  {
-    "id": "eu4:modifier:monthly_asha_vahishta",
-    "context": "modifier",
-    "parent_path": [],
-    "key": {
-      "exact": "monthly_asha_vahishta"
-    },
-    "operator": "=",
-    "value": {
-      "float": {
-        "min": null,
-        "max": null
-      }
-    },
-    "shape": "leaf",
-    "child_context": null,
-    "alternative_id": null,
-    "severity": null,
-    "required": false,
-    "deprecated": false,
-    "documentation": [
-      "Monthly Asha Vahishta government mechanic power modifier."
-    ],
-    "allowed_scopes": [
-      "country"
-    ],
-    "push_scope": null,
-    "replace_scope": [],
-    "min_occurs": 0,
-    "strict_min": true,
-    "max_occurs": 1,
-    "source_file": "semantic-rules.json",
-    "line": 5870
-  },
-  {
     "id": "eu4:modifier:vanilla_exported_keys",
     "context": "modifier",
     "parent_path": [],
@@ -27930,7 +27753,14 @@
     "context": "modifier",
     "parent_path": [],
     "key": {
-      "exact": "<estate>_influence_modifier"
+      "template": {
+        "prefix": "",
+        "parameter": {
+          "type": "estate",
+          "strip_prefix": "estate_"
+        },
+        "suffix": "_influence_modifier"
+      }
     },
     "operator": "=",
     "value": {
@@ -27954,7 +27784,7 @@
     "replace_scope": [],
     "min_occurs": 0,
     "strict_min": true,
-    "max_occurs": 1,
+    "max_occurs": null,
     "source_file": "wiki-modifier-list",
     "line": 0
   },
@@ -27963,7 +27793,14 @@
     "context": "modifier",
     "parent_path": [],
     "key": {
-      "exact": "<estate>_loyalty_modifier"
+      "template": {
+        "prefix": "",
+        "parameter": {
+          "type": "estate",
+          "strip_prefix": "estate_"
+        },
+        "suffix": "_loyalty_modifier"
+      }
     },
     "operator": "=",
     "value": {
@@ -27987,7 +27824,7 @@
     "replace_scope": [],
     "min_occurs": 0,
     "strict_min": true,
-    "max_occurs": 1,
+    "max_occurs": null,
     "source_file": "wiki-modifier-list",
     "line": 0
   },
@@ -27996,7 +27833,14 @@
     "context": "modifier",
     "parent_path": [],
     "key": {
-      "exact": "<estate>_privilege_slots"
+      "template": {
+        "prefix": "",
+        "parameter": {
+          "type": "estate",
+          "strip_prefix": "estate_"
+        },
+        "suffix": "_privilege_slots"
+      }
     },
     "operator": "=",
     "value": {
@@ -28020,8 +27864,807 @@
     "replace_scope": [],
     "min_occurs": 0,
     "strict_min": true,
-    "max_occurs": 1,
+    "max_occurs": null,
     "source_file": "wiki-modifier-list",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:<estate>_loyalty_equilibrium",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "template": {
+        "prefix": "",
+        "parameter": {
+          "type": "estate",
+          "strip_prefix": "estate_"
+        },
+        "suffix": "_loyalty_equilibrium"
+      }
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:<estate>_loyalty_equilibrium",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies the loyalty equilibrium of the specified estate."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": null,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:brahmins_hindu_loyalty_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "brahmins_hindu_loyalty_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:brahmins_hindu_loyalty_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies brahmins estate loyalty in hindu countries."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:brahmins_muslim_loyalty_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "brahmins_muslim_loyalty_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:brahmins_muslim_loyalty_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies brahmins estate loyalty in muslim countries."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:brahmins_other_loyalty_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "brahmins_other_loyalty_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:brahmins_other_loyalty_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies brahmins estate loyalty in other countries."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:brahmins_hindu_influence_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "brahmins_hindu_influence_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:brahmins_hindu_influence_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies brahmins estate influence in hindu countries."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:brahmins_muslim_influence_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "brahmins_muslim_influence_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:brahmins_muslim_influence_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies brahmins estate influence in muslim countries."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:brahmins_other_influence_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "brahmins_other_influence_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:brahmins_other_influence_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies brahmins estate influence in other countries."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:piety_church_loyalty_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "piety_church_loyalty_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:piety_church_loyalty_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies church estate loyalty through the piety mechanic."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:piety_dhimmi_loyalty_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "piety_dhimmi_loyalty_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:piety_dhimmi_loyalty_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies dhimmi estate loyalty through the piety mechanic."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:maratha_muslim_loyalty_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "maratha_muslim_loyalty_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:maratha_muslim_loyalty_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies maratha estate loyalty in muslim countries."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:maratha_muslim_influence_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "maratha_muslim_influence_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:maratha_muslim_influence_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies maratha estate influence in muslim countries."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:maratha_exclusive_loyalty_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "maratha_exclusive_loyalty_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:maratha_exclusive_loyalty_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Loyalty modifier for the maratha estate's exclusive privilege variant."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:maratha_exclusive_influence_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "maratha_exclusive_influence_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:maratha_exclusive_influence_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Influence modifier for the maratha estate's exclusive privilege variant."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:nobles_exclusive_loyalty_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "nobles_exclusive_loyalty_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:nobles_exclusive_loyalty_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Loyalty modifier for the nobles estate's exclusive privilege variant."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:nobles_exclusive_influence_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "nobles_exclusive_influence_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:nobles_exclusive_influence_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Influence modifier for the nobles estate's exclusive privilege variant."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:nobles_loyalty_modifier_forts",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "nobles_loyalty_modifier_forts"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:nobles_loyalty_modifier_forts",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies nobles estate loyalty based on fortified provinces."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:MAY_conditional_loyalty",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "MAY_conditional_loyalty"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:MAY_conditional_loyalty",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Conditional estate loyalty modifier used by Maya content."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:vaisyas_non_muslim_loyalty_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "vaisyas_non_muslim_loyalty_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:vaisyas_non_muslim_loyalty_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies vaisyas estate loyalty in non-muslim countries."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:vaisyas_non_muslim_influence_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "vaisyas_non_muslim_influence_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:vaisyas_non_muslim_influence_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies vaisyas estate influence in non-muslim countries."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:rajput_muslim_loyalty_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "rajput_muslim_loyalty_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:rajput_muslim_loyalty_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies rajput estate loyalty in muslim countries."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:rajput_muslim_influence_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "rajput_muslim_influence_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:rajput_muslim_influence_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies rajput estate influence in muslim countries."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:rajput_exclusive_loyalty_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "rajput_exclusive_loyalty_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:rajput_exclusive_loyalty_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Loyalty modifier for the rajput estate's exclusive privilege variant."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:rajput_exclusive_influence_modifier",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "rajput_exclusive_influence_modifier"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:rajput_exclusive_influence_modifier",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Influence modifier for the rajput estate's exclusive privilege variant."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
+    "line": 0
+  },
+  {
+    "id": "eu4:modifier:trade_goods_size_modifier_in_livestock_provinces",
+    "context": "modifier",
+    "parent_path": [],
+    "key": {
+      "exact": "trade_goods_size_modifier_in_livestock_provinces"
+    },
+    "operator": "=",
+    "value": {
+      "float": {
+        "min": null,
+        "max": null
+      }
+    },
+    "shape": "leaf",
+    "child_context": null,
+    "alternative_id": "eu4:modifier:trade_goods_size_modifier_in_livestock_provinces",
+    "severity": null,
+    "required": false,
+    "documentation": [
+      "Modifies trade goods size in livestock provinces."
+    ],
+    "allowed_scopes": [
+      "country"
+    ],
+    "push_scope": null,
+    "replace_scope": [],
+    "min_occurs": 0,
+    "strict_min": true,
+    "max_occurs": 1,
+    "source_file": "estates-preload",
     "line": 0
   }
 ]

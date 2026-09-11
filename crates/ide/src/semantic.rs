@@ -2980,6 +2980,39 @@ pub(crate) fn enum_members<'a>(
         .map(|(_, values)| values.as_slice())
 }
 
+/// Concrete key spellings a template key matcher accepts: every domain member
+/// spliced between the rule's literal affixes, so `estate_nobles` +
+/// `_loyalty_modifier` yields `nobles_loyalty_modifier`.
+pub(crate) fn template_key_spellings(
+    snapshot: &AnalysisSnapshot,
+    matcher: &KeyMatcher,
+) -> Vec<String> {
+    let KeyMatcher::Template {
+        prefix,
+        parameter,
+        suffix,
+    } = matcher
+    else {
+        return Vec::new();
+    };
+    let spellings = if let Some(type_name) = parameter.type_domain() {
+        workspace_member_index(snapshot, type_name).select("")
+    } else if let Some(enum_name) = parameter.enum_domain() {
+        enum_members(snapshot, enum_name)
+            .map(<[String]>::to_vec)
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    spellings
+        .into_iter()
+        .filter_map(|member| {
+            let spelling = parameter.splice_member(&member);
+            (!spelling.is_empty()).then(|| format!("{prefix}{spelling}{suffix}"))
+        })
+        .collect()
+}
+
 fn enum_member_uncached(snapshot: &AnalysisSnapshot, enum_name: &str, member: &str) -> bool {
     let static_member = snapshot
         .rules()

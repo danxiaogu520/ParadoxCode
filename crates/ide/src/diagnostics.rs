@@ -918,13 +918,25 @@ fn validate_semantic_container(
                 // Sibling keys of the same container rule set make a useful
                 // correction vocabulary for a misspelled key.
                 let mut sibling_keys = Vec::new();
-                for rule in semantic_rules_for_container(snapshot, context, parent_path, scope) {
-                    if let KeyMatcher::Exact(key) = &rule.key
-                        && !sibling_keys
-                            .iter()
-                            .any(|seen: &String| seen.eq_ignore_ascii_case(key))
+                let seen_siblings = |key: &str, sibling_keys: &mut Vec<String>| {
+                    if !sibling_keys
+                        .iter()
+                        .any(|seen: &String| seen.eq_ignore_ascii_case(key))
                     {
-                        sibling_keys.push(key.clone());
+                        sibling_keys.push(key.to_owned());
+                    }
+                };
+                for rule in semantic_rules_for_container(snapshot, context, parent_path, scope) {
+                    match &rule.key {
+                        KeyMatcher::Exact(key) => seen_siblings(key, &mut sibling_keys),
+                        // Template rows contribute their concrete member spellings
+                        // (`nobles_loyalty_modifier`), never the placeholder itself.
+                        KeyMatcher::Template { .. } => {
+                            for spelling in template_key_spellings(snapshot, &rule.key) {
+                                seen_siblings(&spelling, &mut sibling_keys);
+                            }
+                        }
+                        _ => {}
                     }
                 }
                 let suggestion =

@@ -628,7 +628,7 @@ pub(crate) fn semantic_type_property_is_invalid<'a>(
         let mut has_type = false;
         for rule in &rules {
             match &rule.key {
-                KeyMatcher::Type(_) => has_type = true,
+                KeyMatcher::Type(_) | KeyMatcher::Template { .. } => has_type = true,
                 KeyMatcher::Dynamic(_) => {}
                 KeyMatcher::Exact(key) if !matches!(rule.shape, RuleShape::LeafValue) => {
                     has_concrete = true;

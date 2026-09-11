@@ -192,6 +192,17 @@ pub(crate) fn key_description(matcher: &KeyMatcher) -> String {
     match matcher {
         KeyMatcher::Exact(value) => format!("`{value}`"),
         KeyMatcher::Type(kind) => format!("a `{kind}` name"),
+        KeyMatcher::Template {
+            prefix,
+            parameter,
+            suffix,
+        } => {
+            let domain = parameter
+                .type_domain()
+                .or(parameter.enum_domain())
+                .unwrap_or_default();
+            format!("`{prefix}<{domain}>{suffix}`")
+        }
         KeyMatcher::Enum(_) => "an accepted key".to_owned(),
         KeyMatcher::Int { .. } => "an integer key".to_owned(),
         KeyMatcher::AnyScalar | KeyMatcher::Dynamic(_) | KeyMatcher::Date => "a key".to_owned(),

@@ -84,3 +84,40 @@ fn find_cst_node_is_depth_bounded() {
         .is_none()
     );
 }
+
+#[test]
+fn template_modifier_keys_report_their_rule_family_hint() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!("ide-template-hover-{nonce}"));
+    let estates = root.join("common/estates");
+    std::fs::create_dir_all(&estates).expect("estates directory");
+    std::fs::write(
+        estates.join("00_test.txt"),
+        "estate_my_guild = { icon = 1 }
+",
+    )
+    .expect("estate source");
+    let mut host = eu4_host(game::eu4::first_party_rules().expect("first-party rules"));
+    host.apply_change(WorkspaceChange::SetSourceRoots(vec![SourceRoot::new(
+        SourceRootId::new(1),
+        SourceRootKind::CurrentMod,
+        root.clone(),
+    )]));
+    host.refresh_source_roots().expect("scan estates");
+    let hint =
+        crate::hover::semantic_pattern_rule_hint(&host.snapshot(), "my_guild_loyalty_modifier");
+    assert!(
+        hint.as_deref()
+            .is_some_and(|hint| hint.contains("template")),
+        "a template-matched key must report its rule family: {hint:?}"
+    );
+    assert!(
+        crate::hover::semantic_pattern_rule_hint(&host.snapshot(), "stranger_loyalty_modifier")
+            .is_none(),
+        "an unknown estate spelling must not claim a rule family"
+    );
+    std::fs::remove_dir_all(root).expect("cleanup");
+}
