@@ -11,11 +11,16 @@
 //! revisions are discarded as soon as a newer revision is observed; an old worker that finishes
 //! later cannot repopulate the cache with stale data.
 //!
-//! Entries live in one of two invalidation domains. Document edits used to clear the whole
-//! cache, so every keystroke discarded workspace-scale indexes (member-name lists, the
-//! localisation key index) and rebuilt them from scratch. Index-domain entries now survive
-//! document revisions; each domain overflows independently, so cheap boolean probes no longer
-//! evict the large shared indexes they share a map with.
+//! Entries live in one of two invalidation domains, each tracking its own revision.
+//! Document edits used to clear the whole cache, so every keystroke discarded
+//! workspace-scale indexes (member-name lists, the localisation key index) and rebuilt them
+//! from scratch. Index-domain entries now survive document revisions: an entry built from
+//! index state revision `r` stays valid for every reader at revision `r` or later until the
+//! index state itself advances, so a slow workspace-wide pass observing an older revision
+//! keeps hitting views that a newer interactive reader already populated (and vice versa).
+//! Documents-domain entries are valid for exactly one document revision. Each domain
+//! overflows independently, so cheap boolean probes no longer evict the large shared
+//! indexes they share a map with.
 
 use std::any::Any;
 use std::fmt;
@@ -57,7 +62,11 @@ pub struct SnapshotQueryCache {
 static NEXT_CACHE_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 struct CacheState {
-    revision: Option<u64>,
+    /// Revision of the index state the `index` entries were built from. Entries stay
+    /// valid for every revision at or after it until an index advance clears them.
+    index_revision: Option<u64>,
+    /// Revision of the `documents` entries; document revisions change per keystroke.
+    documents_revision: Option<u64>,
     index: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
     documents: FxHashMap<Box<str>, Arc<dyn Any + Send + Sync>>,
 }
@@ -83,7 +92,8 @@ impl SnapshotQueryCache {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             state: RwLock::new(CacheState {
-                revision: None,
+                index_revision: None,
+                documents_revision: None,
                 index: FxHashMap::default(),
                 documents: FxHashMap::default(),
             }),
@@ -111,22 +121,38 @@ impl SnapshotQueryCache {
     }
 
     /// Returns the cached value for `(revision, key)` when it was inserted as `T`.
+    ///
+    /// Documents-domain entries answer only at their exact revision. Index-domain
+    /// entries answer at their revision and every later one: only an index advance
+    /// can clear them, so a reader still observing an older revision (a slow
+    /// workspace-wide pass) hits views built for the same index state.
     pub fn get<T: Send + Sync + 'static>(&self, revision: u64, key: &str) -> Option<Arc<T>> {
         let state = self
             .state
             .read()
             .expect("snapshot query cache lock poisoned");
-        if state.revision != Some(revision) {
-            return None;
+        if state.documents_revision == Some(revision)
+            && let Some(value) = state.documents.get(key)
+        {
+            return Arc::clone(value).downcast::<T>().ok();
         }
-        state
-            .documents
-            .get(key)
-            .or_else(|| state.index.get(key))
-            .and_then(|value| Arc::clone(value).downcast::<T>().ok())
+        if state
+            .index_revision
+            .is_some_and(|current| revision >= current)
+            && let Some(value) = state.index.get(key)
+        {
+            return Arc::clone(value).downcast::<T>().ok();
+        }
+        None
     }
 
     /// Stores `value` under `(revision, domain, key)`; an existing key is never replaced.
+    ///
+    /// An insert from a revision the domain has already advanced past is dropped: a
+    /// stale worker finishing late must not repopulate the cache with results derived
+    /// from superseded state. An Index insert at a newer revision does not clear the
+    /// domain — reaching a newer revision without an index advance proves the index
+    /// state did not change, so the older entries remain valid.
     pub fn insert<T: Send + Sync + 'static>(
         &self,
         revision: u64,
@@ -135,15 +161,25 @@ impl SnapshotQueryCache {
         value: Arc<T>,
     ) {
         let mut state = self.write();
-        match state.revision {
-            Some(current) if revision < current => return,
-            Some(current) if revision != current => {
-                state.index.clear();
-                state.documents.clear();
-                state.revision = Some(revision);
-            }
-            None => state.revision = Some(revision),
-            _ => {}
+        match domain {
+            CacheDomain::Documents => match state.documents_revision {
+                Some(current) if revision < current => return,
+                Some(current) if revision > current => {
+                    state.documents.clear();
+                    state.documents_revision = Some(revision);
+                }
+                None => state.documents_revision = Some(revision),
+                _ => {}
+            },
+            CacheDomain::Index => match state.index_revision {
+                Some(current) if revision < current => return,
+                // An insert above `current` proves no index advance happened since
+                // (an advance clears the domain and moves the watermark), so the
+                // entry joins the same index-state lineage without touching the
+                // watermark — readers still at `current` keep hitting every entry.
+                Some(_) => {}
+                None => state.index_revision = Some(revision),
+            },
         }
         let entries = state.map(domain);
         if entries.len() >= self.capacity && !entries.contains_key(key.as_str()) {
@@ -157,30 +193,35 @@ impl SnapshotQueryCache {
     /// Advances the cache to a committed workspace revision and drops all query results.
     pub fn advance_to(&self, revision: u64) {
         let mut state = self.write();
-        match state.revision {
-            Some(current) if revision > current => {
-                state.index.clear();
-                state.documents.clear();
-                state.revision = Some(revision);
-            }
-            None => state.revision = Some(revision),
-            _ => {}
+        if state
+            .index_revision
+            .is_none_or(|current| revision > current)
+        {
+            state.index.clear();
+            state.index_revision = Some(revision);
+        }
+        if state
+            .documents_revision
+            .is_none_or(|current| revision > current)
+        {
+            state.documents.clear();
+            state.documents_revision = Some(revision);
         }
     }
 
     /// Advances to a document-only revision, keeping index-derived entries.
     ///
     /// Overlay edits and closes change per-document query results but leave the workspace
-    /// index untouched, so the expensive index-domain indexes stay valid across keystrokes.
+    /// index untouched, so the expensive index-domain indexes stay valid across keystrokes
+    /// and across readers still observing an older revision.
     pub fn advance_documents(&self, revision: u64) {
         let mut state = self.write();
-        match state.revision {
-            Some(current) if revision > current => {
-                state.documents.clear();
-                state.revision = Some(revision);
-            }
-            None => state.revision = Some(revision),
-            _ => {}
+        if state
+            .documents_revision
+            .is_none_or(|current| revision > current)
+        {
+            state.documents.clear();
+            state.documents_revision = Some(revision);
         }
     }
 
@@ -235,21 +276,95 @@ mod tests {
             Arc::new("replacement"),
         );
         assert_eq!(*cache.get::<u32>(1, "key").expect("cached"), 7);
-        // Moving to a newer revision drops the old snapshot's entries.
-        assert!(cache.get::<u32>(2, "key").is_none());
-        cache.insert(2, CacheDomain::Index, "other".to_owned(), Arc::new(9_u32));
-        assert_eq!(cache.len(), 1);
+        // Document revisions keep index entries valid for readers at both revisions.
+        cache.advance_documents(2);
+        assert!(cache.get::<u32>(1, "key").is_some());
+        assert!(cache.get::<u32>(2, "key").is_some());
+        // A full advance drops the entries.
+        cache.advance_to(3);
         assert!(cache.get::<u32>(1, "key").is_none());
+        assert!(cache.get::<u32>(3, "key").is_none());
         // A stale worker cannot repopulate the cache after the revision advanced.
         cache.insert(1, CacheDomain::Index, "stale".to_owned(), Arc::new(11_u32));
-        assert_eq!(cache.len(), 1);
         assert!(cache.get::<u32>(1, "stale").is_none());
-        cache.insert(2, CacheDomain::Index, "third".to_owned(), Arc::new(11_u32));
-        assert_eq!(cache.len(), 2);
-        // Overflow clears that domain wholesale and the newest entry survives.
-        cache.insert(2, CacheDomain::Index, "fourth".to_owned(), Arc::new(13_u32));
+        assert!(cache.get::<u32>(3, "stale").is_none());
+        cache.insert(3, CacheDomain::Index, "third".to_owned(), Arc::new(11_u32));
         assert_eq!(cache.len(), 1);
-        assert_eq!(*cache.get::<u32>(2, "fourth").expect("newest entry"), 13);
+        // Overflow clears that domain wholesale and the newest entry survives.
+        cache.insert(3, CacheDomain::Index, "fourth".to_owned(), Arc::new(13_u32));
+        assert_eq!(cache.len(), 2);
+        cache.insert(3, CacheDomain::Index, "fifth".to_owned(), Arc::new(17_u32));
+        assert_eq!(cache.len(), 1);
+        assert_eq!(*cache.get::<u32>(3, "fifth").expect("newest entry"), 17);
+    }
+
+    /// A slow workspace-wide pass observes an older revision while interactive edits
+    /// advance the document revision. Index-derived views must keep answering the
+    /// older reader; document-derived entries must not.
+    #[test]
+    fn index_entries_survive_document_advances_for_older_readers() {
+        let cache = SnapshotQueryCache::with_capacity(8);
+        cache.insert(
+            5,
+            CacheDomain::Index,
+            "context-rule-view:effect".to_owned(),
+            Arc::new(vec![1_u32]),
+        );
+        cache.advance_documents(7);
+        // The pass worker still at revision 5 hits the same index state.
+        assert!(
+            cache
+                .get::<Vec<u32>>(5, "context-rule-view:effect")
+                .is_some()
+        );
+        // So does the newer interactive reader.
+        assert!(
+            cache
+                .get::<Vec<u32>>(7, "context-rule-view:effect")
+                .is_some()
+        );
+        // A newer reader can extend the lineage; the older one hits the new entry too.
+        cache.insert(
+            7,
+            CacheDomain::Index,
+            "context-rule-view:trigger".to_owned(),
+            Arc::new(vec![2_u32]),
+        );
+        assert!(
+            cache
+                .get::<Vec<u32>>(5, "context-rule-view:trigger")
+                .is_some()
+        );
+        // Document-derived entries answer only at their own revision.
+        cache.insert(
+            7,
+            CacheDomain::Documents,
+            "dynamic-definition:e:x".to_owned(),
+            Arc::new(1_u32),
+        );
+        assert!(cache.get::<u32>(7, "dynamic-definition:e:x").is_some());
+        assert!(cache.get::<u32>(5, "dynamic-definition:e:x").is_none());
+        // An index advance supersedes every older reader's entries.
+        cache.advance_to(9);
+        assert!(
+            cache
+                .get::<Vec<u32>>(5, "context-rule-view:effect")
+                .is_none()
+        );
+        assert!(
+            cache
+                .get::<Vec<u32>>(7, "context-rule-view:effect")
+                .is_none()
+        );
+        assert!(
+            cache
+                .get::<Vec<u32>>(9, "context-rule-view:effect")
+                .is_none()
+        );
+        // A stale worker cannot repopulate after the advance.
+        cache.insert(5, CacheDomain::Index, "stale".to_owned(), Arc::new(9_u32));
+        assert!(cache.get::<u32>(9, "stale").is_none());
+        assert!(cache.get::<u32>(5, "stale").is_none());
     }
 
     #[test]

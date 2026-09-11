@@ -14,6 +14,7 @@ fn workspace_validation_result(
     publish_diagnostics: bool,
 ) -> Result<WorkspaceValidationResult, WorkspaceError> {
     let snapshot = host.snapshot();
+    let base_revision = snapshot.revision();
     let mut files = snapshot
         .source_files()
         .values()
@@ -95,6 +96,16 @@ fn workspace_validation_result(
                     if cancelled.load(std::sync::atomic::Ordering::Relaxed)
                         || scan_cancellation.is_cancelled()
                     {
+                        return;
+                    }
+                    if host.live_revision() != base_revision {
+                        // A newer revision superseded this pass's snapshot
+                        // mid-flight (an edit or refresh committed while the
+                        // pass walked). Its completion handler discards and
+                        // reschedules on exactly this mismatch, so grinding on
+                        // would burn hours of CPU for a result nobody reads;
+                        // stop the whole pass now.
+                        cancelled.store(true, std::sync::atomic::Ordering::Relaxed);
                         return;
                     }
                     let index = next_file.fetch_add(1, std::sync::atomic::Ordering::Relaxed);

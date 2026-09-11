@@ -504,10 +504,17 @@ impl<'a> StatementInference<'a> {
                 })
                 .collect();
         // A same-kind dynamic definition call contributes its own contract; a key
-        // that is both builtin and dynamic accepts through either path.
-        let callee = dynamic_kind_for_context(self.snapshot, context)
-            .and_then(|kind| resolve_dynamic_definition(self.snapshot, &kind, key));
-        let callee_contract = callee.as_ref().map(|callee| contracts.contract_of(callee));
+        // that is both builtin and dynamic accepts through either path. Resolving
+        // deep-clones the callee's template, so repeat callees consult the contract
+        // memo before paying for resolution.
+        let callee_contract = dynamic_kind_for_context(self.snapshot, context).and_then(|kind| {
+            let memo_key = (kind.to_ascii_lowercase(), lowered.clone());
+            if let Some(cached) = contracts.memo.get(&memo_key) {
+                return Some(cached.clone());
+            }
+            resolve_dynamic_definition(self.snapshot, &kind, key)
+                .map(|callee| contracts.contract_of(&callee))
+        });
         let mut statement = Vec::with_capacity(2);
         if matching.iter().all(|rule| !rule.allowed_scopes.is_empty()) && !matching.is_empty() {
             for rule in &matching {
