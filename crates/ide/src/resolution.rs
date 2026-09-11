@@ -1069,7 +1069,7 @@ fn prefer_localisation_language_ordered(
 /// Picks the effective localisation definition from a candidate list sorted by
 /// priority descending then read order ascending: the highest layer wins, and
 /// within that layer the latest-read definition wins — mirroring the game's
-/// later-load override semantics (`docs/eu4-cjk-localisation-design.md` §7.2).
+/// later-load override semantics.
 /// Equal-priority runs are contiguous in the sorted list, so the last element
 /// of the leading run is the winner.
 pub(crate) fn effective_localisation_candidate(
@@ -1085,7 +1085,7 @@ pub(crate) fn effective_localisation_candidate(
 /// Resolves localisation keys to their effective displayed value — exactly one
 /// value per key: candidates are language-filtered, then the highest layer wins
 /// and within that layer the latest read order wins (the game's later-load
-/// override semantics, `docs/eu4-cjk-localisation-design.md` §7.2). Keys whose
+/// override semantics). Keys whose
 /// effective definition has no preview are simply absent from the map.
 ///
 /// Used by the LSP mission preview to resolve mission titles (`{id}_title`).

@@ -70,6 +70,6 @@
   "commands.localisation.openDecoded.title": "Open in Decoded (Chinese) View",
   "commands.localisation.revealOriginal.title": "Open the Raw Transcoded File",
   "commands.localisation.transcodeFile.title": "Transcode Localisation File",
-  "configuration.localisation.transparentEncoding.description": "Enable the `pdcloc://` transparent read/write view over EU4dll-transcoded files: localisation yml (and script files matching the globs below) open as readable Chinese, and saving re-encodes to the on-disk escaped form. See `docs/eu4-cjk-localisation-design.md`.",
+  "configuration.localisation.transparentEncoding.description": "Enable the `pdcloc://` transparent read/write view over EU4dll-transcoded files: localisation yml (and script files matching the globs below) open as readable Chinese, and saving re-encodes to the on-disk escaped form.",
   "configuration.localisation.transparentScriptGlobs.description": "Workspace-relative glob patterns of script files eligible for the decoded view (paratranz `latin1eu4` profile, e.g. `history/countries/*.txt`). Default: `history/**`."
 }

@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 
 /// Converts a `file://` or `pdcloc://` URI to a filesystem path.
 ///
-/// `pdcloc://` is the extension's transparent localisation view
-/// (`docs/eu4-cjk-localisation-design.md` §4): the URI is a `file://` URI with
+/// `pdcloc://` is the extension's transparent localisation view: the URI is a
+/// `file://` URI with
 /// the scheme swapped, so the path is the real on-disk file and a virtual
 /// document opened under this scheme attaches to (and hides) the backing file
 /// while showing the decoded text the client syncs.

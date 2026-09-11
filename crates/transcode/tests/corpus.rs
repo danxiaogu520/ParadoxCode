@@ -1,8 +1,7 @@
 //! Golden corpus tests: the EDG-KTP localisation file pair (the user's own mod,
 //! verified against the deployed paratranz converter on 2026-09-11) plus synthetic
 //! script fixtures reproducing the phenomena found in the 310-file workshop corpus
-//! (history/countries of workshop mod 3047072888; the empirical round-trip report
-//! lives in docs/eu4-cjk-localisation-design.md §3.1).
+//! (history/countries of workshop mod 3047072888).
 
 use transcode::{
     Classification, EscapeSet, Profile, classify_file, decode_file, decode_text, encode_file,
