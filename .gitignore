@@ -25,7 +25,7 @@ pnpm-debug.log*
 # Generated Zed extension assets
 /editors/zed/extension.wasm
 /editors/zed/grammars/
-/editors/zed/bundled-rules/*.pdxrules
+/editors/zed/bundled-rules/*.pdcrules
 
 # Generated VS Code extension assets
 /editors/vscode/out/
@@ -33,10 +33,10 @@ pnpm-debug.log*
 *.vsix
 
 # Local indexes, caches, and generated rule artifacts
-*.pdxindex
-**/.pdx/cache/
+*.pdcindex
+**/.pdc/cache/
 /rules/vanilla-cache/
-/rules/*.pdxrules
+/rules/*.pdcrules
 
 # Generated whole-Current-Mod diagnostic reports
 **/diagnostic-reports/

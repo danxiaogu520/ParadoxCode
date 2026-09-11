@@ -115,7 +115,7 @@ export class LoadedFilesProvider implements vscode.TreeDataProvider<ExplorerNode
             return;
         }
         try {
-            const response = await client.sendRequest<WorkspaceFilesResponse>('pdx/workspaceFiles');
+            const response = await client.sendRequest<WorkspaceFilesResponse>('pdc/workspaceFiles');
             this.setData(response);
         } catch {
             // A server that is stopping or an older binary without this optional request should

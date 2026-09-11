@@ -8,13 +8,17 @@
 * @danxiaogu520
 
 # Core Rust crates (engine layers, dependency direction: text -> parser -> engine -> analysis -> lsp)
-/crates/pdx-text/ @danxiaogu520
-/crates/pdx-parser/ @danxiaogu520
-/crates/pdx-rules/ @danxiaogu520
-/crates/pdx-game/  @danxiaogu520
-/crates/pdx-engine/ @danxiaogu520
-/crates/pdx-analysis/ @danxiaogu520
-/crates/pdx-lsp/ @danxiaogu520
+/crates/text/ @danxiaogu520
+/crates/parser/ @danxiaogu520
+/crates/rules/ @danxiaogu520
+/crates/game/  @danxiaogu520
+/crates/engine/ @danxiaogu520
+/crates/vfs/    @danxiaogu520
+/crates/hir/    @danxiaogu520
+/crates/index/  @danxiaogu520
+/crates/tools/  @danxiaogu520
+/crates/ide/ @danxiaogu520
+/crates/pdc/ @danxiaogu520
 
 # First-party EU4 rules (sole authoritative rule source)
 /rules/ @danxiaogu520

@@ -1,4 +1,4 @@
-//! Zed extension entry point and checksummed `pdx-ls` release installer.
+//! Zed extension entry point and checksummed `pdc` release installer.
 
 use std::fs;
 use std::io::Read;
@@ -9,7 +9,7 @@ use zed_extension_api as zed;
 
 struct ParadoxCodeExtension;
 
-const LANGUAGE_SERVER_ID: &str = "pdx-ls";
+const LANGUAGE_SERVER_ID: &str = "pdc";
 const REPOSITORY: &str = "danxiaogu520/ParadoxCode";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const MAX_CHECKSUM_BYTES: usize = 1_024;
@@ -35,30 +35,30 @@ fn platform_artifact(platform: (zed::Os, zed::Architecture)) -> zed::Result<Arti
     let artifact = match platform {
         (Os::Linux, Architecture::X8664) => Artifact {
             target: "x86_64-unknown-linux-gnu",
-            binary: "pdx-ls",
+            binary: "pdc",
             kind: ArchiveKind::TarGz,
         },
         (Os::Linux, Architecture::Aarch64) => Artifact {
             target: "aarch64-unknown-linux-gnu",
-            binary: "pdx-ls",
+            binary: "pdc",
             kind: ArchiveKind::TarGz,
         },
         (Os::Mac, Architecture::X8664) => Artifact {
             target: "x86_64-apple-darwin",
-            binary: "pdx-ls",
+            binary: "pdc",
             kind: ArchiveKind::TarGz,
         },
         (Os::Mac, Architecture::Aarch64) => Artifact {
             target: "aarch64-apple-darwin",
-            binary: "pdx-ls",
+            binary: "pdc",
             kind: ArchiveKind::TarGz,
         },
         (Os::Windows, Architecture::X8664) => Artifact {
             target: "x86_64-pc-windows-msvc",
-            binary: "pdx-ls.exe",
+            binary: "pdc.exe",
             kind: ArchiveKind::Zip,
         },
-        _ => return Err("ParadoxCode does not publish pdx-ls for this platform".to_owned()),
+        _ => return Err("ParadoxCode does not publish pdc for this platform".to_owned()),
     };
     Ok(artifact)
 }
@@ -68,7 +68,7 @@ fn archive_name(artifact: &Artifact) -> String {
         ArchiveKind::TarGz => "tar.gz",
         ArchiveKind::Zip => "zip",
     };
-    format!("pdx-ls-v{VERSION}-{}.{extension}", artifact.target)
+    format!("pdc-v{VERSION}-{}.{extension}", artifact.target)
 }
 
 fn fetch(url: &str, maximum: usize, label: &str) -> zed::Result<Vec<u8>> {
@@ -393,7 +393,7 @@ fn ensure_install_directory(path: &str) -> zed::Result<()> {
 
 fn install_server(language_server_id: &zed::LanguageServerId) -> zed::Result<String> {
     let artifact = platform_artifact(zed::current_platform())?;
-    let install_dir = format!("pdx-ls-v{VERSION}-{}", artifact.target);
+    let install_dir = format!("pdc-v{VERSION}-{}", artifact.target);
     let binary_path = format!("{install_dir}/{}", artifact.binary);
     let local_checksum_path = format!("{binary_path}.sha256");
     if cached_server_is_valid(&binary_path) {
@@ -427,7 +427,7 @@ fn install_server(language_server_id: &zed::LanguageServerId) -> zed::Result<Str
         }
         let executable = extract(&bytes, &artifact)?;
         if executable.is_empty() {
-            return Err("downloaded pdx-ls executable is empty".to_owned());
+            return Err("downloaded pdc executable is empty".to_owned());
         }
         let executable_checksum = format!("{:x}\n", Sha256::digest(&executable));
         ensure_install_directory(&install_dir)?;
@@ -495,9 +495,9 @@ impl zed::Extension for ParadoxCodeExtension {
 
 zed::register_extension!(ParadoxCodeExtension);
 
-/// JSON Schema for `lsp.pdx-ls.initialization_options`.
+/// JSON Schema for `lsp.pdc.initialization_options`.
 ///
-/// Mirrors the workspace options accepted by `pdx-ls`. These values are configured only in
+/// Mirrors the workspace options accepted by `pdc`. These values are configured only in
 /// Zed's `.zed/settings.json`; VS Code keeps an independent `paradoxcode.*` configuration.
 fn initialization_options_schema() -> serde_json::Value {
     serde_json::json!({
@@ -510,7 +510,7 @@ fn initialization_options_schema() -> serde_json::Value {
             },
             "vanillaIndexCache": {
                 "type": "string",
-                "description": "Path to a persistent Vanilla index cache (`.pdxindex`). When absent, `pdx-ls` attempts automatic discovery once."
+                "description": "Path to a persistent Vanilla index cache (`.pdcindex`). When absent, `pdc` attempts automatic discovery once."
             },
             "dependencies": {
                 "type": "array",
@@ -529,7 +529,7 @@ fn initialization_options_schema() -> serde_json::Value {
                         },
                         "index": {
                             "type": "string",
-                            "description": "Optional persistent index cache (`.pdxindex`). When set, the dependency is not scanned live; the cache is loaded and rebuilt in the background when missing. Rebuild after changing the dependency by running `pdx index dependency --id <id> --source <path> --output <cache>` and restarting the language server."
+                            "description": "Optional persistent index cache (`.pdcindex`). When set, the dependency is not scanned live; the cache is loaded and rebuilt in the background when missing. Rebuild after changing the dependency by deleting the cache file and restarting the language server."
                         }
                     }
                 }
@@ -541,7 +541,7 @@ fn initialization_options_schema() -> serde_json::Value {
             "ignoredErrorCodes": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Stable diagnostic codes to hide from pdx-ls responses, for example `UnknownScope`."
+                "description": "Stable diagnostic codes to hide from pdc responses, for example `UnknownScope`."
             },
             "workspaceWideDiagnostics": {
                 "type": "boolean",
@@ -639,7 +639,7 @@ mod tests {
     #[cfg(unix)]
     use super::{ensure_install_directory, remove_cache_file};
 
-    const PAYLOAD: &[u8] = b"pdx-ls test payload";
+    const PAYLOAD: &[u8] = b"pdc test payload";
 
     struct TestDirectory(PathBuf);
 
@@ -650,7 +650,7 @@ mod tests {
                 .expect("system clock")
                 .as_nanos();
             let path = std::env::temp_dir()
-                .join(format!("pdx-zed-contract-{}-{nonce}", std::process::id()));
+                .join(format!("pdc-zed-contract-{}-{nonce}", std::process::id()));
             fs::create_dir(&path).expect("create contract test directory");
             Self(path)
         }
@@ -757,7 +757,7 @@ mod tests {
     }
 
     #[test]
-    fn initialization_options_schema_describes_the_pdx_ls_workspace_options() {
+    fn initialization_options_schema_describes_the_pdc_workspace_options() {
         let schema = initialization_options_schema();
         let properties = schema["properties"].as_object().expect("schema properties");
         assert!(
@@ -803,13 +803,13 @@ mod tests {
         let digest = "a".repeat(64);
         assert_eq!(
             expected_checksum(
-                format!("{digest}  pdx-ls-v0.1.0-test.tar.gz\n").as_bytes(),
-                "pdx-ls-v0.1.0-test.tar.gz",
+                format!("{digest}  pdc-v0.1.0-test.tar.gz\n").as_bytes(),
+                "pdc-v0.1.0-test.tar.gz",
             ),
             Ok(digest)
         );
         assert!(
-            expected_checksum(b"aaaaaaaa  another.tar.gz\n", "pdx-ls-v0.1.0-test.tar.gz").is_err()
+            expected_checksum(b"aaaaaaaa  another.tar.gz\n", "pdc-v0.1.0-test.tar.gz").is_err()
         );
     }
 
@@ -890,16 +890,16 @@ mod tests {
 
     #[test]
     fn restricted_extractors_accept_only_the_expected_executable() {
-        let valid_tar = tar_gz("pdx-ls", PAYLOAD);
-        assert_eq!(extract_tar_gz(&valid_tar, "pdx-ls"), Ok(PAYLOAD.to_vec()));
-        assert!(extract_tar_gz(&tar_gz("../pdx-ls", PAYLOAD), "pdx-ls").is_err());
+        let valid_tar = tar_gz("pdc", PAYLOAD);
+        assert_eq!(extract_tar_gz(&valid_tar, "pdc"), Ok(PAYLOAD.to_vec()));
+        assert!(extract_tar_gz(&tar_gz("../pdc", PAYLOAD), "pdc").is_err());
         let mut corrupt_tar = valid_tar;
         corrupt_tar[20] ^= 1;
-        assert!(extract_tar_gz(&corrupt_tar, "pdx-ls").is_err());
+        assert!(extract_tar_gz(&corrupt_tar, "pdc").is_err());
 
-        let valid_zip = zip("pdx-ls.exe", PAYLOAD);
-        assert_eq!(extract_zip(&valid_zip, "pdx-ls.exe"), Ok(PAYLOAD.to_vec()));
-        assert!(extract_zip(&zip("nested/pdx-ls.exe", PAYLOAD), "pdx-ls.exe").is_err());
+        let valid_zip = zip("pdc.exe", PAYLOAD);
+        assert_eq!(extract_zip(&valid_zip, "pdc.exe"), Ok(PAYLOAD.to_vec()));
+        assert!(extract_zip(&zip("nested/pdc.exe", PAYLOAD), "pdc.exe").is_err());
         let mut corrupt_zip = valid_zip;
         let central_offset = corrupt_zip
             .windows(4)
@@ -907,19 +907,19 @@ mod tests {
             .expect("central directory");
         corrupt_zip[14] ^= 1;
         corrupt_zip[central_offset + 16] ^= 1;
-        assert!(extract_zip(&corrupt_zip, "pdx-ls.exe").is_err());
+        assert!(extract_zip(&corrupt_zip, "pdc.exe").is_err());
     }
 
     #[test]
     fn tar_container_overhead_does_not_reduce_the_executable_limit() {
         let payload = vec![b'x'; 512];
         assert_eq!(
-            extract_tar_gz_with_limit(&tar_gz("pdx-ls", &payload), "pdx-ls", payload.len()),
+            extract_tar_gz_with_limit(&tar_gz("pdc", &payload), "pdc", payload.len()),
             Ok(payload.clone())
         );
         let oversized = vec![b'x'; payload.len() + 1];
         assert!(
-            extract_tar_gz_with_limit(&tar_gz("pdx-ls", &oversized), "pdx-ls", payload.len())
+            extract_tar_gz_with_limit(&tar_gz("pdc", &oversized), "pdc", payload.len())
                 .is_err()
         );
     }
@@ -927,11 +927,11 @@ mod tests {
     #[test]
     fn release_archive_shapes_are_accepted_by_the_rust_extractors() {
         assert_eq!(
-            extract_tar_gz(&tar_gz("pdx-ls", PAYLOAD), "pdx-ls"),
+            extract_tar_gz(&tar_gz("pdc", PAYLOAD), "pdc"),
             Ok(PAYLOAD.to_vec())
         );
         assert_eq!(
-            extract_zip(&zip("pdx-ls.exe", PAYLOAD), "pdx-ls.exe"),
+            extract_zip(&zip("pdc.exe", PAYLOAD), "pdc.exe"),
             Ok(PAYLOAD.to_vec())
         );
     }
@@ -939,7 +939,7 @@ mod tests {
     #[test]
     fn cached_server_requires_a_matching_local_executable_checksum() {
         let root = TestDirectory::new();
-        let binary = root.0.join("pdx-ls");
+        let binary = root.0.join("pdc");
         let binary_path = binary.to_str().expect("UTF-8 test path");
         fs::write(&binary, PAYLOAD).expect("write cached executable");
         assert!(!cached_server_is_valid(binary_path));
@@ -963,8 +963,8 @@ mod tests {
         use std::os::unix::fs::symlink;
 
         let root = TestDirectory::new();
-        let target = root.0.join("target-pdx-ls");
-        let binary = root.0.join("pdx-ls");
+        let target = root.0.join("target-pdc");
+        let binary = root.0.join("pdc");
         fs::write(&target, PAYLOAD).expect("write symlink target");
         symlink(&target, &binary).expect("link cached executable");
         fs::write(

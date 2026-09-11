@@ -1,16 +1,16 @@
 // Smoke test for the VSCode mission-preview data contract: drives the real
-// pdx-ls over stdio JSON-RPC and validates the `pdx/missionPreview` payload
+// pdc over stdio JSON-RPC and validates the `pdc/missionPreview` payload
 // shape the webview renderer consumes. Exit code 1 on any mismatch.
 //
-// Usage: node scripts/smoke.mjs [path-to-pdx-ls-binary]
-// Default: `cargo run --quiet -p pdx-lsp --bin pdx-ls` (repo checkout).
+// Usage: node scripts/smoke.mjs [path-to-pdc-binary]
+// Default: `cargo run --quiet -p pdc --bin pdc` (repo checkout).
 
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { delimiter, dirname, join } from 'node:path';
-// The extension's PATH fallback must detect a missing `pdx-ls` before launch,
+// The extension's PATH fallback must detect a missing `pdc` before launch,
 // so the user gets an actionable warning instead of a bare spawn ENOENT. The
 // helper lives in the compiled `out/` tree (check runs compile first).
 import { findExecutableOnPath } from '../out/serverPath.js';
@@ -67,7 +67,7 @@ function run(serverArgs) {
     child.on('error', reject);
     child.on('exit', (code) => {
       if (code !== 0 && responses.length === 0) {
-        reject(new Error(`pdx-ls exited with code ${code}`));
+        reject(new Error(`pdc exited with code ${code}`));
       } else {
         resolve(responses);
       }
@@ -81,7 +81,7 @@ function run(serverArgs) {
       capabilities: {},
     });
     child.stdin.write(encode({ jsonrpc: '2.0', method: 'initialized', params: {} }));
-    request(2, 'pdx/missionPreview', {
+    request(2, 'pdc/missionPreview', {
       path: 'missions/smoke.txt',
       text: MISSION_TEXT,
       uri: 'file:///tmp/paradoxcode-smoke/missions/smoke.txt',
@@ -101,7 +101,7 @@ function run(serverArgs) {
     request(3, 'textDocument/semanticTokens/full', {
       textDocument: { uri: scriptUri },
     });
-    request(5, 'pdx/workspaceFiles');
+    request(5, 'pdc/workspaceFiles');
     request(4, 'shutdown', {});
     child.stdin.write(encode({ jsonrpc: '2.0', method: 'exit', params: {} }));
     child.stdin.end();
@@ -126,7 +126,7 @@ const ARROW_GLYPHS = new Set([
 
 const serverArgs = process.argv.length > 2
   ? process.argv.slice(2)
-  : ['cargo', 'run', '--quiet', '-p', 'pdx-lsp', '--bin', 'pdx-ls'];
+  : ['cargo', 'run', '--quiet', '-p', 'pdc', '--bin', 'pdc'];
 
 const responses = await run(serverArgs);
 
@@ -142,7 +142,7 @@ if (!Array.isArray(tokenScopes) || tokenScopes.length === 0) {
 }
 
 // Semantic tokens remain enabled even with the local TextMate fallback grammar, so a
-// theme can overlay rule-aware classifications once pdx-ls is ready.
+// theme can overlay rule-aware classifications once pdc is ready.
 const defaultConfig = manifest?.contributes?.configurationDefaults;
 if (defaultConfig?.['[eu4]']?.['editor.semanticHighlighting.enabled'] !== true) {
   fail('configurationDefaults["[eu4]"].editor.semanticHighlighting.enabled must be true');
@@ -165,7 +165,7 @@ for (const entry of tokenScopes) {
 }
 
 // The server must narrate its initialization over `window/logMessage`, so the
-// VS Code output panel shows what pdx-ls is doing instead of staying empty.
+// VS Code output panel shows what pdc is doing instead of staying empty.
 // The client registers a handler that forwards these to the 'ParadoxCode'
 // channel and mirrors the latest stage into the status-bar tooltip.
 const serverLogs = responses.filter((value) => value.method === 'window/logMessage');
@@ -175,7 +175,7 @@ if (serverLogs.length === 0) {
   const messages = serverLogs
     .map((log) => log?.params?.message)
     .filter((message) => typeof message === 'string');
-  if (!messages.some((message) => message.includes('pdx-ls initializing'))) {
+  if (!messages.some((message) => message.includes('pdc initializing'))) {
     fail('initialize log trail must include the startup stage');
   }
   if (!messages.some((message) => message.includes('Initialization finished'))) {
@@ -185,9 +185,9 @@ if (serverLogs.length === 0) {
 
 const preview = responses.find((value) => value.id === 2);
 if (!preview) {
-  fail('no pdx/missionPreview response received');
+  fail('no pdc/missionPreview response received');
 } else if (preview.error) {
-  fail(`pdx/missionPreview failed: ${JSON.stringify(preview.error)}`);
+  fail(`pdc/missionPreview failed: ${JSON.stringify(preview.error)}`);
 } else {
   const result = preview.result;
   const nodes = result?.nodes;
@@ -288,11 +288,11 @@ if (!semanticTokens) {
 
 const workspaceFiles = responses.find((value) => value.id === 5);
 if (!workspaceFiles) {
-  fail('no pdx/workspaceFiles response received');
+  fail('no pdc/workspaceFiles response received');
 } else if (workspaceFiles.error) {
-  fail(`pdx/workspaceFiles failed: ${JSON.stringify(workspaceFiles.error)}`);
+  fail(`pdc/workspaceFiles failed: ${JSON.stringify(workspaceFiles.error)}`);
 } else if (!Array.isArray(workspaceFiles.result?.roots) || !Array.isArray(workspaceFiles.result?.files)) {
-  fail('pdx/workspaceFiles must return roots and files arrays');
+  fail('pdc/workspaceFiles must return roots and files arrays');
 }
 
 const failures = process.exitCode === 1;
@@ -300,16 +300,16 @@ console.log(failures ? 'smoke FAILED' : 'smoke OK');
 
 const fakeDir = mkdtempSync(join(tmpdir(), 'paradoxcode-path-'));
 try {
-  const fakeName = process.platform === 'win32' ? 'pdxls-fake.exe' : 'pdxls-fake';
+  const fakeName = process.platform === 'win32' ? 'pdc-fake.exe' : 'pdc-fake';
   writeFileSync(join(fakeDir, fakeName), '');
   const previousPath = process.env.PATH;
   process.env.PATH = fakeDir + (previousPath ? delimiter + previousPath : '');
-  const found = findExecutableOnPath('pdxls-fake');
+  const found = findExecutableOnPath('pdc-fake');
   process.env.PATH = previousPath;
   if (found !== join(fakeDir, fakeName)) {
     fail(`findExecutableOnPath must resolve ${fakeName} from PATH`);
   }
-  if (findExecutableOnPath('pdxls-definitely-missing') !== undefined) {
+  if (findExecutableOnPath('pdc-definitely-missing') !== undefined) {
     fail('findExecutableOnPath must return undefined for a name not on PATH');
   }
 } finally {

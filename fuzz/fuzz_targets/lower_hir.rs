@@ -2,11 +2,11 @@
 
 use std::sync::OnceLock;
 
+use hir::{HirFile, lower, lower_with_profile};
 use libfuzzer_sys::fuzz_target;
-use pdx_engine::hir::{HirFile, lower, lower_with_profile};
-use pdx_parser::{FileFormat, parse};
-use pdx_rules::{GameProfile, RuleSet};
-use pdx_text::LogicalPath;
+use parser::{FileFormat, parse};
+use rules::{GameProfile, RuleSet};
+use text::LogicalPath;
 
 static PROFILE_INPUTS: OnceLock<(RuleSet, GameProfile, LogicalPath)> = OnceLock::new();
 
@@ -17,8 +17,8 @@ fuzz_target!(|data: &[u8]| {
 
         let (rules, profile, path) = PROFILE_INPUTS.get_or_init(|| {
             (
-                pdx_game::eu4::bootstrap_rules(),
-                pdx_game::eu4::profile(),
+                game::eu4::bootstrap_rules(),
+                game::eu4::profile(),
                 LogicalPath::parse("common/scripted_effects/fuzz.txt")
                     .expect("static fuzz path is valid"),
             )

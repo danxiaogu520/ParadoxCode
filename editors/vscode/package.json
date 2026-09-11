@@ -19,7 +19,7 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": false,
-      "description": "ParadoxCode downloads and runs the checksum-verified pdx-ls binary for the current platform."
+      "description": "ParadoxCode downloads and runs the checksum-verified pdc binary for the current platform."
     }
   },
   "categories": [
@@ -673,7 +673,7 @@
         },
         {
           "command": "paradoxcode.localisation.revealOriginal",
-          "when": "resourceScheme == pdxloc",
+          "when": "resourceScheme == pdcloc",
           "group": "navigation@3"
         }
       ],
@@ -707,10 +707,10 @@
     "configuration": {
       "title": "ParadoxCode",
       "properties": {
-        "paradoxcode.pdxLsPath": {
+        "paradoxcode.serverPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "%configuration.pdxLsPath.description%"
+          "markdownDescription": "%configuration.serverPath.description%"
         },
         "paradoxcode.serverInstallDirectory": {
           "type": "string",

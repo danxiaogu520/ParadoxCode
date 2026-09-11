@@ -219,11 +219,11 @@ UTF-8 重编码），对应 paratranz 的 `Latin1（EU4 txt）` 目标档。para
 
 | # | 优先级 | 需求 |
 |---|---|---|
-| FR-1 | P0 | **编解码核心库**：按 §3.2 规格实现双向转码，纯函数、无状态、纯 Rust（建议落位 `pdx-parser` 或新 crate）。API 返回结构化结果（成功/不可编码码点列表），不 panic。支持 `paratranz` 与 `dll-full` 两档转义集。 |
-| FR-2 | P0 | **CLI 转码与校验**：`pdx loc`（命名待定）子命令：单文件/目录双向转码、`--check` 只校验不写、`--dry-run`、`--profile`、目录映射（母本树 ↔ 发行本树，如 `l_english/ ↔ replace/`）。退出码供 CI 使用。保留 BOM/CRLF/结构（§3.2.4）。 |
+| FR-1 | P0 | **编解码核心库**：按 §3.2 规格实现双向转码，纯函数、无状态、纯 Rust（建议落位 `parser` 或新 crate）。API 返回结构化结果（成功/不可编码码点列表），不 panic。支持 `paratranz` 与 `dll-full` 两档转义集。 |
+| FR-2 | P0 | **转码与校验**：`tools` 子命令（原计划的独立 loc 命令，随去 CLI 化调整）：单文件/目录双向转码、`--check` 只校验不写、`--dry-run`、`--profile`、目录映射（母本树 ↔ 发行本树，如 `l_english/ ↔ replace/`）。退出码供 CI 使用。保留 BOM/CRLF/结构（§3.2.4）。 |
 | FR-3 | P1 | **一致性诊断**：a) 母本 vs `decode(发行本)` 的行/键级差异报告（漂移检测）；b) "可读中文被误存入发行本"检测（发行本中出现未转义 CJK 即告警）；c) 不可编码码点（非 BMP 等）警告。CLI 与 LSP 双入口，诊断码纳入 `docs/diagnostics.md` 体系。 |
 | FR-4 | P1 | **编辑器可读性**：打开发行本时提供"解码预览"（命令输出/hover）；转义三元组的 inline 预览（复用 inlay hint 基建）；语义高亮把三元组作为整体着色。 |
-| FR-5 | P2（可行性已确认，机制见 §9-B） | **透明编辑视图**：自定义 scheme（如 `pdxloc://`）注册 `FileSystemProvider`：`readFile` 读盘→解码→返回可读 UTF-8，`writeFile` 收到可读文本→编码→写回磁盘。编辑器内打开发行本直接看到中文，Ctrl+S 落盘即游戏编码。LSP 侧这些文档走 textSync（didOpen/didChange 传解码后全文），服务端不读盘，从根上绕开坐标映射；未打开文件的服务端文件操作经 URI 重写层解码访问。需配套：外部磁盘变更 watcher 映射、双重转码检测、状态栏指示当前视图。 |
+| FR-5 | P2（可行性已确认，机制见 §9-B） | **透明编辑视图**：自定义 scheme（如 `pdcloc://`）注册 `FileSystemProvider`：`readFile` 读盘→解码→返回可读 UTF-8，`writeFile` 收到可读文本→编码→写回磁盘。编辑器内打开发行本直接看到中文，Ctrl+S 落盘即游戏编码。LSP 侧这些文档走 textSync（didOpen/didChange 传解码后全文），服务端不读盘，从根上绕开坐标映射；未打开文件的服务端文件操作经 URI 重写层解码访问。需配套：外部磁盘变更 watcher 映射、双重转码检测、状态栏指示当前视图。 |
 | FR-7 | P2 | **git 集成**：clean/smudge filter（工作区保持转码、仓库 blob 存可读中文）+ textconv（diff 可读）+ 自动生成 `.gitattributes` 片段。依赖 FR-2 CLI 作为 filter 驱动程序。解决 O2（发行本入 git 的 diff 噪音）并使 `git diff/log/blame` 全部可读。注意：VS Code SCM 视图的 diff 是否吃 textconv 需实现期验证，命令行 git 确定可读。 |
 | FR-6 | P1 | **兼容性测试基建**：黄金语料 = EDG-KTP 文件对 + 全量探针（每个转义集字节值 × 高/低位置 × 常用汉字抽样）+ paratranz 对拍样例；纳入 CI 与 fuzz（仓库已有 `parse_localisation` fuzz 先例）。用于把 §3.3 的转义集结论从"样例验证"升级为"全量标定"。 |
 | FR-8 | P1 | **本地化数据库单源化**（机制见方案文档 §7）：预览/hover/补全消费的本地化值改为每 (键, 语言) 恰一有效值。层序 current mod > dependency（按声明序）> vanilla；同层内一律平等（不区分 `l_*` 与 `replace/`），按读取序后来居上。值经 FR-1 解码器在引擎读取处（分类器门控）取自发行本真实文本，消灭"两套本地化并存"的多值与乱码。配套：索引缓存携带 codec 版本号、跳转定义坐标映射。 |
@@ -267,8 +267,8 @@ UTF-8 重编码），对应 paratranz 的 `Latin1（EU4 txt）` 目标档。para
   `localisation/`（更干净，但改变现有布局）？
 - **O2 发行本是否入 git**：入（发布即用，但 diff 噪音）vs 不入（构建产物，需发布流程
   保证生成）。
-- **O3 CLI 命令形态**：`pdx loc transcode|check` 还是并入现有 `pdx check` 体系？
-- **O4 目录映射配置**：放 `pdx` 项目配置、`.mod` 文件旁的约定，还是 CLI 参数？
+- **O3 命令形态**：随仓库整体去 CLI 化，FR-2 落在 `tools`（`cargo run -p tools -- ...`），不进 `pdc`。
+- **O4 目录映射配置**：`.mod` 文件旁的约定，还是命令参数？
 - **O5 字节级兼容承诺范围**：仅默认 paratranz 档，还是提供 `--exact-paratranz` 严格模式
   （探针标定完成前无法承诺 100%）？
 - **O6 透明视图的产品形态**：虚拟 scheme 文件夹加入工作区（全量透明）vs 命令逐文件打开

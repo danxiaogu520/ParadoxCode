@@ -1,0 +1,44 @@
+[package]
+name = "engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Analysis host, immutable snapshots, and query caching for ParadoxCode."
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish = false
+
+[dependencies]
+rustc-hash = "2"
+hir = { path = "../hir" }
+vfs = { path = "../vfs" }
+index = { path = "../index" }
+rules = { path = "../rules" }
+parser = { path = "../parser" }
+text = { path = "../text" }
+serde = { version = "1", features = ["derive"] }
+rusqlite = { version = "0.40", features = ["bundled", "hooks"] }
+sha2 = "0.11"
+zstd = "0.14"
+postcard = { version = "1.1", default-features = false, features = ["alloc"] }
+transcode = { path = "../transcode" }
+encoding_rs = "0.8"
+serde_json = "1"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+ide = { path = "../ide" }
+game = { path = "../game" }
+
+[[bench]]
+name = "synthetic_workspace"
+harness = false
+
+[[bench]]
+name = "index_cache"
+harness = false

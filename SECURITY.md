@@ -30,7 +30,7 @@ for what that typically looks like.
 
 The following areas are in scope:
 
-- `pdx-ls` and the `pdx` CLI: parsing and indexing of untrusted files, cache handling, archive
+- `pdc`: parsing and indexing of untrusted files, cache handling, archive
   extraction, path handling, and resource limits.
 - Server bootstrap and checksum verification in the VS Code and Zed extensions.
 - Rule/packaging artifacts: integrity metadata, manifest checks, and redistribution boundaries.

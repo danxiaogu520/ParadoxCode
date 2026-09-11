@@ -123,7 +123,7 @@ readable CJK text: without the escape triples the EU4dll patch expects, the
 game renders mojibake. Transcode the file (`ParadoxCode: Transcode localisation
 file`) or keep readable sources in the master tree outside `replace/`. Files
 under other `localisation/` directories are master copies by convention and
-are never flagged. A decoded `pdxloc://` view suppresses this code: readable
+are never flagged. A decoded `pdcloc://` view suppresses this code: readable
 text is the point of that view, and saving re-encodes the shard behind it.
 
 ## LocalisationMixedEncoding

@@ -1,8 +1,8 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use pdx_parser::{FileFormat, SyntaxEdit, parse};
-use pdx_text::TextRange;
+use parser::{FileFormat, SyntaxEdit, parse};
+use text::TextRange;
 
 fuzz_target!(|data: &[u8]| {
     let Ok(seed) = std::str::from_utf8(data) else {

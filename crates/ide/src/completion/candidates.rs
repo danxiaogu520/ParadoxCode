@@ -1,0 +1,1973 @@
+use std::collections::{BTreeMap, HashSet};
+
+use crate::semantic::*;
+use crate::support::*;
+use crate::types::*;
+use engine::AnalysisSnapshot;
+use rules::{
+    KeyMatcher, ProfileRootEntryInsertion, ProfileRootEntrySource, RuleShape, ValueMatcher,
+};
+use text::TextRange;
+
+use super::context::SemanticCompletionContext;
+use super::dynamic_constraints::infer_dynamic_value_constraints;
+#[cfg(test)]
+use super::support::finalize_completion_items;
+use super::support::{
+    CompletionRankContext, CompletionSchemaTier, CompletionSpecificity, RankedCompletionItem,
+    push_completion,
+};
+
+pub(crate) struct SemanticCompletionRule<'rule, 'path> {
+    pub(crate) rule: &'rule rules::SemanticRule,
+    pub(crate) parent_path: &'path [std::sync::Arc<str>],
+    pub(crate) scope: &'path ScopeContext,
+    pub(crate) schema_tier: CompletionSchemaTier,
+}
+
+#[derive(Default)]
+pub(crate) struct CompletionMemberCache {
+    pub(crate) workspace: BTreeMap<(String, String), Vec<String>>,
+    pub(crate) enums: BTreeMap<(String, String), Vec<String>>,
+    typed_prefixes: BTreeMap<String, Vec<String>>,
+}
+
+impl CompletionMemberCache {
+    fn workspace_member_names(
+        &mut self,
+        snapshot: &AnalysisSnapshot,
+        type_name: &str,
+        prefix: &str,
+    ) -> &[String] {
+        let cache_key = (type_name.to_ascii_lowercase(), prefix.to_ascii_lowercase());
+        self.workspace
+            .entry(cache_key)
+            .or_insert_with(|| workspace_member_index(snapshot, type_name).select(prefix))
+    }
+
+    fn enum_member_names(
+        &mut self,
+        snapshot: &AnalysisSnapshot,
+        enum_name: &str,
+        prefix: &str,
+    ) -> &[String] {
+        let cache_key = (enum_name.to_ascii_lowercase(), prefix.to_ascii_lowercase());
+        if !self.enums.contains_key(&cache_key) {
+            let mut names = snapshot
+                .rules()
+                .model()
+                .semantic
+                .enum_values
+                .get(enum_name)
+                .cloned()
+                .unwrap_or_default();
+            names.extend(
+                self.workspace_member_names(snapshot, enum_name, prefix)
+                    .iter()
+                    .cloned(),
+            );
+            names.retain(|name| completion_matches(name, prefix));
+            names.sort_by_key(|name| name.to_ascii_lowercase());
+            names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+            self.enums.insert(cache_key.clone(), names);
+        }
+        self.enums.get(&cache_key).map_or(&[], Vec::as_slice)
+    }
+
+    /// Names resolvable by one typed-prefix matcher: top-level exact-key rules of `context`
+    /// whose own value matcher passes the operand filter.
+    fn typed_prefix_member_names(
+        &mut self,
+        snapshot: &AnalysisSnapshot,
+        context: &str,
+        operand: rules::TypedPrefixOperand,
+    ) -> &[String] {
+        let cache_key = format!(
+            "{}|{}",
+            context.to_ascii_lowercase(),
+            semantic_typed_prefix_operand_tag(operand)
+        );
+        if !self.typed_prefixes.contains_key(&cache_key) {
+            let rules = snapshot.rules();
+            let mut names: Vec<String> = rules
+                .semantic_rule_indices_for_context(context)
+                .filter_map(|index| rules.semantic_rule_at(index))
+                .filter(|rule| {
+                    rule.parent_path.is_empty()
+                        && matches!(rule.key, KeyMatcher::Exact(_))
+                        && typed_prefix_operand_allows(operand, &rule.value)
+                })
+                .filter_map(|rule| match &rule.key {
+                    KeyMatcher::Exact(name) => Some(name.clone()),
+                    _ => None,
+                })
+                .collect();
+            names.sort_by_key(|name| name.to_ascii_lowercase());
+            names.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+            self.typed_prefixes.insert(cache_key.clone(), names);
+        }
+        self.typed_prefixes
+            .get(&cache_key)
+            .map_or(&[], Vec::as_slice)
+    }
+}
+
+/// Stable tag for one typed-prefix operand filter, used as a completion cache key fragment.
+fn semantic_typed_prefix_operand_tag(operand: rules::TypedPrefixOperand) -> &'static str {
+    match operand {
+        rules::TypedPrefixOperand::NumericOrBool => "numeric_or_bool",
+    }
+}
+
+/// Offers the `matcher_prefix<name>` spellings a typed-prefix matcher accepts, such as
+/// `trigger_value:<numeric trigger>`.
+#[expect(clippy::too_many_arguments)]
+fn add_typed_prefix_value_items(
+    snapshot: &AnalysisSnapshot,
+    member_cache: &mut CompletionMemberCache,
+    items: &mut Vec<RankedCompletionItem>,
+    matcher_prefix: &str,
+    context: &str,
+    operand: rules::TypedPrefixOperand,
+    documentation: Option<String>,
+    replacement_range: TextRange,
+    query_prefix: &str,
+    deprecated: bool,
+    schema_tier: CompletionSchemaTier,
+) {
+    for name in member_cache.typed_prefix_member_names(snapshot, context, operand) {
+        let label = format!("{matcher_prefix}{name}");
+        if !completion_matches(&label, query_prefix) {
+            continue;
+        }
+        push_completion(
+            items,
+            CompletionItem {
+                label: label.clone(),
+                kind: CompletionKind::Value,
+                detail: format!("{matcher_prefix}{context}"),
+                documentation: documentation.clone(),
+                replacement_range,
+                insert_text: label,
+                sort_score: 0,
+                deprecated,
+                resolve_data: None,
+            },
+            query_prefix,
+            CompletionRankContext::new(
+                schema_tier,
+                CompletionSpecificity::Value,
+                false,
+                deprecated,
+            ),
+        );
+    }
+}
+
+/// Returns whether a rule's key behaves like a callable script command or trigger predicate.
+///
+/// The rule source deliberately keeps these as ordinary semantic contexts.  Keeping the
+/// presentation hint here lets the LSP layer stay a protocol adapter instead of having to infer
+/// game semantics from a completion item's detail text.
+fn is_command_context(context: &str) -> bool {
+    context.eq_ignore_ascii_case("effect") || context.eq_ignore_ascii_case("trigger")
+}
+
+fn key_completion_kind(snapshot: &AnalysisSnapshot, rule: &rules::SemanticRule) -> CompletionKind {
+    match &rule.key {
+        KeyMatcher::Enum(_) => CompletionKind::EnumMember,
+        KeyMatcher::Type(type_name) | KeyMatcher::Dynamic(type_name)
+            if dynamic_definition_type(snapshot, type_name) =>
+        {
+            CompletionKind::DynamicDefinition
+        }
+        KeyMatcher::Exact(_) | KeyMatcher::Type(_) | KeyMatcher::Dynamic(_)
+            if is_command_context(&rule.context) =>
+        {
+            CompletionKind::Command
+        }
+        _ => CompletionKind::Key,
+    }
+}
+
+fn key_specificity(
+    snapshot: &AnalysisSnapshot,
+    rule: &rules::SemanticRule,
+) -> CompletionSpecificity {
+    match &rule.key {
+        KeyMatcher::Exact(_) => CompletionSpecificity::Exact,
+        KeyMatcher::Enum(_) => CompletionSpecificity::Enum,
+        KeyMatcher::Type(type_name) if dynamic_definition_type(snapshot, type_name) => {
+            CompletionSpecificity::DynamicDefinition
+        }
+        KeyMatcher::Type(_) => CompletionSpecificity::Type,
+        KeyMatcher::Dynamic(_) => CompletionSpecificity::Dynamic,
+        KeyMatcher::Date | KeyMatcher::Int { .. } | KeyMatcher::AnyScalar => {
+            CompletionSpecificity::Fallback
+        }
+    }
+}
+
+/// Filters dynamic-definition member names by their inferred entry contract
+/// against the scope active at the completion site, mirroring
+/// `dynamic_call_site_diagnostics`: only `Scopes` contracts filter, an `Empty`
+/// contract stays visible (its error is reported at the definition site), and
+/// an unknown caller scope (`any`) never filters.
+fn contract_filtered_dynamic_members(
+    snapshot: &AnalysisSnapshot,
+    kind: &str,
+    members: &[String],
+    scope: &ScopeContext,
+) -> Vec<String> {
+    let current = scope.current.as_ref();
+    if current.eq_ignore_ascii_case("any") || current.eq_ignore_ascii_case("invalid") {
+        return members.to_vec();
+    }
+    let report = crate::dynamic_contracts::dynamic_contract_report_view(snapshot);
+    let profile = snapshot.game_profile();
+    members
+        .iter()
+        .filter(|name| {
+            let Some(contract) = report.contract(kind, name) else {
+                return true;
+            };
+            !matches!(contract, crate::dynamic_contracts::ScopeContract::Scopes(_))
+                || contract.accepts(profile, current)
+        })
+        .cloned()
+        .collect()
+}
+
+/// Lists workspace members of a dynamic-definition kind filtered by entry
+/// contract, or the plain member list for every other kind.
+fn dynamic_members_for_scope(
+    snapshot: &AnalysisSnapshot,
+    member_cache: &mut CompletionMemberCache,
+    type_name: &str,
+    prefix: &str,
+    scope: &ScopeContext,
+) -> Vec<String> {
+    let members = member_cache.workspace_member_names(snapshot, type_name, prefix);
+    if dynamic_definition_type(snapshot, type_name) {
+        contract_filtered_dynamic_members(snapshot, type_name, members, scope)
+    } else {
+        members.to_vec()
+    }
+}
+
+fn rule_required_missing(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    candidate: &SemanticCompletionRule<'_, '_>,
+) -> bool {
+    // `min_occurs` is populated with the parser's default cardinality for nearly every rule;
+    // the explicit `required` flag is the schema's signal that a member is expected in the
+    // current container.  Treating every `min_occurs = 1` row as required would bury ordinary
+    // commands such as `always` behind hundreds of mandatory-looking aliases.
+    if !candidate.rule.required {
+        return false;
+    }
+    !context
+        .existing_keys
+        .iter()
+        .any(|key| semantic_rule_key_matches(snapshot, candidate.rule, candidate.parent_path, key))
+}
+
+fn rule_rank_context(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    candidate: &SemanticCompletionRule<'_, '_>,
+    specificity: CompletionSpecificity,
+) -> CompletionRankContext {
+    CompletionRankContext::new(
+        candidate.schema_tier,
+        specificity,
+        rule_required_missing(snapshot, context, candidate),
+        candidate.rule.deprecated,
+    )
+}
+
+pub(crate) fn semantic_rules_for_completion<'rule, 'path>(
+    snapshot: &'rule AnalysisSnapshot,
+    context: &'path SemanticCompletionContext,
+) -> Vec<SemanticCompletionRule<'rule, 'path>> {
+    let mut rules = semantic_rules_for_container(
+        snapshot,
+        &context.context,
+        &context.parent_path,
+        &context.scope,
+    )
+    .into_iter()
+    .map(|rule| SemanticCompletionRule {
+        rule,
+        parent_path: &context.parent_path,
+        scope: &context.scope,
+        schema_tier: if context.dynamic_inferred {
+            CompletionSchemaTier::DynamicInferred
+        } else {
+            CompletionSchemaTier::CurrentContext
+        },
+    })
+    .collect::<Vec<_>>();
+    for (structural_context, structural_path) in &context.structural_containers {
+        rules.extend(
+            semantic_rules_for_container(
+                snapshot,
+                structural_context,
+                structural_path,
+                &context.scope,
+            )
+            .into_iter()
+            .map(|rule| SemanticCompletionRule {
+                rule,
+                parent_path: structural_path,
+                scope: &context.scope,
+                schema_tier: CompletionSchemaTier::ExplicitParentMember,
+            }),
+        );
+    }
+    for alternative in &context.alternative_containers {
+        rules.extend(
+            semantic_rules_for_container(
+                snapshot,
+                &alternative.context,
+                &alternative.parent_path,
+                &alternative.scope,
+            )
+            .into_iter()
+            .map(|rule| SemanticCompletionRule {
+                rule,
+                parent_path: &alternative.parent_path,
+                scope: &alternative.scope,
+                schema_tier: if context.dynamic_inferred {
+                    CompletionSchemaTier::DynamicInferred
+                } else {
+                    CompletionSchemaTier::Alternative
+                },
+            }),
+        );
+    }
+    rules.sort_by(|left, right| {
+        left.rule
+            .id
+            .cmp(&right.rule.id)
+            .then_with(|| left.schema_tier.cmp(&right.schema_tier))
+    });
+    rules.dedup_by(|left, right| {
+        left.rule.id == right.rule.id
+            && left.parent_path.len() == right.parent_path.len()
+            && left
+                .parent_path
+                .iter()
+                .zip(right.parent_path)
+                .all(|(left, right)| left.eq_ignore_ascii_case(right))
+            && left.scope == right.scope
+    });
+    rules
+}
+
+#[cfg(test)]
+pub(crate) fn add_semantic_key_items(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    member_cache: &mut CompletionMemberCache,
+    items: &mut Vec<CompletionItem>,
+    replacement_range: TextRange,
+    prefix: &str,
+    insert_assignment: bool,
+) {
+    let mut ranked = Vec::new();
+    add_semantic_key_items_ranked(
+        snapshot,
+        context,
+        member_cache,
+        &mut ranked,
+        replacement_range,
+        prefix,
+        insert_assignment,
+    );
+    items.extend(finalize_completion_items(ranked));
+}
+
+pub(crate) fn add_semantic_key_items_ranked(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    member_cache: &mut CompletionMemberCache,
+    items: &mut Vec<RankedCompletionItem>,
+    replacement_range: TextRange,
+    prefix: &str,
+    insert_assignment: bool,
+) {
+    add_type_root_key_items(
+        snapshot,
+        context,
+        member_cache,
+        items,
+        replacement_range,
+        prefix,
+        insert_assignment,
+    );
+    for candidate in semantic_rules_for_completion(snapshot, context) {
+        let rule = candidate.rule;
+        if !semantic_scope_allows(rule, candidate.scope) {
+            continue;
+        }
+        // The file-root entry scaffold is the only container that suppresses single-instance
+        // keys already declared at the document root; ordinary containers keep offering
+        // declared keys so users can repeat or edit them.
+        if context.root_entry_container
+            && rule.max_occurs == Some(1)
+            && context
+                .existing_keys
+                .iter()
+                .any(|key| semantic_rule_key_matches(snapshot, rule, candidate.parent_path, key))
+        {
+            continue;
+        }
+        let documentation = (!rule.documentation.is_empty()).then(|| rule.documentation.join("\n"));
+        if matches!(rule.shape, RuleShape::LeafValue) {
+            // A leaf-value container such as `required_missions = { ... }` accepts any key as
+            // an instance of the rule's value type; complete the workspace members of that
+            // type instead of rule keys.
+            add_leaf_value_member_items(
+                snapshot,
+                rule,
+                member_cache,
+                items,
+                replacement_range,
+                prefix,
+                documentation,
+                candidate.schema_tier,
+            );
+            continue;
+        }
+        match &rule.key {
+            KeyMatcher::Exact(label) => push_completion(
+                items,
+                CompletionItem {
+                    label: label.clone(),
+                    kind: key_completion_kind(snapshot, rule),
+                    detail: rule_context_detail(rule),
+                    documentation,
+                    replacement_range,
+                    insert_text: key_insert_text(rule, label, insert_assignment),
+                    sort_score: 0,
+                    deprecated: rule.deprecated,
+                    resolve_data: Some(format!("rule:{}", rule.id)),
+                },
+                prefix,
+                rule_rank_context(snapshot, context, &candidate, CompletionSpecificity::Exact),
+            ),
+            KeyMatcher::Type(type_name) => {
+                for label in dynamic_members_for_scope(
+                    snapshot,
+                    member_cache,
+                    type_name,
+                    prefix,
+                    candidate.scope,
+                ) {
+                    let insert_text = if !insert_assignment {
+                        label.clone()
+                    } else if dynamic_definition_type(snapshot, type_name) {
+                        scripted_definition_snippet(snapshot, type_name, &label)
+                    } else {
+                        key_insert_text(rule, &label, true)
+                    };
+                    push_completion(
+                        items,
+                        CompletionItem {
+                            label: label.clone(),
+                            kind: key_completion_kind(snapshot, rule),
+                            detail: type_name.clone(),
+                            documentation: documentation.clone(),
+                            replacement_range,
+                            insert_text,
+                            sort_score: 0,
+                            deprecated: rule.deprecated,
+                            resolve_data: Some(format!("rule:{}", rule.id)),
+                        },
+                        prefix,
+                        rule_rank_context(
+                            snapshot,
+                            context,
+                            &candidate,
+                            key_specificity(snapshot, rule),
+                        ),
+                    );
+                }
+            }
+            KeyMatcher::Enum(enum_name) => {
+                match qualified_parameter_domain(snapshot, rule, candidate.parent_path) {
+                    QualifiedParameterDomain::Known(labels) => {
+                        for label in labels {
+                            push_completion(
+                                items,
+                                CompletionItem {
+                                    label: label.clone(),
+                                    kind: CompletionKind::DynamicParameter,
+                                    detail: "parameter".to_owned(),
+                                    documentation: documentation.clone(),
+                                    replacement_range,
+                                    insert_text: key_insert_text(rule, &label, insert_assignment),
+                                    sort_score: 0,
+                                    deprecated: rule.deprecated,
+                                    resolve_data: Some(format!("rule:{}", rule.id)),
+                                },
+                                prefix,
+                                rule_rank_context(
+                                    snapshot,
+                                    context,
+                                    &candidate,
+                                    CompletionSpecificity::Enum,
+                                ),
+                            );
+                        }
+                    }
+                    QualifiedParameterDomain::OpenWorld => {}
+                    QualifiedParameterDomain::NotApplicable => {
+                        for label in member_cache.enum_member_names(snapshot, enum_name, prefix) {
+                            push_completion(
+                                items,
+                                CompletionItem {
+                                    label: label.clone(),
+                                    kind: CompletionKind::EnumMember,
+                                    detail: enum_name.clone(),
+                                    documentation: documentation.clone(),
+                                    replacement_range,
+                                    insert_text: key_insert_text(rule, label, insert_assignment),
+                                    sort_score: 0,
+                                    deprecated: rule.deprecated,
+                                    resolve_data: Some(format!("rule:{}", rule.id)),
+                                },
+                                prefix,
+                                rule_rank_context(
+                                    snapshot,
+                                    context,
+                                    &candidate,
+                                    CompletionSpecificity::Enum,
+                                ),
+                            );
+                        }
+                    }
+                }
+            }
+            KeyMatcher::Dynamic(kind) => {
+                for label in
+                    dynamic_members_for_scope(snapshot, member_cache, kind, prefix, candidate.scope)
+                {
+                    push_completion(
+                        items,
+                        CompletionItem {
+                            label: label.clone(),
+                            kind: key_completion_kind(snapshot, rule),
+                            detail: kind.clone(),
+                            documentation: documentation.clone(),
+                            replacement_range,
+                            insert_text: key_insert_text(rule, &label, true),
+                            sort_score: 0,
+                            deprecated: rule.deprecated,
+                            resolve_data: Some(format!("rule:{}", rule.id)),
+                        },
+                        prefix,
+                        rule_rank_context(
+                            snapshot,
+                            context,
+                            &candidate,
+                            CompletionSpecificity::Dynamic,
+                        ),
+                    );
+                }
+            }
+            // Open-ended keys accept arbitrary spellings and carry no member information. Date
+            // keys are validated as a shape, but a fixed sample date is not a useful candidate.
+            KeyMatcher::AnyScalar | KeyMatcher::Date | KeyMatcher::Int { .. } => {}
+        }
+    }
+}
+
+/// Adds the concrete keys that instantiate a type at a file root.
+///
+/// The ordinary `root_entries` container carries path selection and duplicate suppression, while
+/// this helper supplies type-instance names when that container has no per-key semantic rule rows.
+/// Static `type_root_keys`, profile enums, and workspace members are all supported through the
+/// profile's source selector.
+fn add_type_root_key_items(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    member_cache: &mut CompletionMemberCache,
+    items: &mut Vec<RankedCompletionItem>,
+    replacement_range: TextRange,
+    prefix: &str,
+    insert_assignment: bool,
+) {
+    if !context.root_entry_container {
+        return;
+    }
+    let Some(entry_name) = context.context.strip_prefix("root:") else {
+        return;
+    };
+    let semantic = &snapshot.rules().model().semantic;
+    let Some((type_name, _)) = semantic.type_descriptors.iter().find(|(_, descriptor)| {
+        descriptor
+            .root_entries
+            .as_deref()
+            .is_some_and(|name| name.eq_ignore_ascii_case(entry_name))
+    }) else {
+        return;
+    };
+    let profile_spec = snapshot.game_profile().root_entry_spec(entry_name);
+    let source = profile_spec.map_or(ProfileRootEntrySource::TypeRootKeys, |spec| {
+        spec.source.clone()
+    });
+    let mut roots = match &source {
+        ProfileRootEntrySource::TypeRootKeys => semantic
+            .type_root_keys
+            .get(type_name)
+            .or_else(|| {
+                semantic
+                    .type_root_keys
+                    .iter()
+                    .find(|(candidate, _)| candidate.eq_ignore_ascii_case(type_name))
+                    .map(|(_, roots)| roots)
+            })
+            .cloned()
+            .unwrap_or_default(),
+        ProfileRootEntrySource::Enum { enum_name } => {
+            let mut values = semantic
+                .enum_values
+                .iter()
+                .find(|(candidate, _)| candidate.eq_ignore_ascii_case(enum_name))
+                .map_or_else(Vec::new, |(_, values)| values.clone());
+            if let Some((_, extras)) = snapshot
+                .game_profile()
+                .enum_extra_members
+                .iter()
+                .find(|(candidate, _)| candidate.eq_ignore_ascii_case(enum_name))
+            {
+                values.extend(extras.iter().cloned());
+            }
+            values.extend(
+                member_cache
+                    .workspace_member_names(snapshot, enum_name, prefix)
+                    .iter()
+                    .cloned(),
+            );
+            values
+        }
+        ProfileRootEntrySource::Workspace { type_name } => {
+            let mut values = member_cache
+                .workspace_member_names(snapshot, type_name, prefix)
+                .to_vec();
+            // Profile extras are keyed by the user-facing collection name in a few cases
+            // (`country_tags`) while the workspace member kind is singular (`country_tag`).
+            // Accept both spellings, including aliases declared by the active game profile.
+            for (candidate, extras) in &snapshot.game_profile().enum_extra_members {
+                if candidate.eq_ignore_ascii_case(type_name)
+                    || snapshot
+                        .game_profile()
+                        .member_kind_alias(candidate)
+                        .is_some_and(|kind| kind.eq_ignore_ascii_case(type_name))
+                {
+                    values.extend(extras.iter().cloned());
+                }
+            }
+            values
+        }
+    };
+    roots.retain(|label| completion_matches(label, prefix));
+    roots.sort_by_key(|label| label.to_ascii_lowercase());
+    roots.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+    let insertion = profile_spec.map_or(ProfileRootEntryInsertion::Block, |spec| spec.insertion);
+    let repeatable = profile_spec.is_some_and(|spec| spec.repeatable);
+    let kind = match &source {
+        ProfileRootEntrySource::TypeRootKeys => CompletionKind::Key,
+        ProfileRootEntrySource::Enum { .. } | ProfileRootEntrySource::Workspace { .. } => {
+            CompletionKind::EnumMember
+        }
+    };
+    for label in roots {
+        if !repeatable
+            && context
+                .existing_keys
+                .iter()
+                .any(|key| key.eq_ignore_ascii_case(&label))
+        {
+            continue;
+        }
+        let insert_text = root_entry_insert_text(insertion, &label, insert_assignment);
+        let documentation = snapshot
+            .rules()
+            .type_root_scope_registers(type_name, &label)
+            .filter(|scope| !scope.documentation.is_empty())
+            .map(|scope| scope.documentation.join("\n"));
+        push_completion(
+            items,
+            CompletionItem {
+                label: label.clone(),
+                kind,
+                detail: type_name.clone(),
+                documentation,
+                replacement_range,
+                insert_text,
+                sort_score: 0,
+                deprecated: false,
+                resolve_data: None,
+            },
+            prefix,
+            CompletionRankContext::new(
+                CompletionSchemaTier::CurrentContext,
+                CompletionSpecificity::Exact,
+                false,
+                false,
+            ),
+        );
+    }
+}
+
+fn root_entry_insert_text(
+    insertion: ProfileRootEntryInsertion,
+    label: &str,
+    insert_assignment: bool,
+) -> String {
+    match insertion {
+        ProfileRootEntryInsertion::Block => {
+            if insert_assignment {
+                format!("{label} = {{\n\t$0\n}}")
+            } else {
+                label.to_owned()
+            }
+        }
+        ProfileRootEntryInsertion::Bare => label.to_owned(),
+        ProfileRootEntryInsertion::Assignment => format!("{label} = $0"),
+        ProfileRootEntryInsertion::QuotedAssignment => format!("{label} = \"$0\""),
+    }
+}
+
+/// Completes workspace/static members for a leaf-value rule's value matcher.
+///
+/// Used both for keys inside a leaf-value container and for bare values of a `value_clause`
+/// rule whose children are leaf-value rules. Members are completed as keys (the inserted text
+/// is the bare spelling, without an assignment).
+#[expect(clippy::too_many_arguments)]
+fn add_leaf_value_member_items(
+    snapshot: &AnalysisSnapshot,
+    rule: &rules::SemanticRule,
+    member_cache: &mut CompletionMemberCache,
+    items: &mut Vec<RankedCompletionItem>,
+    replacement_range: TextRange,
+    prefix: &str,
+    documentation: Option<String>,
+    schema_tier: CompletionSchemaTier,
+) {
+    match &rule.value {
+        ValueMatcher::Type(type_name) => {
+            for label in member_cache.workspace_member_names(snapshot, type_name, prefix) {
+                push_completion(
+                    items,
+                    CompletionItem {
+                        label: label.clone(),
+                        kind: CompletionKind::Key,
+                        detail: type_name.clone(),
+                        documentation: documentation.clone(),
+                        replacement_range,
+                        insert_text: label.clone(),
+                        sort_score: 0,
+                        deprecated: rule.deprecated,
+                        resolve_data: Some(format!("rule:{}", rule.id)),
+                    },
+                    prefix,
+                    CompletionRankContext::new(
+                        schema_tier,
+                        CompletionSpecificity::Type,
+                        false,
+                        rule.deprecated,
+                    ),
+                );
+            }
+        }
+        ValueMatcher::Enum(enum_name) => {
+            for label in member_cache.enum_member_names(snapshot, enum_name, prefix) {
+                push_completion(
+                    items,
+                    CompletionItem {
+                        label: label.clone(),
+                        kind: CompletionKind::EnumMember,
+                        detail: enum_name.clone(),
+                        documentation: documentation.clone(),
+                        replacement_range,
+                        insert_text: label.clone(),
+                        sort_score: 0,
+                        deprecated: rule.deprecated,
+                        resolve_data: Some(format!("rule:{}", rule.id)),
+                    },
+                    prefix,
+                    CompletionRankContext::new(
+                        schema_tier,
+                        CompletionSpecificity::Enum,
+                        false,
+                        rule.deprecated,
+                    ),
+                );
+            }
+        }
+        ValueMatcher::Dynamic(kind) => {
+            for label in member_cache.workspace_member_names(snapshot, kind, prefix) {
+                push_completion(
+                    items,
+                    CompletionItem {
+                        label: label.clone(),
+                        kind: CompletionKind::Key,
+                        detail: kind.clone(),
+                        documentation: documentation.clone(),
+                        replacement_range,
+                        insert_text: label.clone(),
+                        sort_score: 0,
+                        deprecated: rule.deprecated,
+                        resolve_data: Some(format!("rule:{}", rule.id)),
+                    },
+                    prefix,
+                    CompletionRankContext::new(
+                        schema_tier,
+                        CompletionSpecificity::Dynamic,
+                        false,
+                        rule.deprecated,
+                    ),
+                );
+            }
+        }
+        ValueMatcher::TypedPrefix {
+            prefix: matcher_prefix,
+            context,
+            operand,
+        } => add_typed_prefix_value_items(
+            snapshot,
+            member_cache,
+            items,
+            matcher_prefix,
+            context,
+            *operand,
+            documentation.clone(),
+            replacement_range,
+            prefix,
+            rule.deprecated,
+            schema_tier,
+        ),
+        ValueMatcher::Localisation => {
+            for label in member_cache.workspace_member_names(snapshot, "localisation", prefix) {
+                add_localisation_value_completion_ranked(
+                    items,
+                    label,
+                    "localisation",
+                    documentation.clone(),
+                    replacement_range,
+                    prefix,
+                    rule.deprecated,
+                    schema_tier,
+                );
+            }
+        }
+        ValueMatcher::Exact(label) => {
+            add_value_completion_ranked(
+                items,
+                label,
+                &semantic_value_matcher_label(&rule.value),
+                documentation,
+                replacement_range,
+                prefix,
+                rule.deprecated,
+                schema_tier,
+                CompletionSpecificity::Exact,
+            );
+        }
+        ValueMatcher::Bool => {
+            for label in ["yes", "no"] {
+                add_value_completion_ranked(
+                    items,
+                    label,
+                    "bool",
+                    documentation.clone(),
+                    replacement_range,
+                    prefix,
+                    rule.deprecated,
+                    schema_tier,
+                    CompletionSpecificity::Value,
+                );
+            }
+        }
+        // Numeric and date matchers describe open-ended syntax/ranges, not finite candidate sets.
+        // AnyScalar, DynamicSet, Filepath, Opaque, and Scope likewise carry no member
+        // information.
+        ValueMatcher::Int { .. }
+        | ValueMatcher::Float { .. }
+        | ValueMatcher::Date
+        | ValueMatcher::AnyScalar
+        | ValueMatcher::DynamicSet(_)
+        | ValueMatcher::Filepath
+        | ValueMatcher::Opaque(_)
+        | ValueMatcher::Scope(_) => {}
+    }
+}
+
+pub(crate) fn add_semantic_value_items(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    property: &ScriptProperty,
+    member_cache: &mut CompletionMemberCache,
+    items: &mut Vec<RankedCompletionItem>,
+    replacement_range: TextRange,
+    prefix: &str,
+) {
+    let matching = semantic_rules_for_completion(snapshot, context)
+        .into_iter()
+        .filter(|candidate| {
+            let rule = candidate.rule;
+            semantic_rule_key_matches(snapshot, rule, candidate.parent_path, &property.key)
+                && rule
+                    .operator
+                    .as_deref()
+                    .is_none_or(|operator| property.operator.as_deref() == Some(operator))
+        })
+        .filter(|candidate| semantic_scope_allows(candidate.rule, candidate.scope))
+        .collect::<Vec<_>>();
+    for candidate in matching {
+        let rule = candidate.rule;
+        let documentation = (!rule.documentation.is_empty()).then(|| rule.documentation.join("\n"));
+        if matches!(rule.shape, RuleShape::LeafValue) {
+            // A bare `key = ` position inside a leaf-value container completes the members of
+            // the value type, mirroring the key-position behavior.
+            add_leaf_value_member_items(
+                snapshot,
+                rule,
+                member_cache,
+                items,
+                replacement_range,
+                prefix,
+                documentation,
+                candidate.schema_tier,
+            );
+            continue;
+        }
+        if matches!(rule.shape, RuleShape::ValueClause) {
+            // A bare value of a `value_clause` rule is validated by the leaf-value rules of its
+            // child container; complete their value-type members here.
+            let mut child_path = candidate.parent_path.to_vec();
+            child_path.push(property.key.clone());
+            for child_rule in semantic_rules_for_container(
+                snapshot,
+                &context.context,
+                &child_path,
+                &context.scope,
+            ) {
+                if matches!(child_rule.shape, RuleShape::LeafValue) {
+                    add_leaf_value_member_items(
+                        snapshot,
+                        child_rule,
+                        member_cache,
+                        items,
+                        replacement_range,
+                        prefix,
+                        documentation.clone(),
+                        candidate.schema_tier,
+                    );
+                }
+            }
+            continue;
+        }
+        match &rule.value {
+            ValueMatcher::Exact(label) => add_value_completion_ranked(
+                items,
+                label,
+                &semantic_value_matcher_label(&rule.value),
+                documentation.clone(),
+                replacement_range,
+                prefix,
+                rule.deprecated,
+                candidate.schema_tier,
+                CompletionSpecificity::Exact,
+            ),
+            ValueMatcher::Bool => {
+                add_value_completion_ranked(
+                    items,
+                    "yes",
+                    "bool",
+                    documentation.clone(),
+                    replacement_range,
+                    prefix,
+                    rule.deprecated,
+                    candidate.schema_tier,
+                    CompletionSpecificity::Value,
+                );
+                add_value_completion_ranked(
+                    items,
+                    "no",
+                    "bool",
+                    documentation.clone(),
+                    replacement_range,
+                    prefix,
+                    rule.deprecated,
+                    candidate.schema_tier,
+                    CompletionSpecificity::Value,
+                );
+            }
+            // Numeric and date matchers describe open-ended syntax/ranges, not finite candidate
+            // sets. Their constraints remain available to diagnostics and hover.
+            ValueMatcher::Int { .. } | ValueMatcher::Float { .. } | ValueMatcher::Date => {}
+            ValueMatcher::Type(type_name) => {
+                for label in dynamic_members_for_scope(
+                    snapshot,
+                    member_cache,
+                    type_name,
+                    prefix,
+                    candidate.scope,
+                ) {
+                    add_value_completion_ranked(
+                        items,
+                        &label,
+                        type_name,
+                        documentation.clone(),
+                        replacement_range,
+                        prefix,
+                        rule.deprecated,
+                        candidate.schema_tier,
+                        CompletionSpecificity::Type,
+                    );
+                }
+            }
+            ValueMatcher::Enum(enum_name) => {
+                for label in member_cache.enum_member_names(snapshot, enum_name, prefix) {
+                    add_enum_member_completion_ranked(
+                        items,
+                        label,
+                        enum_name,
+                        documentation.clone(),
+                        replacement_range,
+                        prefix,
+                        rule.deprecated,
+                        candidate.schema_tier,
+                    );
+                }
+            }
+            ValueMatcher::TypedPrefix {
+                prefix: matcher_prefix,
+                context,
+                operand,
+            } => add_typed_prefix_value_items(
+                snapshot,
+                member_cache,
+                items,
+                matcher_prefix,
+                context,
+                *operand,
+                documentation.clone(),
+                replacement_range,
+                prefix,
+                rule.deprecated,
+                candidate.schema_tier,
+            ),
+            ValueMatcher::Scope(expected) => {
+                for (label, detail) in
+                    scope_expression_candidates(snapshot, context, expected.as_deref())
+                {
+                    add_scope_completion_ranked(
+                        items,
+                        &label,
+                        detail,
+                        documentation.clone(),
+                        replacement_range,
+                        prefix,
+                        rule.deprecated,
+                        candidate.schema_tier,
+                    );
+                }
+            }
+            ValueMatcher::Localisation => {
+                for label in member_cache.workspace_member_names(snapshot, "localisation", prefix) {
+                    add_localisation_value_completion_ranked(
+                        items,
+                        label,
+                        "localisation",
+                        documentation.clone(),
+                        replacement_range,
+                        prefix,
+                        rule.deprecated,
+                        candidate.schema_tier,
+                    );
+                }
+            }
+            ValueMatcher::Dynamic(kind) => {
+                // Mirror `semantic_dynamic_value_matches`: scope fields accept scope expressions
+                // and variable names; every dynamic kind additionally accepts scope expressions
+                // and same-named static enum members at runtime.
+                if kind.eq_ignore_ascii_case("scope_field") {
+                    for (label, detail) in scope_expression_candidates(snapshot, context, None) {
+                        add_scope_completion_ranked(
+                            items,
+                            &label,
+                            detail,
+                            documentation.clone(),
+                            replacement_range,
+                            prefix,
+                            rule.deprecated,
+                            candidate.schema_tier,
+                        );
+                    }
+                    for label in
+                        member_cache.workspace_member_names(snapshot, "variable_name", prefix)
+                    {
+                        add_value_completion_ranked(
+                            items,
+                            label,
+                            "variable_name",
+                            documentation.clone(),
+                            replacement_range,
+                            prefix,
+                            rule.deprecated,
+                            candidate.schema_tier,
+                            CompletionSpecificity::Type,
+                        );
+                    }
+                    continue;
+                }
+                for label in
+                    dynamic_members_for_scope(snapshot, member_cache, kind, prefix, candidate.scope)
+                {
+                    add_value_completion_ranked(
+                        items,
+                        &label,
+                        kind,
+                        documentation.clone(),
+                        replacement_range,
+                        prefix,
+                        rule.deprecated,
+                        candidate.schema_tier,
+                        CompletionSpecificity::Dynamic,
+                    );
+                }
+                if snapshot.game_profile().is_closed_dynamic_kind(kind) {
+                    // Closed kinds validate against reachable write sites and
+                    // engine seeds, so their known names are enumerable.
+                    add_closed_dynamic_kind_items(
+                        snapshot,
+                        items,
+                        kind,
+                        &documentation,
+                        replacement_range,
+                        prefix,
+                        rule.deprecated,
+                        candidate.schema_tier,
+                    );
+                }
+                for (label, detail) in scope_expression_candidates(snapshot, context, None) {
+                    add_scope_completion_ranked(
+                        items,
+                        &label,
+                        detail,
+                        documentation.clone(),
+                        replacement_range,
+                        prefix,
+                        rule.deprecated,
+                        candidate.schema_tier,
+                    );
+                }
+                for label in member_cache.enum_member_names(snapshot, kind, prefix) {
+                    add_enum_member_completion_ranked(
+                        items,
+                        label,
+                        kind,
+                        documentation.clone(),
+                        replacement_range,
+                        prefix,
+                        rule.deprecated,
+                        candidate.schema_tier,
+                    );
+                }
+            }
+            ValueMatcher::DynamicSet(_)
+            | ValueMatcher::AnyScalar
+            | ValueMatcher::Filepath
+            | ValueMatcher::Opaque(_) => {}
+        }
+    }
+}
+
+pub(crate) struct InferredDynamicCompletionInput<'a> {
+    pub(crate) snapshot: &'a AnalysisSnapshot,
+    pub(crate) context: &'a SemanticCompletionContext,
+    pub(crate) property: &'a ScriptProperty,
+    pub(crate) member_cache: &'a mut CompletionMemberCache,
+    pub(crate) items: &'a mut Vec<RankedCompletionItem>,
+    pub(crate) replacement_range: TextRange,
+    pub(crate) prefix: &'a str,
+    pub(crate) cancellation: &'a CancellationToken,
+}
+
+pub(crate) fn add_inferred_dynamic_value_items(
+    input: InferredDynamicCompletionInput<'_>,
+) -> Result<bool, Cancelled> {
+    let InferredDynamicCompletionInput {
+        snapshot,
+        context,
+        property,
+        member_cache,
+        items,
+        replacement_range,
+        prefix,
+        cancellation,
+    } = input;
+    let constraints = infer_dynamic_value_constraints(snapshot, context, property, cancellation)?;
+    if constraints.sites.is_empty() && constraints.key_renders.is_empty() {
+        // A non-enumerable constraint (numbers, opaque strings) is still a
+        // constraint: offer nothing rather than falling back to the generic
+        // value items for this context.
+        return Ok(constraints.unenumerable);
+    }
+    let sites = constraints.sites;
+    let mut intersection: Option<BTreeMap<(String, CompletionKind), RankedCompletionItem>> = None;
+    for site in sites {
+        cancellation.checkpoint()?;
+        let site_context = SemanticCompletionContext {
+            context: context.context.clone(),
+            parent_path: context.parent_path.clone(),
+            structural_containers: Vec::new(),
+            alternative_containers: Vec::new(),
+            existing_keys: Vec::new(),
+            dynamic_inferred: false,
+            scope: site.scope,
+            container_property: None,
+            property: None,
+            quoted_depth: context.quoted_depth,
+            embedded_value_context: context.embedded_value_context,
+            wrapper_container: false,
+            root_entry_container: false,
+        };
+        let mut site_items = Vec::new();
+        for matcher in &site.matchers {
+            add_inferred_matcher_items(
+                snapshot,
+                &site_context,
+                matcher,
+                member_cache,
+                &mut site_items,
+                replacement_range,
+                prefix,
+            );
+        }
+        let site_items = site_items.into_iter().fold(
+            BTreeMap::<(String, CompletionKind), RankedCompletionItem>::new(),
+            |mut known, item| {
+                let key = (item.item.label.to_ascii_lowercase(), item.item.kind);
+                match known.entry(key) {
+                    std::collections::btree_map::Entry::Vacant(entry) => {
+                        entry.insert(item);
+                    }
+                    std::collections::btree_map::Entry::Occupied(mut entry)
+                        if item.rank < entry.get().rank =>
+                    {
+                        entry.insert(item);
+                    }
+                    std::collections::btree_map::Entry::Occupied(_) => {}
+                }
+                known
+            },
+        );
+        if let Some(known) = &mut intersection {
+            known.retain(|key, _| site_items.contains_key(key));
+        } else {
+            intersection = Some(site_items);
+        }
+    }
+    let key_rendered = key_render_site_items(KeyRenderSiteInput {
+        snapshot,
+        context,
+        sites: &constraints.key_renders,
+        member_cache,
+        replacement_range,
+        prefix,
+    });
+    match (intersection, key_rendered) {
+        (Some(values), Some(keys)) => {
+            // The argument must satisfy both stories: keep value-site items
+            // whose name also renders to a valid key at every key site.
+            let names = keys.into_keys().collect::<std::collections::BTreeSet<_>>();
+            items.extend(
+                values
+                    .into_iter()
+                    .filter(|(key, _)| names.contains(&key.0))
+                    .map(|(_, item)| item),
+            );
+        }
+        (Some(values), None) => items.extend(values.into_values()),
+        (None, Some(keys)) => items.extend(keys.into_values()),
+        (None, None) => {}
+    }
+    Ok(true)
+}
+
+pub(crate) struct KeyRenderSiteInput<'a> {
+    pub(crate) snapshot: &'a AnalysisSnapshot,
+    pub(crate) context: &'a SemanticCompletionContext,
+    pub(crate) sites: &'a [super::dynamic_constraints::DynamicKeyRenderSite],
+    pub(crate) member_cache: &'a mut CompletionMemberCache,
+    pub(crate) replacement_range: TextRange,
+    pub(crate) prefix: &'a str,
+}
+
+/// Builds the candidate list implied by key-render sites: sites whose
+/// parameter is the whole key (empty affixes) accept every command name of
+/// their context and scope, while affixed sites constrain the argument to the
+/// middle segments of the rule keys matching their literal affixes. Affixed
+/// sites intersect case-insensitively; wildcard sites never narrow them.
+fn key_render_site_items(
+    input: KeyRenderSiteInput<'_>,
+) -> Option<BTreeMap<String, RankedCompletionItem>> {
+    let KeyRenderSiteInput {
+        snapshot,
+        context,
+        sites,
+        member_cache,
+        replacement_range,
+        prefix,
+    } = input;
+    let affixed = sites
+        .iter()
+        .filter(|site| !site.prefix.is_empty() || !site.suffix.is_empty())
+        .collect::<Vec<_>>();
+    if affixed.is_empty() {
+        // Wildcard dispatch: the argument is a whole key, so reuse the key
+        // completion of the first site's context and scope verbatim.
+        let site = sites.first()?;
+        let site_context = SemanticCompletionContext {
+            context: site.context.clone(),
+            parent_path: site.parent_path.clone(),
+            structural_containers: Vec::new(),
+            alternative_containers: Vec::new(),
+            existing_keys: Vec::new(),
+            dynamic_inferred: false,
+            scope: site.scope.clone(),
+            container_property: None,
+            property: None,
+            quoted_depth: context.quoted_depth,
+            embedded_value_context: context.embedded_value_context,
+            wrapper_container: false,
+            root_entry_container: false,
+        };
+        let mut site_items = Vec::new();
+        add_semantic_key_items_ranked(
+            snapshot,
+            &site_context,
+            member_cache,
+            &mut site_items,
+            replacement_range,
+            prefix,
+            false,
+        );
+        return Some(site_items.into_iter().fold(
+            BTreeMap::<String, RankedCompletionItem>::new(),
+            |mut known, item| {
+                let key = item.item.label.to_ascii_lowercase();
+                match known.entry(key) {
+                    std::collections::btree_map::Entry::Vacant(entry) => {
+                        entry.insert(item);
+                    }
+                    std::collections::btree_map::Entry::Occupied(mut entry)
+                        if item.rank < entry.get().rank =>
+                    {
+                        entry.insert(item);
+                    }
+                    std::collections::btree_map::Entry::Occupied(_) => {}
+                }
+                known
+            },
+        ));
+    }
+    let mut intersection: Option<BTreeMap<String, RankedCompletionItem>> = None;
+    for site in affixed {
+        let site_context = SemanticCompletionContext {
+            context: site.context.clone(),
+            parent_path: site.parent_path.clone(),
+            structural_containers: Vec::new(),
+            alternative_containers: Vec::new(),
+            existing_keys: Vec::new(),
+            dynamic_inferred: false,
+            scope: site.scope.clone(),
+            container_property: None,
+            property: None,
+            quoted_depth: context.quoted_depth,
+            embedded_value_context: context.embedded_value_context,
+            wrapper_container: false,
+            root_entry_container: false,
+        };
+        let pattern = format!("{}$param${}", site.prefix, site.suffix);
+        let mut site_items = Vec::new();
+        for candidate in semantic_rules_for_completion(snapshot, &site_context) {
+            let rule = candidate.rule;
+            if !semantic_scope_allows(rule, candidate.scope) {
+                continue;
+            }
+            // Only exact keys can confirm an affixed render; open matchers
+            // (enums, types, dynamic kinds) stay silent rather than inventing
+            // members the template never meant.
+            let KeyMatcher::Exact(label) = &rule.key else {
+                continue;
+            };
+            let Some(middle) = strip_key_affixes(label, &site.prefix, &site.suffix) else {
+                continue;
+            };
+            add_value_completion_ranked(
+                &mut site_items,
+                middle,
+                &pattern,
+                None,
+                replacement_range,
+                prefix,
+                false,
+                CompletionSchemaTier::DynamicInferred,
+                CompletionSpecificity::Exact,
+            );
+        }
+        let site_items = site_items.into_iter().fold(
+            BTreeMap::<String, RankedCompletionItem>::new(),
+            |mut known, item| {
+                let key = item.item.label.to_ascii_lowercase();
+                match known.entry(key) {
+                    std::collections::btree_map::Entry::Vacant(entry) => {
+                        entry.insert(item);
+                    }
+                    std::collections::btree_map::Entry::Occupied(mut entry)
+                        if item.rank < entry.get().rank =>
+                    {
+                        entry.insert(item);
+                    }
+                    std::collections::btree_map::Entry::Occupied(_) => {}
+                }
+                known
+            },
+        );
+        if let Some(known) = &mut intersection {
+            known.retain(|key, _| site_items.contains_key(key));
+        } else {
+            intersection = Some(site_items);
+        }
+    }
+    intersection
+}
+
+/// Extracts the middle segment of a rule key matching the site's literal
+/// affixes, or `None` when the key does not start with the prefix and end
+/// with the suffix (leaving a non-empty middle).
+fn strip_key_affixes<'label>(
+    label: &'label str,
+    prefix: &str,
+    suffix: &str,
+) -> Option<&'label str> {
+    if label.len() <= prefix.len() + suffix.len()
+        || !label.is_char_boundary(prefix.len())
+        || !label.is_char_boundary(label.len() - suffix.len())
+    {
+        return None;
+    }
+    let (head, rest) = label.split_at(prefix.len());
+    let middle_len = rest.len() - suffix.len();
+    let (middle, tail) = rest.split_at(middle_len);
+    if head.eq_ignore_ascii_case(prefix) && tail.eq_ignore_ascii_case(suffix) {
+        Some(middle)
+    } else {
+        None
+    }
+}
+
+fn add_inferred_matcher_items(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    matcher: &ValueMatcher,
+    member_cache: &mut CompletionMemberCache,
+    items: &mut Vec<RankedCompletionItem>,
+    replacement_range: TextRange,
+    prefix: &str,
+) {
+    match matcher {
+        ValueMatcher::Exact(label) => add_value_completion_ranked(
+            items,
+            label,
+            &semantic_value_matcher_label(matcher),
+            None,
+            replacement_range,
+            prefix,
+            false,
+            CompletionSchemaTier::DynamicInferred,
+            CompletionSpecificity::Exact,
+        ),
+        ValueMatcher::Bool => {
+            for label in ["yes", "no"] {
+                add_value_completion_ranked(
+                    items,
+                    label,
+                    "bool",
+                    None,
+                    replacement_range,
+                    prefix,
+                    false,
+                    CompletionSchemaTier::DynamicInferred,
+                    CompletionSpecificity::Value,
+                );
+            }
+        }
+        // Numeric and date matchers are open-ended; do not turn their constraints into arbitrary
+        // completion values.
+        ValueMatcher::Int { .. } | ValueMatcher::Float { .. } | ValueMatcher::Date => {}
+        ValueMatcher::Type(type_name) => {
+            for label in
+                dynamic_members_for_scope(snapshot, member_cache, type_name, prefix, &context.scope)
+            {
+                add_value_completion_ranked(
+                    items,
+                    &label,
+                    type_name,
+                    None,
+                    replacement_range,
+                    prefix,
+                    false,
+                    CompletionSchemaTier::DynamicInferred,
+                    CompletionSpecificity::Type,
+                );
+            }
+        }
+        ValueMatcher::Enum(enum_name) => {
+            for label in member_cache.enum_member_names(snapshot, enum_name, prefix) {
+                add_enum_member_completion_ranked(
+                    items,
+                    label,
+                    enum_name,
+                    None,
+                    replacement_range,
+                    prefix,
+                    false,
+                    CompletionSchemaTier::DynamicInferred,
+                );
+            }
+        }
+        // Inferred matchers are synthesized from scripted usage sites, which never mint
+        // typed-prefix references; first-party rules reach them through the schema tiers above.
+        ValueMatcher::TypedPrefix { .. } => {}
+        ValueMatcher::Scope(expected) => {
+            for (label, detail) in
+                scope_expression_candidates(snapshot, context, expected.as_deref())
+            {
+                add_scope_completion_ranked(
+                    items,
+                    &label,
+                    detail,
+                    None,
+                    replacement_range,
+                    prefix,
+                    false,
+                    CompletionSchemaTier::DynamicInferred,
+                );
+            }
+        }
+        ValueMatcher::Localisation => {
+            for label in member_cache.workspace_member_names(snapshot, "localisation", prefix) {
+                add_localisation_value_completion_ranked(
+                    items,
+                    label,
+                    "localisation",
+                    None,
+                    replacement_range,
+                    prefix,
+                    false,
+                    CompletionSchemaTier::DynamicInferred,
+                );
+            }
+        }
+        ValueMatcher::Dynamic(kind) => {
+            for label in
+                dynamic_members_for_scope(snapshot, member_cache, kind, prefix, &context.scope)
+            {
+                add_value_completion_ranked(
+                    items,
+                    &label,
+                    kind,
+                    None,
+                    replacement_range,
+                    prefix,
+                    false,
+                    CompletionSchemaTier::DynamicInferred,
+                    CompletionSpecificity::Dynamic,
+                );
+            }
+        }
+        ValueMatcher::DynamicSet(_)
+        | ValueMatcher::AnyScalar
+        | ValueMatcher::Filepath
+        | ValueMatcher::Opaque(_) => {}
+    }
+}
+
+/// Maximum number of multi-segment scope chains offered as completion candidates.
+pub(crate) const SCOPE_CHAIN_LIMIT: usize = 16;
+
+/// Scope expression candidates for a value position: base scope names and intrinsics whose
+/// resolved scope is compatible with the expectation, plus scope links reachable from the
+/// current scope (single links and, when the first hop does not already satisfy, one-hop chains).
+pub(crate) fn scope_expression_candidates(
+    snapshot: &AnalysisSnapshot,
+    context: &SemanticCompletionContext,
+    expected: Option<&str>,
+) -> Vec<(String, &'static str)> {
+    let profile = snapshot.game_profile();
+    let scope = &context.scope;
+    let mut candidates = Vec::new();
+    let mut seen = HashSet::new();
+    let compatible = |scope_name: &str| -> bool {
+        expected.is_none_or(|expected| profile.scopes_compatible(scope_name, expected))
+    };
+    // Intrinsics with an unknown resolved scope stay visible; they may still be legal here.
+    let intrinsic_compatible = |resolved: &str| -> bool {
+        resolved.eq_ignore_ascii_case("any")
+            || resolved.eq_ignore_ascii_case("invalid")
+            || compatible(resolved)
+    };
+    for label in &profile.scope_completions {
+        let resolved = if label.eq_ignore_ascii_case("root") {
+            Some(scope.root.as_ref())
+        } else if label.eq_ignore_ascii_case("this") {
+            Some(scope.current.as_ref())
+        } else if label.eq_ignore_ascii_case("from") {
+            scope.from.first().map(|value| value.as_ref())
+        } else if label.eq_ignore_ascii_case("prev") {
+            scope.previous.first().map(|value| value.as_ref())
+        } else {
+            None
+        };
+        let keep = match resolved {
+            Some(resolved) => intrinsic_compatible(resolved),
+            None => compatible(label),
+        };
+        if keep && seen.insert(label.clone()) {
+            candidates.push((label.clone(), "scope"));
+        }
+    }
+    let links = scope_link_rules(snapshot);
+    for (label, allowed, target) in &links {
+        let reachable = allowed.is_empty()
+            || allowed
+                .iter()
+                .any(|allowed| profile.scopes_compatible(&scope.current, allowed));
+        if reachable && compatible(target) && seen.insert(label.clone()) {
+            candidates.push((label.clone(), "scope link"));
+        }
+    }
+    let mut chains = Vec::new();
+    for (label1, allowed1, target1) in &links {
+        let reachable1 = allowed1.is_empty()
+            || allowed1
+                .iter()
+                .any(|allowed| profile.scopes_compatible(&scope.current, allowed));
+        if !reachable1 || compatible(target1) {
+            // The single link already satisfies the expectation; a chain adds no value.
+            continue;
+        }
+        for (label2, allowed2, target2) in &links {
+            if label1 == label2 {
+                continue;
+            }
+            let second_hop = allowed2.is_empty()
+                || allowed2
+                    .iter()
+                    .any(|allowed| profile.scopes_compatible(target1, allowed));
+            if second_hop && compatible(target2) {
+                chains.push(format!("{label1}.{label2}"));
+            }
+        }
+    }
+    chains.sort();
+    chains.dedup();
+    for chain in chains.into_iter().take(SCOPE_CHAIN_LIMIT) {
+        if seen.insert(chain.clone()) {
+            candidates.push((chain, "scope link"));
+        }
+    }
+    candidates
+}
+
+/// Exact-key effect/trigger rules that push a scope: `(label, allowed_scopes, push_scope)`.
+pub(crate) fn scope_link_rules(snapshot: &AnalysisSnapshot) -> Vec<(String, Vec<String>, String)> {
+    let mut links = snapshot
+        .rules()
+        .model()
+        .semantic
+        .rules
+        .iter()
+        .filter(|rule| {
+            matches!(
+                rule.context.to_ascii_lowercase().as_str(),
+                "effect" | "trigger"
+            ) && matches!(&rule.key, KeyMatcher::Exact(label) if !label.contains('.'))
+                && rule.push_scope.is_some()
+        })
+        .map(|rule| {
+            let label = match &rule.key {
+                KeyMatcher::Exact(label) => label.clone(),
+                _ => unreachable!("filtered for exact keys"),
+            };
+            (
+                label,
+                rule.allowed_scopes.clone(),
+                rule.push_scope.clone().expect("filtered for push scope"),
+            )
+        })
+        .collect::<Vec<_>>();
+    links.sort();
+    links.dedup();
+    links
+}
+
+/// Known names of a closed dynamic kind: workspace-indexed write literals,
+/// open-overlay writes, and the profile's engine-set seeds. Validation accepts
+/// exactly these plus runtime-rendered `$param$` spellings, which cannot be
+/// enumerated.
+#[expect(clippy::too_many_arguments)]
+fn add_closed_dynamic_kind_items(
+    snapshot: &AnalysisSnapshot,
+    items: &mut Vec<RankedCompletionItem>,
+    kind: &str,
+    documentation: &Option<String>,
+    replacement_range: TextRange,
+    prefix: &str,
+    deprecated: bool,
+    schema_tier: CompletionSchemaTier,
+) {
+    let mut seen: std::collections::BTreeSet<Box<str>> = std::collections::BTreeSet::new();
+    let mut push = |items: &mut Vec<RankedCompletionItem>, label: &str, detail: &str| {
+        if !seen.insert(Box::from(label.to_ascii_lowercase())) {
+            return;
+        }
+        add_value_completion_ranked(
+            items,
+            label,
+            detail,
+            documentation.clone(),
+            replacement_range,
+            prefix,
+            deprecated,
+            schema_tier,
+            CompletionSpecificity::Dynamic,
+        );
+    };
+    if let Some(view) = snapshot.index().flag_write_index(kind) {
+        for label in view.literal_names() {
+            push(items, label, kind);
+        }
+    }
+    for (view_kind, view) in crate::semantic::overlay_flag_writes(snapshot).iter() {
+        if view_kind.eq_ignore_ascii_case(kind) {
+            for label in view.literal_names() {
+                push(items, label, kind);
+            }
+        }
+    }
+    let engine_detail = format!("engine-set {kind}");
+    for (seed_kind, seeds) in &snapshot.game_profile().engine_set_flags {
+        if seed_kind.eq_ignore_ascii_case(kind) {
+            for label in seeds {
+                push(items, label, &engine_detail);
+            }
+        }
+    }
+}
+
+#[expect(clippy::too_many_arguments)]
+fn add_value_completion_ranked(
+    items: &mut Vec<RankedCompletionItem>,
+    label: &str,
+    detail: &str,
+    documentation: Option<String>,
+    replacement_range: TextRange,
+    prefix: &str,
+    deprecated: bool,
+    schema_tier: CompletionSchemaTier,
+    specificity: CompletionSpecificity,
+) {
+    add_typed_value_completion(
+        items,
+        TypedValueCompletion {
+            label,
+            detail,
+            documentation,
+            replacement_range,
+            prefix,
+            deprecated,
+            kind: CompletionKind::Value,
+            rank: CompletionRankContext::new(schema_tier, specificity, false, deprecated),
+        },
+    );
+}
+
+#[expect(clippy::too_many_arguments)]
+fn add_enum_member_completion_ranked(
+    items: &mut Vec<RankedCompletionItem>,
+    label: &str,
+    detail: &str,
+    documentation: Option<String>,
+    replacement_range: TextRange,
+    prefix: &str,
+    deprecated: bool,
+    schema_tier: CompletionSchemaTier,
+) {
+    add_typed_value_completion(
+        items,
+        TypedValueCompletion {
+            label,
+            detail,
+            documentation,
+            replacement_range,
+            prefix,
+            deprecated,
+            kind: CompletionKind::EnumMember,
+            rank: CompletionRankContext::new(
+                schema_tier,
+                CompletionSpecificity::Enum,
+                false,
+                deprecated,
+            ),
+        },
+    );
+}
+
+#[expect(clippy::too_many_arguments)]
+fn add_scope_completion_ranked(
+    items: &mut Vec<RankedCompletionItem>,
+    label: &str,
+    detail: &str,
+    documentation: Option<String>,
+    replacement_range: TextRange,
+    prefix: &str,
+    deprecated: bool,
+    schema_tier: CompletionSchemaTier,
+) {
+    add_typed_value_completion(
+        items,
+        TypedValueCompletion {
+            label,
+            detail,
+            documentation,
+            replacement_range,
+            prefix,
+            deprecated,
+            kind: CompletionKind::Scope,
+            rank: CompletionRankContext::new(
+                schema_tier,
+                CompletionSpecificity::Scope,
+                false,
+                deprecated,
+            )
+            .with_scope_distance(label.matches('.').count().min(99) as u8),
+        },
+    );
+}
+
+struct TypedValueCompletion<'a> {
+    label: &'a str,
+    detail: &'a str,
+    documentation: Option<String>,
+    replacement_range: TextRange,
+    prefix: &'a str,
+    deprecated: bool,
+    kind: CompletionKind,
+    rank: CompletionRankContext,
+}
+
+fn add_typed_value_completion(
+    items: &mut Vec<RankedCompletionItem>,
+    completion: TypedValueCompletion<'_>,
+) {
+    push_completion(
+        items,
+        CompletionItem {
+            label: completion.label.to_owned(),
+            kind: completion.kind,
+            detail: completion.detail.to_owned(),
+            documentation: completion.documentation,
+            replacement_range: completion.replacement_range,
+            insert_text: completion.label.to_owned(),
+            sort_score: 0,
+            deprecated: completion.deprecated,
+            resolve_data: None,
+        },
+        completion.prefix,
+        completion.rank,
+    );
+}
+
+/// Value completion for localisation keys, which keeps the `Localisation` kind independent of
+/// the detail text.
+#[expect(clippy::too_many_arguments)]
+fn add_localisation_value_completion_ranked(
+    items: &mut Vec<RankedCompletionItem>,
+    label: &str,
+    detail: &str,
+    documentation: Option<String>,
+    replacement_range: TextRange,
+    prefix: &str,
+    deprecated: bool,
+    schema_tier: CompletionSchemaTier,
+) {
+    push_completion(
+        items,
+        CompletionItem {
+            label: label.to_owned(),
+            kind: CompletionKind::Localisation,
+            detail: detail.to_owned(),
+            documentation,
+            replacement_range,
+            insert_text: label.to_owned(),
+            sort_score: 0,
+            deprecated,
+            resolve_data: None,
+        },
+        prefix,
+        CompletionRankContext::new(
+            schema_tier,
+            CompletionSpecificity::Localisation,
+            false,
+            deprecated,
+        ),
+    );
+}
+
+/// Short detail for a rule-backed key: the semantic context the rule belongs to. `effect` and
+/// `trigger` keep their short names; other contexts (including `type:`/`root:` prefixed roots)
+/// are shown by their bare name.
+pub(crate) fn rule_context_detail(rule: &rules::SemanticRule) -> String {
+    if rule.context.eq_ignore_ascii_case("effect") || rule.context.eq_ignore_ascii_case("trigger") {
+        return rule.context.clone();
+    }
+    rule.context
+        .strip_prefix("type:")
+        .or_else(|| rule.context.strip_prefix("root:"))
+        .unwrap_or(&rule.context)
+        .to_owned()
+}
+
+/// Builds the text inserted for a rule-backed key completion. Scalar and value-clause keys
+/// insert the `=` operator so the cursor lands on the value; block keys insert an empty block
+/// skeleton as a snippet. Existing assignments only replace the key spelling.
+pub(crate) fn key_insert_text(
+    rule: &rules::SemanticRule,
+    label: &str,
+    insert_assignment: bool,
+) -> String {
+    if !insert_assignment {
+        return label.to_owned();
+    }
+    // Snippets carry only relative indentation: the client re-indents multi-line snippets to the
+    // insertion line, so baking absolute leading whitespace in here would stack with that.
+    match rule.shape {
+        RuleShape::Node => format!("{label} = {{\n\t$0\n}}"),
+        RuleShape::QuotedScript => {
+            format!("{label} = \"\n\t$0\n\"")
+        }
+        RuleShape::Leaf | RuleShape::ValueClause => format!("{label} = "),
+        RuleShape::LeafValue => label.to_owned(),
+    }
+}

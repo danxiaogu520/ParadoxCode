@@ -13,7 +13,7 @@ body:
       label: Component
       description: Which part of the project has the problem?
       options:
-        - Language server (pdx-ls / pdx CLI)
+        - Language server (pdc)
         - Parser / HIR / analysis
         - Rules database (rules/eu4)
         - VS Code extension
@@ -74,7 +74,7 @@ body:
     attributes:
       label: Server logs / output
       description: |
-        Paste relevant `pdx-ls` or editor output (Language Server / Output panel). Redact any
+        Paste relevant `pdc` or editor output (Language Server / Output panel). Redact any
         personal information such as full user profile paths and mod names if you prefer.
       render: text
   - type: checkboxes

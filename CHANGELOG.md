@@ -7,6 +7,36 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** the workspace is restructured along rust-analyzer's layering and all `pdx-`
+  crate prefixes are gone: `pdx-text`→`text`, `pdx-codec`→`transcode`, `pdx-parser`→`parser`,
+  `pdx-rules`→`rules`, `pdx-game`→`game`, `pdx-analysis`→`ide`, and `pdx-lsp`→`pdc`. The old
+  `pdx-engine` split into `vfs` (source roots, scans, document data), `hir` (semantic lowering),
+  `index` (symbol shards and the analysis pipeline), and a slim `engine` orchestrator
+  (analysis host, snapshots, `.pdcindex` persistence) that re-exports their API.
+- **Breaking:** the language server binary is now `pdc` (previously `pdx-ls`) and is the only
+  shipped executable. The `pdx` CLI is removed: vanilla/dependency cache building and game
+  discovery are performed by the server itself (missing dependency caches are rebuilt in place;
+  game selection moves to editor settings), and repository tooling (`check`, `release`,
+  `dev prepare-manifest`, `index`, `setup`) moved to the unpublished `tools` crate
+  (`cargo run -p tools -- check policy --root .`).
+- **Breaking:** user-visible contract names drop the `pdx` prefix: index caches are
+  `.pdcindex` (old caches are regenerated), compiled rules are `.pdcrules`, the virtual
+  localisation URI scheme is `pdcloc://`, workspace-local data lives under `.pdc/`, LSP methods
+  and commands use the `pdc/` prefix, release archives are `pdc-v…`, and diagnostic codes are
+  `pdc-parser-*`/`pdc-localisation-*`. The VS Code setting `paradoxcode.pdxLsPath` is replaced
+  by `paradoxcode.serverPath` (the old key is still honoured), and the Zed language-server id is
+  `pdc`.
+- CI is reorganized the rust-analyzer way: no path filtering or skip bookkeeping, every job
+  runs on every pull request, and the fast lint gates (rustfmt, clippy, rustdoc) are separate
+  jobs that do not wait behind the test suite.
+
+### Removed
+
+- The versioned Git pre-commit hook and `scripts/install-git-hooks.sh`. Quality gates run in
+  CI on every pull request; run `scripts/check-quality-gates.sh` locally when needed.
+
 ## [0.3.2] - 2026-09-11
 
 This release reworks hover into a first-class presentation surface, deepens dynamic-definition

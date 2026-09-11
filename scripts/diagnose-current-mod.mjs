@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Run a whole-Current-Mod diagnostic pass through the real pdx-ls JSON-RPC transport.
+ * Run a whole-Current-Mod diagnostic pass through the real pdc JSON-RPC transport.
  *
  * The language server remains the source of truth for parsing, first-party EU4 rules, Vanilla
  * resolution, and diagnostics. This script only opens each relevant file, collects the normal
@@ -66,8 +66,8 @@ Required:
   --vanilla-source PATH      Vanilla source tree; diagnose through virtual overlays backed by its cache
 
 Options:
-  --vanilla-cache PATH       Vanilla .pdxindex (also PDX_DIAGNOSTIC_VANILLA_CACHE)
-  --server PATH              pdx-ls executable (explicit path must exist; auto-detected from target/{debug,release} only when omitted)
+  --vanilla-cache PATH       Vanilla .pdcindex (also PDC_DIAGNOSTIC_VANILLA_CACHE)
+  --server PATH              pdc executable (explicit path must exist; auto-detected from target/{debug,release} only when omitted)
   --workspace PATH           LSP workspace root (default: parent of --mod)
   --output DIR               report directory (default: ${DEFAULT_OUTPUT_DIR})
   --timeout-ms N             overall server timeout (default: ${DEFAULT_TIMEOUT_MS})
@@ -82,12 +82,12 @@ Options:
   --fail-on LEVEL             error, warning, or none (default: error)
   --help                     show this help
 
-Environment equivalents: PDX_DIAGNOSTIC_VANILLA_CACHE, PDX_DIAGNOSTIC_SERVER,
-PDX_DIAGNOSTIC_WORKSPACE, PDX_DIAGNOSTIC_OUTPUT,
-PDX_DIAGNOSTIC_TIMEOUT_MS, PDX_DIAGNOSTIC_FILE_TIMEOUT_MS, PDX_DIAGNOSTIC_MAX_FILES,
-PDX_DIAGNOSTIC_PATH_PREFIX, PDX_DIAGNOSTIC_SHARD_COUNT, PDX_DIAGNOSTIC_SHARD_INDEX,
-PDX_DIAGNOSTIC_BATCH_SIZE, PDX_DIAGNOSTIC_CONCURRENCY, PDX_DIAGNOSTIC_CHECKPOINT_EVERY,
-PDX_DIAGNOSTIC_FAIL_ON.
+Environment equivalents: PDC_DIAGNOSTIC_VANILLA_CACHE, PDC_DIAGNOSTIC_SERVER,
+PDC_DIAGNOSTIC_WORKSPACE, PDC_DIAGNOSTIC_OUTPUT,
+PDC_DIAGNOSTIC_TIMEOUT_MS, PDC_DIAGNOSTIC_FILE_TIMEOUT_MS, PDC_DIAGNOSTIC_MAX_FILES,
+PDC_DIAGNOSTIC_PATH_PREFIX, PDC_DIAGNOSTIC_SHARD_COUNT, PDC_DIAGNOSTIC_SHARD_INDEX,
+PDC_DIAGNOSTIC_BATCH_SIZE, PDC_DIAGNOSTIC_CONCURRENCY, PDC_DIAGNOSTIC_CHECKPOINT_EVERY,
+PDC_DIAGNOSTIC_FAIL_ON.
 `;
 
 class CliUsageError extends Error {
@@ -144,38 +144,38 @@ function parseArgs(argv) {
     mod: undefined,
     vanillaSource: undefined,
     vanillaCache:
-      envValue('PDX_DIAGNOSTIC_VANILLA_CACHE') || envValue('PDX_PERF_CACHE') || undefined,
-    server: envValue('PDX_DIAGNOSTIC_SERVER'),
-    workspace: envValue('PDX_DIAGNOSTIC_WORKSPACE'),
-    output: envValue('PDX_DIAGNOSTIC_OUTPUT') || DEFAULT_OUTPUT_DIR,
+      envValue('PDC_DIAGNOSTIC_VANILLA_CACHE') || envValue('PDC_PERF_CACHE') || undefined,
+    server: envValue('PDC_DIAGNOSTIC_SERVER'),
+    workspace: envValue('PDC_DIAGNOSTIC_WORKSPACE'),
+    output: envValue('PDC_DIAGNOSTIC_OUTPUT') || DEFAULT_OUTPUT_DIR,
     timeoutMs: parsePositiveInteger(
-      envValue('PDX_DIAGNOSTIC_TIMEOUT_MS') || DEFAULT_TIMEOUT_MS,
+      envValue('PDC_DIAGNOSTIC_TIMEOUT_MS') || DEFAULT_TIMEOUT_MS,
       'timeout',
     ),
     fileTimeoutMs: parsePositiveInteger(
-      envValue('PDX_DIAGNOSTIC_FILE_TIMEOUT_MS') || DEFAULT_FILE_TIMEOUT_MS,
+      envValue('PDC_DIAGNOSTIC_FILE_TIMEOUT_MS') || DEFAULT_FILE_TIMEOUT_MS,
       'file timeout',
     ),
     maxFiles: parsePositiveInteger(
-      envValue('PDX_DIAGNOSTIC_MAX_FILES') || DEFAULT_MAX_FILES,
+      envValue('PDC_DIAGNOSTIC_MAX_FILES') || DEFAULT_MAX_FILES,
       'max files',
     ),
-    pathPrefix: envValue('PDX_DIAGNOSTIC_PATH_PREFIX'),
-    shardCount: parsePositiveInteger(envValue('PDX_DIAGNOSTIC_SHARD_COUNT') || 1, 'shard count'),
-    shardIndex: parseNonnegativeInteger(envValue('PDX_DIAGNOSTIC_SHARD_INDEX') || 0, 'shard index'),
+    pathPrefix: envValue('PDC_DIAGNOSTIC_PATH_PREFIX'),
+    shardCount: parsePositiveInteger(envValue('PDC_DIAGNOSTIC_SHARD_COUNT') || 1, 'shard count'),
+    shardIndex: parseNonnegativeInteger(envValue('PDC_DIAGNOSTIC_SHARD_INDEX') || 0, 'shard index'),
     batchSize: parsePositiveInteger(
-      envValue('PDX_DIAGNOSTIC_BATCH_SIZE') || DEFAULT_WORKSPACE_DIAGNOSTIC_BATCH_SIZE,
+      envValue('PDC_DIAGNOSTIC_BATCH_SIZE') || DEFAULT_WORKSPACE_DIAGNOSTIC_BATCH_SIZE,
       'batch size',
     ),
     concurrency: parsePositiveInteger(
-      envValue('PDX_DIAGNOSTIC_CONCURRENCY') || 8,
+      envValue('PDC_DIAGNOSTIC_CONCURRENCY') || 8,
       'concurrency',
     ),
     checkpointEvery: parsePositiveInteger(
-      envValue('PDX_DIAGNOSTIC_CHECKPOINT_EVERY') || CHECKPOINT_FILE_INTERVAL,
+      envValue('PDC_DIAGNOSTIC_CHECKPOINT_EVERY') || CHECKPOINT_FILE_INTERVAL,
       'checkpoint interval',
     ),
-    failOn: parseFailOn(envValue('PDX_DIAGNOSTIC_FAIL_ON') || 'error'),
+    failOn: parseFailOn(envValue('PDC_DIAGNOSTIC_FAIL_ON') || 'error'),
   };
 
   const valueOptions = new Map([
@@ -322,7 +322,7 @@ function resolveOptions(raw) {
   if (!vanillaCache) vanillaCache = userConfiguredVanillaCache();
   if (!vanillaCache) {
     throw new CliUsageError(
-      'a Vanilla cache is required; pass --vanilla-cache PATH or configure it with `pdx setup vanilla`',
+      'a Vanilla cache is required; pass --vanilla-cache PATH or launch `pdc` once against the game so it is discovered and built automatically',
     );
   }
   vanillaCache = canonicalFile(vanillaCache, '--vanilla-cache');
@@ -362,7 +362,7 @@ function resolveServer(explicit) {
     }
     return candidate;
   }
-  const executableName = process.platform === 'win32' ? 'pdx-ls.exe' : 'pdx-ls';
+  const executableName = process.platform === 'win32' ? 'pdc.exe' : 'pdc';
   const candidates = [
     join(REPOSITORY_ROOT, 'target', 'debug', executableName),
     join(REPOSITORY_ROOT, 'target', 'release', executableName),
@@ -370,7 +370,7 @@ function resolveServer(explicit) {
   for (const candidate of candidates) {
     if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
   }
-  return 'pdx-ls';
+  return 'pdc';
 }
 
 function decodeSource(bytes) {
@@ -441,7 +441,7 @@ function diagnosticItemPath(item, root) {
   const candidateKey = pathKey(candidate);
   if (candidateKey !== rootKey && !candidateKey.startsWith(`${rootKey}${sep}`)) {
     throw new ProtocolError(
-      `pdx/workspaceDiagnostics returned a path outside the Current Mod: ${item.logicalPath}`,
+      `pdc/workspaceDiagnostics returned a path outside the Current Mod: ${item.logicalPath}`,
     );
   }
   return candidate;
@@ -532,7 +532,7 @@ function normalizeDiagnostic(diagnostic, text) {
     severity: Number(diagnostic.severity || 1),
     severity_name: severityName(diagnostic.severity),
     message: String(diagnostic.message || ''),
-    source: diagnostic.source || 'pdx-ls',
+    source: diagnostic.source || 'pdc',
     range: diagnostic.range || null,
     location,
     excerpt: lineExcerpt(text, location.line - 1),
@@ -775,17 +775,17 @@ async function diagnoseIndexedWorkspace(client, report, options) {
   let nextCheckpoint = CHECKPOINT_FILE_INTERVAL;
   while (true) {
     const batch = await client.request(
-      'pdx/workspaceDiagnostics',
+      'pdc/workspaceDiagnostics',
       { offset, limit: options.batchSize },
       Math.max(options.fileTimeoutMs * options.batchSize, 120_000),
     );
     if (!batch || !Array.isArray(batch.items) || !Number.isSafeInteger(batch.total)) {
-      throw new ProtocolError('pdx/workspaceDiagnostics returned an invalid batch');
+      throw new ProtocolError('pdc/workspaceDiagnostics returned an invalid batch');
     }
     report.scan.workspace_diagnostic_files = batch.total;
     for (const item of batch.items) {
       if (typeof item?.uri !== 'string' || !Array.isArray(item.diagnostics)) {
-        throw new ProtocolError('pdx/workspaceDiagnostics returned an invalid file result');
+        throw new ProtocolError('pdc/workspaceDiagnostics returned an invalid file result');
       }
       const file = diagnosticItemPath(item, options.mod);
       const bytes = readFileSync(file);
@@ -804,7 +804,7 @@ async function diagnoseIndexedWorkspace(client, report, options) {
     }
     if (nextOffset === null) break;
     if (!Number.isSafeInteger(nextOffset) || nextOffset <= offset || nextOffset > batch.total) {
-      throw new ProtocolError('pdx/workspaceDiagnostics returned a non-advancing offset');
+      throw new ProtocolError('pdc/workspaceDiagnostics returned a non-advancing offset');
     }
     offset = nextOffset;
   }
@@ -819,12 +819,12 @@ async function selectDiagnosableFiles(client, report, options, files) {
       relative(options.source, file).split(sep).join('/'),
     );
     const result = await client.request(
-      'pdx/classifyPaths',
+      'pdc/classifyPaths',
       { paths: logicalPaths },
       options.fileTimeoutMs,
     );
     if (!Array.isArray(result) || result.some((path) => typeof path !== 'string')) {
-      throw new ProtocolError('pdx/classifyPaths returned an invalid result');
+      throw new ProtocolError('pdc/classifyPaths returned an invalid result');
     }
     for (const path of result) accepted.add(path);
   }
@@ -962,12 +962,12 @@ async function diagnoseTextFiles(client, report, options, files) {
       if (inputs.length) {
         try {
           const results = await client.request(
-            'pdx/textDiagnostics',
+            'pdc/textDiagnostics',
             { files: inputs },
             Math.max(options.fileTimeoutMs, options.fileTimeoutMs * inputs.length),
           );
           if (!Array.isArray(results) || results.length !== inputs.length) {
-            throw new ProtocolError('pdx/textDiagnostics returned an invalid batch');
+            throw new ProtocolError('pdc/textDiagnostics returned an invalid batch');
           }
           const returned = new Set();
           for (const result of results) {
@@ -977,7 +977,7 @@ async function diagnoseTextFiles(client, report, options, files) {
               !sources.has(result.path) ||
               returned.has(result.path)
             ) {
-              throw new ProtocolError('pdx/textDiagnostics returned an invalid file result');
+              throw new ProtocolError('pdc/textDiagnostics returned an invalid file result');
             }
             returned.add(result.path);
             const source = sources.get(result.path);

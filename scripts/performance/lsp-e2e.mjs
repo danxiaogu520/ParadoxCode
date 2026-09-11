@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 /**
- * Measure the pdx-ls stdio JSON-RPC path without depending on a particular
+ * Measure the pdc stdio JSON-RPC path without depending on a particular
  * user's checkout or home directory.  The default workspace is a temporary
  * one-file EU4 fixture; pass --workspace/--document to measure another tree.
- * Vanilla cache resolution is explicit first, then PDX_PERF_CACHE, then the
- * platform user configuration written by `pdx setup vanilla`.
+ * Vanilla cache resolution is explicit first, then PDC_PERF_CACHE, then the
+ * platform user configuration written by a previous automatic discovery.
  */
 
 import { execFile, spawn } from 'node:child_process';
@@ -31,12 +31,12 @@ const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '..', '..');
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MEMORY_INTERVAL_MS = 250;
 const FIXTURE_TEXT = 'country_event = {\n    id = my_perf_event\n}\n';
-const NO_CACHE_NAME = `pdx-perf-no-cache-${process.pid}.pdxindex`;
+const NO_CACHE_NAME = `pdc-perf-no-cache-${process.pid}.pdcindex`;
 
 const USAGE = `Usage: node scripts/performance/lsp-e2e.mjs [options]
 
 Options:
-  --server PATH             pdx-ls executable (default target/release/pdx-ls[.exe])
+  --server PATH             pdc executable (default target/release/pdc[.exe])
   --workspace DIR           workspace root (default: temporary one-file fixture)
   --document FILE            document to open (relative to workspace or absolute)
   --cache FILE               Vanilla cache (overrides user config)
@@ -48,9 +48,9 @@ Options:
   --keep-workspace            keep an automatically-created fixture for inspection
   --help                      show this help
 
-Environment equivalents: PDX_PERF_SERVER, PDX_PERF_WORKSPACE, PDX_PERF_DOCUMENT,
-PDX_PERF_CACHE, PDX_PERF_LINE, PDX_PERF_CHARACTER,
-PDX_PERF_TIMEOUT_MS, PDX_PERF_MEMORY_INTERVAL_MS.
+Environment equivalents: PDC_PERF_SERVER, PDC_PERF_WORKSPACE, PDC_PERF_DOCUMENT,
+PDC_PERF_CACHE, PDC_PERF_LINE, PDC_PERF_CHARACTER,
+PDC_PERF_TIMEOUT_MS, PDC_PERF_MEMORY_INTERVAL_MS.
 `;
 
 function envValue(name) {
@@ -171,45 +171,45 @@ function parseArguments(argv) {
 
 function applyEnvironment(options) {
   const fromEnvironment = {
-    server: envValue('PDX_PERF_SERVER'),
-    workspace: envValue('PDX_PERF_WORKSPACE'),
-    document: envValue('PDX_PERF_DOCUMENT'),
-    cache: envValue('PDX_PERF_CACHE'),
+    server: envValue('PDC_PERF_SERVER'),
+    workspace: envValue('PDC_PERF_WORKSPACE'),
+    document: envValue('PDC_PERF_DOCUMENT'),
+    cache: envValue('PDC_PERF_CACHE'),
   };
   for (const [key, value] of Object.entries(fromEnvironment)) {
     if (options[key] === undefined && value !== undefined) options[key] = value;
   }
-  if (options.line === undefined && envValue('PDX_PERF_LINE') !== undefined) {
-    options.line = parseNonNegativeInteger(envValue('PDX_PERF_LINE'), 'PDX_PERF_LINE');
+  if (options.line === undefined && envValue('PDC_PERF_LINE') !== undefined) {
+    options.line = parseNonNegativeInteger(envValue('PDC_PERF_LINE'), 'PDC_PERF_LINE');
   }
-  if (options.character === undefined && envValue('PDX_PERF_CHARACTER') !== undefined) {
+  if (options.character === undefined && envValue('PDC_PERF_CHARACTER') !== undefined) {
     options.character = parseNonNegativeInteger(
-      envValue('PDX_PERF_CHARACTER'),
-      'PDX_PERF_CHARACTER',
+      envValue('PDC_PERF_CHARACTER'),
+      'PDC_PERF_CHARACTER',
     );
   }
-  if (envValue('PDX_PERF_TIMEOUT_MS') !== undefined && options.timeoutMs === DEFAULT_TIMEOUT_MS) {
+  if (envValue('PDC_PERF_TIMEOUT_MS') !== undefined && options.timeoutMs === DEFAULT_TIMEOUT_MS) {
     options.timeoutMs = parsePositiveInteger(
-      envValue('PDX_PERF_TIMEOUT_MS'),
-      'PDX_PERF_TIMEOUT_MS',
+      envValue('PDC_PERF_TIMEOUT_MS'),
+      'PDC_PERF_TIMEOUT_MS',
     );
   }
   if (
-    envValue('PDX_PERF_MEMORY_INTERVAL_MS') !== undefined &&
+    envValue('PDC_PERF_MEMORY_INTERVAL_MS') !== undefined &&
     options.memoryIntervalMs === DEFAULT_MEMORY_INTERVAL_MS
   ) {
     options.memoryIntervalMs = parsePositiveInteger(
-      envValue('PDX_PERF_MEMORY_INTERVAL_MS'),
-      'PDX_PERF_MEMORY_INTERVAL_MS',
+      envValue('PDC_PERF_MEMORY_INTERVAL_MS'),
+      'PDC_PERF_MEMORY_INTERVAL_MS',
     );
   }
   if (options.noCache && options.cache !== undefined) {
-    throw new Error('--no-cache cannot be combined with PDX_PERF_CACHE/--cache');
+    throw new Error('--no-cache cannot be combined with PDC_PERF_CACHE/--cache');
   }
-  const noCacheEnvironment = envValue('PDX_PERF_NO_CACHE');
+  const noCacheEnvironment = envValue('PDC_PERF_NO_CACHE');
   if (noCacheEnvironment && /^(1|true|yes)$/i.test(noCacheEnvironment)) {
     if (options.cache !== undefined) {
-      throw new Error('--no-cache cannot be combined with PDX_PERF_CACHE');
+      throw new Error('--no-cache cannot be combined with PDC_PERF_CACHE');
     }
     options.noCache = true;
   }
@@ -256,19 +256,19 @@ function conventionalCachePath() {
   if (process.platform === 'win32') {
     const localAppData = envValue('LOCALAPPDATA');
     return localAppData
-      ? join(localAppData, 'ParadoxCode', 'cache', 'eu4', 'vanilla.pdxindex')
+      ? join(localAppData, 'ParadoxCode', 'cache', 'eu4', 'vanilla.pdcindex')
       : undefined;
   }
   const home = envValue('HOME');
   if (!home) return undefined;
   if (process.platform === 'darwin') {
-    return join(home, 'Library', 'Caches', 'ParadoxCode', 'eu4', 'vanilla.pdxindex');
+    return join(home, 'Library', 'Caches', 'ParadoxCode', 'eu4', 'vanilla.pdcindex');
   }
   return join(
     envValue('XDG_CACHE_HOME') ?? join(home, '.cache'),
     'paradoxcode',
     'eu4',
-    'vanilla.pdxindex',
+    'vanilla.pdcindex',
   );
 }
 
@@ -310,7 +310,7 @@ function cacheFromUserConfiguration(configPath) {
 function resolveVanillaCache(options) {
   if (options.noCache) return undefined;
   let configuredPath = options.cache;
-  let sourceDescription = options.cache ? 'the --cache/PDX_PERF_CACHE option' : undefined;
+  let sourceDescription = options.cache ? 'the --cache/PDC_PERF_CACHE option' : undefined;
   const configPath = userConfigurationPath();
   if (configuredPath === undefined && configPath && existsSync(configPath)) {
     configuredPath = cacheFromUserConfiguration(configPath);
@@ -325,7 +325,7 @@ function resolveVanillaCache(options) {
   }
   if (configuredPath === undefined) {
     throw new Error(
-      'Vanilla cache was not found. Pass --cache PATH (or PDX_PERF_CACHE), configure [games.eu4].vanilla_cache in the user config, or use --no-cache. The reported cache-backed numbers are not comparable without this precondition.',
+      'Vanilla cache was not found. Pass --cache PATH (or PDC_PERF_CACHE), configure [games.eu4].vanilla_cache in the user config, or use --no-cache. The reported cache-backed numbers are not comparable without this precondition.',
     );
   }
   const base = sourceDescription?.startsWith('user configuration') ? dirname(configPath) : process.cwd();
@@ -335,7 +335,7 @@ function resolveVanillaCache(options) {
 }
 
 function createFixture() {
-  const root = mkdtempSync(join(tmpdir(), 'pdx-perf-root-'));
+  const root = mkdtempSync(join(tmpdir(), 'pdc-perf-root-'));
   const events = join(root, 'events');
   mkdirSync(events, { recursive: true });
   const document = join(events, 'perf_event.txt');
@@ -386,7 +386,7 @@ function validatePosition(text, position) {
 
 function changedText(text) {
   if (text.includes('my_perf_event')) return text.replace('my_perf_event', 'my_perf_event_renamed');
-  return `${text}${text.endsWith('\n') ? '' : '\n'}# pdx-perf didChange\n`;
+  return `${text}${text.endsWith('\n') ? '' : '\n'}# pdc-perf didChange\n`;
 }
 
 function withTimeout(promise, timeoutMs, label) {
@@ -416,7 +416,7 @@ function waitForSpawn(child, timeoutMs) {
       child.once('error', onError);
     }),
     timeoutMs,
-    'pdx-ls spawn',
+    'pdc spawn',
   );
 }
 
@@ -425,7 +425,7 @@ function waitForExit(child, timeoutMs) {
   return withTimeout(
     new Promise((resolvePromise) => child.once('exit', () => resolvePromise())),
     timeoutMs,
-    'pdx-ls exit',
+    'pdc exit',
   );
 }
 
@@ -532,7 +532,7 @@ function initializeParameters(root, initializationOptions) {
   const workspaceUri = pathToFileURL(root).href;
   return {
     processId: null,
-    workspaceFolders: [{ uri: workspaceUri, name: 'pdx-perf-workspace' }],
+    workspaceFolders: [{ uri: workspaceUri, name: 'pdc-perf-workspace' }],
     capabilities: {},
     initializationOptions,
   };
@@ -541,10 +541,10 @@ function initializeParameters(root, initializationOptions) {
 async function runMeasurement(options, workspace) {
   const cache = resolveVanillaCache(options);
   const serverPath = inputPath(
-    options.server ?? join('target', 'release', process.platform === 'win32' ? 'pdx-ls.exe' : 'pdx-ls'),
+    options.server ?? join('target', 'release', process.platform === 'win32' ? 'pdc.exe' : 'pdc'),
     REPOSITORY_ROOT,
   );
-  requireFile(serverPath, 'pdx-ls executable');
+  requireFile(serverPath, 'pdc executable');
   const initializationOptions = {};
   if (cache) initializationOptions.vanillaIndexCache = cache;
   else initializationOptions.vanillaIndexCache = join(tmpdir(), NO_CACHE_NAME);

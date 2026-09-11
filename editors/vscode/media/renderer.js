@@ -1,6 +1,6 @@
 // Mission-tree canvas renderer for the ParadoxCode preview webview.
 //
-// Consumes the `pdx/missionPreview` wire contract: world-space node/group
+// Consumes the `pdc/missionPreview` wire contract: world-space node/group
 // positions, arrow glyph placements, and UTF-16 source ranges for jump-to-source,
 // mission-scoped diagnostics. All geometry is presentation-only; the server
 // owns layout semantics — including every arrow segment (the renderer maps
@@ -14,7 +14,7 @@
     const NODE_WIDTH = 104;
     const NODE_HEIGHT = 122;
 
-    // Arrow glyph world metrics, mirroring `pdx_game::eu4::mission::geometry`:
+    // Arrow glyph world metrics, mirroring `game::eu4::mission::geometry`:
     // horizontal tiles span one flush column width; vertical fallback tiles
     // span a node bottom edge to the end-offset level.
     const ARROW_TILE_HEIGHT = 20;

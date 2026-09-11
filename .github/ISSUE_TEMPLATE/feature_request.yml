@@ -13,7 +13,7 @@ body:
       label: Component
       description: Which part of the project should this affect?
       options:
-        - Language server (pdx-ls / pdx CLI)
+        - Language server (pdc)
         - Parser / HIR / analysis
         - Rules database (rules/eu4)
         - VS Code extension

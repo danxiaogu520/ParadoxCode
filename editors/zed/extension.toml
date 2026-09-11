@@ -3,7 +3,7 @@ name = "ParadoxCode - EU4 Language Tools"
 version = "0.3.2"
 schema_version = 1
 authors = ["ParadoxCode contributors"]
-description = "Independent, unofficial EU4 language tooling backed by pdx-ls."
+description = "Independent, unofficial EU4 language tooling backed by pdc."
 repository = "https://github.com/danxiaogu520/ParadoxCode"
 
 [lib]
@@ -22,6 +22,6 @@ repository = "https://github.com/danxiaogu520/ParadoxCode.git"
 rev = "f0c4d252e4bf14dd1e438338f87e6466248d9228"
 path = "grammars/tree-sitter-localisation"
 
-[language_servers.pdx-ls]
+[language_servers.pdc]
 name = "ParadoxCode Language Server"
 languages = ["Europa Universalis IV", "Localisation"]

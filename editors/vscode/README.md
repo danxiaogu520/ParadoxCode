@@ -1,7 +1,7 @@
 # ParadoxCode VS Code extension
 
 ParadoxCode provides EU4 script and Localisation diagnostics, completion, Hover, navigation, rename,
-formatting, semantic highlighting, and a live mission-tree preview backed by `pdx-ls`.
+formatting, semantic highlighting, and a live mission-tree preview backed by `pdc`.
 
 ParadoxCode is independent and unofficial. It is not affiliated with or endorsed by Paradox
 Interactive.
@@ -10,7 +10,7 @@ Interactive.
 
 Install ParadoxCode from the VS Code Marketplace, trust and open an EU4 Mod workspace, then open an
 EU4 or Localisation file. No language-server setup is required: ParadoxCode automatically downloads the matching
-`pdx-ls` release for the current platform, verifies its SHA-256 checksum, caches it in VS Code's
+`pdc` release for the current platform, verifies its SHA-256 checksum, caches it in VS Code's
 global storage, and starts it. The download happens only in a trusted workspace that activates EU4
 or Localisation support; unrelated workspaces do not start ParadoxCode.
 
@@ -18,8 +18,8 @@ After installation, VS Code's **Get Started** page includes **Start using Parado
 walkthrough covering workspace trust, Mod folder selection, the automatic server download, Vanilla
 symbols, diagnostics, and mission preview. The same guide can be reopened from **Help > Get Started**.
 
-Advanced users can set `paradoxcode.pdxLsPath` or use **ParadoxCode: Select pdx-ls Binary** for a
-local build. If automatic setup is interrupted, **ParadoxCode: Install or Update pdx-ls** retries
+Advanced users can set `paradoxcode.serverPath` or use **ParadoxCode: Select pdc Binary** for a
+local build. If automatic setup is interrupted, **ParadoxCode: Install or Update pdc** retries
 it and the output channel contains the actionable error.
 
 Use **Choose EU4 Installation / Vanilla Data** if automatic Vanilla discovery cannot find the game.
@@ -51,7 +51,7 @@ navigation, zoom controls, a mission list, and PNG/JSON export.
 ## Transparent Localisation (Chinese)
 
 Mods running the EU4dll double-byte patch store localisation as escape-tripled bytes. ParadoxCode
-ships the transcoder and opens those files as readable Chinese through the `pdxloc://` view:
+ships the transcoder and opens those files as readable Chinese through the `pdcloc://` view:
 
 - Choose **ParadoxCode: Open in Decoded (Chinese) View** on any `localisation/**/*.yml` (or a
   script file matching `paradoxcode.localisation.transparentScriptGlobs`) — you can also accept
@@ -69,11 +69,11 @@ ships the transcoder and opens those files as readable Chinese through the `pdxl
 
 Optional path, dependency, Vanilla cache, diagnostic filtering, preview, and installer settings live under
 the `paradoxcode.*` namespace. `eu4` and `localisation` are separate language IDs so their syntax
-grammars do not conflict, while both are served by the same `pdx-ls` process.
+grammars do not conflict, while both are served by the same `pdc` process.
 
 For dependencies, use the Command Palette commands **ParadoxCode: Add Dependency** and
 **ParadoxCode: Remove Dependency**. Adding a dependency opens a folder picker, suggests an ID,
-lets you choose live scanning or a persistent `.pdxindex` path, and writes the ordered list to the
+lets you choose live scanning or a persistent `.pdcindex` path, and writes the ordered list to the
 workspace `paradoxcode.dependencies` setting. New entries are appended as the highest-priority
 dependency; use **ParadoxCode: Open ParadoxCode Dependency Settings** to adjust the order or edit
 the paths directly. The generated paths are workspace-relative whenever possible.
@@ -83,13 +83,13 @@ on the next server restart; preview settings take effect immediately.
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| `paradoxcode.pdxLsPath` | `""` | Explicit `pdx-ls` executable path. |
+| `paradoxcode.serverPath` | `""` | Explicit `pdc` executable path. |
 | `paradoxcode.serverInstallDirectory` | `""` | Machine-local verified server download directory. |
 | `paradoxcode.server.installPolicy` | `"auto"` | Automatic server install policy: `auto`, `prompt`, or `never`. |
 | `paradoxcode.modDirectory` | `""` | Current Mod directory; empty uses the workspace root. |
 | `paradoxcode.dependencies` | `[]` | Ordered dependency roots (`id`, `path`, optional `index`). |
 | `paradoxcode.gameDirectory` | `""` | EU4 installation root for textures and guided Vanilla setup. |
-| `paradoxcode.vanillaIndexCache` | `""` | Persistent `.pdxindex` cache path. |
+| `paradoxcode.vanillaIndexCache` | `""` | Persistent `.pdcindex` cache path. |
 | `paradoxcode.vanilla.mode` | `"auto"` | Vanilla policy: `auto`, `cacheOnly`, or `disabled`. |
 | `paradoxcode.workspaceWideDiagnostics` | `false` | Publish diagnostics for closed Current Mod files. Off by default; opened files are always validated. |
 | `paradoxcode.backgroundReindexIntervalMinutes` | `0` | Quiet full re-scan interval; `0` disables it. |
@@ -101,7 +101,7 @@ on the next server restart; preview settings take effect immediately.
 | `paradoxcode.diagnosticLogging` | `false` | Log client-side diagnostic filtering counts. |
 | `paradoxcode.diagnostics.severityOverrides` | `{}` | Remap diagnostic codes to `error`, `warning`, `info`, `hint`, or `off`. |
 | `paradoxcode.localisation.preferredLanguages` | `[]` | Localisation language preference order. |
-| `paradoxcode.localisation.transparentEncoding` | `true` | Enable the `pdxloc://` decoded read/write view over EU4dll-transcoded files. |
+| `paradoxcode.localisation.transparentEncoding` | `true` | Enable the `pdcloc://` decoded read/write view over EU4dll-transcoded files. |
 | `paradoxcode.localisation.transparentScriptGlobs` | `["history/**"]` | Workspace-relative globs of script files eligible for the decoded view (`latin1eu4`). |
 | `paradoxcode.completion.sourceLayers` | `[currentMod, dependencies, vanilla]` | Completion layers to include; resolution priority is unchanged. |
 | `paradoxcode.performance.profile` | `"balanced"` | Bounded scan concurrency: `conservative`, `balanced`, or `fast`. |

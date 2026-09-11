@@ -1,0 +1,27 @@
+[package]
+name = "index"
+description = "Workspace symbol index, document analysis state, and the persistent .pdcindex cache for ParadoxCode."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish = false
+
+[dependencies]
+hir = { path = "../hir" }
+vfs = { path = "../vfs" }
+parser = { path = "../parser" }
+rules = { path = "../rules" }
+text = { path = "../text" }
+transcode = { path = "../transcode" }
+rustc-hash = "2"
+postcard = { version = "1.1", default-features = false, features = ["alloc"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints]
+workspace = true

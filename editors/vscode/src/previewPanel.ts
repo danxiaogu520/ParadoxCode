@@ -7,7 +7,7 @@ const PREVIEW_VIEW_TYPE = 'paradoxcode.missionPreview';
 
 const EU4_LANGUAGE_ID = 'eu4';
 
-/** Wire shape of `pdx/missionPreview` (see `pdx-lsp::requests`). */
+/** Wire shape of `pdc/missionPreview` (see `pdc::requests`). */
 export interface MissionNode {
     tree: number;
     mission: number;
@@ -20,7 +20,7 @@ export interface MissionNode {
     title: { language: string | null; value: string } | null;
     x: number;
     y: number;
-    /** UTF-16 LSP range supplied by pdx-ls. */
+    /** UTF-16 LSP range supplied by pdc. */
     sourceRange: SourceRange | null;
     isRoot: boolean;
     hasError: boolean;
@@ -250,7 +250,7 @@ function isPreviewDocument(document: vscode.TextDocument): boolean {
 }
 
 /** The logical path expected by the server, relative to the workspace root
- * (the same convention `pdx/classifyPaths` uses). */
+ * (the same convention `pdc/classifyPaths` uses). */
 function logicalPath(document: vscode.TextDocument): string | undefined {
     const workspace = vscode.workspace.getWorkspaceFolder(document.uri);
     if (!workspace) {
@@ -328,7 +328,7 @@ export class MissionPreviewPanel {
         void MissionPreviewPanel.refresh(client);
     }
 
-    /** Fetches the mission layout for the active EU4 document from pdx-ls and
+    /** Fetches the mission layout for the active EU4 document from pdc and
      * pushes it to the webview. No-ops when the panel is closed. */
     public static async refresh(client?: LanguageClient): Promise<void> {
         const panel = MissionPreviewPanel.panel;
@@ -373,7 +373,7 @@ export class MissionPreviewPanel {
         }
         try {
             const payload = (await client.sendRequest(
-                'pdx/missionPreview',
+                'pdc/missionPreview',
                 {
                     path: logical,
                     text: editor.getText(),
