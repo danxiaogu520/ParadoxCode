@@ -385,6 +385,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 name = "pdx-analysis"
 version = "0.3.2"
 dependencies = [
+ "pdx-codec",
  "pdx-engine",
  "pdx-game",
  "pdx-parser",
@@ -394,11 +395,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pdx-codec"
+version = "0.3.2"
+
+[[package]]
 name = "pdx-engine"
 version = "0.3.2"
 dependencies = [
  "encoding_rs",
  "pdx-analysis",
+ "pdx-codec",
  "pdx-game",
  "pdx-parser",
  "pdx-rules",

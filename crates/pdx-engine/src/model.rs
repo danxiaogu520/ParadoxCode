@@ -568,8 +568,13 @@ fn localisation_previews_from_parsed(parsed: &ParsedFile) -> Vec<(TextRange, Loc
                     .strip_prefix('"')
                     .and_then(|value| value.strip_suffix('"'))
                     .unwrap_or(raw);
-                let truncated = value.chars().count() > MAX_LOCALISATION_PREVIEW_CHARS;
-                let mut value = value
+                // EU4dll-transcoded values (the `replace/` release tree) store CJK as
+                // escape triples; decode before bounding so the preview shows the
+                // readable text the game renders. Readable values contain no escape
+                // markers and pass through unchanged.
+                let decoded = pdx_codec::decode_value(value);
+                let truncated = decoded.chars().count() > MAX_LOCALISATION_PREVIEW_CHARS;
+                let mut value = decoded
                     .chars()
                     .take(MAX_LOCALISATION_PREVIEW_CHARS)
                     .collect::<String>();

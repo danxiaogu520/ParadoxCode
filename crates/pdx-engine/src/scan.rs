@@ -500,13 +500,32 @@ fn sanitize_recovered_text(text: String) -> (String, bool) {
     let mut chars = text.chars().collect::<Vec<_>>();
     let mut bad = vec![false; chars.len()];
     let mut has_bad = false;
-    for (index, character) in chars.iter().copied().enumerate() {
+    let mut index = 0;
+    while index < chars.len() {
+        // EU4dll escape triples (marker U+0010..=U+0013 plus two payload characters)
+        // are intentional transcoded content, not damage: consume them whole so the
+        // preview layer can decode their values later. The escape set guarantees the
+        // payload never contains structural characters (quotes, newline, '#'), so the
+        // surrounding span analysis stays intact. An orphan marker at end of input
+        // remains flagged as damage.
+        if matches!(chars[index], '\u{0010}'..='\u{0013}') {
+            if chars.len() - index >= 3 {
+                index += 3;
+                continue;
+            }
+            bad[index] = true;
+            has_bad = true;
+            index += 1;
+            continue;
+        }
+        let character = chars[index];
         if character == '\u{fffd}'
             || (character.is_control() && !matches!(character, '\t' | '\r' | '\n'))
         {
             bad[index] = true;
             has_bad = true;
         }
+        index += 1;
     }
     if !has_bad {
         return (text, false);

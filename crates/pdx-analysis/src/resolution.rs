@@ -1068,10 +1068,27 @@ fn prefer_localisation_language_ordered(
     candidates
 }
 
-/// Resolves localisation keys to their displayed values in a single workspace
-/// pass, mirroring symbol resolution semantics: per-language variants prefer
-/// the English definition, and only keys with a non-empty active definition
-/// are returned. Keys without a definition are simply absent from the map.
+/// Picks the effective localisation definition from a candidate list sorted by
+/// priority descending then read order ascending: the highest layer wins, and
+/// within that layer the latest-read definition wins — mirroring the game's
+/// later-load override semantics (`docs/eu4-cjk-localisation-design.md` §7.2).
+/// Equal-priority runs are contiguous in the sorted list, so the last element
+/// of the leading run is the winner.
+pub(crate) fn effective_localisation_candidate(
+    candidates: &[ResolutionDefinition],
+) -> Option<&ResolutionDefinition> {
+    let highest_priority = candidates.first()?.priority;
+    candidates
+        .iter()
+        .take_while(|candidate| candidate.priority == highest_priority)
+        .last()
+}
+
+/// Resolves localisation keys to their effective displayed value — exactly one
+/// value per key: candidates are language-filtered, then the highest layer wins
+/// and within that layer the latest read order wins (the game's later-load
+/// override semantics, `docs/eu4-cjk-localisation-design.md` §7.2). Keys whose
+/// effective definition has no preview are simply absent from the map.
 ///
 /// Used by the LSP mission preview to resolve mission titles (`{id}_title`).
 /// Each key is resolved with a targeted overlay scan plus an exact index lookup
@@ -1086,14 +1103,11 @@ pub fn localisation_values_by_key<'a>(
     let mut resolved = HashMap::new();
     for &key in keys {
         cancellation.checkpoint()?;
-        let Some(definition) =
-            symbol_candidates_for_hover(snapshot, "localisation", key, cancellation)?
-                .into_iter()
-                .next()
-        else {
+        let candidates = symbol_candidates_for_hover(snapshot, "localisation", key, cancellation)?;
+        let Some(definition) = effective_localisation_candidate(&candidates) else {
             continue;
         };
-        if let Some(preview) = crate::localisation::localisation_preview(snapshot, &definition) {
+        if let Some(preview) = crate::localisation::localisation_preview(snapshot, definition) {
             resolved.insert(key.to_owned(), preview);
         }
     }

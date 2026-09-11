@@ -122,6 +122,11 @@ fn load_connection(
     {
         return Err(IndexCacheError::UnsupportedSchema(schema_version));
     }
+    // Previews are decoded by `pdx-codec`; a codec bump changes their meaning, so
+    // caches written by a different codec are rebuilt instead of mixed in.
+    if metadata_text(connection, "codec_version")?.trim() != pdx_codec::CODEC_VERSION.to_string() {
+        return Err(IndexCacheError::UnsupportedSchema(schema_version));
+    }
     let table_counts = validate_table_limits(connection)?;
     // Every loaded row plus the derived cross-table validation work: the known-range set
     // holds one entry per definition and reference, and every navigation position and

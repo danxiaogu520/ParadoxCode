@@ -559,7 +559,9 @@ pub(crate) fn localisation_preview(
         .strip_prefix('"')
         .and_then(|value| value.strip_suffix('"'))
         .unwrap_or(raw);
-    let value = truncate_hover_text(value);
+    // Mirror the engine preview derivation: transcoded (escaped) values decode to
+    // the readable text the game renders; readable values pass through unchanged.
+    let value = truncate_hover_text(&pdx_codec::decode_value(value));
     if value.is_empty() {
         return None;
     }
@@ -581,30 +583,44 @@ pub(crate) fn localisation_preview(
 }
 
 /// Finds every language a localisation key resolves to, one preview per
-/// language in candidate order (first definition per language wins). The
-/// hover renders them in parallel instead of the historical first-found
-/// value.
+/// language. Candidates arrive sorted by priority descending then read order
+/// ascending, so per language the effective value is the *latest* definition
+/// of the highest layer — the game's later-load override semantics
+/// (`docs/eu4-cjk-localisation-design.md` §7.2). The hover renders the
+/// languages in parallel instead of a single first-found value.
 pub(crate) fn localisation_previews_for_name(
     snapshot: &AnalysisSnapshot,
     name: &str,
     cancellation: &CancellationToken,
 ) -> Result<Vec<(Option<String>, String)>, Cancelled> {
-    let mut previews = Vec::new();
+    let mut previews: Vec<(Option<String>, String)> = Vec::new();
+    let mut priorities: Vec<u64> = Vec::new();
     for candidate in symbol_candidates_for_hover(snapshot, "localisation", name, cancellation)? {
-        if let Some(preview) = localisation_preview(snapshot, &candidate)
-            && !preview.1.is_empty()
-            && !previews
-                .iter()
-                .any(|(language, _): &(Option<String>, String)| {
-                    language.as_deref().is_some_and(|known| {
-                        preview
-                            .0
-                            .as_deref()
-                            .is_some_and(|current| known.eq_ignore_ascii_case(current))
-                    })
-                })
-        {
-            previews.push(preview);
+        let Some(preview) = localisation_preview(snapshot, &candidate) else {
+            continue;
+        };
+        if preview.1.is_empty() {
+            continue;
+        }
+        let claimed = previews.iter().position(|(language, _)| {
+            language.as_deref().is_some_and(|known| {
+                preview
+                    .0
+                    .as_deref()
+                    .is_some_and(|current| known.eq_ignore_ascii_case(current))
+            })
+        });
+        match claimed {
+            // Same layer, later read order: the successor overrides the pick.
+            Some(index) if candidate.priority == priorities[index] => {
+                previews[index] = preview;
+            }
+            // Lower layer or an unseen language: keep the existing pick / append.
+            Some(_) => {}
+            None => {
+                previews.push(preview);
+                priorities.push(candidate.priority);
+            }
         }
     }
     Ok(previews)
