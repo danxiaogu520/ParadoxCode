@@ -7,16 +7,37 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-11
+
+This release reworks hover into a first-class presentation surface, deepens dynamic-definition
+analysis so completion, hover, and diagnostics replay one shared per-site derivation, and
+rebuilds the EU4 variable model and modifier data from wiki and vanilla evidence. Steady-state
+diagnostics latency on large workspaces drops to under a second.
+
 ### Added
 
-- Four vanilla constructs recorded in the patchnotes' Usermodding sections now
-  validate: the `militarized_society` trigger (int, country) used by 12 vanilla
-  files, the `add_militarised_society` (float, country) and `back_current_issue`
-  (bool, province) effects, and the 1.37 state-edict on_action hooks
-  `on_state_edict_enacted`/`on_state_edict_revoked` (root-keys 256→258 with
-  root=province, from=country scope registers). The revoked hook uses the
-  vanilla name; the patchnote's `on_state_edict_removed` spelling is not
-  shipped. Vanilla diagnostics are unchanged (1320/48/1063).
+- Dynamic-definition completion round: candidate lists filter by the inferred entry-scope
+  contract, key-rendered parameters complete their commands or derive candidates from rule keys
+  matching their literal affixes, and editing a scripted definition's body seeds the completion
+  scope from its own contract when that contract pins a single concrete scope.
+- Hover rework: titles follow the symbol-hover pattern (`### Trigger `is_part_of_hre``, `###
+  Modifier `x``), an ambient `#### Scope` table shows the active here/root/prev/from registers
+  and scope transitions, localisation previews render every language in parallel (capped at four
+  plus a count) including generated event `.t` titles, `$NAME$` fragments inside localisation
+  values resolve as nested keys, scripted localisation, or context placeholders, and
+  ambiguous-symbol candidate lists carry line/column positions.
+- Rule-data documentation backfill from the EU4 wiki and repository semantics: 148 trigger/effect
+  keys, 515 modifier keys, and the definition-body fields of events, decisions, missions, and
+  the shared structural fields.
+- Typed entry keys: `luck` entries are country tags and `government_ranks` entries are rank
+  numbers 1-10. Unknown keys are reported with the expected type, and completion in the root gap
+  offers workspace country tags.
+- First-party EU4 rule-data corrections: four constructs from the patchnotes' Usermodding
+  sections (`militarized_society`, `add_militarised_society`, `back_current_issue`, and the 1.37
+  state-edict on_action hooks), the `hussars_cavalry` province effect rows, and the wiki-audit
+  arbitration: nine missing modifiers, estate privilege templates, renames to wiki spellings,
+  corpus-tightened bool/float keys, trigger/effect shape corrections (`is_discounted`,
+  `num_of_musketeers`, ...), and `mean_time_to_happen` cardinality fixes.
 
 ### Changed
 
@@ -28,8 +49,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   — mods see exactly the attributes they (or vanilla: 149 distinct keys)
   define. The 52 wiki-only spellings that vanilla never defines leave
   completion; legacy flat reform flags keep passing through the any_scalar
-  row. Vanilla diagnostics are unchanged (1320/48/1063, per-diagnostic diff
-  empty).
+  row.
+- Dynamic-parameter constraints are derived once per revision as replayable per-site rows
+  consumed by completion, hover, and diagnostics, so the three surfaces can no longer drift.
+  Quoted payloads validate at their real render-site context and scope - including
+  `limit`-style structural sub-blocks and blocks whose key is itself rendered from a
+  parameter - and parameters embedded between literal affixes constrain their bare argument by
+  splicing.
+- Whole-workspace diagnostics now default to off on the server as well, matching the published
+  VS Code default; the explicit validateWorkspace command keeps its opt-in semantics.
+- Steady-state diagnostics latency: the dynamic cycle-graph report is skipped for files that
+  define no dynamic definitions and its call-site binding collection is cached across keystroke
+  revisions, and the index query cache survives overlay parse commits. Edit-to-publish latency
+  on the 7,907-file test mod drops from ~3.0s to 0.4-0.7s per file.
+- HIR scope lowering merges inherited rule contexts, so scope inlay hints, typed references,
+  and transitions see the effect vocabulary inside country and province history and on_action
+  bodies; one vanilla false positive about event-modifier names in on_action bodies is gone.
 
 ### Fixed
 
@@ -47,7 +82,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   through the dynamic-value prefix bypass). The four sibling variable effects
   (`set_variable` and friends) stay literal-plus-variable only: the wiki documents
   `trigger_value:` exclusively for `export_to_variable`, and vanilla uses it there
-  and nowhere else. Vanilla diagnostics are unchanged (1320/48/1063).
+  and nowhere else.
 - The wiki's Variables page is now fully covered: the four arithmetic effects
   `round_variable` (new in 1.37), `sqrt_variable`, `random_variable`, and
   `modulo_variable` validate in their documented shapes (including the second
@@ -56,7 +91,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   spellings (`war_exhaustion`, `base_tax`, `monarch_age`, …) that previously
   flagged as invalid now validate, while the undocumented `ruler_adm`/`ruler_age`/
   `ruler_dip`/`ruler_mil` variants are rejected in favour of `ADM`/`DIP`/`MIL`
-  and `monarch_age`. Vanilla diagnostics are unchanged (1320/48/1063).
+  and `monarch_age`.
 - The remaining imported whitelist patches around the variable model are gone,
   replaced by principled rows. The arithmetic siblings (`multiply_variable`,
   `divide_variable`, `subtract_variable`, `change_variable`) now accept
@@ -70,7 +105,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `check_variable` `which` enum fallback and the two dead `modifier:` export
   rows were dropped alongside the `variable_name` enum they referenced — the
   dynamic variable set and the dynamic-value prefix bypass already cover every
-  vanilla site. Vanilla diagnostics are unchanged (1320/48/1063).
+  vanilla site.
+- Completion offers statement keys again after a complete single-line block statement
+  instead of yielding zero items.
+- Nested blocks in contexts that inherit their rules (for example `if` inside country
+  history) complete the full inherited vocabulary again instead of only clause keys.
+- Scalar invocation (`name = yes`) of a definition whose parameters are all optional is
+  accepted as its parameterless form.
+- The hover-compare harness scripts fail loudly when an explicit `--server` path does not
+  resolve instead of silently falling back to a stale build.
 
 ## [0.3.1] - 2026-09-05
 
@@ -352,7 +395,9 @@ Initial alpha release of the game-neutral `pdx-lsp` engine with an EU4-first pro
 - Fuzz targets for script/localisation parsing, incremental edits, typed CST walks, HIR lowering,
   formatting, line indexing, and first-party rule parsing.
 
-[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/danxiaogu520/ParadoxCode/compare/v0.1.3...v0.1.4
