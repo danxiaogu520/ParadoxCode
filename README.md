@@ -95,13 +95,14 @@ that send only the deprecated `rootUri` field are intentionally unsupported and 
 
 ## Project status
 
-**Latest release: v0.3.1** (5 Sep 2026). The EU4 analysis and indexing features are implemented,
+**Latest release: v0.3.2** (11 Sep 2026). The EU4 analysis and indexing features are implemented,
 tested, and released through the tag-driven release pipeline (see [Releases](#releases)). This
-release rebuilds the diagnostic system around a 16-code table: messages describe the script with
-`expected:` constraints and did-you-mean quick fixes, findings underline the exact offending
-token, duplicate definitions resolve later-wins with a related location, and mission trees
-validate dependencies in the main pipeline. Early adopters should still expect rough edges while
-0.x matures; please report problems through the issue templates so they can be fixed in the next
+release reworks hover into a first-class presentation surface (category titles, scope tables,
+parallel multi-language localisation previews), shares one per-site dynamic-parameter derivation
+across completion, hover, and diagnostics, rebuilds the EU4 variable model and modifier data from
+wiki and vanilla evidence, and cuts steady-state diagnostics latency on large workspaces to under
+a second. Early adopters should still expect rough edges while 0.x matures; please report problems
+through the issue templates so they can be fixed in the next
 release.
 
 Known limitations of the current scope:
