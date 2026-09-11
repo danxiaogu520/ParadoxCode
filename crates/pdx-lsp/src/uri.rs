@@ -1,11 +1,19 @@
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-/// Converts a `file://` URI to a filesystem path.
+/// Converts a `file://` or `pdxloc://` URI to a filesystem path.
+///
+/// `pdxloc://` is the extension's transparent localisation view
+/// (`docs/eu4-cjk-localisation-design.md` §4): the URI is a `file://` URI with
+/// the scheme swapped, so the path is the real on-disk file and a virtual
+/// document opened under this scheme attaches to (and hides) the backing file
+/// while showing the decoded text the client syncs.
 pub fn uri_to_path(uri: &str) -> Result<PathBuf, UriError> {
     let rest = uri
         .strip_prefix("file://")
         .or_else(|| uri.strip_prefix("FILE://"))
+        .or_else(|| uri.strip_prefix("pdxloc://"))
+        .or_else(|| uri.strip_prefix("PDXLOC://"))
         .ok_or(UriError::UnsupportedScheme)?;
     let rest = rest.split(['?', '#']).next().unwrap_or(rest);
     let (authority, encoded_path) = if rest.starts_with('/') {

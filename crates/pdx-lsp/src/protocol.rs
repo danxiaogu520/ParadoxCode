@@ -746,7 +746,12 @@ pub(crate) fn request_id_from_lsp(id: NumberOrString) -> RequestId {
 }
 
 pub(crate) fn parse_file_uri_str(uri: &str) -> Result<PathBuf, RpcError> {
-    uri_to_path(uri).map_err(|_| RpcError::new(INVALID_PARAMS, "only file:// URIs are supported"))
+    uri_to_path(uri).map_err(|_| {
+        RpcError::new(
+            INVALID_PARAMS,
+            "only file:// and pdxloc:// URIs are supported",
+        )
+    })
 }
 
 impl RpcError {

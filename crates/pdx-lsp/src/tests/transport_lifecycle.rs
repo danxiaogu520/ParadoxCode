@@ -67,6 +67,40 @@ fn uri_round_trip_preserves_unicode_and_spaces() {
     assert_eq!(uri_to_path(&uri).expect("URI should decode"), path);
 }
 
+/// `pdxloc://` is the extension's decoded view over a real file: the path
+/// must resolve to the same on-disk location the `file://` spelling does, so
+/// a virtually opened document attaches to (and hides) its backing file.
+#[test]
+fn pdxloc_uris_resolve_to_the_backing_file_path() {
+    assert_eq!(
+        uri_to_path("pdxloc:///C:/mods/edg/localisation/replace/edg_l_english.yml")
+            .expect("pdxloc URI should decode"),
+        std::path::PathBuf::from("C:/mods/edg/localisation/replace/edg_l_english.yml")
+    );
+    assert_eq!(
+        uri_to_path("pdxloc://localhost/C:/mods/edg/history/countries/CHI%20-%20Ming.txt")
+            .expect("pdxloc URI with localhost authority should decode"),
+        std::path::PathBuf::from("C:/mods/edg/history/countries/CHI - Ming.txt")
+    );
+    assert_eq!(
+        uri_to_path(&format!(
+            "pdxloc://{}",
+            path_to_uri(std::path::Path::new("/tmp/edg/localisation/x.yml"))
+                .trim_start_matches("file://")
+        ))
+        .expect("scheme-swapped file URI should decode"),
+        // The Windows branch of `uri_to_path` drops the leading `/` of a
+        // POSIX-style path just like it does for `file://` URIs.
+        std::path::PathBuf::from(if cfg!(windows) {
+            "tmp/edg/localisation/x.yml"
+        } else {
+            "/tmp/edg/localisation/x.yml"
+        })
+    );
+    assert!(uri_to_path("pdxloc://remote/share/file.yml").is_err());
+    assert!(uri_to_path("untitled:Untitled-1").is_err());
+}
+
 #[cfg(windows)]
 #[test]
 fn windows_file_uri_normalizes_extended_canonical_paths() {
